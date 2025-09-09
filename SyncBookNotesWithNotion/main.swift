@@ -8,6 +8,9 @@
 import Foundation
 import SQLite3
 
+// Bridge C macro SQLITE_TRANSIENT for Swift
+private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 // MARK: - Types
 
 struct Highlight: Codable {
@@ -174,7 +177,8 @@ func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow] {
     }
     defer { finalize(stmt) }
     for (i, id) in assetIds.enumerated() {
-        sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
+        let ns = id as NSString
+        sqlite3_bind_text(stmt, Int32(i + 1), ns.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
     var rows: [BookRow] = []
     while sqlite3_step(stmt) == SQLITE_ROW {

@@ -16,16 +16,16 @@
   - `sample`：示例输出前 N 条（`--limit`）。
   - `--db-root`：可选覆盖根路径，默认自动探测。
   - 全局：`--pretty`、`--overwrite`、`--progress`、`--quiet`、`--verbose`。
-- [ ] **数据库路径自动探测**：
+- [x] **数据库路径自动探测**：
   - `~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite`
   - `~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/*.sqlite`
   - 若存在多个 `.sqlite`，选择最新修改时间；均不存在则输出可诊断错误与建议。
   - 若只读打开失败或 DB 被占用：复制到临时目录只读打开（可选 `immutable=1`）。
-- [ ] **最小查询跑通**（与参考插件一致）：
+- [x] **最小查询跑通**（与参考插件一致）：
   - 从 `ZAEANNOTATION` 读取：`ZANNOTATIONASSETID`、`ZANNOTATIONUUID`、`ZANNOTATIONSELECTEDTEXT`（过滤删除/空文本）。
   - 从 `ZBKLIBRARYASSET` 读取：`ZASSETID`、`ZAUTHOR`、`ZTITLE`。
   - 合并为内存模型：`Book{assetId,title,author,ibooksURL}`、`Highlight{uuid,text}`。
-- [ ] **基础导出**：按书聚合导出 JSON；校验编码与换行处理。
+- [x] **基础导出**：按书聚合导出 JSON；校验编码与换行处理。
   - 规范化文本：去除首尾空白，保留段内换行；过滤全空白行。
   - 文件名清洗：移除/替换非法字符，避免覆盖；支持 `--overwrite`。
   - JSON 输出：默认 UTF-8，支持 `--pretty`。
