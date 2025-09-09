@@ -38,12 +38,16 @@ enum ExitCode: Int32 {
 // MARK: - CLI Arguments
 
 struct CLIOptions {
-    enum Command: String { case inspect, export }
+    enum Command: String { case inspect, export, list }
 
     var command: Command = .export
     var dbRootOverride: String?
     var outPath: String?
     var pretty: Bool = false
+    // Filters
+    var bookFilters: [String] = []
+    var authorFilters: [String] = []
+    var assetFilters: [String] = []
 }
 
 func parseArguments(_ args: [String]) -> CLIOptions {
@@ -62,6 +66,12 @@ func parseArguments(_ args: [String]) -> CLIOptions {
             if index + 1 < args.count { options.outPath = args[index + 1]; index += 2 } else { index += 1 }
         case "--pretty":
             options.pretty = true; index += 1
+        case "--book":
+            if index + 1 < args.count { options.bookFilters.append(args[index + 1]); index += 2 } else { index += 1 }
+        case "--author":
+            if index + 1 < args.count { options.authorFilters.append(args[index + 1]); index += 2 } else { index += 1 }
+        case "--asset":
+            if index + 1 < args.count { options.assetFilters.append(args[index + 1]); index += 2 } else { index += 1 }
         default:
             // Ignore unknown for M0 to keep零依赖
             index += 1
@@ -148,6 +158,24 @@ func close(_ db: OpaquePointer?) {
 struct HighlightRow { let assetId: String; let uuid: String; let text: String }
 struct BookRow { let assetId: String; let author: String; let title: String }
 
+struct Filters { let bookSubstrings: [String]; let authorSubstrings: [String]; let assetIds: [String] }
+
+func matches(book: BookRow, filters: Filters) -> Bool {
+    // asset filter (exact) if provided
+    if !filters.assetIds.isEmpty && !filters.assetIds.contains(book.assetId) { return false }
+    // title substring OR logic
+    if !filters.bookSubstrings.isEmpty {
+        let t = book.title.lowercased()
+        if !filters.bookSubstrings.contains(where: { t.contains($0.lowercased()) }) { return false }
+    }
+    // author substring OR logic
+    if !filters.authorSubstrings.isEmpty {
+        let a = book.author.lowercased()
+        if !filters.authorSubstrings.contains(where: { a.contains($0.lowercased()) }) { return false }
+    }
+    return true
+}
+
 func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
     let sql = "SELECT ZANNOTATIONASSETID,ZANNOTATIONUUID,ZANNOTATIONSELECTEDTEXT FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
     var stmt: OpaquePointer?
@@ -190,7 +218,7 @@ func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow] {
 
 // MARK: - Export
 
-func buildExport(annotations: [HighlightRow], books: [BookRow]) -> [BookExport] {
+func buildExport(annotations: [HighlightRow], books: [BookRow], filters: Filters?) -> [BookExport] {
     var highlightsByAsset: [String: [Highlight]] = [:]
     for row in annotations {
         highlightsByAsset[row.assetId, default: []].append(Highlight(uuid: row.uuid, text: row.text))
@@ -200,6 +228,7 @@ func buildExport(annotations: [HighlightRow], books: [BookRow]) -> [BookExport] 
     var result: [BookExport] = []
     for (assetId, hs) in highlightsByAsset {
         guard let b = booksIndex[assetId] else { continue }
+        if let f = filters, !matches(book: b, filters: f) { continue }
         result.append(BookExport(bookId: assetId, authorName: b.author, bookTitle: b.title, ibooksURL: "ibooks://assetid/\(assetId)", highlights: hs))
     }
     return result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
@@ -282,11 +311,50 @@ func main() -> ExitCode {
             let annotations = try fetchAnnotations(db: adbH)
             let assetIds = Array(Set(annotations.map { $0.assetId })).sorted()
             let books = try fetchBooks(db: bdbH, assetIds: assetIds)
-            let exportData = buildExport(annotations: annotations, books: books)
+            let filters = Filters(bookSubstrings: options.bookFilters, authorSubstrings: options.authorFilters, assetIds: options.assetFilters)
+            let exportData = buildExport(annotations: annotations, books: books, filters: filters)
+            if exportData.isEmpty {
+                fputs("No books matched filters.\n", stderr)
+            }
             try writeJSON(exportData, to: options.outPath, pretty: options.pretty)
             return .success
         } catch {
             fputs("export failed: \(error)\n", stderr)
+            return .queryFailed
+        }
+    case .list:
+        guard let adb = annotationDB else {
+            fputs("Annotation DB not found under \(annotationDir)\n", stderr)
+            return .dbOpenFailed
+        }
+        guard let bdb = booksDB else {
+            fputs("Books DB not found under \(booksDir)\n", stderr)
+            return .dbOpenFailed
+        }
+        let adbPath = ensureTempCopyIfLocked(originalPath: adb)
+        let bdbPath = ensureTempCopyIfLocked(originalPath: bdb)
+        do {
+            let adbH = try openReadOnlyDatabase(dbPath: adbPath)
+            defer { close(adbH) }
+            let bdbH = try openReadOnlyDatabase(dbPath: bdbPath)
+            defer { close(bdbH) }
+            let annotations = try fetchAnnotations(db: adbH)
+            let assetIds = Array(Set(annotations.map { $0.assetId })).sorted()
+            let books = try fetchBooks(db: bdbH, assetIds: assetIds)
+            let filters = Filters(bookSubstrings: options.bookFilters, authorSubstrings: options.authorFilters, assetIds: options.assetFilters)
+            // count highlights by asset
+            var cnt: [String: Int] = [:]
+            for a in annotations { cnt[a.assetId, default: 0] += 1 }
+            // print filtered list
+            let filteredBooks = books.filter { matches(book: $0, filters: filters) }
+            for b in filteredBooks.sorted(by: { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }) {
+                let c = cnt[b.assetId] ?? 0
+                print("\(b.assetId)\t\(c)\t\(b.title)\t\(b.author)")
+            }
+            if filteredBooks.isEmpty { fputs("No books matched filters.\n", stderr) }
+            return .success
+        } catch {
+            fputs("list failed: \(error)\n", stderr)
             return .queryFailed
         }
     }
