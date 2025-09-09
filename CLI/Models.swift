@@ -42,7 +42,7 @@ struct Filters {
 
 // MARK: - Exit Codes
 
-enum ExitCode: Int32 {
+public enum ExitCode: Int32 {
     case success = 0
     case argumentError = 2
     case dbOpenFailed = 10
