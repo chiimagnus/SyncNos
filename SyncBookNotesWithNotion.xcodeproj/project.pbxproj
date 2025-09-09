@@ -19,13 +19,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		D81167BC2E70A140000D0173 /* SyncBookNotesWithNotion */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SyncBookNotesWithNotion; sourceTree = BUILT_PRODUCTS_DIR; };
+		D81167BC2E70A140000D0173 /* CLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CLI; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D81167BE2E70A140000D0173 /* SyncBookNotesWithNotion */ = {
+		D81167BE2E70A140000D0173 /* CLI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SyncBookNotesWithNotion;
+			path = CLI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -44,7 +44,7 @@
 		D81167B32E70A13F000D0173 = {
 			isa = PBXGroup;
 			children = (
-				D81167BE2E70A140000D0173 /* SyncBookNotesWithNotion */,
+				D81167BE2E70A140000D0173 /* CLI */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,7 +52,7 @@
 		D81167BD2E70A140000D0173 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D81167BC2E70A140000D0173 /* SyncBookNotesWithNotion */,
+				D81167BC2E70A140000D0173 /* CLI */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -60,9 +60,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D81167BB2E70A13F000D0173 /* SyncBookNotesWithNotion */ = {
+		D81167BB2E70A13F000D0173 /* CLI */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "SyncBookNotesWithNotion" */;
+			buildConfigurationList = D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "CLI" */;
 			buildPhases = (
 				D81167B82E70A13F000D0173 /* Sources */,
 				D81167B92E70A13F000D0173 /* Frameworks */,
@@ -73,13 +73,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D81167BE2E70A140000D0173 /* SyncBookNotesWithNotion */,
+				D81167BE2E70A140000D0173 /* CLI */,
 			);
-			name = SyncBookNotesWithNotion;
+			name = CLI;
 			packageProductDependencies = (
 			);
 			productName = SyncBookNotesWithNotion;
-			productReference = D81167BC2E70A140000D0173 /* SyncBookNotesWithNotion */;
+			productReference = D81167BC2E70A140000D0173 /* CLI */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -111,7 +111,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D81167BB2E70A13F000D0173 /* SyncBookNotesWithNotion */,
+				D81167BB2E70A13F000D0173 /* CLI */,
 			);
 		};
 /* End PBXProject section */
@@ -281,7 +281,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "SyncBookNotesWithNotion" */ = {
+		D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "CLI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D81167C42E70A140000D0173 /* Debug */,
