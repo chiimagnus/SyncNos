@@ -9,21 +9,26 @@
 #### M0：工程初始化与最小可运行（能读到基础字段）
 - [ ] **初始化 SwiftPM CLI 工程**（macOS 14+，Swift 6.1）。
   - 二进制名暂定：`syncbooknotes`。
-  - 依赖：优先使用 `GRDB`（易用与稳定）或原生 `SQLite3`（零依赖），择一实现；后续可抽象存储层以便切换。
+  - 依赖：加入 `swift-argument-parser`；数据库优先原生 `SQLite3`（零依赖，M0），`GRDB` 可在后续里程碑切换；抽象存储层以便替换。
 - [ ] **命令结构**（采用 `swift-argument-parser` 或自建轻量解析）：
   - `inspect`：打印 Apple Books 数据库位置、表清单、记录统计。
   - `export`：导出数据（默认 JSON），支持 `--format json|jsonl|csv|md`、`--out <path>`。
   - `sample`：示例输出前 N 条（`--limit`）。
   - `--db-root`：可选覆盖根路径，默认自动探测。
+  - 全局：`--pretty`、`--overwrite`、`--progress`、`--quiet`、`--verbose`。
 - [ ] **数据库路径自动探测**：
   - `~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite`
   - `~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/*.sqlite`
   - 若存在多个 `.sqlite`，选择最新修改时间；均不存在则输出可诊断错误与建议。
+  - 若只读打开失败或 DB 被占用：复制到临时目录只读打开（可选 `immutable=1`）。
 - [ ] **最小查询跑通**（与参考插件一致）：
   - 从 `ZAEANNOTATION` 读取：`ZANNOTATIONASSETID`、`ZANNOTATIONUUID`、`ZANNOTATIONSELECTEDTEXT`（过滤删除/空文本）。
   - 从 `ZBKLIBRARYASSET` 读取：`ZASSETID`、`ZAUTHOR`、`ZTITLE`。
   - 合并为内存模型：`Book{assetId,title,author,ibooksURL}`、`Highlight{uuid,text}`。
 - [ ] **基础导出**：按书聚合导出 JSON；校验编码与换行处理。
+  - 规范化文本：去除首尾空白，保留段内换行；过滤全空白行。
+  - 文件名清洗：移除/替换非法字符，避免覆盖；支持 `--overwrite`。
+  - JSON 输出：默认 UTF-8，支持 `--pretty`。
 
 验收（M0）：可运行 `inspect` 与 `export`，导出包含（书名/作者/AssetID/UUID/文本）的 JSON 文件。
 
@@ -35,8 +40,8 @@
   - 文本：`ZANNOTATIONSELECTEDTEXT`
   - 批注/笔记：常见列如 `ZANNOTATIONNOTE`/`ZANNOTATIONTEXT`（以探测为准）
   - 颜色/样式：如 `ZANNOTATIONSTYLE`/`ZANNOTATIONSTYLINGCOLOR`（值→颜色名称映射）
-  - 创建/修改时间：如 `ZANNOTATIONDATEADDED`/`ZANNOTATIONMODIFIED`（需时间戳→ISO8601）
-  - 位置信息：章节名/索引、页码、spine/anchor/cfi/range start-end（可能为数值、字符串或 BLOB）
+  - 创建/修改时间：如 `ZANNOTATIONDATEADDED`/`ZANNOTATIONMODIFIED`（CoreFoundation 2001 epoch → ISO8601，含时区）
+  - 位置信息：章节名/索引、页码、spine/anchor/cfi/range start-end（常见列如 `ZANNOTATIONLOCATION`/`ZRANGESTART`/`ZRANGEEND`，可能为数值、字符串或 BLOB）
   - 关联键：`ZANNOTATIONUUID`、`ZANNOTATIONASSETID`（用于关联书籍）
 - [ ] **BLOB/归档字段解析（可选但重要）**：
   - 若位置/样式等以 `NSKeyedArchiver` 或二进制 Plist 形式存储，尝试用 `PropertyListSerialization`/开源解码实现还原主要键值。
@@ -100,5 +105,3 @@
 - [ ] `inspect` 能列出数据库路径、表/列、记录数量、缺失列提示。
 - [ ] `export` 能导出 JSON/JSONL/CSV/Markdown，字段覆盖面达到上述优先级 1-6，多版本兼容。
 - [ ] 在包含上千条高亮的库上运行稳定，错误可定位，导出可被下游工具直接消费。
-
-
