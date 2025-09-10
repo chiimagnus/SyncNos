@@ -106,8 +106,14 @@ struct BookDetailView: View {
                                 
                                 // Add link to open highlight in Apple Books
                                 Button("在Apple Books中打开") {
-                                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(highlight.uuid)")!
-                                    NSWorkspace.shared.open(url)
+                                    if let location = highlight.location {
+                                        let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
+                                        NSWorkspace.shared.open(url)
+                                    } else {
+                                        // Fallback to book level if no location info
+                                        let url = URL(string: "ibooks://assetid/\(book.bookId)")!
+                                        NSWorkspace.shared.open(url)
+                                    }
                                 }
                                 .font(.caption)
                                 .foregroundColor(.blue)
@@ -169,8 +175,8 @@ struct BookDetailView_Previews: PreviewProvider {
             bookTitle: "Sample Book Title",
             ibooksURL: "ibooks://assetid/sample-id",
             highlights: [
-                Highlight(uuid: "highlight-1", text: "This is a sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil),
-                Highlight(uuid: "highlight-2", text: "This is another sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil)
+                Highlight(uuid: "highlight-1", text: "This is a sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil),
+                Highlight(uuid: "highlight-2", text: "This is another sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil)
             ]
         )
         
