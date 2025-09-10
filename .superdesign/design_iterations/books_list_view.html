@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Books with Highlights</title>
+    <link rel="stylesheet" href="macos_app_theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        body {
+            background-color: var(--background);
+            color: var(--foreground);
+            font-family: var(--font-sans);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .search-box {
+            position: relative;
+        }
+        
+        .search-box input {
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            width: 240px;
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted-foreground);
+        }
+        
+        .btn {
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+            border-radius: var(--radius);
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: var(--secondary-foreground);
+        }
+        
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .book-card {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .book-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        
+        .book-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            flex: 1;
+        }
+        
+        .highlight-count {
+            background-color: var(--accent);
+            color: var(--accent-foreground);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .book-author {
+            color: var(--muted-foreground);
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+        }
+        
+        .book-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+        }
+        
+        .action-icon {
+            color: var(--muted-foreground);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .action-icon:hover {
+            background-color: var(--secondary);
+            color: var(--foreground);
+        }
+        
+        @media (max-width: 768px) {
+            .books-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .search-box input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Books with Highlights (24)</h1>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search books...">
+                </div>
+                <button class="btn">
+                    <i class="fas fa-file-export"></i> Export All
+                </button>
+            </div>
+        </div>
+        
+        <div class="books-grid">
+            <!-- Book 1 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">The Design of Everyday Things</h2>
+                    <div class="highlight-count">12</div>
+                </div>
+                <div class="book-author">Don Norman</div>
+                <div class="book-meta">
+                    <span>Last annotated: 2 days ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+            
+            <!-- Book 2 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">Atomic Habits</h2>
+                    <div class="highlight-count">8</div>
+                </div>
+                <div class="book-author">James Clear</div>
+                <div class="book-meta">
+                    <span>Last annotated: 1 week ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+            
+            <!-- Book 3 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">Thinking, Fast and Slow</h2>
+                    <div class="highlight-count">15</div>
+                </div>
+                <div class="book-author">Daniel Kahneman</div>
+                <div class="book-meta">
+                    <span>Last annotated: 3 days ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+            
+            <!-- Book 4 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">The Psychology of Human-Computer Interaction</h2>
+                    <div class="highlight-count">7</div>
+                </div>
+                <div class="book-author">Stephen Kearsley</div>
+                <div class="book-meta">
+                    <span>Last annotated: 5 days ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+            
+            <!-- Book 5 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">Don't Make Me Think</h2>
+                    <div class="highlight-count">9</div>
+                </div>
+                <div class="book-author">Steve Krug</div>
+                <div class="book-meta">
+                    <span>Last annotated: 1 day ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+            
+            <!-- Book 6 -->
+            <div class="book-card">
+                <div class="book-header">
+                    <h2 class="book-title">The Innovator's Dilemma</h2>
+                    <div class="highlight-count">11</div>
+                </div>
+                <div class="book-author">Clayton Christensen</div>
+                <div class="book-meta">
+                    <span>Last annotated: 2 weeks ago</span>
+                    <i class="fas fa-external-link-alt action-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
