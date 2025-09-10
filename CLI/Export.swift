@@ -12,7 +12,7 @@ import Foundation
 func buildExport(annotations: [HighlightRow], books: [BookRow], filters: Filters?) -> [BookExport] {
     var highlightsByAsset: [String: [Highlight]] = [:]
     for row in annotations {
-        highlightsByAsset[row.assetId, default: []].append(Highlight(uuid: row.uuid, text: row.text, note: row.note, style: row.style, stylingColor: row.stylingColor, dateAdded: row.dateAdded, modified: row.modified, location: row.location, rangeStart: row.rangeStart, rangeEnd: row.rangeEnd))
+        highlightsByAsset[row.assetId, default: []].append(Highlight(uuid: row.uuid, text: row.text, note: row.note, style: row.style, dateAdded: row.dateAdded, modified: row.modified, location: row.location, rangeStart: row.rangeStart, rangeEnd: row.rangeEnd))
     }
     var booksIndex: [String: BookRow] = [:]
     for b in books { 

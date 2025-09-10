@@ -134,7 +134,7 @@ class DatabaseQueryService {
                 }
             }
             
-            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, stylingColor: nil, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
+            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
             count += 1
         }
         sqlite3_finalize(stmt)
