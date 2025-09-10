@@ -51,6 +51,10 @@ struct BookDetailView: View {
         }
     }
     
+    private static var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 280), spacing: 12, alignment: .top)]
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -77,101 +81,114 @@ struct BookDetailView: View {
                 .cornerRadius(8)
                 
                 // Highlights section
-                VStack(alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: Self.gridColumns, spacing: 12) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                // Display highlight style/color indicator
-                                if let style = highlight.style {
-                                    Text(Self.highlightStyleText(for: style))
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Self.highlightStyleColor(for: style))
-                                        .cornerRadius(4)
-                                }
-                                
-                                Text("高亮笔记")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                // Add link to open highlight in Apple Books
-                                Button("在Apple Books中打开") {
-                                    if let location = highlight.location {
-                                        let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
-                                        NSWorkspace.shared.open(url)
-                                    } else {
-                                        // Fallback to book level if no location info
-                                        let url = URL(string: "ibooks://assetid/\(book.bookId)")!
-                                        NSWorkspace.shared.open(url)
+                        // Card
+                        ZStack(alignment: .topTrailing) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    if let style = highlight.style {
+                                        Text(Self.highlightStyleText(for: style))
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.white.opacity(0.25))
+                                            .cornerRadius(4)
                                     }
-                                }
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                            }
-                            
-                            Text(highlight.text)
-                                .padding()
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
-                            
-                            // Display additional highlight information
-                            if let note = highlight.note, !note.isEmpty {
-                                Text("Note: \(note)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
-                            }
-                            
-                            HStack {
-                                if let style = highlight.style {
-                                    Text("Style: \(Self.highlightStyleText(for: style))")
+                                    
+                                    Text("高亮笔记")
                                         .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Spacer(minLength: 0)
+                                }
+                                
+                                Text(highlight.text)
+                                    .font(.body)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                
+                                if let note = highlight.note, !note.isEmpty {
+                                    Text(note)
+                                        .font(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
                                 
-                                if let dateAdded = highlight.dateAdded {
-                                    Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                HStack(spacing: 12) {
+                                    if let style = highlight.style {
+                                        Text("样式：\(Self.highlightStyleText(for: style))")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if let dateAdded = highlight.dateAdded {
+                                        Text("创建：\(dateAdded, formatter: Self.dateFormatter)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if let modified = highlight.modified {
+                                        Text("修改：\(modified, formatter: Self.dateFormatter)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer(minLength: 0)
                                 }
-                                
-                                if let modified = highlight.modified {
-                                    Text("Modified: \(modified, formatter: Self.dateFormatter)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
                             }
-                            .padding(.horizontal)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.black.opacity(0.05))
+                            )
+                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                             
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    if viewModel.canLoadMore {
-                        HStack {
-                            Spacer()
-                            Button(action: {
-                                viewModel.loadNextPage(dbPath: annotationDBPath, assetId: book.bookId)
-                            }) {
-                                if viewModel.isLoadingPage {
-                                    ProgressView()
+                            Button {
+                                if let location = highlight.location {
+                                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
+                                    NSWorkspace.shared.open(url)
                                 } else {
-                                    Text("加载更多")
+                                    let url = URL(string: "ibooks://assetid/\(book.bookId)")!
+                                    NSWorkspace.shared.open(url)
                                 }
+                            } label: {
+                                Image(systemName: "book.fill")
+                                    .imageScale(.medium)
+                                    .padding(8)
+                                    .background(Color.white.opacity(0.7))
+                                    .clipShape(Circle())
                             }
-                            .buttonStyle(.borderedProminent)
-                            Spacer()
+                            .buttonStyle(.plain)
+                            .padding(8)
+                            .help("在 Apple Books 中打开")
+                            .accessibilityLabel("在 Apple Books 中打开")
                         }
-                        .padding(.top, 8)
                     }
                 }
                 .padding(.top)
+
+                if viewModel.canLoadMore {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            viewModel.loadNextPage(dbPath: annotationDBPath, assetId: book.bookId)
+                        }) {
+                            if viewModel.isLoadingPage {
+                                ProgressView()
+                            } else {
+                                Text("加载更多")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                }
             }
             .padding()
         }
