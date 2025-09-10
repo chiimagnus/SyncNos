@@ -138,28 +138,6 @@ struct BookDetailView: View {
                             }
                             .padding(.horizontal)
                             
-                            HStack {
-                                if let location = highlight.location {
-                                    Text("Location: \(location)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                if let rangeStart = highlight.rangeStart {
-                                    Text("Range Start: \(rangeStart)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                if let rangeEnd = highlight.rangeEnd {
-                                    Text("Range End: \(rangeEnd)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal)
                         }
                         .padding(.vertical, 4)
                     }
@@ -180,8 +158,8 @@ struct BookDetailView_Previews: PreviewProvider {
             bookTitle: "Sample Book Title",
             ibooksURL: "ibooks://assetid/sample-id",
             highlights: [
-                Highlight(uuid: "highlight-1", text: "This is a sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil, rangeStart: nil, rangeEnd: nil),
-                Highlight(uuid: "highlight-2", text: "This is another sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil, rangeStart: nil, rangeEnd: nil)
+                Highlight(uuid: "highlight-1", text: "This is a sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil),
+                Highlight(uuid: "highlight-2", text: "This is another sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil)
             ]
         )
         

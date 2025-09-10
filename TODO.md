@@ -41,7 +41,7 @@
   - 批注/笔记：常见列如 `ZANNOTATIONNOTE`/`ZANNOTATIONTEXT`（以探测为准）
   - 颜色/样式：如 `ZANNOTATIONSTYLE`（值→颜色名称映射）
   - 创建/修改时间：如 `ZANNOTATIONDATEADDED`/`ZANNOTATIONMODIFIED`（CoreFoundation 2001 epoch → ISO8601，含时区）
-  - 位置信息：章节名/索引、页码、spine/anchor/cfi/range start-end（常见列如 `ZANNOTATIONLOCATION`/`ZRANGESTART`/`ZRANGEEND`，可能为数值、字符串或 BLOB）
+  - 位置信息：章节名/索引、页码、spine/anchor/cfi（可能为数值、字符串或 BLOB）
   - 关联键：`ZANNOTATIONUUID`、`ZANNOTATIONASSETID`（用于关联书籍）
 - [ ] **BLOB/归档字段解析（可选但重要）**：
   - 若位置/样式等以 `NSKeyedArchiver` 或二进制 Plist 形式存储，尝试用 `PropertyListSerialization`/开源解码实现还原主要键值。

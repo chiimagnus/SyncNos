@@ -45,10 +45,7 @@ class DatabaseQueryService {
             "ZANNOTATIONNOTE": "note",
             "ZANNOTATIONSTYLE": "style",
             "ZANNOTATIONCREATIONDATE": "dateAdded",
-            "ZANNOTATIONMODIFICATIONDATE": "modified",
-            "ZANNOTATIONLOCATION": "location",
-            "ZPLLOCATIONRANGESTART": "rangeStart",
-            "ZPLLOCATIONRANGEEND": "rangeEnd"
+            "ZANNOTATIONMODIFICATIONDATE": "modified"
         ]
         
         var nextIndex = 3
@@ -89,9 +86,6 @@ class DatabaseQueryService {
             var style: Int? = nil
             var dateAdded: Date? = nil
             var modified: Date? = nil
-            var location: Int? = nil
-            var rangeStart: Int? = nil
-            var rangeEnd: Int? = nil
             
             // 根据实际的列索引获取数据
             if let noteIndex = columnIndices["ZANNOTATIONNOTE"], noteIndex < Int(sqlite3_column_count(stmt)) {
@@ -116,25 +110,7 @@ class DatabaseQueryService {
                 }
             }
             
-            if let locationIndex = columnIndices["ZANNOTATIONLOCATION"], locationIndex < Int(sqlite3_column_count(stmt)) {
-                if sqlite3_column_type(stmt, Int32(locationIndex)) != SQLITE_NULL {
-                    location = Int(sqlite3_column_int64(stmt, Int32(locationIndex)))
-                }
-            }
-            
-            if let rangeStartIndex = columnIndices["ZPLLOCATIONRANGESTART"], rangeStartIndex < Int(sqlite3_column_count(stmt)) {
-                if sqlite3_column_type(stmt, Int32(rangeStartIndex)) != SQLITE_NULL {
-                    rangeStart = Int(sqlite3_column_int64(stmt, Int32(rangeStartIndex)))
-                }
-            }
-            
-            if let rangeEndIndex = columnIndices["ZPLLOCATIONRANGEEND"], rangeEndIndex < Int(sqlite3_column_count(stmt)) {
-                if sqlite3_column_type(stmt, Int32(rangeEndIndex)) != SQLITE_NULL {
-                    rangeEnd = Int(sqlite3_column_int64(stmt, Int32(rangeEndIndex)))
-                }
-            }
-            
-            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
+            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified))
             count += 1
         }
         sqlite3_finalize(stmt)
