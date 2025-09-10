@@ -14,7 +14,7 @@ class DatabaseQueryService {
     
     // MARK: - Queries
     func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
-        let sql = "SELECT ZANNOTATIONASSETID,ZANNOTATIONUUID,ZANNOTATIONSELECTEDTEXT FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
+        let sql = "SELECT ZANNOTATIONASSETID,ZANNOTATIONUUID,ZANNOTATIONSELECTEDTEXT,ZANNOTATIONNOTE,ZANNOTATIONSTYLE,ZANNOTATIONSTYLINGCOLOR,ZANNOTATIONDATEADDED,ZANNOTATIONMODIFIED,ZANNOTATIONLOCATION,ZRANGESTART,ZRANGEEND FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
         print("Executing query: \(sql)")
         
         var stmt: OpaquePointer?
@@ -38,7 +38,18 @@ class DatabaseQueryService {
             if text.isEmpty { 
                 continue 
             }
-            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text))
+            
+            // 获取新添加的字段
+            let note = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+            let style = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 4)) : nil
+            let stylingColor = sqlite3_column_text(stmt, 5).map { String(cString: $0) }
+            let dateAdded = sqlite3_column_type(stmt, 6) != SQLITE_NULL ? Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, 6))) : nil
+            let modified = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, 7))) : nil
+            let location = sqlite3_column_type(stmt, 8) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 8)) : nil
+            let rangeStart = sqlite3_column_type(stmt, 9) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 9)) : nil
+            let rangeEnd = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 10)) : nil
+            
+            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, stylingColor: stylingColor, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
             count += 1
         }
         sqlite3_finalize(stmt)
