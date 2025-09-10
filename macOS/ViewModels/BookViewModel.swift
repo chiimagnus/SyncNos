@@ -16,8 +16,13 @@ class BookViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     private let databaseService = DatabaseService()
+    private var dbRootOverride: String?
     
     // MARK: - Public Methods
+    
+    func setDbRootOverride(_ path: String?) {
+        dbRootOverride = path
+    }
     
     func loadBooks() {
         isLoading = true
@@ -71,7 +76,7 @@ class BookViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func fetchBooksFromDatabase() throws -> [BookExport] {
-        let root = booksDataRoot(dbRootOverride: nil)
+        let root = booksDataRoot(dbRootOverride: dbRootOverride)
         print("Books data root: \(root)")
         
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
