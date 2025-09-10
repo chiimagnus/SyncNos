@@ -76,7 +76,10 @@ class BookViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func fetchBooksFromDatabase() throws -> [BookExport] {
-        let root = booksDataRoot(dbRootOverride: dbRootOverride)
+        guard let root = dbRootOverride else {
+            print("Books data root not selected; skipping load until user picks a folder")
+            return []
+        }
         print("Books data root: \(root)")
         
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
@@ -124,19 +127,6 @@ class BookViewModel: ObservableObject {
         let exportData = buildExport(annotations: annotations, books: books, filters: filters)
         
         return exportData
-    }
-    
-    private func booksDataRoot(dbRootOverride: String?) -> String {
-        if let override = dbRootOverride {
-            return override
-        }
-        
-        // 在沙盒环境中，我们需要使用正确的路径来访问 Apple Books 数据
-        // Apple Books 数据存储在 ~/Library/Containers/com.apple.iBooksX/Data/Documents 中
-        let home = NSHomeDirectory()
-        let booksRoot = "\(home)/Library/Containers/com.apple.iBooksX/Data/Documents"
-        print("Using books root path: \(booksRoot)")
-        return booksRoot
     }
     
     private func latestSQLiteFile(in dir: String) -> String? {
