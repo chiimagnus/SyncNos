@@ -7,7 +7,7 @@
 
 import Foundation
 
-final class BookmarkStore {
+final class BookmarkStore: BookmarkStoreProtocol {
     static let shared = BookmarkStore()
     
     private let bookmarkDefaultsKey = "SelectedBooksFolderBookmark"
