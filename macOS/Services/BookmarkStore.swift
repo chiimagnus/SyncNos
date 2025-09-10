@@ -22,7 +22,7 @@ final class BookmarkStore {
                                                   includingResourceValuesForKeys: nil,
                                                   relativeTo: nil)
             UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
-            UserDefaults.standard.synchronize()
+            // UserDefaults.standard.synchronize() is not needed in modern iOS/macOS development
         } catch {
             print("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
         }

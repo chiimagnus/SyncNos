@@ -86,23 +86,14 @@ struct BooksListView: View {
                 let started = BookmarkStore.shared.startAccessing(url: url)
                 print("Using restored bookmark on appear, startAccess=\(started)")
                 let selectedPath = url.path
-                let fm = FileManager.default
-                var rootCandidate = selectedPath
-                let maybeDataDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
-                let aeAnnoInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("AEAnnotation")
-                let bkLibInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("BKLibrary")
-                if fm.fileExists(atPath: aeAnnoInDataDocs) || fm.fileExists(atPath: bkLibInDataDocs) {
-                    rootCandidate = maybeDataDocs
-                } else {
-                    let aeAnno = (selectedPath as NSString).appendingPathComponent("AEAnnotation")
-                    let bkLib = (selectedPath as NSString).appendingPathComponent("BKLibrary")
-                    if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
-                        rootCandidate = selectedPath
-                    }
-                }
+                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
                 viewModel.loadBooks()
             }
+        }
+        .onDisappear {
+            // Release security-scoped bookmark when view disappears
+            BookmarkStore.shared.stopAccessingIfNeeded()
         }
     }
 
@@ -128,23 +119,7 @@ struct BooksListView: View {
             let selectedPath = url.path
 
             // Normalize selection to the root that contains AEAnnotation/BKLibrary under Data/Documents
-            let fm = FileManager.default
-            var rootCandidate = selectedPath
-
-            let maybeDataDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
-            let aeAnnoInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("AEAnnotation")
-            let bkLibInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("BKLibrary")
-
-            if fm.fileExists(atPath: aeAnnoInDataDocs) || fm.fileExists(atPath: bkLibInDataDocs) {
-                rootCandidate = maybeDataDocs
-            } else {
-                // If they picked Data/Documents directly, accept as-is
-                let aeAnno = (selectedPath as NSString).appendingPathComponent("AEAnnotation")
-                let bkLib = (selectedPath as NSString).appendingPathComponent("BKLibrary")
-                if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
-                    rootCandidate = selectedPath
-                }
-            }
+            let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
 
             DispatchQueue.main.async {
                 viewModel.setDbRootOverride(rootCandidate)
