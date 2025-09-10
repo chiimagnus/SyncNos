@@ -32,7 +32,7 @@
 
 验收（M0）：可运行 `inspect` 与 `export`，导出包含（书名/作者/AssetID/UUID/文本）的 JSON 文件。
 
-#### M1：表结构探测与字段最大化（“最全面”）
+#### M1：表结构探测与字段最大化（"最全面"）
 - [ ] **运行时表结构探测**：
   - 使用 `PRAGMA table_info('ZAEANNOTATION')`、`PRAGMA table_info('ZBKLIBRARYASSET')`、必要时遍历所有表 `SELECT name FROM sqlite_master WHERE type='table'`。
   - 根据探测到的列名构建动态查询，确保不同 macOS/Books 版本下尽量取全字段。
@@ -43,11 +43,16 @@
   - 创建/修改时间：如 `ZANNOTATIONDATEADDED`/`ZANNOTATIONMODIFIED`（CoreFoundation 2001 epoch → ISO8601，含时区）
   - 位置信息：章节名/索引、页码、spine/anchor/cfi（可能为数值、字符串或 BLOB）
   - 关联键：`ZANNOTATIONUUID`、`ZANNOTATIONASSETID`（用于关联书籍）
+- [ ] **Apple Books URL Scheme支持**：
+  - 实现书籍和高亮笔记的深度链接功能
+  - 格式：`ibooks://assetid/{bookAssetId}#{epubCFI}`
+  - 支持从ZANNOTATIONLOCATION字段获取epubCFI信息
+  - ZANNOTATIONLOCATION字段包含EPUB CFI字符串，例如：`epubcfi(/6/10[id9]!/4/2[filepos2892]/1,:11,:23)`
 - [ ] **BLOB/归档字段解析（可选但重要）**：
   - 若位置/样式等以 `NSKeyedArchiver` 或二进制 Plist 形式存储，尝试用 `PropertyListSerialization`/开源解码实现还原主要键值。
   - 解析失败时保留原始十六进制/BASE64 字段，避免信息丢失。
 - [ ] **模型与导出结构升级**：
-  - `Highlight{ uuid,text,note?,color?,createdAt?,modifiedAt?,chapter?,page?,location?{start?,end?,cfi?,spine?},raw?{...} }`
+  - `Highlight{ uuid,text,note?,color?,createdAt?,modifiedAt?,location?:string,raw?{...} }`
   - `Book{ assetId,title,author,ibooksURL, highlights:[Highlight] }`
 - [ ] **字段存在性与降级策略**：
   - 缺列不报错，标记为 `null` 或缺省；将“已探测列/缺失列”写入 `inspect` 输出。
@@ -93,7 +98,7 @@
 3. **内容**：`text`、`note`
 4. **时间**：`createdAt`、`modifiedAt`
 5. **样式**：`color/style`（数值→名称映射）
-6. **位置**：`chapter`、`page`、`location{start,end,cfi,spine}`
+6. **位置**：`location`（EPUB CFI字符串）
 7. **原始**：`raw`（未识别或解析失败字段，便于后续演进）
 
 ### 风险与应对
