@@ -18,6 +18,34 @@ class BookViewModel: ObservableObject {
     private let databaseService = DatabaseService()
     private var dbRootOverride: String?
     
+    // MARK: - Path Utility Methods
+    
+    /// 根据选择的路径确定数据库根目录
+    /// - Parameter selectedPath: 用户选择的路径
+    /// - Returns: 数据库根目录路径
+    func determineDatabaseRoot(from selectedPath: String) -> String {
+        let fm = FileManager.default
+        var rootCandidate = selectedPath
+        
+        // 检查是否选择了容器目录（包含Data/Documents）
+        let maybeDataDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
+        let aeAnnoInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("AEAnnotation")
+        let bkLibInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("BKLibrary")
+        
+        if fm.fileExists(atPath: aeAnnoInDataDocs) || fm.fileExists(atPath: bkLibInDataDocs) {
+            rootCandidate = maybeDataDocs
+        } else {
+            // 检查是否直接选择了Data/Documents目录
+            let aeAnno = (selectedPath as NSString).appendingPathComponent("AEAnnotation")
+            let bkLib = (selectedPath as NSString).appendingPathComponent("BKLibrary")
+            if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
+                rootCandidate = selectedPath
+            }
+        }
+        
+        return rootCandidate
+    }
+    
     // MARK: - Public Methods
     
     func setDbRootOverride(_ path: String?) {
