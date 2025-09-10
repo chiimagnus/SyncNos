@@ -10,16 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Swift version is 5.0
 
 ### Code Structure
-- CLI directory contains the command-line interface implementation
-- macOS directory contains the macOS SwiftUI application
-- Both share common data models and SQLite database access logic
-
-## 2. High-Level Architecture
-
-### Overall Design
-The project consists of two main components:
-1. A CLI tool for reading Apple Books annotations and exporting them
-2. A macOS SwiftUI app that provides a GUI for the same functionality
+- macOS directory contains the macOS SwiftUI application for reading Apple Books annotations and exporting them
 
 ### Key Design Principles
 - Composition over inheritance using dependency injection
@@ -35,7 +26,6 @@ The project consists of two main components:
 ### Shared Components
 - Data models in `Models/` directories
 - SQLite database access logic in `Services/` directories
-- File system utilities in `FSUtils.swift`
 
 ### Technology Stack
 - Swift 5.0
