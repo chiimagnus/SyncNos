@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import SQLite3
 
 // MARK: - BookViewModel
 
@@ -15,8 +16,16 @@ class BookViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    private let databaseService = DatabaseService()
+    private let databaseService: DatabaseServiceProtocol
+    private let bookmarkStore: BookmarkStoreProtocol
     private var dbRootOverride: String?
+    
+    // MARK: - Initialization
+    init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
+         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
+        self.databaseService = databaseService
+        self.bookmarkStore = bookmarkStore
+    }
     
     // MARK: - Path Utility Methods
     

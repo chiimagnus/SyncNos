@@ -27,37 +27,47 @@
 ### 项目结构
 ```
 macOS/
-├── Services/
-│   └── BookmarkStore.swift
+├── Core/
+│   ├── Protocols.swift
+│   ├── DIContainer.swift
+│   └── Services/
+│       ├── DatabaseConnectionService.swift
+│       ├── DatabaseQueryService.swift
+│       ├── BookFilterService.swift
+│       ├── DatabaseService.swift
+│       └── BookmarkStore.swift
 ├── ViewModels/
 │   └── BookViewModel.swift
 ├── Views/
 │   └── BooksListView.swift
+├── Models/
+│   └── Models.swift
 └── macOSApp.swift
 ```
 
-当前结构简单清晰，但与CLI版本存在重复实现。
+当前结构已经重构为模块化设计，核心服务被提取到独立的Core模块中。
 
 ### 设计模式
-虽然使用了MVVM模式，但缺少以下关键元素：
+虽然使用了MVVM模式，但现在已实现以下关键元素：
 1. 依赖注入容器
 2. 协议抽象层
 3. 状态管理机制
 
 ### 依赖关系
 ```
-BooksListView -> BookViewModel -> DatabaseService
+BooksListView -> BookViewModel -> DatabaseServiceProtocol
+                              -> BookmarkStoreProtocol
 ```
-这种直接依赖关系使得单元测试困难，也不利于替换实现。
+通过依赖注入和协议抽象，组件之间的耦合度已大大降低，便于单元测试和实现替换。
 
 ## 改进建议
 
 ### 1. 模块化重构
-- **创建共享核心模块**：将DatabaseService、数据模型等通用组件提取到独立模块
-- **消除重复代码**：CLI和macOS版本共享同一核心实现
+- **创建共享核心模块**：已将DatabaseService、数据模型等通用组件提取到独立模块
+- **消除重复代码**：CLI和macOS版本可以共享同一核心实现
 
 ### 2. 实现依赖注入
-- **引入依赖注入框架**或手动实现DI容器
+- **引入依赖注入框架**或手动实现DI容器：已手动实现DI容器
 - **为服务层定义协议**：
   ```swift
   protocol DatabaseServiceProtocol {
@@ -66,23 +76,36 @@ BooksListView -> BookViewModel -> DatabaseService
       func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow]
       func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow]
   }
+  
+  protocol BookmarkStoreProtocol {
+      func save(folderURL: URL)
+      func restore() -> URL?
+      func startAccessing(url: URL) -> Bool
+      func stopAccessingIfNeeded()
+  }
   ```
 
 ### 3. 改进ViewModel设计
 ```swift
 class BookViewModel: ObservableObject {
     private let databaseService: DatabaseServiceProtocol
+    private let bookmarkStore: BookmarkStoreProtocol
     
-    init(databaseService: DatabaseServiceProtocol) {
+    init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
+         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
         self.databaseService = databaseService
+        self.bookmarkStore = bookmarkStore
     }
 }
 ```
 
 ### 4. 遵循SOLID原则
-- **单一职责**：拆分DatabaseService为多个专门的类
+- **单一职责**：已拆分DatabaseService为多个专门的类：
+  - DatabaseConnectionService：专门处理数据库连接
+  - DatabaseQueryService：专门处理数据库查询
+  - BookFilterService：专门处理书籍过滤逻辑
 - **开放封闭**：通过协议和扩展实现新功能，而不需要修改现有代码
 - **依赖倒置**：依赖抽象协议而非具体实现
 
 ## 结论
-当前架构虽然能够工作，但存在明显的改进空间。通过模块化重构、引入依赖注入和遵循SOLID原则，可以显著提高代码质量、可维护性和可扩展性。
+当前架构已经过重构，显著改进了代码质量、可维护性和可扩展性。通过模块化重构、引入依赖注入和遵循SOLID原则，项目现在更加清晰、灵活且易于测试。
