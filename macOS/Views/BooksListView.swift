@@ -53,7 +53,8 @@ struct BooksListView: View {
                             .padding(.vertical, 4)
                         }
                     }
-                    .listStyle(PlainListStyle())
+                    .listStyle(SidebarListStyle())
+                    .background(.thinMaterial)
                 }
             }
             .navigationTitle("Books")
