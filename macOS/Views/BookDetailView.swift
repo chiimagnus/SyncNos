@@ -1,6 +1,61 @@
 import SwiftUI
 import AppKit
 
+// A simple waterfall (masonry) layout that adapts column count to the available width.
+private struct WaterfallLayout: Layout {
+    var minColumnWidth: CGFloat = 280
+    var spacing: CGFloat = 12
+
+    private func computeColumnInfo(width: CGFloat, subviews: Subviews) -> (positions: [CGPoint], totalHeight: CGFloat, columnWidth: CGFloat) {
+        // Sanitize inputs to avoid NaN/Inf and negative values
+        let safeWidth: CGFloat = (width.isFinite && width > 0) ? width : 1
+        let safeSpacing: CGFloat = (spacing.isFinite && spacing >= 0) ? spacing : 0
+        let safeMinWidth: CGFloat = (minColumnWidth.isFinite && minColumnWidth > 0) ? minColumnWidth : 1
+
+        let denom = max(safeMinWidth + safeSpacing, 1)
+        let rawColumnCount = (safeWidth + safeSpacing) / denom
+        let columnCount = max(1, Int(rawColumnCount.isFinite ? rawColumnCount : 1))
+        let computedColumnWidth = (safeWidth - CGFloat(columnCount - 1) * safeSpacing) / CGFloat(columnCount)
+        let columnWidth = max(1, computedColumnWidth.isFinite ? computedColumnWidth : safeMinWidth)
+
+        var columnHeights = Array(repeating: CGFloat(0), count: columnCount)
+        var positions: [CGPoint] = Array(repeating: .zero, count: subviews.count)
+        var maxHeight: CGFloat = 0
+
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.init(width: columnWidth, height: nil))
+            // Place into the shortest column
+            let targetColumn = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
+            let x = CGFloat(targetColumn) * (columnWidth + spacing)
+            let y = columnHeights[targetColumn]
+            positions[index] = CGPoint(x: x, y: y)
+            columnHeights[targetColumn] = y + size.height + spacing
+            maxHeight = max(maxHeight, columnHeights[targetColumn])
+        }
+
+        let totalHeight = max(0, maxHeight - spacing)
+        return (positions, totalHeight, columnWidth)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 0
+        guard width > 0 else { return .zero }
+        let info = computeColumnInfo(width: width, subviews: subviews)
+        return CGSize(width: width, height: info.totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let width = bounds.width
+        guard width > 0 else { return }
+        let info = computeColumnInfo(width: width, subviews: subviews)
+        for index in subviews.indices {
+            let position = info.positions[index]
+            let point = CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y)
+            subviews[index].place(at: point, proposal: .init(width: info.columnWidth, height: nil))
+        }
+    }
+}
+
 struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
@@ -51,9 +106,7 @@ struct BookDetailView: View {
         }
     }
     
-    private static var gridColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 280), spacing: 12, alignment: .top)]
-    }
+    // Removed gridColumns; WaterfallLayout handles adaptive columns.
     
     var body: some View {
         ScrollView {
@@ -80,10 +133,9 @@ struct BookDetailView: View {
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 
-                // Highlights section
-                LazyVGrid(columns: Self.gridColumns, spacing: 12) {
+                // Highlights section (Waterfall / Masonry)
+                WaterfallLayout(minColumnWidth: 280, spacing: 12) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                        // Card
                         ZStack(alignment: .topTrailing) {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack(spacing: 8) {
