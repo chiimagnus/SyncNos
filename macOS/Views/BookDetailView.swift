@@ -119,9 +119,7 @@ struct BookDetailView: View {
                 WaterfallLayout(minColumnWidth: 280, spacing: 12) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         ZStack(alignment: .topTrailing) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                // (Decoration removed: badge and label)
-                                
+                            VStack(alignment: .leading, spacing: 8) {                                
                                 Text(highlight.text)
                                     .font(.body)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -132,19 +130,21 @@ struct BookDetailView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 
-                                HStack(spacing: 12) {
-                                    if let dateAdded = highlight.dateAdded {
-                                        Text("创建：\(dateAdded, formatter: Self.dateFormatter)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        if let dateAdded = highlight.dateAdded {
+                                            Text("创建：\(dateAdded, formatter: Self.dateFormatter)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+
+                                        if let modified = highlight.modified {
+                                            Text("修改：\(modified, formatter: Self.dateFormatter)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
-                                    
-                                    if let modified = highlight.modified {
-                                        Text("修改：\(modified, formatter: Self.dateFormatter)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
+
                                     Spacer(minLength: 0)
                                 }
                             }
