@@ -68,24 +68,6 @@ struct BookDetailView: View {
         return formatter
     }()
     
-    static func highlightStyleText(for style: Int) -> String {
-        switch style {
-        case 0:
-            return "下划线"
-        case 1:
-            return "绿色"
-        case 2:
-            return "蓝色"
-        case 3:
-            return "黄色"
-        case 4:
-            return "粉色"
-        case 5:
-            return "紫色"
-        default:
-            return "其他"
-        }
-    }
     
     static func highlightStyleColor(for style: Int) -> Color {
         switch style {
@@ -138,23 +120,7 @@ struct BookDetailView: View {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         ZStack(alignment: .topTrailing) {
                             VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 8) {
-                                    if let style = highlight.style {
-                                        Text(Self.highlightStyleText(for: style))
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.white.opacity(0.25))
-                                            .cornerRadius(4)
-                                    }
-                                    
-                                    Text("高亮笔记")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Spacer(minLength: 0)
-                                }
+                                // (Decoration removed: badge and label)
                                 
                                 Text(highlight.text)
                                     .font(.body)
@@ -167,12 +133,6 @@ struct BookDetailView: View {
                                 }
                                 
                                 HStack(spacing: 12) {
-                                    if let style = highlight.style {
-                                        Text("样式：\(Self.highlightStyleText(for: style))")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
                                     if let dateAdded = highlight.dateAdded {
                                         Text("创建：\(dateAdded, formatter: Self.dateFormatter)")
                                             .font(.caption)
@@ -211,9 +171,7 @@ struct BookDetailView: View {
                             } label: {
                                 Image(systemName: "book.fill")
                                     .imageScale(.medium)
-                                    .padding(8)
-                                    .background(Color.white.opacity(0.7))
-                                    .clipShape(Circle())
+                                    .foregroundColor(.primary)
                             }
                             .buttonStyle(.plain)
                             .padding(8)
