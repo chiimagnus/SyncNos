@@ -31,10 +31,13 @@ class BookViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.books = books
                     self.isLoading = false
+                    print("Successfully loaded \(books.count) books")
                 }
             } catch {
+                let errorDesc = error.localizedDescription
+                print("Error loading books: \(errorDesc)")
                 DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = errorDesc
                     self.isLoading = false
                 }
             }
@@ -60,33 +63,62 @@ class BookViewModel: ObservableObject {
             }
             result.append(BookExport(bookId: assetId, authorName: b.author, bookTitle: b.title, ibooksURL: "ibooks://assetid/\(assetId)", highlights: hs))
         }
-        return result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
+        let sortedResult = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
+        print("Built export with \(sortedResult.count) books")
+        return sortedResult
     }
     
     // MARK: - Private Methods
     
     private func fetchBooksFromDatabase() throws -> [BookExport] {
         let root = booksDataRoot(dbRootOverride: nil)
+        print("Books data root: \(root)")
+        
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
         let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
+        
+        print("Looking for annotation DB in: \(annotationDir)")
+        print("Looking for books DB in: \(booksDir)")
+        
         guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
-            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: "Annotation DB not found under \(annotationDir)"])
+            let error = "Annotation DB not found under \(annotationDir)"
+            print("Error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
+        print("Found annotation DB: \(annotationDB)")
+        
         guard let booksDB = latestSQLiteFile(in: booksDir) else {
-            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: "Books DB not found under \(booksDir)"])
+            let error = "Books DB not found under \(booksDir)"
+            print("Error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
+        print("Found books DB: \(booksDB)")
         
         let adbPath = ensureTempCopyIfLocked(originalPath: annotationDB)
         let bdbPath = ensureTempCopyIfLocked(originalPath: booksDB)
         
+        print("Using annotation DB copy: \(adbPath)")
+        print("Using books DB copy: \(bdbPath)")
+        
         let adbH = try databaseService.openReadOnlyDatabase(dbPath: adbPath)
-        defer { databaseService.close(adbH) }
+        defer { 
+            databaseService.close(adbH)
+            print("Closed annotation DB")
+        }
         let bdbH = try databaseService.openReadOnlyDatabase(dbPath: bdbPath)
-        defer { databaseService.close(bdbH) }
+        defer { 
+            databaseService.close(bdbH)
+            print("Closed books DB")
+        }
         
         let annotations = try databaseService.fetchAnnotations(db: adbH)
+        print("Fetched \(annotations.count) annotations")
+        
         let assetIds = Array(Set(annotations.map { $0.assetId })).sorted()
+        print("Found \(assetIds.count) unique asset IDs")
+        
         let books = try databaseService.fetchBooks(db: bdbH, assetIds: assetIds)
+        print("Fetched \(books.count) books")
         
         let filters = Filters(bookSubstrings: [], authorSubstrings: [], assetIds: [])
         let exportData = buildExport(annotations: annotations, books: books, filters: filters)
@@ -105,10 +137,12 @@ class BookViewModel: ObservableObject {
     private func latestSQLiteFile(in dir: String) -> String? {
         let url = URL(fileURLWithPath: dir)
         guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey]) else {
+            print("Failed to list contents of directory: \(dir)")
             return nil
         }
         let sqliteFiles = files.filter { $0.pathExtension == "sqlite" }
         guard !sqliteFiles.isEmpty else {
+            print("No SQLite files found in directory: \(dir)")
             return nil
         }
         let sorted = sqliteFiles.sorted { a, b in
@@ -118,7 +152,9 @@ class BookViewModel: ObservableObject {
             }
             return dateA > dateB
         }
-        return sorted.first?.path
+        let latestFile = sorted.first?.path
+        print("Latest SQLite file in \(dir): \(latestFile ?? "none")")
+        return latestFile
     }
     
     private func ensureTempCopyIfLocked(originalPath: String) -> String {
@@ -128,8 +164,10 @@ class BookViewModel: ObservableObject {
         
         do {
             try FileManager.default.copyItem(at: url, to: tempURL)
+            print("Copied DB from \(originalPath) to \(tempURL.path)")
             return tempURL.path
         } catch {
+            print("Failed to copy DB from \(originalPath) to \(tempURL.path): \(error.localizedDescription)")
             return originalPath
         }
     }
