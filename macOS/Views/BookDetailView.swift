@@ -149,16 +149,10 @@ struct BookDetailView: View {
                                 }
                             }
                             .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.black.opacity(0.05))
-                            )
-                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                             
                             Button {
                                 if let location = highlight.location {
