@@ -12,6 +12,14 @@ import Foundation
 struct Highlight: Codable {
     let uuid: String
     let text: String
+    let note: String?
+    let style: Int?
+    let stylingColor: String?
+    let dateAdded: Date?
+    let modified: Date?
+    let location: Int?
+    let rangeStart: Int?
+    let rangeEnd: Int?
 }
 
 struct BookExport: Codable {
@@ -26,6 +34,14 @@ struct HighlightRow {
     let assetId: String
     let uuid: String
     let text: String 
+    let note: String?
+    let style: Int?
+    let stylingColor: String?
+    let dateAdded: Date?
+    let modified: Date?
+    let location: Int?
+    let rangeStart: Int?
+    let rangeEnd: Int?
 }
 
 struct BookRow { 
