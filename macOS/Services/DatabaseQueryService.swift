@@ -14,10 +14,55 @@ class DatabaseQueryService {
     
     // MARK: - Queries
     func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
-        let sql = "SELECT ZANNOTATIONASSETID,ZANNOTATIONUUID,ZANNOTATIONSELECTEDTEXT,ZANNOTATIONNOTE,ZANNOTATIONSTYLE,ZANNOTATIONSTYLINGCOLOR,ZANNOTATIONDATEADDED,ZANNOTATIONMODIFIED,ZANNOTATIONLOCATION,ZRANGESTART,ZRANGEEND FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
+        // 首先获取表结构信息，动态构建查询语句
+        let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, tableInfoSQL, -1, &stmt, nil) == SQLITE_OK else {
+            let error = "Prepare failed: table info"
+            print("Database error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+        
+        // 收集可用的列名
+        var availableColumns: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let columnName = sqlite3_column_text(stmt, 1) {
+                availableColumns.insert(String(cString: columnName))
+            }
+        }
+        sqlite3_finalize(stmt)
+        
+        // 构建查询语句，只包含存在的列
+        var selectColumns: [String] = ["ZANNOTATIONASSETID", "ZANNOTATIONUUID", "ZANNOTATIONSELECTEDTEXT"]
+        var columnIndices: [String: Int] = [
+            "ZANNOTATIONASSETID": 0,
+            "ZANNOTATIONUUID": 1,
+            "ZANNOTATIONSELECTEDTEXT": 2
+        ]
+        
+        // 检查并添加可选列
+        let optionalColumns = [
+            "ZANNOTATIONNOTE": "note",
+            "ZANNOTATIONSTYLE": "style",
+            "ZANNOTATIONCREATIONDATE": "dateAdded",
+            "ZANNOTATIONMODIFICATIONDATE": "modified",
+            "ZANNOTATIONLOCATION": "location",
+            "ZPLLOCATIONRANGESTART": "rangeStart",
+            "ZPLLOCATIONRANGEEND": "rangeEnd"
+        ]
+        
+        var nextIndex = 3
+        for (column, _) in optionalColumns {
+            if availableColumns.contains(column) {
+                selectColumns.append(column)
+                columnIndices[column] = nextIndex
+                nextIndex += 1
+            }
+        }
+        
+        let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
         print("Executing query: \(sql)")
         
-        var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: annotations"
             print("Database error: \(error)")
@@ -39,17 +84,57 @@ class DatabaseQueryService {
                 continue 
             }
             
-            // 获取新添加的字段
-            let note = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-            let style = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 4)) : nil
-            let stylingColor = sqlite3_column_text(stmt, 5).map { String(cString: $0) }
-            let dateAdded = sqlite3_column_type(stmt, 6) != SQLITE_NULL ? Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, 6))) : nil
-            let modified = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, 7))) : nil
-            let location = sqlite3_column_type(stmt, 8) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 8)) : nil
-            let rangeStart = sqlite3_column_type(stmt, 9) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 9)) : nil
-            let rangeEnd = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 10)) : nil
+            // 获取可选字段
+            var note: String? = nil
+            var style: Int? = nil
+            var dateAdded: Date? = nil
+            var modified: Date? = nil
+            var location: Int? = nil
+            var rangeStart: Int? = nil
+            var rangeEnd: Int? = nil
             
-            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, stylingColor: stylingColor, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
+            // 根据实际的列索引获取数据
+            if let noteIndex = columnIndices["ZANNOTATIONNOTE"], noteIndex < Int(sqlite3_column_count(stmt)) {
+                note = sqlite3_column_text(stmt, Int32(noteIndex)).map { String(cString: $0) }
+            }
+            
+            if let styleIndex = columnIndices["ZANNOTATIONSTYLE"], styleIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(styleIndex)) != SQLITE_NULL {
+                    style = Int(sqlite3_column_int64(stmt, Int32(styleIndex)))
+                }
+            }
+            
+            if let dateAddedIndex = columnIndices["ZANNOTATIONCREATIONDATE"], dateAddedIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(dateAddedIndex)) != SQLITE_NULL {
+                    dateAdded = Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, Int32(dateAddedIndex))))
+                }
+            }
+            
+            if let modifiedIndex = columnIndices["ZANNOTATIONMODIFICATIONDATE"], modifiedIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(modifiedIndex)) != SQLITE_NULL {
+                    modified = Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, Int32(modifiedIndex))))
+                }
+            }
+            
+            if let locationIndex = columnIndices["ZANNOTATIONLOCATION"], locationIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(locationIndex)) != SQLITE_NULL {
+                    location = Int(sqlite3_column_int64(stmt, Int32(locationIndex)))
+                }
+            }
+            
+            if let rangeStartIndex = columnIndices["ZPLLOCATIONRANGESTART"], rangeStartIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(rangeStartIndex)) != SQLITE_NULL {
+                    rangeStart = Int(sqlite3_column_int64(stmt, Int32(rangeStartIndex)))
+                }
+            }
+            
+            if let rangeEndIndex = columnIndices["ZPLLOCATIONRANGEEND"], rangeEndIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(rangeEndIndex)) != SQLITE_NULL {
+                    rangeEnd = Int(sqlite3_column_int64(stmt, Int32(rangeEndIndex)))
+                }
+            }
+            
+            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, stylingColor: nil, dateAdded: dateAdded, modified: modified, location: location, rangeStart: rangeStart, rangeEnd: rangeEnd))
             count += 1
         }
         sqlite3_finalize(stmt)
