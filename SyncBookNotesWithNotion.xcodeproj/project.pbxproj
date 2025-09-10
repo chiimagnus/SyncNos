@@ -6,29 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXCopyFilesBuildPhase section */
-		D81167BA2E70A13F000D0173 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		D81167BC2E70A140000D0173 /* CLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CLI; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8CE88DA2E713DB50025AD6E /* macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D81167BE2E70A140000D0173 /* CLI */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CLI;
-			sourceTree = "<group>";
-		};
 		D8CE88DB2E713DB50025AD6E /* macOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = macOS;
@@ -37,13 +19,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D81167B92E70A13F000D0173 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D72E713DB50025AD6E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -57,7 +32,6 @@
 		D81167B32E70A13F000D0173 = {
 			isa = PBXGroup;
 			children = (
-				D81167BE2E70A140000D0173 /* CLI */,
 				D8CE88DB2E713DB50025AD6E /* macOS */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
@@ -66,7 +40,6 @@
 		D81167BD2E70A140000D0173 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D81167BC2E70A140000D0173 /* CLI */,
 				D8CE88DA2E713DB50025AD6E /* macOS.app */,
 			);
 			name = Products;
@@ -75,28 +48,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D81167BB2E70A13F000D0173 /* CLI */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "CLI" */;
-			buildPhases = (
-				D81167B82E70A13F000D0173 /* Sources */,
-				D81167B92E70A13F000D0173 /* Frameworks */,
-				D81167BA2E70A13F000D0173 /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				D81167BE2E70A140000D0173 /* CLI */,
-			);
-			name = CLI;
-			packageProductDependencies = (
-			);
-			productName = SyncBookNotesWithNotion;
-			productReference = D81167BC2E70A140000D0173 /* CLI */;
-			productType = "com.apple.product-type.tool";
-		};
 		D8CE88D92E713DB50025AD6E /* macOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D8CE88E32E713DB60025AD6E /* Build configuration list for PBXNativeTarget "macOS" */;
@@ -129,9 +80,6 @@
 				LastSwiftUpdateCheck = 1630;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
-					D81167BB2E70A13F000D0173 = {
-						CreatedOnToolsVersion = 16.3;
-					};
 					D8CE88D92E713DB50025AD6E = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -151,7 +99,6 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D81167BB2E70A13F000D0173 /* CLI */,
 				D8CE88D92E713DB50025AD6E /* macOS */,
 			);
 		};
@@ -168,13 +115,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D81167B82E70A13F000D0173 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D62E713DB50025AD6E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -305,30 +245,6 @@
 			};
 			name = Release;
 		};
-		D81167C42E70A140000D0173 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		D81167C52E70A140000D0173 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		D8CE88E42E713DB60025AD6E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -399,15 +315,6 @@
 			buildConfigurations = (
 				D81167C12E70A140000D0173 /* Debug */,
 				D81167C22E70A140000D0173 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		D81167C32E70A140000D0173 /* Build configuration list for PBXNativeTarget "CLI" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D81167C42E70A140000D0173 /* Debug */,
-				D81167C52E70A140000D0173 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
