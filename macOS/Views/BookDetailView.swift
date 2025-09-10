@@ -17,6 +17,44 @@ struct BookDetailView: View {
         return formatter
     }()
     
+    static func highlightStyleText(for style: Int) -> String {
+        switch style {
+        case 0:
+            return "下划线"
+        case 1:
+            return "绿色"
+        case 2:
+            return "蓝色"
+        case 3:
+            return "黄色"
+        case 4:
+            return "粉色"
+        case 5:
+            return "紫色"
+        default:
+            return "其他"
+        }
+    }
+    
+    static func highlightStyleColor(for style: Int) -> Color {
+        switch style {
+        case 0:
+            return Color.orange.opacity(0.3) // Underline style
+        case 1:
+            return Color.green.opacity(0.3)
+        case 2:
+            return Color.blue.opacity(0.3)
+        case 3:
+            return Color.yellow.opacity(0.3)
+        case 4:
+            return Color.pink.opacity(0.3)
+        case 5:
+            return Color.purple.opacity(0.3)
+        default:
+            return Color.gray.opacity(0.3)
+        }
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -46,6 +84,24 @@ struct BookDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(book.highlights, id: \.uuid) { highlight in
                         VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                // Display highlight style/color indicator
+                                if let style = highlight.style {
+                                    Text(Self.highlightStyleText(for: style))
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Self.highlightStyleColor(for: style))
+                                        .cornerRadius(4)
+                                }
+                                
+                                Text("高亮笔记")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                            }
+                            
                             Text(highlight.text)
                                 .padding()
                                 .background(Color.blue.opacity(0.1))
