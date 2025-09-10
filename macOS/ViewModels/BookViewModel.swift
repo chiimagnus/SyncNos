@@ -5,13 +5,19 @@ import SQLite3
 // MARK: - BookViewModel
 
 class BookViewModel: ObservableObject {
-    @Published var books: [BookExport] = []
+    @Published var books: [BookListItem] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
     private let databaseService: DatabaseServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
     private var dbRootOverride: String?
+    private var annotationDBPath: String?
+    private var booksDBPath: String?
+    
+    // Public readonly accessors
+    var annotationDatabasePath: String? { annotationDBPath }
+    var booksDatabasePath: String? { booksDBPath }
     
     // MARK: - Initialization
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
@@ -79,6 +85,7 @@ class BookViewModel: ObservableObject {
         }
     }
     
+    // Legacy helper kept for potential future export features
     func buildExport(annotations: [HighlightRow], books: [BookRow], filters: Filters?) -> [BookExport] {
         var highlightsByAsset: [String: [Highlight]] = [:]
         for row in annotations {
@@ -105,7 +112,7 @@ class BookViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
-    private func fetchBooksFromDatabase() throws -> [BookExport] {
+    private func fetchBooksFromDatabase() throws -> [BookListItem] {
         guard let root = dbRootOverride else {
             print("Books data root not selected; skipping load until user picks a folder")
             return []
@@ -131,6 +138,8 @@ class BookViewModel: ObservableObject {
             throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
         print("Found books DB: \(booksDB)")
+        self.annotationDBPath = annotationDB
+        self.booksDBPath = booksDB
         
         // 直接使用原始数据库文件路径，不进行复制
         let adbH = try databaseService.openReadOnlyDatabase(dbPath: annotationDB)
@@ -144,19 +153,30 @@ class BookViewModel: ObservableObject {
             print("Closed books DB")
         }
         
-        let annotations = try databaseService.fetchAnnotations(db: adbH)
-        print("Fetched \(annotations.count) annotations")
-        
-        let assetIds = Array(Set(annotations.map { $0.assetId })).sorted()
-        print("Found \(assetIds.count) unique asset IDs")
-        
+        // 获取每本书的高亮数量（而不是把全部高亮读入内存）
+        let counts = try databaseService.fetchHighlightCountsByAsset(db: adbH)
+        let assetIds = counts.map { $0.assetId }.sorted()
+        print("Found \(assetIds.count) assets with highlights")
         let books = try databaseService.fetchBooks(db: bdbH, assetIds: assetIds)
-        print("Fetched \(books.count) books")
+        print("Fetched \(books.count) books for counts")
         
-        let filters = Filters(bookSubstrings: [], authorSubstrings: [], assetIds: [])
-        let exportData = buildExport(annotations: annotations, books: books, filters: filters)
+        var countIndex: [String: Int] = [:]
+        for c in counts {
+            countIndex[c.assetId] = c.count
+        }
         
-        return exportData
+        var result: [BookListItem] = []
+        for b in books {
+            let cnt = countIndex[b.assetId] ?? 0
+            result.append(BookListItem(bookId: b.assetId,
+                                       authorName: b.author,
+                                       bookTitle: b.title,
+                                       ibooksURL: "ibooks://assetid/\(b.assetId)",
+                                       highlightCount: cnt))
+        }
+        let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
+        print("Built list with \(sorted.count) books (counts only)")
+        return sorted
     }
     
     private func latestSQLiteFile(in dir: String) -> String? {

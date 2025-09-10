@@ -42,3 +42,18 @@ struct Filters {
     let authorSubstrings: [String]
     let assetIds: [String] 
 }
+
+// Lightweight model for listing books without loading all highlights
+struct BookListItem: Codable {
+    let bookId: String
+    let authorName: String
+    let bookTitle: String
+    let ibooksURL: String
+    let highlightCount: Int
+}
+
+// Aggregated highlight count per asset/book
+struct AssetHighlightCount {
+    let assetId: String
+    let count: Int
+}
