@@ -81,6 +81,29 @@ struct BooksListView: View {
                 }
             }
         }
+        .onAppear {
+            if let url = BookmarkStore.shared.restore() {
+                let started = BookmarkStore.shared.startAccessing(url: url)
+                print("Using restored bookmark on appear, startAccess=\(started)")
+                let selectedPath = url.path
+                let fm = FileManager.default
+                var rootCandidate = selectedPath
+                let maybeDataDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
+                let aeAnnoInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("AEAnnotation")
+                let bkLibInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("BKLibrary")
+                if fm.fileExists(atPath: aeAnnoInDataDocs) || fm.fileExists(atPath: bkLibInDataDocs) {
+                    rootCandidate = maybeDataDocs
+                } else {
+                    let aeAnno = (selectedPath as NSString).appendingPathComponent("AEAnnotation")
+                    let bkLib = (selectedPath as NSString).appendingPathComponent("BKLibrary")
+                    if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
+                        rootCandidate = selectedPath
+                    }
+                }
+                viewModel.setDbRootOverride(rootCandidate)
+                viewModel.loadBooks()
+            }
+        }
     }
 
     // MARK: - Private Helpers
@@ -99,6 +122,9 @@ struct BooksListView: View {
 
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
+            // Persist security-scoped bookmark for future launches
+            BookmarkStore.shared.save(folderURL: url)
+            _ = BookmarkStore.shared.startAccessing(url: url)
             let selectedPath = url.path
 
             // Normalize selection to the root that contains AEAnnotation/BKLibrary under Data/Documents
