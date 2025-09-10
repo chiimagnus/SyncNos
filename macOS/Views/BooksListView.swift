@@ -39,14 +39,14 @@ struct BooksListView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(viewModel.books, id: \.bookId) { book in
-                        NavigationLink(destination: BookDetailView(book: book)) {
+                        NavigationLink(destination: BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)) {
                             VStack(alignment: .leading) {
                                 Text(book.bookTitle)
                                     .font(.headline)
                                 Text(book.authorName)
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
-                                Text("\(book.highlights.count) highlights")
+                                Text("\(book.highlightCount) highlights")
                                     .font(.caption)
 //                                    .foregroundColor(.tertiary)
                             }

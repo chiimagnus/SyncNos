@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 
 struct BookDetailView: View {
-    let book: BookExport
+    let book: BookListItem
+    let annotationDBPath: String?
+    @StateObject private var viewModel = BookDetailViewModel()
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -62,7 +64,7 @@ struct BookDetailView: View {
                         .font(.title2)
                         .foregroundColor(.secondary)
                     
-                    Text("\(book.highlights.count) highlights")
+                    Text("\(book.highlightCount) highlights")
                         .font(.subheadline)
 //                        .foregroundColor(.tertiary)
                     
@@ -76,7 +78,7 @@ struct BookDetailView: View {
                 
                 // Highlights section
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(book.highlights, id: \.uuid) { highlight in
+                    ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 // Display highlight style/color indicator
@@ -151,10 +153,30 @@ struct BookDetailView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                    if viewModel.canLoadMore {
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                viewModel.loadNextPage(dbPath: annotationDBPath, assetId: book.bookId)
+                            }) {
+                                if viewModel.isLoadingPage {
+                                    ProgressView()
+                                } else {
+                                    Text("加载更多")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+                    }
                 }
                 .padding(.top)
             }
             .padding()
+        }
+        .onAppear {
+            viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
         .navigationTitle("Highlights")
     }
@@ -162,19 +184,14 @@ struct BookDetailView: View {
 
 struct BookDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        let sampleBook = BookExport(
-            bookId: "sample-id",
-            authorName: "Sample Author",
-            bookTitle: "Sample Book Title",
-            ibooksURL: "ibooks://assetid/sample-id",
-            highlights: [
-                Highlight(uuid: "highlight-1", text: "This is a sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil),
-                Highlight(uuid: "highlight-2", text: "This is another sample highlight text.", note: nil, style: nil, dateAdded: nil, modified: nil, location: nil)
-            ]
-        )
+        let sampleBook = BookListItem(bookId: "sample-id",
+                                       authorName: "Sample Author",
+                                       bookTitle: "Sample Book Title",
+                                       ibooksURL: "ibooks://assetid/sample-id",
+                                       highlightCount: 123)
         
         NavigationView {
-            BookDetailView(book: sampleBook)
+            BookDetailView(book: sampleBook, annotationDBPath: nil)
         }
     }
 }

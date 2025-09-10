@@ -30,6 +30,15 @@ class DatabaseService: DatabaseServiceProtocol {
         return try queryService.fetchBooks(db: db, assetIds: assetIds)
     }
     
+    // Pagination and aggregation
+    func fetchHighlightCountsByAsset(db: OpaquePointer) throws -> [AssetHighlightCount] {
+        return try queryService.fetchHighlightCountsByAsset(db: db)
+    }
+    
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
+        return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset)
+    }
+    
     // MARK: - Filter Methods
     func matches(book: BookRow, filters: Filters) -> Bool {
         return filterService.matches(book: book, filters: filters)
