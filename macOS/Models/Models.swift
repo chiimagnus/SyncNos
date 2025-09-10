@@ -16,6 +16,7 @@ struct Highlight: Codable {
     let style: Int?
     let dateAdded: Date?
     let modified: Date?
+    let location: String?
 }
 
 struct BookExport: Codable {
@@ -34,6 +35,7 @@ struct HighlightRow {
     let style: Int?
     let dateAdded: Date?
     let modified: Date?
+    let location: String?
 }
 
 struct BookRow { 

@@ -45,7 +45,8 @@ class DatabaseQueryService {
             "ZANNOTATIONNOTE": "note",
             "ZANNOTATIONSTYLE": "style",
             "ZANNOTATIONCREATIONDATE": "dateAdded",
-            "ZANNOTATIONMODIFICATIONDATE": "modified"
+            "ZANNOTATIONMODIFICATIONDATE": "modified",
+            "ZANNOTATIONLOCATION": "location"
         ]
         
         var nextIndex = 3
@@ -86,6 +87,7 @@ class DatabaseQueryService {
             var style: Int? = nil
             var dateAdded: Date? = nil
             var modified: Date? = nil
+            var location: String? = nil
             
             // 根据实际的列索引获取数据
             if let noteIndex = columnIndices["ZANNOTATIONNOTE"], noteIndex < Int(sqlite3_column_count(stmt)) {
@@ -110,7 +112,13 @@ class DatabaseQueryService {
                 }
             }
             
-            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified))
+            if let locationIndex = columnIndices["ZANNOTATIONLOCATION"], locationIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(locationIndex)) != SQLITE_NULL {
+                    location = sqlite3_column_text(stmt, Int32(locationIndex)).map { String(cString: $0) }
+                }
+            }
+            
+            rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified, location: location))
             count += 1
         }
         sqlite3_finalize(stmt)
