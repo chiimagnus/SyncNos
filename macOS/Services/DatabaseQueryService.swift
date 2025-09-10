@@ -1,10 +1,3 @@
-//
-//  DatabaseQueryService.swift
-//  SyncBookNotesWithNotion
-//
-//  Created by chii_magnus on 2025/9/10.
-//
-
 import Foundation
 import SQLite3
 
