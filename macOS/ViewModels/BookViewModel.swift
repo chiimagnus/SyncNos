@@ -94,18 +94,13 @@ class BookViewModel: ObservableObject {
         }
         print("Found books DB: \(booksDB)")
         
-        let adbPath = ensureTempCopyIfLocked(originalPath: annotationDB)
-        let bdbPath = ensureTempCopyIfLocked(originalPath: booksDB)
-        
-        print("Using annotation DB copy: \(adbPath)")
-        print("Using books DB copy: \(bdbPath)")
-        
-        let adbH = try databaseService.openReadOnlyDatabase(dbPath: adbPath)
+        // 直接使用原始数据库文件路径，不进行复制
+        let adbH = try databaseService.openReadOnlyDatabase(dbPath: annotationDB)
         defer { 
             databaseService.close(adbH)
             print("Closed annotation DB")
         }
-        let bdbH = try databaseService.openReadOnlyDatabase(dbPath: bdbPath)
+        let bdbH = try databaseService.openReadOnlyDatabase(dbPath: booksDB)
         defer { 
             databaseService.close(bdbH)
             print("Closed books DB")
@@ -174,20 +169,5 @@ class BookViewModel: ObservableObject {
         let latestFile = sorted.first?.path
         print("Latest SQLite file in \(dir): \(latestFile ?? "none")")
         return latestFile
-    }
-    
-    private func ensureTempCopyIfLocked(originalPath: String) -> String {
-        let url = URL(fileURLWithPath: originalPath)
-        let tempDir = NSTemporaryDirectory()
-        let tempURL = URL(fileURLWithPath: tempDir).appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
-        
-        do {
-            try FileManager.default.copyItem(at: url, to: tempURL)
-            print("Copied DB from \(originalPath) to \(tempURL.path)")
-            return tempURL.path
-        } catch {
-            print("Failed to copy DB from \(originalPath) to \(tempURL.path): \(error.localizedDescription)")
-            return originalPath
-        }
     }
 }
