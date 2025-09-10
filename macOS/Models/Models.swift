@@ -14,7 +14,6 @@ struct Highlight: Codable {
     let text: String
     let note: String?
     let style: Int?
-    let stylingColor: String?
     let dateAdded: Date?
     let modified: Date?
     let location: Int?
@@ -36,7 +35,6 @@ struct HighlightRow {
     let text: String 
     let note: String?
     let style: Int?
-    let stylingColor: String?
     let dateAdded: Date?
     let modified: Date?
     let location: Int?
