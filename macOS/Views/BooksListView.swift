@@ -81,9 +81,6 @@ struct BooksListView: View {
                 }
             }
         }
-        .onAppear {
-            viewModel.loadBooks()
-        }
     }
 
     // MARK: - Private Helpers
