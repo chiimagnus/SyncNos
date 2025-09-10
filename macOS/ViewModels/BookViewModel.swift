@@ -130,12 +130,31 @@ class BookViewModel: ObservableObject {
         if let override = dbRootOverride {
             return override
         }
+        
+        // 在沙盒环境中，我们需要使用正确的路径来访问 Apple Books 数据
+        // Apple Books 数据存储在 ~/Library/Containers/com.apple.iBooksX/Data/Documents 中
         let home = NSHomeDirectory()
-        return "\(home)/Library/Containers/com.apple.iBooksX/Data/Documents"
+        let booksRoot = "\(home)/Library/Containers/com.apple.iBooksX/Data/Documents"
+        print("Using books root path: \(booksRoot)")
+        return booksRoot
     }
     
     private func latestSQLiteFile(in dir: String) -> String? {
         let url = URL(fileURLWithPath: dir)
+        print("Checking directory: \(dir)")
+        
+        // 检查目录是否存在
+        var isDir: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: dir, isDirectory: &isDir) {
+            print("Directory does not exist: \(dir)")
+            return nil
+        }
+        
+        if !isDir.boolValue {
+            print("Path is not a directory: \(dir)")
+            return nil
+        }
+        
         guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey]) else {
             print("Failed to list contents of directory: \(dir)")
             return nil
