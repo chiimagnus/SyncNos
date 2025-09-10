@@ -130,7 +130,7 @@ macOS/
 1. **数据模型**: Models.swift 中的结构体可直接复用
 2. **数据库访问逻辑**: SQLiteHelpers.swift 中的函数可封装为服务
 3. **数据处理逻辑**: Export.swift 和 MainFlow.swift 中的部分逻辑可复用
-4. **文件系统工具**: FSUtils.swift 中的辅助函数
+4. **文件系统工具**: macOS项目中的辅助函数
 
 ### 需要重新实现的部分
 1. **命令行参数解析**: 替换为 SwiftUI 界面交互
