@@ -1,30 +1,24 @@
-# SyncBookNotes
-我想做个Apple books高亮笔记、注释的导出app，或者做成命令行：）需要保存到notion中的。最好是同步。
+# SyncBookNotes — 只保留对用户的价值
 
-因为我发现obsidian 中的Apple Books笔记同步功能很糟糕：）
+SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据，目标是让笔记可以被长期保存、搜索和同步到第三方工具（如Notion）。
 
-难点：接下来要解决的问题是，获取到Apple 图书app的数据。
+## 为什么使用
+- 直接导出 Apple Books 笔记，避免手动复制粘贴
+- 导出为 JSON/Markdown，便于归档或导入其他笔记工具
 
-参考：https://github.com/atfzl/obsidian-apple-books-plugin?tab=readme-ov-file
+## 主要功能（可用）
+- 从本地 Apple Books 数据库读取高亮与注释
+- 导出为 JSON、Markdown
+- 按书名/作者/assetId 过滤导出内容
 
+## 常见问题
+- 我可以直接同步到 Notion 吗？
+  - 目前支持导出；Notion 同步为后续功能。
+- 支持批量导出吗？
+  - 支持按书籍批量导出（UI 中选择多个书籍）。
 
-我现在想做： @README.md 
-然后目前的计划是@TODO.md 
+## 计划
+- 扩展到更多的无官方同步笔记的平台
 
-book note的数据解析可以参考 @obsidian-apple-books-plugin/ 项目中的@main.ts 来实现。
-
-我们要做的事情分以下几个步骤：
-1、实现解析Apple book note数据
-2、导出笔记为json、markdown文件。
-3、集成notion app，同步数据到notion。
-
-## Apple Books URL Scheme
-Apple Books支持以下URL scheme用于深度链接：
-
-- 打开指定书籍：`ibooks://assetid/{bookAssetId}`
-- 打开指定书籍的高亮笔记位置：`ibooks://assetid/{bookAssetId}#{epubCFI}`
-
-其中：
-- `{bookAssetId}` 是书籍的唯一标识符
-- `{epubCFI}` 是EPUB Canonical Fragment Identifier，用于精确定位书籍中的位置，比如：`ibooks://assetid/6DD1DDFBA85918A22B61BD5884B3856F#epubcfi(/6/12[Chapter_0002.xhtml]!/4,/6/1:0,/12/1:0)`
-
+## 贡献
+- 欢迎提交 Issue 或 PR：简单明了地描述问题或改进点即可。
