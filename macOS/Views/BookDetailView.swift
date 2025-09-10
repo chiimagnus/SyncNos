@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct BookDetailView: View {
     let book: BookExport
@@ -100,6 +101,16 @@ struct BookDetailView: View {
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                // Add link to open highlight in Apple Books
+                                Button("在Apple Books中打开") {
+                                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(highlight.uuid)")!
+                                    NSWorkspace.shared.open(url)
+                                }
+                                .font(.caption)
+                                .foregroundColor(.blue)
                             }
                             
                             Text(highlight.text)
@@ -117,7 +128,7 @@ struct BookDetailView: View {
                             
                             HStack {
                                 if let style = highlight.style {
-                                    Text("Style: \(style)")
+                                    Text("Style: \(Self.highlightStyleText(for: style))")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
