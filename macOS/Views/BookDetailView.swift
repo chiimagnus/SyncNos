@@ -60,6 +60,7 @@ struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
+    @State private var isSyncing = false
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -193,6 +194,9 @@ struct BookDetailView: View {
                     }
                     .padding(.top, 8)
                 }
+                if let msg = viewModel.syncMessage {
+                    Text(msg).font(.footnote).foregroundColor(.secondary)
+                }
             }
             .padding()
         }
@@ -200,6 +204,16 @@ struct BookDetailView: View {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
         .navigationTitle("Highlights")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    Task { await viewModel.syncToNotion(book: book, dbPath: annotationDBPath) }
+                }) {
+                    Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .help("Create/locate syncnote DB, create/locate book page, and append new highlights.")
+            }
+        }
     }
 }
 

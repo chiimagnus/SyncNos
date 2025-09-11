@@ -33,6 +33,13 @@ protocol NotionServiceProtocol: AnyObject {
     func createDatabase(title: String) async throws -> NotionDatabase
     func createPage(databaseId: String, pageTitle: String, header: String?) async throws -> NotionPage
     func appendParagraph(pageId: String, content: String) async throws -> NotionAppendResult
+    // Extended sync helpers
+    func findDatabaseId(title: String, parentPageId: String) async throws -> String?
+    func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String?
+    func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage
+    func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
+    func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
+    func updatePageHighlightCount(pageId: String, count: Int) async throws
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
