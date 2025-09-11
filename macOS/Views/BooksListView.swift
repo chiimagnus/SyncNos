@@ -3,6 +3,9 @@ import AppKit
 
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
+    @State private var isShowingNotionConfig = false
+    @State private var isSyncing = false
+    @State private var syncStatus: String?
     
     var body: some View {
         NavigationView {
@@ -35,6 +38,12 @@ struct BooksListView: View {
                             viewModel.loadBooks()
                         }
                         .buttonStyle(.borderedProminent)
+                        if let syncStatus = syncStatus {
+                            Text(syncStatus)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -73,12 +82,32 @@ struct BooksListView: View {
                     }
                     .help("选择 Apple Books 容器目录并加载笔记")
                 }
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { isShowingNotionConfig = true }) {
+                        Image(systemName: "gearshape")
+                    }
+                    .help("Notion 配置")
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { Task { await syncAllToNotion() } }) {
+                        if isSyncing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .disabled(isSyncing || viewModel.annotationDatabasePath == nil || viewModel.books.isEmpty)
+                    .help("同步到 Notion")
+                }
             }
+        }
+        .sheet(isPresented: $isShowingNotionConfig) {
+            NotionConfigView()
         }
         .onAppear {
             if let url = BookmarkStore.shared.restore() {
                 let started = BookmarkStore.shared.startAccessing(url: url)
-                print("Using restored bookmark on appear, startAccess=\(started)")
+                AppLogger.shared.info("Using restored bookmark on appear, startAccess=\(started)")
                 let selectedPath = url.path
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
@@ -118,6 +147,29 @@ struct BooksListView: View {
             DispatchQueue.main.async {
                 viewModel.setDbRootOverride(rootCandidate)
                 viewModel.loadBooks()
+            }
+        }
+    }
+
+    // MARK: - Notion Sync
+    private func syncAllToNotion() async {
+        guard let adb = viewModel.annotationDatabasePath else { return }
+        isSyncing = true
+        syncStatus = "准备同步..."
+        defer { isSyncing = false }
+        let syncService = NotionSyncService()
+        do {
+            try await syncService.syncAll(annotationDbPath: adb, books: viewModel.books) { book, done, total in
+                DispatchQueue.main.async {
+                    self.syncStatus = "\(book.bookTitle): \(done)/\(total)"
+                }
+            }
+            DispatchQueue.main.async {
+                self.syncStatus = "完成"
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.syncStatus = "错误: \(error.localizedDescription)"
             }
         }
     }
