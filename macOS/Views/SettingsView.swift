@@ -15,7 +15,6 @@ struct SettingsView: View {
                 }
 
                 Section(header: Text("Integrations")) {
-                    // Use NavigationLink so NotionIntegrationView is pushed onto the navigation stack
                     NavigationLink(destination: NotionIntegrationView()) {
                         Label("Notion Integration", systemImage: "n.square")
                     }
@@ -59,10 +58,6 @@ struct SettingsView: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            SettingsView()
-        }
+        SettingsView()
     }
 }
-
-
