@@ -22,9 +22,9 @@ struct SettingsView: View {
                 }
             }
             .listStyle(SidebarListStyle())
-            .frame(minWidth: 200, minHeight: 200)
         }
         .navigationTitle("Settings")
+        .frame(minWidth: 320, idealWidth: 375, maxWidth: 375)
     }
 
     // Replicate the Apple Books picker behavior from BooksListView
