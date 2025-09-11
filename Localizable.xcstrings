@@ -222,7 +222,14 @@
       }
     },
     "Notion Integration" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notion 集成"
+          }
+        }
+      }
     },
     "NOTION_KEY" : {
       "localizations" : {
@@ -245,7 +252,14 @@
       }
     },
     "Open Apple Books notes" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Apple Books 笔记"
+          }
+        }
+      }
     },
     "Open in Apple Books" : {
       "localizations" : {
@@ -258,7 +272,14 @@
       }
     },
     "Open Settings" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
+          }
+        }
+      }
     },
     "Page ID: %@" : {
       "localizations" : {
@@ -320,8 +341,25 @@
         }
       }
     },
+    "Select a book to view details" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择一本书以查看详细信息"
+          }
+        }
+      }
+    },
     "Settings" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
