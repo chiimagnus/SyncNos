@@ -4,159 +4,324 @@
     "%lld highlights" : {
       "localizations" : {
         "zh-Hans" : {
-          "stringUnit" : { "state" : "translated", "value" : "%lld 个高亮" }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个高亮"
+          }
         }
       }
     },
     "1. Create a new database" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建新的数据库" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建新的数据库"
+          }
+        }
       }
     },
     "2. Add a page to the database" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在此数据库添加新页" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此数据库添加新页"
+          }
+        }
       }
     },
     "3. Add content to the page" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "向该页面添加内容" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向该页面添加内容"
+          }
+        }
       }
     },
     "Append Paragraph" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "追加段落" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加段落"
+          }
+        }
       }
     },
     "Books" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "书籍" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书籍"
+          }
+        }
       }
     },
     "by %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "作者：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作者：%@"
+          }
+        }
       }
     },
     "Choose Apple Books container directory and load notes" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择 Apple Books 容器目录并加载笔记" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 Apple Books 容器目录并加载笔记"
+          }
+        }
       }
     },
     "Configure Notion and run example API calls" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 Notion 并执行示例 API 调用" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置 Notion 并执行示例 API 调用"
+          }
+        }
       }
     },
     "Create Database" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建数据库" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建数据库"
+          }
+        }
       }
     },
     "Create Page" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建页面" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建页面"
+          }
+        }
       }
     },
     "Created: %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建：%@"
+          }
+        }
       }
     },
     "Credentials" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "凭据" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "凭据"
+          }
+        }
       }
     },
     "Database ID: %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据库 ID：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据库 ID：%@"
+          }
+        }
       }
     },
     "Database title" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据库标题" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据库标题"
+          }
+        }
       }
     },
     "Error: %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "错误：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "错误：%@"
+          }
+        }
       }
     },
     "Header (optional)" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "标题（可选）" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题（可选）"
+          }
+        }
       }
     },
     "Highlights" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "高亮" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高亮"
+          }
+        }
       }
     },
     "Load more" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加载更多" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载更多"
+          }
+        }
       }
     },
     "Loading books..." : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载书籍..." } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载书籍..."
+          }
+        }
       }
     },
     "Modified: %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "修改：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改：%@"
+          }
+        }
       }
     },
     "No books found" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未找到书籍" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到书籍"
+          }
+        }
       }
+    },
+    "Notion Integration" : {
+
     },
     "NOTION_KEY" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "NOTION_KEY" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NOTION_KEY"
+          }
+        }
       }
     },
     "NOTION_PAGE_ID" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "NOTION_PAGE_ID" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NOTION_PAGE_ID"
+          }
+        }
       }
+    },
+    "Open Apple Books notes" : {
+
     },
     "Open in Apple Books" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Apple Books 中打开" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Apple Books 中打开"
+          }
+        }
       }
+    },
+    "Open Settings" : {
+
     },
     "Page ID: %@" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "页面 ID：%@" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面 ID：%@"
+          }
+        }
       }
     },
     "Page title" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "页面标题" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面标题"
+          }
+        }
       }
     },
     "Paragraph content" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "段落内容" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "段落内容"
+          }
+        }
       }
     },
     "Refresh" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新"
+          }
+        }
       }
     },
     "Retry" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        }
       }
     },
     "Save" : {
       "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存" } }
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
       }
+    },
+    "Settings" : {
+
     }
   },
   "version" : "1.0"
