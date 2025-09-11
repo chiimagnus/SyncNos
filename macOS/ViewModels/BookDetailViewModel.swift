@@ -121,14 +121,18 @@ class BookDetailViewModel: ObservableObject {
         guard let parentPageId = DIContainer.shared.notionConfigStore.notionPageId else {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please set NOTION_PAGE_ID in Notion Integration view."])
         }
-        // Ensure database exists
+        // Ensure database exists (prefer stored syncDatabaseId; otherwise find/create and store it)
         let dbTitle = "syncnote"
         let databaseId: String
-        if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
+        if let saved = DIContainer.shared.notionConfigStore.syncDatabaseId {
+            databaseId = saved
+        } else if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
             databaseId = found
+            DIContainer.shared.notionConfigStore.syncDatabaseId = found
         } else {
             let created = try await notionService.createDatabase(title: dbTitle)
             databaseId = created.id
+            DIContainer.shared.notionConfigStore.syncDatabaseId = created.id
         }
         // Ensure book page exists (by Asset ID)
         let pageId: String

@@ -26,6 +26,7 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
+    var syncDatabaseId: String? { get set }
 }
 
 // MARK: - Notion Service Protocol
