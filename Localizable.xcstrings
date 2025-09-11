@@ -241,6 +241,9 @@
         }
       }
     },
+    "General" : {
+
+    },
     "Header (optional)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -260,6 +263,9 @@
           }
         }
       }
+    },
+    "Integrations" : {
+
     },
     "Load more" : {
       "localizations" : {
@@ -300,6 +306,9 @@
           }
         }
       }
+    },
+    "Notion" : {
+
     },
     "Notion Integration" : {
       "localizations" : {
