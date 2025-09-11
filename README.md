@@ -2,7 +2,7 @@
 
 [![macOS](https://img.shields.io/badge/macOS-13+-blue.svg)](https://developer.apple.com/macos/)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-orange.svg)](https://developer.apple.com/documentation/swiftui/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL3.0-green.svg)](LICENSE)
 
 SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据，目标是让笔记可以被长期保存、搜索和同步到第三方工具（如Notion）。
 
