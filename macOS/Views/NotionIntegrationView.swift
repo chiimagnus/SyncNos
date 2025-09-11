@@ -51,6 +51,11 @@ struct NotionIntegrationView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     TextField("Existing Database ID", text: $viewModel.existingDatabaseIdInput)
                         .textFieldStyle(.roundedBorder)
+                    Button("Use as default for future syncs") {
+                        DIContainer.shared.notionConfigStore.syncDatabaseId = viewModel.existingDatabaseIdInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        viewModel.message = "Saved default database id"
+                    }
+                    .buttonStyle(.bordered)
                     TextField("Page title (for existing DB)", text: $viewModel.existingDbPageTitleInput)
                         .textFieldStyle(.roundedBorder)
                     TextField("Header (optional)", text: $viewModel.existingDbHeaderInput)

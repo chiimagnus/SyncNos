@@ -31,6 +31,8 @@ final class NotionIntegrationViewModel: ObservableObject {
         self.notionService = notionService
         self.notionKeyInput = notionConfig.notionKey ?? ""
         self.notionPageIdInput = notionConfig.notionPageId ?? ""
+        // Pre-fill existing sync database id (if any) into the UI helpers
+        self.existingDatabaseIdInput = notionConfig.syncDatabaseId ?? ""
     }
     
     func saveCredentials() {
