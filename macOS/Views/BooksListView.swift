@@ -3,14 +3,13 @@ import AppKit
 
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
-    @State private var showNotionSheet = false
-    
+    @State private var selectedBookId: String? = nil
+
     var body: some View {
-        NavigationView {
-            VStack {
+        NavigationSplitView {
+            Group {
                 if viewModel.isLoading {
                     ProgressView("Loading books...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage = viewModel.errorMessage {
                     VStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -19,12 +18,9 @@ struct BooksListView: View {
                         Text("Error: \(errorMessage)")
                             .multilineTextAlignment(.center)
                             .padding()
-                        Button("Retry") {
-                            viewModel.loadBooks()
-                        }
-                        .buttonStyle(.borderedProminent)
+                        Button("Retry") { viewModel.loadBooks() }
+                            .buttonStyle(.borderedProminent)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if viewModel.books.isEmpty {
                     VStack {
                         Image(systemName: "books.vertical")
@@ -32,52 +28,47 @@ struct BooksListView: View {
                             .font(.largeTitle)
                         Text("No books found")
                             .padding()
-                        Button("Refresh") {
-                            viewModel.loadBooks()
-                        }
-                        .buttonStyle(.borderedProminent)
+                        Button("Refresh") { viewModel.loadBooks() }
+                            .buttonStyle(.borderedProminent)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(viewModel.books, id: \.bookId) { book in
-                        NavigationLink(destination: BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)) {
-                            VStack(alignment: .leading) {
-                                Text(book.bookTitle)
-                                    .font(.headline)
-                                Text(book.authorName)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                Text("\(book.highlightCount) highlights")
-                                    .font(.caption)
-//                                    .foregroundColor(.tertiary)
+                    List(selection: $selectedBookId) {
+                        ForEach(viewModel.books, id: \.bookId) { book in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(book.bookTitle).font(.headline)
+                                    Text(book.authorName).font(.subheadline).foregroundColor(.secondary)
+                                    Text("\(book.highlightCount) highlights").font(.caption)
+                                }
+                                Spacer()
                             }
                             .padding(.vertical, 4)
+                            .tag(book.bookId)
                         }
                     }
-                    .listStyle(SidebarListStyle())
-                    .background(.thinMaterial)
+                    .listStyle(.sidebar)
                 }
             }
             .navigationTitle("Books")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: {
-                        viewModel.loadBooks()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh")
+                    Button(action: { viewModel.loadBooks() }) { Label("Refresh", systemImage: "arrow.clockwise") }
+                        .help("Refresh")
                 }
                 ToolbarItem(placement: .automatic) {
                     Button(action: { NotificationCenter.default.post(name: Notification.Name("ShowSettings"), object: nil) }) {
-                        Image(systemName: "gearshape")
+                        Label("Settings", systemImage: "gearshape")
                     }
                     .help("Open Settings")
                 }
             }
-        }
-        .sheet(isPresented: $showNotionSheet) {
-            NotionIntegrationView()
+        } detail: {
+            // Detail content: show selected book details
+            if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
+                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
+            } else {
+                Text("Select a book to view details").foregroundColor(.secondary)
+            }
         }
         .onAppear {
             if let url = BookmarkStore.shared.restore() {
