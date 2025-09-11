@@ -24,6 +24,11 @@ struct SettingsView: View {
             .listStyle(SidebarListStyle())
         }
         .navigationTitle("Settings")
+        .toolbar {
+            ToolbarItem {
+                Text("")
+            }
+        }
         .frame(minWidth: 320, idealWidth: 375, maxWidth: 375)
     }
 
