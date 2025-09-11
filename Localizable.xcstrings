@@ -331,16 +331,6 @@
         }
       }
     },
-    "Notion" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion"
-          }
-        }
-      }
-    },
     "Notion Integration" : {
       "localizations" : {
         "zh-Hans" : {
