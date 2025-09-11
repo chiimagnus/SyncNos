@@ -6,7 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D8CCCCA42E72DB3C00ED8EFA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */; };
+		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -32,6 +39,8 @@
 		D81167B32E70A13F000D0173 = {
 			isa = PBXGroup;
 			children = (
+				D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */,
+				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* macOS */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
@@ -91,6 +100,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
@@ -109,6 +119,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */,
+				D8CCCCA42E72DB3C00ED8EFA /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +197,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -242,6 +255,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
 		};
