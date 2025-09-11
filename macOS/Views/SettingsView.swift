@@ -2,39 +2,28 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
-    @State private var showNotionIntegration = false
     @State private var isLoading: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Settings")
-                .font(.title2)
-
-            HStack(spacing: 12) {
+        List {
+            Section(header: Text("General")) {
                 Button(action: pickAppleBooksContainer) {
-                    HStack {
-                        Image(systemName: "book")
-                        Text("Open Apple Books notes")
-                    }
+                    Label("Open Apple Books notes", systemImage: "book")
                 }
                 .help("Choose Apple Books container directory and load notes")
+            }
 
-                Button(action: { showNotionIntegration = true }) {
-                    HStack {
-                        Image(systemName: "n.square")
-                        Text("Notion Integration")
-                    }
+            Section(header: Text("Integrations")) {
+                // Use NavigationLink so NotionIntegrationView is pushed onto the navigation stack
+                NavigationLink(destination: NotionIntegrationView()) {
+                    Label("Notion Integration", systemImage: "n.square")
                 }
                 .help("Configure Notion and run example API calls")
             }
-
-            Spacer()
         }
-        .padding()
-        .frame(minWidth: 420, minHeight: 160)
-        .sheet(isPresented: $showNotionIntegration) {
-            NotionIntegrationView()
-        }
+//        .listStyle(InsetGroupedListStyle())
+        .frame(minWidth: 420, minHeight: 200)
+        .navigationTitle("Settings")
     }
 
     // Replicate the Apple Books picker behavior from BooksListView
@@ -68,7 +57,9 @@ struct SettingsView: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView()
+        NavigationView {
+            SettingsView()
+        }
     }
 }
 
