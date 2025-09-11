@@ -20,7 +20,7 @@ struct macOSApp: App {
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Settings…") {
+                Button("Settings") {
                     SettingsWindow.show()
                 }
                 .keyboardShortcut(",", modifiers: .command)

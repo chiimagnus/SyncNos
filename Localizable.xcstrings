@@ -81,6 +81,16 @@
         }
       }
     },
+    "Back" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        }
+      }
+    },
     "Books" : {
       "localizations" : {
         "zh-Hans" : {
