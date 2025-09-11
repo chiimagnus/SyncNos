@@ -133,13 +133,13 @@ struct BookDetailView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         if let dateAdded = highlight.dateAdded {
-                                            Text("创建：\(dateAdded, formatter: Self.dateFormatter)")
+                                            Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
 
                                         if let modified = highlight.modified {
-                                            Text("修改：\(modified, formatter: Self.dateFormatter)")
+                                            Text("Modified: \(modified, formatter: Self.dateFormatter)")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
@@ -169,8 +169,8 @@ struct BookDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(8)
-                            .help("在 Apple Books 中打开")
-                            .accessibilityLabel("在 Apple Books 中打开")
+                            .help("Open in Apple Books")
+                            .accessibilityLabel("Open in Apple Books")
                         }
                     }
                 }
@@ -185,7 +185,7 @@ struct BookDetailView: View {
                             if viewModel.isLoadingPage {
                                 ProgressView()
                             } else {
-                                Text("加载更多")
+                                Text("Load more")
                             }
                         }
                         .buttonStyle(.borderedProminent)

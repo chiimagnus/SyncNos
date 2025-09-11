@@ -69,16 +69,16 @@ struct BooksListView: View {
                     .help("Refresh")
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button("查看Apple Books笔记") {
+                    Button("Open Apple Books notes") {
                         pickAppleBooksContainer()
                     }
-                    .help("选择 Apple Books 容器目录并加载笔记")
+                    .help("Choose Apple Books container directory and load notes")
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button("Notion 集成") {
+                    Button("Notion Integration") {
                         showNotionSheet = true
                     }
-                    .help("配置 Notion 并执行示例 API 调用")
+                    .help("Configure Notion and run example API calls")
                 }
             }
         }
@@ -108,8 +108,8 @@ struct BooksListView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "选择"
-        panel.message = "请选择 Apple Books 容器目录（com.apple.iBooksX）或其 Data/Documents 路径"
+        panel.prompt = "Choose"
+        panel.message = "Please choose the Apple Books container directory (com.apple.iBooksX) or its Data/Documents path"
 
         let home = NSHomeDirectory()
         let defaultContainer = "\(home)/Library/Containers/com.apple.iBooksX"
