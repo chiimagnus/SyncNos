@@ -104,7 +104,7 @@ struct NotionIntegrationView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Notion")
+        .navigationTitle("Notion Integration")
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: { dismiss() }) {
