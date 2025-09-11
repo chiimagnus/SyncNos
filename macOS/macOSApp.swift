@@ -11,13 +11,10 @@ struct macOSApp: App {
             print("No saved bookmark to restore")
         }
     }
+    
     var body: some Scene {
         WindowGroup {
             BooksListView()
-        }
-
-        WindowGroup(id: "settingsview") {
-            SettingsView()
         }
     }
 }
