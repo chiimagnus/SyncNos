@@ -16,6 +16,7 @@ struct macOSApp: App {
         WindowGroup {
             BooksListView()
         }
+        
         Settings {
             SettingsView()
         }
