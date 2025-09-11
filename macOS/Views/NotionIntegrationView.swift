@@ -4,7 +4,8 @@ struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
             GroupBox("Credentials") {
                 VStack(alignment: .leading, spacing: 8) {
                     SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
@@ -98,10 +99,12 @@ struct NotionIntegrationView: View {
                 Text(message).foregroundColor(.secondary)
             }
             
-            Spacer()
+                Spacer()
+            }
+            .padding()
+            .frame(minWidth: 520, minHeight: 520)
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 520)
+        .navigationTitle("Notion")
     }
 }
 
