@@ -22,14 +22,10 @@ struct SettingsView: View {
                 .help("Configure Notion and run example API calls")
             }
             }
-            //        .listStyle(InsetGroupedListStyle())
+            .listStyle(SidebarListStyle())
             .frame(minWidth: 200, minHeight: 200)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Settings").font(.headline)
-                }
-            }
         }
+        .navigationTitle("Settings")
     }
 
     // Replicate the Apple Books picker behavior from BooksListView
