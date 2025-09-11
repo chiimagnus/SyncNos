@@ -20,3 +20,35 @@ protocol BookmarkStoreProtocol {
     func startAccessing(url: URL) -> Bool
     func stopAccessingIfNeeded()
 }
+
+// MARK: - Notion Config Store Protocol
+protocol NotionConfigStoreProtocol: AnyObject {
+    var notionKey: String? { get set }
+    var notionPageId: String? { get set }
+    var isConfigured: Bool { get }
+}
+
+// MARK: - Notion Service Protocol
+protocol NotionServiceProtocol: AnyObject {
+    func createDatabase(title: String) async throws -> NotionDatabase
+    func createPage(databaseId: String, pageTitle: String, header: String?) async throws -> NotionPage
+    func appendParagraph(pageId: String, content: String) async throws -> NotionAppendResult
+}
+
+// MARK: - Notion Models (lightweight decodables for responses)
+struct NotionDatabase: Decodable {
+    let id: String
+    let url: String?
+}
+
+struct NotionPage: Decodable {
+    let id: String
+    let url: String?
+}
+
+struct NotionAppendResult: Decodable {
+    struct ResultItem: Decodable {
+        let id: String
+    }
+    let results: [ResultItem]
+}

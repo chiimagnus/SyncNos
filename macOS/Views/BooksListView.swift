@@ -3,6 +3,7 @@ import AppKit
 
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
+    @State private var showNotionSheet = false
     
     var body: some View {
         NavigationView {
@@ -73,7 +74,16 @@ struct BooksListView: View {
                     }
                     .help("选择 Apple Books 容器目录并加载笔记")
                 }
+                ToolbarItem(placement: .automatic) {
+                    Button("Notion 集成") {
+                        showNotionSheet = true
+                    }
+                    .help("配置 Notion 并执行示例 API 调用")
+                }
             }
+        }
+        .sheet(isPresented: $showNotionSheet) {
+            NotionIntegrationView()
         }
         .onAppear {
             if let url = BookmarkStore.shared.restore() {
