@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Building and Running
 - The project is an Xcode project, open `SyncBookNotesWithNotion.xcodeproj` to build and run
-- macOS deployment target is 15.4
+- macOS deployment target is 13
 - Swift version is 5.0
 
 ### Testing
