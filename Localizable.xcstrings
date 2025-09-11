@@ -242,7 +242,14 @@
       }
     },
     "General" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
     },
     "Header (optional)" : {
       "localizations" : {
@@ -265,7 +272,14 @@
       }
     },
     "Integrations" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集成"
+          }
+        }
+      }
     },
     "Load more" : {
       "localizations" : {
@@ -308,7 +322,14 @@
       }
     },
     "Notion" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notion"
+          }
+        }
+      }
     },
     "Notion Integration" : {
       "localizations" : {
@@ -356,16 +377,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Apple Books 中打开"
-          }
-        }
-      }
-    },
-    "Open Settings" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开设置"
           }
         }
       }
