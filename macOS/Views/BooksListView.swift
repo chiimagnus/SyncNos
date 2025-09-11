@@ -66,6 +66,7 @@ struct BooksListView: View {
             // Detail content: show selected book details
             if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
                 BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
+                    .id(book.bookId) // force view refresh when selection changes
             } else {
                 Text("Select a book to view details").foregroundColor(.secondary)
             }
