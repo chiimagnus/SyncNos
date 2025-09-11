@@ -7,20 +7,20 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-            Section(header: Text("General")) {
-                Button(action: pickAppleBooksContainer) {
-                    Label("Open Apple Books notes", systemImage: "book")
+                Section(header: Text("General")) {
+                    Button(action: pickAppleBooksContainer) {
+                        Label("Open Apple Books notes", systemImage: "book")
+                    }
+                    .help("Choose Apple Books container directory and load notes")
                 }
-                .help("Choose Apple Books container directory and load notes")
-            }
 
-            Section(header: Text("Integrations")) {
-                // Use NavigationLink so NotionIntegrationView is pushed onto the navigation stack
-                NavigationLink(destination: NotionIntegrationView()) {
-                    Label("Notion Integration", systemImage: "n.square")
+                Section(header: Text("Integrations")) {
+                    // Use NavigationLink so NotionIntegrationView is pushed onto the navigation stack
+                    NavigationLink(destination: NotionIntegrationView()) {
+                        Label("Notion Integration", systemImage: "n.square")
+                    }
+                    .help("Configure Notion and run example API calls")
                 }
-                .help("Configure Notion and run example API calls")
-            }
             }
             .listStyle(SidebarListStyle())
             .frame(minWidth: 200, minHeight: 200)
