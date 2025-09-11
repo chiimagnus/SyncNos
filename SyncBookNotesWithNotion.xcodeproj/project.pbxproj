@@ -7,11 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
+		D8529F732E7354C900FE0D95 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = D8529F722E7354C900FE0D95 /* CLAUDE.md */; };
 		D8CCCCA42E72DB3C00ED8EFA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */; };
 		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		D8529F722E7354C900FE0D95 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -40,6 +44,8 @@
 			isa = PBXGroup;
 			children = (
 				D8CCCCA32E72DB3C00ED8EFA /* Localizable.xcstrings */,
+				D8529F722E7354C900FE0D95 /* CLAUDE.md */,
+				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* macOS */,
 				D81167BD2E70A140000D0173 /* Products */,
@@ -120,6 +126,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */,
+				D8529F732E7354C900FE0D95 /* CLAUDE.md in Resources */,
+				D8529F712E7354B200FE0D95 /* LICENSE in Resources */,
 				D8CCCCA42E72DB3C00ED8EFA /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
