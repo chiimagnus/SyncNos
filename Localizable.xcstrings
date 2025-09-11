@@ -1,0 +1,99 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld highlights" : {
+
+    },
+    "1. Create a new database" : {
+
+    },
+    "2. Add a page to the database" : {
+
+    },
+    "3. Add content to the page" : {
+
+    },
+    "Append Paragraph" : {
+
+    },
+    "Books" : {
+
+    },
+    "by %@" : {
+
+    },
+    "Choose Apple Books container directory and load notes" : {
+
+    },
+    "Configure Notion and run example API calls" : {
+
+    },
+    "Create Database" : {
+
+    },
+    "Create Page" : {
+
+    },
+    "Created: %@" : {
+
+    },
+    "Credentials" : {
+
+    },
+    "Database ID: %@" : {
+
+    },
+    "Database title" : {
+
+    },
+    "Error: %@" : {
+
+    },
+    "Header (optional)" : {
+
+    },
+    "Highlights" : {
+
+    },
+    "Load more" : {
+
+    },
+    "Loading books..." : {
+
+    },
+    "Modified: %@" : {
+
+    },
+    "No books found" : {
+
+    },
+    "NOTION_KEY" : {
+
+    },
+    "NOTION_PAGE_ID" : {
+
+    },
+    "Open in Apple Books" : {
+
+    },
+    "Page ID: %@" : {
+
+    },
+    "Page title" : {
+
+    },
+    "Paragraph content" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Save" : {
+
+    }
+  },
+  "version" : "1.0"
+}
