@@ -4,7 +4,7 @@ struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()
     
     var body: some View {
-        ScrollView {
+        Form {
             VStack(alignment: .leading, spacing: 16) {
                 GroupBox("Credentials") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -101,9 +101,8 @@ struct NotionIntegrationView: View {
                 
                 Spacer()
             }
-            .padding()
-            // .frame(minWidth: 520, minHeight: 520)
         }
+        .formStyle(.grouped)
         .navigationTitle("Notion")
     }
 }
