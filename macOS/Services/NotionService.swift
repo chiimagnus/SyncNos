@@ -324,13 +324,25 @@ final class NotionService: NotionServiceProtocol {
                     "bulleted_list_item": ["rich_text": rt]
                 ]
             }
-            let body: [String: Any] = ["children": children]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-            let (data, response) = try await URLSession.shared.data(for: request)
-            try Self.ensureSuccess(response: response, data: data)
-            _ = data
+            // Delegate to generalized appendBlocks so that callers can reuse
+            try await appendBlocks(pageId: pageId, children: children)
             index += batchSize
         }
+    }
+
+    func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent("blocks/\(pageId)/children")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+        let body: [String: Any] = ["children": children]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
     }
     
     func updatePageHighlightCount(pageId: String, count: Int) async throws {

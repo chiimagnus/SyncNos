@@ -206,12 +206,26 @@ struct BookDetailView: View {
         .navigationTitle("Highlights")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: {
-                    Task { await viewModel.syncToNotion(book: book, dbPath: annotationDBPath) }
-                }) {
-                    Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
+                if viewModel.isSyncing {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        if let progress = viewModel.syncProgressText {
+                            Text(progress).font(.caption)
+                        } else {
+                            Text("Syncing...").font(.caption)
+                        }
+                    }
+                    .help("Sync in progress")
+                } else {
+                    Button(action: {
+                        Task {
+                            await viewModel.syncToNotion(book: book, dbPath: annotationDBPath)
+                        }
+                    }) {
+                        Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .help("Create/locate syncnote DB, create/locate book page, and append new highlights.")
                 }
-                .help("Create/locate syncnote DB, create/locate book page, and append new highlights.")
             }
         }
     }

@@ -6,6 +6,8 @@ class BookDetailViewModel: ObservableObject {
     @Published var isLoadingPage = false
     @Published var errorMessage: String?
     @Published var syncMessage: String?
+    @Published var syncProgressText: String?
+    @Published var isSyncing: Bool = false
     
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
     
@@ -95,12 +97,22 @@ class BookDetailViewModel: ObservableObject {
     // MARK: - Notion Sync
     func syncToNotion(book: BookListItem, dbPath: String?) {
         syncMessage = nil
+        syncProgressText = nil
+        isSyncing = true
         Task {
             do {
                 try await performSync(book: book, dbPath: dbPath)
-                await MainActor.run { self.syncMessage = "Synced to Notion" }
+                await MainActor.run {
+                    self.syncMessage = "Synced to Notion"
+                    self.syncProgressText = nil
+                    self.isSyncing = false
+                }
             } catch {
-                await MainActor.run { self.syncMessage = error.localizedDescription }
+                await MainActor.run {
+                    self.syncMessage = error.localizedDescription
+                    self.syncProgressText = nil
+                    self.isSyncing = false
+                }
             }
         }
     }
@@ -145,13 +157,20 @@ class BookDetailViewModel: ObservableObject {
             if page.isEmpty { break }
             let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
             newRows.append(contentsOf: fresh)
+            await MainActor.run {
+                self.syncProgressText = "Fetched \(newRows.count) new highlights..."
+            }
             if page.count < 100 { break }
             offset += 100
         }
         if !newRows.isEmpty {
+            // Show progress while appending
+            await MainActor.run { self.syncProgressText = "Appending \(newRows.count) highlights..." }
             try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: newRows)
         }
+        await MainActor.run { self.syncProgressText = "Updating count..." }
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
+        await MainActor.run { self.syncProgressText = "Done" }
     }
 }
 
