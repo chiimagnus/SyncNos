@@ -4,7 +4,6 @@ import AppKit
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -55,14 +54,6 @@ struct BooksListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { viewModel.loadBooks() }) { Label("Refresh", systemImage: "arrow.clockwise") }
                         .help("Refresh")
-                }
-                ToolbarItem(placement: .automatic) {
-                    Button(action: {
-                        openWindow(id: "settingsview")
-                    }) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .help("Open Settings")
                 }
             }
         } detail: {
