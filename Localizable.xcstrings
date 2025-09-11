@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
     "%lld highlights" : {
       "localizations" : {
         "zh-Hans" : {
