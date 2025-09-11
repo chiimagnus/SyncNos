@@ -1,4 +1,4 @@
-# SyncBookNotes 📚
+# SyncNotes 📚
 
 [![macOS](https://img.shields.io/badge/macOS-13+-blue.svg)](https://developer.apple.com/macos/)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-orange.svg)](https://developer.apple.com/documentation/swiftui/)
