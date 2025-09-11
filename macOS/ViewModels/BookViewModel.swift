@@ -49,6 +49,25 @@ class BookViewModel: ObservableObject {
             if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
                 rootCandidate = selectedPath
             }
+            // 如果用户选择了 `.../Data`，则自动补上 `Documents`
+            let lastPath = (selectedPath as NSString).lastPathComponent
+            if lastPath == "Data" {
+                let dataDocs = (selectedPath as NSString).appendingPathComponent("Documents")
+                let aeAnno2 = (dataDocs as NSString).appendingPathComponent("AEAnnotation")
+                let bkLib2 = (dataDocs as NSString).appendingPathComponent("BKLibrary")
+                if fm.fileExists(atPath: aeAnno2) || fm.fileExists(atPath: bkLib2) {
+                    rootCandidate = dataDocs
+                }
+            }
+            // 如果用户选择了容器根 `.../Containers/com.apple.iBooksX`，则进入 `Data/Documents`
+            if lastPath == "com.apple.iBooksX" || selectedPath.hasSuffix("/Containers/com.apple.iBooksX") {
+                let containerDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
+                let aeAnno3 = (containerDocs as NSString).appendingPathComponent("AEAnnotation")
+                let bkLib3 = (containerDocs as NSString).appendingPathComponent("BKLibrary")
+                if fm.fileExists(atPath: aeAnno3) || fm.fileExists(atPath: bkLib3) {
+                    rootCandidate = containerDocs
+                }
+            }
         }
         
         return rootCandidate

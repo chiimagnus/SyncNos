@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
@@ -78,6 +79,12 @@ struct BooksListView: View {
         .onDisappear {
             // Release security-scoped bookmark when view disappears
             BookmarkStore.shared.stopAccessingIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))) { notif in
+            guard let selectedPath = notif.object as? String else { return }
+            let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
+            viewModel.setDbRootOverride(rootCandidate)
+            viewModel.loadBooks()
         }
     }
 }
