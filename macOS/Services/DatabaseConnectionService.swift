@@ -23,10 +23,10 @@ class DatabaseConnectionService {
         let rc = sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil)
         guard rc == SQLITE_OK, let handle = db else {
             let error = "Failed to open SQLite database at \(dbPath) (rc=\(rc))"
-            AppLogger.shared.error("Database error: \(error)")
+            print("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        AppLogger.shared.info("Successfully opened database: \(dbPath)")
+        print("Successfully opened database: \(dbPath)")
         return handle
     }
     
