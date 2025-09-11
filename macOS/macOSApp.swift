@@ -16,7 +16,7 @@ struct macOSApp: App {
             BooksListView()
         }
 
-        WindowGroup("Settings", id: "settingsview") {
+        WindowGroup(id: "settingsview") {
             SettingsView()
         }
     }
