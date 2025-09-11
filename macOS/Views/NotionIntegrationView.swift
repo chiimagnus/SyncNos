@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         Form {
@@ -104,6 +105,13 @@ struct NotionIntegrationView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Notion")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: { dismiss() }) {
+                    Label("Back", systemImage: "chevron.left")
+                }
+            }
+        }
     }
 }
 
