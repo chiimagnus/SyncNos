@@ -5,7 +5,8 @@ struct SettingsView: View {
     @State private var isLoading: Bool = false
 
     var body: some View {
-        List {
+        NavigationStack {
+            List {
             Section(header: Text("General")) {
                 Button(action: pickAppleBooksContainer) {
                     Label("Open Apple Books notes", systemImage: "book")
@@ -20,10 +21,15 @@ struct SettingsView: View {
                 }
                 .help("Configure Notion and run example API calls")
             }
+            }
+            //        .listStyle(InsetGroupedListStyle())
+            .frame(minWidth: 200, minHeight: 200)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Settings").font(.headline)
+                }
+            }
         }
-//        .listStyle(InsetGroupedListStyle())
-        .frame(minWidth: 420, minHeight: 200)
-        .navigationTitle("Settings")
     }
 
     // Replicate the Apple Books picker behavior from BooksListView
@@ -57,7 +63,7 @@ struct SettingsView: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
+        NavigationStack {
             SettingsView()
         }
     }
