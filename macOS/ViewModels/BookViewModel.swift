@@ -72,11 +72,11 @@ class BookViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.books = books
                     self.isLoading = false
-                    AppLogger.shared.info("Successfully loaded \(books.count) books")
+                    print("Successfully loaded \(books.count) books")
                 }
             } catch {
                 let errorDesc = error.localizedDescription
-                AppLogger.shared.error("Error loading books: \(errorDesc)")
+                print("Error loading books: \(errorDesc)")
                 DispatchQueue.main.async {
                     self.errorMessage = errorDesc
                     self.isLoading = false
@@ -106,7 +106,7 @@ class BookViewModel: ObservableObject {
             result.append(BookExport(bookId: assetId, authorName: b.author, bookTitle: b.title, ibooksURL: "ibooks://assetid/\(assetId)", highlights: hs))
         }
         let sortedResult = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
-        AppLogger.shared.info("Built export with \(sortedResult.count) books")
+        print("Built export with \(sortedResult.count) books")
         return sortedResult
     }
     
@@ -114,30 +114,30 @@ class BookViewModel: ObservableObject {
     
     private func fetchBooksFromDatabase() throws -> [BookListItem] {
         guard let root = dbRootOverride else {
-            AppLogger.shared.info("Books data root not selected; skipping load until user picks a folder")
+            print("Books data root not selected; skipping load until user picks a folder")
             return []
         }
-        AppLogger.shared.info("Books data root: \(root)")
+        print("Books data root: \(root)")
         
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
         let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
         
-        AppLogger.shared.info("Looking for annotation DB in: \(annotationDir)")
-        AppLogger.shared.info("Looking for books DB in: \(booksDir)")
+        print("Looking for annotation DB in: \(annotationDir)")
+        print("Looking for books DB in: \(booksDir)")
         
         guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
             let error = "Annotation DB not found under \(annotationDir)"
-            AppLogger.shared.error("Error: \(error)")
+            print("Error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        AppLogger.shared.info("Found annotation DB: \(annotationDB)")
+        print("Found annotation DB: \(annotationDB)")
         
         guard let booksDB = latestSQLiteFile(in: booksDir) else {
             let error = "Books DB not found under \(booksDir)"
-            AppLogger.shared.error("Error: \(error)")
+            print("Error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        AppLogger.shared.info("Found books DB: \(booksDB)")
+        print("Found books DB: \(booksDB)")
         self.annotationDBPath = annotationDB
         self.booksDBPath = booksDB
         
@@ -145,20 +145,20 @@ class BookViewModel: ObservableObject {
         let adbH = try databaseService.openReadOnlyDatabase(dbPath: annotationDB)
         defer { 
             databaseService.close(adbH)
-            AppLogger.shared.info("Closed annotation DB")
+            print("Closed annotation DB")
         }
         let bdbH = try databaseService.openReadOnlyDatabase(dbPath: booksDB)
         defer { 
             databaseService.close(bdbH)
-            AppLogger.shared.info("Closed books DB")
+            print("Closed books DB")
         }
         
         // 获取每本书的高亮数量（而不是把全部高亮读入内存）
         let counts = try databaseService.fetchHighlightCountsByAsset(db: adbH)
         let assetIds = counts.map { $0.assetId }.sorted()
-        AppLogger.shared.info("Found \(assetIds.count) assets with highlights")
+        print("Found \(assetIds.count) assets with highlights")
         let books = try databaseService.fetchBooks(db: bdbH, assetIds: assetIds)
-        AppLogger.shared.info("Fetched \(books.count) books for counts")
+        print("Fetched \(books.count) books for counts")
         
         var countIndex: [String: Int] = [:]
         for c in counts {
@@ -175,33 +175,33 @@ class BookViewModel: ObservableObject {
                                        highlightCount: cnt))
         }
         let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
-        AppLogger.shared.info("Built list with \(sorted.count) books (counts only)")
+        print("Built list with \(sorted.count) books (counts only)")
         return sorted
     }
     
     private func latestSQLiteFile(in dir: String) -> String? {
         let url = URL(fileURLWithPath: dir)
-        AppLogger.shared.debug("Checking directory: \(dir)")
+        print("Checking directory: \(dir)")
         
         // 检查目录是否存在
         var isDir: ObjCBool = false
         if !FileManager.default.fileExists(atPath: dir, isDirectory: &isDir) {
-            AppLogger.shared.warning("Directory does not exist: \(dir)")
+            print("Directory does not exist: \(dir)")
             return nil
         }
         
         if !isDir.boolValue {
-            AppLogger.shared.warning("Path is not a directory: \(dir)")
+            print("Path is not a directory: \(dir)")
             return nil
         }
         
         guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey]) else {
-            AppLogger.shared.error("Failed to list contents of directory: \(dir)")
+            print("Failed to list contents of directory: \(dir)")
             return nil
         }
         let sqliteFiles = files.filter { $0.pathExtension == "sqlite" }
         guard !sqliteFiles.isEmpty else {
-            AppLogger.shared.warning("No SQLite files found in directory: \(dir)")
+            print("No SQLite files found in directory: \(dir)")
             return nil
         }
         let sorted = sqliteFiles.sorted { a, b in
@@ -212,7 +212,7 @@ class BookViewModel: ObservableObject {
             return dateA > dateB
         }
         let latestFile = sorted.first?.path
-        AppLogger.shared.debug("Latest SQLite file in \(dir): \(latestFile ?? "none")")
+        print("Latest SQLite file in \(dir): \(latestFile ?? "none")")
         return latestFile
     }
 }

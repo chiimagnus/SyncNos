@@ -6,9 +6,9 @@ struct macOSApp: App {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
             let started = BookmarkStore.shared.startAccessing(url: url)
-            AppLogger.shared.info("Restored bookmark: \(url.path), startAccess=\(started)")
+            print("Restored bookmark: \(url.path), startAccess=\(started)")
         } else {
-            AppLogger.shared.info("No saved bookmark to restore")
+            print("No saved bookmark to restore")
         }
     }
     var body: some Scene {
