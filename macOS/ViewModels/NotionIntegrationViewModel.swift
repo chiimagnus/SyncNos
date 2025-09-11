@@ -12,6 +12,9 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var existingDatabaseIdInput: String = ""
     @Published var existingDbPageTitleInput: String = "Page in existing DB"
     @Published var existingDbHeaderInput: String = ""
+    // Inputs for existing page flow
+    @Published var existingPageIdInput: String = ""
+    @Published var existingPageContentInput: String = "Hello from macOS (existing page)"
     
     @Published var createdDatabaseId: String?
     @Published var createdPageId: String?
@@ -88,6 +91,19 @@ final class NotionIntegrationViewModel: ObservableObject {
             let page = try await self.notionService.createPage(databaseId: trimmed, pageTitle: self.existingDbPageTitleInput, header: self.existingDbHeaderInput)
             self.createdPageId = page.id
             self.message = "Page created in existing DB: \(page.id)"
+        }
+    }
+
+    // Append content to an arbitrary existing page id provided by the user
+    func appendContent(toPageId pageId: String) async {
+        let trimmed = pageId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            self.message = "Please provide a page id"
+            return
+        }
+        await runWithBusy { [self] in
+            _ = try await self.notionService.appendParagraph(pageId: trimmed, content: self.existingPageContentInput)
+            self.message = "Content appended to existing page!"
         }
     }
     

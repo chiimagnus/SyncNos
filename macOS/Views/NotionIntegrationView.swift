@@ -74,6 +74,20 @@ struct NotionIntegrationView: View {
                 }
                 .padding(8)
             }
+
+            GroupBox("3b. Create content in an existing page") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Existing Page ID", text: $viewModel.existingPageIdInput)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Content to append", text: $viewModel.existingPageContentInput)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Append to Existing Page") {
+                        Task { await viewModel.appendContent(toPageId: viewModel.existingPageIdInput) }
+                    }
+                    .disabled(viewModel.isBusy || viewModel.existingPageIdInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(8)
+            }
             
             if let message = viewModel.message {
                 Text(message).foregroundColor(.secondary)

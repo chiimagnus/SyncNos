@@ -51,12 +51,32 @@
         }
       }
     },
+    "3b. Create content in an existing page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3b. 在已有页面中创建内容"
+          }
+        }
+      }
+    },
     "Append Paragraph" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加段落"
+          }
+        }
+      }
+    },
+    "Append to Existing Page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加到已有页面"
           }
         }
       }
@@ -101,6 +121,16 @@
         }
       }
     },
+    "Content to append" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加的内容"
+          }
+        }
+      }
+    },
     "Create Database" : {
       "localizations" : {
         "zh-Hans" : {
@@ -122,7 +152,14 @@
       }
     },
     "Create Page in Existing DB" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在现有数据库中创建页面"
+          }
+        }
+      }
     },
     "Created: %@" : {
       "localizations" : {
@@ -175,7 +212,24 @@
       }
     },
     "Existing Database ID" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已有数据库 ID"
+          }
+        }
+      }
+    },
+    "Existing Page ID" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已有页面 ID"
+          }
+        }
+      }
     },
     "Header (optional)" : {
       "localizations" : {
@@ -318,7 +372,14 @@
       }
     },
     "Page title (for existing DB)" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面标题（适用于现有数据库）"
+          }
+        }
+      }
     },
     "Paragraph content" : {
       "localizations" : {
