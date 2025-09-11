@@ -16,7 +16,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建新的数据库"
+            "value" : "1. 创建新的数据库"
           }
         }
       }
@@ -26,7 +26,17 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在此数据库添加新页"
+            "value" : "2. 在此数据库添加新页"
+          }
+        }
+      }
+    },
+    "2b. Create a page in an existing database" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2b. 在已有数据库中创建页面"
           }
         }
       }
@@ -36,7 +46,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "向该页面添加内容"
+            "value" : "3. 向该页面添加内容"
           }
         }
       }
@@ -111,6 +121,9 @@
         }
       }
     },
+    "Create Page in Existing DB" : {
+
+    },
     "Created: %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -160,6 +173,9 @@
           }
         }
       }
+    },
+    "Existing Database ID" : {
+
     },
     "Header (optional)" : {
       "localizations" : {
@@ -300,6 +316,9 @@
           }
         }
       }
+    },
+    "Page title (for existing DB)" : {
+
     },
     "Paragraph content" : {
       "localizations" : {
