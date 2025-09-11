@@ -13,7 +13,22 @@ struct macOSApp: App {
     }
     var body: some Scene {
         WindowGroup {
-            BooksListView()
+            ContentViewRouter()
         }
+    }
+}
+
+// A small router to host BooksListView and present Settings when requested
+struct ContentViewRouter: View {
+    @State private var showSettings = false
+
+    var body: some View {
+        BooksListView()
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowSettings"))) { _ in
+                showSettings = true
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
     }
 }
