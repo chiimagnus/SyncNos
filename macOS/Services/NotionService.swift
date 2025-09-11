@@ -20,6 +20,7 @@ final class NotionService: NotionServiceProtocol {
         request.httpMethod = "POST"
         addCommonHeaders(to: &request, key: key)
         
+        // Create properties for book-focused database: Name (title), Author (rich_text), Highlight Count (number)
         let body: [String: Any] = [
             "parent": [
                 "type": "page_id",
@@ -30,7 +31,12 @@ final class NotionService: NotionServiceProtocol {
                 "text": ["content": title]
             ]],
             "properties": [
-                "Name": ["title": [:]]
+                // Primary title property (book title)
+                "Name": ["title": [:]],
+                // Author as rich text
+                "Author": ["rich_text": [:]],
+                // Highlight count as number
+                "Highlight Count": ["number": [:]]
             ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
@@ -68,7 +74,14 @@ final class NotionService: NotionServiceProtocol {
                 "database_id": databaseId
             ],
             "properties": [
+                // Provide both English and Chinese title keys so pages created by this demo
+                // work whether the database primary property is "Name" or "书名".
                 "Name": [
+                    "title": [[
+                        "text": ["content": pageTitle]
+                    ]]
+                ],
+                "书名": [
                     "title": [[
                         "text": ["content": pageTitle]
                     ]]
