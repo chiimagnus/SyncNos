@@ -73,3 +73,6 @@ macOS/
 ## 📄 许可证
 
 本项目采用 GPL-3.0 License
+
+## 相关文章链接
+[微信公众号-开发了一个小工具，SyncNotes。将Apple Books中的读书笔记同步到Notion](https://mp.weixin.qq.com/s/jeTko_mQbCe3DXUNpmjHHA)
