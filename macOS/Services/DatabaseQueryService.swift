@@ -12,7 +12,7 @@ class DatabaseQueryService {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, tableInfoSQL, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: table info"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         
@@ -52,11 +52,11 @@ class DatabaseQueryService {
         }
         
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
-        print("Executing query: \(sql)")
+        AppLogger.shared.debug("Executing query: \(sql)")
         
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: annotations"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         
@@ -115,18 +115,18 @@ class DatabaseQueryService {
             count += 1
         }
         sqlite3_finalize(stmt)
-        print("Fetched \(count) valid annotations")
+        AppLogger.shared.info("Fetched \(count) valid annotations")
         return rows
     }
     
     /// 按图书(assetId)聚合高亮数量，用于列表快速展示
     func fetchHighlightCountsByAsset(db: OpaquePointer) throws -> [AssetHighlightCount] {
         let sql = "SELECT ZANNOTATIONASSETID, COUNT(*) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL GROUP BY ZANNOTATIONASSETID;"
-        print("Executing query: \(sql)")
+        AppLogger.shared.debug("Executing query: \(sql)")
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: counts by asset"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         defer { sqlite3_finalize(stmt) }
@@ -139,7 +139,7 @@ class DatabaseQueryService {
             results.append(AssetHighlightCount(assetId: assetId, count: c))
             count += 1
         }
-        print("Fetched counts for \(count) assets")
+        AppLogger.shared.info("Fetched counts for \(count) assets")
         return results
     }
 
@@ -150,7 +150,7 @@ class DatabaseQueryService {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, tableInfoSQL, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: table info (page)"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         var availableColumns: Set<String> = []
@@ -192,11 +192,11 @@ class DatabaseQueryService {
             orderBy = "rowid DESC"
         }
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL AND ZANNOTATIONASSETID=? ORDER BY \(orderBy) LIMIT ? OFFSET ?;"
-        print("Executing query: \(sql)")
+        AppLogger.shared.debug("Executing query: \(sql)")
         
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: highlight page"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         defer { sqlite3_finalize(stmt) }
@@ -252,24 +252,24 @@ class DatabaseQueryService {
             rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified, location: location))
             fetched += 1
         }
-        print("Fetched page: limit=\(limit) offset=\(offset) fetched=\(fetched)")
+        AppLogger.shared.info("Fetched page: limit=\(limit) offset=\(offset) fetched=\(fetched)")
         return rows
     }
     
     func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow] {
         guard !assetIds.isEmpty else { 
-            print("No asset IDs provided, returning empty books array")
+            AppLogger.shared.warning("No asset IDs provided, returning empty books array")
             return [] 
         }
         
         let placeholders = Array(repeating: "?", count: assetIds.count).joined(separator: ",")
         let sql = "SELECT ZASSETID,ZAUTHOR,ZTITLE FROM ZBKLIBRARYASSET WHERE ZASSETID IN (\(placeholders));"
-        print("Executing query: \(sql)")
+        AppLogger.shared.debug("Executing query: \(sql)")
         
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: books"
-            print("Database error: \(error)")
+            AppLogger.shared.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         
@@ -290,7 +290,7 @@ class DatabaseQueryService {
             count += 1
         }
         sqlite3_finalize(stmt)
-        print("Fetched \(count) books")
+        AppLogger.shared.info("Fetched \(count) books")
         return rows
     }
     

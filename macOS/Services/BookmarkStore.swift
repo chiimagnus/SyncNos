@@ -17,7 +17,7 @@ final class BookmarkStore: BookmarkStoreProtocol {
             UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
             // UserDefaults.standard.synchronize() is not needed in modern iOS/macOS development
         } catch {
-            print("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
+            AppLogger.shared.error("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
         }
     }
     
@@ -37,7 +37,7 @@ final class BookmarkStore: BookmarkStoreProtocol {
             }
             return url
         } catch {
-            print("Failed to resolve bookmark: \(error)")
+            AppLogger.shared.error("Failed to resolve bookmark: \(error)")
             return nil
         }
     }

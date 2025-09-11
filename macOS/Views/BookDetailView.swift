@@ -60,6 +60,8 @@ struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
+    @State private var isSyncing = false
+    @State private var syncLabel: String = ""
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -200,6 +202,36 @@ struct BookDetailView: View {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
         .navigationTitle("Highlights")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button(action: { Task { await syncThisBook() } }) {
+                    if isSyncing { ProgressView() } else { Image(systemName: "arrow.triangle.2.circlepath") }
+                }
+                .disabled(isSyncing || annotationDBPath == nil)
+                .help("同步到 Notion（当前书籍）")
+            }
+        }
+    }
+}
+
+// MARK: - Notion Sync
+extension BookDetailView {
+    private func syncThisBook() async {
+        guard let adb = annotationDBPath else { return }
+        isSyncing = true
+        syncLabel = "准备同步..."
+        defer { isSyncing = false }
+        let service = NotionSyncService()
+        do {
+            try await service.syncBook(annotationDbPath: adb, book: book) { done, total in
+                DispatchQueue.main.async {
+                    self.syncLabel = "\(done)/\(total)"
+                }
+            }
+            syncLabel = "完成"
+        } catch {
+            syncLabel = "错误: \(error.localizedDescription)"
+        }
     }
 }
 
