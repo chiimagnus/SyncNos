@@ -4,6 +4,7 @@ import AppKit
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -56,7 +57,9 @@ struct BooksListView: View {
                         .help("Refresh")
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button(action: { NotificationCenter.default.post(name: Notification.Name("ShowSettings"), object: nil) }) {
+                    Button(action: {
+                        openWindow(id: "settingsview")
+                    }) {
                         Label("Settings", systemImage: "gearshape")
                     }
                     .help("Open Settings")
