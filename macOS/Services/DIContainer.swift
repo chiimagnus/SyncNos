@@ -9,6 +9,8 @@ class DIContainer {
     // MARK: - Services
     private var _databaseService: DatabaseServiceProtocol?
     private var _bookmarkStore: BookmarkStoreProtocol?
+    private var _notionConfigStore: NotionConfigStoreProtocol?
+    private var _notionService: NotionServiceProtocol?
     
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -25,6 +27,20 @@ class DIContainer {
         return _bookmarkStore!
     }
     
+    var notionConfigStore: NotionConfigStoreProtocol {
+        if _notionConfigStore == nil {
+            _notionConfigStore = NotionConfigStore.shared
+        }
+        return _notionConfigStore!
+    }
+    
+    var notionService: NotionServiceProtocol {
+        if _notionService == nil {
+            _notionService = NotionService(configStore: notionConfigStore)
+        }
+        return _notionService!
+    }
+    
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -32,5 +48,13 @@ class DIContainer {
     
     func register(bookmarkStore: BookmarkStoreProtocol) {
         self._bookmarkStore = bookmarkStore
+    }
+    
+    func register(notionConfigStore: NotionConfigStoreProtocol) {
+        self._notionConfigStore = notionConfigStore
+    }
+    
+    func register(notionService: NotionServiceProtocol) {
+        self._notionService = notionService
     }
 }
