@@ -29,6 +29,17 @@ final class NotionIntegrationViewModel: ObservableObject {
     func saveCredentials() {
         notionConfig.notionKey = notionKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
         notionConfig.notionPageId = notionPageIdInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Provide immediate feedback to the UI
+        message = "Credentials saved"
+        // Clear feedback after 2 seconds
+        Task {
+            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+            await MainActor.run {
+                if message == "Credentials saved" {
+                    message = nil
+                }
+            }
+        }
     }
     
     func createDatabase() async {
