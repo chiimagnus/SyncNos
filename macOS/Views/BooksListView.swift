@@ -69,14 +69,14 @@ struct BooksListView: View {
                     .help("Refresh")
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button("Open Apple Books notes") {
-                        pickAppleBooksContainer()
+                    Button(action: { pickAppleBooksContainer() }) {
+                        Image(systemName: "book")
                     }
                     .help("Choose Apple Books container directory and load notes")
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button("Notion Integration") {
-                        showNotionSheet = true
+                    Button(action: { showNotionSheet = true }) {
+                        Image(systemName: "n.square")
                     }
                     .help("Configure Notion and run example API calls")
                 }
