@@ -40,6 +40,7 @@ protocol NotionServiceProtocol: AnyObject {
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
     func updatePageHighlightCount(pageId: String, count: Int) async throws
+    func appendBlocks(pageId: String, children: [[String: Any]]) async throws
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
