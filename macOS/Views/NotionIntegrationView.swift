@@ -46,6 +46,22 @@ struct NotionIntegrationView: View {
                 }
                 .padding(8)
             }
+
+            GroupBox("2b. Create a page in an existing database") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Existing Database ID", text: $viewModel.existingDatabaseIdInput)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Page title (for existing DB)", text: $viewModel.existingDbPageTitleInput)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Header (optional)", text: $viewModel.existingDbHeaderInput)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Create Page in Existing DB") {
+                        Task { await viewModel.createPage(inDatabaseId: viewModel.existingDatabaseIdInput) }
+                    }
+                    .disabled(viewModel.isBusy || viewModel.existingDatabaseIdInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(8)
+            }
             
             GroupBox("3. Add content to the page") {
                 VStack(alignment: .leading, spacing: 8) {
