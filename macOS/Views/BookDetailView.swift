@@ -219,7 +219,7 @@ struct BookDetailView: View {
                 } else {
                     Button(action: {
                         Task {
-                            await viewModel.syncToNotion(book: book, dbPath: annotationDBPath)
+                            viewModel.syncToNotion(book: book, dbPath: annotationDBPath)
                         }
                     }) {
                         Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
