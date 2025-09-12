@@ -116,3 +116,122 @@
 ---
 
 本隐私协议的解释权归SyncBookNotes开发团队所有。
+
+---
+
+# Privacy Policy
+
+Last Updated Date: September 13, 2025
+
+Thank you for choosing to use SyncBookNotes (hereinafter referred to as "the Application"). This Privacy Policy is intended to inform you how the Application collects, uses, stores, and protects your personal information, as well as the rights you are entitled to. Please read and understand this agreement carefully before using the Application.
+
+## 1. Information Collection and Use
+
+### 1.1 Apple Books Data Access
+The Application will access the Apple Books database on your device to read your book notes and highlight information. Specifically including:
+- Book titles and author information
+- Highlighted text content
+- Annotations you have added
+- Creation and modification times of highlights and annotations
+- Color markers of highlights
+
+### 1.2 Data Processing Method
+- The Application accesses the Apple Books database in read-only mode only, without modifying, deleting, or adding any data
+- All data processing is performed locally on your device and will not be uploaded to any server
+- The Application does not collect your reading habits, preference settings, or other personal usage data
+- The Application strictly follows the principle of data minimization, collecting and processing only the data necessary to provide the service
+
+### 1.3 Notion Synchronization Data
+When you choose to synchronize data to Notion, the Application will send your book notes and highlight information to Notion servers. This data includes:
+- Book information (title, author)
+- Highlighted text and your annotations
+- Related timestamp information
+
+To avoid creating duplicate content in Notion, the Application adopts the following mechanisms:
+- Assign a unique UUID identifier to each highlight
+- Check if content with the same UUID already exists on the target page before synchronization
+- Only add new or modified content
+
+### 1.4 Configuration Information Storage
+The Application will locally store the following configuration information on your device:
+- Notion API key
+- Notion page ID
+- Sync database ID
+
+## 2. Data Transmission and Storage
+
+### 2.1 Local Processing
+Unless you actively choose to synchronize to Notion, all data is processed only on your local device and will not be transmitted to any external server.
+
+### 2.2 Notion Synchronization
+When you enable the Notion synchronization feature:
+- Data will be transmitted to Notion servers through secure HTTPS protocol
+- Data storage and processing follow Notion's privacy policy and terms of service
+- You can manage, edit, or delete synchronized data through Notion's interface
+
+## 3. Security Measures
+
+### 3.1 Sandbox Mechanism
+The Application follows the macOS sandbox security mechanism, declaring the following permissions in the entitlements file:
+- Network client access permission: for communicating with the Notion API
+- Read-only access permission to user-selected files: for accessing the Apple Books database
+- Read-only access permission to the Downloads directory: for accessing database files that may be stored in the Downloads directory
+- Application-scoped bookmark permission: for securely accessing user-authorized database files
+
+### 3.2 Security-Scoped Bookmarks
+To access the Apple Books database, the Application uses security-scoped bookmark technology:
+- Requires your explicit authorization to access the database file
+- Bookmark data is encrypted and stored in application settings
+- Access permissions are temporarily obtained only when needed
+
+### 3.3 Configuration Information Protection
+- Notion API keys and other configuration information are stored in user defaults within the application sandbox
+- Users are advised to clear configuration information in a timely manner after use to ensure account security
+
+### 3.4 Data Transmission Security
+The Application adopts the following security measures to protect data transmission:
+- Uses HTTPS protocol to communicate with the Notion API
+- Notion API keys are stored in user defaults within the application sandbox
+- All network requests use modern TLS encryption
+
+## 4. Your Rights
+
+### 4.1 Data Control Rights
+- You can disable the Notion synchronization feature at any time in the application settings
+- You can change or delete stored Notion configuration information at any time
+
+### 4.2 Data Deletion Rights
+- You can directly delete synchronized data in Notion
+- Deleting the application will simultaneously delete all local configuration information
+
+### 4.3 Access Permission Control
+- You can revoke the Application's access permission to the Apple Books database at any time in System Settings
+
+### 4.4 Configuration Information Clearance
+You can clear local configuration information through the following methods:
+- Manually delete Notion configuration information in application settings
+- Uninstalling the application will automatically delete all local configuration information
+- Users can revoke the application's access permission to the Apple Books database at any time in System Settings
+
+## 5. Data Retention Policy
+
+### 5.1 Local Data
+- The Application will not persistently store the original Apple Books data on your device
+- The Application only temporarily reads and processes data during runtime and does not retain any cache after closing
+
+### 5.2 Configuration Information
+- Notion configuration information will be retained on your device until you actively delete the application or clear the configuration
+
+### 5.3 Synchronized Data
+- Data synchronized to Notion is stored and managed by Notion, and retention policies follow Notion's terms of service
+
+## 6. Policy Changes
+
+We may update this Privacy Policy from time to time. In the event of significant changes, we will notify you when updating the application.
+
+## 7. Contact Us
+
+If you have any questions or suggestions regarding this Privacy Policy, please contact us through the following methods:
+- Submit an Issue on the project GitHub page: https://github.com/chiimagnus/SyncNos/issues
+
+The right of interpretation of this Privacy Policy belongs to the SyncBookNotes development team.
