@@ -234,4 +234,4 @@ We may update this Privacy Policy from time to time. In the event of significant
 If you have any questions or suggestions regarding this Privacy Policy, please contact us through the following methods:
 - Submit an Issue on the project GitHub page: https://github.com/chiimagnus/SyncNos/issues
 
-The right of interpretation of this Privacy Policy belongs to the SyncBookNotes development team.
+The right of interpretation of this Privacy Policy belongs to the SyncNos development team.
