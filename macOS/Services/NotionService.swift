@@ -4,6 +4,12 @@ final class NotionService: NotionServiceProtocol {
     private let configStore: NotionConfigStoreProtocol
     private let apiBase = URL(string: "https://api.notion.com/v1/")!
     private let notionVersion = "2022-06-28"
+    // ISO8601 formatter for highlight timestamps when syncing to Notion
+    private static let isoDateFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
     
     init(configStore: NotionConfigStoreProtocol) {
         self.configStore = configStore
@@ -308,6 +314,14 @@ final class NotionService: NotionServiceProtocol {
                 // Optional note
                 if let note = h.note, !note.isEmpty {
                     rt.append(["text": ["content": " — Note: \(note)"], "annotations": ["italic": true]])
+                }
+                // Add metadata (style, creation, modification) when available
+                var metaParts: [String] = []
+                if let s = h.style { metaParts.append("style:\(s)") }
+                if let d = h.dateAdded { metaParts.append("added:\(Self.isoDateFormatter.string(from: d))") }
+                if let m = h.modified { metaParts.append("modified:\(Self.isoDateFormatter.string(from: m))") }
+                if !metaParts.isEmpty {
+                    rt.append(["text": ["content": " — \(metaParts.joined(separator: " | "))"], "annotations": ["italic": true]])
                 }
                 // Optional link
                 let linkUrl: String
