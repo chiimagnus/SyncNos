@@ -13,6 +13,7 @@ struct SettingsView: View {
                     }
                     .help("Choose Apple Books container directory and load notes")
                 }
+                .collapsible(false)
 
                 Section(header: Text("Integrations")) {
                     NavigationLink(destination: NotionIntegrationView()) {
@@ -20,6 +21,7 @@ struct SettingsView: View {
                     }
                     .help("Configure Notion and run example API calls")
                 }
+                .collapsible(false)
             }
             .listStyle(SidebarListStyle())
         }
