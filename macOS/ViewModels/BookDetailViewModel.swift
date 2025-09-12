@@ -16,7 +16,7 @@ class BookDetailViewModel: ObservableObject {
     private var dbHandle: OpaquePointer?
     private var currentAssetId: String?
     private var currentOffset = 0
-    private let pageSize = 100
+    private let pageSize = 50
     private var expectedTotalCount = 0
     
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
@@ -157,7 +157,7 @@ class BookDetailViewModel: ObservableObject {
         var offset = 0
         var newRows: [HighlightRow] = []
         while true {
-            let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: 100, offset: offset)
+            let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
             if page.isEmpty { break }
             let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
             newRows.append(contentsOf: fresh)
@@ -165,8 +165,8 @@ class BookDetailViewModel: ObservableObject {
             await MainActor.run {
                 self.syncProgressText = "Fetched \(fetchedCount) new highlights..."
             }
-            if page.count < 100 { break }
-            offset += 100
+            if page.count < self.pageSize { break }
+            offset += self.pageSize
         }
         if !newRows.isEmpty {
             // Show progress while appending
