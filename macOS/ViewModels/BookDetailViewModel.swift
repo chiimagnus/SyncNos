@@ -161,16 +161,19 @@ class BookDetailViewModel: ObservableObject {
             if page.isEmpty { break }
             let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
             newRows.append(contentsOf: fresh)
+            let fetchedCount = newRows.count
             await MainActor.run {
-                self.syncProgressText = "Fetched \(newRows.count) new highlights..."
+                self.syncProgressText = "Fetched \(fetchedCount) new highlights..."
             }
             if page.count < 100 { break }
             offset += 100
         }
         if !newRows.isEmpty {
             // Show progress while appending
-            await MainActor.run { self.syncProgressText = "Appending \(newRows.count) highlights..." }
-            try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: newRows)
+            let appendCount = newRows.count
+            await MainActor.run { self.syncProgressText = "Appending \(appendCount) highlights..." }
+            let rowsToAppend = newRows
+            try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: rowsToAppend)
         }
         await MainActor.run { self.syncProgressText = "Updating count..." }
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
