@@ -1,10 +1,21 @@
-# SyncNotes 📚
+# SyncNos 📚
 
 [![macOS](https://img.shields.io/badge/macOS-13+-blue.svg)](https://developer.apple.com/macos/)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-orange.svg)](https://developer.apple.com/documentation/swiftui/)
 [![License](https://img.shields.io/badge/license-GPL3.0-green.svg)](LICENSE)
 
-SyncNos，同步Apple Books阅读笔记到 Notion。
+SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据，目标是让笔记可以被长期保存、搜索和同步到第三方工具（如Notion）。
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/placeholder-image.jpg" alt="SyncBookNotes 主界面" width="600"/>
+</p>
+
+## 🌟 为什么使用
+
+- **直接导出**：无需手动复制粘贴，一键读取 Apple Books 笔记
+- **多种格式**：导出为 JSON/Markdown，便于归档或导入其他笔记工具
+- **精美展示**：采用瀑布流布局，优雅展示读书笔记
+- **安全访问**：使用安全范围书签机制，保护用户隐私
 
 ## 🚀 主要功能
 - 同步Apple Books 的数据：书名、作者；高亮笔记、注释、高亮笔记的颜色、创建时间和修改时间。
