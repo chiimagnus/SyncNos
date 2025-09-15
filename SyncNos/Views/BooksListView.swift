@@ -16,11 +16,15 @@ struct BooksListView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .foregroundColor(.orange)
                             .font(.largeTitle)
-                        Text("Error: \(errorMessage)")
+                        Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
                             .multilineTextAlignment(.center)
                             .padding()
-                        Button("Retry") { viewModel.loadBooks() }
-                            .buttonStyle(.borderedProminent)
+                        // Button("Retry") { viewModel.loadBooks() }
+                        //     .buttonStyle(.borderedProminent)
+                        Button("Please restart SyncNos") {
+                            NSApplication.shared.terminate(nil)
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 } else if viewModel.books.isEmpty {
                     VStack {
@@ -29,8 +33,33 @@ struct BooksListView: View {
                             .font(.largeTitle)
                         Text("No books found")
                             .padding()
-                        Button("Refresh") { viewModel.loadBooks() }
-                            .buttonStyle(.borderedProminent)
+                        // Button("Refresh") { viewModel.loadBooks() }
+                            // .buttonStyle(.borderedProminent)
+                        Button("Open Apple Books notes") {
+                            let panel = NSOpenPanel()
+                            panel.canChooseFiles = false
+                            panel.canChooseDirectories = true
+                            panel.allowsMultipleSelection = false
+                            panel.canCreateDirectories = false
+                            panel.prompt = "Choose"
+                            panel.message = "Please choose the Apple Books container directory (com.apple.iBooksX) or its Data/Documents path"
+
+                            let home = NSHomeDirectory()
+                            let defaultContainer = "\(home)/Library/Containers/com.apple.iBooksX"
+                            panel.directoryURL = URL(fileURLWithPath: defaultContainer, isDirectory: true)
+
+                            panel.begin { response in
+                                guard response == .OK, let url = panel.url else { return }
+                                // Persist security-scoped bookmark for future launches
+                                BookmarkStore.shared.save(folderURL: url)
+                                _ = BookmarkStore.shared.startAccessing(url: url)
+                                let selectedPath = url.path
+                                // Determine root and notify other views
+                                DispatchQueue.main.async {
+                                    NotificationCenter.default.post(name: Notification.Name("AppleBooksContainerSelected"), object: selectedPath)
+                                }
+                            }
+                        }
                     }
                 } else {
                     List(selection: $selectedBookId) {
@@ -51,12 +80,6 @@ struct BooksListView: View {
                 }
             }
             .navigationTitle("Books")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { viewModel.loadBooks() }) { Label("Refresh", systemImage: "arrow.clockwise") }
-                        .help("Refresh")
-                }
-            }
         } detail: {
             // Detail content: show selected book details
             if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {

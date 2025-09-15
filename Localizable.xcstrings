@@ -224,12 +224,12 @@
         }
       }
     },
-    "Error: %@" : {
+    "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "错误：%@"
+            "value" : "错误：您需要允许SyncNos访问Apple Books中的笔记，否则无法加载"
           }
         }
       }
@@ -424,22 +424,12 @@
         }
       }
     },
-    "Refresh" : {
+    "Please restart SyncNos" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新"
-          }
-        }
-      }
-    },
-    "Retry" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重试"
+            "value" : "请重启SyncNos"
           }
         }
       }
