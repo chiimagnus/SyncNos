@@ -22,7 +22,7 @@ struct BooksListView: View {
                         // Button("Retry") { viewModel.loadBooks() }
                         //     .buttonStyle(.borderedProminent)
                         Button("Please restart SyncNos") {
-                            NSApplication.shared.terminate(nil)
+                            restartApp()
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -88,6 +88,28 @@ struct BooksListView: View {
             viewModel.loadBooks()
         }
     }
+}
+
+// MARK: - App restart helper
+
+fileprivate func restartApp() {
+    // 获取当前应用的 bundle URL
+    let bundleURL = Bundle.main.bundleURL
+
+    // 创建启动配置
+    let configuration = NSWorkspace.OpenConfiguration()
+
+    // 使用 NSWorkspace 重新打开应用
+    NSWorkspace.shared.openApplication(at: bundleURL, configuration: configuration) { runningApp, error in
+        if let error = error {
+            print("Failed to restart app: \(error)")
+        } else {
+            print("App restart launched successfully")
+        }
+    }
+
+    // 退出当前应用
+    NSApplication.shared.terminate(nil)
 }
 
 struct BooksListView_Previews: PreviewProvider {
