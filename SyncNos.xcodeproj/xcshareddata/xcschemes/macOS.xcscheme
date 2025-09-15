@@ -18,7 +18,7 @@
                BlueprintIdentifier = "D8CE88D92E713DB50025AD6E"
                BuildableName = "macOS.app"
                BlueprintName = "macOS"
-               ReferencedContainer = "container:SyncBookNotesWithNotion.xcodeproj">
+               ReferencedContainer = "container:SyncNos.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -47,7 +47,7 @@
             BlueprintIdentifier = "D8CE88D92E713DB50025AD6E"
             BuildableName = "macOS.app"
             BlueprintName = "macOS"
-            ReferencedContainer = "container:SyncBookNotesWithNotion.xcodeproj">
+            ReferencedContainer = "container:SyncNos.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -64,7 +64,7 @@
             BlueprintIdentifier = "D8CE88D92E713DB50025AD6E"
             BuildableName = "macOS.app"
             BlueprintName = "macOS"
-            ReferencedContainer = "container:SyncBookNotesWithNotion.xcodeproj">
+            ReferencedContainer = "container:SyncNos.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

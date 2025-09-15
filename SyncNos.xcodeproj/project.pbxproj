@@ -24,9 +24,9 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D8CE88DB2E713DB50025AD6E /* macOS */ = {
+		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = macOS;
+			path = SyncNos;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,7 +50,7 @@
 				D8DC9C592E73CFF7000A9101 /* README_EN.md */,
 				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
-				D8CE88DB2E713DB50025AD6E /* macOS */,
+				D8CE88DB2E713DB50025AD6E /* SyncNos */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,7 +79,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D8CE88DB2E713DB50025AD6E /* macOS */,
+				D8CE88DB2E713DB50025AD6E /* SyncNos */,
 			);
 			name = macOS;
 			packageProductDependencies = (
@@ -103,7 +103,7 @@
 					};
 				};
 			};
-			buildConfigurationList = D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncBookNotesWithNotion" */;
+			buildConfigurationList = D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncNos" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -336,7 +336,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncBookNotesWithNotion" */ = {
+		D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncNos" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D81167C12E70A140000D0173 /* Debug */,
