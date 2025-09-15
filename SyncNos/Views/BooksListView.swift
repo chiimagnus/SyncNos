@@ -93,23 +93,79 @@ struct BooksListView: View {
 // MARK: - App restart helper
 
 fileprivate func restartApp() {
-    // 获取当前应用的 bundle URL
+    // Debug info: show bundle identifier and bundle path we're trying to open
+    let bundleID = Bundle.main.bundleIdentifier ?? ""
     let bundleURL = Bundle.main.bundleURL
+    let bundlePath = bundleURL.path
+    print("Attempting to restart app. bundleID=\(bundleID), bundlePath=\(bundlePath)")
 
-    // 创建启动配置
-    let configuration = NSWorkspace.OpenConfiguration()
+    // 1) Prefer launching by bundle identifier (system will locate installed app in /Applications)
+    var launchIdentifier: NSNumber? = nil
+    let launchedByBundleID = NSWorkspace.shared.launchApplication(
+        withBundleIdentifier: bundleID,
+        options: [],
+        additionalEventParamDescriptor: nil,
+        launchIdentifier: &launchIdentifier
+    )
 
-    // 使用 NSWorkspace 重新打开应用
-    NSWorkspace.shared.openApplication(at: bundleURL, configuration: configuration) { runningApp, error in
-        if let error = error {
-            print("Failed to restart app: \(error)")
-        } else {
-            print("App restart launched successfully")
+    if launchedByBundleID {
+        print("Launched by bundle identifier, launchIdentifier=\(String(describing: launchIdentifier))")
+        // Give the new process time to start up before exiting
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            NSApplication.shared.terminate(nil)
         }
+        return
     }
 
-    // 退出当前应用
-    NSApplication.shared.terminate(nil)
+    print("launchApplication(withBundleIdentifier:) failed or returned false")
+
+    // 2) Try NSWorkspace.openApplication with the bundle URL we have
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: bundleURL, configuration: configuration) { runningApp, error in
+        if let error = error {
+            print("NSWorkspace.openApplication failed: \(error). Falling back to /usr/bin/open")
+
+            // 3) Fallback: use '/usr/bin/open -a <AppName>' so LaunchServices can resolve the installed app
+            let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? bundleURL.deletingPathExtension().lastPathComponent
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = ["-a", appName]
+            do {
+                try task.run()
+                print("Fallback /usr/bin/open -a \(appName) invoked")
+            } catch {
+                print("Fallback open failed: \(error)")
+            }
+
+            // Terminate after fallback attempt (give it a moment)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                NSApplication.shared.terminate(nil)
+            }
+            return
+        }
+
+        if let runningApp = runningApp {
+            print("NSWorkspace.openApplication launched: \(runningApp.localizedName ?? "unknown")")
+        } else {
+            print("NSWorkspace.openApplication returned no error but runningApp is nil; will fallback to /usr/bin/open")
+            let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? bundleURL.deletingPathExtension().lastPathComponent
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = ["-a", appName]
+            do {
+                try task.run()
+                print("Fallback /usr/bin/open -a \(appName) invoked (no runningApp)")
+            } catch {
+                print("Fallback open failed: \(error)")
+            }
+        }
+
+        // Give the launched process time to start before terminating the current one
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            NSApplication.shared.terminate(nil)
+        }
+    }
 }
 
 struct BooksListView_Previews: PreviewProvider {
