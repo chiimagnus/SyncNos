@@ -21,10 +21,10 @@ struct BooksListView: View {
                             .padding()
                         // Button("Retry") { viewModel.loadBooks() }
                         //     .buttonStyle(.borderedProminent)
-                        Button("Please restart SyncNos") {
-                            restartApp()
-                        }
-                        .buttonStyle(.borderedProminent)
+                        // Button("Please restart SyncNos") {
+                        //     restartApp()
+                        // }
+                        // .buttonStyle(.borderedProminent)
                     }
                 } else if viewModel.books.isEmpty {
                     VStack {
