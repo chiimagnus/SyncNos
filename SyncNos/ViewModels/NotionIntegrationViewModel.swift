@@ -7,14 +7,14 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var databaseTitleInput: String = "My Database"
     @Published var pageTitleInput: String = "My Page"
     @Published var headerTextInput: String = "Header"
-    @Published var pageContentInput: String = "Hello from macOS app"
+    @Published var pageContentInput: String = "Hello from SyncNos"
     // Inputs for existing database flow
     @Published var existingDatabaseIdInput: String = ""
     @Published var existingDbPageTitleInput: String = "Page in existing DB"
     @Published var existingDbHeaderInput: String = ""
     // Inputs for existing page flow
     @Published var existingPageIdInput: String = ""
-    @Published var existingPageContentInput: String = "Hello from macOS (existing page)"
+    @Published var existingPageContentInput: String = "Hello from SyncNos (existing page)"
     
     @Published var createdDatabaseId: String?
     @Published var createdPageId: String?

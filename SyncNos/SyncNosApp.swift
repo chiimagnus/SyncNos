@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct macOSApp: App {
+struct SyncNosApp: App {
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
