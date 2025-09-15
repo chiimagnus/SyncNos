@@ -8,7 +8,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Button(action: pickAppleBooksContainer) {
+                    Button(action: AppleBooksPicker.pickAppleBooksContainer) {
                         Label("Open Apple Books notes", systemImage: "book")
                     }
                     .help("Choose Apple Books container directory and load notes")
@@ -32,34 +32,6 @@ struct SettingsView: View {
             }
         }
         .frame(minWidth: 320, idealWidth: 375, maxWidth: 375)
-    }
-
-    // Replicate the Apple Books picker behavior from BooksListView
-    private func pickAppleBooksContainer() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-        panel.prompt = "Choose"
-        panel.message = "Please choose the Apple Books container directory (com.apple.iBooksX) or its Data/Documents path"
-
-        let home = NSHomeDirectory()
-        let defaultContainer = "\(home)/Library/Containers/com.apple.iBooksX"
-        panel.directoryURL = URL(fileURLWithPath: defaultContainer, isDirectory: true)
-
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            // Persist security-scoped bookmark for future launches
-            BookmarkStore.shared.save(folderURL: url)
-            _ = BookmarkStore.shared.startAccessing(url: url)
-            let selectedPath = url.path
-            // Determine root and trigger reload via DI or Notification
-            DispatchQueue.main.async {
-                // Attempt to locate BooksListView's BookViewModel via notification
-                NotificationCenter.default.post(name: Notification.Name("AppleBooksContainerSelected"), object: selectedPath)
-            }
-        }
     }
 }
 
