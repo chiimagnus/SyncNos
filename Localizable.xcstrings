@@ -425,6 +425,7 @@
       }
     },
     "Please restart SyncNos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
