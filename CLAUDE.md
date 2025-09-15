@@ -6,19 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Building and Running
 - The project is an Xcode project, open `SyncBookNotesWithNotion.xcodeproj` to build and run
-- macOS deployment target is 13
+- macOS deployment target is 13.0
 - Swift version is 5.0
+- Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
 
 ### Testing
 - Run tests using Xcode's test navigator or Cmd+U
 - For running specific tests, use Xcode's test filtering capabilities
+- Add unit tests for new business logic in Services
+- Test edge cases and error conditions
+- Ensure UI components behave correctly with different data states
 
 ### Code Structure
-- macOS directory contains the macOS SwiftUI application for reading Apple Books annotations and exporting them
-- Models in `macOS/Models/` define the data structures
-- Services in `macOS/Services/` handle database access and business logic
-- ViewModels in `macOS/ViewModels/` connect data to UI
-- Views in `macOS/Views/` contain the SwiftUI UI components
+- Models in `SyncNos/Models/` define the data structures
+- Services in `SyncNos/Services/` handle database access and business logic
+- ViewModels in `SyncNos/ViewModels/` connect data to UI
+- Views in `SyncNos/Views/` contain the SwiftUI UI components
 
 ### Key Design Principles
 - Composition over inheritance using dependency injection
@@ -31,77 +34,78 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Service-oriented architecture with protocol-based interfaces
 - Separation of concerns between data access, business logic, and presentation layers
 
-### Shared Components
-- Data models in `Models/` directories
-- SQLite database access logic in `Services/` directories
+## 2. High-Level Architecture
 
-### Technology Stack
-- Swift 5.0
-- SwiftUI for macOS UI
-- SQLite3 for database access
-- Foundation framework for core functionality
+### Core Components
+1. **Database Access Layer**: 
+   - Uses SQLite3 to access Apple Books annotation data directly
+   - Dynamically detects available columns in the database to handle different versions
+   - Implements proper error handling for database operations
+   - All database access is read-only for security
 
-## 2. Project Overview
+2. **Data Models**:
+   - `Highlight`: Represents a single highlight/note from Apple Books
+   - `BookExport`: Represents a book with its highlights
+   - `BookListItem`: Lightweight model for listing books without loading all highlights
+   - `AssetHighlightCount`: Aggregated highlight count per asset/book
 
-This project is a macOS application that reads Apple Books annotations and exports them. It has two main components:
-1. A CLI (command-line interface) version for direct execution
-2. A macOS SwiftUI UI version for graphical interaction
+3. **Services**:
+   - `DatabaseService`: Main service that coordinates database operations
+   - `DatabaseConnectionService`: Handles database connections and operations
+   - `DatabaseQueryService`: Contains the actual SQL queries and data fetching logic
+   - `BookFilterService`: Handles filtering of books based on criteria
+   - `BookmarkStore`: Manages security-scoped bookmarks for accessing the database file
+   - `NotionService`: Handles communication with the Notion API
+   - All services use protocols for testability and dependency injection
 
-The macOS app reads data from Apple Books' SQLite database and presents it in a user-friendly interface.
+4. **UI Components**:
+   - `BooksListView`: Main view showing the list of books with highlight counts
+   - `BookDetailView`: Detail view showing highlights for a selected book with pagination
+   - Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
+   - `SettingsView`: Configuration interface for Apple Books container and Notion integration
+   - `NotionIntegrationView`: UI for configuring Notion API credentials and testing integration
 
-## 3. Key Implementation Details
+5. **ViewModels**:
+   - `BookViewModel`: Manages the data flow between services and BooksListView
+   - `BookDetailViewModel`: Manages pagination and data loading for BookDetailView
+   - `NotionIntegrationViewModel`: Handles UI logic for Notion integration setup
 
-### Database Access
-- Uses SQLite3 to access Apple Books annotation data
-- Dynamically detects available columns in the database to handle different versions
-- Implements proper error handling for database operations
-- Uses security-scoped bookmarks for accessing the database file in the App Sandbox
+6. **Dependency Injection**:
+   - `DIContainer` provides shared instances of services
+   - Services are injected into ViewModels through initializer parameters with default values
 
-### Data Models
-- `Highlight`: Represents a single highlight/note from Apple Books
-- `BookExport`: Represents a book with its highlights
-- `HighlightRow` and `BookRow`: Intermediate representations for database rows
-- `BookListItem`: Lightweight model for listing books without loading all highlights
-- `AssetHighlightCount`: Aggregated highlight count per asset/book
-
-### Services
-- `DatabaseService`: Main service that coordinates database operations
-- `DatabaseConnectionService`: Handles database connections and operations
-- `DatabaseQueryService`: Contains the actual SQL queries and data fetching logic
-- `BookFilterService`: Handles filtering of books based on criteria
-- `BookmarkStore`: Manages security-scoped bookmarks for accessing the database file
-- All services use protocols for testability and dependency injection
-
-### UI Components
-- `BooksListView`: Main view showing the list of books with highlight counts
-- `BookDetailView`: Detail view showing highlights for a selected book with pagination
-- `BookViewModel`: ViewModel that manages the data flow between services and BooksListView
-- `BookDetailViewModel`: ViewModel that manages pagination and data loading for BookDetailView
-- Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
-
-### Dependency Injection
-- `DIContainer` provides shared instances of services
-- Services are injected into ViewModels through initializer parameters with default values
-
-## 4. Development Guidelines
-
-### Adding New Features
-1. Follow the MVVM pattern by adding new data to Models, business logic to Services, and UI presentation to Views
-2. Use dependency injection for better testability
-3. Maintain single responsibility principle for each component
-4. Use protocols for service interfaces to enable mocking in tests
-
-### Error Handling
-- Use Swift's error handling mechanisms
-- Provide user-friendly error messages in the UI
-- Log errors appropriately for debugging
-
-### Testing
-- Add unit tests for new business logic in Services
-- Test edge cases and error conditions
-- Ensure UI components behave correctly with different data states
+### Data Flow
+1. Views observe ViewModels through @Published properties
+2. ViewModels coordinate with Services to fetch data
+3. Services handle database access and return model objects
+4. ViewModels process and expose data to Views
+5. User interactions trigger updates through the same flow
 
 ### Security Considerations
 - Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
 - All database access is read-only
 - Properly manages security-scoped resource access lifecycle
+- Notion API credentials stored in UserDefaults (standard for macOS apps)
+
+### Notion Integration
+- `NotionService` handles all Notion API communications
+- `NotionConfigStore` manages credential storage and retrieval
+- Idempotent sync using UUID tracking to prevent duplicate highlights
+- Batch operations for efficient API usage
+- Rich formatting of highlights with metadata and iBooks links
+- Progress tracking during sync operations
+
+### Database Access Patterns
+- Security-Scoped Access: Uses security-scoped bookmarks for accessing the Apple Books database within the App Sandbox
+- Dynamic Schema Detection: Dynamically detects available columns to handle different Apple Books database versions
+- Error Handling: Implements proper error handling for database operations
+- Pagination: Implements pagination for efficient loading of large datasets
+- Read-Only Access: All database access is read-only for security
+
+### UI/UX Patterns
+- Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
+- Master-detail interface using `NavigationSplitView`
+- Progress indicators for long-running operations
+- Error states with user-friendly messages
+- Pagination with "Load More" functionality
+- Toolbar integration for primary actions
