@@ -12,8 +12,7 @@ SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据�
 - 同步Apple Books 的数据：书名、作者；高亮笔记、注释、高亮笔记的颜色、创建时间和修改时间。
 
 ## 快速开始
-- 下载SyncNos源码
-- 在Mac App Store下载
+- 在[Mac App Store下载](https://apps.apple.com/app/syncnos/id6752426176)
 - 打开设置，填写“凭据”部分的Notion API token和Page ID，点击保存。
 - 注意：需要在 [Notion 集成](https://www.notion.so/profile/integrations) 中授权。
 
