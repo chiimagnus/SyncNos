@@ -633,7 +633,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
+            "value" : "Apple Books Container-Verzeichnis auswählen und Notizen laden"
           }
         },
         "en" : {
@@ -645,13 +645,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
+            "value" : "Elegir directorio contenedor de Apple Books y cargar notas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
+            "value" : "Choisir le répertoire conteneur Apple Books et charger les notes"
           }
         },
         "ja" : {
@@ -669,7 +669,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
+            "value" : "Escolher diretório contêiner do Apple Books e carregar notas"
           }
         },
         "zh-Hans" : {
@@ -685,7 +685,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
+            "value" : "Notion konfigurieren und Beispiel-API-Aufrufe ausführen"
           }
         },
         "en" : {
@@ -697,13 +697,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
+            "value" : "Configurar Notion y ejecutar llamadas de API de ejemplo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
+            "value" : "Configurer Notion et exécuter des appels API d'exemple"
           }
         },
         "ja" : {
@@ -721,7 +721,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
+            "value" : "Configurar Notion e executar chamadas de API de exemplo"
           }
         },
         "zh-Hans" : {
@@ -749,13 +749,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Content to append"
+            "value" : "Contenido a agregar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Content to append"
+            "value" : "Contenu à ajouter"
           }
         },
         "ja" : {
@@ -773,7 +773,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Content to append"
+            "value" : "Conteúdo a adicionar"
           }
         },
         "zh-Hans" : {
@@ -801,13 +801,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Database"
+            "value" : "Crear base de datos"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Database"
+            "value" : "Créer une base de données"
           }
         },
         "ja" : {
@@ -825,7 +825,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Database"
+            "value" : "Criar banco de dados"
           }
         },
         "zh-Hans" : {
@@ -853,13 +853,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page"
+            "value" : "Crear página"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page"
+            "value" : "Créer une page"
           }
         },
         "ja" : {
@@ -877,7 +877,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page"
+            "value" : "Criar página"
           }
         },
         "zh-Hans" : {
@@ -905,13 +905,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page in Existing DB"
+            "value" : "Crear página en base de datos existente"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page in Existing DB"
+            "value" : "Créer une page dans une base de données existante"
           }
         },
         "ja" : {
@@ -929,7 +929,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Page in Existing DB"
+            "value" : "Criar página em banco de dados existente"
           }
         },
         "zh-Hans" : {
@@ -1842,13 +1842,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No books found"
+            "value" : "No se encontraron libros"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No books found"
+            "value" : "Aucun livre trouvé"
           }
         },
         "ja" : {
@@ -1866,7 +1866,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No books found"
+            "value" : "Nenhum livro encontrado"
           }
         },
         "zh-Hans" : {
@@ -2520,13 +2520,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a book to view details"
+            "value" : "Selecciona un libro para ver detalles"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a book to view details"
+            "value" : "Sélectionnez un livre pour voir les détails"
           }
         },
         "ja" : {
@@ -2544,7 +2544,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a book to view details"
+            "value" : "Selecione um livro para ver detalhes"
           }
         },
         "zh-Hans" : {
@@ -2780,13 +2780,13 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use as default for future syncs"
+            "value" : "Usar como predeterminado para sincronizaciones futuras"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use as default for future syncs"
+            "value" : "Utiliser par défaut pour les synchronisations futures"
           }
         },
         "ja" : {
@@ -2804,7 +2804,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use as default for future syncs"
+            "value" : "Usar como padrão para sincronizações futuras"
           }
         },
         "zh-Hans" : {
