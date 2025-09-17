@@ -7,13 +7,28 @@ struct SettingsView: View {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
 
-        // 处理中文特殊情况
+        // 处理特殊语言情况
         if languageCode?.starts(with: "zh") == true {
             return "zh-Hans"
         }
 
+        // 处理法语变体（加拿大法语等）
+        if languageCode?.starts(with: "fr") == true {
+            return "fr"
+        }
+
+        // 处理德语变体（奥地利德语等）
+        if languageCode?.starts(with: "de") == true {
+            return "de"
+        }
+
+        // 处理葡萄牙语变体（巴西葡萄牙语）
+        if languageCode == "pt" {
+            return "pt-BR"
+        }
+
         // 检查是否支持当前语言，否则默认使用英语
-        let supportedCodes = ["en", "zh-Hans", "ja", "ko"]
+        let supportedCodes = ["en", "zh-Hans", "ja", "ko", "es-ES", "fr", "de", "pt-BR"]
         return supportedCodes.contains(languageCode ?? "") ? languageCode! : "en"
     }()
 
@@ -21,7 +36,11 @@ struct SettingsView: View {
         ("en", "English"),
         ("zh-Hans", "中文(简体)"),
         ("ja", "日本語"),
-        ("ko", "한국어")
+        ("ko", "한국어"),
+        ("es-ES", "Español"),
+        ("fr", "Français"),
+        ("de", "Deutsch"),
+        ("pt-BR", "Português (Brasil)")
     ]
 
     private func changeAppLanguage(to languageCode: String) {
@@ -31,10 +50,10 @@ struct SettingsView: View {
 
         // 显示重启提示
         let alert = NSAlert()
-        alert.messageText = "Language Changed"
-        alert.informativeText = "Please restart the application for the language change to take effect."
+        alert.messageText = NSLocalizedString("Language Changed", comment: "Language change confirmation title")
+        alert.informativeText = NSLocalizedString("Please restart the application for the language change to take effect.", comment: "Language change restart instruction")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
         alert.runModal()
     }
 
