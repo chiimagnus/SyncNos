@@ -5,6 +5,8 @@ import AppKit
 private struct WaterfallLayout: Layout {
     var minColumnWidth: CGFloat = 280
     var spacing: CGFloat = 12
+    // When provided, use this width for internal layout computation to "freeze" columns
+    var overrideWidth: CGFloat? = nil
 
     private func computeColumnInfo(width: CGFloat, subviews: Subviews) -> (positions: [CGPoint], totalHeight: CGFloat, columnWidth: CGFloat) {
         // Sanitize inputs to avoid NaN/Inf and negative values
@@ -38,16 +40,19 @@ private struct WaterfallLayout: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 0
-        guard width > 0 else { return .zero }
-        let info = computeColumnInfo(width: width, subviews: subviews)
-        return CGSize(width: width, height: info.totalHeight)
+        let proposedWidth = proposal.width ?? 0
+        guard proposedWidth > 0 else { return .zero }
+        let usedWidth = overrideWidth ?? proposedWidth
+        let info = computeColumnInfo(width: usedWidth, subviews: subviews)
+        // Report proposed width to parent to avoid affecting outer layout (e.g., NavigationSplitView)
+        return CGSize(width: proposedWidth, height: info.totalHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let width = bounds.width
-        guard width > 0 else { return }
-        let info = computeColumnInfo(width: width, subviews: subviews)
+        let actualWidth = bounds.width
+        guard actualWidth > 0 else { return }
+        let usedWidth = overrideWidth ?? actualWidth
+        let info = computeColumnInfo(width: usedWidth, subviews: subviews)
         for index in subviews.indices {
             let position = info.positions[index]
             let point = CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y)
@@ -169,7 +174,7 @@ struct BookDetailView: View {
                 .cornerRadius(8)
                 
                 // Highlights section (Waterfall / Masonry)
-                WaterfallLayout(minColumnWidth: 280, spacing: 12) {
+                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         ZStack(alignment: .topTrailing) {
                             VStack(alignment: .leading, spacing: 8) {                                
@@ -227,7 +232,6 @@ struct BookDetailView: View {
                         }
                     }
                 }
-                .frame(width: frozenLayoutWidth, alignment: .leading)
                 .padding(.top)
                 .overlay(
                     GeometryReader { proxy in
