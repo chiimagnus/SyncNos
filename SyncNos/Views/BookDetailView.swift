@@ -8,10 +8,7 @@ private struct WaterfallLayout: Layout {
 
     private func computeColumnInfo(width: CGFloat, subviews: Subviews) -> (positions: [CGPoint], totalHeight: CGFloat, columnWidth: CGFloat) {
         // Sanitize inputs to avoid NaN/Inf and negative values
-        // Defensive clamp: avoid extremely narrow widths during live-resize probing.
-        let minAllowedWidth: CGFloat = 200
-        let safeWidthCandidate: CGFloat = (width.isFinite && width > 0) ? width : minAllowedWidth
-        let safeWidth: CGFloat = max(safeWidthCandidate, minAllowedWidth)
+        let safeWidth: CGFloat = (width.isFinite && width > 0) ? width : 1
         let safeSpacing: CGFloat = (spacing.isFinite && spacing >= 0) ? spacing : 0
         let safeMinWidth: CGFloat = (minColumnWidth.isFinite && minColumnWidth > 0) ? minColumnWidth : 1
 
@@ -59,86 +56,11 @@ private struct WaterfallLayout: Layout {
     }
 }
 
-// Note: we intentionally avoid using GeometryReader-based measurement here.
-// We'll read the hosting NSWindow width at live-resize start to decide a frozen width.
-
-// Observe NSWindow live-resize lifecycle (start/end) for the hosting window
-// onWillStart provides the hosting window's current content width so callers
-// can choose a stable frozen width (and clamp it if necessary).
-private struct WindowResizeObserver: NSViewRepresentable {
-    var onWillStartWithWidth: (CGFloat) -> Void
-    var onDidEnd: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onWillStartWithWidth: onWillStartWithWidth, onDidEnd: onDidEnd)
-    }
-
-    func makeNSView(context: Context) -> ObserverView {
-        let view = ObserverView()
-        view.onWindowChange = { window in
-            context.coordinator.attach(to: window)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: ObserverView, context: Context) {}
-
-    final class ObserverView: NSView {
-        var onWindowChange: ((NSWindow?) -> Void)?
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            onWindowChange?(self.window)
-        }
-    }
-
-    final class Coordinator {
-        var onWillStartWithWidth: (CGFloat) -> Void
-        var onDidEnd: () -> Void
-        weak var window: NSWindow?
-        var observers: [NSObjectProtocol] = []
-
-        init(onWillStartWithWidth: @escaping (CGFloat) -> Void, onDidEnd: @escaping () -> Void) {
-            self.onWillStartWithWidth = onWillStartWithWidth
-            self.onDidEnd = onDidEnd
-        }
-
-        func attach(to window: NSWindow?) {
-            if self.window === window { return }
-            detach()
-            guard let window else { return }
-            self.window = window
-            let center = NotificationCenter.default
-            observers.append(center.addObserver(forName: NSWindow.willStartLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
-                guard let self, let w = self.window else { return }
-                // Prefer contentView width; fall back to window frame width
-                let width = w.contentView?.bounds.width ?? w.frame.size.width
-                self.onWillStartWithWidth(width)
-            })
-            observers.append(center.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
-                self?.onDidEnd()
-            })
-        }
-
-        func detach() {
-            let center = NotificationCenter.default
-            for o in observers { center.removeObserver(o) }
-            observers.removeAll()
-            window = nil
-        }
-
-        deinit { detach() }
-    }
-}
-
 struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
-    // Freeze layout state (only frozenLayoutWidth is used)
-    @State private var frozenLayoutWidth: CGFloat? = nil
-    // Last known content (container) width measured once to avoid probing-frame issues
-    @State private var lastKnownContentWidth: CGFloat? = nil
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -253,15 +175,6 @@ struct BookDetailView: View {
                         }
                     }
                 }
-                .frame(width: frozenLayoutWidth)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.onAppear {
-                            // capture container width once as a reliable fallback
-                            lastKnownContentWidth = proxy.size.width
-                        }
-                    }
-                )
                 .padding(.top)
 
                 if viewModel.canLoadMore {
@@ -285,27 +198,12 @@ struct BookDetailView: View {
                     Text(msg).font(.footnote).foregroundColor(.secondary)
                 }
             }
-            // No outer width freezing; layout freezing happens inside WaterfallLayout via cache
             .padding()
         }
         .onAppear {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
         .navigationTitle("Highlights")
-        .background(
-            WindowResizeObserver(
-                onWillStartWithWidth: { width in
-                    // Use the hosting window width but prefer the last known container width
-                    let clampedWindow = max(200, width)
-                    let chosen = min(clampedWindow, lastKnownContentWidth ?? clampedWindow)
-                    frozenLayoutWidth = chosen
-                },
-                onDidEnd: {
-                    frozenLayoutWidth = nil
-                }
-            )
-            .frame(width: 0, height: 0)
-        )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if viewModel.isSyncing {
