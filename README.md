@@ -32,3 +32,5 @@ SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据�
 
 ## 相关文章链接
 [微信公众号｜开发了一个小工具，SyncNotes。将Apple Books中的读书笔记同步到Notion](https://mp.weixin.qq.com/s/jeTko_mQbCe3DXUNpmjHHA)
+
+[技术文档](Resource)
