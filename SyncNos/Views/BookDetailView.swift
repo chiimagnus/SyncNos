@@ -56,11 +56,63 @@ private struct WaterfallLayout: Layout {
     }
 }
 
+// Track macOS window live-resize events and expose as a SwiftUI binding.
+private struct LiveResizeObserver: NSViewRepresentable {
+    @Binding var isResizing: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isResizing: $isResizing)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = TrackingView()
+        view.onStart = { context.coordinator.setResizing(true) }
+        view.onEnd = { context.coordinator.setResizing(false) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class TrackingView: NSView {
+        var onStart: (() -> Void)?
+        var onEnd: (() -> Void)?
+
+        override func viewWillStartLiveResize() {
+            onStart?()
+        }
+
+        override func viewDidEndLiveResize() {
+            onEnd?()
+        }
+    }
+
+    final class Coordinator {
+        var isResizing: Binding<Bool>
+        init(isResizing: Binding<Bool>) { self.isResizing = isResizing }
+        func setResizing(_ newValue: Bool) {
+            let apply = {
+                if self.isResizing.wrappedValue != newValue {
+                    self.isResizing.wrappedValue = newValue
+                }
+            }
+            if Thread.isMainThread {
+                apply()
+            } else {
+                DispatchQueue.main.async { apply() }
+            }
+        }
+    }
+}
+
 struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
+    // Freeze layout width during live resize to avoid heavy recomputation.
+    @State private var isLiveResizing: Bool = false
+    @State private var measuredLayoutWidth: CGFloat = 0
+    @State private var frozenLayoutWidth: CGFloat? = nil
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -175,7 +227,18 @@ struct BookDetailView: View {
                         }
                     }
                 }
+                .frame(width: frozenLayoutWidth, alignment: .leading)
                 .padding(.top)
+                .overlay(
+                    GeometryReader { proxy in
+                        let w = proxy.size.width
+                        Color.clear
+                            .onAppear { measuredLayoutWidth = w }
+                            .onChange(of: w) { newValue in
+                                measuredLayoutWidth = newValue
+                            }
+                    }
+                )
 
                 if viewModel.canLoadMore {
                     HStack {
@@ -204,6 +267,14 @@ struct BookDetailView: View {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
         .navigationTitle("Highlights")
+        .background(LiveResizeObserver(isResizing: $isLiveResizing))
+        .onChange(of: isLiveResizing) { resizing in
+            if resizing {
+                frozenLayoutWidth = measuredLayoutWidth
+            } else {
+                frozenLayoutWidth = nil
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if viewModel.isSyncing {
