@@ -302,8 +302,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .alert("同步错误", isPresented: $showingSyncError) {
-            Button("确定", role: .cancel) { }
+        .alert("Sync Error", isPresented: $showingSyncError) {
+            Button("OK", role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
         }
