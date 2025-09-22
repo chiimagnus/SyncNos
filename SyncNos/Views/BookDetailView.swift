@@ -118,6 +118,8 @@ struct BookDetailView: View {
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var frozenLayoutWidth: CGFloat? = nil
+    @State private var showingSyncError = false
+    @State private var syncErrorMessage = ""
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -260,9 +262,6 @@ struct BookDetailView: View {
                     }
                     .padding(.top, 8)
                 }
-                if let msg = viewModel.syncMessage {
-                    Text(msg).font(.footnote).foregroundColor(.secondary)
-                }
             }
             .padding()
         }
@@ -301,6 +300,17 @@ struct BookDetailView: View {
                     }
                     .help("Create/locate syncnote DB, create/locate book page, and append new highlights.")
                 }
+            }
+        }
+        .alert("同步错误", isPresented: $showingSyncError) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text(syncErrorMessage)
+        }
+        .onChange(of: viewModel.syncMessage) { newMessage in
+            if let message = newMessage, message != "Synced to Notion" {
+                syncErrorMessage = message
+                showingSyncError = true
             }
         }
     }
