@@ -1,2976 +1,3318 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "" : {
-      "shouldTranslate" : false
+  "sourceLanguage": "en",
+  "strings": {
+    "": {
+      "shouldTranslate": false
     },
-    "%lld highlights" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Hervorhebungen"
+    "%lld highlights": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Hervorhebungen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld highlights"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld highlights"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld destacados"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld destacados"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld surlignements"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld surlignements"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個のハイライト"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個のハイライト"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 개의 하이라이트"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 개의 하이라이트"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld destaques"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld destaques"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个高亮"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld выделений"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个高亮"
           }
         }
       }
     },
-    "1. Create a new database" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Neue Datenbank erstellen"
+    "1. Create a new database": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Neue Datenbank erstellen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Create a new database"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Create a new database"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Crear una nueva base de datos"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Crear una nueva base de datos"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Créer une nouvelle base de données"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Créer une nouvelle base de données"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. 新しいデータベースを作成"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. 新しいデータベースを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. 새 데이터베이스 생성"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. 새 데이터베이스 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Criar um novo banco de dados"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Criar um novo banco de dados"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. 创建新的数据库"
-          }
-        }
-      }
-    },
-    "2. Add a page to the database" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Seite zur Datenbank hinzufügen"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Создать новую базу данных"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Add a page to the database"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Agregar una página a la base de datos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Ajouter une page à la base de données"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. データベースにページを追加"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. 데이터베이스에 페이지 추가"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Adicionar uma página ao banco de dados"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. 在此数据库添加新页"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. 创建新的数据库"
           }
         }
       }
     },
-    "2b. Create a page in an existing database" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. Seite in vorhandener Datenbank erstellen"
+    "2. Add a page to the database": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Seite zur Datenbank hinzufügen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. Create a page in an existing database"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Add a page to the database"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. Crear una página en una base de datos existente"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Agregar una página a la base de datos"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. Créer une page dans une base de données existante"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Ajouter une page à la base de données"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. 既存のデータベースにページを作成"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. データベースにページを追加"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. 기존 데이터베이스에 페이지 생성"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. 데이터베이스에 페이지 추가"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. Criar uma página em um banco de dados existente"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Adicionar uma página ao banco de dados"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2b. 在已有数据库中创建页面"
-          }
-        }
-      }
-    },
-    "3. Add content to the page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. Inhalt zur Seite hinzufügen"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Добавить страницу в базу данных"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. Add content to the page"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. Agregar contenido a la página"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. Ajouter du contenu à la page"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. ページにコンテンツを追加"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. 페이지에 콘텐츠 추가"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. Adicionar conteúdo à página"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3. 向该页面添加内容"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. 在此数据库添加新页"
           }
         }
       }
     },
-    "3b. Create content in an existing page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. Inhalt in vorhandener Seite erstellen"
+    "2b. Create a page in an existing database": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Seite in vorhandener Datenbank erstellen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. Create content in an existing page"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Create a page in an existing database"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. Crear contenido en una página existente"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Crear una página en una base de datos existente"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. Créer du contenu dans une page existante"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Créer une page dans une base de données existante"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. 既存のページにコンテンツを作成"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. 既存のデータベースにページを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. 기존 페이지에 콘텐츠 생성"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. 기존 데이터베이스에 페이지 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. Criar conteúdo em uma página existente"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Criar uma página em um banco de dados existente"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "3b. 在已有页面中创建内容"
-          }
-        }
-      }
-    },
-    "Append Paragraph" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Absatz hinzufügen"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. Создать страницу в существующей базе данных"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Append Paragraph"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agregar párrafo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter un paragraphe"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "段落を追加"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "단락 추가"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar parágrafo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加段落"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2b. 在已有数据库中创建页面"
           }
         }
       }
     },
-    "Append to Existing Page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zur vorhandenen Seite hinzufügen"
+    "3. Add content to the page": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Inhalt zur Seite hinzufügen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Append to Existing Page"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Add content to the page"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agregar a página existente"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Agregar contenido a la página"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter à la page existante"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Ajouter du contenu à la page"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "既存のページに追加"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. ページにコンテンツを追加"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기존 페이지에 추가"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. 페이지에 콘텐츠 추가"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar à página existente"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Adicionar conteúdo à página"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加到已有页面"
-          }
-        }
-      }
-    },
-    "Back" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zurück"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. 向该页面添加内容"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atrás"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retour"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "戻る"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "뒤로"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voltar"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "返回"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Добавить содержимое на страницу"
           }
         }
       }
     },
-    "Books" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bücher"
+    "3b. Create content in an existing page": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Inhalt in vorhandener Seite erstellen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Books"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Create content in an existing page"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Libros"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Crear contenido en una página existente"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Livres"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Créer du contenu dans une page existante"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "書籍"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. 既存のページにコンテンツを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "책"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. 기존 페이지에 콘텐츠 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Livros"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Criar conteúdo em uma página existente"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "书籍"
-          }
-        }
-      }
-    },
-    "by %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. 在已有页面中创建内容"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 著"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 저자"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "作者：%@"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3b. Создать содержимое в существующей странице"
           }
         }
       }
     },
-    "Change application language" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anwendungssprache ändern"
+    "Append Paragraph": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Absatz hinzufügen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Change application language"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Append Paragraph"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cambiar idioma de la aplicación"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agregar párrafo"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Changer la langue de l'application"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un paragraphe"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリケーション言語を変更"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "段落を追加"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "애플리케이션 언어 변경"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단락 추가"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alterar idioma do aplicativo"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar parágrafo"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更改应用语言"
-          }
-        }
-      }
-    },
-    "Choose Apple Books container directory and load notes" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books Container-Verzeichnis auswählen und Notizen laden"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加段落"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elegir directorio contenedor de Apple Books y cargar notas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisir le répertoire conteneur Apple Books et charger les notes"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books コンテナディレクトリを選択してノートを読み込む"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books 컨테이너 디렉토리 선택 및 노트 불러오기"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolher diretório contêiner do Apple Books e carregar notas"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择 Apple Books 容器目录并加载笔记"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить абзац"
           }
         }
       }
     },
-    "Configure Notion and run example API calls" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion konfigurieren und Beispiel-API-Aufrufe ausführen"
+    "Append to Existing Page": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zur vorhandenen Seite hinzufügen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Append to Existing Page"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configurar Notion y ejecutar llamadas de API de ejemplo"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agregar a página existente"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configurer Notion et exécuter des appels API d'exemple"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter à la page existante"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion を設定してサンプル API 呼び出しを実行"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存のページに追加"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion 구성 및 예제 API 호출 실행"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기존 페이지에 추가"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configurar Notion e executar chamadas de API de exemplo"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar à página existente"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置 Notion 并执行示例 API 调用"
-          }
-        }
-      }
-    },
-    "Content to append" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Content to append"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加到已有页面"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Content to append"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contenido a agregar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contenu à ajouter"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加するコンテンツ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "추가할 콘텐츠"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conteúdo a adicionar"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要添加的内容"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить к существующей странице"
           }
         }
       }
     },
-    "Create Database" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Database"
+    "Back": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Database"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crear base de datos"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atrás"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer une base de données"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "データベースを作成"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "戻る"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "데이터베이스 생성"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뒤로"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Criar banco de dados"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建数据库"
-          }
-        }
-      }
-    },
-    "Create Page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Page"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Page"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crear página"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer une page"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ページを作成"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지 생성"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Criar página"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建页面"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Назад"
           }
         }
       }
     },
-    "Create Page in Existing DB" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Page in Existing DB"
+    "Books": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bücher"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create Page in Existing DB"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Books"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crear página en base de datos existente"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libros"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer une page dans une base de données existante"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livres"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "既存 DB でページを作成"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籍"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기존 DB에서 페이지 생성"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "책"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Criar página em banco de dados existente"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livros"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在现有数据库中创建页面"
-          }
-        }
-      }
-    },
-    "Create/locate syncnote DB, create/locate book page, and append new highlights." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create/locate syncnote DB, create/locate book page, and append new highlights."
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书籍"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create/locate syncnote DB, create/locate book page, and append new highlights."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create/locate syncnote DB, create/locate book page, and append new highlights."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create/locate syncnote DB, create/locate book page, and append new highlights."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "syncnote DB の作成/配置、書籍ページの作成/配置、新しいハイライトの追加。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "syncnote DB 생성/위치 지정, 책 페이지 생성/위치 지정, 새 하이라이트 추가."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create/locate syncnote DB, create/locate book page, and append new highlights."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建/定位 syncnote 数据库、创建/定位书籍页面，并追加新的高亮。"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Книги"
           }
         }
       }
     },
-    "Created: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
+    "by %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "by %@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "by %@"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "by %@"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "by %@"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "作成日: %@"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 著"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "생성: %@"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 저자"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "by %@"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建：%@"
-          }
-        }
-      }
-    },
-    "Credentials" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作者：%@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "認証情報"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "인증 정보"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "凭据"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "автор %@"
           }
         }
       }
     },
-    "Database ID: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database ID: %@"
+    "Change application language": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anwendungssprache ändern"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database ID: %@"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change application language"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database ID: %@"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar idioma de la aplicación"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database ID: %@"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer la langue de l'application"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "データベース ID: %@"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリケーション言語を変更"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "데이터베이스 ID: %@"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "애플리케이션 언어 변경"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database ID: %@"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alterar idioma do aplicativo"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "数据库 ID：%@"
-          }
-        }
-      }
-    },
-    "Database title" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database title"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更改应用语言"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database title"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database title"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database title"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "データベースタイトル"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "데이터베이스 제목"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Database title"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "数据库标题"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить язык приложения"
           }
         }
       }
     },
-    "Enable Background Image" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hintergrundbild aktivieren"
+    "Choose Apple Books container directory and load notes": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books Container-Verzeichnis auswählen und Notizen laden"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable Background Image"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Apple Books container directory and load notes"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habilitar imagen de fondo"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir directorio contenedor de Apple Books y cargar notas"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activer l'image d'arrière-plan"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir le répertoire conteneur Apple Books et charger les notes"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "背景画像を有効にする"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books コンテナディレクトリを選択してノートを読み込む"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "배경 이미지 활성화"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books 컨테이너 디렉토리 선택 및 노트 불러오기"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habilitar imagem de fundo"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher diretório contêiner do Apple Books e carregar notas"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启用背景图像"
-          }
-        }
-      }
-    },
-    "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 Apple Books 容器目录并加载笔记"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "エラー：SyncNos が Apple Books のノートにアクセスすることを許可してください。そうしないと読み込めません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "오류: SyncNos가 Apple Books 노트에 액세스할 수 있도록 허용해 주세요. 그렇지 않으면 로드할 수 없습니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "错误：您需要允许SyncNos访问Apple Books中的笔记，否则无法加载"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите каталог контейнера Apple Books и загрузите заметки"
           }
         }
       }
     },
-    "Existing Database ID" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Database ID"
+    "Configure Notion and run example API calls": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion konfigurieren und Beispiel-API-Aufrufe ausführen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Database ID"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure Notion and run example API calls"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Database ID"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurar Notion y ejecutar llamadas de API de ejemplo"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Database ID"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurer Notion et exécuter des appels API d'exemple"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "既存のデータベース ID"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion を設定してサンプル API 呼び出しを実行"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기존 데이터베이스 ID"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion 구성 및 예제 API 호출 실행"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Database ID"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurar Notion e executar chamadas de API de exemplo"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已有数据库 ID"
-          }
-        }
-      }
-    },
-    "Existing Page ID" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Page ID"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置 Notion 并执行示例 API 调用"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Page ID"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Page ID"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Page ID"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "既存のページ ID"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기존 페이지 ID"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existing Page ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已有页面 ID"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настроить Notion и выполнить примеры вызовов API"
           }
         }
       }
     },
-    "General" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
+    "Content to append": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content to append"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content to append"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenido a agregar"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenu à ajouter"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一般"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加するコンテンツ"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "일반"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추가할 콘텐츠"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conteúdo a adicionar"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用"
-          }
-        }
-      }
-    },
-    "Header (optional)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Header (optional)"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要添加的内容"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Header (optional)"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Header (optional)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Header (optional)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ヘッダー（オプション）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "헤더 (선택사항)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Header (optional)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "标题（可选）"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Содержимое для добавления"
           }
         }
       }
     },
-    "Highlights" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
+    "Create Database": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Database"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Database"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear base de datos"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer une base de données"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ハイライト"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データベースを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "하이라이트"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데이터베이스 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Criar banco de dados"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高亮"
-          }
-        }
-      }
-    },
-    "Integrations" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建数据库"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "連携"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "통합"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "集成"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создать базу данных"
           }
         }
       }
     },
-    "Language" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
+    "Create Page": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Page"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Page"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear página"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer une page"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "言語"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "언어"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "페이지 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Criar página"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "语言"
-          }
-        }
-      }
-    },
-    "Language Changed" : {
-      "comment" : "Language change confirmation title",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sprache geändert"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建页面"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language Changed"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Idioma cambiado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Langue modifiée"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "言語が変更されました"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "언어가 변경되었습니다"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Idioma alterado"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "语言已更改"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создать страницу"
           }
         }
       }
     },
-    "Load more" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
+    "Create Page in Existing DB": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Page in Existing DB"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Page in Existing DB"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear página en base de datos existente"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer une page dans une base de données existante"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "もっと読み込む"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存 DB でページを作成"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "더 불러오기"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기존 DB에서 페이지 생성"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Criar página em banco de dados existente"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加载更多"
-          }
-        }
-      }
-    },
-    "Loading books..." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在现有数据库中创建页面"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "書籍を読み込み中..."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "책 불러오는 중..."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载书籍..."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создать страницу в существующей БД"
           }
         }
       }
     },
-    "Modified: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
+    "Create/locate syncnote DB, create/locate book page, and append new highlights.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create/locate syncnote DB, create/locate book page, and append new highlights."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create/locate syncnote DB, create/locate book page, and append new highlights."
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create/locate syncnote DB, create/locate book page, and append new highlights."
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create/locate syncnote DB, create/locate book page, and append new highlights."
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "変更日: %@"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syncnote DB の作成/配置、書籍ページの作成/配置、新しいハイライトの追加。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "수정: %@"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syncnote DB 생성/위치 지정, 책 페이지 생성/위치 지정, 새 하이라이트 추가."
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create/locate syncnote DB, create/locate book page, and append new highlights."
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修改：%@"
-          }
-        }
-      }
-    },
-    "No books found" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No books found"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建/定位 syncnote 数据库、创建/定位书籍页面，并追加新的高亮。"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No books found"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se encontraron libros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun livre trouvé"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "書籍が見つかりません"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "책을 찾을 수 없음"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nenhum livro encontrado"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到书籍"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создать/найти БД syncnote, создать/найти страницу книги и добавить новые выделения."
           }
         }
       }
     },
-    "Notion Integration" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
+    "Created: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created: %@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created: %@"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created: %@"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created: %@"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion 連携"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作成日: %@"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion 통합"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성: %@"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created: %@"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion 集成"
-          }
-        }
-      }
-    },
-    "NOTION_KEY" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建：%@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создано: %@"
           }
         }
       }
     },
-    "NOTION_PAGE_ID" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+    "Credentials": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credentials"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credentials"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credentials"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credentials"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "認証情報"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "인증 정보"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credentials"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
-          }
-        }
-      }
-    },
-    "OK" : {
-      "comment" : "OK button",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "凭据"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aceptar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "확인"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Учётные данные"
           }
         }
       }
     },
-    "Open Apple Books notes" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
+    "Database ID: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID: %@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID: %@"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID: %@"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID: %@"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books ノートを開く"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データベース ID: %@"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books 노트 열기"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데이터베이스 ID: %@"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID: %@"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开 Apple Books 笔记"
-          }
-        }
-      }
-    },
-    "Open in Apple Books" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据库 ID：%@"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books で開く"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Books에서 열기"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Apple Books 中打开"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID базы данных: %@"
           }
         }
       }
     },
-    "Page ID: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page ID: %@"
+    "Database title": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database title"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page ID: %@"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database title"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page ID: %@"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database title"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page ID: %@"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database title"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ページ ID: %@"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データベースタイトル"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지 ID: %@"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데이터베이스 제목"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page ID: %@"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database title"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "页面 ID：%@"
-          }
-        }
-      }
-    },
-    "Page title" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据库标题"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ページタイトル"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지 제목"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "页面标题"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Название базы данных"
           }
         }
       }
     },
-    "Page title (for existing DB)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title (for existing DB)"
+    "Enable Background Image": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hintergrundbild aktivieren"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title (for existing DB)"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Background Image"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title (for existing DB)"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Habilitar imagen de fondo"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title (for existing DB)"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activer l'image d'arrière-plan"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ページタイトル（既存 DB 用）"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景画像を有効にする"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지 제목 (기존 DB용)"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "배경 이미지 활성화"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page title (for existing DB)"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Habilitar imagem de fundo"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "页面标题（适用于现有数据库）"
-          }
-        }
-      }
-    },
-    "Paragraph content" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paragraph content"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用背景图像"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paragraph content"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paragraph content"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paragraph content"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "段落コンテンツ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "단락 콘텐츠"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paragraph content"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "段落内容"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включить фоновое изображение"
           }
         }
       }
     },
-    "Please restart the application for the language change to take effect." : {
-      "comment" : "Language change restart instruction",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bitte starten Sie die Anwendung neu, damit die Sprachänderung wirksam wird."
+    "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please restart the application for the language change to take effect."
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reinicie la aplicación para que el cambio de idioma surta efecto."
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Veuillez redémarrer l'application pour que le changement de langue prenne effet."
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "言語の変更を有効にするには、アプリケーションを再起動してください。"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エラー：SyncNos が Apple Books のノートにアクセスすることを許可してください。そうしないと読み込めません。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "언어 변경을 적용하려면 애플리케이션을 다시 시작하세요."
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오류: SyncNos가 Apple Books 노트에 액세스할 수 있도록 허용해 주세요. 그렇지 않으면 로드할 수 없습니다."
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reinicie o aplicativo para que a mudança de idioma tenha efeito."
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请重新启动应用程序以使语言更改生效。"
-          }
-        }
-      }
-    },
-    "Save" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speichern"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "错误：您需要允许SyncNos访问Apple Books中的笔记，否则无法加载"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrer"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "저장"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salvar"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ошибка: Пожалуйста, разрешите SyncNos доступ к заметкам Apple Books, иначе они не смогут быть загружены."
           }
         }
       }
     },
-    "Select a book to view details" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a book to view details"
+    "Existing Database ID": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Database ID"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a book to view details"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Database ID"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selecciona un libro para ver detalles"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Database ID"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sélectionnez un livre pour voir les détails"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Database ID"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "詳細を表示する書籍を選択してください"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存のデータベース ID"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "세부정보를 보려면 책을 선택하세요"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기존 데이터베이스 ID"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selecione um livro para ver detalhes"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Database ID"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请选择一本书以查看详细信息"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有数据库 ID"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID существующей базы данных"
           }
         }
       }
     },
-    "Settings" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einstellungen"
+    "Existing Page ID": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Page ID"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Settings"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Page ID"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configuración"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Page ID"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paramètres"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Page ID"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存のページ ID"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "설정"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기존 페이지 ID"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configurações"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing Page ID"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设置"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有页面 ID"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID существующей страницы"
           }
         }
       }
     },
-    "Show a background image in the main window" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hintergrundbild im Hauptfenster anzeigen"
+    "General": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show a background image in the main window"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar imagen de fondo en la ventana principal"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher une image d'arrière-plan dans la fenêtre principale"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メインウィンドウに背景画像を表示"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一般"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "메인 창에 배경 이미지 표시"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "일반"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar imagem de fundo na janela principal"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在主窗口中显示背景图像"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Общие"
           }
         }
       }
     },
-    "Sync Error" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisierungsfehler"
+    "Header (optional)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Header (optional)"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync Error"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Header (optional)"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error de sincronización"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Header (optional)"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erreur de synchronisation"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Header (optional)"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同期エラー"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ヘッダー（オプション）"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동기화 오류"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "헤더 (선택사항)"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erro de sincronização"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Header (optional)"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步出错"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题（可选）"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Заголовок (необязательно)"
           }
         }
       }
     },
-    "Sync in progress" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation läuft"
+    "Highlights": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync in progress"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización en progreso"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation en cours"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同期中"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ハイライト"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동기화 진행 중"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "하이라이트"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização em andamento"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步进行中"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高亮"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выделения"
           }
         }
       }
     },
-    "Sync to Notion" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mit Notion synchronisieren"
+    "Integrations": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrations"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync to Notion"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrations"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizar con Notion"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrations"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchroniser avec Notion"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrations"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion に同期"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "連携"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion에 동기화"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "통합"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizar com Notion"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrations"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步到 Notion"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "集成"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Интеграции"
           }
         }
       }
     },
-    "Syncing..." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisiere..."
+    "Language": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Syncing..."
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizando..."
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation..."
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同期中..."
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동기화 중..."
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronizando..."
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在同步..."
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Язык"
           }
         }
       }
     },
-    "Use as default for future syncs" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use as default for future syncs"
+    "Language Changed": {
+      "comment": "Language change confirmation title",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprache geändert"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use as default for future syncs"
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language Changed"
           }
         },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar como predeterminado para sincronizaciones futuras"
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma cambiado"
           }
         },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser par défaut pour les synchronisations futures"
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue modifiée"
           }
         },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "今後の同期のデフォルトとして使用"
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語が変更されました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "향후 동기화의 기본값으로 사용"
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어가 변경되었습니다"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar como padrão para sincronizações futuras"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma alterado"
           }
         },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "作为未来同步的默认设置"
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言已更改"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Язык изменён"
+          }
+        }
+      }
+    },
+    "Load more": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もっと読み込む"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 불러오기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加载更多"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузить ещё"
+          }
+        }
+      }
+    },
+    "Loading books...": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading books..."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading books..."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading books..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading books..."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籍を読み込み中..."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "책 불러오는 중..."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading books..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载书籍..."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка книг..."
+          }
+        }
+      }
+    },
+    "Modified: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified: %@"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更日: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수정: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改：%@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменено: %@"
+          }
+        }
+      }
+    },
+    "No books found": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No books found"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No books found"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron libros"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun livre trouvé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籍が見つかりません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "책을 찾을 수 없음"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum livro encontrado"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到书籍"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Книги не найдены"
+          }
+        }
+      }
+    },
+    "Notion Integration": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion Integration"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion Integration"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion Integration"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion Integration"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion 連携"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion 통합"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion Integration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion 集成"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Интеграция с Notion"
+          }
+        }
+      }
+    },
+    "NOTION_KEY": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_KEY"
+          }
+        }
+      }
+    },
+    "NOTION_PAGE_ID": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NOTION_PAGE_ID"
+          }
+        }
+      }
+    },
+    "OK": {
+      "comment": "OK button",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aceptar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "확인"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Open Apple Books notes": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Books notes"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Books notes"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Books notes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Books notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books ノートを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books 노트 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Books notes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 Apple Books 笔记"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть заметки Apple Books"
+          }
+        }
+      }
+    },
+    "Open in Apple Books": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Books"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Books"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Books"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Books"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books で開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Books에서 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Books"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Apple Books 中打开"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть в Apple Books"
+          }
+        }
+      }
+    },
+    "Page ID: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page ID: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page ID: %@"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page ID: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page ID: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページ ID: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "페이지 ID: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page ID: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页面 ID：%@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID страницы: %@"
+          }
+        }
+      }
+    },
+    "Page title": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページタイトル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "페이지 제목"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页面标题"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Название страницы"
+          }
+        }
+      }
+    },
+    "Page title (for existing DB)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title (for existing DB)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title (for existing DB)"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title (for existing DB)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title (for existing DB)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページタイトル（既存 DB 用）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "페이지 제목 (기존 DB용)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page title (for existing DB)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页面标题（适用于现有数据库）"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Название страницы (для существующей БД)"
+          }
+        }
+      }
+    },
+    "Paragraph content": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragraph content"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragraph content"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragraph content"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragraph content"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "段落コンテンツ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단락 콘텐츠"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragraph content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "段落内容"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Содержимое абзаца"
+          }
+        }
+      }
+    },
+    "Please restart the application for the language change to take effect.": {
+      "comment": "Language change restart instruction",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte starten Sie die Anwendung neu, damit die Sprachänderung wirksam wird."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please restart the application for the language change to take effect."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinicie la aplicación para que el cambio de idioma surta efecto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veuillez redémarrer l'application pour que le changement de langue prenne effet."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語の変更を有効にするには、アプリケーションを再起動してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 변경을 적용하려면 애플리케이션을 다시 시작하세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinicie o aplicativo para que a mudança de idioma tenha efeito."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请重新启动应用程序以使语言更改生效。"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пожалуйста, перезапустите приложение, чтобы изменение языка вступило в силу."
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speichern"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранить"
+          }
+        }
+      }
+    },
+    "Select a book to view details": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a book to view details"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a book to view details"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona un libro para ver detalles"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez un livre pour voir les détails"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細を表示する書籍を選択してください"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세부정보를 보려면 책을 선택하세요"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecione um livro para ver detalhes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一本书以查看详细信息"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите книгу для просмотра деталей"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuración"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paramètres"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurações"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки"
+          }
+        }
+      }
+    },
+    "Show a background image in the main window": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hintergrundbild im Hauptfenster anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a background image in the main window"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar imagen de fondo en la ventana principal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher une image d'arrière-plan dans la fenêtre principale"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メインウィンドウに背景画像を表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메인 창에 배경 이미지 표시"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar imagem de fundo na janela principal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在主窗口中显示背景图像"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показать фоновое изображение в главном окне"
+          }
+        }
+      }
+    },
+    "Sync Error": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisierungsfehler"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync Error"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error de sincronización"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erreur de synchronisation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期エラー"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "동기화 오류"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erro de sincronização"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步出错"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ошибка синхронизации"
+          }
+        }
+      }
+    },
+    "Sync in progress": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation läuft"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync in progress"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronización en progreso"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation en cours"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期中"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "동기화 진행 중"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronização em andamento"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步进行中"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронизация в процессе"
+          }
+        }
+      }
+    },
+    "Sync to Notion": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit Notion synchronisieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync to Notion"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizar con Notion"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchroniser avec Notion"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion に同期"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion에 동기화"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizar com Notion"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步到 Notion"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронизировать с Notion"
+          }
+        }
+      }
+    },
+    "Syncing...": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisiere..."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncing..."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizando..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation..."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期中..."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "동기화 중..."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizando..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在同步..."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронизация..."
+          }
+        }
+      }
+    },
+    "Use as default for future syncs": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use as default for future syncs"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use as default for future syncs"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar como predeterminado para sincronizaciones futuras"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser par défaut pour les synchronisations futures"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今後の同期のデフォルトとして使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "향후 동기화의 기본값으로 사용"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar como padrão para sincronizações futuras"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作为未来同步的默认设置"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Использовать по умолчанию для будущих синхронизаций"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }
