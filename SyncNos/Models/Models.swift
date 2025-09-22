@@ -44,7 +44,7 @@ struct Filters {
 }
 
 // Lightweight model for listing books without loading all highlights
-struct BookListItem: Codable {
+struct BookListItem: Codable, Equatable {
     let bookId: String
     let authorName: String
     let bookTitle: String
