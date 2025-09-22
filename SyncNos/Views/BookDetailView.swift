@@ -163,7 +163,6 @@ struct BookDetailView: View {
                     
                     Text("\(book.highlightCount) highlights")
                         .font(.subheadline)
-//                        .foregroundColor(.tertiary)
                     
                     Link("Open in Apple Books", destination: URL(string: book.ibooksURL)!)
                         .font(.subheadline)
@@ -267,6 +266,7 @@ struct BookDetailView: View {
             }
             .padding()
         }
+        .frame(minWidth: 400, idealWidth: 600)
         .onAppear {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
