@@ -12,7 +12,7 @@ struct BooksListView: View {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading books...")
-                } else if let errorMessage = viewModel.errorMessage {
+                } else if viewModel.errorMessage != nil {
                     VStack {
                         Image(systemName: "exclamationmark.triangle")
                             .foregroundColor(.orange)
@@ -93,13 +93,13 @@ struct BooksListView: View {
                 // 使用彩虹渐变背景
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color.red.opacity(0.08),
-                        Color.orange.opacity(0.08),
-                        Color.yellow.opacity(0.08),
-                        Color.green.opacity(0.08),
-                        Color.blue.opacity(0.08),
-                        Color.purple.opacity(0.08),
-                        Color.pink.opacity(0.08)
+                        Color.red.opacity(0.3),
+                        Color.orange.opacity(0.3),
+                        Color.yellow.opacity(0.3),
+                        Color.green.opacity(0.3),
+                        Color.blue.opacity(0.3),
+                        Color.purple.opacity(0.3),
+                        Color.pink.opacity(0.3)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
