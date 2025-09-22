@@ -1,4 +1,4 @@
-# SyncNotes 📚
+# SyncNos 📚
 
 [English](README_EN.md) | [中文](../README.md)
 
@@ -6,16 +6,17 @@
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-orange.svg)](https://developer.apple.com/documentation/swiftui/)
 [![License](https://img.shields.io/badge/license-GPL3.0-green.svg)](LICENSE)
 
-SyncNotes synchronizes reading notes from Apple Books to Notion.
+[<img src="../Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
+
+SyncBookNotes helps you transform Apple Books highlights and notes into exportable data, aiming to enable long-term preservation, searchability, and synchronization to third-party tools (like Notion).
 
 ## 🚀 Main Features
 - Sync Apple Books data: title, author; highlights and notes including highlight color, creation time, and modification time.
 
 ## Quick Start
-- Clone the SyncNotes source code
-- Download the app from the Mac App Store
-- Open Settings and fill in the Notion API token and Page ID in the "Credentials" section, then click Save.
-- Note: You need to authorize the integration in your Notion integrations at `https://www.notion.so/profile/integrations`.
+- [Download from Mac App Store](https://apps.apple.com/app/syncnos/id6752426176)
+- Open Settings, fill in the Notion API token and Page ID in the "Credentials" section, then click Save.
+- Note: You need to authorize the integration in [Notion integrations](https://www.notion.so/profile/integrations).
 
 ## 🤝 Contributing
 
@@ -31,5 +32,7 @@ Please describe issues or improvements clearly and concisely.
 
 This project is licensed under GPL-3.0 License.
 
-## Related Article
-- [WeChat article - Developed a small tool, SyncNotes. Sync reading notes from Apple Books to Notion](https://mp.weixin.qq.com/s/jeTko_mQbCe3DXUNpmjHHA)
+## Related Article Links
+[WeChat Official Account | Developed a small tool, SyncNotes. Sync reading notes from Apple Books to Notion](https://mp.weixin.qq.com/s/jeTko_mQbCe3DXUNpmjHHA)
+
+[Technical Documentation](Resource)
