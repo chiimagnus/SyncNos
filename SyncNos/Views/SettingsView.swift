@@ -29,7 +29,7 @@ struct SettingsView: View {
         }
 
         // 检查是否支持当前语言，否则默认使用英语
-        let supportedCodes = ["en", "zh-Hans", "ja", "ko", "es-ES", "fr", "de", "pt-BR"]
+        let supportedCodes = ["en", "zh-Hans", "ja", "ko", "es-ES", "fr", "de", "pt-BR", "ru"]
         return supportedCodes.contains(languageCode ?? "") ? languageCode! : "en"
     }()
 
@@ -41,7 +41,8 @@ struct SettingsView: View {
         ("es-ES", "Español"),
         ("fr", "Français"),
         ("de", "Deutsch"),
-        ("pt-BR", "Português (Brasil)")
+        ("pt-BR", "Português (Brasil)"),
+        ("ru", "Русский")
     ]
 
     private func changeAppLanguage(to languageCode: String) {
