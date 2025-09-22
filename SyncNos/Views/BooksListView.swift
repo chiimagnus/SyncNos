@@ -89,6 +89,12 @@ struct BooksListView: View {
             viewModel.setDbRootOverride(rootCandidate)
             viewModel.loadBooks()
         }
+        .onChange(of: viewModel.books) { books in
+            // 当书籍列表首次加载且尚未选择时，默认选中第一个
+            if selectedBookId == nil {
+                selectedBookId = books.first?.bookId
+            }
+        }
         .background {
             if backgroundImageEnabled {
                 // 使用彩虹渐变背景
