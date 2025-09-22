@@ -1200,6 +1200,9 @@
         }
       }
     },
+    "Enable Background Image" : {
+
+    },
     "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded." : {
       "localizations" : {
         "de" : {
@@ -2606,6 +2609,9 @@
           }
         }
       }
+    },
+    "Show a background image in the main window" : {
+
     },
     "Sync in progress" : {
       "localizations" : {
