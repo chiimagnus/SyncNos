@@ -58,6 +58,7 @@ struct BooksListView: View {
                     .listStyle(.sidebar)
                 }
             }
+            .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
             .navigationTitle("Books")
         } detail: {
             // Detail content: show selected book details
