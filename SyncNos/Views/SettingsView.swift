@@ -3,6 +3,7 @@ import AppKit
 
 struct SettingsView: View {
     @State private var isLoading: Bool = false
+    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
@@ -65,6 +66,9 @@ struct SettingsView: View {
                         Label("Open Apple Books notes", systemImage: "book")
                     }
                     .help("Choose Apple Books container directory and load notes")
+
+                    Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
+                        .help("Show a background image in the main window")
 
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
