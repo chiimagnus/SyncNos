@@ -5,6 +5,7 @@ import Combine
 struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
+    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
 
     var body: some View {
         NavigationSplitView {
@@ -86,6 +87,28 @@ struct BooksListView: View {
             let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
             viewModel.setDbRootOverride(rootCandidate)
             viewModel.loadBooks()
+        }
+        .background {
+            if backgroundImageEnabled {
+                // 使用彩虹渐变背景
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.red.opacity(0.08),
+                        Color.orange.opacity(0.08),
+                        Color.yellow.opacity(0.08),
+                        Color.green.opacity(0.08),
+                        Color.blue.opacity(0.08),
+                        Color.purple.opacity(0.08),
+                        Color.pink.opacity(0.08)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            } else {
+                // 使用默认的背景
+                Color.clear
+            }
         }
     }
 }
