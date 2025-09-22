@@ -16,6 +16,7 @@ struct SyncNosApp: App {
         WindowGroup {
             BooksListView()
         }
+        .windowStyle(.hiddenTitleBar)
         // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
         .commands {
