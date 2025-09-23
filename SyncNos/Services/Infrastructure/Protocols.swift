@@ -37,6 +37,29 @@ protocol LoggerServiceProtocol {
     func error(_ message: String, file: String, function: String, line: Int)
 }
 
+// MARK: - Logger Extension with Default Parameters
+extension LoggerServiceProtocol {
+    func verbose(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(.verbose, message: message, file: file, function: function, line: line)
+    }
+
+    func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(.debug, message: message, file: file, function: function, line: line)
+    }
+
+    func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(.info, message: message, file: file, function: function, line: line)
+    }
+
+    func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(.warning, message: message, file: file, function: function, line: line)
+    }
+
+    func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(.error, message: message, file: file, function: function, line: line)
+    }
+}
+
 // MARK: - Database Service Protocol
 protocol DatabaseServiceProtocol {
     func canOpenReadOnly(dbPath: String) -> Bool
