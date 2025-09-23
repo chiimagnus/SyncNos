@@ -30,23 +30,4 @@ class LoggerService: LoggerServiceProtocol {
         // 这里可以添加将日志写入文件的逻辑
     }
 
-    func verbose(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.verbose, message: message, file: file, function: function, line: line)
-    }
-
-    func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.debug, message: message, file: file, function: function, line: line)
-    }
-
-    func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.info, message: message, file: file, function: function, line: line)
-    }
-
-    func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.warning, message: message, file: file, function: function, line: line)
-    }
-
-    func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.error, message: message, file: file, function: function, line: line)
-    }
 }
