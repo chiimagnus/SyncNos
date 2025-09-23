@@ -256,12 +256,18 @@ final class NotionService: NotionServiceProtocol {
         let has_more: Bool
         let next_cursor: String?
     }
-    
+
+        
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String> {
+        let mapping = try await collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+        return Set(mapping.keys)
+    }
+
+    func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String] {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        var collected: Set<String> = []
+        var collected: [String: String] = [:]
         var startCursor: String? = nil
         repeat {
             var components = URLComponents(url: apiBase.appendingPathComponent("blocks/\(pageId)/children"), resolvingAgainstBaseURL: false)!
@@ -279,11 +285,16 @@ final class NotionService: NotionServiceProtocol {
                 let texts = holder?.rich_text ?? []
                 for t in texts {
                     if let s = t.plain_text {
-                        if let range = s.range(of: "uuid:") {
-                            let suffix = String(s[range.lowerBound...])
-                            if let end = suffix.firstIndex(of: "]") {
-                                let idPart = suffix[suffix.index(range.lowerBound, offsetBy: 5)..<end]
-                                collected.insert(String(idPart))
+                        print("DEBUG: 检查文本内容: \(s)")
+                        // 查找 "[uuid:" 和 "]" 之间的内容
+                        if let startRange = s.range(of: "[uuid:") {
+                            let startIdx = startRange.upperBound // 跳过 "[uuid:"
+                            if let endRange = s.range(of: "]", range: startIdx..<s.endIndex) {
+                                let idPart = String(s[startIdx..<endRange.lowerBound])
+                                collected[idPart] = block.id
+                                print("DEBUG: 找到UUID映射 - UUID: \(idPart), Block ID: \(block.id)")
+                            } else {
+                                print("DEBUG: 未找到结束括号]")
                             }
                         }
                     }
@@ -291,6 +302,7 @@ final class NotionService: NotionServiceProtocol {
             }
             startCursor = decoded.has_more ? decoded.next_cursor : nil
         } while startCursor != nil
+        print("DEBUG: 收集到 \(collected.count) 个UUID到块ID的映射")
         return collected
     }
     
@@ -371,6 +383,52 @@ final class NotionService: NotionServiceProtocol {
             "properties": [
                 "Highlight Count": ["number": count]
             ]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
+    }
+
+    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+
+        let url = apiBase.appendingPathComponent("blocks/\(blockId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+
+        // 构建富文本内容
+        var rt: [[String: Any]] = []
+        // Highlight text
+        rt.append(["text": ["content": highlight.text]])
+        // Optional note
+        if let note = highlight.note, !note.isEmpty {
+            rt.append(["text": ["content": " — Note: \(note)"], "annotations": ["italic": true]])
+        }
+        // Add metadata (style, creation, modification) when available
+        var metaParts: [String] = []
+        if let s = highlight.style { metaParts.append("style:\(s)") }
+        if let d = highlight.dateAdded { metaParts.append("added:\(Self.isoDateFormatter.string(from: d))") }
+        if let m = highlight.modified { metaParts.append("modified:\(Self.isoDateFormatter.string(from: m))") }
+        if !metaParts.isEmpty {
+            rt.append(["text": ["content": " — \(metaParts.joined(separator: " | "))"], "annotations": ["italic": true]])
+        }
+        // Optional link
+        let linkUrl: String
+        if let loc = highlight.location, !loc.isEmpty {
+            linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
+        } else {
+            linkUrl = "ibooks://assetid/\(bookId)"
+        }
+        rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
+        // UUID marker for idempotency
+        rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
+
+        let body: [String: Any] = [
+            "bulleted_list_item": ["rich_text": rt]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         let (data, response) = try await URLSession.shared.data(for: request)

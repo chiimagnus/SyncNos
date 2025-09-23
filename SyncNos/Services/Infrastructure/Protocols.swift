@@ -40,9 +40,11 @@ protocol NotionServiceProtocol: AnyObject {
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String?
     func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
+    func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String]
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
     func updatePageHighlightCount(pageId: String, count: Int) async throws
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
+    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
