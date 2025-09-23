@@ -25,18 +25,22 @@ class DatabaseService: DatabaseServiceProtocol {
     func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
         return try queryService.fetchAnnotations(db: db)
     }
-    
+
     func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow] {
         return try queryService.fetchBooks(db: db, assetIds: assetIds)
     }
-    
+
     // Pagination and aggregation
     func fetchHighlightCountsByAsset(db: OpaquePointer) throws -> [AssetHighlightCount] {
         return try queryService.fetchHighlightCountsByAsset(db: db)
     }
-    
+
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
         return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset)
+    }
+
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow] {
+        return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since)
     }
     
     // MARK: - Filter Methods
