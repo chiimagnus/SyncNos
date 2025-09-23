@@ -180,29 +180,72 @@ class BookDetailViewModel: ObservableObject {
 
         if incremental {
             // For incremental sync, we need to check if highlights already exist in Notion
-            let existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
-            print("DEBUG: 增量同步 - 收集到 \(existingUUIDs.count) 个已存在的UUID")
+            let existingUUIDToBlockIdMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+            print("DEBUG: 增量同步 - 收集到 \(existingUUIDToBlockIdMap.count) 个已存在的UUID到块ID映射")
+            print("DEBUG: 现有的UUID列表: \(Array(existingUUIDToBlockIdMap.keys))")
+
+            // Separate highlights into new and existing ones
+            var newHighlights: [HighlightRow] = []
+            var existingHighlights: [(blockId: String, highlight: HighlightRow)] = []
 
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset, since: sinceDate)
                 print("DEBUG: 增量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮 (offset: \(offset))")
 
-                // Filter out highlights that already exist in Notion
-                let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
-                newRows.append(contentsOf: fresh)
-                print("DEBUG: 增量同步批次 \(batchCount + 1) - 其中 \(fresh.count) 条是新的")
-
-                let fetchedCount = newRows.count
-                await MainActor.run {
-                    self.syncProgressText = "已获取 \(fetchedCount) 条新高亮..."
+                for highlight in page {
+                    print("DEBUG: 检查高亮 UUID: \(highlight.uuid)")
+                    if let blockId = existingUUIDToBlockIdMap[highlight.uuid] {
+                        // This highlight already exists in Notion, we need to update it
+                        existingHighlights.append((blockId: blockId, highlight: highlight))
+                        print("DEBUG: 发现已存在的高亮需要更新 UUID: \(highlight.uuid), Block ID: \(blockId)")
+                    } else {
+                        // This is a new highlight
+                        newHighlights.append(highlight)
+                        print("DEBUG: 发现新的高亮 UUID: \(highlight.uuid)")
+                    }
                 }
+
                 if page.isEmpty || page.count < self.pageSize {
-                    print("DEBUG: 增量同步获取完成，总共 \(batchCount + 1) 个批次，\(fetchedCount) 条新高亮")
+                    print("DEBUG: 增量同步获取完成，总共 \(batchCount + 1) 个批次")
                     break
                 }
                 offset += self.pageSize
                 batchCount += 1
             }
+
+            // Update existing highlights
+            var updatedCount = 0
+            for (blockId, highlight) in existingHighlights {
+                try await notionService.updateBlockContent(blockId: blockId, highlight: highlight, bookId: book.bookId)
+                updatedCount += 1
+                print("DEBUG: 更新了高亮 UUID: \(highlight.uuid)")
+            }
+
+            // Add new highlights
+            if !newHighlights.isEmpty {
+                let appendCount = newHighlights.count
+                print("DEBUG: 准备添加 \(appendCount) 条新高亮到Notion")
+                await MainActor.run { self.syncProgressText = "正在添加 \(appendCount) 条新高亮..." }
+                try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: newHighlights)
+                print("DEBUG: 成功添加 \(appendCount) 条新高亮到Notion")
+            }
+
+            // Report results
+            let totalProcessed = existingHighlights.count + newHighlights.count
+            print("DEBUG: 增量同步完成 - 更新了 \(updatedCount) 条高亮，添加了 \(newHighlights.count) 条新高亮，总共处理了 \(totalProcessed) 条高亮")
+
+            // Update last sync time for incremental sync
+            if incremental {
+                let syncTime = Date()
+                SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+                print("DEBUG: 更新同步时间戳 for 书籍ID: \(book.bookId) to \(syncTime)")
+            }
+
+            // Skip the general newRows processing since we've already handled everything
+            await MainActor.run { self.syncProgressText = "正在更新数量..." }
+            try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
+            await MainActor.run { self.syncProgressText = "增量同步完成" }
+            return
         } else {
             // Full sync logic (existing behavior)
             while true {
