@@ -164,6 +164,7 @@ class BookDetailViewModel: ObservableObject {
         var existingUUIDs: Set<String> = []
         if !incremental {
             existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
+            print("DEBUG: 全量同步 - 收集到 \(existingUUIDs.count) 个已存在的UUID")
         }
 
         // Fetch highlights for this book in batches
@@ -176,34 +177,53 @@ class BookDetailViewModel: ObservableObject {
         var offset = 0
         var newRows: [HighlightRow] = []
         var batchCount = 0
-        while true {
-            let page: [HighlightRow]
-            if incremental {
-                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset, since: sinceDate)
+
+        if incremental {
+            // For incremental sync, we need to check if highlights already exist in Notion
+            let existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
+            print("DEBUG: 增量同步 - 收集到 \(existingUUIDs.count) 个已存在的UUID")
+
+            while true {
+                let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset, since: sinceDate)
                 print("DEBUG: 增量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮 (offset: \(offset))")
-            } else {
-                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
+
+                // Filter out highlights that already exist in Notion
+                let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
+                newRows.append(contentsOf: fresh)
+                print("DEBUG: 增量同步批次 \(batchCount + 1) - 其中 \(fresh.count) 条是新的")
+
+                let fetchedCount = newRows.count
+                await MainActor.run {
+                    self.syncProgressText = "已获取 \(fetchedCount) 条新高亮..."
+                }
+                if page.isEmpty || page.count < self.pageSize {
+                    print("DEBUG: 增量同步获取完成，总共 \(batchCount + 1) 个批次，\(fetchedCount) 条新高亮")
+                    break
+                }
+                offset += self.pageSize
+                batchCount += 1
+            }
+        } else {
+            // Full sync logic (existing behavior)
+            while true {
+                let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
                 let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
                 newRows.append(contentsOf: fresh)
                 print("DEBUG: 全量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮，其中 \(fresh.count) 条是新的 (offset: \(offset))")
-            }
 
-            if incremental {
-                // For incremental sync, all fetched highlights are considered new
-                newRows.append(contentsOf: page)
+                let fetchedCount = newRows.count
+                await MainActor.run {
+                    self.syncProgressText = "已获取 \(fetchedCount) 条高亮..."
+                }
+                if page.isEmpty || page.count < self.pageSize {
+                    print("DEBUG: 全量同步获取完成，总共 \(batchCount + 1) 个批次，\(fetchedCount) 条高亮")
+                    break
+                }
+                offset += self.pageSize
+                batchCount += 1
             }
-
-            let fetchedCount = newRows.count
-            await MainActor.run {
-                self.syncProgressText = "已获取 \(fetchedCount) 条高亮..."
-            }
-            if page.isEmpty || page.count < self.pageSize {
-                print("DEBUG: 获取完成，总共 \(batchCount + 1) 个批次，\(fetchedCount) 条高亮")
-                break
-            }
-            offset += self.pageSize
-            batchCount += 1
         }
+
         if !newRows.isEmpty {
             // Show progress while appending
             let appendCount = newRows.count
