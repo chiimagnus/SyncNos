@@ -10,6 +10,7 @@ protocol DatabaseServiceProtocol {
     func fetchBooks(db: OpaquePointer, assetIds: [String]) throws -> [BookRow]
     func fetchHighlightCountsByAsset(db: OpaquePointer) throws -> [AssetHighlightCount]
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow]
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow]
     func matches(book: BookRow, filters: Filters) -> Bool
 }
 

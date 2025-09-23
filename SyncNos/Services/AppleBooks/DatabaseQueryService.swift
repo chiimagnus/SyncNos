@@ -145,6 +145,18 @@ class DatabaseQueryService {
 
     /// 拉取指定图书的一页高亮（MVP: 使用 LIMIT/OFFSET 分页）
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
+        return try fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: nil)
+    }
+
+    /// 拉取指定图书的一页高亮（支持增量同步）
+    /// - Parameters:
+    ///   - db: 数据库连接
+    ///   - assetId: 书籍ID
+    ///   - limit: 限制数量
+    ///   - offset: 偏移量
+    ///   - since: 只获取此时间之后修改的高亮（用于增量同步）
+    /// - Returns: 高亮数组
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil) throws -> [HighlightRow] {
         // Discover available columns for dynamic select and optional fields
         let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
         var stmt: OpaquePointer?
@@ -160,14 +172,14 @@ class DatabaseQueryService {
             }
         }
         sqlite3_finalize(stmt)
-        
+
         var selectColumns: [String] = ["ZANNOTATIONASSETID", "ZANNOTATIONUUID", "ZANNOTATIONSELECTEDTEXT"]
         var columnIndices: [String: Int] = [
             "ZANNOTATIONASSETID": 0,
             "ZANNOTATIONUUID": 1,
             "ZANNOTATIONSELECTEDTEXT": 2
         ]
-        
+
         let optionalColumns = [
             "ZANNOTATIONNOTE": "note",
             "ZANNOTATIONSTYLE": "style",
@@ -183,7 +195,19 @@ class DatabaseQueryService {
                 nextIndex += 1
             }
         }
-        
+
+        // 构建基础查询
+        var whereConditions = [
+            "ZANNOTATIONDELETED=0",
+            "ZANNOTATIONSELECTEDTEXT NOT NULL",
+            "ZANNOTATIONASSETID=?"
+        ]
+
+        // 如果是增量同步，添加时间条件
+        if since != nil && availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") {
+            whereConditions.append("ZANNOTATIONMODIFICATIONDATE >= ?")
+        }
+
         let orderBy: String
         if availableColumns.contains("ZANNOTATIONCREATIONDATE") {
             orderBy = "ZANNOTATIONCREATIONDATE DESC"
@@ -191,21 +215,34 @@ class DatabaseQueryService {
             // Fallback: use ROWID to get stable order
             orderBy = "rowid DESC"
         }
-        let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL AND ZANNOTATIONASSETID=? ORDER BY \(orderBy) LIMIT ? OFFSET ?;"
-        print("Executing query: \(sql)")
-        
+
+        let whereClause = whereConditions.joined(separator: " AND ")
+        let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE \(whereClause) ORDER BY \(orderBy) LIMIT ? OFFSET ?;"
+        print("DEBUG: 执行查询: \(sql)")
+        print("DEBUG: 查询参数 - assetId: \(assetId), limit: \(limit), offset: \(offset)" + (since != nil ? ", since: \(since!)" : ""))
+
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: highlight page"
             print("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
         defer { sqlite3_finalize(stmt) }
-        
+
+        // 绑定参数
         let nsAssetId = assetId as NSString
         sqlite3_bind_text(stmt, 1, nsAssetId.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        sqlite3_bind_int64(stmt, 2, Int64(limit))
-        sqlite3_bind_int64(stmt, 3, Int64(offset))
-        
+
+        var bindIndex = 2
+        if since != nil && availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") {
+            // 绑定时间参数（转换为SQLite的时间格式）
+            let timeInterval = since!.timeIntervalSinceReferenceDate
+            sqlite3_bind_double(stmt, Int32(bindIndex), timeInterval)
+            bindIndex += 1
+        }
+
+        sqlite3_bind_int64(stmt, Int32(bindIndex), Int64(limit))
+        sqlite3_bind_int64(stmt, Int32(bindIndex + 1), Int64(offset))
+
         var rows: [HighlightRow] = []
         var fetched = 0
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -218,13 +255,13 @@ class DatabaseQueryService {
             let uuid = String(cString: c1)
             let text = String(cString: c2).trimmingCharacters(in: .whitespacesAndNewlines)
             if text.isEmpty { continue }
-            
+
             var note: String? = nil
             var style: Int? = nil
             var dateAdded: Date? = nil
             var modified: Date? = nil
             var location: String? = nil
-            
+
             if let noteIndex = columnIndices["ZANNOTATIONNOTE"], noteIndex < Int(sqlite3_column_count(stmt)) {
                 note = sqlite3_column_text(stmt, Int32(noteIndex)).map { String(cString: $0) }
             }
@@ -248,11 +285,11 @@ class DatabaseQueryService {
                     location = sqlite3_column_text(stmt, Int32(locationIndex)).map { String(cString: $0) }
                 }
             }
-            
+
             rows.append(HighlightRow(assetId: assetId, uuid: uuid, text: text, note: note, style: style, dateAdded: dateAdded, modified: modified, location: location))
             fetched += 1
         }
-        print("Fetched page: limit=\(limit) offset=\(offset) fetched=\(fetched)")
+        print("Fetched page: limit=\(limit) offset=\(offset) fetched=\(fetched)" + (since != nil ? " since=\(since!)" : ""))
         return rows
     }
     

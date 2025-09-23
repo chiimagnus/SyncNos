@@ -95,15 +95,15 @@ class BookDetailViewModel: ObservableObject {
     }
     
     // MARK: - Notion Sync
-    func syncToNotion(book: BookListItem, dbPath: String?) {
+    func syncToNotion(book: BookListItem, dbPath: String?, incremental: Bool = false) {
         syncMessage = nil
         syncProgressText = nil
         isSyncing = true
         Task {
             do {
-                try await performSync(book: book, dbPath: dbPath)
+                try await performSync(book: book, dbPath: dbPath, incremental: incremental)
                 await MainActor.run {
-                    self.syncMessage = "Synced to Notion"
+                    self.syncMessage = incremental ? "增量同步完成" : "全量同步完成"
                     self.syncProgressText = nil
                     self.isSyncing = false
                 }
@@ -116,8 +116,8 @@ class BookDetailViewModel: ObservableObject {
             }
         }
     }
-    
-    private func performSync(book: BookListItem, dbPath: String?) async throws {
+
+    private func performSync(book: BookListItem, dbPath: String?, incremental: Bool = false) async throws {
         guard let parentPageId = DIContainer.shared.notionConfigStore.notionPageId else {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please set NOTION_PAGE_ID in Notion Integration view."])
         }
@@ -147,37 +147,84 @@ class BookDetailViewModel: ObservableObject {
                                                                  header: "Highlights")
             pageId = created.id
         }
-        // Collect existing UUIDs to avoid duplicates
-        let existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
-        
-        // Fetch all highlights for this book in batches
+
+        // For incremental sync, we only fetch highlights modified since last sync
+        var sinceDate: Date? = nil
+        if incremental {
+            sinceDate = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+            print("DEBUG: 增量同步 - 书籍ID: \(book.bookId), 上次同步时间: \(sinceDate?.description ?? "从未")")
+            await MainActor.run {
+                self.syncProgressText = "执行增量同步，上次同步时间: \(sinceDate?.description ?? "从未")"
+            }
+        } else {
+            print("DEBUG: 全量同步 - 书籍ID: \(book.bookId)")
+        }
+
+        // Collect existing UUIDs to avoid duplicates (only for full sync)
+        var existingUUIDs: Set<String> = []
+        if !incremental {
+            existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
+        }
+
+        // Fetch highlights for this book in batches
         guard let path = dbPath else { return }
         let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
-        defer { databaseService.close(handle) }
+        defer {
+            databaseService.close(handle)
+            print("DEBUG: 关闭数据库连接")
+        }
         var offset = 0
         var newRows: [HighlightRow] = []
+        var batchCount = 0
         while true {
-            let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
-            if page.isEmpty { break }
-            let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
-            newRows.append(contentsOf: fresh)
+            let page: [HighlightRow]
+            if incremental {
+                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset, since: sinceDate)
+                print("DEBUG: 增量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮 (offset: \(offset))")
+            } else {
+                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
+                let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
+                newRows.append(contentsOf: fresh)
+                print("DEBUG: 全量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮，其中 \(fresh.count) 条是新的 (offset: \(offset))")
+            }
+
+            if incremental {
+                // For incremental sync, all fetched highlights are considered new
+                newRows.append(contentsOf: page)
+            }
+
             let fetchedCount = newRows.count
             await MainActor.run {
-                self.syncProgressText = "Fetched \(fetchedCount) new highlights..."
+                self.syncProgressText = "已获取 \(fetchedCount) 条高亮..."
             }
-            if page.count < self.pageSize { break }
+            if page.isEmpty || page.count < self.pageSize {
+                print("DEBUG: 获取完成，总共 \(batchCount + 1) 个批次，\(fetchedCount) 条高亮")
+                break
+            }
             offset += self.pageSize
+            batchCount += 1
         }
         if !newRows.isEmpty {
             // Show progress while appending
             let appendCount = newRows.count
-            await MainActor.run { self.syncProgressText = "Appending \(appendCount) highlights..." }
+            print("DEBUG: 准备添加 \(appendCount) 条高亮到Notion")
+            await MainActor.run { self.syncProgressText = "正在添加 \(appendCount) 条高亮..." }
             let rowsToAppend = newRows
             try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: rowsToAppend)
+            print("DEBUG: 成功添加 \(appendCount) 条高亮到Notion")
+
+            // Update last sync time for incremental sync
+            if incremental {
+                let syncTime = Date()
+                SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+                print("DEBUG: 更新同步时间戳 for 书籍ID: \(book.bookId) to \(syncTime)")
+            }
+        } else {
+            print("DEBUG: 没有新的高亮需要同步")
         }
-        await MainActor.run { self.syncProgressText = "Updating count..." }
+        await MainActor.run { self.syncProgressText = "正在更新数量..." }
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
-        await MainActor.run { self.syncProgressText = "Done" }
+        await MainActor.run { self.syncProgressText = "同步完成" }
     }
 }
 
