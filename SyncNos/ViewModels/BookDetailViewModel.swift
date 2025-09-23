@@ -93,6 +93,17 @@ class BookDetailViewModel: ObservableObject {
             dbHandle = nil
         }
     }
+
+    private func getLatestHighlightCount(dbPath: String?, assetId: String) async throws -> Int {
+        guard let path = dbPath else { return 0 }
+        let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
+        defer { databaseService.close(handle) }
+
+        let counts = try databaseService.fetchHighlightCountsByAsset(db: handle)
+        let count = counts.first { $0.assetId == assetId }?.count ?? 0
+        print("DEBUG: 获取到最新的高亮数量: \(count) for assetId: \(assetId)")
+        return count
+    }
     
     // MARK: - Notion Sync
     func syncToNotion(book: BookListItem, dbPath: String?, incremental: Bool = false) {
@@ -241,9 +252,12 @@ class BookDetailViewModel: ObservableObject {
                 print("DEBUG: 更新同步时间戳 for 书籍ID: \(book.bookId) to \(syncTime)")
             }
 
+            // Get the latest highlight count from the database
+            let latestHighlightCount = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
+
             // Skip the general newRows processing since we've already handled everything
             await MainActor.run { self.syncProgressText = "正在更新数量..." }
-            try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
+            try await notionService.updatePageHighlightCount(pageId: pageId, count: latestHighlightCount)
             await MainActor.run { self.syncProgressText = "增量同步完成" }
             return
         } else {
