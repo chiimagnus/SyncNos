@@ -2,10 +2,11 @@ import Foundation
 
 final class BookmarkStore: BookmarkStoreProtocol {
     static let shared = BookmarkStore()
-    
+    private let logger = DIContainer.shared.loggerService
+
     private let bookmarkDefaultsKey = "SelectedBooksFolderBookmark"
     private var currentlyAccessingURL: URL?
-    
+
     private init() {}
     
     // MARK: - Public API
@@ -16,7 +17,7 @@ final class BookmarkStore: BookmarkStoreProtocol {
                                                   relativeTo: nil)
             UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
         } catch {
-            print("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
+            logger.error("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
         }
     }
     
@@ -36,7 +37,7 @@ final class BookmarkStore: BookmarkStoreProtocol {
             }
             return url
         } catch {
-            print("Failed to resolve bookmark: \(error)")
+            logger.error("Failed to resolve bookmark: \(error)")
             return nil
         }
     }
