@@ -1,41 +1,5 @@
 import Foundation
 
-// MARK: - Logger Level
-enum LogLevel: Int, CaseIterable, Comparable {
-    case verbose = 0
-    case debug = 1
-    case info = 2
-    case warning = 3
-    case error = 4
-
-    static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
-        return lhs.rawValue < rhs.rawValue
-    }
-
-    var description: String {
-        switch self {
-        case .verbose: return "VERBOSE"
-        case .debug: return "DEBUG"
-        case .info: return "INFO"
-        case .warning: return "WARNING"
-        case .error: return "ERROR"
-        }
-    }
-}
-
-// MARK: - Logger Service Protocol
-protocol LoggerServiceProtocol {
-    var currentLevel: LogLevel { get set }
-
-    func log(_ level: LogLevel, message: String, file: String, function: String, line: Int)
-
-    func verbose(_ message: String, file: String, function: String, line: Int)
-    func debug(_ message: String, file: String, function: String, line: Int)
-    func info(_ message: String, file: String, function: String, line: Int)
-    func warning(_ message: String, file: String, function: String, line: Int)
-    func error(_ message: String, file: String, function: String, line: Int)
-}
-
 // MARK: - Logger Service Implementation
 class LoggerService: LoggerServiceProtocol {
     static let shared = LoggerService()
