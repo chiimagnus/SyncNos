@@ -2,6 +2,7 @@ import Foundation
 
 final class NotionService: NotionServiceProtocol {
     private let configStore: NotionConfigStoreProtocol
+    private let logger = DIContainer.shared.loggerService
     private let apiBase = URL(string: "https://api.notion.com/v1/")!
     private let notionVersion = "2022-06-28"
     // ISO8601 formatter for highlight timestamps when syncing to Notion
@@ -285,16 +286,16 @@ final class NotionService: NotionServiceProtocol {
                 let texts = holder?.rich_text ?? []
                 for t in texts {
                     if let s = t.plain_text {
-                        print("DEBUG: 检查文本内容: \(s)")
+                        logger.verbose("DEBUG: 检查文本内容: \(s)")
                         // 查找 "[uuid:" 和 "]" 之间的内容
                         if let startRange = s.range(of: "[uuid:") {
                             let startIdx = startRange.upperBound // 跳过 "[uuid:"
                             if let endRange = s.range(of: "]", range: startIdx..<s.endIndex) {
                                 let idPart = String(s[startIdx..<endRange.lowerBound])
                                 collected[idPart] = block.id
-                                print("DEBUG: 找到UUID映射 - UUID: \(idPart), Block ID: \(block.id)")
+                                logger.debug("DEBUG: 找到UUID映射 - UUID: \(idPart), Block ID: \(block.id)")
                             } else {
-                                print("DEBUG: 未找到结束括号]")
+                                logger.debug("DEBUG: 未找到结束括号]")
                             }
                         }
                     }
@@ -302,7 +303,7 @@ final class NotionService: NotionServiceProtocol {
             }
             startCursor = decoded.has_more ? decoded.next_cursor : nil
         } while startCursor != nil
-        print("DEBUG: 收集到 \(collected.count) 个UUID到块ID的映射")
+        logger.debug("DEBUG: 收集到 \(collected.count) 个UUID到块ID的映射")
         return collected
     }
     

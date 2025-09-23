@@ -2,6 +2,7 @@ import Foundation
 
 final class SyncTimestampStore {
     static let shared = SyncTimestampStore()
+    private let logger = DIContainer.shared.loggerService
 
     private let userDefaults = UserDefaults.standard
     private let lastSyncKeyPrefix = "LAST_SYNC_TIMESTAMP_"
@@ -14,7 +15,7 @@ final class SyncTimestampStore {
     func getLastSyncTime(for bookId: String) -> Date? {
         let key = lastSyncKeyPrefix + bookId
         let date = userDefaults.object(forKey: key) as? Date
-        print("DEBUG: 获取同步时间戳 for 书籍ID: \(bookId) = \(date?.description ?? "nil")")
+        logger.debug("DEBUG: 获取同步时间戳 for 书籍ID: \(bookId) = \(date?.description ?? "nil")")
         return date
     }
 
@@ -25,7 +26,7 @@ final class SyncTimestampStore {
     func setLastSyncTime(for bookId: String, to date: Date) {
         let key = lastSyncKeyPrefix + bookId
         userDefaults.set(date, forKey: key)
-        print("DEBUG: 设置同步时间戳 for 书籍ID: \(bookId) = \(date)")
+        logger.debug("DEBUG: 设置同步时间戳 for 书籍ID: \(bookId) = \(date)")
     }
 
     /// 清除指定书籍的同步时间

@@ -72,7 +72,7 @@ struct BooksListView: View {
         .onAppear {
             if let url = BookmarkStore.shared.restore() {
                 let started = BookmarkStore.shared.startAccessing(url: url)
-                print("Using restored bookmark on appear, startAccess=\(started)")
+                DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
                 let selectedPath = url.path
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)

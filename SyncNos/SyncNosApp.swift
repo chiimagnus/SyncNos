@@ -6,9 +6,9 @@ struct SyncNosApp: App {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
             let started = BookmarkStore.shared.startAccessing(url: url)
-            print("Restored bookmark: \(url.path), startAccess=\(started)")
+            DIContainer.shared.loggerService.info("Restored bookmark: \(url.path), startAccess=\(started)")
         } else {
-            print("No saved bookmark to restore")
+            DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
     }
     
