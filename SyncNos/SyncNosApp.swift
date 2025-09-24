@@ -49,6 +49,9 @@ struct SyncNosApp: App {
                 Button("Report Issues & Suggestions", systemImage: "ladybug") {
                     openGitHubRepo()
                 }
+                Button("View Source Code", systemImage: "code") {
+                    openGitHubSource()
+                }
             }
             CommandGroup(replacing: .sidebar) {
                 Button("Toggle Sidebar", systemImage: "sidebar.left") {
@@ -73,6 +76,11 @@ struct SyncNosApp: App {
 
     private func openGitHubRepo() {
         let githubURL = URL(string: "https://github.com/chiimagnus/SyncNos/issues")!
+        NSWorkspace.shared.open(githubURL)
+    }
+
+    private func openGitHubSource() {
+        let githubURL = URL(string: "https://github.com/chiimagnus/SyncNos")!
         NSWorkspace.shared.open(githubURL)
     }
 }
