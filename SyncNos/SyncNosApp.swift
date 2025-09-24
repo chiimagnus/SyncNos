@@ -36,16 +36,14 @@ struct SyncNosApp: App {
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Settings") {
+                Button("Settings", systemImage: "gear") {
                     SettingsWindow.show()
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .sidebar) {
-                Button {
+                Button("Toggle Sidebar", systemImage: "sidebar.left") {
                     columnVisibility = columnVisibility == .all ? .detailOnly : .all
-                } label: {
-                    Label("Toggle Sidebar", systemImage: "sidebar.left")
                 }
                 .keyboardShortcut("\\", modifiers: .command)
             }
