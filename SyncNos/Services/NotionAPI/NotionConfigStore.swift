@@ -7,6 +7,8 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
     private let syncDbIdKey = "SYNC_DATABASE_ID"
+    private let syncModeKey = "NOTION_SYNC_MODE" // "single" | "perBook"
+    private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     
     private init() {}
     
@@ -44,6 +46,36 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
             } else {
                 userDefaults.removeObject(forKey: syncDbIdKey)
             }
+        }
+    }
+
+    // MARK: - Sync Mode
+    var syncMode: String? {
+        get {
+            // default to "single" for backward compatibility
+            return userDefaults.string(forKey: syncModeKey) ?? "single"
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                userDefaults.set(value, forKey: syncModeKey)
+            } else {
+                userDefaults.removeObject(forKey: syncModeKey)
+            }
+        }
+    }
+
+    // MARK: - Per-book database mapping
+    func databaseIdForBook(assetId: String) -> String? {
+        let key = perBookDbPrefix + assetId
+        return userDefaults.string(forKey: key)
+    }
+
+    func setDatabaseId(_ id: String?, forBook assetId: String) {
+        let key = perBookDbPrefix + assetId
+        if let id, !id.isEmpty {
+            userDefaults.set(id, forKey: key)
+        } else {
+            userDefaults.removeObject(forKey: key)
         }
     }
 }
