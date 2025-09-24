@@ -54,6 +54,11 @@ struct BooksListView: View {
                             }
                             .padding(.vertical, 4)
                             .tag(book.bookId)
+                            .contextMenu {
+                                Button("Not yet realized", systemImage: "heart", action: {
+                                    // 占位符操作
+                                })
+                            }
                         }
                     }
                     .listStyle(.sidebar)
