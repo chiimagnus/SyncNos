@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // 创建环境变量来管理侧边栏状态
 private struct SidebarVisibilityKey: EnvironmentKey {
@@ -41,12 +42,29 @@ struct SyncNosApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
+            CommandGroup(after: .appSettings) {
+                Button("Please give five stars", systemImage: "heart") {
+                    openAppStoreReview()
+                }
+            }
             CommandGroup(replacing: .sidebar) {
                 Button("Toggle Sidebar", systemImage: "sidebar.left") {
                     columnVisibility = columnVisibility == .all ? .detailOnly : .all
                 }
                 .keyboardShortcut("\\", modifiers: .command)
             }
+        }
+    }
+
+    private func openAppStoreReview() {
+        // TODO: 替换为你的实际 App Store ID
+        let appStoreID = "6752426176" // 示例 ID，需要替换为实际的应用 ID
+        let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id\(appStoreID)")!
+        let webURL = URL(string: "https://apps.apple.com/app/id\(appStoreID)")!
+
+        // 尝试打开 App Store 应用，如果失败则打开网页版本
+        if !NSWorkspace.shared.open(appStoreURL) {
+            NSWorkspace.shared.open(webURL)
         }
     }
 }
