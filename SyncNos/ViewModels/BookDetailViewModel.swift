@@ -161,7 +161,7 @@ class BookDetailViewModel: ObservableObject {
         }
 
         // For incremental sync, we only fetch highlights modified since last sync
-        var sinceDate: Date? = nil
+        let sinceDate: Date?
         if incremental {
             sinceDate = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
             logger.debug("DEBUG: 增量同步 - 书籍ID: \(book.bookId), 上次同步时间: \(sinceDate?.description ?? "从未")")
@@ -169,6 +169,7 @@ class BookDetailViewModel: ObservableObject {
                 self.syncProgressText = "执行增量同步，上次同步时间: \(sinceDate?.description ?? "从未")"
             }
         } else {
+            sinceDate = nil
             logger.debug("DEBUG: 全量同步 - 书籍ID: \(book.bookId)")
         }
 
