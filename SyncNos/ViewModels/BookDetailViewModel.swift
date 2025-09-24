@@ -306,5 +306,3 @@ class BookDetailViewModel: ObservableObject {
         await MainActor.run { self.syncProgressText = "同步完成" }
     }
 }
-
-

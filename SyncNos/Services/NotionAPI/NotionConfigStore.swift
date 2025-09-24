@@ -47,5 +47,3 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         }
     }
 }
-
-

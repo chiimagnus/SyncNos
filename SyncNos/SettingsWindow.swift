@@ -31,5 +31,3 @@ final class SettingsWindow {
         NSApp.activate(ignoringOtherApps: true)
     }
 }
-
-
