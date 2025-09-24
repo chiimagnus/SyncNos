@@ -1570,64 +1570,6 @@
         }
       }
     },
-    "Full sync completed" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vollständige Synchronisation abgeschlossen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full sync completed"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización completa finalizada"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation complète terminée"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完全同期が完了しました"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "전체 동기화 완료"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização completa concluída"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полная синхронизация завершена"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全量同步完成"
-          }
-        }
-      }
-    },
     "General" : {
       "localizations" : {
         "de" : {
@@ -1856,64 +1798,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "增量同步"
-          }
-        }
-      }
-    },
-    "Incremental sync completed" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inkrementelle Synchronisation abgeschlossen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Incremental sync completed"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización incremental completada"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation incrémentielle terminée"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "増分同期が完了しました"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "증분 동기화 완료"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização incremental concluída"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Инкрементная синхронизация завершена"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "增量同步完成"
           }
         }
       }
