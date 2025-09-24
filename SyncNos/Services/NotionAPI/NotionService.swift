@@ -436,6 +436,221 @@ final class NotionService: NotionServiceProtocol {
         try Self.ensureSuccess(response: response, data: data)
         _ = data
     }
+
+    // MARK: - Per-book database (方案2)
+    func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase {
+        guard let pageId = configStore.notionPageId, let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+
+        let url = apiBase.appendingPathComponent("databases")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        addCommonHeaders(to: &request, key: key)
+
+        // Database title uses book title for clarity
+        let dbTitle = "SyncNos - \(bookTitle)"
+
+        // Properties for highlight items
+        let body: [String: Any] = [
+            "parent": [
+                "type": "page_id",
+                "page_id": pageId
+            ],
+            "title": [[
+                "type": "text",
+                "text": ["content": dbTitle]
+            ]],
+            "properties": [
+                // Title property for highlight text
+                "Text": ["title": [:]],
+                // Metadata
+                "UUID": ["rich_text": [:]],
+                "Note": ["rich_text": [:]],
+                "Style": ["number": [:]],
+                "Added At": ["date": [:]],
+                "Modified At": ["date": [:]],
+                "Location": ["rich_text": [:]],
+                // Book info for redundancy and filtering
+                "Book ID": ["rich_text": [:]],
+                "Book Title": ["rich_text": [:]],
+                "Author": ["rich_text": [:]],
+                "Link": ["url": [:]]
+            ]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        return try JSONDecoder().decode(NotionDatabase.self, from: data)
+    }
+
+    func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+
+        let url = apiBase.appendingPathComponent("pages")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        addCommonHeaders(to: &request, key: key)
+
+        var properties: [String: Any] = [
+            "Text": [
+                "title": [["text": ["content": highlight.text]]]
+            ],
+            "UUID": [
+                "rich_text": [["text": ["content": highlight.uuid]]]
+            ],
+            "Book ID": [
+                "rich_text": [["text": ["content": bookId]]]
+            ],
+            "Book Title": [
+                "rich_text": [["text": ["content": bookTitle]]]
+            ],
+            "Author": [
+                "rich_text": [["text": ["content": author]]]
+            ]
+        ]
+        if let note = highlight.note, !note.isEmpty {
+            properties["Note"] = ["rich_text": [["text": ["content": note]]]]
+        }
+        if let style = highlight.style {
+            properties["Style"] = ["number": style]
+        }
+        if let added = highlight.dateAdded {
+            properties["Added At"] = [
+                "date": [
+                    "start": Self.isoDateFormatter.string(from: added)
+                ]
+            ]
+        }
+        if let modified = highlight.modified {
+            properties["Modified At"] = [
+                "date": [
+                    "start": Self.isoDateFormatter.string(from: modified)
+                ]
+            ]
+        }
+        if let loc = highlight.location, !loc.isEmpty {
+            properties["Location"] = ["rich_text": [["text": ["content": loc]]]]
+        }
+        // Link to open in Apple Books
+        let linkUrl: String
+        if let loc = highlight.location, !loc.isEmpty {
+            linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
+        } else {
+            linkUrl = "ibooks://assetid/\(bookId)"
+        }
+        properties["Link"] = ["url": linkUrl]
+
+        let body: [String: Any] = [
+            "parent": [
+                "type": "database_id",
+                "database_id": databaseId
+            ],
+            "properties": properties
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        return try JSONDecoder().decode(NotionPage.self, from: data)
+    }
+
+    func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String? {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent("databases/\(databaseId)/query")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        addCommonHeaders(to: &request, key: key)
+        let body: [String: Any] = [
+            "filter": [
+                "property": "UUID",
+                "rich_text": ["equals": uuid]
+            ],
+            "page_size": 1
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
+        return decoded.results.first?.id
+    }
+
+    func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+
+        let url = apiBase.appendingPathComponent("pages/\(pageId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+
+        var properties: [String: Any] = [
+            "Text": [
+                "title": [["text": ["content": highlight.text]]]
+            ],
+            "UUID": [
+                "rich_text": [["text": ["content": highlight.uuid]]]
+            ],
+            "Book ID": [
+                "rich_text": [["text": ["content": bookId]]]
+            ],
+            "Book Title": [
+                "rich_text": [["text": ["content": bookTitle]]]
+            ],
+            "Author": [
+                "rich_text": [["text": ["content": author]]]
+            ]
+        ]
+        if let note = highlight.note, !note.isEmpty {
+            properties["Note"] = ["rich_text": [["text": ["content": note]]]]
+        } else {
+            // Explicitly clear Note when empty
+            properties["Note"] = ["rich_text": []]
+        }
+        if let style = highlight.style {
+            properties["Style"] = ["number": style]
+        }
+        if let added = highlight.dateAdded {
+            properties["Added At"] = [
+                "date": [
+                    "start": Self.isoDateFormatter.string(from: added)
+                ]
+            ]
+        }
+        if let modified = highlight.modified {
+            properties["Modified At"] = [
+                "date": [
+                    "start": Self.isoDateFormatter.string(from: modified)
+                ]
+            ]
+        }
+        if let loc = highlight.location, !loc.isEmpty {
+            properties["Location"] = ["rich_text": [["text": ["content": loc]]]]
+        } else {
+            properties["Location"] = ["rich_text": []]
+        }
+        let linkUrl: String
+        if let loc = highlight.location, !loc.isEmpty {
+            linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
+        } else {
+            linkUrl = "ibooks://assetid/\(bookId)"
+        }
+        properties["Link"] = ["url": linkUrl]
+
+        let body: [String: Any] = [
+            "properties": properties
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
+    }
     
     // MARK: - Helpers
     private func addCommonHeaders(to request: inout URLRequest, key: String) {

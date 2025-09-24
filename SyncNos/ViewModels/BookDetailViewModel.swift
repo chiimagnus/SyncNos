@@ -114,7 +114,13 @@ class BookDetailViewModel: ObservableObject {
         isSyncing = true
         Task {
             do {
-                try await performSmartSync(book: book, dbPath: dbPath)
+                // 模式分支
+                let mode = DIContainer.shared.notionConfigStore.syncMode ?? "single"
+                if mode == "perBook" {
+                    try await performSmartSyncPerBook(book: book, dbPath: dbPath)
+                } else {
+                    try await performSmartSync(book: book, dbPath: dbPath)
+                }
                 await MainActor.run {
                     self.syncMessage = "同步完成"
                     self.syncProgressText = nil
@@ -136,7 +142,13 @@ class BookDetailViewModel: ObservableObject {
         isSyncing = true
         Task {
             do {
-                try await performSync(book: book, dbPath: dbPath, incremental: incremental)
+                // 模式分支
+                let mode = DIContainer.shared.notionConfigStore.syncMode ?? "single"
+                if mode == "perBook" {
+                    try await performSyncPerBook(book: book, dbPath: dbPath, incremental: incremental)
+                } else {
+                    try await performSync(book: book, dbPath: dbPath, incremental: incremental)
+                }
                 await MainActor.run {
                     self.syncMessage = incremental ? "增量同步完成" : "全量同步完成"
                     self.syncProgressText = nil
@@ -149,6 +161,92 @@ class BookDetailViewModel: ObservableObject {
                     self.isSyncing = false
                 }
             }
+        }
+    }
+
+    // MARK: - 方案2：每本书一个数据库 + 每条高亮一个条目
+    private func ensurePerBookDatabaseId(book: BookListItem) async throws -> String {
+        if let saved = DIContainer.shared.notionConfigStore.databaseIdForBook(assetId: book.bookId) {
+            return saved
+        }
+        let db = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+        DIContainer.shared.notionConfigStore.setDatabaseId(db.id, forBook: book.bookId)
+        return db.id
+    }
+
+    private func performSyncPerBook(book: BookListItem, dbPath: String?, incremental: Bool) async throws {
+        _ = DIContainer.shared.notionConfigStore.notionPageId // guard by NotionService inside
+
+        let databaseId = try await ensurePerBookDatabaseId(book: book)
+
+        // 获取待处理高亮
+        guard let path = dbPath else { return }
+        let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
+        defer { databaseService.close(handle) }
+
+        var offset = 0
+        let pageSizeLocal = self.pageSize
+
+        let sinceDate: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
+        if incremental {
+            logger.debug("DEBUG: 方案2-增量同步，上次同步时间: \(sinceDate?.description ?? "从未")")
+        } else {
+            logger.debug("DEBUG: 方案2-全量同步")
+        }
+
+        var batchCount = 0
+        while true {
+            let page: [HighlightRow]
+            if incremental {
+                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSizeLocal, offset: offset, since: sinceDate)
+            } else {
+                page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSizeLocal, offset: offset)
+            }
+            if page.isEmpty {
+                break
+            }
+            logger.debug("DEBUG: 方案2-批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮")
+            await MainActor.run { self.syncProgressText = "方案2：处理第 \(batchCount + 1) 批..." }
+
+            // 对每条高亮：存在则更新；不存在则创建
+            for h in page {
+                if let existingPageId = try await notionService.findHighlightItemPageIdByUUID(databaseId: databaseId, uuid: h.uuid) {
+                    try await notionService.updateHighlightItem(pageId: existingPageId,
+                                                                bookId: book.bookId,
+                                                                bookTitle: book.bookTitle,
+                                                                author: book.authorName,
+                                                                highlight: h)
+                } else {
+                    _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                     bookId: book.bookId,
+                                                                     bookTitle: book.bookTitle,
+                                                                     author: book.authorName,
+                                                                     highlight: h)
+                }
+            }
+
+            offset += pageSizeLocal
+            batchCount += 1
+        }
+
+        // 更新同步时间戳
+        if incremental {
+            let syncTime = Date()
+            SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+            logger.debug("DEBUG: 方案2-增量同步完成，时间戳更新为: \(syncTime)")
+        }
+    }
+
+    private func performSmartSyncPerBook(book: BookListItem, dbPath: String?) async throws {
+        // 智能策略：若无上次同步时间 -> 全量；否则增量（按修改时间）
+        let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+        await MainActor.run { self.syncProgressText = last == nil ? "方案2：首次同步（全量）" : "方案2：增量同步" }
+        try await performSyncPerBook(book: book, dbPath: dbPath, incremental: last != nil)
+        // 若是首次全量，同步结束后写入时间戳
+        if last == nil {
+            let syncTime = Date()
+            SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+            logger.debug("DEBUG: 方案2-首次同步完成，时间戳更新为: \(syncTime)")
         }
     }
 
