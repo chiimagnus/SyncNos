@@ -1,7 +1,21 @@
 import SwiftUI
 
+// 创建环境变量来管理侧边栏状态
+private struct SidebarVisibilityKey: EnvironmentKey {
+    static let defaultValue: Binding<NavigationSplitViewVisibility> = .constant(.all)
+}
+
+extension EnvironmentValues {
+    var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        get { self[SidebarVisibilityKey.self] }
+        set { self[SidebarVisibilityKey.self] = newValue }
+    }
+}
+
 @main
 struct SyncNosApp: App {
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
@@ -15,6 +29,7 @@ struct SyncNosApp: App {
     var body: some Scene {
         WindowGroup {
             BooksListView()
+                .environment(\.sidebarVisibility, $columnVisibility)
         }
         // .windowStyle(.hiddenTitleBar)
         // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
@@ -28,7 +43,7 @@ struct SyncNosApp: App {
             }
             CommandGroup(replacing: .sidebar) {
                 Button {
-                    NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
+                    columnVisibility = columnVisibility == .all ? .detailOnly : .all
                 } label: {
                     Label("Toggle Sidebar", systemImage: "sidebar.left")
                 }
