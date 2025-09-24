@@ -46,6 +46,9 @@ struct SyncNosApp: App {
                 Button("Please give five stars", systemImage: "heart") {
                     openAppStoreReview()
                 }
+                Button("View Source Code", systemImage: "link.circle") {
+                    openGitHubRepo()
+                }
             }
             CommandGroup(replacing: .sidebar) {
                 Button("Toggle Sidebar", systemImage: "sidebar.left") {
@@ -66,5 +69,10 @@ struct SyncNosApp: App {
         if !NSWorkspace.shared.open(appStoreURL) {
             NSWorkspace.shared.open(webURL)
         }
+    }
+
+    private func openGitHubRepo() {
+        let githubURL = URL(string: "https://github.com/chiimagnus/SyncNos")!
+        NSWorkspace.shared.open(githubURL)
     }
 }
