@@ -46,7 +46,7 @@ struct SyncNosApp: App {
                 Button("Please give five stars", systemImage: "heart") {
                     openAppStoreReview()
                 }
-                Button("View Source Code", systemImage: "link.circle") {
+                Button("Report Issues & Suggestions", systemImage: "ladybug") {
                     openGitHubRepo()
                 }
             }
@@ -72,7 +72,7 @@ struct SyncNosApp: App {
     }
 
     private func openGitHubRepo() {
-        let githubURL = URL(string: "https://github.com/chiimagnus/SyncNos")!
+        let githubURL = URL(string: "https://github.com/chiimagnus/SyncNos/issues")!
         NSWorkspace.shared.open(githubURL)
     }
 }
