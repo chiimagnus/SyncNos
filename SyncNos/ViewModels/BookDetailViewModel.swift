@@ -167,7 +167,12 @@ class BookDetailViewModel: ObservableObject {
     // MARK: - 方案2：每本书一个数据库 + 每条高亮一个条目
     private func ensurePerBookDatabaseId(book: BookListItem) async throws -> String {
         if let saved = DIContainer.shared.notionConfigStore.databaseIdForBook(assetId: book.bookId) {
-            return saved
+            // 验证数据库是否仍存在；若不存在则清除并重建
+            if await notionService.databaseExists(databaseId: saved) {
+                return saved
+            } else {
+                DIContainer.shared.notionConfigStore.setDatabaseId(nil, forBook: book.bookId)
+            }
         }
         let db = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
         DIContainer.shared.notionConfigStore.setDatabaseId(db.id, forBook: book.bookId)

@@ -110,6 +110,7 @@ protocol NotionServiceProtocol: AnyObject {
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
     // Per-book database mode (方案2)
+    func databaseExists(databaseId: String) async -> Bool
     func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String?

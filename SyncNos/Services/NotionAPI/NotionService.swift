@@ -15,6 +15,19 @@ final class NotionService: NotionServiceProtocol {
     init(configStore: NotionConfigStoreProtocol) {
         self.configStore = configStore
     }
+    // Lightweight exists check by querying minimal page
+    func databaseExists(databaseId: String) async -> Bool {
+        guard let key = configStore.notionKey else { return false }
+        let url = apiBase.appendingPathComponent("databases/\(databaseId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        addCommonHeaders(to: &request, key: key)
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse { return (200...299).contains(http.statusCode) }
+        } catch { return false }
+        return false
+    }
     
     // MARK: - Public API
     func createDatabase(title: String) async throws -> NotionDatabase {
@@ -451,7 +464,7 @@ final class NotionService: NotionServiceProtocol {
         // Database title uses book title for clarity
         let dbTitle = "SyncNos - \(bookTitle)"
 
-        // Properties for highlight items
+        // Properties for highlight items（Style 采用 rich_text 以承载 “{颜色名}_{数字}” 文本）
         let body: [String: Any] = [
             "parent": [
                 "type": "page_id",
@@ -467,7 +480,7 @@ final class NotionService: NotionServiceProtocol {
                 // Metadata
                 "UUID": ["rich_text": [:]],
                 "Note": ["rich_text": [:]],
-                "Style": ["number": [:]],
+                "Style": ["rich_text": [:]],
                 "Added At": ["date": [:]],
                 "Modified At": ["date": [:]],
                 "Location": ["rich_text": [:]],
@@ -516,7 +529,9 @@ final class NotionService: NotionServiceProtocol {
             properties["Note"] = ["rich_text": [["text": ["content": note]]]]
         }
         if let style = highlight.style {
-            properties["Style"] = ["number": style]
+            properties["Style"] = [
+                "rich_text": [["text": ["content": styleName(for: style) + "_\(style)"]]]
+            ]
         }
         if let added = highlight.dateAdded {
             properties["Added At"] = [
@@ -616,7 +631,11 @@ final class NotionService: NotionServiceProtocol {
             properties["Note"] = ["rich_text": []]
         }
         if let style = highlight.style {
-            properties["Style"] = ["number": style]
+            properties["Style"] = [
+                "rich_text": [["text": ["content": styleName(for: style) + "_\(style)"]]]
+            ]
+        } else {
+            properties["Style"] = ["rich_text": []]
         }
         if let added = highlight.dateAdded {
             properties["Added At"] = [
@@ -751,6 +770,19 @@ final class NotionService: NotionServiceProtocol {
 
         // 3) Append new children
         try await appendBlocks(pageId: pageId, children: children)
+    }
+
+    // Convert numeric style to human-friendly color name
+    private func styleName(for style: Int) -> String {
+        switch style {
+        case 0: return "orange"
+        case 1: return "green"
+        case 2: return "blue"
+        case 3: return "yellow"
+        case 4: return "pink"
+        case 5: return "purple"
+        default: return "gray"
+        }
     }
     
     // MARK: - Helpers
