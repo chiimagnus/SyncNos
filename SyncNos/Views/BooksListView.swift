@@ -6,9 +6,14 @@ struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+
+    func toggleSidebar() {
+        columnVisibility = columnVisibility == .all ? .detailOnly : .all
+    }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading books...")
@@ -94,6 +99,9 @@ struct BooksListView: View {
             if selectedBookId == nil {
                 selectedBookId = books.first?.bookId
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ToggleSidebar"))) { _ in
+            toggleSidebar()
         }
         .background {
             if backgroundImageEnabled {
