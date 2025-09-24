@@ -26,6 +26,14 @@ struct SyncNosApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
+            CommandGroup(replacing: .sidebar) {
+                Button {
+                    NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
+                } label: {
+                    Label("Toggle Sidebar", systemImage: "sidebar.left")
+                }
+                .keyboardShortcut("\\", modifiers: .command)
+            }
         }
     }
 }
