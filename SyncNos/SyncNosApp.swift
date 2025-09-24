@@ -49,7 +49,7 @@ struct SyncNosApp: App {
                 Button("Report Issues & Suggestions", systemImage: "ladybug") {
                     openGitHubRepo()
                 }
-                Button("View Source Code", systemImage: "code") {
+                Button("View Source Code", systemImage: "link") {
                     openGitHubSource()
                 }
             }
