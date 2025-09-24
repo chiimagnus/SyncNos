@@ -107,6 +107,29 @@ class BookDetailViewModel: ObservableObject {
     }
     
     // MARK: - Notion Sync
+    // 统一入口：智能同步（创建/补齐/更新）
+    func syncSmart(book: BookListItem, dbPath: String?) {
+        syncMessage = nil
+        syncProgressText = nil
+        isSyncing = true
+        Task {
+            do {
+                try await performSmartSync(book: book, dbPath: dbPath)
+                await MainActor.run {
+                    self.syncMessage = "同步完成"
+                    self.syncProgressText = nil
+                    self.isSyncing = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.syncProgressText = nil
+                    self.isSyncing = false
+                }
+            }
+        }
+    }
+
     func syncToNotion(book: BookListItem, dbPath: String?, incremental: Bool = false) {
         syncMessage = nil
         syncProgressText = nil
@@ -303,6 +326,148 @@ class BookDetailViewModel: ObservableObject {
         }
         await MainActor.run { self.syncProgressText = "正在更新数量..." }
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
+        await MainActor.run { self.syncProgressText = "同步完成" }
+    }
+
+    // MARK: - 智能同步实现
+    private func performSmartSync(book: BookListItem, dbPath: String?) async throws {
+        guard let parentPageId = DIContainer.shared.notionConfigStore.notionPageId else {
+            throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "请先在 Notion Integration 视图设置 NOTION_PAGE_ID。"])
+        }
+
+        let dbTitle = "syncnote"
+        let databaseId: String
+        if let saved = DIContainer.shared.notionConfigStore.syncDatabaseId {
+            databaseId = saved
+        } else if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
+            databaseId = found
+            DIContainer.shared.notionConfigStore.syncDatabaseId = found
+        } else {
+            let created = try await notionService.createDatabase(title: dbTitle)
+            databaseId = created.id
+            DIContainer.shared.notionConfigStore.syncDatabaseId = created.id
+        }
+
+        // 确认或创建书籍页面
+        let pageId: String
+        let pageWasCreated: Bool
+        if let existing = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: book.bookId) {
+            pageId = existing
+            pageWasCreated = false
+        } else {
+            let created = try await notionService.createBookPage(databaseId: databaseId,
+                                                                 bookTitle: book.bookTitle,
+                                                                 author: book.authorName,
+                                                                 assetId: book.bookId,
+                                                                 urlString: book.ibooksURL,
+                                                                 header: "Highlights")
+            pageId = created.id
+            pageWasCreated = true
+        }
+
+        guard let path = dbPath else { return }
+        let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
+        defer {
+            databaseService.close(handle)
+            logger.debug("DEBUG: 关闭数据库连接")
+        }
+
+        var offset = 0
+        var batchCount = 0
+
+        if pageWasCreated {
+            // 新页面：全量追加所有高亮
+            logger.debug("DEBUG: 智能同步 - 页面不存在，已创建，开始全量追加")
+            while true {
+                let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
+                if page.isEmpty {
+                    logger.debug("DEBUG: 智能同步（新页） - 没有更多高亮，结束。批次数: \(batchCount + 1)")
+                    break
+                }
+                await MainActor.run { self.syncProgressText = "正在添加第 \(batchCount + 1) 批，条数：\(page.count)" }
+                try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: page)
+                offset += self.pageSize
+                batchCount += 1
+            }
+
+            // 使用数据库最新数量
+            let latestHighlightCount = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
+            await MainActor.run { self.syncProgressText = "正在更新数量..." }
+            try await notionService.updatePageHighlightCount(pageId: pageId, count: latestHighlightCount)
+
+            // 记录同步时间
+            let syncTime = Date()
+            SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+            logger.debug("DEBUG: 智能同步（新页）完成，更新同步时间戳: \(syncTime)")
+            await MainActor.run { self.syncProgressText = "同步完成" }
+            return
+        }
+
+        // 已存在页面：对比 UUID，增量追加 + 有则更新
+        let existingUUIDToBlockIdMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+        logger.debug("DEBUG: 智能同步 - 现有UUID映射数量: \(existingUUIDToBlockIdMap.count)")
+
+        let lastSyncTime = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+        if let lastSyncTime { logger.debug("DEBUG: 智能同步 - 上次同步时间: \(lastSyncTime)") }
+        await MainActor.run { self.syncProgressText = "正在扫描本地高亮..." }
+
+        var toAppend: [HighlightRow] = []
+        var toUpdate: [(String, HighlightRow)] = [] // (blockId, highlight)
+
+        offset = 0
+        batchCount = 0
+        while true {
+            let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: self.pageSize, offset: offset)
+            logger.debug("DEBUG: 智能同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮 (offset: \(offset))")
+
+            if page.isEmpty {
+                break
+            }
+
+            for h in page {
+                if let blockId = existingUUIDToBlockIdMap[h.uuid] {
+                    // 如果有上次同步时间，且有修改时间且未超过上次同步则跳过更新
+                    if let last = lastSyncTime, let modified = h.modified, modified < last {
+                        continue
+                    }
+                    toUpdate.append((blockId, h))
+                } else {
+                    toAppend.append(h)
+                }
+            }
+
+            offset += self.pageSize
+            batchCount += 1
+        }
+
+        // 执行更新
+        if !toUpdate.isEmpty {
+            await MainActor.run { self.syncProgressText = "正在更新 \(toUpdate.count) 条已存在高亮..." }
+            var updated = 0
+            for (blockId, h) in toUpdate {
+                try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId)
+                updated += 1
+                if updated % 20 == 0 {
+                    await MainActor.run { self.syncProgressText = "已更新 \(updated)/\(toUpdate.count) 条..." }
+                }
+            }
+        }
+
+        // 执行追加
+        if !toAppend.isEmpty {
+            await MainActor.run { self.syncProgressText = "正在追加 \(toAppend.count) 条新高亮..." }
+            try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: toAppend)
+        }
+
+        // 更新数量（以数据库最新为准）
+        let latestHighlightCount = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
+        await MainActor.run { self.syncProgressText = "正在更新数量..." }
+        try await notionService.updatePageHighlightCount(pageId: pageId, count: latestHighlightCount)
+
+        // 记录同步时间
+        let syncTime = Date()
+        SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+        logger.debug("DEBUG: 智能同步完成，更新同步时间戳: \(syncTime)")
         await MainActor.run { self.syncProgressText = "同步完成" }
     }
 }

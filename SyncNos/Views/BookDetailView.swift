@@ -291,26 +291,12 @@ struct BookDetailView: View {
                     }
                     .help("Sync in progress")
                 } else {
-                    Menu {
-                        Button(action: {
-                            Task {
-                                viewModel.syncToNotion(book: book, dbPath: annotationDBPath, incremental: false)
-                            }
-                        }) {
-                            Text("Full sync")
-                            Text("Sync all highlights")
-                        }
-
-                        Button(action: {
-                            Task {
-                                viewModel.syncToNotion(book: book, dbPath: annotationDBPath, incremental: true)
-                            }
-                        }) {
-                            Text("Incremental sync")
-                            Text("Sync only new/modified highlights")
+                    Button {
+                        Task {
+                            viewModel.syncSmart(book: book, dbPath: annotationDBPath)
                         }
                     } label: {
-                        Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
+                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .help("Sync highlights to Notion")
                 }
@@ -322,9 +308,14 @@ struct BookDetailView: View {
             Text(syncErrorMessage)
         }
         .onChange(of: viewModel.syncMessage) { newMessage in
-            if let message = newMessage, message != "Synced to Notion" && message != "Incremental sync completed" && message != "Full sync completed" {
-                syncErrorMessage = message
-                showingSyncError = true
+            if let message = newMessage {
+                // 仅在消息明显是错误时弹窗；“同步完成”等成功文案不提示
+                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
+                if !isSuccess {
+                    syncErrorMessage = message
+                    showingSyncError = true
+                }
             }
         }
     }
