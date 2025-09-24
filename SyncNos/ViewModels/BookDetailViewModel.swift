@@ -182,7 +182,7 @@ class BookDetailViewModel: ObservableObject {
     private func performSyncPerBook(book: BookListItem, dbPath: String?, incremental: Bool) async throws {
         _ = DIContainer.shared.notionConfigStore.notionPageId // guard by NotionService inside
 
-        let databaseId = try await ensurePerBookDatabaseId(book: book)
+        var databaseId = try await ensurePerBookDatabaseId(book: book)
 
         // 获取待处理高亮
         guard let path = dbPath else { return }
@@ -215,18 +215,61 @@ class BookDetailViewModel: ObservableObject {
 
             // 对每条高亮：存在则更新；不存在则创建
             for h in page {
-                if let existingPageId = try await notionService.findHighlightItemPageIdByUUID(databaseId: databaseId, uuid: h.uuid) {
-                    try await notionService.updateHighlightItem(pageId: existingPageId,
-                                                                bookId: book.bookId,
-                                                                bookTitle: book.bookTitle,
-                                                                author: book.authorName,
-                                                                highlight: h)
-                } else {
-                    _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
-                                                                     bookId: book.bookId,
-                                                                     bookTitle: book.bookTitle,
-                                                                     author: book.authorName,
-                                                                     highlight: h)
+                do {
+                    if let existingPageId = try await notionService.findHighlightItemPageIdByUUID(databaseId: databaseId, uuid: h.uuid) {
+                        do {
+                            try await notionService.updateHighlightItem(pageId: existingPageId,
+                                                                        bookId: book.bookId,
+                                                                        bookTitle: book.bookTitle,
+                                                                        author: book.authorName,
+                                                                        highlight: h)
+                        } catch {
+                            if self.isDatabaseMissingError(error) {
+                                // Recreate database and create as new
+                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                                databaseId = newDb.id
+                                DIContainer.shared.notionConfigStore.setDatabaseId(databaseId, forBook: book.bookId)
+                                _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                                bookId: book.bookId,
+                                                                                bookTitle: book.bookTitle,
+                                                                                author: book.authorName,
+                                                                                highlight: h)
+                            } else { throw error }
+                        }
+                    } else {
+                        do {
+                            _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                            bookId: book.bookId,
+                                                                            bookTitle: book.bookTitle,
+                                                                            author: book.authorName,
+                                                                            highlight: h)
+                        } catch {
+                            if self.isDatabaseMissingError(error) {
+                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                                databaseId = newDb.id
+                                DIContainer.shared.notionConfigStore.setDatabaseId(databaseId, forBook: book.bookId)
+                                _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                                bookId: book.bookId,
+                                                                                bookTitle: book.bookTitle,
+                                                                                author: book.authorName,
+                                                                                highlight: h)
+                            } else { throw error }
+                        }
+                    }
+                } catch {
+                    if self.isDatabaseMissingError(error) {
+                        // Recreate and retry a final time as new
+                        let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                        databaseId = newDb.id
+                        DIContainer.shared.notionConfigStore.setDatabaseId(databaseId, forBook: book.bookId)
+                        _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                        bookId: book.bookId,
+                                                                        bookTitle: book.bookTitle,
+                                                                        author: book.authorName,
+                                                                        highlight: h)
+                    } else {
+                        throw error
+                    }
                 }
             }
 
@@ -253,6 +296,16 @@ class BookDetailViewModel: ObservableObject {
             SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
             logger.debug("DEBUG: 方案2-首次同步完成，时间戳更新为: \(syncTime)")
         }
+    }
+
+    // MARK: - Helpers
+    private func isDatabaseMissingError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == "NotionService" {
+            // Notion returns 404 Not Found for deleted DB, 400 for bad input on trashed DB, sometimes 410 Gone
+            return ns.code == 404 || ns.code == 400 || ns.code == 410
+        }
+        return false
     }
 
     private func performSync(book: BookListItem, dbPath: String?, incremental: Bool = false) async throws {
