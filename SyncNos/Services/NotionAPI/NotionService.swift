@@ -544,12 +544,14 @@ final class NotionService: NotionServiceProtocol {
         }
         properties["Link"] = ["url": linkUrl]
 
+        let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
         let body: [String: Any] = [
             "parent": [
                 "type": "database_id",
                 "database_id": databaseId
             ],
-            "properties": properties
+            "properties": properties,
+            "children": children
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
 
@@ -650,6 +652,105 @@ final class NotionService: NotionServiceProtocol {
         let (data, response) = try await URLSession.shared.data(for: request)
         try Self.ensureSuccess(response: response, data: data)
         _ = data
+
+        // Replace page children with up-to-date content
+        let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
+        try await replacePageChildren(pageId: pageId, with: children)
+    }
+
+    // MARK: - Helpers for per-book item content
+    private func buildHighlightChildren(bookId: String, highlight: HighlightRow) -> [[String: Any]] {
+        var children: [[String: Any]] = []
+        // 1) Quote block for highlight text
+        children.append([
+            "object": "block",
+            "quote": [
+                "rich_text": [["text": ["content": highlight.text]]]
+            ]
+        ])
+        // 2) Note block if exists
+        if let note = highlight.note, !note.isEmpty {
+            children.append([
+                "object": "block",
+                "paragraph": [
+                    "rich_text": [[
+                        "text": ["content": note],
+                        "annotations": ["italic": true]
+                    ]]
+                ]
+            ])
+        }
+        // 3) Metadata line (style/added/modified)
+        var metaParts: [String] = []
+        if let s = highlight.style { metaParts.append("style:\(s)") }
+        if let d = highlight.dateAdded { metaParts.append("added:\(Self.isoDateFormatter.string(from: d))") }
+        if let m = highlight.modified { metaParts.append("modified:\(Self.isoDateFormatter.string(from: m))") }
+        if !metaParts.isEmpty {
+            children.append([
+                "object": "block",
+                "paragraph": [
+                    "rich_text": [[
+                        "text": ["content": metaParts.joined(separator: " | ")],
+                        "annotations": ["italic": true]
+                    ]]
+                ]
+            ])
+        }
+        // 4) Open in Apple Books link
+        let linkUrl: String
+        if let loc = highlight.location, !loc.isEmpty {
+            linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
+        } else {
+            linkUrl = "ibooks://assetid/\(bookId)"
+        }
+        children.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [[
+                    "text": ["content": "Open ↗"],
+                    "href": linkUrl
+                ]]
+            ]
+        ])
+        return children
+    }
+
+    private func replacePageChildren(pageId: String, with children: [[String: Any]]) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        // 1) List existing children
+        var startCursor: String? = nil
+        var existing: [BlockChildrenResponse.Block] = []
+        repeat {
+            var components = URLComponents(url: apiBase.appendingPathComponent("blocks/\(pageId)/children"), resolvingAgainstBaseURL: false)!
+            if let cursor = startCursor {
+                components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
+            }
+            var getReq = URLRequest(url: components.url!)
+            getReq.httpMethod = "GET"
+            addCommonHeaders(to: &getReq, key: key)
+            let (data, response) = try await URLSession.shared.data(for: getReq)
+            try Self.ensureSuccess(response: response, data: data)
+            let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
+            existing.append(contentsOf: decoded.results)
+            startCursor = decoded.has_more ? decoded.next_cursor : nil
+        } while startCursor != nil
+
+        // 2) Delete existing children
+        for block in existing {
+            var del = URLRequest(url: apiBase.appendingPathComponent("blocks/\(block.id)"))
+            del.httpMethod = "DELETE"
+            addCommonHeaders(to: &del, key: key)
+            let (_, response) = try await URLSession.shared.data(for: del)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                // ignore failures for already-deleted or permissions; continue best-effort
+                continue
+            }
+        }
+
+        // 3) Append new children
+        try await appendBlocks(pageId: pageId, children: children)
     }
     
     // MARK: - Helpers
