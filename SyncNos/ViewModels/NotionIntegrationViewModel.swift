@@ -21,6 +21,9 @@ final class NotionIntegrationViewModel: ObservableObject {
     
     @Published var isBusy: Bool = false
     @Published var message: String?
+
+    // Sync mode UI binding: "single" | "perBook"
+    @Published var syncMode: String = "single"
     
     private let notionConfig: NotionConfigStoreProtocol
     private let notionService: NotionServiceProtocol
@@ -33,6 +36,7 @@ final class NotionIntegrationViewModel: ObservableObject {
         self.notionPageIdInput = notionConfig.notionPageId ?? ""
         // Pre-fill existing sync database id (if any) into the UI helpers
         self.existingDatabaseIdInput = notionConfig.syncDatabaseId ?? ""
+        self.syncMode = notionConfig.syncMode ?? "single"
     }
     
     func saveCredentials() {
@@ -45,6 +49,20 @@ final class NotionIntegrationViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
             await MainActor.run {
                 if message == "Credentials saved" {
+                    message = nil
+                }
+            }
+        }
+    }
+
+    func saveSyncMode() {
+        let trimmed = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        notionConfig.syncMode = trimmed.isEmpty ? "single" : trimmed
+        message = "Sync mode saved: \(notionConfig.syncMode ?? "single")"
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                if message?.starts(with: "Sync mode saved") == true {
                     message = nil
                 }
             }

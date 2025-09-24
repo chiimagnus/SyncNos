@@ -7,6 +7,19 @@ struct NotionIntegrationView: View {
     var body: some View {
         Form {
             VStack(alignment: .leading, spacing: 16) {
+                GroupBox("Sync Mode") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("Mode", selection: $viewModel.syncMode) {
+                            Text("单库（每本书一个页面）").tag("single")
+                            Text("每本书一个库（每条高亮为条目）").tag("perBook")
+                        }
+                        .pickerStyle(.segmented)
+                        Button("保存同步模式") { viewModel.saveSyncMode() }
+                            .buttonStyle(.bordered)
+                    }
+                    .padding(8)
+                }
+                
                 GroupBox("Credentials") {
                     VStack(alignment: .leading, spacing: 8) {
                         SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
