@@ -297,8 +297,8 @@ struct BookDetailView: View {
                                 viewModel.syncToNotion(book: book, dbPath: annotationDBPath, incremental: false)
                             }
                         }) {
-                            Text("全量同步")
-                            Text("同步所有高亮")
+                            Text("Full sync")
+                            Text("Sync all highlights")
                         }
 
                         Button(action: {
@@ -306,13 +306,13 @@ struct BookDetailView: View {
                                 viewModel.syncToNotion(book: book, dbPath: annotationDBPath, incremental: true)
                             }
                         }) {
-                            Text("增量同步")
-                            Text("仅同步新增/修改的高亮")
+                            Text("Incremental sync")
+                            Text("Sync only new/modified highlights")
                         }
                     } label: {
                         Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath")
                     }
-                    .help("同步高亮到Notion")
+                    .help("Sync highlights to Notion")
                 }
             }
         }
@@ -322,7 +322,7 @@ struct BookDetailView: View {
             Text(syncErrorMessage)
         }
         .onChange(of: viewModel.syncMessage) { newMessage in
-            if let message = newMessage, message != "Synced to Notion" && message != "增量同步完成" && message != "全量同步完成" {
+            if let message = newMessage, message != "Synced to Notion" && message != "Incremental sync completed" && message != "Full sync completed" {
                 syncErrorMessage = message
                 showingSyncError = true
             }
