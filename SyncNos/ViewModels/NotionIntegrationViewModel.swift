@@ -120,5 +120,3 @@ final class NotionIntegrationViewModel: ObservableObject {
         isBusy = false
     }
 }
-
-
