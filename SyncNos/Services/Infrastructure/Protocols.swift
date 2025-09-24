@@ -87,6 +87,11 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
     var syncDatabaseId: String? { get set }
+    // Sync mode: "single" (方案1：单库+每本书一个页面) 或 "perBook" (方案2：每本书一个库+每条高亮为一条目)
+    var syncMode: String? { get set }
+    // Per-book database id mapping helpers
+    func databaseIdForBook(assetId: String) -> String?
+    func setDatabaseId(_ id: String?, forBook assetId: String)
 }
 
 // MARK: - Notion Service Protocol
@@ -104,6 +109,11 @@ protocol NotionServiceProtocol: AnyObject {
     func updatePageHighlightCount(pageId: String, count: Int) async throws
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
+    // Per-book database mode (方案2)
+    func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
+    func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage
+    func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String?
+    func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
