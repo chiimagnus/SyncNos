@@ -222,7 +222,7 @@ struct BookDetailView: View {
                                     NSWorkspace.shared.open(url)
                                 }
                             } label: {
-                                Image(systemName: "book.fill")
+                                Image(systemName: "book")
                                     .imageScale(.medium)
                                     .foregroundColor(.primary)
                             }

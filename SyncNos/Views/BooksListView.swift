@@ -37,7 +37,7 @@ struct BooksListView: View {
                             .padding()
                         // Button("Refresh") { viewModel.loadBooks() }
                             // .buttonStyle(.borderedProminent)
-                        Button("Open Apple Books notes") {
+                        Button("Open Apple Books notes", systemImage: "book") {
                             AppleBooksPicker.pickAppleBooksContainer()
                         }
                     }

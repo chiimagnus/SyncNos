@@ -63,12 +63,12 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Button(action: AppleBooksPicker.pickAppleBooksContainer) {
-                        Label("Open Apple Books notes", systemImage: "book")
+                    Button("Open Apple Books notes", systemImage: "book") {
+                        AppleBooksPicker.pickAppleBooksContainer()
                     }
-                    .help("Choose Apple Books container directory and load notes")
+                        .help("Choose Apple Books container directory and load notes")
 
-                    Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
+                    Toggle("Enable Background Image", systemImage: "photo", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
 
                     Picker("Language", selection: $selectedLanguage) {
