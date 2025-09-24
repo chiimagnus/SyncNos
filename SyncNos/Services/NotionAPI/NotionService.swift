@@ -22,11 +22,29 @@ final class NotionService: NotionServiceProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         addCommonHeaders(to: &request, key: key)
+        struct DatabaseMeta: Decodable { let id: String; let in_trash: Bool? }
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse { return (200...299).contains(http.statusCode) }
-        } catch { return false }
-        return false
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return false }
+            if let meta = try? JSONDecoder().decode(DatabaseMeta.self, from: data), (meta.in_trash ?? false) {
+                return false
+            }
+            // Some trashed databases still return 200 on GET; verify by running a minimal query
+            let qURL = apiBase.appendingPathComponent("databases/\(databaseId)/query")
+            var qReq = URLRequest(url: qURL)
+            qReq.httpMethod = "POST"
+            addCommonHeaders(to: &qReq, key: key)
+            let body: [String: Any] = ["page_size": 1]
+            qReq.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            let (_, qResp) = try await URLSession.shared.data(for: qReq)
+            if let qHttp = qResp as? HTTPURLResponse, (200...299).contains(qHttp.statusCode) {
+                return true
+            } else {
+                return false
+            }
+        } catch {
+            return false
+        }
     }
     
     // MARK: - Public API
