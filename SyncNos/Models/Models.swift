@@ -12,14 +12,6 @@ struct Highlight: Codable {
     let location: String?
 }
 
-struct BookExport: Codable {
-    let bookId: String
-    let authorName: String
-    let bookTitle: String
-    let ibooksURL: String
-    let highlights: [Highlight]
-}
-
 struct HighlightRow { 
     let assetId: String
     let uuid: String
