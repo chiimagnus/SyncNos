@@ -95,17 +95,6 @@ class BookDetailViewModel: ObservableObject {
         }
     }
 
-    private func getLatestHighlightCount(dbPath: String?, assetId: String) async throws -> Int {
-        guard let path = dbPath else { return 0 }
-        let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
-        defer { databaseService.close(handle) }
-
-        let counts = try databaseService.fetchHighlightCountsByAsset(db: handle)
-        let count = counts.first { $0.assetId == assetId }?.count ?? 0
-        logger.verbose("DEBUG: 获取到最新的高亮数量: \(count) for assetId: \(assetId)")
-        return count
-    }
-    
     // MARK: - Notion Sync
     // 统一入口：智能同步（创建/补齐/更新）
     func syncSmart(book: BookListItem, dbPath: String?) {
@@ -154,16 +143,5 @@ class BookDetailViewModel: ObservableObject {
                 }
             }
         }
-    }
-
-    // 已将方案1/方案2同步逻辑移至 NotionSyncCoordinator
-
-    // MARK: - Helpers
-    private func isDatabaseMissingError(_ error: Error) -> Bool {
-        let ns = error as NSError
-        if ns.domain == "NotionService" {
-            return ns.code == 404 || ns.code == 400 || ns.code == 410
-        }
-        return false
     }
 }
