@@ -342,10 +342,22 @@ class BookDetailViewModel: ObservableObject {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please set NOTION_PAGE_ID in Notion Integration view."])
         }
         // Ensure database exists (prefer stored syncDatabaseId; otherwise find/create and store it)
-        let dbTitle = "syncnote"
+        let dbTitle = "syncnos"
         let databaseId: String
         if let saved = DIContainer.shared.notionConfigStore.syncDatabaseId {
-            databaseId = saved
+            if await notionService.databaseExists(databaseId: saved) {
+                databaseId = saved
+            } else {
+                DIContainer.shared.notionConfigStore.syncDatabaseId = nil
+                if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
+                    databaseId = found
+                    DIContainer.shared.notionConfigStore.syncDatabaseId = found
+                } else {
+                    let created = try await notionService.createDatabase(title: dbTitle)
+                    databaseId = created.id
+                    DIContainer.shared.notionConfigStore.syncDatabaseId = created.id
+                }
+            }
         } else if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
             databaseId = found
             DIContainer.shared.notionConfigStore.syncDatabaseId = found
@@ -520,10 +532,22 @@ class BookDetailViewModel: ObservableObject {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "请先在 Notion Integration 视图设置 NOTION_PAGE_ID。"])
         }
 
-        let dbTitle = "syncnote"
+        let dbTitle = "syncnos"
         let databaseId: String
         if let saved = DIContainer.shared.notionConfigStore.syncDatabaseId {
-            databaseId = saved
+            if await notionService.databaseExists(databaseId: saved) {
+                databaseId = saved
+            } else {
+                DIContainer.shared.notionConfigStore.syncDatabaseId = nil
+                if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
+                    databaseId = found
+                    DIContainer.shared.notionConfigStore.syncDatabaseId = found
+                } else {
+                    let created = try await notionService.createDatabase(title: dbTitle)
+                    databaseId = created.id
+                    DIContainer.shared.notionConfigStore.syncDatabaseId = created.id
+                }
+            }
         } else if let found = try await notionService.findDatabaseId(title: dbTitle, parentPageId: parentPageId) {
             databaseId = found
             DIContainer.shared.notionConfigStore.syncDatabaseId = found
