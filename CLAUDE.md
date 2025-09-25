@@ -5,17 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 1. Commands for Development
 
 ### Building and Running
-- The project is an Xcode project, open `SyncBookNotesWithNotion.xcodeproj` to build and run
+- The project is an Xcode project, open `SyncNos.xcodeproj` to build and run
 - macOS deployment target is 13.0
 - Swift version is 5.0
 - Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
 
 ### Testing
-- Run tests using Xcode's test navigator or Cmd+U
-- For running specific tests, use Xcode's test filtering capabilities
-- Add unit tests for new business logic in Services
-- Test edge cases and error conditions
-- Ensure UI components behave correctly with different data states
+- Currently no formal unit tests exist; tests for business logic need to be added in Services
+- Run application through Xcode to perform manual testing
+- No automated testing framework is configured
 
 ### Code Structure
 - Models in `SyncNos/Models/` define the data structures
@@ -29,15 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Clear data flow and explicit dependencies
 - Single responsibility principle - each component has a focused purpose
 
-### Architecture Patterns
-- MVVM (Model-View-ViewModel) for the macOS app
-- Service-oriented architecture with protocol-based interfaces
-- Separation of concerns between data access, business logic, and presentation layers
-
 ## 2. High-Level Architecture
 
 ### Core Components
-1. **Database Access Layer**: 
+1. **Database Access Layer**:
    - Uses SQLite3 to access Apple Books annotation data directly
    - Dynamically detects available columns in the database to handle different versions
    - Implements proper error handling for database operations
@@ -45,38 +38,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 2. **Data Models**:
    - `Highlight`: Represents a single highlight/note from Apple Books
+   - `HighlightRow`: Contains additional assetId for use in database operations
    - `BookExport`: Represents a book with its highlights
    - `BookListItem`: Lightweight model for listing books without loading all highlights
    - `AssetHighlightCount`: Aggregated highlight count per asset/book
+   - `Filters`: Criteria for filtering books
+   - `BookRow`: Basic book information from database
 
 3. **Services**:
-   - `DatabaseService`: Main service that coordinates database operations
-   - `DatabaseConnectionService`: Handles database connections and operations
+   - `DatabaseService`: Main service that coordinates database operations; conforms to `DatabaseServiceProtocol`
+   - `DatabaseConnectionService`: Handles database connections and opening/closing
    - `DatabaseQueryService`: Contains the actual SQL queries and data fetching logic
    - `BookFilterService`: Handles filtering of books based on criteria
-   - `BookmarkStore`: Manages security-scoped bookmarks for accessing the database file
-   - `NotionService`: Handles communication with the Notion API
+   - `BookmarkStore`: Manages security-scoped bookmarks for accessing the database file; conforms to `BookmarkStoreProtocol`
+   - `NotionService`: Handles communication with the Notion API; conforms to `NotionServiceProtocol`
+   - `NotionConfigStore`: Manages Notion API credentials and configuration; conforms to `NotionConfigStoreProtocol`
+   - `LoggerService`: Provides leveled logging functionality; conforms to `LoggerServiceProtocol`
    - All services use protocols for testability and dependency injection
 
-4. **UI Components**:
+4. **Protocols for Dependency Injection**:
+   - `DatabaseServiceProtocol`: Defines database access methods
+   - `BookmarkStoreProtocol`: Defines bookmark management methods
+   - `NotionConfigStoreProtocol`: Defines Notion configuration storage
+   - `NotionServiceProtocol`: Defines Notion API communication interface
+   - `LoggerServiceProtocol`: Defines leveled logging interface with levels: verbose, debug, info, warning, error
+
+5. **UI Components**:
    - `BooksListView`: Main view showing the list of books with highlight counts
    - `BookDetailView`: Detail view showing highlights for a selected book with pagination
    - Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
    - `SettingsView`: Configuration interface for Apple Books container and Notion integration
    - `NotionIntegrationView`: UI for configuring Notion API credentials and testing integration
 
-5. **ViewModels**:
+6. **ViewModels**:
    - `BookViewModel`: Manages the data flow between services and BooksListView
    - `BookDetailViewModel`: Manages pagination and data loading for BookDetailView
    - `NotionIntegrationViewModel`: Handles UI logic for Notion integration setup
 
-6. **Dependency Injection**:
-   - `DIContainer` provides shared instances of services
+7. **Dependency Injection**:
+   - `DIContainer` provides shared instances of services and allows registration for testing
    - Services are injected into ViewModels through initializer parameters with default values
+   - All service protocols defined in `Protocols.swift`
 
 ### Data Flow
 1. Views observe ViewModels through @Published properties
-2. ViewModels coordinate with Services to fetch data
+2. ViewModels coordinate with Services (accessed through DIContainer) to fetch data
 3. Services handle database access and return model objects
 4. ViewModels process and expose data to Views
 5. User interactions trigger updates through the same flow
@@ -85,7 +91,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
 - All database access is read-only
 - Properly manages security-scoped resource access lifecycle
-- Notion API credentials stored in UserDefaults (standard for macOS apps)
+- Notion API credentials stored in UserDefaults (standard for macOS apps) through NotionConfigStore
 
 ### Notion Integration
 - `NotionService` handles all Notion API communications
@@ -94,6 +100,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Batch operations for efficient API usage
 - Rich formatting of highlights with metadata and iBooks links
 - Progress tracking during sync operations
+- Two sync modes supported: single database with book pages, or per-book databases with highlight entries
 
 ### Database Access Patterns
 - Security-Scoped Access: Uses security-scoped bookmarks for accessing the Apple Books database within the App Sandbox
@@ -109,3 +116,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Error states with user-friendly messages
 - Pagination with "Load More" functionality
 - Toolbar integration for primary actions
+
+### Architecture Patterns
+- MVVM (Model-View-ViewModel) for the macOS app
+- Service-oriented architecture with protocol-based interfaces
+- Separation of concerns between data access, business logic, and presentation layers
+- Dependency injection via `DIContainer` for testability
+- Protocol-oriented programming for flexibility
+
+### Logging
+- Centralized logging service with 5 levels (verbose, debug, info, warning, error)
+- Automatic logging includes file, function and line number information
+- Level can be adjusted based on debugging needs
