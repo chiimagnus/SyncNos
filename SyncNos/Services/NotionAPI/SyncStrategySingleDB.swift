@@ -20,7 +20,7 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
     func sync(book: BookListItem, dbPath: String?, incremental: Bool, progress: @escaping (String) -> Void) async throws {
         guard let parentPageId = config.notionPageId else {
-            throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "请先在 Notion Integration 视图设置 NOTION_PAGE_ID。"])
+            throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
 
         let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
@@ -46,13 +46,13 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
         // Incremental window
         let since: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
-        if incremental { progress("执行增量同步，上次同步时间: \(since?.description ?? "从未")") }
+        if incremental { progress(String(format: NSLocalizedString("Performing incremental sync, last sync time: %@", comment: ""), since?.description ?? "从未")) }
 
         // Full: build existing set
         var existingUUIDs: Set<String> = []
         if !incremental {
             existingUUIDs = try await notionService.collectExistingUUIDs(fromPageId: pageId)
-            logger.debug("DEBUG: 全量同步 - 收集到 \(existingUUIDs.count) 个已存在的UUID")
+            logger.debug(String(format: NSLocalizedString("DEBUG: Full sync - collected %lld existing UUIDs", comment: ""), existingUUIDs.count))
         }
 
         var offset = 0
@@ -61,13 +61,13 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
         if incremental {
             let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
-            logger.debug("DEBUG: 增量同步 - 映射: \(existingMap.count)")
+            logger.debug(String(format: NSLocalizedString("DEBUG: Incremental sync - mapping: %lld", comment: ""), existingMap.count))
             var toUpdate: [(String, HighlightRow)] = []
             var toAppend: [HighlightRow] = []
 
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset, since: since)
-                logger.debug("DEBUG: 增量同步批次 \(batchCount + 1) - 获取到 \(page.count) 条高亮 (offset: \(offset))")
+                logger.debug(String(format: NSLocalizedString("DEBUG: Incremental sync batch %d - fetched %lld highlights (offset: %lld)", comment: ""), batchCount + 1, page.count, offset))
                 if page.isEmpty { break }
                 for h in page {
                     if let blockId = existingMap[h.uuid] {
@@ -83,17 +83,17 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
             // Apply
             if !toUpdate.isEmpty {
-                progress("正在更新 \(toUpdate.count) 条已存在高亮...")
+                progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
                 for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId) }
             }
             if !toAppend.isEmpty {
-                progress("正在添加 \(toAppend.count) 条新高亮...")
+                progress(String(format: NSLocalizedString("Adding %lld new highlights...", comment: ""), toAppend.count))
                 try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: toAppend)
             }
 
             // Count & timestamp
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
-            progress("正在更新数量...")
+            progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
             return
@@ -104,22 +104,22 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
             let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset)
             let fresh = page.filter { !existingUUIDs.contains($0.uuid) }
             newRows.append(contentsOf: fresh)
-            progress("已获取 \(newRows.count) 条高亮...")
+            progress(String(format: NSLocalizedString("Fetched %lld highlights...", comment: ""), newRows.count))
             if page.isEmpty || page.count < pageSize { break }
             offset += pageSize
             batchCount += 1
         }
         if !newRows.isEmpty {
-            progress("正在添加 \(newRows.count) 条高亮...")
+            progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), newRows.count))
             try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: newRows)
         }
-        progress("正在更新数量...")
+        progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
     }
 
     func syncSmart(book: BookListItem, dbPath: String?, progress: @escaping (String) -> Void) async throws {
         guard let parentPageId = config.notionPageId else {
-            throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "请先在 Notion Integration 视图设置 NOTION_PAGE_ID。"])
+            throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
         let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
 
@@ -148,13 +148,13 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset)
                 if page.isEmpty { break }
-                progress("方案1，正在添加第 \(batch + 1) 批，条数：\(page.count)")
+                progress(String(format: NSLocalizedString("Plan 1: Adding batch %d, count: %lld", comment: ""), batch + 1, page.count))
                 try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: page)
                 offset += pageSize
                 batch += 1
             }
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
-            progress("正在更新数量...")
+            progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
             return
@@ -163,7 +163,7 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
         // existing page → scan & update/append
         let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
         let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
-        progress("正在扫描本地高亮...")
+        progress(NSLocalizedString("Scanning local highlights...", comment: ""))
         var toAppend: [HighlightRow] = []
         var toUpdate: [(String, HighlightRow)] = []
         var offset = 0
@@ -183,15 +183,15 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
             batch += 1
         }
         if !toUpdate.isEmpty {
-            progress("正在更新 \(toUpdate.count) 条已存在高亮...")
+            progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
             for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId) }
         }
         if !toAppend.isEmpty {
-            progress("正在追加 \(toAppend.count) 条新高亮...")
+            progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
             try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: toAppend)
         }
         let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
-        progress("正在更新数量...")
+        progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
         let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
     }

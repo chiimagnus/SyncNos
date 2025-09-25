@@ -27,13 +27,13 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
 
         let since = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
         if ensured.recreated {
-            progress("检测到数据库被重建，执行全量同步...")
+            progress(NSLocalizedString("Detected database recreation, performing full sync...", comment: ""))
             var offset = 0
             var batch = 0
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset)
                 if page.isEmpty { break }
-                progress("方案2：全量批次 \(batch + 1)，条数：\(page.count)")
+                progress(String(format: NSLocalizedString("Plan 2: Full batch %d, count: %lld", comment: ""), batch + 1, page.count))
                 for h in page {
                     _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                 }
@@ -51,7 +51,7 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
             if let since { page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset, since: since) }
             else { page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset) }
             if page.isEmpty { break }
-            progress("方案2：处理第 \(batch + 1) 批...")
+            progress(String(format: NSLocalizedString("Plan 2: Processing batch %d...", comment: ""), batch + 1))
             for h in page {
                 do {
                     if let existingPageId = try await notionService.findHighlightItemPageIdByUUID(databaseId: databaseId, uuid: h.uuid) {
@@ -94,7 +94,7 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
 
     func syncSmart(book: BookListItem, dbPath: String?, progress: @escaping (String) -> Void) async throws {
         let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
-        progress(last == nil ? "方案2：首次同步（全量）" : "方案2：增量同步")
+        progress(last == nil ? NSLocalizedString("Plan 2: Initial sync (full)", comment: "") : NSLocalizedString("Plan 2: Incremental sync", comment: ""))
         try await sync(book: book, dbPath: dbPath, incremental: last != nil, progress: progress)
         if last == nil {
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
