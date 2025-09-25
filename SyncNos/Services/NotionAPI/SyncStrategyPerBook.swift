@@ -7,7 +7,6 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
     private let databaseService: DatabaseServiceProtocol
     private let notionService: NotionServiceProtocol
     private let config: NotionConfigStoreProtocol
-    private let logger = DIContainer.shared.loggerService
     private let pageSize = 50
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
