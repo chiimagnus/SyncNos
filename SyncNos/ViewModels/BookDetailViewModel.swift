@@ -1,5 +1,4 @@
 import Foundation
-import SQLite3
 
 class BookDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
@@ -14,7 +13,7 @@ class BookDetailViewModel: ObservableObject {
     private let databaseService: DatabaseServiceProtocol
     private let syncCoordinator: NotionSyncCoordinatorProtocol
     private let logger = DIContainer.shared.loggerService
-    private var dbHandle: OpaquePointer?
+    private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
     private var currentOffset = 0
     private let pageSize = 50
@@ -26,13 +25,11 @@ class BookDetailViewModel: ObservableObject {
         self.syncCoordinator = syncCoordinator
     }
     
-    deinit {
-        closeHandle()
-    }
+    deinit { closeSession() }
     
     func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) {
         errorMessage = nil
-        closeHandle()
+        closeSession()
         highlights = []
         currentOffset = 0
         currentAssetId = assetId
@@ -40,7 +37,7 @@ class BookDetailViewModel: ObservableObject {
         
         if let path = dbPath {
             do {
-                dbHandle = try databaseService.openReadOnlyDatabase(dbPath: path)
+                session = try databaseService.makeReadOnlySession(dbPath: path)
             } catch {
                 errorMessage = error.localizedDescription
                 return
@@ -56,21 +53,21 @@ class BookDetailViewModel: ObservableObject {
         if currentAssetId == nil {
             currentAssetId = assetId
         }
-        if dbHandle == nil, let path = dbPath {
+        if session == nil, let path = dbPath {
             do {
-                dbHandle = try databaseService.openReadOnlyDatabase(dbPath: path)
+                session = try databaseService.makeReadOnlySession(dbPath: path)
             } catch {
                 errorMessage = error.localizedDescription
                 return
             }
         }
-        guard let handle = dbHandle, let asset = currentAssetId else { return }
+        guard let s = session, let asset = currentAssetId else { return }
         
         isLoadingPage = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             do {
-                let rows = try self.databaseService.fetchHighlightPage(db: handle, assetId: asset, limit: self.pageSize, offset: self.currentOffset)
+                let rows = try s.fetchHighlightPage(assetId: asset, limit: self.pageSize, offset: self.currentOffset, since: nil)
                 let page = rows.map { r in
                     Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
                 }
@@ -88,11 +85,9 @@ class BookDetailViewModel: ObservableObject {
         }
     }
     
-    private func closeHandle() {
-        if let handle = dbHandle {
-            databaseService.close(handle)
-            dbHandle = nil
-        }
+    private func closeSession() {
+        session?.close()
+        session = nil
     }
 
     // MARK: - Notion Sync

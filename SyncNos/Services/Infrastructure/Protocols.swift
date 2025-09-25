@@ -71,6 +71,17 @@ protocol DatabaseServiceProtocol {
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow]
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow]
     func matches(book: BookRow, filters: Filters) -> Bool
+    // High-level helper: create a read-only session that manages connection lifecycle
+    func makeReadOnlySession(dbPath: String) throws -> DatabaseReadOnlySessionProtocol
+}
+
+// MARK: - Database Read-Only Session Protocol
+/// 以会话形式封装数据库连接，避免在 ViewModel 中直接持有 SQLite 句柄
+protocol DatabaseReadOnlySessionProtocol: AnyObject {
+    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow]
+    func fetchHighlightCountsByAsset() throws -> [AssetHighlightCount]
+    func fetchBooks(assetIds: [String]) throws -> [BookRow]
+    func close()
 }
 
 // MARK: - Bookmark Store Protocol
