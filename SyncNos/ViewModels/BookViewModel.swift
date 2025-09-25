@@ -103,32 +103,7 @@ class BookViewModel: ObservableObject {
             }
         }
     }
-    
-    // Legacy helper kept for potential future export features
-    func buildExport(annotations: [HighlightRow], books: [BookRow], filters: Filters?) -> [BookExport] {
-        var highlightsByAsset: [String: [Highlight]] = [:]
-        for row in annotations {
-            highlightsByAsset[row.assetId, default: []].append(Highlight(uuid: row.uuid, text: row.text, note: row.note, style: row.style, dateAdded: row.dateAdded, modified: row.modified, location: row.location))
-        }
-        var booksIndex: [String: BookRow] = [:]
-        for b in books { 
-            booksIndex[b.assetId] = b 
-        }
-        var result: [BookExport] = []
-        for (assetId, hs) in highlightsByAsset {
-            guard let b = booksIndex[assetId] else { 
-                continue 
-            }
-            if let f = filters, !self.databaseService.matches(book: b, filters: f) { 
-                continue 
-            }
-            result.append(BookExport(bookId: assetId, authorName: b.author, bookTitle: b.title, ibooksURL: "ibooks://assetid/\(assetId)", highlights: hs))
-        }
-        let sortedResult = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
-        logger.info("Built export with \(sortedResult.count) books")
-        return sortedResult
-    }
-    
+        
     // MARK: - Private Methods
     
     private func fetchBooksFromDatabase() throws -> [BookListItem] {
