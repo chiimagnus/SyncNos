@@ -10,11 +10,11 @@ struct NotionIntegrationView: View {
                 GroupBox("Sync Mode") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Mode", selection: $viewModel.syncMode) {
-                            Text("单库（每本书一个页面）").tag("single")
-                            Text("每本书一个库（每条高亮为条目）").tag("perBook")
+                            Text("Single Database (One page per book)").tag("single")
+                            Text("One database per book (Each highlight as an entry)").tag("perBook")
                         }
                         .pickerStyle(.segmented)
-                        Button("保存同步模式") { viewModel.saveSyncMode() }
+                        Button("Save Sync Mode") { viewModel.saveSyncMode() }
                             .buttonStyle(.bordered)
                     }
                     .padding(8)
