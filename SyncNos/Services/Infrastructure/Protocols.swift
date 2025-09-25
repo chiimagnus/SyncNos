@@ -108,8 +108,6 @@ protocol NotionConfigStoreProtocol: AnyObject {
 // MARK: - Notion Service Protocol
 protocol NotionServiceProtocol: AnyObject {
     func createDatabase(title: String) async throws -> NotionDatabase
-    func createPage(databaseId: String, pageTitle: String, header: String?) async throws -> NotionPage
-    func appendParagraph(pageId: String, content: String) async throws -> NotionAppendResult
     // Extended sync helpers
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String?
