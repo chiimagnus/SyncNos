@@ -17,12 +17,16 @@ struct NotionIntegrationView: View {
             }
 
             Section(header: Text("Credentials")) {
-                SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-                    .textFieldStyle(.roundedBorder)
+                LabeledContent("NOTION_KEY") {
+                    SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                }
 
-                TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
-                    .textFieldStyle(.roundedBorder)
-                    
+                LabeledContent("NOTION_PAGE_ID") {
+                    TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
+                        .textFieldStyle(.roundedBorder)
+                }
+
                 Button("Save") {
                     viewModel.saveCredentials()
                 }
