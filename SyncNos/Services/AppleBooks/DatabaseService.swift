@@ -47,4 +47,9 @@ class DatabaseService: DatabaseServiceProtocol {
     func matches(book: BookRow, filters: Filters) -> Bool {
         return filterService.matches(book: book, filters: filters)
     }
+
+    // MARK: - Session Factory
+    func makeReadOnlySession(dbPath: String) throws -> DatabaseReadOnlySessionProtocol {
+        return try DatabaseReadOnlySession(dbPath: dbPath)
+    }
 }

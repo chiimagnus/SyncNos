@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import SQLite3
 
 // MARK: - BookViewModel
 
@@ -161,23 +160,17 @@ class BookViewModel: ObservableObject {
         self.annotationDBPath = annotationDB
         self.booksDBPath = booksDB
         
-        // 直接使用原始数据库文件路径，不进行复制
-        let adbH = try databaseService.openReadOnlyDatabase(dbPath: annotationDB)
-        defer { 
-            databaseService.close(adbH)
-            logger.debug("Closed annotation DB")
-        }
-        let bdbH = try databaseService.openReadOnlyDatabase(dbPath: booksDB)
-        defer { 
-            databaseService.close(bdbH)
-            logger.debug("Closed books DB")
-        }
+        // 使用只读会话封装连接生命周期
+        let annotationSession = try databaseService.makeReadOnlySession(dbPath: annotationDB)
+        defer { annotationSession.close(); logger.debug("Closed annotation DB session") }
+        let booksSession = try databaseService.makeReadOnlySession(dbPath: booksDB)
+        defer { booksSession.close(); logger.debug("Closed books DB session") }
         
         // 获取每本书的高亮数量（而不是把全部高亮读入内存）
-        let counts = try databaseService.fetchHighlightCountsByAsset(db: adbH)
+        let counts = try annotationSession.fetchHighlightCountsByAsset()
         let assetIds = counts.map { $0.assetId }.sorted()
         logger.info("Found \(assetIds.count) assets with highlights")
-        let books = try databaseService.fetchBooks(db: bdbH, assetIds: assetIds)
+        let books = try booksSession.fetchBooks(assetIds: assetIds)
         logger.debug("Fetched \(books.count) books for counts")
         
         var countIndex: [String: Int] = [:]
