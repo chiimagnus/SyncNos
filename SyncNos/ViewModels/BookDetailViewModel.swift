@@ -165,24 +165,25 @@ class BookDetailViewModel: ObservableObject {
     }
 
     // MARK: - 方案2：每本书一个数据库 + 每条高亮一个条目
-    private func ensurePerBookDatabaseId(book: BookListItem) async throws -> String {
+    private func ensurePerBookDatabaseId(book: BookListItem) async throws -> (id: String, recreated: Bool) {
         if let saved = DIContainer.shared.notionConfigStore.databaseIdForBook(assetId: book.bookId) {
             // 验证数据库是否仍存在；若不存在则清除并重建
             if await notionService.databaseExists(databaseId: saved) {
-                return saved
+                return (saved, false)
             } else {
                 DIContainer.shared.notionConfigStore.setDatabaseId(nil, forBook: book.bookId)
             }
         }
         let db = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
         DIContainer.shared.notionConfigStore.setDatabaseId(db.id, forBook: book.bookId)
-        return db.id
+        return (db.id, true)
     }
 
     private func performSyncPerBook(book: BookListItem, dbPath: String?, incremental: Bool) async throws {
         _ = DIContainer.shared.notionConfigStore.notionPageId // guard by NotionService inside
 
-        var databaseId = try await ensurePerBookDatabaseId(book: book)
+        let ensured = try await ensurePerBookDatabaseId(book: book)
+        var databaseId = ensured.id
 
         // 获取待处理高亮
         guard let path = dbPath else { return }
@@ -192,11 +193,18 @@ class BookDetailViewModel: ObservableObject {
         var offset = 0
         let pageSizeLocal = self.pageSize
 
-        let sinceDate: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
-        if incremental {
-            logger.debug("DEBUG: 方案2-增量同步，上次同步时间: \(sinceDate?.description ?? "从未")")
+        var sinceDate: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
+        // 若数据库刚刚被重建，则强制全量同步（忽略上次同步时间）
+        if ensured.recreated {
+            sinceDate = nil
+            logger.debug("DEBUG: 方案2-检测到数据库被重建，本次强制全量同步")
+            await MainActor.run { self.syncProgressText = "检测到数据库被重建，执行全量同步..." }
         } else {
-            logger.debug("DEBUG: 方案2-全量同步")
+            if incremental {
+                logger.debug("DEBUG: 方案2-增量同步，上次同步时间: \(sinceDate?.description ?? "从未")")
+            } else {
+                logger.debug("DEBUG: 方案2-全量同步")
+            }
         }
 
         var batchCount = 0
