@@ -66,7 +66,7 @@ struct SettingsView: View {
                     // 使用 NavigationLink 替代 Button，自带右侧箭头
                     NavigationLink(destination: EmptyView()) {
                         HStack {
-                            Label("Open Apple Books notes", systemImage: "book")
+                            Label("Open Apple Books notes")
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(.secondary)
