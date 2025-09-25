@@ -70,6 +70,7 @@ struct SettingsView: View {
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
+                        .toggleStyle(SwitchToggleStyle())
 
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
