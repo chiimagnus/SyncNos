@@ -68,7 +68,7 @@ struct SettingsView: View {
                     }
                         .help("Choose Apple Books container directory and load notes")
 
-                    Toggle("Enable Background Image", systemImage: "photo", isOn: $backgroundImageEnabled)
+                    Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
 
                     Picker("Language", selection: $selectedLanguage) {
