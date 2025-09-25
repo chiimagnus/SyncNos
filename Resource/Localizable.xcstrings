@@ -1513,6 +1513,7 @@
       }
     },
     "Full sync" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1745,6 +1746,7 @@
       }
     },
     "Incremental sync" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2093,6 +2095,9 @@
         }
       }
     },
+    "Mode" : {
+
+    },
     "Modified: %@" : {
       "localizations" : {
         "de" : {
@@ -2208,6 +2213,9 @@
           }
         }
       }
+    },
+    "Not yet realized" : {
+
     },
     "Notion Integration" : {
       "localizations" : {
@@ -2790,6 +2798,9 @@
         }
       }
     },
+    "Please give five stars" : {
+
+    },
     "Please restart the application for the language change to take effect." : {
       "comment" : "Language change restart instruction",
       "localizations" : {
@@ -2848,6 +2859,9 @@
           }
         }
       }
+    },
+    "Report Issues & Suggestions" : {
+
     },
     "Save" : {
       "localizations" : {
@@ -3081,7 +3095,11 @@
         }
       }
     },
+    "Sync" : {
+
+    },
     "Sync all highlights" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3313,7 +3331,11 @@
         }
       }
     },
+    "Sync Mode" : {
+
+    },
     "Sync only new/modified highlights" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3372,6 +3394,7 @@
       }
     },
     "Sync to Notion" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3487,6 +3510,9 @@
         }
       }
     },
+    "Toggle Sidebar" : {
+
+    },
     "Use as default for future syncs" : {
       "localizations" : {
         "de" : {
@@ -3544,6 +3570,18 @@
           }
         }
       }
+    },
+    "View Source Code" : {
+
+    },
+    "保存同步模式" : {
+
+    },
+    "单库（每本书一个页面）" : {
+
+    },
+    "每本书一个库（每条高亮为条目）" : {
+
     }
   },
   "version" : "1.0"
