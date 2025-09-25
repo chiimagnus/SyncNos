@@ -63,10 +63,21 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Button("Open Apple Books notes", systemImage: "book") {
+                    // 使用 NavigationLink 替代 Button，自带右侧箭头
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("Open Apple Books notes", systemImage: "book")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .onTapGesture {
                         AppleBooksPicker.pickAppleBooksContainer()
                     }
-                        .help("Choose Apple Books container directory and load notes")
+                    .help("Choose Apple Books container directory and load notes")
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
@@ -85,8 +96,15 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Integrations")) {
+                    // 修改为使用 NavigationLink 并添加 disclosureGroup 样式
                     NavigationLink(destination: NotionIntegrationView()) {
-                        Label("Notion Integration", systemImage: "n.square")
+                        HStack {
+                            Label("Notion Integration", systemImage: "n.square")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
                     }
                     .help("Configure Notion and run example API calls")
                 }
