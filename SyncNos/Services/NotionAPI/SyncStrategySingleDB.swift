@@ -148,7 +148,7 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset)
                 if page.isEmpty { break }
-                progress("正在添加第 \(batch + 1) 批，条数：\(page.count)")
+                progress("方案1，正在添加第 \(batch + 1) 批，条数：\(page.count)")
                 try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: page)
                 offset += pageSize
                 batch += 1
