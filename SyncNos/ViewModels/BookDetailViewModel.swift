@@ -194,11 +194,32 @@ class BookDetailViewModel: ObservableObject {
         let pageSizeLocal = self.pageSize
 
         var sinceDate: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
-        // 若数据库刚刚被重建，则强制全量同步（忽略上次同步时间）
+        // 若数据库刚刚被重建：直接走“显式全量”路径（不走增量/混合逻辑）并提前返回
         if ensured.recreated {
-            sinceDate = nil
-            logger.debug("DEBUG: 方案2-检测到数据库被重建，本次强制全量同步")
+            logger.debug("DEBUG: 方案2-检测到数据库被重建，执行显式全量同步")
             await MainActor.run { self.syncProgressText = "检测到数据库被重建，执行全量同步..." }
+
+            var offsetFull = 0
+            var batchFull = 0
+            while true {
+                let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSizeLocal, offset: offsetFull)
+                if page.isEmpty { break }
+                await MainActor.run { self.syncProgressText = "方案2：全量批次 \(batchFull + 1)，条数：\(page.count)" }
+                for h in page {
+                    _ = try await notionService.createHighlightItem(inDatabaseId: databaseId,
+                                                                    bookId: book.bookId,
+                                                                    bookTitle: book.bookTitle,
+                                                                    author: book.authorName,
+                                                                    highlight: h)
+                }
+                offsetFull += pageSizeLocal
+                batchFull += 1
+            }
+            // 记录同步时间戳
+            let syncTime = Date()
+            SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: syncTime)
+            logger.debug("DEBUG: 方案2-全量同步完成（重建后），时间戳更新为: \(syncTime)")
+            return
         } else {
             if incremental {
                 logger.debug("DEBUG: 方案2-增量同步，上次同步时间: \(sinceDate?.description ?? "从未")")
