@@ -5,41 +5,38 @@ struct NotionIntegrationView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        Form {
-            VStack(alignment: .leading, spacing: 16) {
-                GroupBox("Sync Mode") {
-                    Picker("Mode", selection: $viewModel.syncMode) {
-                        Text("Single Database (One page per book)").tag("single")
-                        Text("One database per book (Each highlight as an entry)").tag("perBook")
-                    }
-                    .onChange(of: viewModel.syncMode) { _ in
-                        viewModel.saveSyncMode()
-                    }
-                    .padding(8)
+        List {
+            Section(header: Text("Sync Mode")) {
+                Picker("Mode", selection: $viewModel.syncMode) {
+                    Text("Single Database (One page per book)").tag("single")
+                    Text("One database per book (Each highlight as an entry)").tag("perBook")
                 }
-                
-                GroupBox("Credentials") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-                            .textFieldStyle(.roundedBorder)
-                        TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
-                            .textFieldStyle(.roundedBorder)
-                        Button("Save") {
-                            viewModel.saveCredentials()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding(8)
+                .onChange(of: viewModel.syncMode) { _ in
+                    viewModel.saveSyncMode()
                 }
-                
-                if let message = viewModel.message {
-                    Text(message).foregroundColor(.secondary)
+            }
+
+            Section(header: Text("Credentials")) {
+                SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
+                    .textFieldStyle(.roundedBorder)
+                    
+                Button("Save") {
+                    viewModel.saveCredentials()
                 }
-                
-                Spacer()
+                .buttonStyle(.borderedProminent)
+            }
+
+            if let message = viewModel.message {
+                Section {
+                    Text(message)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .formStyle(.grouped)
+        .listStyle(SidebarListStyle())
         .navigationTitle("Notion Integration")
         .toolbar {
             ToolbarItem(placement: .navigation) {
