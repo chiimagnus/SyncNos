@@ -136,10 +136,3 @@ struct NotionPage: Decodable {
     let id: String
     let url: String?
 }
-
-struct NotionAppendResult: Decodable {
-    struct ResultItem: Decodable {
-        let id: String
-    }
-    let results: [ResultItem]
-}
