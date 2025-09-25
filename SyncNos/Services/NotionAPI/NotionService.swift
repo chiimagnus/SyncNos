@@ -46,8 +46,7 @@ final class NotionService: NotionServiceProtocol {
             return false
         }
     }
-    
-    // MARK: - Public API
+
     func createDatabase(title: String) async throws -> NotionDatabase {
         guard let pageId = configStore.notionPageId, let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
