@@ -12,6 +12,7 @@ class DIContainer {
     private var _notionConfigStore: NotionConfigStoreProtocol?
     private var _notionService: NotionServiceProtocol?
     private var _loggerService: LoggerServiceProtocol?
+    private var _syncCoordinator: NotionSyncCoordinatorProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -49,6 +50,13 @@ class DIContainer {
         return _loggerService!
     }
 
+    var syncCoordinator: NotionSyncCoordinatorProtocol {
+        if _syncCoordinator == nil {
+            _syncCoordinator = NotionSyncCoordinator()
+        }
+        return _syncCoordinator!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -68,5 +76,9 @@ class DIContainer {
 
     func register(loggerService: LoggerServiceProtocol) {
         self._loggerService = loggerService
+    }
+
+    func register(syncCoordinator: NotionSyncCoordinatorProtocol) {
+        self._syncCoordinator = syncCoordinator
     }
 }
