@@ -12,12 +12,6 @@
             "value" : "%lld Hervorhebungen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld highlights"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -68,12 +62,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Über"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "About"
           }
         },
         "es-ES" : {
@@ -128,12 +116,6 @@
             "value" : "Über SyncNos"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "About SyncNos"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -184,12 +166,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld Hervorhebungen werden hinzugefügt..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adding %lld highlights..."
           }
         },
         "es-ES" : {
@@ -244,12 +220,6 @@
             "value" : "%lld neue Hervorhebungen werden hinzugefügt..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adding %lld new highlights..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -300,12 +270,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld neue Hervorhebungen werden angehängt..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appending %lld new highlights..."
           }
         },
         "es-ES" : {
@@ -360,12 +324,6 @@
             "value" : "Buchdetail-Fenster"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Book Detail Window"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -418,12 +376,6 @@
             "value" : "Bücher"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Books"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -471,12 +423,6 @@
     "by %@" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "by %@"
@@ -534,12 +480,6 @@
             "value" : "Anwendungssprache ändern"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Change application language"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -590,12 +530,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple Books Container-Verzeichnis auswählen und Notizen laden"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Apple Books container directory and load notes"
           }
         },
         "es-ES" : {
@@ -650,12 +584,6 @@
             "value" : "Notion konfigurieren und Beispiel-API-Aufrufe ausführen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Configure Notion and run example API calls"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -703,12 +631,6 @@
     "Created: %@" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Created: %@"
@@ -766,12 +688,6 @@
             "value" : "Credentials"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Credentials"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -822,12 +738,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DEBUG: Vollständige Synchronisation - %lld vorhandene UUIDs gesammelt"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DEBUG: Full sync - collected %lld existing UUIDs"
           }
         },
         "es-ES" : {
@@ -882,12 +792,6 @@
             "value" : "DEBUG: Inkrementelle Synchronisation - Zuordnung: %lld"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DEBUG: Incremental sync - mapping: %lld"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -938,12 +842,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DEBUG: Inkrementelle Synchronisation Stapel %d - %lld Hervorhebungen abgerufen (Offset: %lld)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DEBUG: Incremental sync batch %d - fetched %lld highlights (offset: %lld)"
           }
         },
         "es-ES" : {
@@ -998,12 +896,6 @@
             "value" : "Datenbank-Neuerstellung erkannt, vollständige Synchronisation wird ausgeführt..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detected database recreation, performing full sync..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1056,12 +948,6 @@
             "value" : "Hintergrundbild aktivieren"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable Background Image"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1109,12 +995,6 @@
     "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded." : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
@@ -1172,12 +1052,6 @@
             "value" : "%lld Hervorhebungen abgerufen..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fetched %lld highlights..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1230,12 +1104,6 @@
             "value" : "In Büchern suchen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Find in Books"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1283,12 +1151,6 @@
     "General" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "General"
@@ -1346,12 +1208,6 @@
             "value" : "Highlights"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1399,12 +1255,6 @@
     "Integrations" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Integrations"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Integrations"
@@ -1462,12 +1312,6 @@
             "value" : "Tastenkombinationen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keyboard Shortcuts"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1515,12 +1359,6 @@
     "Language" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Language"
@@ -1579,12 +1417,6 @@
             "value" : "Sprache geändert"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language Changed"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1632,12 +1464,6 @@
     "Load more" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load more"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Load more"
@@ -1695,12 +1521,6 @@
             "value" : "Loading books..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading books..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1749,55 +1569,49 @@
       "localizations" : {
         "de" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Erstellt mit SwiftUI • macOS 13+"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Made with SwiftUI • macOS 13+"
           }
         },
         "es-ES" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Hecho con SwiftUI • macOS 13+"
           }
         },
         "fr" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Réalisé avec SwiftUI • macOS 13+"
           }
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "SwiftUI で作成 • macOS 13+"
           }
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "SwiftUI로 제작 • macOS 13+"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Feito com SwiftUI • macOS 13+"
           }
         },
         "ru" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Создано с SwiftUI • macOS 13+"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "使用 SwiftUI 制作 • macOS 13+"
           }
         }
@@ -1809,12 +1623,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modus"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mode"
           }
         },
         "es-ES" : {
@@ -1864,12 +1672,6 @@
     "Modified: %@" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modified: %@"
@@ -1927,12 +1729,6 @@
             "value" : "No books found"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No books found"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1985,12 +1781,6 @@
             "value" : "Noch nicht realisiert"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not yet realized"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2038,12 +1828,6 @@
     "Notion Integration" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notion Integration"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notion Integration"
@@ -2101,12 +1885,6 @@
             "value" : "NOTION_KEY"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_KEY"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2154,12 +1932,6 @@
     "NOTION_PAGE_ID" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NOTION_PAGE_ID"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "NOTION_PAGE_ID"
@@ -2218,12 +1990,6 @@
             "value" : "OK"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2276,12 +2042,6 @@
             "value" : "Eine Datenbank pro Buch (Jede Hervorhebung als Eintrag)"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One database per book (Each highlight as an entry)"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2329,12 +2089,6 @@
     "Open Apple Books notes" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Apple Books notes"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Open Apple Books notes"
@@ -2392,12 +2146,6 @@
             "value" : "Open in Apple Books"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in Apple Books"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2448,12 +2196,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inkrementelle Synchronisation wird ausgeführt, letzte Synchronisationszeit: %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Performing incremental sync, last sync time: %@"
           }
         },
         "es-ES" : {
@@ -2508,12 +2250,6 @@
             "value" : "Plan 1: Stapel %d wird hinzugefügt, Anzahl: %lld"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan 1: Adding batch %d, count: %lld"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2564,12 +2300,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plan 2: Vollständiger Stapel %d, Anzahl: %lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan 2: Full batch %d, count: %lld"
           }
         },
         "es-ES" : {
@@ -2624,12 +2354,6 @@
             "value" : "Plan 2: Inkrementelle Synchronisation"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan 2: Incremental sync"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2680,12 +2404,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plan 2: Erste Synchronisation (vollständig)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan 2: Initial sync (full)"
           }
         },
         "es-ES" : {
@@ -2740,12 +2458,6 @@
             "value" : "Plan 2: Stapel %d wird verarbeitet..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan 2: Processing batch %d..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2796,12 +2508,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bitte geben Sie fünf Sterne"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please give five stars"
           }
         },
         "es-ES" : {
@@ -2857,12 +2563,6 @@
             "value" : "Bitte starten Sie die Anwendung neu, damit die Sprachänderung wirksam wird."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please restart the application for the language change to take effect."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2913,12 +2613,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bitte setzen Sie zuerst NOTION_PAGE_ID in der Notion Integration-Ansicht."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please set NOTION_PAGE_ID in Notion Integration view first."
           }
         },
         "es-ES" : {
@@ -2973,12 +2667,6 @@
             "value" : "Bücher aktualisieren"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refresh Books"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3029,12 +2717,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Probleme melden & Vorschläge"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Report Issues & Suggestions"
           }
         },
         "es-ES" : {
@@ -3089,12 +2771,6 @@
             "value" : "Speichern"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3147,12 +2823,6 @@
             "value" : "Lokale Hervorhebungen werden gescannt..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scanning local highlights..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3200,12 +2870,6 @@
     "Select a book to view details" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a book to view details"
-          }
-        },
-        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select a book to view details"
@@ -3263,12 +2927,6 @@
             "value" : "Einstellungen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Settings"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3319,12 +2977,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hintergrundbild im Hauptfenster anzeigen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show a background image in the main window"
           }
         },
         "es-ES" : {
@@ -3379,12 +3031,6 @@
             "value" : "Anwendungsinformationen anzeigen"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show application about information"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3435,12 +3081,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Einzelne Datenbank (Eine Seite pro Buch)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Single Database (One page per book)"
           }
         },
         "es-ES" : {
@@ -3495,12 +3135,6 @@
             "value" : "Synchronisieren"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3551,12 +3185,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Synchronisierungsfehler"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync Error"
           }
         },
         "es-ES" : {
@@ -3611,12 +3239,6 @@
             "value" : "Hervorhebungen mit Notion synchronisieren"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync highlights to Notion"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3667,12 +3289,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Synchronisation läuft"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync in progress"
           }
         },
         "es-ES" : {
@@ -3727,12 +3343,6 @@
             "value" : "Synchronisationsmodus"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync Mode"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3783,12 +3393,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Synchronisiere..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Syncing..."
           }
         },
         "es-ES" : {
@@ -3843,12 +3447,6 @@
             "value" : "SyncNos Benutzerhandbuch"
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SyncNos User Guide"
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3899,12 +3497,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seitenleiste umschalten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toggle Sidebar"
           }
         },
         "es-ES" : {
@@ -3959,12 +3551,6 @@
             "value" : "%lld vorhandene Hervorhebungen werden aktualisiert..."
           }
         },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Updating %lld existing highlights..."
-          }
-        },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4015,12 +3601,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Anzahl wird aktualisiert..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Updating count..."
           }
         },
         "es-ES" : {
@@ -4084,12 +3664,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quellcode anzeigen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View Source Code"
           }
         },
         "es-ES" : {
