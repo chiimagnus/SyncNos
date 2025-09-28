@@ -3,6 +3,7 @@ import AppKit
 
 struct SettingsView: View {
     @State private var isLoading: Bool = false
+    @State private var isPickingBooks: Bool = false
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
@@ -65,7 +66,13 @@ struct SettingsView: View {
                 Section(header: Text("General")) {
                     // 使用 Button 样式
                     Button(action: {
+                        guard !isPickingBooks else { return }
+                        isPickingBooks = true
                         AppleBooksPicker.pickAppleBooksContainer()
+                        // 延迟重置状态，防止快速重复点击
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            isPickingBooks = false
+                        }
                     }) {
                         HStack {
                             Text("Open Apple Books notes")
