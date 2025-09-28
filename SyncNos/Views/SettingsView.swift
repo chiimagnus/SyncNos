@@ -82,6 +82,7 @@ struct SettingsView: View {
                                 .font(.body.weight(.regular))
                         }
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .help("Choose Apple Books container directory and load notes")
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
