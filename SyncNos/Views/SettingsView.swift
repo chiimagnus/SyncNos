@@ -130,7 +130,7 @@ struct SettingsView: View {
             }
             .listStyle(SidebarListStyle())
             .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .background(Color(nsColor: NSColor.windowBackgroundColor))
         }
         .navigationTitle("Settings")
         .toolbar {

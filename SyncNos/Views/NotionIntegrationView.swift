@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()
@@ -42,7 +43,7 @@ struct NotionIntegrationView: View {
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
-        .background(Color.white)
+        .background(Color(nsColor: NSColor.windowBackgroundColor))
         .navigationTitle("Notion Integration")
     }
 }
