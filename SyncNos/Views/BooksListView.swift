@@ -6,10 +6,9 @@ struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
-    @Environment(\.sidebarVisibility) private var columnVisibility
 
     var body: some View {
-        NavigationSplitView(columnVisibility: columnVisibility) {
+        NavigationSplitView {
             Group {
                 if viewModel.isLoading {
                     ProgressView("Loading books...")
