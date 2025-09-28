@@ -3,7 +3,6 @@ import AppKit
 
 // 将应用菜单命令抽取到单独文件，便于维护与测试
 struct AppCommands: Commands {
-    @Binding var columnVisibility: NavigationSplitViewVisibility
 
     var body: some Commands {
         // SyncNos 应用菜单 - 应用设置相关
@@ -43,12 +42,10 @@ struct AppCommands: Commands {
         }
 
         // View 菜单 - 视图相关
-        CommandGroup(after: .toolbar) {
-            Button("Toggle Sidebar", systemImage: "sidebar.left") {
-                columnVisibility = columnVisibility == .all ? .detailOnly : .all
-            }
-            .keyboardShortcut("\\", modifiers: .command)
+        // 使用系统自带的侧边栏命令（包含 Toggle Sidebar）以保持一致的行为与快捷键
+        SidebarCommands()
 
+        CommandGroup(after: .toolbar) {
             Button("Refresh Books", systemImage: "arrow.clockwise") {
                 // 刷新书籍列表的逻辑
             }
