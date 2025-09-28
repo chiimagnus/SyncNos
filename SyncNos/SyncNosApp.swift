@@ -19,6 +19,12 @@ struct SyncNosApp: App {
             BooksListView()
         }
         
+        // 设置窗口（单实例）
+        Window("Settings", id: "setting") {
+            SettingsView()
+        }
+        .windowResizability(.contentSize)
+        
         // 自定义 About 窗口（单实例）
         Window("About SyncNos", id: "about") {
             AboutView()
