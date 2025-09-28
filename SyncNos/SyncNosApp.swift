@@ -36,6 +36,7 @@ struct SyncNosApp: App {
         // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
         .commands {
+            // SyncNos 应用菜单 - 应用设置相关
             CommandGroup(replacing: .appSettings) {
                 Button("Settings", systemImage: "gear") {
                     SettingsWindow.show()
@@ -53,11 +54,55 @@ struct SyncNosApp: App {
                     openGitHubSource()
                 }
             }
-            CommandGroup(replacing: .sidebar) {
+
+            // File 菜单 - 文件操作相关
+            CommandGroup(after: .newItem) {
+                Button("Import Books", systemImage: "plus.rectangle") {
+                    // 导入书籍的逻辑
+                }
+                .keyboardShortcut("i", modifiers: .command)
+            }
+
+            // Edit 菜单 - 编辑操作相关
+            CommandGroup(after: .textEditing) {
+                Button("Find in Books", systemImage: "magnifyingglass") {
+                    // 在书籍中搜索的逻辑
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
+
+            // View 菜单 - 视图相关
+            CommandGroup(after: .toolbar) {
                 Button("Toggle Sidebar", systemImage: "sidebar.left") {
                     columnVisibility = columnVisibility == .all ? .detailOnly : .all
                 }
                 .keyboardShortcut("\\", modifiers: .command)
+
+                Button("Refresh Books", systemImage: "arrow.clockwise") {
+                    // 刷新书籍列表的逻辑
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
+
+            // Window 菜单 - 窗口管理相关
+            CommandGroup(after: .windowList) {
+                Button("Book Detail Window", systemImage: "book") {
+                    // 打开书籍详情窗口的逻辑
+                }
+                .keyboardShortcut("1", modifiers: [.command, .shift])
+            }
+
+            // Help 菜单 - 帮助相关
+            CommandGroup(after: .help) {
+                Button("SyncNos User Guide", systemImage: "questionmark.circle") {
+                    // 打开用户指南的逻辑
+                }
+                .keyboardShortcut("?", modifiers: .command)
+
+                Button("Keyboard Shortcuts", systemImage: "keyboard") {
+                    // 显示快捷键列表的逻辑
+                }
+                .keyboardShortcut("/", modifiers: [.command, .shift])
             }
         }
     }
