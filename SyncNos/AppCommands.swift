@@ -60,10 +60,10 @@ struct AppCommands: Commands {
 
         // File 菜单 - 文件操作相关
         CommandGroup(after: .newItem) {
-            Button("Import Books", systemImage: "plus.rectangle") {
-                // 导入书籍的逻辑
-            }
-            .keyboardShortcut("i", modifiers: .command)
+            // Button("Import Books", systemImage: "plus.rectangle") {
+            //     // 导入书籍的逻辑
+            // }
+            // .keyboardShortcut("i", modifiers: .command)
         }
 
         // Edit 菜单 - 编辑操作相关
