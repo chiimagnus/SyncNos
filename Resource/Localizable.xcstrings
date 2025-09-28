@@ -4,6 +4,12 @@
     "" : {
       "shouldTranslate" : false
     },
+    "- 在左侧列表选择一本书，右侧工具栏点击 ‘Sync’ 进行同步。" : {
+
+    },
+    "- 或在菜单 View → ‘Sync Current Book to Notion’ 触发对当前书籍的同步。" : {
+
+    },
     "%lld highlights" : {
       "localizations" : {
         "de" : {
@@ -55,6 +61,15 @@
           }
         }
       }
+    },
+    "1. 在 App Store 下载并安装 SyncNos。" : {
+
+    },
+    "2. 打开设置，填写 Notion 的凭据：NOTION_KEY 和 NOTION_PAGE_ID，点击保存。" : {
+
+    },
+    "3. 在 Notion 的 ‘集成’ 页面授权该集成访问对应页面。" : {
+
     },
     "About" : {
       "localizations" : {
@@ -1300,58 +1315,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "集成"
-          }
-        }
-      }
-    },
-    "Keyboard Shortcuts" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tastenkombinationen"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atajos de teclado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raccourcis clavier"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "キーボードショートカット"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "키보드 단축키"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atalhos de teclado"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Горячие клавиши"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "键盘快捷键"
           }
         }
       }
@@ -3130,6 +3093,9 @@
         }
       }
     },
+    "Sync Current Book to Notion" : {
+
+    },
     "Sync Error" : {
       "localizations" : {
         "de" : {
@@ -3660,6 +3626,12 @@
           }
         }
       }
+    },
+    "同步到 Notion" : {
+
+    },
+    "快速开始" : {
+
     }
   },
   "version" : "1.0"
