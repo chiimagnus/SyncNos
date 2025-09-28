@@ -71,7 +71,7 @@ private struct ActionCard: View {
         }
         .buttonStyle(.plain)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        // .hoverEffect(.highlight)
+        .navigationTitle("About")
     }
 }
 
