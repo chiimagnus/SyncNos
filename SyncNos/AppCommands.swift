@@ -90,6 +90,8 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+
+            Divider()
         }
 
         // Window 菜单 - 窗口管理相关
