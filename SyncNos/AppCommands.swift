@@ -100,11 +100,6 @@ struct AppCommands: Commands {
             Button("SyncNos User Guide", systemImage: "questionmark.circle") {
                 openWindow(id: "userguide")
             }
-
-            Button("Keyboard Shortcuts", systemImage: "keyboard") {
-                // 显示快捷键列表的逻辑
-            }
-            .keyboardShortcut("/", modifiers: [.command, .shift])
         }
     }
 
