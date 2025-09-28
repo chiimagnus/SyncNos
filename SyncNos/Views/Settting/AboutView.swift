@@ -20,16 +20,16 @@ struct AboutView: View {
 
             // 小组件：一组常用动作
             HStack(spacing: 12) {
-                ActionCard(symbol: "heart", title: "评分支持") {
+                ActionCard(symbol: "heart", title: "Rate & Review") {
                     openAppStoreReview()
                 }
-                ActionCard(symbol: "ladybug", title: "问题反馈") {
+                ActionCard(symbol: "ladybug", title: "Report Issues") {
                     openGitHubIssues()
                 }
-                ActionCard(symbol: "link", title: "源代码") {
+                ActionCard(symbol: "link", title: "Source Code") {
                     openGitHubRepo()
                 }
-                ActionCard(symbol: "doc.plaintext", title: "隐私政策") {
+                ActionCard(symbol: "doc.plaintext", title: "Privacy Policy") {
                     openPrivacyPolicy()
                 }
             }
@@ -41,7 +41,8 @@ struct AboutView: View {
                 .padding(.top, 4)
         }
         .padding(20)
-        .frame(minWidth: 420)
+        .frame(minWidth: 400, idealWidth: 425, maxWidth: 425)
+        .navigationTitle("About")
     }
 
     private var appName: String {
@@ -51,7 +52,7 @@ struct AboutView: View {
 
 private struct ActionCard: View {
     let symbol: String
-    let title: String
+    let title: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {
@@ -71,7 +72,6 @@ private struct ActionCard: View {
         }
         .buttonStyle(.plain)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .navigationTitle("About")
     }
 }
 
