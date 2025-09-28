@@ -1,3 +1,7 @@
+## v0.3.7
+
+新增了"一键同步当前书籍"快捷键，还有详细的用户指南，帮你快速上手。
+
 ## v0.3.6 - "焕然一新"的SyncNos！
 
 嘿，书虫们！v0.3.6版本带着满满的惊喜来啦！这次更新就像给你的书架来了个大扫除，让一切都变得更整洁、更高效！
@@ -30,39 +34,3 @@
 **小贴士**: 这个版本特别适合喜欢界面整洁的你！如果觉得不错，记得给开发者点个赞哦～
 
 **感谢所有测试用户的反馈，让SyncNos变得越来越好！**
-
----
-
-## v0.3.6 - "Brand New" SyncNos!
-
-Hey bookworms! v0.3.6 is here with tons of surprises! This update is like giving your bookshelf a big spring cleaning, making everything cleaner and more efficient!
-
-### Visual Makeover
-- **Background Refresh** - Your reading interface now looks more comfortable! Just like changing your bedsheets for sweeter dreams
-- **Settings Window Upgrade** - Settings page now perfectly matches the main interface, no more "odd one out" feeling
-- **Unified Button Style** - All buttons now wear the same uniform, looking more professional and neat
-
-### Feature Fiesta
-- **About Us Page** - Finally, you can click directly to learn all about SyncNos! Developer info, version details, everything you need
-- **Book Refresh Feature** - Want to see what's new in Apple Books? One-click refresh keeps your library forever up-to-date!
-- **Sidebar Magic** - Now you can toggle the sidebar freely with keyboard shortcuts! Want to focus on reading? Sidebar, disappear! Want to manage books? Sidebar, appear!
-
-### Smart Assistant
-- **Anti-misclick Protection** - No more accidentally clicking books twice! The system intelligently manages your click states
-- **Navigation Optimization** - Opening Apple Books notes is now more intuitive and faster, like having your own personal teleportation portal
-
-### Behind-the-Scenes Heroes
-- **Menu Reorganization** - App menu is now perfectly organized, finding features is as easy as finding spices in your kitchen
-- **Shortcut Optimization** - Sidebar toggle shortcuts are more reasonable and won't conflict with system shortcuts anymore
-- **Code Cleanup** - Developers did a lot of organizing behind the scenes to make the app run smoother
-
-### Bug Fix Squad
-- **Navigation Cleanup** - Removed unnecessary back buttons for a cleaner interface
-- **Menu Streamlining** - Temporarily hid less-used features to keep the menu fresh and tidy
-
----
-
-**Pro Tip**: This version is perfect for those who love a clean interface! If you like it, don't forget to give the developer a thumbs up~
-
-**Thanks to all beta testers for your feedback, making SyncNos better and better!**
-
