@@ -4075,7 +4075,8 @@
             "value" : "Version %1$@ (%2$@)"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "View Source Code" : {
       "localizations" : {
