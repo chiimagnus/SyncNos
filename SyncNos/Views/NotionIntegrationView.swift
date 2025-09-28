@@ -42,13 +42,6 @@ struct NotionIntegrationView: View {
         }
         .listStyle(SidebarListStyle())
         .navigationTitle("Notion Integration")
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: { dismiss() }) {
-                    Label("Back", systemImage: "chevron.left")
-                }
-            }
-        }
     }
 }
 
