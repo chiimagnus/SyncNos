@@ -98,6 +98,18 @@ struct SettingsView: View {
                         changeAppLanguage(to: newLanguage)
                     }
                     .help("Change application language")
+
+                    // 添加 AboutView 的 NavigationLink
+                    NavigationLink(destination: AboutView()) {
+                        HStack {
+                            Text("About")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Show application about information")
                 }
                 .collapsible(false)
 
