@@ -35,6 +35,7 @@ struct SyncNosApp: App {
         // .windowStyle(.hiddenTitleBar)
         // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
+        // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {
             AppCommands()
         }
