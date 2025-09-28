@@ -30,6 +30,12 @@ struct SyncNosApp: App {
             AboutView()
         }
         .windowResizability(.contentSize)
+
+        // 用户指南窗口（单实例）
+        Window("SyncNos User Guide", id: "userguide") {
+            UserGuideView()
+        }
+        .windowResizability(.contentSize)
         
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {

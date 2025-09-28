@@ -307,6 +307,14 @@ struct BookDetailView: View {
         } message: {
             Text(syncErrorMessage)
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: Notification.Name("SyncCurrentBookToNotionRequested"))
+                .receive(on: DispatchQueue.main)
+        ) { _ in
+            Task {
+                viewModel.syncSmart(book: book, dbPath: annotationDBPath)
+            }
+        }
         .onChange(of: viewModel.syncMessage) { newMessage in
             if let message = newMessage {
                 // 仅在消息明显是错误时弹窗；“同步完成”等成功文案不提示
