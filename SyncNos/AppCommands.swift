@@ -98,9 +98,8 @@ struct AppCommands: Commands {
         // Help 菜单 - 帮助相关
         CommandGroup(replacing: .help) {
             Button("SyncNos User Guide", systemImage: "questionmark.circle") {
-                // 打开用户指南的逻辑
+                openWindow(id: "userguide")
             }
-            .keyboardShortcut("?", modifiers: .command)
 
             Button("Keyboard Shortcuts", systemImage: "keyboard") {
                 // 显示快捷键列表的逻辑
