@@ -3,6 +3,7 @@ import AppKit
 
 // 将应用菜单命令抽取到单独文件，便于维护与测试
 struct AppCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
 
     init() {
         // 禁用自动窗口标签，从而隐藏 "Show Tab" 和 "Show All Tabs" 菜单项
@@ -30,6 +31,13 @@ struct AppCommands: Commands {
     }
 
     var body: some Commands {
+        // 替换系统自带的 About 面板，改为打开我们的自定义 About 窗口
+        CommandGroup(replacing: .appInfo) {
+            Button("About SyncNos", systemImage: "info.circle") {
+                openWindow(id: "about")
+            }
+        }
+
         // SyncNos 应用菜单 - 应用设置相关
         CommandGroup(replacing: .appSettings) {
             Button("Settings", systemImage: "gear") {
