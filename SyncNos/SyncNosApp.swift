@@ -19,6 +19,12 @@ struct SyncNosApp: App {
             BooksListView()
         }
         
+        // 自定义 About 窗口（单实例）
+        Window("About SyncNos", id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
+        
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {
             AppCommands()
