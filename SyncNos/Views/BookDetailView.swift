@@ -257,7 +257,7 @@ struct BookDetailView: View {
                                 Text("Load more")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        // .buttonStyle(.borderedProminent)
                         Spacer()
                     }
                     .padding(.top, 8)

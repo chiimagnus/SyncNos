@@ -20,12 +20,6 @@ struct BooksListView: View {
                         Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
                             .multilineTextAlignment(.center)
                             .padding()
-                        // Button("Retry") { viewModel.loadBooks() }
-                        //     .buttonStyle(.borderedProminent)
-                        // Button("Please restart SyncNos") {
-                        //     restartApp()
-                        // }
-                        // .buttonStyle(.borderedProminent)
                     }
                 } else if viewModel.books.isEmpty {
                     VStack {
@@ -34,8 +28,6 @@ struct BooksListView: View {
                             .font(.largeTitle)
                         Text("No books found")
                             .padding()
-                        // Button("Refresh") { viewModel.loadBooks() }
-                            // .buttonStyle(.borderedProminent)
                         Button("Open Apple Books notes", systemImage: "book") {
                             AppleBooksPicker.pickAppleBooksContainer()
                         }
