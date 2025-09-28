@@ -89,6 +89,7 @@ struct AppCommands: Commands {
             Button("Sync Current Book to Notion", systemImage: "arrow.triangle.2.circlepath") {
                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
             }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
         }
 
         // Window 菜单 - 窗口管理相关
