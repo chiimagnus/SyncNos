@@ -88,10 +88,17 @@ struct BooksListView: View {
             // Release security-scoped bookmark when view disappears
             BookmarkStore.shared.stopAccessingIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))) { notif in
-            guard let selectedPath = notif.object as? String else { return }
-            let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
-            viewModel.setDbRootOverride(rootCandidate)
+        .onReceive(
+            NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
+                .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
+                .receive(on: DispatchQueue.main)
+        ) { notification in
+            if notification.name == Notification.Name("AppleBooksContainerSelected") {
+                guard let selectedPath = notification.object as? String else { return }
+                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
+                viewModel.setDbRootOverride(rootCandidate)
+            }
+            // 无论是选择容器还是手动刷新，都重新加载书籍
             viewModel.loadBooks()
         }
         .onChange(of: viewModel.books) { books in

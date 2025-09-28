@@ -74,7 +74,7 @@ struct AppCommands: Commands {
             .keyboardShortcut("\\", modifiers: .command)
 
             Button("Refresh Books", systemImage: "arrow.clockwise") {
-                // 刷新书籍列表的逻辑
+                NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
             }
             .keyboardShortcut("r", modifiers: .command)
         }
