@@ -33,9 +33,9 @@ struct AppCommands: Commands {
     var body: some Commands {
         // 替换系统自带的 About 面板，改为打开我们的自定义 About 窗口
         CommandGroup(replacing: .appInfo) {
-            Button("About SyncNos", systemImage: "info.circle") {
-                openWindow(id: "about")
-            }
+            // Button("About SyncNos", systemImage: "info.circle") {
+            //     openWindow(id: "about")
+            // }
         }
 
         // SyncNos 应用菜单 - 应用设置相关
