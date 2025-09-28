@@ -63,8 +63,10 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    // 使用 NavigationLink 替代 Button，自带右侧箭头
-                    NavigationLink(destination: EmptyView()) {
+                    // 使用 Button 样式
+                    Button(action: {
+                        AppleBooksPicker.pickAppleBooksContainer()
+                    }) {
                         HStack {
                             Text("Open Apple Books notes")
                             Spacer()
@@ -74,9 +76,6 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .onTapGesture {
-                        AppleBooksPicker.pickAppleBooksContainer()
-                    }
                     .help("Choose Apple Books container directory and load notes")
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
