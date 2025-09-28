@@ -15,7 +15,7 @@ extension EnvironmentValues {
 
 @main
 struct SyncNosApp: App {
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    // @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     init() {
         // Try auto-restore bookmark at launch
@@ -30,13 +30,13 @@ struct SyncNosApp: App {
     var body: some Scene {
         WindowGroup {
             BooksListView()
-                .environment(\.sidebarVisibility, $columnVisibility)
+                // .environment(\.sidebarVisibility, $columnVisibility)
         }
         // .windowStyle(.hiddenTitleBar)
         // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
         // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
         .commands {
-            AppCommands(columnVisibility: $columnVisibility)
+            AppCommands()
         }
     }
 
