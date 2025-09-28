@@ -15,6 +15,8 @@ extension EnvironmentValues {
 
 @main
 struct SyncNosApp: App {
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
@@ -28,6 +30,7 @@ struct SyncNosApp: App {
     var body: some Scene {
         WindowGroup {
             BooksListView()
+                .environment(\.sidebarVisibility, $columnVisibility)
         }
         
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
