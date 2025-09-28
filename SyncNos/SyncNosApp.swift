@@ -15,8 +15,6 @@ extension EnvironmentValues {
 
 @main
 struct SyncNosApp: App {
-    // @State private var columnVisibility = NavigationSplitViewVisibility.all
-
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
@@ -30,16 +28,11 @@ struct SyncNosApp: App {
     var body: some Scene {
         WindowGroup {
             BooksListView()
-                // .environment(\.sidebarVisibility, $columnVisibility)
         }
-        // .windowStyle(.hiddenTitleBar)
-        // Removed Settings scene to avoid NavigationStack / toolbar conflicts with Settings window.
-        // Provide a menu command that opens Settings in a standalone NSWindow to avoid toolbar/nav conflicts.
+        
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {
             AppCommands()
         }
     }
-
-    // 命令相关逻辑已抽取到 `SyncNos/SyncNos/Commands/AppCommands.swift`
 }
