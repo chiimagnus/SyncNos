@@ -138,7 +138,7 @@ struct SettingsView: View {
                 Text("")
             }
         }
-        .frame(minWidth: 320, idealWidth: 375, maxWidth: 375)
+        .frame(minWidth: 400, idealWidth: 425, maxWidth: 425)
     }
 }
 

@@ -7,31 +7,15 @@ struct UserGuideView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("快速开始")
-                    .font(.headline)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("1. 在 App Store 下载并安装 SyncNos。")
-                    Text("2. 打开设置，填写 Notion 的凭据：NOTION_KEY 和 NOTION_PAGE_ID，点击保存。")
-                    Text("3. 在 Notion 的 ‘集成’ 页面授权该集成访问对应页面。")
-                }
+            VStack(alignment: .leading, spacing: 16) {
+                Text("1. Open Settings, fill in the Notion API token and Page ID in the \"Credentials\" section, then click Save.")
+                Text("2. Authorize the integration in [Notion integrations 🔗](https://www.notion.so/profile/integrations).")
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("同步到 Notion")
-                    .font(.headline)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("- 在左侧列表选择一本书，右侧工具栏点击 ‘Sync’ 进行同步。")
-                    Text("- 或在菜单 View → ‘Sync Current Book to Notion’ 触发对当前书籍的同步。")
-                }
-            }
-
-            Spacer(minLength: 0)
+            Spacer()
         }
-        .padding(20)
-        .frame(minWidth: 420)
+        .padding()
+        .frame(minWidth: 400, idealWidth: 425, maxWidth: 425)
     }
 }
 
