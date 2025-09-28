@@ -51,7 +51,7 @@ struct AppCommands: Commands {
         }
 
         // File 菜单 - 文件操作相关
-        CommandGroup(replacing: .newItem) {
+        CommandGroup(after: .newItem) {
             Button("Import Books", systemImage: "plus.rectangle") {
                 // 导入书籍的逻辑
             }
