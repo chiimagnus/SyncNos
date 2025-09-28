@@ -129,6 +129,8 @@ struct SettingsView: View {
                 .collapsible(false)
             }
             .listStyle(SidebarListStyle())
+            .scrollContentBackground(.hidden)
+            .background(Color.white)
         }
         .navigationTitle("Settings")
         .toolbar {

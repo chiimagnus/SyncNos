@@ -41,6 +41,8 @@ struct NotionIntegrationView: View {
             }
         }
         .listStyle(SidebarListStyle())
+        .scrollContentBackground(.hidden)
+        .background(Color.white)
         .navigationTitle("Notion Integration")
     }
 }
