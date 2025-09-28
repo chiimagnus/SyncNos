@@ -5,6 +5,9 @@ import AppKit
 struct AppCommands: Commands {
 
     init() {
+        // 禁用自动窗口标签，从而隐藏 "Show Tab" 和 "Show All Tabs" 菜单项
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         // 确保系统中任何绑定到 toggleSidebar 的菜单项都使用我们想要的快捷键（Cmd+\）
         DispatchQueue.main.async {
             let selector = #selector(NSSplitViewController.toggleSidebar(_:))
