@@ -42,6 +42,7 @@ struct AboutView: View {
         }
         .padding(20)
         .frame(minWidth: 420)
+        .background(Color.appWindowBackground)
     }
 
     private var appName: String {

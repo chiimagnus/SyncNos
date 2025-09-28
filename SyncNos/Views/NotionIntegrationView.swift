@@ -43,7 +43,7 @@ struct NotionIntegrationView: View {
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: NSColor.windowBackgroundColor))
+        .background(Color.appWindowBackground)
         .navigationTitle("Notion Integration")
     }
 }
