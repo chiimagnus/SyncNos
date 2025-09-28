@@ -108,8 +108,7 @@ struct SyncNosApp: App {
     }
 
     private func openAppStoreReview() {
-        // TODO: 替换为你的实际 App Store ID
-        let appStoreID = "6752426176" // 示例 ID，需要替换为实际的应用 ID
+        let appStoreID = "6752426176"
         let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id\(appStoreID)")!
         let webURL = URL(string: "https://apps.apple.com/app/id\(appStoreID)")!
 
