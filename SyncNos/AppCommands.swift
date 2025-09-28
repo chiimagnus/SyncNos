@@ -42,10 +42,12 @@ struct AppCommands: Commands {
         }
 
         // View 菜单 - 视图相关
-        // 使用系统自带的侧边栏命令（包含 Toggle Sidebar）以保持一致的行为与快捷键
-        SidebarCommands()
-
         CommandGroup(after: .toolbar) {
+            Button("Toggle Sidebar", systemImage: "sidebar.left") {
+                NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option])
+
             Button("Refresh Books", systemImage: "arrow.clockwise") {
                 // 刷新书籍列表的逻辑
             }
