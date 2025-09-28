@@ -4,6 +4,28 @@ import AppKit
 // 将应用菜单命令抽取到单独文件，便于维护与测试
 struct AppCommands: Commands {
 
+    init() {
+        // 确保系统中任何绑定到 toggleSidebar 的菜单项都使用我们想要的快捷键（Cmd+\）
+        DispatchQueue.main.async {
+            let selector = #selector(NSSplitViewController.toggleSidebar(_:))
+            guard let mainMenu = NSApp.mainMenu else { return }
+
+            func normalize(menu: NSMenu) {
+                for item in menu.items {
+                    if item.action == selector {
+                        item.keyEquivalent = "\\"
+                        item.keyEquivalentModifierMask = [.command]
+                    }
+                    if let submenu = item.submenu {
+                        normalize(menu: submenu)
+                    }
+                }
+            }
+
+            normalize(menu: mainMenu)
+        }
+    }
+
     var body: some Commands {
         // SyncNos 应用菜单 - 应用设置相关
         CommandGroup(replacing: .appSettings) {
@@ -46,7 +68,7 @@ struct AppCommands: Commands {
             Button("Toggle Sidebar", systemImage: "sidebar.left") {
                 NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
             }
-            .keyboardShortcut("s", modifiers: [.command, .option])
+            .keyboardShortcut("\\", modifiers: .command)
 
             Button("Refresh Books", systemImage: "arrow.clockwise") {
                 // 刷新书籍列表的逻辑
@@ -63,7 +85,7 @@ struct AppCommands: Commands {
         }
 
         // Help 菜单 - 帮助相关
-        CommandGroup(after: .help) {
+        CommandGroup(replacing: .help) {
             Button("SyncNos User Guide", systemImage: "questionmark.circle") {
                 // 打开用户指南的逻辑
             }
