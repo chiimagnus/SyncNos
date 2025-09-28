@@ -1565,57 +1565,8 @@
         }
       }
     },
-    "Made with SwiftUI · macOS 13+" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Erstellt mit SwiftUI • macOS 13+"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Hecho con SwiftUI • macOS 13+"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Réalisé avec SwiftUI • macOS 13+"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "SwiftUI で作成 • macOS 13+"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "SwiftUI로 제작 • macOS 13+"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Feito com SwiftUI • macOS 13+"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Создано с SwiftUI • macOS 13+"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "使用 SwiftUI 制作 • macOS 13+"
-          }
-        }
-      }
+    "Made with SwiftUI ⋅ macOS 13+" : {
+      "shouldTranslate" : false
     },
     "Mode" : {
       "localizations" : {

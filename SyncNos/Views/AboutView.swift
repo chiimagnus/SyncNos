@@ -35,7 +35,7 @@ struct AboutView: View {
             }
             .padding(.top, 8)
 
-            Text("Made with SwiftUI · macOS 13+")
+            Text("Made with SwiftUI ⋅ macOS 13+")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
