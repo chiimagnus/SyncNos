@@ -1,22 +1,9 @@
 import SwiftUI
 import AppKit
 
-// 创建环境变量来管理侧边栏状态
-private struct SidebarVisibilityKey: EnvironmentKey {
-    static let defaultValue: Binding<NavigationSplitViewVisibility> = .constant(.all)
-}
-
-extension EnvironmentValues {
-    var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
-        get { self[SidebarVisibilityKey.self] }
-        set { self[SidebarVisibilityKey.self] = newValue }
-    }
-}
 
 @main
 struct SyncNosApp: App {
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
-
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
@@ -26,11 +13,10 @@ struct SyncNosApp: App {
             DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
     }
-    
+
     var body: some Scene {
         WindowGroup {
             BooksListView()
-                .environment(\.sidebarVisibility, $columnVisibility)
         }
         
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
