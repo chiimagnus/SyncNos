@@ -60,7 +60,7 @@ struct BooksListView: View {
         } detail: {
             // Detail content: show selected book details
             if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
-                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
+                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath, booksDBPath: viewModel.booksDatabasePath)
                     .id(book.bookId) // force view refresh when selection changes
             } else {
                 Text("Select a book to view details").foregroundColor(.secondary)
@@ -75,10 +75,16 @@ struct BooksListView: View {
                 viewModel.setDbRootOverride(rootCandidate)
                 viewModel.loadBooks()
             }
+            // Restore iCloud Books folder access if user granted previously
+            if let icloudURL = ICloudBooksBookmarkStore.shared.restore() {
+                let started = ICloudBooksBookmarkStore.shared.startAccessing(url: icloudURL)
+                DIContainer.shared.loggerService.debug("Restored iCloud Books access, startAccess=\(started)")
+            }
         }
         .onDisappear {
             // Release security-scoped bookmark when view disappears
             BookmarkStore.shared.stopAccessingIfNeeded()
+            ICloudBooksBookmarkStore.shared.stopAccessingIfNeeded()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))

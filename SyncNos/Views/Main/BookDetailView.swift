@@ -112,6 +112,7 @@ private struct LiveResizeObserver: NSViewRepresentable {
 struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
+    let booksDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
     // Freeze layout width during live resize to avoid heavy recomputation.
@@ -150,6 +151,53 @@ struct BookDetailView: View {
     
     // Removed gridColumns; WaterfallLayout handles adaptive columns.
     
+    @ViewBuilder
+    private func contextView(for highlight: Highlight) -> some View {
+        if let ctx = viewModel.contextsByUUID[highlight.uuid] {
+            VStack(alignment: .leading, spacing: 6) {
+                if let prev = ctx.previous, !prev.isEmpty {
+                    Text(prev)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(ctx.current)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let next = ctx.next, !next.isEmpty {
+                    Text(next)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(highlight.text)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .task {
+                        viewModel.loadContextIfNeeded(booksDBPath: booksDBPath, for: highlight, assetId: book.bookId)
+                    }
+                HStack(spacing: 12) {
+                    Button("加载上下文") {
+                        viewModel.loadContextIfNeeded(booksDBPath: booksDBPath, for: highlight, assetId: book.bookId)
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("尝试从 EPUB 提取上下文三段")
+
+                    Button("授予 iCloud 访问") {
+                        ICloudBooksPicker.pickICloudBooksFolder()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("选择 iCloud Books 目录以读取书籍文件")
+                }
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -179,9 +227,7 @@ struct BookDetailView: View {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         ZStack(alignment: .topTrailing) {
                             VStack(alignment: .leading, spacing: 8) {                                
-                                Text(highlight.text)
-                                    .font(.body)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                contextView(for: highlight)
                                 
                                 if let note = highlight.note, !note.isEmpty {
                                     Text(note)
@@ -230,6 +276,11 @@ struct BookDetailView: View {
                             .padding(8)
                             .help("Open in Apple Books")
                             .accessibilityLabel("Open in Apple Books")
+                            .contextMenu {
+                                Button("允许访问 iCloud Books 目录", systemImage: "icloud") {
+                                    ICloudBooksPicker.pickICloudBooksFolder()
+                                }
+                            }
                         }
                     }
                 }
@@ -338,7 +389,7 @@ struct BookDetailView_Previews: PreviewProvider {
                                        highlightCount: 123)
         
         NavigationView {
-            BookDetailView(book: sampleBook, annotationDBPath: nil)
+            BookDetailView(book: sampleBook, annotationDBPath: nil, booksDBPath: nil)
         }
     }
 }
