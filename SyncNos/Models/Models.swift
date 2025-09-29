@@ -49,10 +49,3 @@ struct AssetHighlightCount {
     let assetId: String
     let count: Int
 }
-
-// Context triplet for a highlight: previous, current, next paragraphs
-struct HighlightContextTriplet: Equatable {
-    let previous: String?
-    let current: String
-    let next: String?
-}

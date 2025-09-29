@@ -60,7 +60,7 @@ struct BooksListView: View {
         } detail: {
             // Detail content: show selected book details
             if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
-                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath, booksDBPath: viewModel.booksDatabasePath)
+                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
                     .id(book.bookId) // force view refresh when selection changes
             } else {
                 Text("Select a book to view details").foregroundColor(.secondary)
@@ -83,16 +83,12 @@ struct BooksListView: View {
         .onReceive(
             NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
                 .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
-                .merge(with: NotificationCenter.default.publisher(for: Notification.Name("AppleBooksLocalContainerSelected")))
                 .receive(on: DispatchQueue.main)
         ) { notification in
             if notification.name == Notification.Name("AppleBooksContainerSelected") {
                 guard let selectedPath = notification.object as? String else { return }
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
-            } else if notification.name == Notification.Name("AppleBooksLocalContainerSelected") {
-                // 本地容器仅用于访问书籍文件，不影响 DB 根路径
-                // 这里不改变 dbRootOverride，只触发一次刷新即可
             }
             // 无论是选择容器还是手动刷新，都重新加载书籍
             viewModel.loadBooks()

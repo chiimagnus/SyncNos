@@ -112,7 +112,6 @@ private struct LiveResizeObserver: NSViewRepresentable {
 struct BookDetailView: View {
     let book: BookListItem
     let annotationDBPath: String?
-    let booksDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
     // Freeze layout width during live resize to avoid heavy recomputation.
@@ -121,9 +120,6 @@ struct BookDetailView: View {
     @State private var frozenLayoutWidth: CGFloat? = nil
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
-    // Context cache and loading states for highlights
-    @State private var contextMap: [String: HighlightContextTriplet] = [:]
-    @State private var contextLoading: Set<String> = []
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -209,91 +205,6 @@ struct BookDetailView: View {
                                     }
 
                                     Spacer(minLength: 0)
-                                }
-
-                                // Context actions and display
-                                HStack(spacing: 8) {
-                                    if contextLoading.contains(highlight.uuid) {
-                                        ProgressView().scaleEffect(0.8)
-                                        Text("正在加载上下文…").font(.caption).foregroundColor(.secondary)
-                                    } else {
-                                        Button {
-                                            // Load context lazily
-                                            if contextMap[highlight.uuid] == nil {
-                                                contextLoading.insert(highlight.uuid)
-                                                DispatchQueue.global(qos: .userInitiated).async {
-                                                    let service = EPUBContextService()
-                                                    let containerURL = BookmarkStore.shared.restore()
-                                                    let triplet = service.fetchContextTriplet(assetId: book.bookId,
-                                                                                             selectedText: highlight.text,
-                                                                                             cfi: highlight.location,
-                                                                                             booksDBPath: self.booksDBPath,
-                                                                                             booksContainerHint: containerURL)
-                                                    DispatchQueue.main.async {
-                                                        self.contextLoading.remove(highlight.uuid)
-                                                        if let t = triplet {
-                                                            self.contextMap[highlight.uuid] = t
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                // Toggle off
-                                                contextMap.removeValue(forKey: highlight.uuid)
-                                            }
-                                        } label: {
-                                            if contextMap[highlight.uuid] == nil {
-                                                Label("显示上下文", systemImage: "text.append")
-                                                    .font(.caption)
-                                            } else {
-                                                Label("隐藏上下文", systemImage: "text.badge.minus")
-                                                    .font(.caption)
-                                            }
-                                        }
-                                        .buttonStyle(.borderless)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-
-                                if let t = contextMap[highlight.uuid] {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        if let prev = t.previous, !prev.isEmpty {
-                                            Text(prev)
-                                                .font(.callout)
-                                                .foregroundColor(.secondary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                        Text(t.current)
-                                            .font(.body)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        if let nxt = t.next, !nxt.isEmpty {
-                                            Text(nxt)
-                                                .font(.callout)
-                                                .foregroundColor(.secondary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        }
-                                        if t.previous == nil && t.next == nil {
-                                            Text("无法加载上下文（可能为 DRM 或文件不可访问）")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Button {
-                                                AppleBooksPicker.pickLocalBooksContainer()
-                                            } label: {
-                                                Label("授权本地 Books 目录", systemImage: "folder.badge.plus")
-                                                    .font(.caption)
-                                            }
-                                            .buttonStyle(.borderless)
-                                            Button {
-                                                AppleBooksPicker.pickICloudBooksDirectory()
-                                            } label: {
-                                                Label("授权 iCloud Books 目录", systemImage: "icloud")
-                                                    .font(.caption)
-                                            }
-                                            .buttonStyle(.borderless)
-                                        }
-                                    }
-                                    .padding(8)
-                                    .background(Color.gray.opacity(0.06))
-                                    .cornerRadius(6)
                                 }
                             }
                             .padding(12)
@@ -427,7 +338,7 @@ struct BookDetailView_Previews: PreviewProvider {
                                        highlightCount: 123)
         
         NavigationView {
-            BookDetailView(book: sampleBook, annotationDBPath: nil, booksDBPath: nil)
+            BookDetailView(book: sampleBook, annotationDBPath: nil)
         }
     }
 }
