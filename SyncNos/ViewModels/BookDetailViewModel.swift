@@ -2,6 +2,7 @@ import Foundation
 
 class BookDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
+    @Published var contextsByUUID: [String: HighlightContextTriple] = [:]
     @Published var isLoadingPage = false
     @Published var errorMessage: String?
     @Published var syncMessage: String?
@@ -11,10 +12,12 @@ class BookDetailViewModel: ObservableObject {
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
+    private let epubContextService = EPUBContextService()
     private let syncCoordinator: NotionSyncCoordinatorProtocol
     private let logger = DIContainer.shared.loggerService
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
+    private var currentBooksDBPath: String?
     private var currentOffset = 0
     private let pageSize = 50
     private var expectedTotalCount = 0
@@ -31,6 +34,7 @@ class BookDetailViewModel: ObservableObject {
         errorMessage = nil
         closeSession()
         highlights = []
+        contextsByUUID = [:]
         currentOffset = 0
         currentAssetId = assetId
         self.expectedTotalCount = expectedTotalCount
@@ -81,6 +85,22 @@ class BookDetailViewModel: ObservableObject {
                     self.errorMessage = error.localizedDescription
                     self.isLoadingPage = false
                 }
+            }
+        }
+    }
+
+    // MARK: - Context Loading (MVP)
+    func loadContextIfNeeded(booksDBPath: String?, for highlight: Highlight, assetId: String) {
+        guard contextsByUUID[highlight.uuid] == nil else { return }
+        guard let booksDBPath = booksDBPath else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let triple = self.epubContextService.loadContext(booksDBPath: booksDBPath,
+                                                             assetId: assetId,
+                                                             cfi: highlight.location,
+                                                             highlightText: highlight.text)
+            if let triple = triple {
+                DispatchQueue.main.async { self.contextsByUUID[highlight.uuid] = triple }
             }
         }
     }
