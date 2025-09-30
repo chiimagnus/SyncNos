@@ -628,6 +628,12 @@
         }
       }
     },
+    "Choose iCloud Books Directory" : {
+
+    },
+    "Choose iCloud Books directory for EPUB context extraction" : {
+
+    },
     "Configure Notion and run example API calls" : {
       "localizations" : {
         "de" : {

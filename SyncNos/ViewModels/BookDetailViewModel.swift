@@ -12,6 +12,8 @@ class BookDetailViewModel: ObservableObject {
 
     private let databaseService: DatabaseServiceProtocol
     private let syncCoordinator: NotionSyncCoordinatorProtocol
+    private let epubContextService: EPUBContextServiceProtocol
+    private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
@@ -20,9 +22,13 @@ class BookDetailViewModel: ObservableObject {
     private var expectedTotalCount = 0
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-         syncCoordinator: NotionSyncCoordinatorProtocol = DIContainer.shared.syncCoordinator) {
+         syncCoordinator: NotionSyncCoordinatorProtocol = DIContainer.shared.syncCoordinator,
+         epubContextService: EPUBContextServiceProtocol = DIContainer.shared.epubContextService,
+         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
         self.databaseService = databaseService
         self.syncCoordinator = syncCoordinator
+        self.epubContextService = epubContextService
+        self.bookmarkStore = bookmarkStore
     }
     
     deinit { closeSession() }
@@ -67,9 +73,20 @@ class BookDetailViewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             do {
-                let rows = try s.fetchHighlightPage(assetId: asset, limit: self.pageSize, offset: self.currentOffset, since: nil)
+                var rows = try s.fetchHighlightPage(assetId: asset, limit: self.pageSize, offset: self.currentOffset, since: nil)
+                
+                // Enrich highlights with EPUB context if iBooks directory is available
+                if let iBooksURL = self.bookmarkStore.restoreiBooksDirectory() {
+                    _ = self.bookmarkStore.startAccessingiBooksDirectory(url: iBooksURL)
+                    self.logger.info("Enriching \(rows.count) highlights with EPUB context")
+                    rows = self.epubContextService.enrichHighlights(rows, iBooksDirectoryURL: iBooksURL, progressHandler: nil)
+                    self.bookmarkStore.stopAccessingiBooksDirectoryIfNeeded()
+                } else {
+                    self.logger.debug("iCloud Books directory not configured, skipping context enrichment")
+                }
+                
                 let page = rows.map { r in
-                    Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
+                    Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location, previousParagraph: r.previousParagraph, nextParagraph: r.nextParagraph)
                 }
                 DispatchQueue.main.async {
                     self.highlights.append(contentsOf: page)
