@@ -49,12 +49,6 @@ struct BooksListView: View {
                                 Button("Not yet realized", systemImage: "heart", action: {
                                     // 占位符操作
                                 })
-
-                                Divider()
-
-                                Button("Select iCloud Books Directory", systemImage: "folder.badge.gearshape", action: {
-                                    ICloudBooksPicker.pickICloudBooksFolder()
-                                })
                             }
                         }
                     }
