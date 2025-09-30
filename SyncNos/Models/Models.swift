@@ -10,6 +10,8 @@ struct Highlight: Codable {
     let dateAdded: Date?
     let modified: Date?
     let location: String?
+    let previousParagraph: String?
+    let nextParagraph: String?
 }
 
 struct HighlightRow { 
@@ -21,6 +23,8 @@ struct HighlightRow {
     let dateAdded: Date?
     let modified: Date?
     let location: String?
+    var previousParagraph: String?
+    var nextParagraph: String?
 }
 
 struct BookRow { 
