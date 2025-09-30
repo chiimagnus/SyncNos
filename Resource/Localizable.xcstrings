@@ -212,6 +212,9 @@
         }
       }
     },
+    "Actions" : {
+
+    },
     "Adding %lld highlights..." : {
       "localizations" : {
         "de" : {
@@ -471,6 +474,9 @@
           }
         }
       }
+    },
+    "Buy" : {
+
     },
     "by %@" : {
       "localizations" : {
@@ -1724,6 +1730,9 @@
         }
       }
     },
+    "No products found." : {
+
+    },
     "Not yet realized" : {
       "localizations" : {
         "de" : {
@@ -2662,6 +2671,18 @@
         }
       }
     },
+    "Pro Unlocked" : {
+
+    },
+    "Products" : {
+
+    },
+    "Purchase cancelled or pending." : {
+
+    },
+    "Purchase successful." : {
+
+    },
     "Rate & Review" : {
       "localizations" : {
         "de" : {
@@ -2869,6 +2890,15 @@
           }
         }
       }
+    },
+    "Restore failed." : {
+
+    },
+    "Restore Purchases" : {
+
+    },
+    "Restored successfully." : {
+
     },
     "Save" : {
       "localizations" : {
@@ -3285,6 +3315,21 @@
           }
         }
       }
+    },
+    "Status" : {
+
+    },
+    "Support" : {
+
+    },
+    "Support & Pro Unlock" : {
+
+    },
+    "Support development and unlock Pro features" : {
+
+    },
+    "Support the Project" : {
+
     },
     "Sync" : {
       "localizations" : {
