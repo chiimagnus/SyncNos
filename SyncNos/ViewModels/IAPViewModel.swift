@@ -12,7 +12,7 @@ final class IAPViewModel: ObservableObject {
     private let productIds: [String]
 
     init(iapService: IAPServiceProtocol = DIContainer.shared.iapService,
-         productIds: [String] = ["com.chii.syncnos.pro"]) {
+         productIds: [String] = ["com.chiimagnus.syncnos.pro"]) {
         self.iapService = iapService
         self.productIds = productIds
     }
