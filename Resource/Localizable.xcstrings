@@ -472,9 +472,6 @@
         }
       }
     },
-    "Buy" : {
-
-    },
     "by %@" : {
       "localizations" : {
         "de" : {
@@ -2665,15 +2662,6 @@
         }
       }
     },
-    "Pro Unlocked" : {
-
-    },
-    "Purchase to support SyncNos and unlock Pro features" : {
-
-    },
-    "Purchased" : {
-
-    },
     "Rate & Review" : {
       "localizations" : {
         "de" : {
@@ -2881,9 +2869,6 @@
           }
         }
       }
-    },
-    "Restore Purchases" : {
-
     },
     "Save" : {
       "localizations" : {
@@ -3300,15 +3285,6 @@
           }
         }
       }
-    },
-    "Support" : {
-
-    },
-    "Support Development (In‑App Purchase)" : {
-
-    },
-    "Support SyncNos" : {
-
     },
     "Sync" : {
       "localizations" : {
