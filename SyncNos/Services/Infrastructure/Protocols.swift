@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import StoreKit
 
 // MARK: - Logger Level
 enum LogLevel: Int, CaseIterable, Comparable {
@@ -135,4 +136,23 @@ struct NotionDatabase: Decodable {
 struct NotionPage: Decodable {
     let id: String
     let url: String?
+}
+
+// MARK: - IAP / StoreKit 2 Protocols
+protocol IAPServiceProtocol: AnyObject {
+    // Start listening to Transaction.updates
+    func start()
+    func stop()
+
+    // Load products by identifiers configured in App Store Connect / StoreKit config
+    func fetchProducts(ids: [String]) async throws -> [Product]
+
+    // Purchase a specific product, returns true if verified success
+    func purchase(_ product: Product) async throws -> Bool
+
+    // Trigger restore (AppStore.sync)
+    func restore() async
+
+    // Check entitlement for a given product identifier
+    func isPurchased(productId: String) async -> Bool
 }
