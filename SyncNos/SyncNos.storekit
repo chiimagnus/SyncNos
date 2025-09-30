@@ -1,0 +1,62 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "20B06B66",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "8.0",
+      "familyShareable" : false,
+      "internalID" : "6753224490",
+      "localizations" : [
+        {
+          "description" : "Want to become a lovely patron?",
+          "displayName" : "SyncNos ProMax & Ultra & Air",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "要不要成为一个可爱的赞助人？",
+          "displayName" : "SyncNos ProMax & Ultra & Air",
+          "locale" : "zh_Hans"
+        }
+      ],
+      "productID" : "com.chiimagnus.syncnos.pro",
+      "referenceName" : "SyncNos-ProUnlock",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6752426176",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "RDQHYSDFFG",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 780951093.41555595,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
