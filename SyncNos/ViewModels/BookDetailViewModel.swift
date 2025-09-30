@@ -2,7 +2,6 @@ import Foundation
 
 class BookDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
-    @Published var contextsByUUID: [String: HighlightContextTriple] = [:]
     @Published var isLoadingPage = false
     @Published var errorMessage: String?
     @Published var syncMessage: String?
@@ -12,12 +11,10 @@ class BookDetailViewModel: ObservableObject {
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
-    private let epubContextService = EPUBContextService()
     private let syncCoordinator: NotionSyncCoordinatorProtocol
     private let logger = DIContainer.shared.loggerService
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
-    private var currentBooksDBPath: String?
     private var currentOffset = 0
     private let pageSize = 50
     private var expectedTotalCount = 0
@@ -34,12 +31,10 @@ class BookDetailViewModel: ObservableObject {
         errorMessage = nil
         closeSession()
         highlights = []
-        contextsByUUID = [:]
         currentOffset = 0
         currentAssetId = assetId
-        currentBooksDBPath = dbPath
         self.expectedTotalCount = expectedTotalCount
-
+        
         if let path = dbPath {
             do {
                 session = try databaseService.makeReadOnlySession(dbPath: path)
@@ -116,28 +111,6 @@ class BookDetailViewModel: ObservableObject {
                     self.errorMessage = error.localizedDescription
                     self.syncProgressText = nil
                     self.isSyncing = false
-                }
-            }
-        }
-    }
-
-    // MARK: - Context Loading (MVP)
-    func loadContextIfNeeded(booksDBPath: String?, for highlight: Highlight, assetId: String) {
-        guard contextsByUUID[highlight.uuid] == nil else { return }
-        guard let booksDBPath = booksDBPath else { return }
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self = self else { return }
-            let triple = self.epubContextService.loadContext(booksDBPath: booksDBPath,
-                                                             assetId: assetId,
-                                                             cfi: highlight.location,
-                                                             highlightText: highlight.text)
-            DispatchQueue.main.async {
-                if let triple = triple {
-                    self.contextsByUUID[highlight.uuid] = triple
-                } else {
-                    // 如果上下文加载失败，仍然记录这个结果以避免重复尝试
-                    // 不存储失败结果，让系统有机会在未来重试
-                    self.logger.debug("Context loading failed for highlight \(highlight.uuid)")
                 }
             }
         }
