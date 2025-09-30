@@ -178,10 +178,33 @@ struct BookDetailView: View {
                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
                         ZStack(alignment: .topTrailing) {
-                            VStack(alignment: .leading, spacing: 8) {                                
+                            VStack(alignment: .leading, spacing: 8) {
+                                // Previous paragraph context
+                                if let prevPara = highlight.previousParagraph, !prevPara.isEmpty {
+                                    Text(prevPara)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary.opacity(0.8))
+                                        .italic()
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    Divider()
+                                }
+                                
+                                // Main highlight text
                                 Text(highlight.text)
                                     .font(.body)
                                     .fixedSize(horizontal: false, vertical: true)
+                                
+                                // Next paragraph context
+                                if let nextPara = highlight.nextParagraph, !nextPara.isEmpty {
+                                    Divider()
+                                    
+                                    Text(nextPara)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary.opacity(0.8))
+                                        .italic()
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                                 
                                 if let note = highlight.note, !note.isEmpty {
                                     Text(note)

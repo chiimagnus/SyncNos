@@ -90,6 +90,12 @@ protocol BookmarkStoreProtocol {
     func restore() -> URL?
     func startAccessing(url: URL) -> Bool
     func stopAccessingIfNeeded()
+    
+    // iCloud Books directory management
+    func saveiBooksDirectory(url: URL)
+    func restoreiBooksDirectory() -> URL?
+    func startAccessingiBooksDirectory(url: URL) -> Bool
+    func stopAccessingiBooksDirectoryIfNeeded()
 }
 
 // MARK: - Notion Config Store Protocol
@@ -124,6 +130,20 @@ protocol NotionServiceProtocol: AnyObject {
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String?
     func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws
+}
+
+// MARK: - EPUB Context Service Protocol
+protocol EPUBContextServiceProtocol: AnyObject {
+    /// Enrich a single highlight with context from EPUB
+    func enrichHighlight(_ highlight: HighlightRow, iBooksDirectoryURL: URL?) -> HighlightRow
+    
+    /// Enrich multiple highlights with context
+    func enrichHighlights(_ highlights: [HighlightRow], 
+                         iBooksDirectoryURL: URL?,
+                         progressHandler: ((Int, Int) -> Void)?) -> [HighlightRow]
+    
+    /// Clear internal caches
+    func clearCache()
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
