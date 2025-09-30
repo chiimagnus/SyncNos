@@ -13,12 +13,14 @@ final class IAPViewModel: ObservableObject {
     init(iap: IAPServiceProtocol = DIContainer.shared.iapService) {
         self.iap = iap
         NotificationCenter.default.addObserver(forName: IAPService.statusChangedNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+            Task { @MainActor [weak self] in
+                self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+            }
         }
     }
 
     func onAppear() {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             await self?.refresh()
         }
     }
@@ -37,7 +39,7 @@ final class IAPViewModel: ObservableObject {
     }
 
     func buy(product: Product) {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             do {
                 let ok = try await self.iap.purchase(product: product)
@@ -53,7 +55,7 @@ final class IAPViewModel: ObservableObject {
     }
 
     func restore() {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             let ok = await self.iap.restorePurchases()
             self.message = ok ? NSLocalizedString("Restored successfully.", comment: "") : NSLocalizedString("Restore failed.", comment: "")
