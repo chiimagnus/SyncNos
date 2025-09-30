@@ -84,20 +84,6 @@ struct SettingsView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("Choose Apple Books container directory and load notes")
-                    
-                    Button(action: {
-                        AppleBooksPicker.pickiBooksDirectory()
-                    }) {
-                        HStack {
-                            Text("Choose iCloud Books Directory")
-                            Spacer()
-                            Image(systemName: "folder.badge.gearshape")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose iCloud Books directory for EPUB context extraction")
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
