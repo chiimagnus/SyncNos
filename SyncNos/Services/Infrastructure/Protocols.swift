@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import StoreKit
 
 // MARK: - Logger Level
 enum LogLevel: Int, CaseIterable, Comparable {
@@ -137,4 +138,11 @@ struct NotionPage: Decodable {
     let url: String?
 }
 
-// No IAP protocol in this file (StoreKit handled by .storekit local config)
+// MARK: - In-App Purchase Service Protocol
+protocol IAPServiceProtocol: AnyObject {
+    var isProUnlocked: Bool { get }
+    func fetchProducts() async throws -> [Product]
+    func purchase(product: Product) async throws -> Bool
+    func restorePurchases() async -> Bool
+    func startObservingTransactions()
+}
