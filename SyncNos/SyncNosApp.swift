@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import StoreKit
 
 
 @main
@@ -12,6 +13,9 @@ struct SyncNosApp: App {
         } else {
             DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
+
+        // Start observing IAP transactions
+        DIContainer.shared.iapService.startObservingTransactions()
     }
 
     var body: some Scene {

@@ -113,6 +113,20 @@ struct SettingsView: View {
                 }
                 .collapsible(false)
 
+                Section(header: Text("Support")) {
+                    NavigationLink(destination: IAPView()) {
+                        HStack {
+                            Label("Support & Pro Unlock", systemImage: "heart.circle")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Support development and unlock Pro features")
+                }
+                .collapsible(false)
+
                 Section(header: Text("Integrations")) {
                     // 修改为使用 NavigationLink 并添加 disclosureGroup 样式
                     NavigationLink(destination: NotionIntegrationView()) {
