@@ -13,7 +13,6 @@ class DIContainer {
     private var _notionService: NotionServiceProtocol?
     private var _loggerService: LoggerServiceProtocol?
     private var _syncCoordinator: NotionSyncCoordinatorProtocol?
-    private var _epubContextService: EPUBContextServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -58,13 +57,6 @@ class DIContainer {
         return _syncCoordinator!
     }
 
-    var epubContextService: EPUBContextServiceProtocol {
-        if _epubContextService == nil {
-            _epubContextService = EPUBContextService()
-        }
-        return _epubContextService!
-    }
-
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -88,9 +80,5 @@ class DIContainer {
 
     func register(syncCoordinator: NotionSyncCoordinatorProtocol) {
         self._syncCoordinator = syncCoordinator
-    }
-
-    func register(epubContextService: EPUBContextServiceProtocol) {
-        self._epubContextService = epubContextService
     }
 }
