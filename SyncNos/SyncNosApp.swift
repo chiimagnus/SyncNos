@@ -12,6 +12,9 @@ struct SyncNosApp: App {
         } else {
             DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
+
+        // Start StoreKit transaction listener
+        DIContainer.shared.iapService.start()
     }
 
     var body: some Scene {

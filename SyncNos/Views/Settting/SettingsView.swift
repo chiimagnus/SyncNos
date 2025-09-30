@@ -127,6 +127,20 @@ struct SettingsView: View {
                     .help("Configure Notion and run example API calls")
                 }
                 .collapsible(false)
+
+                Section(header: Text("Support")) {
+                    NavigationLink(destination: IAPView()) {
+                        HStack {
+                            Label("Support Development (In‑App Purchase)", systemImage: "cart")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Purchase to support SyncNos and unlock Pro features")
+                }
+                .collapsible(false)
             }
             .listStyle(SidebarListStyle())
             .scrollContentBackground(.hidden)
