@@ -147,9 +147,94 @@ struct BookDetailView: View {
             return Color.gray.opacity(0.3)
         }
     }
-    
+
     // Removed gridColumns; WaterfallLayout handles adaptive columns.
-    
+
+    private func highlightCard(for highlight: Highlight) -> some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Show context if available, otherwise show just the highlight
+                if let context = viewModel.contextsByUUID[highlight.uuid] {
+                    // Previous context
+                    if let prev = context.previous {
+                        Text(prev)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    // Current highlight
+                    Text(context.current)
+                        .font(.body)
+                        .fontWeight(.bold)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Next context
+                    if let next = context.next {
+                        Text(next)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    // Fallback to original highlight text when context is not available
+                    Text(highlight.text)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let note = highlight.note, !note.isEmpty {
+                    Text(note)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let dateAdded = highlight.dateAdded {
+                            Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if let modified = highlight.modified {
+                            Text("Modified: \(modified, formatter: Self.dateFormatter)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(12)
+            .background(
+                highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Button {
+                if let location = highlight.location {
+                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
+                    NSWorkspace.shared.open(url)
+                } else {
+                    let url = URL(string: "ibooks://assetid/\(book.bookId)")!
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Image(systemName: "book")
+                    .imageScale(.medium)
+                    .foregroundColor(.primary)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .help("Open in Apple Books")
+            .accessibilityLabel("Open in Apple Books")
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -177,60 +262,11 @@ struct BookDetailView: View {
                 // Highlights section (Waterfall / Masonry)
                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                     ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                        ZStack(alignment: .topTrailing) {
-                            VStack(alignment: .leading, spacing: 8) {                                
-                                Text(highlight.text)
-                                    .font(.body)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                
-                                if let note = highlight.note, !note.isEmpty {
-                                    Text(note)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        if let dateAdded = highlight.dateAdded {
-                                            Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-
-                                        if let modified = highlight.modified {
-                                            Text("Modified: \(modified, formatter: Self.dateFormatter)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-
-                                    Spacer(minLength: 0)
-                                }
+                        highlightCard(for: highlight)
+                            // Load context for this highlight if not already loaded
+                            .onAppear {
+                                viewModel.loadContextIfNeeded(booksDBPath: annotationDBPath, for: highlight, assetId: book.bookId)
                             }
-                            .padding(12)
-                            .background(
-                                highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            
-                            Button {
-                                if let location = highlight.location {
-                                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
-                                    NSWorkspace.shared.open(url)
-                                } else {
-                                    let url = URL(string: "ibooks://assetid/\(book.bookId)")!
-                                    NSWorkspace.shared.open(url)
-                                }
-                            } label: {
-                                Image(systemName: "book")
-                                    .imageScale(.medium)
-                                    .foregroundColor(.primary)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                            .help("Open in Apple Books")
-                            .accessibilityLabel("Open in Apple Books")
-                        }
                     }
                 }
                 .padding(.top)
