@@ -25,13 +25,13 @@ struct IAPView: View {
                     ForEach(viewModel.products, id: \.id) { product in
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(product.displayName)
+                                Text(product.description)
                                 Text(product.displayPrice)
                                     .foregroundStyle(.secondary)
                                     .font(.subheadline)
                             }
                             Spacer()
-                            Button("Buy") {
+                            Button("You Bet!") {
                                 viewModel.buy(product: product)
                             }
                             .buttonStyle(.borderedProminent)
