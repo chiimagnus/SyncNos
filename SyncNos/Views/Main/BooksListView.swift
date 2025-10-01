@@ -6,11 +6,27 @@ struct BooksListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
+    @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+
+    private var contentSource: ContentSource {
+        ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
+    }
 
     var body: some View {
         NavigationSplitView {
             Group {
-                if viewModel.isLoading {
+                if contentSource == .goodLinks {
+                    VStack(spacing: 12) {
+                        Image(systemName: "link")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("GoodLinks 视图占位")
+                            .font(.headline)
+                        Text("即将支持从 GoodLinks 读取列表与高亮")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.isLoading {
                     ProgressView("Loading books...")
                 } else if viewModel.errorMessage != nil {
                     VStack {
@@ -56,24 +72,39 @@ struct BooksListView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
-            .navigationTitle("Books")
+            .navigationTitle(contentSource.title)
         } detail: {
-            // Detail content: show selected book details
-            if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
-                BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
-                    .id(book.bookId) // force view refresh when selection changes
+            if contentSource == .goodLinks {
+                VStack(spacing: 8) {
+                    Image(systemName: "text.quote")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("GoodLinks 详情占位")
+                        .font(.headline)
+                    Text("选择条目后将在此显示高亮内容")
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Text("Select a book to view details").foregroundColor(.secondary)
+                // Detail content: show selected book details
+                if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
+                    BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
+                        .id(book.bookId) // force view refresh when selection changes
+                } else {
+                    Text("Select a book to view details").foregroundColor(.secondary)
+                }
             }
         }
         .onAppear {
-            if let url = BookmarkStore.shared.restore() {
-                let started = BookmarkStore.shared.startAccessing(url: url)
-                DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
-                let selectedPath = url.path
-                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
-                viewModel.setDbRootOverride(rootCandidate)
-                viewModel.loadBooks()
+            if contentSource == .appleBooks {
+                if let url = BookmarkStore.shared.restore() {
+                    let started = BookmarkStore.shared.startAccessing(url: url)
+                    DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
+                    let selectedPath = url.path
+                    let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
+                    viewModel.setDbRootOverride(rootCandidate)
+                    viewModel.loadBooks()
+                }
             }
         }
         .onDisappear {
@@ -85,6 +116,7 @@ struct BooksListView: View {
                 .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
                 .receive(on: DispatchQueue.main)
         ) { notification in
+            guard contentSource == .appleBooks else { return }
             if notification.name == Notification.Name("AppleBooksContainerSelected") {
                 guard let selectedPath = notification.object as? String else { return }
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
@@ -98,6 +130,10 @@ struct BooksListView: View {
             if selectedBookId == nil {
                 selectedBookId = books.first?.bookId
             }
+        }
+        .onChange(of: contentSourceRawValue) { _ in
+            // 切换数据源时重置选择，避免 Apple Books 的选中影响 GoodLinks
+            selectedBookId = nil
         }
         .background {
             if backgroundImageEnabled {

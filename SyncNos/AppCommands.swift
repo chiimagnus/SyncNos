@@ -4,6 +4,7 @@ import AppKit
 // 将应用菜单命令抽取到单独文件，便于维护与测试
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
 
     init() {
         // 禁用自动窗口标签，从而隐藏 "Show Tab" 和 "Show All Tabs" 菜单项
@@ -90,6 +91,21 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+
+            Divider()
+
+            // 数据源切换
+            Button("Apple Books", systemImage: "book") {
+                contentSourceRawValue = ContentSource.appleBooks.rawValue
+            }
+            .keyboardShortcut("1", modifiers: .command)
+            .disabled(contentSourceRawValue == ContentSource.appleBooks.rawValue)
+
+            Button("GoodLinks", systemImage: "link") {
+                contentSourceRawValue = ContentSource.goodLinks.rawValue
+            }
+            .keyboardShortcut("2", modifiers: .command)
+            .disabled(contentSourceRawValue == ContentSource.goodLinks.rawValue)
 
             Divider()
         }
