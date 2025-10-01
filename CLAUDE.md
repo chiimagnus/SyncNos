@@ -64,15 +64,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `LoggerServiceProtocol`: Defines leveled logging interface with levels: verbose, debug, info, warning, error
 
 5. **UI Components**:
-   - `BooksListView`: Main view showing the list of books with highlight counts
-   - `BookDetailView`: Detail view showing highlights for a selected book with pagination
+   - `MainListView`: Main view showing the list of books with highlight counts
+   - `AppleBookDetailView`: Detail view showing highlights for a selected book with pagination
    - Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
    - `SettingsView`: Configuration interface for Apple Books container and Notion integration
    - `NotionIntegrationView`: UI for configuring Notion API credentials and testing integration
 
 6. **ViewModels**:
-   - `BookViewModel`: Manages the data flow between services and BooksListView
-   - `BookDetailViewModel`: Manages pagination and data loading for BookDetailView
+   - `BookViewModel`: Manages the data flow between services and MainListView
+   - `AppleBookDetailViewModel`: Manages pagination and data loading for AppleBookDetailView
    - `NotionIntegrationViewModel`: Handles UI logic for Notion integration setup
 
 7. **Dependency Injection**:

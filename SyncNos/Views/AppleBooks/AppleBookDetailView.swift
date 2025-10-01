@@ -109,10 +109,10 @@ private struct LiveResizeObserver: NSViewRepresentable {
     }
 }
 
-struct BookDetailView: View {
+struct AppleBookDetailView: View {
     @ObservedObject var viewModelList: BookViewModel
     @Binding var selectedBookId: String?
-    @StateObject private var viewModel = BookDetailViewModel()
+    @StateObject private var viewModel = AppleBookDetailViewModel()
     @State private var isSyncing = false
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
@@ -352,7 +352,7 @@ struct BookDetailView: View {
     }
 }
 
-struct BookDetailView_Previews: PreviewProvider {
+struct AppleBookDetailView_Previews: PreviewProvider {
     static var previews: some View {
         let sampleBook = BookListItem(bookId: "sample-id",
                                        authorName: "Sample Author",
@@ -362,6 +362,6 @@ struct BookDetailView_Previews: PreviewProvider {
         
         // Preview for new initializer
         let listVM = BookViewModel()
-        return BookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
+        return AppleBookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
     }
 }

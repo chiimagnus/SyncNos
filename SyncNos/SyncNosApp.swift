@@ -20,7 +20,7 @@ struct SyncNosApp: App {
 
     var body: some Scene {
         WindowGroup {
-            BooksListView()
+            MainListView()
         }
         
         // 设置窗口（单实例）

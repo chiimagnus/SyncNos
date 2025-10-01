@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 import Combine
 
-struct BooksListView: View {
+struct MainListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
@@ -53,7 +53,7 @@ struct BooksListView: View {
             if contentSource == .goodLinks {
                 GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
             } else {
-                BookDetailView(viewModelList: viewModel, selectedBookId: $selectedBookId)
+                AppleBookDetailView(viewModelList: viewModel, selectedBookId: $selectedBookId)
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
@@ -90,8 +90,8 @@ struct BooksListView: View {
     }
 }
 
-struct BooksListView_Previews: PreviewProvider {
+struct MainListView_Previews: PreviewProvider {
     static var previews: some View {
-        BooksListView()
+        MainListView()
     }
 }
