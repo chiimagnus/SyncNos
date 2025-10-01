@@ -119,6 +119,21 @@ struct SettingsView: View {
                     }
                     .help("Configure Notion and run example API calls")
 
+                    // GoodLinks 数据目录授权
+                    Button(action: {
+                        GoodLinksPicker.pickGoodLinksFolder()
+                    }) {
+                        HStack {
+                            Label("Open GoodLinks data", systemImage: "link")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Choose GoodLinks group container and load data")
+
                     Button(action: {
                         guard !isPickingBooks else { return }
                         isPickingBooks = true
