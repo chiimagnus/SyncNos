@@ -53,7 +53,7 @@ struct BooksListView: View {
             if contentSource == .goodLinks {
                 GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
             } else {
-                AppleBooksDetailContainerView(viewModel: viewModel, selectedBookId: $selectedBookId)
+                BookDetailView(viewModelList: viewModel, selectedBookId: $selectedBookId)
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
