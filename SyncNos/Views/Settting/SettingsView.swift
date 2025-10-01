@@ -64,27 +64,6 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    // 使用 Button 样式
-                    Button(action: {
-                        guard !isPickingBooks else { return }
-                        isPickingBooks = true
-                        AppleBooksPicker.pickAppleBooksContainer()
-                        // 延迟重置状态，防止快速重复点击
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            isPickingBooks = false
-                        }
-                    }) {
-                        HStack {
-                            Text("Open Apple Books notes")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose Apple Books container directory and load notes")
-
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
                         .toggleStyle(.switch)
@@ -129,7 +108,6 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Integrations")) {
-                    // 修改为使用 NavigationLink 并添加 disclosureGroup 样式
                     NavigationLink(destination: NotionIntegrationView()) {
                         HStack {
                             Label("Notion Integration", systemImage: "n.square")
@@ -140,6 +118,26 @@ struct SettingsView: View {
                         }
                     }
                     .help("Configure Notion and run example API calls")
+
+                    Button(action: {
+                        guard !isPickingBooks else { return }
+                        isPickingBooks = true
+                        AppleBooksPicker.pickAppleBooksContainer()
+                        // 延迟重置状态，防止快速重复点击
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            isPickingBooks = false
+                        }
+                    }) {
+                        HStack {
+                            Label("Open Apple Books notes", systemImage: "book")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Choose Apple Books container directory and load notes")
                 }
                 .collapsible(false)
             }
