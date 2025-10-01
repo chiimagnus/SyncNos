@@ -38,12 +38,14 @@ struct GoodLinksDetailView: View {
                 .onAppear {
                     viewModel.loadHighlights(for: linkId)
                 }
+                .navigationTitle("GoodLinks")
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "text.quote").font(.largeTitle).foregroundColor(.secondary)
                     Text("选择条目后将在此显示高亮内容").foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("GoodLinks")
             }
         }
     }
