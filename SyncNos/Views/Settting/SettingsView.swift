@@ -87,7 +87,8 @@ struct SettingsView: View {
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
-                        .toggleStyle(SwitchToggleStyle())
+                        .toggleStyle(.switch)
+                        .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
 
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
