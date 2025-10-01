@@ -146,3 +146,10 @@ protocol IAPServiceProtocol: AnyObject {
     func restorePurchases() async -> Bool
     func startObservingTransactions()
 }
+
+// MARK: - GoodLinks Protocol Bridge (exposed to app layer)
+protocol GoodLinksDatabaseServiceExposed: AnyObject {
+    func defaultDatabasePath() -> String
+    func canOpenReadOnly(dbPath: String) -> Bool
+    func makeReadOnlySession(dbPath: String) throws -> GoodLinksReadOnlySessionProtocol
+}
