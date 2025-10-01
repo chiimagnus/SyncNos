@@ -1,0 +1,72 @@
+import SwiftUI
+
+struct GoodLinksListView: View {
+    @ObservedObject var viewModel: GoodLinksViewModel
+    @Binding var selectedLinkId: String?
+
+    var body: some View {
+        Group {
+            if viewModel.isLoading {
+                ProgressView("Loading links...")
+            } else if let error = viewModel.errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle").foregroundColor(.orange).font(.largeTitle)
+                    Text(error).multilineTextAlignment(.center).padding(.horizontal)
+                    Button {
+                        GoodLinksPicker.pickGoodLinksFolder()
+                    } label: {
+                        Label("Open GoodLinks data", systemImage: "folder")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.links.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "link").foregroundColor(.secondary).font(.largeTitle)
+                    Text("No links found").foregroundColor(.secondary)
+                    Button {
+                        GoodLinksPicker.pickGoodLinksFolder()
+                    } label: {
+                        Label("Open GoodLinks data", systemImage: "folder")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(selection: $selectedLinkId) {
+                    ForEach(viewModel.links, id: \.id) { link in
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(link.title?.isEmpty == false ? link.title! : link.url)
+                                    .font(.headline)
+                                    .lineLimit(2)
+                                if let author = link.author, !author.isEmpty {
+                                    Text(author).font(.subheadline).foregroundColor(.secondary)
+                                }
+                                HStack(spacing: 8) {
+                                    if let cnt = link.highlightTotal { Text("\(cnt) highlights").font(.caption).foregroundColor(.secondary) }
+                                    Text(URL(string: link.url)?.host ?? "").font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                        .tag(link.id)
+                    }
+                }
+                .listStyle(.sidebar)
+            }
+        }
+        .onAppear {
+            if viewModel.links.isEmpty {
+                viewModel.loadRecentLinks()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
+            viewModel.loadRecentLinks()
+        }
+        .onDisappear {
+            GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
+        }
+    }
+}
+
+

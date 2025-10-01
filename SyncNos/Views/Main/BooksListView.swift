@@ -12,20 +12,13 @@ struct BooksListView: View {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
     }
 
+    @StateObject private var goodLinksVM = GoodLinksViewModel()
+
     var body: some View {
         NavigationSplitView {
             Group {
                 if contentSource == .goodLinks {
-                    VStack(spacing: 12) {
-                        Image(systemName: "link")
-                            .font(.largeTitle)
-                            .foregroundColor(.secondary)
-                        Text("GoodLinks 视图占位")
-                            .font(.headline)
-                        Text("即将支持从 GoodLinks 读取列表与高亮")
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    GoodLinksListView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
                 } else if viewModel.isLoading {
                     ProgressView("Loading books...")
                 } else if viewModel.errorMessage != nil {
@@ -100,17 +93,8 @@ struct BooksListView: View {
             }
         } detail: {
             if contentSource == .goodLinks {
-                VStack(spacing: 8) {
-                    Image(systemName: "text.quote")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-                    Text("GoodLinks 详情占位")
-                        .font(.headline)
-                    Text("选择条目后将在此显示高亮内容")
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle(contentSource.title)
+                GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
+                    .navigationTitle(contentSource.title)
             } else {
                 // Detail content: show selected book details
                 if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
@@ -159,8 +143,11 @@ struct BooksListView: View {
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
-            // 切换数据源时重置选择，避免 Apple Books 的选中影响 GoodLinks
+            // 切换数据源时重置选择
             selectedBookId = nil
+            if contentSource == .goodLinks {
+                goodLinksVM.loadRecentLinks()
+            }
         }
         .background {
             if backgroundImageEnabled {
