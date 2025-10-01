@@ -48,6 +48,16 @@ struct GoodLinksDetailView: View {
                 .navigationTitle("GoodLinks")
             }
         }
+        .onAppear {
+            if selectedLinkId == nil, let first = viewModel.links.first?.id {
+                selectedLinkId = first
+            }
+        }
+        .onChange(of: viewModel.links) { links in
+            if selectedLinkId == nil, let first = links.first?.id {
+                selectedLinkId = first
+            }
+        }
     }
 }
 
