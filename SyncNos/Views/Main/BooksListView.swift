@@ -73,6 +73,31 @@ struct BooksListView: View {
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
             .navigationTitle(contentSource.title)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            contentSourceRawValue = ContentSource.appleBooks.rawValue
+                        } label: {
+                            HStack {
+                                Text("Apple Books")
+                                if contentSource == .appleBooks { Image(systemName: "checkmark") }
+                            }
+                        }
+
+                        Button {
+                            contentSourceRawValue = ContentSource.goodLinks.rawValue
+                        } label: {
+                            HStack {
+                                Text("GoodLinks")
+                                if contentSource == .goodLinks { Image(systemName: "checkmark") }
+                            }
+                        }
+                    } label: {
+                        Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
+                    }
+                }
+            }
         } detail: {
             if contentSource == .goodLinks {
                 VStack(spacing: 8) {
@@ -85,6 +110,7 @@ struct BooksListView: View {
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle(contentSource.title)
             } else {
                 // Detail content: show selected book details
                 if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
@@ -92,6 +118,7 @@ struct BooksListView: View {
                         .id(book.bookId) // force view refresh when selection changes
                 } else {
                     Text("Select a book to view details").foregroundColor(.secondary)
+                        .navigationTitle(contentSource.title)
                 }
             }
         }
@@ -157,6 +184,7 @@ struct BooksListView: View {
                 Color.clear
             }
         }
+        
     }
 }
 
