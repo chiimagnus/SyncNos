@@ -37,7 +37,7 @@ final class GoodLinksReadOnlySession: GoodLinksReadOnlySessionProtocol {
 
 // MARK: - GoodLinks Database Service
 
-final class GoodLinksDatabaseService: GoodLinksDatabaseServiceProtocol {
+final class GoodLinksDatabaseService: GoodLinksDatabaseServiceProtocol, GoodLinksDatabaseServiceExposed {
     private let connection = GoodLinksConnectionService()
 
     func defaultDatabasePath() -> String {

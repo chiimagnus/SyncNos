@@ -68,7 +68,7 @@ class DIContainer {
 
     var goodLinksService: GoodLinksDatabaseServiceExposed {
         if _goodLinksService == nil {
-            _goodLinksService = GoodLinksDatabaseService() as GoodLinksDatabaseServiceExposed
+            _goodLinksService = GoodLinksDatabaseService()
         }
         return _goodLinksService!
     }
