@@ -53,15 +53,7 @@ struct BooksListView: View {
             if contentSource == .goodLinks {
                 GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
             } else {
-                BookDetailView(
-                    book: (
-                        viewModel.books.first { $0.bookId == (selectedBookId ?? "") }
-                        ?? viewModel.books.first
-                        ?? BookListItem(bookId: "", authorName: "", bookTitle: "", ibooksURL: "", highlightCount: 0)
-                    ),
-                    annotationDBPath: viewModel.annotationDatabasePath
-                )
-                .id(selectedBookId ?? viewModel.books.first?.bookId ?? "")
+                AppleBooksDetailContainerView(viewModel: viewModel, selectedBookId: $selectedBookId)
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
