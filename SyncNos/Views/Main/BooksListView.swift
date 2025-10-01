@@ -24,7 +24,6 @@ struct BooksListView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
-            .navigationTitle(contentSource.title)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -53,16 +52,16 @@ struct BooksListView: View {
         } detail: {
             if contentSource == .goodLinks {
                 GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
-                    .navigationTitle(contentSource.title)
             } else {
-                // Detail content: show selected book details
-                if let sel = selectedBookId, let book = viewModel.books.first(where: { $0.bookId == sel }) {
-                    BookDetailView(book: book, annotationDBPath: viewModel.annotationDatabasePath)
-                        .id(book.bookId) // force view refresh when selection changes
-                } else {
-                    Text("Select a book to view details").foregroundColor(.secondary)
-                        .navigationTitle(contentSource.title)
-                }
+                BookDetailView(
+                    book: (
+                        viewModel.books.first { $0.bookId == (selectedBookId ?? "") }
+                        ?? viewModel.books.first
+                        ?? BookListItem(bookId: "", authorName: "", bookTitle: "", ibooksURL: "", highlightCount: 0)
+                    ),
+                    annotationDBPath: viewModel.annotationDatabasePath
+                )
+                .id(selectedBookId ?? viewModel.books.first?.bookId ?? "")
             }
         }
         .onChange(of: contentSourceRawValue) { _ in

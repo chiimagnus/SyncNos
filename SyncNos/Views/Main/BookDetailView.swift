@@ -166,9 +166,11 @@ struct BookDetailView: View {
                     Text("\(book.highlightCount) highlights")
                         .font(.subheadline)
                     
-                    Link("Open in Apple Books", destination: URL(string: book.ibooksURL)!)
-                        .font(.subheadline)
-                        .padding(.top, 4)
+                    if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
+                        Link("Open in Apple Books", destination: ibooksURL)
+                            .font(.subheadline)
+                            .padding(.top, 4)
+                    }
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
