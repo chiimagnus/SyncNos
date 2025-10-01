@@ -110,8 +110,8 @@ private struct LiveResizeObserver: NSViewRepresentable {
 }
 
 struct BookDetailView: View {
-    let book: BookListItem
-    let annotationDBPath: String?
+    @ObservedObject var viewModelList: BookViewModel
+    @Binding var selectedBookId: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
     // Freeze layout width during live resize to avoid heavy recomputation.
@@ -150,126 +150,143 @@ struct BookDetailView: View {
     
     // Removed gridColumns; WaterfallLayout handles adaptive columns.
     
+    private var selectedBook: BookListItem? {
+        viewModelList.books.first { $0.bookId == (selectedBookId ?? "") } ?? viewModelList.books.first
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Book header
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(book.bookTitle)
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    Text("by \(book.authorName)")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                    
-                    Text("\(book.highlightCount) highlights")
-                        .font(.subheadline)
-                    
-                    if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
-                        Link("Open in Apple Books", destination: ibooksURL)
-                            .font(.subheadline)
-                            .padding(.top, 4)
-                    }
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
-                
-                // Highlights section (Waterfall / Masonry)
-                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
-                    ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                        ZStack(alignment: .topTrailing) {
-                            VStack(alignment: .leading, spacing: 8) {                                
-                                Text(highlight.text)
-                                    .font(.body)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                
-                                if let note = highlight.note, !note.isEmpty {
-                                    Text(note)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        if let dateAdded = highlight.dateAdded {
-                                            Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
-                                                .font(.caption)
+        Group {
+            if let book = selectedBook {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Book header
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(book.bookTitle)
+                                .font(.title)
+                                .fontWeight(.bold)
+                            
+                            Text("by \(book.authorName)")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(book.highlightCount) highlights")
+                                .font(.subheadline)
+                            
+                            if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
+                                Link("Open in Apple Books", destination: ibooksURL)
+                                    .font(.subheadline)
+                                    .padding(.top, 4)
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        // Highlights section (Waterfall / Masonry)
+                        WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                            ForEach(viewModel.highlights, id: \.uuid) { highlight in
+                                ZStack(alignment: .topTrailing) {
+                                    VStack(alignment: .leading, spacing: 8) {                                
+                                        Text(highlight.text)
+                                            .font(.body)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        
+                                        if let note = highlight.note, !note.isEmpty {
+                                            Text(note)
+                                                .font(.subheadline)
                                                 .foregroundColor(.secondary)
                                         }
+                                        
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                if let dateAdded = highlight.dateAdded {
+                                                    Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
 
-                                        if let modified = highlight.modified {
-                                            Text("Modified: \(modified, formatter: Self.dateFormatter)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
+                                                if let modified = highlight.modified {
+                                                    Text("Modified: \(modified, formatter: Self.dateFormatter)")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
+
+                                            Spacer(minLength: 0)
                                         }
                                     }
-
-                                    Spacer(minLength: 0)
+                                    .padding(12)
+                                    .background(
+                                        highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    
+                                    Button {
+                                        if let location = highlight.location {
+                                            let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
+                                            NSWorkspace.shared.open(url)
+                                        } else {
+                                            let url = URL(string: "ibooks://assetid/\(book.bookId)")!
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    } label: {
+                                        Image(systemName: "book")
+                                            .imageScale(.medium)
+                                            .foregroundColor(.primary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(8)
+                                    .help("Open in Apple Books")
+                                    .accessibilityLabel("Open in Apple Books")
                                 }
                             }
-                            .padding(12)
-                            .background(
-                                highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            
-                            Button {
-                                if let location = highlight.location {
-                                    let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
-                                    NSWorkspace.shared.open(url)
-                                } else {
-                                    let url = URL(string: "ibooks://assetid/\(book.bookId)")!
-                                    NSWorkspace.shared.open(url)
-                                }
-                            } label: {
-                                Image(systemName: "book")
-                                    .imageScale(.medium)
-                                    .foregroundColor(.primary)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
-                            .help("Open in Apple Books")
-                            .accessibilityLabel("Open in Apple Books")
                         }
-                    }
-                }
-                .padding(.top)
-                .overlay(
-                    GeometryReader { proxy in
-                        let w = proxy.size.width
-                        Color.clear
-                            .onAppear { measuredLayoutWidth = w }
-                            .onChange(of: w) { newValue in
-                                measuredLayoutWidth = newValue
+                        .padding(.top)
+                        .overlay(
+                            GeometryReader { proxy in
+                                let w = proxy.size.width
+                                Color.clear
+                                    .onAppear { measuredLayoutWidth = w }
+                                    .onChange(of: w) { newValue in
+                                        measuredLayoutWidth = newValue
+                                    }
                             }
-                    }
-                )
+                        )
 
-                if viewModel.canLoadMore {
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            viewModel.loadNextPage(dbPath: annotationDBPath, assetId: book.bookId)
-                        }) {
-                            if viewModel.isLoadingPage {
-                                ProgressView()
-                            } else {
-                                Text("Load more")
+                        if viewModel.canLoadMore {
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId)
+                                }) {
+                                    if viewModel.isLoadingPage {
+                                        ProgressView()
+                                    } else {
+                                        Text("Load more")
+                                    }
+                                }
+                                // .buttonStyle(.borderedProminent)
+                                Spacer()
                             }
+                            .padding(.top, 8)
                         }
-                        // .buttonStyle(.borderedProminent)
-                        Spacer()
                     }
-                    .padding(.top, 8)
+                    .padding()
                 }
+            } else {
+                Text("Select a book to view details").foregroundColor(.secondary)
             }
-            .padding()
         }
         .frame(minWidth: 400, idealWidth: 600)
         .onAppear {
-            viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+            if let book = selectedBook {
+                viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+            }
+        }
+        .onChange(of: selectedBookId) { _ in
+            if let book = selectedBook {
+                viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+            }
         }
         .navigationTitle("Apple Books")
         .background(LiveResizeObserver(isResizing: $isLiveResizing))
@@ -293,14 +310,16 @@ struct BookDetailView: View {
                     }
                     .help("Sync in progress")
                 } else {
-                    Button {
-                        Task {
-                            viewModel.syncSmart(book: book, dbPath: annotationDBPath)
+                    if let book = selectedBook {
+                        Button {
+                            Task {
+                                viewModel.syncSmart(book: book, dbPath: viewModelList.annotationDatabasePath)
+                            }
+                        } label: {
+                            Label("Sync", systemImage: "arrow.triangle.2.circlepath")
                         }
-                    } label: {
-                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                        .help("Sync highlights to Notion")
                     }
-                    .help("Sync highlights to Notion")
                 }
             }
         }
@@ -313,8 +332,10 @@ struct BookDetailView: View {
             NotificationCenter.default.publisher(for: Notification.Name("SyncCurrentBookToNotionRequested"))
                 .receive(on: DispatchQueue.main)
         ) { _ in
-            Task {
-                viewModel.syncSmart(book: book, dbPath: annotationDBPath)
+            if let book = selectedBook {
+                Task {
+                    viewModel.syncSmart(book: book, dbPath: viewModelList.annotationDatabasePath)
+                }
             }
         }
         .onChange(of: viewModel.syncMessage) { newMessage in
@@ -339,8 +360,8 @@ struct BookDetailView_Previews: PreviewProvider {
                                        ibooksURL: "ibooks://assetid/sample-id",
                                        highlightCount: 123)
         
-        NavigationView {
-            BookDetailView(book: sampleBook, annotationDBPath: nil)
-        }
+        // Preview for new initializer
+        let listVM = BookViewModel()
+        return BookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
     }
 }
