@@ -184,6 +184,7 @@ struct BooksListView: View {
                 Color.clear
             }
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         
     }
 }
