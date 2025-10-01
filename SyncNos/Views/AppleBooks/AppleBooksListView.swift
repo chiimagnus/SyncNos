@@ -36,7 +36,7 @@ struct AppleBooksListView: View {
                             VStack(alignment: .leading) {
                                 Text(book.bookTitle).font(.headline)
                                 Text(book.authorName).font(.subheadline).foregroundColor(.secondary)
-                                Text("\\(book.highlightCount) highlights").font(.caption)
+                                Text("\(book.highlightCount) highlights").font(.caption)
                             }
                             Spacer()
                         }
@@ -52,8 +52,8 @@ struct AppleBooksListView: View {
         }
         .onAppear {
             if let url = BookmarkStore.shared.restore() {
-                // let started = BookmarkStore.shared.startAccessing(url: url)
-                DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\\(started)")
+                let started = BookmarkStore.shared.startAccessing(url: url)
+                DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
                 let selectedPath = url.path
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
