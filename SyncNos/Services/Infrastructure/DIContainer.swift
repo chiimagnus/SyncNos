@@ -14,6 +14,7 @@ class DIContainer {
     private var _loggerService: LoggerServiceProtocol?
     private var _syncCoordinator: NotionSyncCoordinatorProtocol?
     private var _iapService: IAPServiceProtocol?
+    private var _goodLinksService: GoodLinksDatabaseServiceExposed?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -65,6 +66,13 @@ class DIContainer {
         return _iapService!
     }
 
+    var goodLinksService: GoodLinksDatabaseServiceExposed {
+        if _goodLinksService == nil {
+            _goodLinksService = GoodLinksDatabaseService() as GoodLinksDatabaseServiceExposed
+        }
+        return _goodLinksService!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -92,6 +100,10 @@ class DIContainer {
 
     func register(iapService: IAPServiceProtocol) {
         self._iapService = iapService
+    }
+
+    func register(goodLinksService: GoodLinksDatabaseServiceExposed) {
+        self._goodLinksService = goodLinksService
     }
 
 }
