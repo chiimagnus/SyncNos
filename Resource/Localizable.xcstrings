@@ -4,9 +4,6 @@
     "" : {
       "shouldTranslate" : false
     },
-    "\\(book.highlightCount) highlights" : {
-
-    },
     "%lld highlights" : {
       "localizations" : {
         "de" : {
