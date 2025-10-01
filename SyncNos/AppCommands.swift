@@ -112,10 +112,10 @@ struct AppCommands: Commands {
 
         // Window 菜单 - 窗口管理相关
         CommandGroup(after: .windowList) {
-            Button("Book Detail Window", systemImage: "book") {
-                // 打开书籍详情窗口的逻辑
-            }
-            .keyboardShortcut("1", modifiers: [.command, .shift])
+            // Button("Book Detail Window", systemImage: "book") {
+            //     // 打开书籍详情窗口的逻辑
+            // }
+            // .keyboardShortcut("1", modifiers: [.command, .shift])
         }
 
         // Help 菜单 - 帮助相关
