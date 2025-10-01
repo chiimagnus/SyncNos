@@ -114,12 +114,14 @@ struct BookDetailView: View {
     let annotationDBPath: String?
     @StateObject private var viewModel = BookDetailViewModel()
     @State private var isSyncing = false
+    @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var frozenLayoutWidth: CGFloat? = nil
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
+    private var contentSource: ContentSource { ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks }
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -269,7 +271,7 @@ struct BookDetailView: View {
         .onAppear {
             viewModel.resetAndLoadFirstPage(dbPath: annotationDBPath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
         }
-        .navigationTitle("Highlights")
+        .navigationTitle(contentSource.title)
         .background(LiveResizeObserver(isResizing: $isLiveResizing))
         .onChange(of: isLiveResizing) { resizing in
             if resizing {

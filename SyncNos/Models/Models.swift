@@ -2,6 +2,19 @@ import Foundation
 
 // MARK: - Types
 
+// 当前列表/详情展示的数据来源
+enum ContentSource: String, Codable, CaseIterable {
+    case appleBooks = "appleBooks"
+    case goodLinks = "goodLinks"
+
+    var title: String {
+        switch self {
+        case .appleBooks: return "Apple Books"
+        case .goodLinks: return "GoodLinks"
+        }
+    }
+}
+
 struct Highlight: Codable {
     let uuid: String
     let text: String
