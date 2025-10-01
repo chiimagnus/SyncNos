@@ -1,3 +1,7 @@
+## v0.3.9
+- 新增赞助项，如果觉得不错，可以赞助一下，谢谢！
+- Add new sponsorship items. If you think it is good, you can sponsor them. Thank you!
+
 ## v0.3.7
 
 新增了"一键同步当前书籍"快捷键，还有详细的用户指南，帮你快速上手。
