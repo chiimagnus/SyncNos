@@ -190,15 +190,19 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) {
+        logger.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             do {
                 let dbPath = self.resolveDatabasePath()
+                self.logger.info("[GoodLinks] 数据库路径: \(dbPath)")
                 let session = try self.service.makeReadOnlySession(dbPath: dbPath)
                 defer { session.close() }
                 let rows = try session.fetchHighlightsForLink(linkId: linkId, limit: limit, offset: offset)
+                self.logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
                 DispatchQueue.main.async {
                     self.highlightsByLinkId[linkId] = rows
+                    self.logger.info("[GoodLinks] 高亮数据已更新到UI，linkId=\(linkId), count=\(rows.count)")
                 }
             } catch {
                 let desc = error.localizedDescription

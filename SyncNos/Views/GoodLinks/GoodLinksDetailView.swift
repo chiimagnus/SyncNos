@@ -8,45 +8,288 @@ struct GoodLinksDetailView: View {
         Group {
             if let linkId = selectedLinkId, !linkId.isEmpty {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                            VStack(alignment: .leading, spacing: 6) {
+                            // 文章信息卡片
+                            VStack(alignment: .leading, spacing: 12) {
+                                // 标题
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
-                                    .font(.title3).bold()
+                                    .font(.title2)
+                                    .bold()
+                                    .textSelection(.enabled)
+                                
+                                // 作者
                                 if let author = link.author, !author.isEmpty {
-                                    Text(author).font(.subheadline).foregroundColor(.secondary)
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "person.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(author)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
-                                if let host = URL(string: link.url)?.host { Text(host).font(.caption).foregroundColor(.secondary) }
-                            }
-                            .padding(.bottom, 8)
-                        }
-
-                        let highlights = viewModel.highlightsByLinkId[linkId] ?? []
-                        ForEach(highlights, id: \.id) { item in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(item.content)
-                                if let note = item.note, !note.isEmpty {
-                                    Text(note).font(.caption).foregroundColor(.secondary)
+                                
+                                // 完整URL（可复制）
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "link")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("URL")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .fontWeight(.medium)
+                                    }
+                                    Text(link.url)
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                        .textSelection(.enabled)
+                                        .lineLimit(3)
+                                }
+                                
+                                // 原始URL（如果存在）
+                                if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.turn.up.left")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("原始URL")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .fontWeight(.medium)
+                                        }
+                                        Text(originalURL)
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                            .textSelection(.enabled)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                
+                                // 摘要
+                                if let summary = link.summary, !summary.isEmpty {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "doc.text")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("摘要")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .fontWeight(.medium)
+                                        }
+                                        Text(summary)
+                                            .font(.body)
+                                            .foregroundColor(.primary)
+                                            .textSelection(.enabled)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .padding(.top, 4)
+                                }
+                                
+                                Divider()
+                                
+                                // 时间信息
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "clock")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("时间信息")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .fontWeight(.medium)
+                                    }
+                                    
+                                    HStack(spacing: 16) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("添加")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Text(formatDate(link.addedAt))
+                                                .font(.caption)
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("修改")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Text(formatDate(link.modifiedAt))
+                                                .font(.caption)
+                                        }
+                                        
+                                        if link.readAt > 0 {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("阅读")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Text(formatDate(link.readAt))
+                                                    .font(.caption)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // 高亮数量
+                                if let total = link.highlightTotal, total > 0 {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "highlighter")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("\(total) 个高亮")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
                             }
                             .padding()
-                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.08)))
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.controlBackgroundColor)))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                            )
+                        }
+
+                        // 高亮列表
+                        let highlights = viewModel.highlightsByLinkId[linkId] ?? []
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "quote.opening")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                Text("高亮笔记")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if highlights.isEmpty {
+                                    Text("加载中...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("\(highlights.count) 条")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.bottom, 4)
+                            
+                            if !highlights.isEmpty {
+                                
+                        ForEach(highlights, id: \.id) { item in
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        // 高亮内容
+                                        HStack(alignment: .top, spacing: 8) {
+                                            // 颜色标记
+                                            if let color = item.color {
+                                                RoundedRectangle(cornerRadius: 2)
+                                                    .fill(highlightColor(for: color))
+                                                    .frame(width: 4)
+                                            }
+                                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(item.content)
+                                                    .font(.body)
+                                                    .textSelection(.enabled)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                                
+                                                // 笔记
+                                if let note = item.note, !note.isEmpty {
+                                                    HStack(alignment: .top, spacing: 6) {
+                                                        Image(systemName: "note.text")
+                                                            .font(.caption)
+                                                            .foregroundColor(.orange)
+                                                        Text(note)
+                                                            .font(.callout)
+                                                            .foregroundColor(.primary)
+                                                            .textSelection(.enabled)
+                                                            .fixedSize(horizontal: false, vertical: true)
+                                                    }
+                                                    .padding(10)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 8)
+                                                            .fill(Color.orange.opacity(0.08))
+                                                    )
+                                                }
+                                                
+                                                // 时间戳
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "calendar")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.secondary)
+                                                    Text(formatDate(item.time))
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding()
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+                                    )
+                                }
+                            } else {
+                                // 空状态提示
+                                Text("该链接暂无高亮笔记")
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                            }
                         }
                     }
                     .padding()
                 }
                 .onAppear {
+                    print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
                     viewModel.loadHighlights(for: linkId)
+                }
+                .onChange(of: linkId) { newLinkId in
+                    print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
+                    viewModel.loadHighlights(for: newLinkId)
                 }
                 .navigationTitle("GoodLinks")
             } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "text.quote").font(.largeTitle).foregroundColor(.secondary)
-                    Text("选择条目后将在此显示高亮内容").foregroundColor(.secondary)
+                VStack(spacing: 12) {
+                    Image(systemName: "text.quote")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("选择条目后将在此显示详细内容")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle("GoodLinks")
             }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// 格式化时间戳为可读日期
+    private func formatDate(_ timestamp: Double) -> String {
+        guard timestamp > 0 else { return "未知" }
+        let date = Date(timeIntervalSince1970: timestamp)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.string(from: date)
+    }
+    
+    /// 根据GoodLinks的颜色值返回对应的SwiftUI Color
+    /// GoodLinks使用整数表示颜色，具体映射可能需要根据实际情况调整
+    private func highlightColor(for colorCode: Int) -> Color {
+        switch colorCode {
+        case 0: return .yellow
+        case 1: return .red
+        case 2: return .green
+        case 3: return .blue
+        case 4: return .purple
+        default: return .gray
         }
     }
 }
