@@ -35,5 +35,3 @@ struct GoodLinksContentRow: Codable, Equatable {
     let wordCount: Int
     let videoDuration: Int?
 }
-
-

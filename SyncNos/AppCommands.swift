@@ -147,5 +147,3 @@ struct AppCommands: Commands {
         NSWorkspace.shared.open(githubURL)
     }
 }
-
-

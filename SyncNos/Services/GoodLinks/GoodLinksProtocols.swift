@@ -19,5 +19,3 @@ protocol GoodLinksReadOnlySessionProtocol: AnyObject {
     func fetchContent(linkId: String) throws -> GoodLinksContentRow?
     func close()
 }
-
-

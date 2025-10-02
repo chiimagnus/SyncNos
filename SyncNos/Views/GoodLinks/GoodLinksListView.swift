@@ -77,5 +77,3 @@ struct GoodLinksListView: View {
         }
     }
 }
-
-

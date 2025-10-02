@@ -82,5 +82,3 @@ struct AppleBooksListView: View {
         }
     }
 }
-
-
