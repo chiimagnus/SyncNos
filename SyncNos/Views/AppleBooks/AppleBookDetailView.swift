@@ -125,42 +125,13 @@ struct AppleBookDetailView: View {
                         // Highlights section (Waterfall / Masonry)
                         WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                             ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                                ZStack(alignment: .topTrailing) {
-                                    VStack(alignment: .leading, spacing: 8) {                                
-                                        Text(highlight.text)
-                                            .font(.body)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        
-                                        if let note = highlight.note, !note.isEmpty {
-                                            Text(note)
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                if let dateAdded = highlight.dateAdded {
-                                                    Text("Created: \(dateAdded, formatter: Self.dateFormatter)")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-
-                                                if let modified = highlight.modified {
-                                                    Text("Modified: \(modified, formatter: Self.dateFormatter)")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-                                            }
-
-                                            Spacer(minLength: 0)
-                                        }
-                                    }
-                                    .padding(12)
-                                    .background(
-                                        highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.12)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    
+                                HighlightCardView(
+                                    colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
+                                    content: highlight.text,
+                                    note: highlight.note,
+                                    createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
+                                    modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
+                                ) {
                                     Button {
                                         if let location = highlight.location {
                                             let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
@@ -175,7 +146,6 @@ struct AppleBookDetailView: View {
                                             .foregroundColor(.primary)
                                     }
                                     .buttonStyle(.plain)
-                                    .padding(8)
                                     .help("Open in Apple Books")
                                     .accessibilityLabel("Open in Apple Books")
                                 }

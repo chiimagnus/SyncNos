@@ -40,6 +40,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         .font(.body)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // 用户笔记（如果有）
                     if let note = note, !note.isEmpty {
@@ -53,6 +54,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
@@ -85,10 +87,12 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 12)
                 .padding(.vertical, 12)
                 .padding(.trailing, 12)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.gray.opacity(0.06))
@@ -102,6 +106,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
             accessory()
                 .padding(8)
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
