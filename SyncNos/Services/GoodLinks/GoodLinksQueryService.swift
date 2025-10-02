@@ -96,6 +96,27 @@ final class GoodLinksQueryService {
         }
         return rows
     }
+    
+    func fetchContent(db: OpaquePointer, linkId: String) throws -> GoodLinksContentRow? {
+        let sql = "SELECT id, content, wordCount, videoDuration FROM content WHERE id=?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1105, userInfo: [NSLocalizedDescriptionKey: "prepare content failed"])
+        }
+        defer { sqlite3_finalize(stmt) }
+        let ns = linkId as NSString
+        sqlite3_bind_text(stmt, 1, ns.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            guard let c0 = sqlite3_column_text(stmt, 0) else { return nil }
+            let id = String(cString: c0)
+            let content = sqlite3_column_text(stmt, 1).map { String(cString: $0) }
+            let wordCount = Int(sqlite3_column_int64(stmt, 2))
+            let videoDuration: Int? = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 3))
+            return GoodLinksContentRow(id: id, content: content, wordCount: wordCount, videoDuration: videoDuration)
+        }
+        return nil
+    }
 }
 
 

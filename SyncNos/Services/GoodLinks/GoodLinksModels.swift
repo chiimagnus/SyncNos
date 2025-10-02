@@ -29,4 +29,11 @@ struct GoodLinksLinkHighlightCount: Equatable {
     let count: Int
 }
 
+struct GoodLinksContentRow: Codable, Equatable {
+    let id: String
+    let content: String?
+    let wordCount: Int
+    let videoDuration: Int?
+}
+
 

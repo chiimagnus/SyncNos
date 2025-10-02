@@ -16,6 +16,7 @@ protocol GoodLinksReadOnlySessionProtocol: AnyObject {
     func fetchHighlights(limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
     func fetchHighlightsForLink(linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
     func fetchHighlightCountsByLink() throws -> [GoodLinksLinkHighlightCount]
+    func fetchContent(linkId: String) throws -> GoodLinksContentRow?
     func close()
 }
 
