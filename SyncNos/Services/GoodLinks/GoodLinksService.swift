@@ -66,8 +66,6 @@ final class GoodLinksDatabaseService: GoodLinksDatabaseServiceProtocol, GoodLink
     }
 }
 
-
-
 // MARK: - GoodLinks Bookmark Store (security-scoped)
 final class GoodLinksBookmarkStore {
     static let shared = GoodLinksBookmarkStore()

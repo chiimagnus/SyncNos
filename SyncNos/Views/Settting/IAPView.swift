@@ -68,5 +68,3 @@ struct IAPView_Previews: PreviewProvider {
         IAPView()
     }
 }
-
-

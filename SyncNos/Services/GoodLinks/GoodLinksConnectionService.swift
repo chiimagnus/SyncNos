@@ -37,5 +37,3 @@ final class GoodLinksConnectionService {
         if let d = db { sqlite3_close(d) }
     }
 }
-
-

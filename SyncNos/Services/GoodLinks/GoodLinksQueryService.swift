@@ -118,5 +118,3 @@ final class GoodLinksQueryService {
         return nil
     }
 }
-
-

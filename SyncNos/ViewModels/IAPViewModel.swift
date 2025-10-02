@@ -62,5 +62,3 @@ final class IAPViewModel: ObservableObject {
         }
     }
 }
-
-
