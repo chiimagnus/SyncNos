@@ -64,159 +64,126 @@ struct GoodLinksDetailView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                            // 文章信息卡片
-                            VStack(alignment: .leading, spacing: 12) {
-                                // 标题
-                                Text(link.title?.isEmpty == false ? link.title! : link.url)
-                                    .font(.title2)
-                                    .bold()
-                                    .textSelection(.enabled)
-                                
-                                // 作者
-                                if let author = link.author, !author.isEmpty {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "person.fill")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text(author)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                
-                                // 完整URL（可复制）
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "link")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text("URL")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .fontWeight(.medium)
-                                    }
-                                    Text(link.url)
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                        .textSelection(.enabled)
-                                        .lineLimit(3)
-                                }
-                                
-                                // 原始URL（如果存在）
-                                if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
+                            // 文章信息卡片 - 使用统一卡片
+                            InfoHeaderCardView(
+                                title: link.title?.isEmpty == false ? link.title! : link.url,
+                                subtitle: link.author
+                            ) {
+                                // trailing 区域留空（可后续加分享/打开按钮）
+                            } content: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    // URL 与原始URL
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
-                                            Image(systemName: "arrow.turn.up.left")
+                                            Image(systemName: "link")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
-                                            Text("原始URL")
+                                            Text("URL")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                                 .fontWeight(.medium)
                                         }
-                                        Text(originalURL)
+                                        Text(link.url)
                                             .font(.caption)
                                             .foregroundColor(.blue)
                                             .textSelection(.enabled)
-                                            .lineLimit(2)
+                                            .lineLimit(3)
                                     }
-                                }
-                                
-                                // 摘要
-                                if let summary = link.summary, !summary.isEmpty {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "doc.text")
+
+                                    if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "arrow.turn.up.left")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                Text("原始URL")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                    .fontWeight(.medium)
+                                            }
+                                            Text(originalURL)
                                                 .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Text("摘要")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                                .fontWeight(.medium)
+                                                .foregroundColor(.blue)
+                                                .textSelection(.enabled)
+                                                .lineLimit(2)
                                         }
-                                        Text(summary)
-                                            .font(.body)
-                                            .foregroundColor(.primary)
-                                            .textSelection(.enabled)
-                                            .fixedSize(horizontal: false, vertical: true)
                                     }
-                                    .padding(.top, 4)
-                                }
-                                
-                                Divider()
-                                
-                                // 时间信息
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "clock")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text("时间信息")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .fontWeight(.medium)
+
+                                    // 摘要
+                                    if let summary = link.summary, !summary.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "doc.text")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                Text("摘要")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                    .fontWeight(.medium)
+                                            }
+                                            Text(summary)
+                                                .font(.body)
+                                                .foregroundColor(.primary)
+                                                .textSelection(.enabled)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .padding(.top, 4)
                                     }
-                                    
-                                    HStack(spacing: 16) {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("添加")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                            Text(formatDate(link.addedAt))
-                                                .font(.caption)
-                                        }
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("修改")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                            Text(formatDate(link.modifiedAt))
-                                                .font(.caption)
-                                        }
-                                        
-                                        if link.readAt > 0 {
+
+                                    Divider()
+
+                                    // 时间与统计
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 16) {
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text("阅读")
+                                                Text("添加")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
-                                                Text(formatDate(link.readAt))
+                                                Text(formatDate(link.addedAt))
                                                     .font(.caption)
+                                            }
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("修改")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Text(formatDate(link.modifiedAt))
+                                                    .font(.caption)
+                                            }
+                                            if link.readAt > 0 {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text("阅读")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.secondary)
+                                                    Text(formatDate(link.readAt))
+                                                        .font(.caption)
+                                                }
+                                            }
+                                        }
+                                        HStack(spacing: 12) {
+                                            if let total = link.highlightTotal, total > 0 {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "highlighter")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                    Text("\(total) 个高亮")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
+                                            if let content = viewModel.contentByLinkId[linkId] {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "doc.plaintext")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                    Text("\(content.wordCount) 字")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
                                             }
                                         }
                                     }
                                 }
-                                
-                                // 高亮数量和字数
-                                HStack(spacing: 12) {
-                                    if let total = link.highlightTotal, total > 0 {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "highlighter")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Text("\(total) 个高亮")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    
-                                    if let content = viewModel.contentByLinkId[linkId] {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "doc.plaintext")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Text("\(content.wordCount) 字")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
                             }
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.controlBackgroundColor)))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                            )
                         }
                         
                         // 全文内容
