@@ -287,5 +287,3 @@ struct GoodLinksDetailView: View {
         }
     }
 }
-
-

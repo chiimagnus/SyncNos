@@ -24,5 +24,3 @@ struct UserGuideView_Previews: PreviewProvider {
         UserGuideView()
     }
 }
-
-

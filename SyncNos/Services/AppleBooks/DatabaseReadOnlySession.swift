@@ -51,5 +51,3 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         close()
     }
 }
-
-
