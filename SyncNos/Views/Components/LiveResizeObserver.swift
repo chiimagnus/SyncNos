@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// Track macOS window live-resize events and expose as a SwiftUI binding.
+// 监听 macOS 窗口的 live resize 事件，并通过 @Binding 将“是否正在调整大小”的状态回传给 SwiftUI（isResizing）。开始拖拽时置为 true，结束时置为 false。
 public struct LiveResizeObserver: NSViewRepresentable {
     @Binding var isResizing: Bool
 
