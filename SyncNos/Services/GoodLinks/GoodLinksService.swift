@@ -30,6 +30,10 @@ final class GoodLinksReadOnlySession: GoodLinksReadOnlySessionProtocol {
     func fetchHighlightCountsByLink() throws -> [GoodLinksLinkHighlightCount] {
         try query.fetchHighlightCountsByLink(db: db)
     }
+    
+    func fetchContent(linkId: String) throws -> GoodLinksContentRow? {
+        try query.fetchContent(db: db, linkId: linkId)
+    }
 
     func close() {
         connection.close(db)
@@ -152,6 +156,7 @@ public struct GoodLinksPicker {
 final class GoodLinksViewModel: ObservableObject {
     @Published var links: [GoodLinksLinkRow] = []
     @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
+    @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
@@ -210,6 +215,29 @@ final class GoodLinksViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.errorMessage = desc
                 }
+            }
+        }
+    }
+    
+    func loadContent(for linkId: String) {
+        logger.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            do {
+                let dbPath = self.resolveDatabasePath()
+                let session = try self.service.makeReadOnlySession(dbPath: dbPath)
+                defer { session.close() }
+                if let content = try session.fetchContent(linkId: linkId) {
+                    self.logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
+                    DispatchQueue.main.async {
+                        self.contentByLinkId[linkId] = content
+                    }
+                } else {
+                    self.logger.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
+                }
+            } catch {
+                let desc = error.localizedDescription
+                self.logger.error("[GoodLinks] loadContent error: \(desc)")
             }
         }
     }
