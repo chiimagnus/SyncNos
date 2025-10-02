@@ -1,54 +1,6 @@
 import SwiftUI
 import AppKit
 
-// Track macOS window live-resize events and expose as a SwiftUI binding.
-private struct LiveResizeObserver: NSViewRepresentable {
-    @Binding var isResizing: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isResizing: $isResizing)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = TrackingView()
-        view.onStart = { context.coordinator.setResizing(true) }
-        view.onEnd = { context.coordinator.setResizing(false) }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    final class TrackingView: NSView {
-        var onStart: (() -> Void)?
-        var onEnd: (() -> Void)?
-
-        override func viewWillStartLiveResize() {
-            onStart?()
-        }
-
-        override func viewDidEndLiveResize() {
-            onEnd?()
-        }
-    }
-
-    final class Coordinator {
-        var isResizing: Binding<Bool>
-        init(isResizing: Binding<Bool>) { self.isResizing = isResizing }
-        func setResizing(_ newValue: Bool) {
-            let apply = {
-                if self.isResizing.wrappedValue != newValue {
-                    self.isResizing.wrappedValue = newValue
-                }
-            }
-            if Thread.isMainThread {
-                apply()
-            } else {
-                DispatchQueue.main.async { apply() }
-            }
-        }
-    }
-}
-
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
