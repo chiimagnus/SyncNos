@@ -50,5 +50,3 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
         )
     }
 }
-
-
