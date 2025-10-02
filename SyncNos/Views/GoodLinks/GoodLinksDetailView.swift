@@ -1,8 +1,62 @@
 import SwiftUI
+import AppKit
+
+// Track macOS window live-resize events and expose as a SwiftUI binding.
+private struct LiveResizeObserver: NSViewRepresentable {
+    @Binding var isResizing: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isResizing: $isResizing)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = TrackingView()
+        view.onStart = { context.coordinator.setResizing(true) }
+        view.onEnd = { context.coordinator.setResizing(false) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class TrackingView: NSView {
+        var onStart: (() -> Void)?
+        var onEnd: (() -> Void)?
+
+        override func viewWillStartLiveResize() {
+            onStart?()
+        }
+
+        override func viewDidEndLiveResize() {
+            onEnd?()
+        }
+    }
+
+    final class Coordinator {
+        var isResizing: Binding<Bool>
+        init(isResizing: Binding<Bool>) { self.isResizing = isResizing }
+        func setResizing(_ newValue: Bool) {
+            let apply = {
+                if self.isResizing.wrappedValue != newValue {
+                    self.isResizing.wrappedValue = newValue
+                }
+            }
+            if Thread.isMainThread {
+                apply()
+            } else {
+                DispatchQueue.main.async { apply() }
+            }
+        }
+    }
+}
 
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
+    
+    // Freeze layout width during live resize to avoid heavy recomputation.
+    @State private var isLiveResizing: Bool = false
+    @State private var measuredLayoutWidth: CGFloat = 0
+    @State private var frozenLayoutWidth: CGFloat? = nil
 
     var body: some View {
         Group {
@@ -222,62 +276,27 @@ struct GoodLinksDetailView: View {
                             .padding(.bottom, 4)
                             
                             if !highlights.isEmpty {
-                                
-                        ForEach(highlights, id: \.id) { item in
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        // 高亮内容
-                                        HStack(alignment: .top, spacing: 8) {
-                                            // 颜色标记
-                                            if let color = item.color {
-                                                RoundedRectangle(cornerRadius: 2)
-                                                    .fill(highlightColor(for: color))
-                                                    .frame(width: 4)
-                                            }
-                                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(item.content)
-                                                    .font(.body)
-                                                    .textSelection(.enabled)
-                                                    .fixedSize(horizontal: false, vertical: true)
-                                                
-                                                // 笔记
-                                if let note = item.note, !note.isEmpty {
-                                                    HStack(alignment: .top, spacing: 6) {
-                                                        Image(systemName: "note.text")
-                                                            .font(.caption)
-                                                            .foregroundColor(.orange)
-                                                        Text(note)
-                                                            .font(.callout)
-                                                            .foregroundColor(.primary)
-                                                            .textSelection(.enabled)
-                                                            .fixedSize(horizontal: false, vertical: true)
-                                                    }
-                                                    .padding(10)
-                                                    .background(
-                                                        RoundedRectangle(cornerRadius: 8)
-                                                            .fill(Color.orange.opacity(0.08))
-                                                    )
-                                                }
-                                                
-                                                // 时间戳
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "calendar")
-                                                        .font(.caption2)
-                                                        .foregroundColor(.secondary)
-                                                    Text(formatDate(item.time))
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-                                            }
-                                        }
+                                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                                    ForEach(highlights, id: \.id) { item in
+                                        HighlightCardView(
+                                            colorMark: item.color.map { highlightColor(for: $0) } ?? Color.gray.opacity(0.5),
+                                            content: item.content,
+                                            note: item.note,
+                                            createdDate: formatDate(item.time),
+                                            modifiedDate: nil
+                                        )
                                     }
-                                    .padding()
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-                                    )
                                 }
+                                .overlay(
+                                    GeometryReader { proxy in
+                                        let w = proxy.size.width
+                                        Color.clear
+                                            .onAppear { measuredLayoutWidth = w }
+                                            .onChange(of: w) { newValue in
+                                                measuredLayoutWidth = newValue
+                                            }
+                                    }
+                                )
                             } else {
                                 // 空状态提示
                                 Text("该链接暂无高亮笔记")
@@ -298,6 +317,14 @@ struct GoodLinksDetailView: View {
                     print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
                     viewModel.loadHighlights(for: newLinkId)
                     viewModel.loadContent(for: newLinkId)
+                }
+                .background(LiveResizeObserver(isResizing: $isLiveResizing))
+                .onChange(of: isLiveResizing) { resizing in
+                    if resizing {
+                        frozenLayoutWidth = measuredLayoutWidth
+                    } else {
+                        frozenLayoutWidth = nil
+                    }
                 }
                 .navigationTitle("GoodLinks")
             } else {
