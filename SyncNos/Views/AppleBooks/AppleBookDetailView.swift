@@ -99,28 +99,27 @@ struct AppleBookDetailView: View {
             if let book = selectedBook {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // Book header
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(book.bookTitle)
-                                .font(.title)
-                                .fontWeight(.bold)
-                            
-                            Text("by \(book.authorName)")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                            
-                            Text("\(book.highlightCount) highlights")
-                                .font(.subheadline)
-                            
+                        // Book header using unified card
+                        InfoHeaderCardView(
+                            title: book.bookTitle,
+                            subtitle: "by \(book.authorName)"
+                        ) {
                             if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
                                 Link("Open in Apple Books", destination: ibooksURL)
                                     .font(.subheadline)
-                                    .padding(.top, 4)
+                            }
+                        } content: {
+                            HStack(spacing: 12) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "highlighter")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(book.highlightCount) highlights")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
                         
                         // Highlights section (Waterfall / Masonry)
                         WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
