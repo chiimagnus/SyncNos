@@ -4,17 +4,20 @@ import SwiftUI
 struct InfoHeaderCardView<Content: View, Trailing: View>: View {
     let title: String
     let subtitle: String?
+    let overrideWidth: CGFloat?
     let trailing: () -> Trailing
     let content: () -> Content
 
     init(
         title: String,
         subtitle: String? = nil,
+        overrideWidth: CGFloat? = nil,
         @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() },
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.subtitle = subtitle
+        self.overrideWidth = overrideWidth
         self.trailing = trailing
         self.content = content
     }
@@ -40,6 +43,7 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
             content()
         }
         .padding()
+        .frame(width: overrideWidth)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.06))

@@ -19,7 +19,8 @@ struct GoodLinksDetailView: View {
                             // 文章信息卡片 - 使用统一卡片
                             InfoHeaderCardView(
                                 title: link.title?.isEmpty == false ? link.title! : link.url,
-                                subtitle: link.author
+                                subtitle: link.author,
+                                overrideWidth: frozenLayoutWidth
                             ) {
                                 // trailing 区域留空（可后续加分享/打开按钮）
                             } content: {
@@ -169,6 +170,7 @@ struct GoodLinksDetailView: View {
                                             .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
                                     )
                             }
+                            .frame(width: frozenLayoutWidth)
                         }
 
                         // 高亮列表

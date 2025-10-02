@@ -39,9 +39,7 @@ struct AppleBookDetailView: View {
             return Color.gray.opacity(0.3)
         }
     }
-    
-    // Removed gridColumns; WaterfallLayout handles adaptive columns.
-    
+        
     private var selectedBook: BookListItem? {
         viewModelList.books.first { $0.bookId == (selectedBookId ?? "") } ?? viewModelList.books.first
     }
@@ -54,7 +52,8 @@ struct AppleBookDetailView: View {
                         // Book header using unified card
                         InfoHeaderCardView(
                             title: book.bookTitle,
-                            subtitle: "by \(book.authorName)"
+                            subtitle: "by \(book.authorName)",
+                            overrideWidth: frozenLayoutWidth
                         ) {
                             if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
                                 Link("Open in Apple Books", destination: ibooksURL)
