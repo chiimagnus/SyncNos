@@ -132,15 +132,28 @@ struct GoodLinksDetailView: View {
                                     }
                                 }
                                 
-                                // 高亮数量
-                                if let total = link.highlightTotal, total > 0 {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "highlighter")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text("\(total) 个高亮")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                // 高亮数量和字数
+                                HStack(spacing: 12) {
+                                    if let total = link.highlightTotal, total > 0 {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "highlighter")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("\(total) 个高亮")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    
+                                    if let content = viewModel.contentByLinkId[linkId] {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "doc.plaintext")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("\(content.wordCount) 字")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                 }
                             }
@@ -150,6 +163,39 @@ struct GoodLinksDetailView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
                             )
+                        }
+                        
+                        // 全文内容
+                        if let contentRow = viewModel.contentByLinkId[linkId], 
+                           let fullText = contentRow.content, 
+                           !fullText.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "doc.text.fill")
+                                        .font(.headline)
+                                        .foregroundColor(.secondary)
+                                    Text("文章全文")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Text("\(contentRow.wordCount) 字")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.bottom, 4)
+                                
+                                Text(fullText)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding()
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+                                    )
+                            }
                         }
 
                         // 高亮列表
@@ -246,10 +292,12 @@ struct GoodLinksDetailView: View {
                 .onAppear {
                     print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
                     viewModel.loadHighlights(for: linkId)
+                    viewModel.loadContent(for: linkId)
                 }
                 .onChange(of: linkId) { newLinkId in
                     print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
                     viewModel.loadHighlights(for: newLinkId)
+                    viewModel.loadContent(for: newLinkId)
                 }
                 .navigationTitle("GoodLinks")
             } else {
