@@ -199,7 +199,7 @@ final class GoodLinksViewModel: ObservableObject {
         self.service = service
     }
 
-    func loadRecentLinks(limit: Int = 200) {
+    func loadRecentLinks(limit: Int = 0) {
         isLoading = true
         errorMessage = nil
 
