@@ -170,7 +170,7 @@ struct GoodLinksDetailView: View {
                                             .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
                                     )
                             }
-                            .frame(width: frozenLayoutWidth)
+                            .frame(maxWidth: frozenLayoutWidth, alignment: .leading)
                         }
 
                         // 高亮列表
