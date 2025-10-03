@@ -7,17 +7,25 @@ struct ArticleContentCardView: View {
     let contentText: String
     let overrideWidth: CGFloat?
     @Binding var measuredWidth: CGFloat
+    let collapsedLineLimit: Int
+    let revealThreshold: Int?
+
+    @State private var isExpanded: Bool = false
 
     init(
         wordCount: Int,
         contentText: String,
         overrideWidth: CGFloat? = nil,
-        measuredWidth: Binding<CGFloat>
+        measuredWidth: Binding<CGFloat>,
+        collapsedLineLimit: Int = 12,
+        revealThreshold: Int? = 800
     ) {
         self.wordCount = wordCount
         self.contentText = contentText
         self.overrideWidth = overrideWidth
         self._measuredWidth = measuredWidth
+        self.collapsedLineLimit = collapsedLineLimit
+        self.revealThreshold = revealThreshold
     }
 
     var body: some View {
@@ -40,13 +48,26 @@ struct ArticleContentCardView: View {
                 .font(.body)
                 .foregroundColor(.primary)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                .fixedSize(horizontal: false, vertical: isExpanded)
                 .padding()
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
                 )
+
+            if shouldShowToggle {
+                Button(action: { isExpanded.toggle() }) {
+                    HStack(spacing: 6) {
+                        Text(isExpanded ? "收起" : "展开全部")
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .imageScale(.small)
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.link)
+            }
         }
         .overlay(
             GeometryReader { proxy in
@@ -59,6 +80,15 @@ struct ArticleContentCardView: View {
             }
         )
         .frame(maxWidth: overrideWidth, alignment: .leading)
+    }
+}
+
+private extension ArticleContentCardView {
+    var shouldShowToggle: Bool {
+        if let threshold = revealThreshold {
+            return contentText.count > threshold
+        }
+        return true
     }
 }
 
