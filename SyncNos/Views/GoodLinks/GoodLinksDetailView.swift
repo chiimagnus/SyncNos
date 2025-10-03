@@ -227,6 +227,7 @@ struct GoodLinksDetailView: View {
                             }
                         }
                     }
+                    // .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                 }
                 .onAppear {
