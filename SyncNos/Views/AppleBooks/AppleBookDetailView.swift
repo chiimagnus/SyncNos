@@ -24,19 +24,19 @@ struct AppleBookDetailView: View {
     static func highlightStyleColor(for style: Int) -> Color {
         switch style {
         case 0:
-            return Color.orange.opacity(0.3) // Underline style
+            return Color.orange // Underline style
         case 1:
-            return Color.green.opacity(0.3)
+            return Color.green
         case 2:
-            return Color.blue.opacity(0.3)
+            return Color.blue
         case 3:
-            return Color.yellow.opacity(0.3)
+            return Color.yellow
         case 4:
-            return Color.pink.opacity(0.3)
+            return Color.pink
         case 5:
-            return Color.purple.opacity(0.3)
+            return Color.purple
         default:
-            return Color.gray.opacity(0.3)
+            return Color.gray
         }
     }
         
