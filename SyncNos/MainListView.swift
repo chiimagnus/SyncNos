@@ -31,7 +31,7 @@ struct MainListView: View {
                             contentSourceRawValue = ContentSource.appleBooks.rawValue
                         } label: {
                             HStack {
-                                Text("Apple Books")
+                                Text("AppleBooks")
                                 if contentSource == .appleBooks { Image(systemName: "checkmark") }
                             }
                         }
