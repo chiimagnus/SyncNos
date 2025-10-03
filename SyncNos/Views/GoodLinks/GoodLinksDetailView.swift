@@ -249,17 +249,6 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 .navigationTitle("GoodLinks")
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "text.quote")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    Text("选择条目后将在此显示详细内容")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("GoodLinks")
             }
         }
     }
