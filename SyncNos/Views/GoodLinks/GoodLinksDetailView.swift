@@ -25,6 +25,20 @@ struct GoodLinksDetailView: View {
                                 // trailing 区域留空（可后续加分享/打开按钮）
                             } content: {
                                 VStack(alignment: .leading, spacing: 10) {
+                                    // 收藏与标签
+                                    HStack(spacing: 8) {
+                                        if link.starred {
+                                            Label("已收藏", systemImage: "star.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.yellow)
+                                        }
+                                        if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                            Label(tags, systemImage: "tag")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
                                     // URL 与原始URL
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
