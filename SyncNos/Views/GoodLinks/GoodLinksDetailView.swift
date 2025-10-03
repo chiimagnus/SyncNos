@@ -170,7 +170,17 @@ struct GoodLinksDetailView: View {
                                             .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
                                     )
                             }
-                            // .frame(maxWidth: frozenLayoutWidth, alignment: .leading)
+                            .overlay(
+                                GeometryReader { proxy in
+                                    let w = proxy.size.width
+                                    Color.clear
+                                        .onAppear { measuredLayoutWidth = w }
+                                        .onChange(of: w) { newValue in
+                                            measuredLayoutWidth = newValue
+                                        }
+                                }
+                            )                            
+                            .frame(maxWidth: frozenLayoutWidth, alignment: .leading)
                         }
 
                         // 高亮列表
