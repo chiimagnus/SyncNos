@@ -18,7 +18,7 @@ struct GoodLinksListView: View {
                         Label("Open GoodLinks data", systemImage: "folder")
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.links.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "link").foregroundColor(.secondary).font(.largeTitle)
@@ -29,7 +29,7 @@ struct GoodLinksListView: View {
                         Label("Open GoodLinks data", systemImage: "folder")
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(selection: $selectedLinkId) {
                     ForEach(viewModel.links, id: \.id) { link in
