@@ -40,34 +40,30 @@ struct GoodLinksDetailView: View {
                                         }
                                     }
                                     // URL 与原始URL
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "link")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            Text("URL")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                                .fontWeight(.medium)
-                                        }
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "link")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("URL")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .fontWeight(.medium)
                                         Text(link.url)
                                             .font(.caption)
                                             .foregroundColor(.blue)
                                             .textSelection(.enabled)
-                                            .lineLimit(3)
+                                            .lineLimit(3)                                        
                                     }
 
                                     if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "arrow.turn.up.left")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                Text("原始URL")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                    .fontWeight(.medium)
-                                            }
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.turn.up.left")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("原始URL")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .fontWeight(.medium)
                                             Text(originalURL)
                                                 .font(.caption)
                                                 .foregroundColor(.blue)
@@ -123,18 +119,6 @@ struct GoodLinksDetailView: View {
                                                         .foregroundColor(.secondary)
                                                     Text(formatDate(link.readAt))
                                                         .font(.caption)
-                                                }
-                                            }
-                                        }
-                                        HStack(spacing: 12) {
-                                            if let total = link.highlightTotal, total > 0 {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "highlighter")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                    Text("\(total) 个高亮")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
                                                 }
                                             }
                                         }
