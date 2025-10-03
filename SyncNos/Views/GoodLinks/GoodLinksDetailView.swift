@@ -123,16 +123,6 @@ struct GoodLinksDetailView: View {
                                                         .foregroundColor(.secondary)
                                                 }
                                             }
-                                            if let content = viewModel.contentByLinkId[linkId] {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "doc.plaintext")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                    Text("\(content.wordCount) 字")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-                                            }
                                         }
                                     }
                                 }
