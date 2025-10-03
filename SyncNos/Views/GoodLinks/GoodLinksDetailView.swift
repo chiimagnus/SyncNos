@@ -219,6 +219,7 @@ struct GoodLinksDetailView: View {
                 .navigationTitle("GoodLinks")
             }
         }
+        .frame(minWidth: 400, idealWidth: 600)
     }
     
     // MARK: - Helper Functions
