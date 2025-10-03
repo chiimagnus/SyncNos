@@ -143,44 +143,12 @@ struct GoodLinksDetailView: View {
                         if let contentRow = viewModel.contentByLinkId[linkId], 
                            let fullText = contentRow.content, 
                            !fullText.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "doc.text.fill")
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
-                                    Text("文章全文")
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                    Text("\(contentRow.wordCount) 字")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.bottom, 4)
-                                
-                                Text(fullText)
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding()
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-                                    )
-                            }
-                            .overlay(
-                                GeometryReader { proxy in
-                                    let w = proxy.size.width
-                                    Color.clear
-                                        .onAppear { measuredLayoutWidth = w }
-                                        .onChange(of: w) { newValue in
-                                            measuredLayoutWidth = newValue
-                                        }
-                                }
-                            )                            
-                            .frame(maxWidth: frozenLayoutWidth, alignment: .leading)
+                            ArticleContentCardView(
+                                wordCount: contentRow.wordCount,
+                                contentText: fullText,
+                                overrideWidth: frozenLayoutWidth,
+                                measuredWidth: $measuredLayoutWidth
+                            )
                         }
 
                         // 高亮列表
