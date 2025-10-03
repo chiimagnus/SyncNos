@@ -239,11 +239,11 @@ struct GoodLinksDetailView: View {
     private func highlightColor(for colorCode: Int) -> Color {
         switch colorCode {
         case 0: return .yellow
-        case 1: return .red
-        case 2: return .green
-        case 3: return .blue
+        case 1: return .green
+        case 2: return .blue
+        case 3: return .red
         case 4: return .purple
-        default: return .gray
+        default: return .mint
         }
     }
 }
