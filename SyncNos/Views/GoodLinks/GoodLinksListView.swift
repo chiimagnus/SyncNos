@@ -44,6 +44,15 @@ struct GoodLinksListView: View {
                                 HStack(spacing: 8) {
                                     if let cnt = link.highlightTotal { Text("\(cnt) highlights").font(.caption).foregroundColor(.secondary) }
                                     Text(URL(string: link.url)?.host ?? "").font(.caption).foregroundColor(.secondary)
+                                    if link.starred {
+                                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
+                                    }
+                                }
+                                if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Text(tags)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
                                 }
                             }
                             Spacer()
