@@ -43,7 +43,7 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
             content()
         }
         .padding()
-        .frame(width: overrideWidth)
+        .frame(maxWidth: overrideWidth, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.06))
