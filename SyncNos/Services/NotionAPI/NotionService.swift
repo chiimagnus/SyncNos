@@ -196,17 +196,24 @@ final class NotionService: NotionServiceProtocol {
                 ]
             ]]
         }
-        // Reserve delimited section anchors for GoodLinks content upsert
+        // Initial structure: Article (empty) + Highlights header
+        children.append([
+            "object": "block",
+            "heading_2": [
+                "rich_text": [["text": ["content": "Article"]]]
+            ]
+        ])
+        // Placeholder empty paragraph; actual content will replace page children later
         children.append([
             "object": "block",
             "paragraph": [
-                "rich_text": [["text": ["content": "[[GL_CONTENT_START]]"]]]
+                "rich_text": []
             ]
         ])
         children.append([
             "object": "block",
-            "paragraph": [
-                "rich_text": [["text": ["content": "[[GL_CONTENT_END]]"]]]
+            "heading_2": [
+                "rich_text": [["text": ["content": "Highlights"]]]
             ]
         ])
         let body: [String: Any] = [
@@ -857,6 +864,11 @@ final class NotionService: NotionServiceProtocol {
 
         // 3) Append new children
         try await appendBlocks(pageId: pageId, children: children)
+    }
+
+    // Expose as protocol method
+    func setPageChildren(pageId: String, children: [[String: Any]]) async throws {
+        try await replacePageChildren(pageId: pageId, with: children)
     }
 
     // Convert numeric style to human-friendly color name
