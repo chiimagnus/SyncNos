@@ -77,7 +77,13 @@ final class NotionService: NotionServiceProtocol {
                 // Asset ID for idempotent lookup
                 "Asset ID": ["rich_text": [:]],
                 // Book URL
-                "URL": ["url": [:]]
+                "URL": ["url": [:]],
+                // Extended properties for GoodLinks
+                "Tags": ["multi_select": [:]],
+                "Summary": ["rich_text": [:]],
+                "Starred": ["checkbox": [:]],
+                "Added At": ["date": [:]],
+                "Modified At": ["date": [:]]
             ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
@@ -178,11 +184,11 @@ final class NotionService: NotionServiceProtocol {
                 "rich_text": [["text": ["content": author]]]
             ]
         ]
-        if let urlString, !urlString.isEmpty {
+        if let urlString = urlString, !urlString.isEmpty {
             properties["URL"] = ["url": urlString]
         }
         var children: [[String: Any]] = []
-        if let header, !header.isEmpty {
+        if let header = header, !header.isEmpty {
             children = [[
                 "object": "block",
                 "heading_2": [
@@ -190,6 +196,19 @@ final class NotionService: NotionServiceProtocol {
                 ]
             ]]
         }
+        // Reserve delimited section anchors for GoodLinks content upsert
+        children.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [["text": ["content": "[[GL_CONTENT_START]]"]]]
+            ]
+        ])
+        children.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [["text": ["content": "[[GL_CONTENT_END]]"]]]
+            ]
+        ])
         let body: [String: Any] = [
             "parent": ["type": "database_id", "database_id": databaseId],
             "properties": properties,
@@ -346,6 +365,108 @@ final class NotionService: NotionServiceProtocol {
         let (data, response) = try await URLSession.shared.data(for: request)
         try Self.ensureSuccess(response: response, data: data)
         _ = data
+    }
+
+    // MARK: - Generic property/schema helpers
+    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent("databases/\(databaseId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+        let body: [String: Any] = [
+            "properties": definitions
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
+    }
+
+    func updatePageProperties(pageId: String, properties: [String: Any]) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent("pages/\(pageId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+        let body: [String: Any] = [
+            "properties": properties
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
+    }
+
+    func upsertDelimitedSection(pageId: String, startMarker: String, endMarker: String, children: [[String: Any]]) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        // 1) Fetch all children
+        var startCursor: String? = nil
+        var blocks: [BlockChildrenResponse.Block] = []
+        repeat {
+            var components = URLComponents(url: apiBase.appendingPathComponent("blocks/\(pageId)/children"), resolvingAgainstBaseURL: false)!
+            if let cursor = startCursor {
+                components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
+            }
+            var getReq = URLRequest(url: components.url!)
+            getReq.httpMethod = "GET"
+            addCommonHeaders(to: &getReq, key: key)
+            let (data, response) = try await URLSession.shared.data(for: getReq)
+            try Self.ensureSuccess(response: response, data: data)
+            let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
+            blocks.append(contentsOf: decoded.results)
+            startCursor = decoded.has_more ? decoded.next_cursor : nil
+        } while startCursor != nil
+
+        // 2) Locate markers
+        func plainText(of block: BlockChildrenResponse.Block) -> String? {
+            let holder = block.paragraph ?? block.bulleted_list_item
+            return holder?.rich_text?.compactMap { $0.plain_text }.joined()
+        }
+        var startIndex: Int? = nil
+        var endIndex: Int? = nil
+        for (idx, b) in blocks.enumerated() {
+            if let text = plainText(of: b) {
+                if text == startMarker, startIndex == nil { startIndex = idx }
+                if text == endMarker { endIndex = idx }
+            }
+        }
+
+        // 3) If both markers found and in order, delete inclusive range to rebuild at end
+        if let sIdx = startIndex, let eIdx = endIndex, sIdx <= eIdx {
+            for i in sIdx...eIdx {
+                let blockId = blocks[i].id
+                var del = URLRequest(url: apiBase.appendingPathComponent("blocks/\(blockId)"))
+                del.httpMethod = "DELETE"
+                addCommonHeaders(to: &del, key: key)
+                _ = try? await URLSession.shared.data(for: del)
+            }
+        }
+
+        // 4) Append new section at the end: start marker + children + end marker
+        var section: [[String: Any]] = []
+        section.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [["text": ["content": startMarker]],
+                ]
+            ]
+        ])
+        section.append(contentsOf: children)
+        section.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [["text": ["content": endMarker]],
+                ]
+            ]
+        ])
+        try await appendBlocks(pageId: pageId, children: section)
     }
 
     // MARK: - Database maintenance helpers

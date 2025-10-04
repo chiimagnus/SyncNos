@@ -325,6 +325,8 @@ final class GoodLinksViewModel: ObservableObject {
 
                 // 2) 确保使用 GoodLinks 专属单库
                 let databaseId = try await ensureGoodLinksDatabaseId(parentPageId: parentPageId)
+                // 2.1) 确保库中存在 GoodLinks 所需属性（可重复调用，Notion 会做幂等添加）
+                try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
                 // 3) 确保该链接对应的页面存在（以 link.id 作为 Asset ID）
                 let pageId: String
@@ -358,6 +360,42 @@ final class GoodLinksViewModel: ObservableObject {
                     batch += 1
                     let countSnapshot = collected.count
                     await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Fetched %lld highlights...", comment: ""), countSnapshot) }
+                }
+
+                // 4.1) 读取 GoodLinks 正文内容/词数/视频时长
+                let contentRow = try session.fetchContent(linkId: link.id)
+
+                // 4.2) 更新页面属性（标签、摘要、添加/修改/阅读时间、是否收藏、原始URL、字数、视频时长、阅读分钟）
+                var properties: [String: Any] = [:]
+                // Tags -> multi_select
+                if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let tagNames = Self.parseTags(from: tags)
+                    if !tagNames.isEmpty {
+                        properties["Tags"] = [
+                            "multi_select": tagNames.map { ["name": $0] }
+                        ]
+                    }
+                }
+                if let summary = link.summary, !summary.isEmpty {
+                    properties["Summary"] = ["rich_text": [["text": ["content": summary]]]]
+                }
+                properties["Starred"] = ["checkbox": link.starred]
+                if link.addedAt > 0 {
+                    let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.addedAt))
+                    properties["Added At"] = ["date": ["start": start]]
+                }
+                if link.modifiedAt > 0 {
+                    let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.modifiedAt))
+                    properties["Modified At"] = ["date": ["start": start]]
+                }
+                if !properties.isEmpty {
+                    try await notionService.updatePageProperties(pageId: pageId, properties: properties)
+                }
+
+                // 4.3) Upsert 正文内容（以分隔标记包裹，避免重复）
+                if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let children = Self.buildContentBlocks(from: contentText)
+                    try await notionService.upsertDelimitedSection(pageId: pageId, startMarker: "[[GL_CONTENT_START]]", endMarker: "[[GL_CONTENT_END]]", children: children)
                 }
 
                 // 5) 去重：读取 Notion 页面已有 UUID 映射，仅追加新高亮
@@ -439,6 +477,61 @@ final class GoodLinksViewModel: ObservableObject {
             try await notionService.appendBlocks(pageId: pageId, children: children)
             index += batchSize
         }
+    }
+
+    // MARK: - Helpers
+    private static var goodLinksPropertyDefinitions: [String: Any] {
+        return [
+            "Tags": ["multi_select": [:]],
+            "Summary": ["rich_text": [:]],
+            "Starred": ["checkbox": [:]],
+            "Added At": ["date": [:]],
+            "Modified At": ["date": [:]]
+        ]
+    }
+
+    private static func parseTags(from raw: String) -> [String] {
+        // 支持逗号/空格/分号分隔
+        let separators = CharacterSet(charactersIn: ",; ")
+        let parts = raw.components(separatedBy: separators)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        // 去重（保持顺序）
+        var seen: Set<String> = []
+        var result: [String] = []
+        for p in parts {
+            if !seen.contains(p) {
+                result.append(p)
+                seen.insert(p)
+            }
+        }
+        return result
+    }
+
+    private static func buildContentBlocks(from text: String) -> [[String: Any]] {
+        // 以双换行拆分段落，适度截断长段
+        let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        var children: [[String: Any]] = []
+        // Notion 建议单段富文本不能过长，这里按 1800 字符切块
+        let chunkSize = 1800
+        for p in paragraphs {
+            var start = p.startIndex
+            while start < p.endIndex {
+                let end = p.index(start, offsetBy: chunkSize, limitedBy: p.endIndex) ?? p.endIndex
+                let slice = String(p[start..<end])
+                children.append([
+                    "object": "block",
+                    "paragraph": [
+                        "rich_text": [["text": ["content": slice]]]
+                    ]
+                ])
+                start = end
+            }
+        }
+        return children
     }
 }
 
