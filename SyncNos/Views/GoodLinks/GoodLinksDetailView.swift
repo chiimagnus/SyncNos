@@ -35,7 +35,8 @@ struct GoodLinksDetailView: View {
                                                 .foregroundColor(.yellow)
                                         }
                                         if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            Label(tags, systemImage: "tag")
+                                            let formattedTags = formatTags(tags)
+                                            Label(formattedTags, systemImage: "tag")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                                 .lineLimit(1)
@@ -305,5 +306,16 @@ struct GoodLinksDetailView: View {
         case 4: return .purple
         default: return .mint
         }
+    }
+
+    /// 格式化标签字符串，将以 U+2063 分隔的标签解析并用分号连接
+    private func formatTags(_ tagsString: String) -> String {
+        // GoodLinks 使用 U+2063 (INVISIBLE SEPARATOR) 作为标签分隔符
+        let separator = "\u{2063}"
+        let tagComponents = tagsString.components(separatedBy: separator)
+
+        // 过滤掉空字符串并用分号连接
+        let validTags = tagComponents.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return validTags.joined(separator: "; ")
     }
 }
