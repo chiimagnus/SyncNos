@@ -122,6 +122,11 @@ protocol NotionServiceProtocol: AnyObject {
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
     func updateDatabaseTitle(databaseId: String, title: String) async throws
+    // Generic property/schema helpers
+    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
+    func updatePageProperties(pageId: String, properties: [String: Any]) async throws
+    /// Upsert a delimited section on the page by removing any existing blocks between markers and appending new children
+    func upsertDelimitedSection(pageId: String, startMarker: String, endMarker: String, children: [[String: Any]]) async throws
     // Per-book database mode (方案2)
     func databaseExists(databaseId: String) async -> Bool
     func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
