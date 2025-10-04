@@ -6,8 +6,7 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
-    private let appleBooksDbIdKey = "APPLE_BOOKS_DATABASE_ID"
-    private let goodLinksDbIdKey = "GOODLINKS_DATABASE_ID"
+    // Deprecated: specific keys removed, use perSourceDbPrefix instead
     private let syncModeKey = "NOTION_SYNC_MODE" // "single" | "perBook"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
@@ -41,28 +40,7 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     }
     
 
-    // MARK: - Split single-database ids per source
-    var appleBooksDatabaseId: String? {
-        get { userDefaults.string(forKey: appleBooksDbIdKey) }
-        set {
-            if let value = newValue, !value.isEmpty {
-                userDefaults.set(value, forKey: appleBooksDbIdKey)
-            } else {
-                userDefaults.removeObject(forKey: appleBooksDbIdKey)
-            }
-        }
-    }
-
-    var goodLinksDatabaseId: String? {
-        get { userDefaults.string(forKey: goodLinksDbIdKey) }
-        set {
-            if let value = newValue, !value.isEmpty {
-                userDefaults.set(value, forKey: goodLinksDbIdKey)
-            } else {
-                userDefaults.removeObject(forKey: goodLinksDbIdKey)
-            }
-        }
-    }
+    // MARK: - Split single-database ids per source - now only via generic mapping
 
     // MARK: - Sync Mode
     var syncMode: String? {
