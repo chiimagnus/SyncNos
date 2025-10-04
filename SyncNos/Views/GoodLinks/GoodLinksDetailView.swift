@@ -218,6 +218,12 @@ struct GoodLinksDetailView: View {
             }
         }
         .frame(minWidth: 400, idealWidth: 600)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+            if let linkId = selectedLinkId, !linkId.isEmpty {
+                viewModel.loadHighlights(for: linkId)
+                viewModel.loadContent(for: linkId)
+            }
+        }
     }
     
     // MARK: - Helper Functions
