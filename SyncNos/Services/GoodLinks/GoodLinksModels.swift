@@ -18,11 +18,11 @@ struct GoodLinksLinkRow: Codable, Equatable {
 
     // MARK: - Derived
     var tagsArray: [String] {
-        GoodLinksConnectionService.parseTagsString(tags)
+        GoodLinksTagParser.parseTagsString(tags)
     }
 
     var tagsFormatted: String {
-        GoodLinksConnectionService.formatTagsWithSemicolon(tags)
+        GoodLinksTagParser.formatTagsWithSemicolon(tags)
     }
 }
 
