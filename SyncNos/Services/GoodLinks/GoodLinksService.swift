@@ -323,8 +323,8 @@ final class GoodLinksViewModel: ObservableObject {
                     throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
                 }
 
-                // 2) 确保使用单库（与 Apple Books 共用 "syncnos" 库）
-                let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
+                // 2) 确保使用 GoodLinks 专属单库
+                let databaseId = try await ensureGoodLinksDatabaseId(parentPageId: parentPageId)
 
                 // 3) 确保该链接对应的页面存在（以 link.id 作为 Asset ID）
                 let pageId: String
@@ -348,21 +348,22 @@ final class GoodLinksViewModel: ObservableObject {
                 defer { session.close() }
 
                 var offset = 0
-                var all: [GoodLinksHighlightRow] = []
+                var collected: [GoodLinksHighlightRow] = []
                 var batch = 0
                 while true {
                     let page = try session.fetchHighlightsForLink(linkId: link.id, limit: pageSize, offset: offset)
                     if page.isEmpty { break }
-                    all.append(contentsOf: page)
+                    collected.append(contentsOf: page)
                     offset += pageSize
                     batch += 1
-                    await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Fetched %lld highlights...", comment: ""), all.count) }
+                    let countSnapshot = collected.count
+                    await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Fetched %lld highlights...", comment: ""), countSnapshot) }
                 }
 
                 // 5) 去重：读取 Notion 页面已有 UUID 映射，仅追加新高亮
                 let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
                 let existingIds = Set(existingMap.keys)
-                let toAppend = all.filter { !existingIds.contains($0.id) }
+                let toAppend = collected.filter { !existingIds.contains($0.id) }
 
                 if !toAppend.isEmpty {
                     await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count) }
@@ -370,7 +371,7 @@ final class GoodLinksViewModel: ObservableObject {
                 }
 
                 // 6) 更新计数（以全部数量为准）
-                try await notionService.updatePageHighlightCount(pageId: pageId, count: all.count)
+                try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
 
                 // 7) 结束
                 await MainActor.run {
@@ -388,19 +389,19 @@ final class GoodLinksViewModel: ObservableObject {
         }
     }
 
-    // 确保（或创建）单库：名称固定为 "syncnos"
-    private func ensureSingleDatabaseId(parentPageId: String) async throws -> String {
-        let title = "syncnos"
-        if let saved = notionConfig.syncDatabaseId {
+    // 确保（或创建）GoodLinks 专属单库：名称固定为 "SyncNos-GoodLinks"
+    private func ensureGoodLinksDatabaseId(parentPageId: String) async throws -> String {
+        let desiredTitle = "SyncNos-GoodLinks"
+        if let saved = notionConfig.goodLinksDatabaseId {
             if await notionService.databaseExists(databaseId: saved) { return saved }
-            notionConfig.syncDatabaseId = nil
+            notionConfig.goodLinksDatabaseId = nil
         }
-        if let found = try await notionService.findDatabaseId(title: title, parentPageId: parentPageId) {
-            notionConfig.syncDatabaseId = found
+        if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
+            notionConfig.goodLinksDatabaseId = found
             return found
         }
-        let created = try await notionService.createDatabase(title: title)
-        notionConfig.syncDatabaseId = created.id
+        let created = try await notionService.createDatabase(title: desiredTitle)
+        notionConfig.goodLinksDatabaseId = created.id
         return created.id
     }
 

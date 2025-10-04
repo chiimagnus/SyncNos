@@ -348,6 +348,28 @@ final class NotionService: NotionServiceProtocol {
         _ = data
     }
 
+    // MARK: - Database maintenance helpers
+    /// 更新数据库标题
+    func updateDatabaseTitle(databaseId: String, title: String) async throws {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent("databases/\(databaseId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        addCommonHeaders(to: &request, key: key)
+        let body: [String: Any] = [
+            "title": [[
+                "type": "text",
+                "text": ["content": title]
+            ]]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        _ = data
+    }
+
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])

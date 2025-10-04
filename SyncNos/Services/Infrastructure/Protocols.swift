@@ -98,7 +98,11 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
+    // Legacy single database id (backward compatibility)
     var syncDatabaseId: String? { get set }
+    // Separate single-database ids per source
+    var appleBooksDatabaseId: String? { get set }
+    var goodLinksDatabaseId: String? { get set }
     // Sync mode: "single" (方案1：单库+每本书一个页面) 或 "perBook" (方案2：每本书一个库+每条高亮为一条目)
     var syncMode: String? { get set }
     // Per-book database id mapping helpers
@@ -119,6 +123,7 @@ protocol NotionServiceProtocol: AnyObject {
     func updatePageHighlightCount(pageId: String, count: Int) async throws
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
+    func updateDatabaseTitle(databaseId: String, title: String) async throws
     // Per-book database mode (方案2)
     func databaseExists(databaseId: String) async -> Bool
     func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
