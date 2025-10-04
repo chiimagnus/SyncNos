@@ -28,6 +28,9 @@ SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据�
 
 简单明了地描述问题或改进点即可。
 
+## 致谢
+- 感谢 [Notero](https://github.com/dvanoni/notero) 开源项目提供的Notion API示例。
+
 ## 📄 许可证
 
 本项目采用 GPL-3.0 License
