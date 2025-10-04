@@ -103,6 +103,9 @@ protocol NotionConfigStoreProtocol: AnyObject {
     // Separate single-database ids per source
     var appleBooksDatabaseId: String? { get set }
     var goodLinksDatabaseId: String? { get set }
+    // Generic mapping for future sources (e.g., WeRead/DeDao/GetBiji)
+    func databaseIdForSource(_ sourceKey: String) -> String?
+    func setDatabaseId(_ id: String?, forSource sourceKey: String)
     // Sync mode: "single" (方案1：单库+每本书一个页面) 或 "perBook" (方案2：每本书一个库+每条高亮为一条目)
     var syncMode: String? { get set }
     // Per-book database id mapping helpers

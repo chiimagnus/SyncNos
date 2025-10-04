@@ -11,6 +11,7 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let goodLinksDbIdKey = "GOODLINKS_DATABASE_ID"
     private let syncModeKey = "NOTION_SYNC_MODE" // "single" | "perBook"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
+    private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
     
     private init() {}
     
@@ -97,6 +98,21 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
 
     func setDatabaseId(_ id: String?, forBook assetId: String) {
         let key = perBookDbPrefix + assetId
+        if let id, !id.isEmpty {
+            userDefaults.set(id, forKey: key)
+        } else {
+            userDefaults.removeObject(forKey: key)
+        }
+    }
+
+    // MARK: - Per-source single database mapping (generic)
+    func databaseIdForSource(_ sourceKey: String) -> String? {
+        let key = perSourceDbPrefix + sourceKey
+        return userDefaults.string(forKey: key)
+    }
+
+    func setDatabaseId(_ id: String?, forSource sourceKey: String) {
+        let key = perSourceDbPrefix + sourceKey
         if let id, !id.isEmpty {
             userDefaults.set(id, forKey: key)
         } else {
