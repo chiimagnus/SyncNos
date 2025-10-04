@@ -392,16 +392,18 @@ final class GoodLinksViewModel: ObservableObject {
     // 确保（或创建）GoodLinks 专属单库：名称固定为 "SyncNos-GoodLinks"
     private func ensureGoodLinksDatabaseId(parentPageId: String) async throws -> String {
         let desiredTitle = "SyncNos-GoodLinks"
-        if let saved = notionConfig.goodLinksDatabaseId {
+        // 优先使用 per-source 存储
+        let sourceKey = "goodLinks"
+        if let saved = notionConfig.databaseIdForSource(sourceKey) {
             if await notionService.databaseExists(databaseId: saved) { return saved }
-            notionConfig.goodLinksDatabaseId = nil
+            notionConfig.setDatabaseId(nil, forSource: sourceKey)
         }
         if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
-            notionConfig.goodLinksDatabaseId = found
+            notionConfig.setDatabaseId(found, forSource: sourceKey)
             return found
         }
         let created = try await notionService.createDatabase(title: desiredTitle)
-        notionConfig.goodLinksDatabaseId = created.id
+        notionConfig.setDatabaseId(created.id, forSource: sourceKey)
         return created.id
     }
 
