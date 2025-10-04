@@ -191,12 +191,21 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var isSyncing: Bool = false
+    @Published var syncMessage: String?
+    @Published var syncProgressText: String?
 
     private let service: GoodLinksDatabaseServiceExposed
+    private let notionService: NotionServiceProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     private let logger = DIContainer.shared.loggerService
 
-    init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService) {
+    init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+         notionService: NotionServiceProtocol = DIContainer.shared.notionService,
+         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.service = service
+        self.notionService = notionService
+        self.notionConfig = notionConfig
     }
 
     func loadRecentLinks(limit: Int = 0) {
@@ -296,6 +305,137 @@ final class GoodLinksViewModel: ObservableObject {
         }
         // Fallback to the default known location
         return GoodLinksConnectionService().defaultDatabasePath()
+    }
+
+    // MARK: - Notion Sync (GoodLinks)
+    /// 智能同步当前 GoodLinks 链接的高亮到 Notion（仅追加新条目，避免重复）
+    func syncSmart(link: GoodLinksLinkRow, pageSize: Int = 200) {
+        if isSyncing { return }
+        syncMessage = nil
+        syncProgressText = nil
+        isSyncing = true
+
+        Task {
+            defer { Task { @MainActor in self.isSyncing = false } }
+            do {
+                // 1) 校验 Notion 配置
+                guard let parentPageId = notionConfig.notionPageId, notionConfig.notionKey?.isEmpty == false else {
+                    throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
+                }
+
+                // 2) 确保使用单库（与 Apple Books 共用 "syncnos" 库）
+                let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
+
+                // 3) 确保该链接对应的页面存在（以 link.id 作为 Asset ID）
+                let pageId: String
+                if let existing = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: link.id) {
+                    pageId = existing
+                } else {
+                    let created = try await notionService.createBookPage(
+                        databaseId: databaseId,
+                        bookTitle: (link.title?.isEmpty == false ? link.title! : link.url),
+                        author: link.author ?? "",
+                        assetId: link.id,
+                        urlString: link.url,
+                        header: "Highlights"
+                    )
+                    pageId = created.id
+                }
+
+                // 4) 读取 GoodLinks 高亮（分页）
+                let dbPath = self.resolveDatabasePath()
+                let session = try self.service.makeReadOnlySession(dbPath: dbPath)
+                defer { session.close() }
+
+                var offset = 0
+                var all: [GoodLinksHighlightRow] = []
+                var batch = 0
+                while true {
+                    let page = try session.fetchHighlightsForLink(linkId: link.id, limit: pageSize, offset: offset)
+                    if page.isEmpty { break }
+                    all.append(contentsOf: page)
+                    offset += pageSize
+                    batch += 1
+                    await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Fetched %lld highlights...", comment: ""), all.count) }
+                }
+
+                // 5) 去重：读取 Notion 页面已有 UUID 映射，仅追加新高亮
+                let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+                let existingIds = Set(existingMap.keys)
+                let toAppend = all.filter { !existingIds.contains($0.id) }
+
+                if !toAppend.isEmpty {
+                    await MainActor.run { self.syncProgressText = String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count) }
+                    try await appendGoodLinksHighlights(pageId: pageId, link: link, highlights: toAppend)
+                }
+
+                // 6) 更新计数（以全部数量为准）
+                try await notionService.updatePageHighlightCount(pageId: pageId, count: all.count)
+
+                // 7) 结束
+                await MainActor.run {
+                    self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                    self.syncProgressText = nil
+                }
+            } catch {
+                let desc = error.localizedDescription
+                logger.error("[GoodLinks] syncSmart error: \(desc)")
+                await MainActor.run {
+                    self.errorMessage = desc
+                    self.syncProgressText = nil
+                }
+            }
+        }
+    }
+
+    // 确保（或创建）单库：名称固定为 "syncnos"
+    private func ensureSingleDatabaseId(parentPageId: String) async throws -> String {
+        let title = "syncnos"
+        if let saved = notionConfig.syncDatabaseId {
+            if await notionService.databaseExists(databaseId: saved) { return saved }
+            notionConfig.syncDatabaseId = nil
+        }
+        if let found = try await notionService.findDatabaseId(title: title, parentPageId: parentPageId) {
+            notionConfig.syncDatabaseId = found
+            return found
+        }
+        let created = try await notionService.createDatabase(title: title)
+        notionConfig.syncDatabaseId = created.id
+        return created.id
+    }
+
+    // 以 bulleted_list_item 形式追加高亮，包含 Note 与 [uuid:] 标记；链接使用 GoodLinks 的 URL
+    private func appendGoodLinksHighlights(pageId: String, link: GoodLinksLinkRow, highlights: [GoodLinksHighlightRow]) async throws {
+        // Notion API 建议批量大小 <= 100，这里与 Apple Books 逻辑一致取 80
+        let batchSize = 80
+        var index = 0
+        while index < highlights.count {
+            let slice = Array(highlights[index..<min(index + batchSize, highlights.count)])
+            let children: [[String: Any]] = slice.map { h in
+                var rt: [[String: Any]] = []
+                // 内容
+                rt.append(["text": ["content": h.content]])
+                // 可选笔记
+                if let note = h.note, !note.isEmpty {
+                    rt.append(["text": ["content": " — Note: \(note)"], "annotations": ["italic": true]])
+                }
+                // 元数据（时间）
+                if h.time > 0 {
+                    let dateString = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: h.time))
+                    rt.append(["text": ["content": " — added:\(dateString)"], "annotations": ["italic": true]])
+                }
+                // 原文链接（GoodLinks 的 URL）
+                rt.append(["text": ["content": "  Open ↗"], "href": link.url])
+                // UUID 标记用于幂等
+                rt.append(["text": ["content": " [uuid:\(h.id)]"], "annotations": ["code": true]])
+                return [
+                    "object": "block",
+                    "bulleted_list_item": ["rich_text": rt]
+                ]
+            }
+            try await notionService.appendBlocks(pageId: pageId, children: children)
+            index += batchSize
+        }
     }
 }
 
