@@ -34,8 +34,9 @@ struct GoodLinksDetailView: View {
                                                 .font(.caption)
                                                 .foregroundColor(.yellow)
                                         }
-                                        if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            Label(tags, systemImage: "tag")
+                                        let tagsText = link.tagsFormatted
+                                        if !tagsText.isEmpty {
+                                            Label(tagsText, systemImage: "tag")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                                 .lineLimit(1)

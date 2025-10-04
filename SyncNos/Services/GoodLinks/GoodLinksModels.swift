@@ -15,6 +15,15 @@ struct GoodLinksLinkRow: Codable, Equatable {
     let addedAt: Double
     let modifiedAt: Double
     let highlightTotal: Int?
+
+    // MARK: - Derived
+    var tagsArray: [String] {
+        GoodLinksConnectionService.parseTagsString(tags)
+    }
+
+    var tagsFormatted: String {
+        GoodLinksConnectionService.formatTagsWithSemicolon(tags)
+    }
 }
 
 struct GoodLinksHighlightRow: Codable, Equatable {
