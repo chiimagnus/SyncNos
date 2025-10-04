@@ -188,6 +188,7 @@ public struct GoodLinksPicker {
 final class GoodLinksViewModel: ObservableObject {
     @Published var links: [GoodLinksLinkRow] = []
     @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
+    @Published var highlightCountsByLinkId: [String: Int] = [:]
     @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
@@ -210,8 +211,13 @@ final class GoodLinksViewModel: ObservableObject {
                 let session = try self.service.makeReadOnlySession(dbPath: dbPath)
                 defer { session.close() }
                 let rows = try session.fetchRecentLinks(limit: limit)
+                // 同一会话中获取按 link 聚合的高亮计数，减少两次打开 DB
+                let counts = try session.fetchHighlightCountsByLink()
+                var countIndex: [String: Int] = [:]
+                for c in counts { countIndex[c.linkId] = c.count }
                 DispatchQueue.main.async {
                     self.links = rows
+                    self.highlightCountsByLinkId = countIndex
                     self.isLoading = false
                     self.logger.info("[GoodLinks] loaded links: \(rows.count)")
                 }
@@ -239,6 +245,8 @@ final class GoodLinksViewModel: ObservableObject {
                 self.logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
                 DispatchQueue.main.async {
                     self.highlightsByLinkId[linkId] = rows
+                    // 同步更新计数缓存，保证列表与详情显示一致
+                    self.highlightCountsByLinkId[linkId] = rows.count
                     self.logger.info("[GoodLinks] 高亮数据已更新到UI，linkId=\(linkId), count=\(rows.count)")
                 }
             } catch {

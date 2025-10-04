@@ -42,7 +42,11 @@ struct GoodLinksListView: View {
                                     Text(author).font(.subheadline).foregroundColor(.secondary)
                                 }
                                 HStack(spacing: 8) {
-                                    if let cnt = link.highlightTotal { Text("\(cnt) highlights").font(.caption).foregroundColor(.secondary) }
+                                    // 优先使用从 DB 聚合得到的计数映射，其次回退到 link.highlightTotal
+                                    let dbCount = viewModel.highlightCountsByLinkId[link.id]
+                                    if let cnt = dbCount ?? link.highlightTotal {
+                                        Text("\(cnt) highlights").font(.caption).foregroundColor(.secondary)
+                                    }
                                     Text(URL(string: link.url)?.host ?? "").font(.caption).foregroundColor(.secondary)
                                     if link.starred {
                                         Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
