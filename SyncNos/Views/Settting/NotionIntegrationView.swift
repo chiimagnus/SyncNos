@@ -7,7 +7,7 @@ struct NotionIntegrationView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Sync Mode")) {
+            Section(header: Text("Sync Mode for Apple Books")) {
                 Picker("Mode", selection: $viewModel.syncMode) {
                     Text("Single Database (One page per book)").tag("single")
                     Text("One database per book (Each highlight as an entry)").tag("perBook")
