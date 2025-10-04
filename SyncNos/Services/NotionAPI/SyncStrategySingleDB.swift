@@ -202,21 +202,22 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
         // Apple Books 专用库名
         let desiredTitle = "SyncNos-AppleBooks"
 
-        // 优先使用新的 AppleBooks 独立 ID
-        if let saved = config.appleBooksDatabaseId {
+        // 优先使用 per-source 存储
+        let sourceKey = "appleBooks"
+        if let saved = config.databaseIdForSource(sourceKey) {
             if await notionService.databaseExists(databaseId: saved) { return saved }
-            config.appleBooksDatabaseId = nil
+            config.setDatabaseId(nil, forSource: sourceKey)
         }
 
         // 如果根据标题能搜索到，直接采用并保存
         if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
-            config.appleBooksDatabaseId = found
+            config.setDatabaseId(found, forSource: sourceKey)
             return found
         }
 
         // 创建新的 AppleBooks 数据库
         let created = try await notionService.createDatabase(title: desiredTitle)
-        config.appleBooksDatabaseId = created.id
+        config.setDatabaseId(created.id, forSource: sourceKey)
         return created.id
     }
 
