@@ -6,7 +6,6 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
-    private let syncDbIdKey = "SYNC_DATABASE_ID"
     private let appleBooksDbIdKey = "APPLE_BOOKS_DATABASE_ID"
     private let goodLinksDbIdKey = "GOODLINKS_DATABASE_ID"
     private let syncModeKey = "NOTION_SYNC_MODE" // "single" | "perBook"
@@ -41,16 +40,6 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         return (notionKey?.isEmpty == false) && (notionPageId?.isEmpty == false)
     }
     
-    var syncDatabaseId: String? {
-        get { userDefaults.string(forKey: syncDbIdKey) }
-        set {
-            if let value = newValue, !value.isEmpty {
-                userDefaults.set(value, forKey: syncDbIdKey)
-            } else {
-                userDefaults.removeObject(forKey: syncDbIdKey)
-            }
-        }
-    }
 
     // MARK: - Split single-database ids per source
     var appleBooksDatabaseId: String? {
