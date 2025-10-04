@@ -98,9 +98,7 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
-    // Legacy single database id (backward compatibility)
-    var syncDatabaseId: String? { get set }
-    // Separate single-database ids per source
+    // Per-source single database ids
     var appleBooksDatabaseId: String? { get set }
     var goodLinksDatabaseId: String? { get set }
     // Generic mapping for future sources (e.g., WeRead/DeDao/GetBiji)

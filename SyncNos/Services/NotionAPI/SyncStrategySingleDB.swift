@@ -208,18 +208,6 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
             config.appleBooksDatabaseId = nil
         }
 
-        // 兼容迁移：如果旧的单库 ID 存在，则尝试重命名并迁移到 appleBooksDatabaseId
-        if let legacy = config.syncDatabaseId {
-            if await notionService.databaseExists(databaseId: legacy) {
-                // 尝试将标题更新为新名（若权限不足则忽略失败）
-                try? await notionService.updateDatabaseTitle(databaseId: legacy, title: desiredTitle)
-                config.appleBooksDatabaseId = legacy
-                return legacy
-            } else {
-                config.syncDatabaseId = nil
-            }
-        }
-
         // 如果根据标题能搜索到，直接采用并保存
         if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
             config.appleBooksDatabaseId = found
