@@ -76,6 +76,9 @@ struct GoodLinksListView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
             viewModel.loadRecentLinks()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+            viewModel.loadRecentLinks()
+        }
         .onChange(of: viewModel.links) { links in
             if selectedLinkId == nil, let firstId = links.first?.id {
                 selectedLinkId = firstId
