@@ -163,3 +163,11 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject {
     func canOpenReadOnly(dbPath: String) -> Bool
     func makeReadOnlySession(dbPath: String) throws -> GoodLinksReadOnlySessionProtocol
 }
+
+// MARK: - Auto Sync Service Protocol
+protocol AutoSyncServiceProtocol: AnyObject {
+    var isRunning: Bool { get }
+    func start()
+    func stop()
+    func triggerSyncNow()
+}

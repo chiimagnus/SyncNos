@@ -68,6 +68,14 @@ struct SettingsView: View {
                     Toggle("Enable Auto Sync", isOn: $autoSyncEnabled)
                         .toggleStyle(.switch)
                         .controlSize(.mini)
+                        .onChange(of: autoSyncEnabled) { newValue in
+                            if newValue {
+                                DIContainer.shared.autoSyncService.start()
+                                NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
+                            } else {
+                                DIContainer.shared.autoSyncService.stop()
+                            }
+                        }
 
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")

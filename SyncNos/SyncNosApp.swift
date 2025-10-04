@@ -14,6 +14,12 @@ struct SyncNosApp: App {
 
         // Start observing IAP transactions
         DIContainer.shared.iapService.startObservingTransactions()
+
+        // Start Auto Sync if enabled
+        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSyncEnabled")
+        if autoSyncEnabled {
+            DIContainer.shared.autoSyncService.start()
+        }
     }
 
     var body: some Scene {
