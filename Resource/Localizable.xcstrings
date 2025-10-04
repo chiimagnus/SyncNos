@@ -62,6 +62,12 @@
         }
       }
     },
+    "%lld 字" : {
+
+    },
+    "%lld 条" : {
+
+    },
     "1. Open Settings, fill in the Notion API token and Page ID in the \"Credentials\" section, then click Save." : {
       "localizations" : {
         "de" : {
@@ -471,7 +477,11 @@
     "Apple Books" : {
       "shouldTranslate" : false
     },
+    "AppleBooks" : {
+
+    },
     "by %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -707,6 +717,7 @@
       }
     },
     "Created: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1703,6 +1714,7 @@
       }
     },
     "Modified: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4611,6 +4623,7 @@
       }
     },
     "Sync Mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4667,6 +4680,9 @@
           }
         }
       }
+    },
+    "Sync Mode for Apple Books" : {
+
     },
     "Syncing..." : {
       "localizations" : {
@@ -4958,6 +4974,9 @@
         }
       }
     },
+    "URL" : {
+
+    },
     "Version %@ (%@)" : {
       "localizations" : {
         "de" : {
@@ -5132,7 +5151,40 @@
         }
       }
     },
-    "选择条目后将在此显示高亮内容" : {
+    "修改" : {
+
+    },
+    "原始URL" : {
+
+    },
+    "同步完成" : {
+
+    },
+    "展开全部" : {
+
+    },
+    "已收藏" : {
+
+    },
+    "摘要" : {
+
+    },
+    "收起" : {
+
+    },
+    "文章全文" : {
+
+    },
+    "添加" : {
+
+    },
+    "该链接暂无高亮笔记" : {
+
+    },
+    "阅读" : {
+
+    },
+    "高亮笔记" : {
 
     }
   },
