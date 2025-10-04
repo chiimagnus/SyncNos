@@ -48,8 +48,9 @@ struct GoodLinksListView: View {
                                         Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
                                     }
                                 }
-                                if let tags = link.tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Text(tags)
+                                let tagsText = link.tagsFormatted
+                                if !tagsText.isEmpty {
+                                    Text(tagsText)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)

@@ -6,6 +6,25 @@ import SQLite3
 final class GoodLinksConnectionService {
     private let logger = DIContainer.shared.loggerService
 
+    // MARK: - Tag Utilities
+    // GoodLinks 使用不可见分隔符 U+2063 (INVISIBLE SEPARATOR) 存储多标签
+    static let tagSeparator: String = "\u{2063}"
+
+    static func parseTagsString(_ raw: String?) -> [String] {
+        guard let raw, !raw.isEmpty else { return [] }
+        // 以字符串分割，过滤空白与空片段
+        return raw
+            .components(separatedBy: Self.tagSeparator)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func formatTagsWithSemicolon(_ raw: String?) -> String {
+        let parts = parseTagsString(raw)
+        // 中文语境下使用全角分号做后缀
+        return parts.map { "\($0)；" }.joined()
+    }
+
     func defaultDatabasePath() -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return "\(home)/Library/Group Containers/group.com.ngocluu.goodlinks/Data/data.sqlite"
