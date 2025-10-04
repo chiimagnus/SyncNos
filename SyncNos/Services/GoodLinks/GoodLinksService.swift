@@ -509,28 +509,7 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     private static func parseTags(from raw: String) -> [String] {
-        // 1) 先按 GoodLinks 的不可见分隔符 U+2063 拆分（数据库真实格式）
-        let primary = GoodLinksConnectionService.parseTagsString(raw)
-
-        // 2) 对每个片段再做一次“常见字符”切分，兼容手动输入/历史数据
-        let commonSeparators = CharacterSet(charactersIn: ",，;；|、 ")
-        let expanded: [String] = (primary.isEmpty ? [raw] : primary).flatMap { chunk in
-            chunk.components(separatedBy: commonSeparators)
-        }
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }
-        .filter { !$0.isEmpty }
-
-        // 3) 去重（保持顺序）
-        var seen: Set<String> = []
-        var result: [String] = []
-        for name in expanded {
-            if !seen.contains(name) {
-                result.append(name)
-                seen.insert(name)
-            }
-        }
-        return result
+        GoodLinksTagParser.parseTagsString(raw)
     }
 
     private static func buildContentBlocks(from text: String) -> [[String: Any]] {

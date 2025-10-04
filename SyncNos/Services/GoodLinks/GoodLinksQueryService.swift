@@ -6,15 +6,6 @@ import SQLite3
 final class GoodLinksQueryService {
     private let logger = DIContainer.shared.loggerService
 
-    // MARK: - Tag helpers (optional, reusable in queries/callers)
-    func parseTags(_ raw: String?) -> [String] {
-        GoodLinksConnectionService.parseTagsString(raw)
-    }
-
-    func formatTagsWithSemicolon(_ raw: String?) -> String {
-        GoodLinksConnectionService.formatTagsWithSemicolon(raw)
-    }
-
     func fetchRecentLinks(db: OpaquePointer, limit: Int) throws -> [GoodLinksLinkRow] {
         // 当 limit <= 0 时，展示全部条目（不加 LIMIT）
         // 使用一次性聚合 + LEFT JOIN，实时统计高亮数量，避免依赖可能过期的 link.highlightTotal
