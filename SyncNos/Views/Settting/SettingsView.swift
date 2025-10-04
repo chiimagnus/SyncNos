@@ -5,6 +5,7 @@ struct SettingsView: View {
     @State private var isLoading: Bool = false
     @State private var isPickingBooks: Bool = false
     @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
+    @AppStorage("autoSyncEnabled") private var autoSyncEnabled: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
@@ -64,6 +65,10 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
+                    Toggle("Enable Auto Sync", isOn: $autoSyncEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+
                     Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
                         .help("Show a background image in the main window")
                         .toggleStyle(.switch)
