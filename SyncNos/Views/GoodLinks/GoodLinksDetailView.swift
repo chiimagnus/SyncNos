@@ -9,6 +9,8 @@ struct GoodLinksDetailView: View {
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var frozenLayoutWidth: CGFloat? = nil
+    @State private var showingSyncError = false
+    @State private var syncErrorMessage = ""
 
     var body: some View {
         Group {
@@ -214,6 +216,32 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 .navigationTitle("GoodLinks")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        if viewModel.isSyncing {
+                            HStack(spacing: 8) {
+                                ProgressView().scaleEffect(0.8)
+                                if let progress = viewModel.syncProgressText {
+                                    Text(progress).font(.caption)
+                                } else {
+                                    Text("Syncing...").font(.caption)
+                                }
+                            }
+                            .help("Sync in progress")
+                        } else {
+                            if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                                Button {
+                                    Task {
+                                        viewModel.syncSmart(link: link)
+                                    }
+                                } label: {
+                                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                                }
+                                .help("Sync highlights to Notion")
+                            }
+                        }
+                    }
+                }
             }
         }
         .frame(minWidth: 400, idealWidth: 600)
@@ -221,6 +249,34 @@ struct GoodLinksDetailView: View {
             if let linkId = selectedLinkId, !linkId.isEmpty {
                 viewModel.loadHighlights(for: linkId)
                 viewModel.loadContent(for: linkId)
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: Notification.Name("SyncCurrentBookToNotionRequested")).receive(on: DispatchQueue.main)
+        ) { _ in
+            if let linkId = selectedLinkId, let link = viewModel.links.first(where: { $0.id == linkId }) {
+                Task { viewModel.syncSmart(link: link) }
+            }
+        }
+        .alert("Sync Error", isPresented: $showingSyncError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(syncErrorMessage)
+        }
+        .onChange(of: viewModel.syncMessage) { newMessage in
+            if let message = newMessage {
+                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
+                if !isSuccess {
+                    syncErrorMessage = message
+                    showingSyncError = true
+                }
+            }
+        }
+        .onChange(of: viewModel.errorMessage) { newError in
+            if let err = newError, !err.isEmpty {
+                syncErrorMessage = err
+                showingSyncError = true
             }
         }
     }
