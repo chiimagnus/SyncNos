@@ -392,11 +392,29 @@ final class GoodLinksViewModel: ObservableObject {
                     try await notionService.updatePageProperties(pageId: pageId, properties: properties)
                 }
 
-                // 4.3) Upsert 正文内容（以分隔标记包裹，避免重复）
+                // 4.3) 重建页面结构：## Article + 正文 + ## Highlights + 高亮列表（高亮列表后续 append）
+                var pageChildren: [[String: Any]] = []
+                // Article heading
+                pageChildren.append([
+                    "object": "block",
+                    "heading_2": [
+                        "rich_text": [["text": ["content": "Article"]]]
+                    ]
+                ])
+                // Article paragraphs
                 if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    let children = Self.buildContentBlocks(from: contentText)
-                    try await notionService.upsertDelimitedSection(pageId: pageId, startMarker: "[[GL_CONTENT_START]]", endMarker: "[[GL_CONTENT_END]]", children: children)
+                    let articleBlocks = Self.buildContentBlocks(from: contentText)
+                    pageChildren.append(contentsOf: articleBlocks)
                 }
+                // Highlights heading
+                pageChildren.append([
+                    "object": "block",
+                    "heading_2": [
+                        "rich_text": [["text": ["content": "Highlights"]]]
+                    ]
+                ])
+                // 先替换为 Article + Highlights 头
+                try await notionService.setPageChildren(pageId: pageId, children: pageChildren)
 
                 // 5) 去重：读取 Notion 页面已有 UUID 映射，仅追加新高亮
                 let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
@@ -491,10 +509,11 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     private static func parseTags(from raw: String) -> [String] {
-        // 支持逗号/空格/分号分隔
-        let separators = CharacterSet(charactersIn: ",; ")
+        // 支持中英文逗号/分号/空格/竖线/顿号，并清理#前缀
+        var separators = CharacterSet(charactersIn: ",，;；|、 ")
         let parts = raw.components(separatedBy: separators)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }
             .filter { !$0.isEmpty }
         // 去重（保持顺序）
         var seen: Set<String> = []
