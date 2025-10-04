@@ -146,19 +146,18 @@ struct GoodLinksDetailView: View {
                                 Image(systemName: "quote.opening")
                                     .font(.headline)
                                     .foregroundColor(.secondary)
+
                                 Text("高亮笔记")
                                     .font(.headline)
                                     .foregroundColor(.primary)
-                                Spacer()
-                                if highlights.isEmpty {
-                                    Text("加载中...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
+
+                                if !highlights.isEmpty {
                                     Text("\(highlights.count) 条")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
+                                
+                                Spacer()
                             }
                             .padding(.bottom, 4)
                             

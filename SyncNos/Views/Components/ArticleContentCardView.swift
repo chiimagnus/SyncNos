@@ -34,13 +34,16 @@ struct ArticleContentCardView: View {
                 Image(systemName: "doc.text.fill")
                     .font(.headline)
                     .foregroundColor(.secondary)
+                
                 Text("文章全文")
                     .font(.headline)
                     .foregroundColor(.primary)
-                Spacer()
+                
                 Text("\(wordCount) 字")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                
+                Spacer()
             }
             .padding(.bottom, 4)
 
