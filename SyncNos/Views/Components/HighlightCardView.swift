@@ -45,9 +45,9 @@ struct HighlightCardView<AccessoryContent: View>: View {
                     // 用户笔记（如果有）
                     if let note = note, !note.isEmpty {
                         HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "note.text")
-                                .font(.caption)
-                                .foregroundColor(.orange)
+                            // Image(systemName: "note.text")
+                            //     .font(.caption)
+                            //     .foregroundColor(.orange)
                             Text(note)
                                 .font(.callout)
                                 .foregroundColor(.primary)
