@@ -8,7 +8,8 @@ final class GoodLinksQueryService {
 
     func fetchRecentLinks(db: OpaquePointer, limit: Int) throws -> [GoodLinksLinkRow] {
         // 当 limit <= 0 时，展示全部条目（不加 LIMIT）
-        let baseSQL = "SELECT id, url, originalURL, title, summary, author, tags, starred, readAt, addedAt, modifiedAt, highlightTotal FROM link ORDER BY modifiedAt DESC"
+        // 使用一次性聚合 + LEFT JOIN，实时统计高亮数量，避免依赖可能过期的 link.highlightTotal
+        let baseSQL = "SELECT link.id, link.url, link.originalURL, link.title, link.summary, link.author, link.tags, link.starred, link.readAt, link.addedAt, link.modifiedAt, COALESCE(h.cnt, 0) AS highlightTotal FROM link LEFT JOIN (SELECT linkID, COUNT(*) AS cnt FROM highlight GROUP BY linkID) AS h ON h.linkID = link.id ORDER BY link.modifiedAt DESC"
         let sql = limit > 0 ? baseSQL + " LIMIT ?;" : baseSQL + ";"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
