@@ -104,9 +104,9 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         let handle = try databaseService.openReadOnlyDatabase(dbPath: annotationDBPath)
         defer { databaseService.close(handle) }
 
-        // 取出有高亮的所有书籍 assetId
+        // 取出有高亮的所有书籍 assetId（稳定排序，避免边界项被跳过）
         let counts = try databaseService.fetchHighlightCountsByAsset(db: handle)
-        let assetIds = counts.map { $0.assetId }
+        let assetIds = counts.map { $0.assetId }.sorted()
         if assetIds.isEmpty { return }
 
         // 构造资产到书名/作者映射
@@ -129,12 +129,24 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                 try await self.syncCoordinator.syncSmart(book: book, dbPath: annotationDBPath) { progress in
                     self.logger.debug("AutoSync progress[\(id)]: \(progress)")
                 }
+                // 成功
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
             } catch {
                 self.logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
+                // 失败后尝试降级到增量同步
+                do {
+                    try await self.syncCoordinator.sync(book: book, dbPath: annotationDBPath, incremental: true) { progress in
+                        self.logger.debug("AutoSync fallback progress[\(id)]: \(progress)")
+                    }
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
+                } catch {
+                    self.logger.error("AutoSync fallback failed for \(id): \(error.localizedDescription)")
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
+                }
             }
             NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
-            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) // 标记已完成（即使此前失败，界面可根据先后以最终状态为准）
+            // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
+            try? await Task.sleep(nanoseconds: 50_000_000)
         }
     }
 }
