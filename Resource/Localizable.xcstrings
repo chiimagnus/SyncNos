@@ -62,10 +62,17 @@
         }
       }
     },
-    "%lld 字" : {
-
+    "%lld item%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld item%2$@"
+          }
+        }
+      }
     },
-    "%lld 条" : {
+    "%lld words" : {
 
     },
     "1. Open Settings, fill in the Notion API token and Page ID in the \"Credentials\" section, then click Save." : {
@@ -300,6 +307,9 @@
         }
       }
     },
+    "Added" : {
+
+    },
     "Adding %lld highlights..." : {
       "localizations" : {
         "de" : {
@@ -477,67 +487,11 @@
     "Apple Books" : {
       "shouldTranslate" : false
     },
-    "AppleBooks" : {
-
+    "AppleBooks-%lld" : {
+      "shouldTranslate" : false
     },
-    "by %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 著"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 저자"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "автор %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "作者：%@"
-          }
-        }
-      }
+    "Article" : {
+
     },
     "Change application language" : {
       "localizations" : {
@@ -658,6 +612,9 @@
     "Choose GoodLinks group container and load data" : {
 
     },
+    "Collapse" : {
+
+    },
     "Configure Notion and run example API calls" : {
       "localizations" : {
         "de" : {
@@ -712,65 +669,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "配置 Notion 并执行示例 API 调用"
-          }
-        }
-      }
-    },
-    "Created: %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "作成日: %@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "생성: %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Created: %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создано: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建：%@"
           }
         }
       }
@@ -1065,6 +963,9 @@
         }
       }
     },
+    "Enable Auto Sync" : {
+
+    },
     "Enable Background Image" : {
       "localizations" : {
         "de" : {
@@ -1180,6 +1081,12 @@
           }
         }
       }
+    },
+    "Expand" : {
+
+    },
+    "Favorited" : {
+
     },
     "Fetched %lld highlights..." : {
       "localizations" : {
@@ -1357,6 +1264,12 @@
     },
     "GoodLinks" : {
       "shouldTranslate" : false
+    },
+    "GoodLinks-%lld" : {
+
+    },
+    "Highlights" : {
+
     },
     "Integrations" : {
       "localizations" : {
@@ -1713,64 +1626,8 @@
         }
       }
     },
-    "Modified: %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "変更日: %@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "수정: %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modified: %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Изменено: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修改：%@"
-          }
-        }
-      }
+    "Modified" : {
+
     },
     "No books found" : {
       "localizations" : {
@@ -1829,6 +1686,9 @@
           }
         }
       }
+    },
+    "No highlights for this link yet" : {
+
     },
     "No links found" : {
 
@@ -2358,6 +2218,9 @@
           }
         }
       }
+    },
+    "Original URL" : {
+
     },
     "Performing incremental sync, last sync time: %@" : {
       "localizations" : {
@@ -3230,6 +3093,9 @@
         }
       }
     },
+    "Read" : {
+
+    },
     "Refresh Books" : {
       "localizations" : {
         "de" : {
@@ -4100,6 +3966,9 @@
         }
       }
     },
+    "Summary" : {
+
+    },
     "Support" : {
       "localizations" : {
         "de" : {
@@ -4622,66 +4491,13 @@
         }
       }
     },
-    "Sync Mode" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisationsmodus"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync Mode"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modo de sincronización"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mode de synchronisation"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同期モード"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동기화 모드"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modo de sincronização"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Режим синхронизации"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步模式"
-          }
-        }
-      }
-    },
     "Sync Mode for Apple Books" : {
+
+    },
+    "Synced" : {
+
+    },
+    "Syncing" : {
 
     },
     "Syncing..." : {
@@ -5151,40 +4967,7 @@
         }
       }
     },
-    "修改" : {
-
-    },
-    "原始URL" : {
-
-    },
     "同步完成" : {
-
-    },
-    "展开全部" : {
-
-    },
-    "已收藏" : {
-
-    },
-    "摘要" : {
-
-    },
-    "收起" : {
-
-    },
-    "文章全文" : {
-
-    },
-    "添加" : {
-
-    },
-    "该链接暂无高亮笔记" : {
-
-    },
-    "阅读" : {
-
-    },
-    "高亮笔记" : {
 
     }
   },
