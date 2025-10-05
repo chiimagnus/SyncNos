@@ -93,39 +93,39 @@ class NotionHighlightOperations {
     // MARK: - Default builders kept in NotionAPI for safety
     private static func buildDefaultHighlightProperties(bookId: String, bookTitle: String, author: String, highlight: HighlightRow, clearEmpty: Bool) -> [String: Any] {
         var properties: [String: Any] = [
-            NotionAppleBooksFields.text: [
+            NotionFields.text: [
                 "title": [["text": ["content": highlight.text]]]
             ],
-            NotionAppleBooksFields.uuid: [
+            NotionFields.uuid: [
                 "rich_text": [["text": ["content": highlight.uuid]]]
             ],
-            NotionAppleBooksFields.bookId: [
+            NotionFields.bookId: [
                 "rich_text": [["text": ["content": bookId]]]
             ],
-            NotionAppleBooksFields.bookTitle: [
+            NotionFields.bookTitle: [
                 "rich_text": [["text": ["content": bookTitle]]]
             ],
-            NotionAppleBooksFields.author: [
+            NotionFields.author: [
                 "rich_text": [["text": ["content": author]]]
             ]
         ]
 
         if let note = highlight.note, !note.isEmpty {
-            properties[NotionAppleBooksFields.note] = ["rich_text": [["text": ["content": note]]]]
+            properties[NotionFields.note] = ["rich_text": [["text": ["content": note]]]]
         } else if clearEmpty {
-            properties[NotionAppleBooksFields.note] = ["rich_text": []]
+            properties[NotionFields.note] = ["rich_text": []]
         }
 
         if let style = highlight.style {
-            properties[NotionAppleBooksFields.style] = [
+            properties[NotionFields.style] = [
                 "rich_text": [["text": ["content": "\(style)"]]]
             ]
         } else if clearEmpty {
-            properties[NotionAppleBooksFields.style] = ["rich_text": []]
+            properties[NotionFields.style] = ["rich_text": []]
         }
 
         if let added = highlight.dateAdded {
-            properties[NotionAppleBooksFields.addedAt] = [
+            properties[NotionFields.addedAt] = [
                 "date": [
                     "start": NotionServiceCore.isoDateFormatter.string(from: added)
                 ]
@@ -133,7 +133,7 @@ class NotionHighlightOperations {
         }
 
         if let modified = highlight.modified {
-            properties[NotionAppleBooksFields.modifiedAt] = [
+            properties[NotionFields.modifiedAt] = [
                 "date": [
                     "start": NotionServiceCore.isoDateFormatter.string(from: modified)
                 ]
@@ -141,13 +141,13 @@ class NotionHighlightOperations {
         }
 
         if let loc = highlight.location, !loc.isEmpty {
-            properties[NotionAppleBooksFields.location] = ["rich_text": [["text": ["content": loc]]]]
+            properties[NotionFields.location] = ["rich_text": [["text": ["content": loc]]]]
         } else if clearEmpty {
-            properties[NotionAppleBooksFields.location] = ["rich_text": []]
+            properties[NotionFields.location] = ["rich_text": []]
         }
 
         let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
-        properties[NotionAppleBooksFields.link] = ["url": linkUrl]
+        properties[NotionFields.link] = ["url": linkUrl]
 
         return properties
     }

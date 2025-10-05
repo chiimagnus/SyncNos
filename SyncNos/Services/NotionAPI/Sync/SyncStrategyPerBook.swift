@@ -56,7 +56,7 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
             progress(String(format: NSLocalizedString("Plan 2: Processing batch %d...", comment: ""), batch + 1))
             for h in page {
                 do {
-                    if let existingPageId = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionAppleBooksFields.uuid, value: h.uuid) {
+                    if let existingPageId = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionFields.uuid, value: h.uuid) {
                         let props = DIContainer.shared.notionAppleBooksHelper.buildHighlightProperties(bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h, clearEmpty: true)
                         try await notionService.updatePageProperties(pageId: existingPageId, properties: props)
                         let children = DIContainer.shared.notionAppleBooksHelper.buildHighlightChildren(bookId: book.bookId, highlight: h)

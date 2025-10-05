@@ -27,7 +27,7 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
         // Ensure book page exists by Asset ID
         let pageId: String
-        if let existing = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionAppleBooksFields.assetId, value: book.bookId) {
+        if let existing = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionFields.assetId, value: book.bookId) {
             pageId = existing
         } else {
             let pageInfo = DIContainer.shared.notionAppleBooksHelper.buildBookPageProperties(bookTitle: book.bookTitle,
@@ -129,7 +129,7 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
         // Ensure page
         let pageId: String
         let created: Bool
-        if let ex = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionAppleBooksFields.assetId, value: book.bookId) {
+        if let ex = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionFields.assetId, value: book.bookId) {
             pageId = ex; created = false
         } else {
             let pageInfo = DIContainer.shared.notionAppleBooksHelper.buildBookPageProperties(bookTitle: book.bookTitle,
@@ -223,11 +223,11 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
 
         // 创建新的 AppleBooks 数据库（显式定义属性，保持 NotionAPI 通用性）
         let properties: [String: Any] = [
-            NotionAppleBooksFields.name: ["title": [:]],
-            NotionAppleBooksFields.author: ["rich_text": [:]],
-            NotionAppleBooksFields.highlightCount: ["number": [:]],
-            NotionAppleBooksFields.assetId: ["rich_text": [:]],
-            NotionAppleBooksFields.url: ["url": [:]]
+            NotionFields.name: ["title": [:]],
+            NotionFields.author: ["rich_text": [:]],
+            NotionFields.highlightCount: ["number": [:]],
+            NotionFields.assetId: ["rich_text": [:]],
+            NotionFields.url: ["url": [:]]
         ]
         let created = try await notionService.createDatabase(title: desiredTitle, properties: properties)
         config.setDatabaseId(created.id, forSource: sourceKey)

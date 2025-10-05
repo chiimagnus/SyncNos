@@ -20,7 +20,7 @@ class NotionQueryOperations {
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String? {
         let body: [String: Any] = [
             "filter": [
-                "property": NotionAppleBooksFields.assetId,
+                "property": NotionFields.assetId,
                 "rich_text": ["equals": assetId]
             ],
             "page_size": 1
@@ -46,7 +46,7 @@ class NotionQueryOperations {
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String? {
         let body: [String: Any] = [
             "filter": [
-                "property": NotionAppleBooksFields.uuid,
+                "property": NotionFields.uuid,
                 "rich_text": ["equals": uuid]
             ],
             "page_size": 1
