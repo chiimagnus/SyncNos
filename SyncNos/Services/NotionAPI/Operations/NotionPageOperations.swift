@@ -5,7 +5,7 @@ class NotionPageOperations {
     private let requestHelper: NotionRequestHelper
     private let appleBooksHelper: NotionAppleBooksHelperProtocol
 
-    init(requestHelper: NotionRequestHelper, appleBooksHelper: NotionAppleBooksHelperProtocol = DefaultNotionAppleBooksHelper()) {
+    init(requestHelper: NotionRequestHelper, appleBooksHelper: NotionAppleBooksHelperProtocol) {
         self.requestHelper = requestHelper
         self.appleBooksHelper = appleBooksHelper
     }

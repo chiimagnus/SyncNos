@@ -166,30 +166,30 @@ class DefaultNotionAppleBooksHelper: NotionAppleBooksHelperProtocol {
     func perBookDatabaseProperties(bookTitle: String, author: String, assetId: String) -> (title: String, properties: [String: Any]) {
         let dbTitle = "SyncNos - \(bookTitle)"
         let properties: [String: Any] = [
-            "Text": ["title": [:]],
-            "UUID": ["rich_text": [:]],
-            "Note": ["rich_text": [:]],
-            "Style": ["rich_text": [:]],
-            "Added At": ["date": [:]],
-            "Modified At": ["date": [:]],
-            "Location": ["rich_text": [:]],
-            "Book ID": ["rich_text": [:]],
-            "Book Title": ["rich_text": [:]],
-            "Author": ["rich_text": [:]],
-            "Link": ["url": [:]]
+            NotionAppleBooksFields.text: ["title": [:]],
+            NotionAppleBooksFields.uuid: ["rich_text": [:]],
+            NotionAppleBooksFields.note: ["rich_text": [:]],
+            NotionAppleBooksFields.style: ["rich_text": [:]],
+            NotionAppleBooksFields.addedAt: ["date": [:]],
+            NotionAppleBooksFields.modifiedAt: ["date": [:]],
+            NotionAppleBooksFields.location: ["rich_text": [:]],
+            NotionAppleBooksFields.bookId: ["rich_text": [:]],
+            NotionAppleBooksFields.bookTitle: ["rich_text": [:]],
+            NotionAppleBooksFields.author: ["rich_text": [:]],
+            NotionAppleBooksFields.link: ["url": [:]]
         ]
         return (title: dbTitle, properties: properties)
     }
 
     func buildBookPageProperties(bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) -> (properties: [String: Any], children: [[String: Any]]) {
         var properties: [String: Any] = [
-            "Name": [
+            NotionAppleBooksFields.name: [
                 "title": [["text": ["content": bookTitle]]]
             ],
-            "Asset ID": [
+            NotionAppleBooksFields.assetId: [
                 "rich_text": [["text": ["content": assetId]]]
             ],
-            "Author": [
+            NotionAppleBooksFields.author: [
                 "rich_text": [["text": ["content": author]]]
             ]
         ]
@@ -207,6 +207,20 @@ class DefaultNotionAppleBooksHelper: NotionAppleBooksHelperProtocol {
         }
         return (properties: properties, children: children)
     }
+
+    // Default parser for UUID markers like "[uuid:... ]"
+    func extractUUID(from text: String) -> String? {
+        if let startRange = text.range(of: "[uuid:") {
+            let startIdx = startRange.upperBound
+            if let endRange = text.range(of: "]", range: startIdx..<text.endIndex) {
+                return String(text[startIdx..<endRange.lowerBound])
+            }
+        }
+        return nil
+    }
+
+    var singleDBTitle: String { "SyncNos-AppleBooks" }
+    var sourceKey: String { "appleBooks" }
 }
 
 protocol NotionAppleBooksHelperProtocol {
@@ -218,4 +232,9 @@ protocol NotionAppleBooksHelperProtocol {
     func styleName(for style: Int) -> String
     func perBookDatabaseProperties(bookTitle: String, author: String, assetId: String) -> (title: String, properties: [String: Any])
     func buildBookPageProperties(bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) -> (properties: [String: Any], children: [[String: Any]])
+
+    // Helpers for parsing/formatting and config
+    func extractUUID(from text: String) -> String?
+    var singleDBTitle: String { get }
+    var sourceKey: String { get }
 }

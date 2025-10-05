@@ -20,7 +20,7 @@ class NotionQueryOperations {
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String? {
         let body: [String: Any] = [
             "filter": [
-                "property": "Asset ID",
+                "property": NotionAppleBooksFields.assetId,
                 "rich_text": ["equals": assetId]
             ],
             "page_size": 1
@@ -33,7 +33,7 @@ class NotionQueryOperations {
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String? {
         let body: [String: Any] = [
             "filter": [
-                "property": "UUID",
+                "property": NotionAppleBooksFields.uuid,
                 "rich_text": ["equals": uuid]
             ],
             "page_size": 1
@@ -79,15 +79,10 @@ class NotionQueryOperations {
                     if let s = t.plain_text {
                         logger.verbose("DEBUG: 检查文本内容: \(s)")
                         // 查找 "[uuid:" 和 "]" 之间的内容
-                        if let startRange = s.range(of: "[uuid:") {
-                            let startIdx = startRange.upperBound // 跳过 "[uuid:"
-                            if let endRange = s.range(of: "]", range: startIdx..<s.endIndex) {
-                                let idPart = String(s[startIdx..<endRange.lowerBound])
-                                collected[idPart] = block.id
-                                logger.debug("DEBUG: 找到UUID映射 - UUID: \(idPart), Block ID: \(block.id)")
-                            } else {
-                                logger.debug("DEBUG: 未找到结束括号]")
-                            }
+                        // Delegate extraction of UUID markers to helper if available via DI.
+                        if let extracted = DIContainer.shared.notionAppleBooksHelper.extractUUID(from: s) {
+                            collected[extracted] = block.id
+                            logger.debug("DEBUG: 找到UUID映射 - UUID: \(extracted), Block ID: \(block.id)")
                         }
                     }
                 }

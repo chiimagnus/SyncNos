@@ -199,11 +199,11 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
     // MARK: - Helpers
 
     private func ensureSingleDatabaseId(parentPageId: String) async throws -> String {
-        // Apple Books 专用库名
-        let desiredTitle = "SyncNos-AppleBooks"
+        // Apple Books 专用库名 / source key provided by helper
+        let desiredTitle = DIContainer.shared.notionAppleBooksHelper.singleDBTitle
 
         // 优先使用 per-source 存储
-        let sourceKey = "appleBooks"
+        let sourceKey = DIContainer.shared.notionAppleBooksHelper.sourceKey
         if let saved = config.databaseIdForSource(sourceKey) {
             if await notionService.databaseExists(databaseId: saved) { return saved }
             config.setDatabaseId(nil, forSource: sourceKey)
