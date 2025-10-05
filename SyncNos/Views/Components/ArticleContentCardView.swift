@@ -35,11 +35,11 @@ struct ArticleContentCardView: View {
                     .font(.headline)
                     .foregroundColor(.secondary)
                 
-                Text("文章全文")
+                Text("Article")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                Text("\(wordCount) 字")
+                Text("\(wordCount) words")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -63,7 +63,7 @@ struct ArticleContentCardView: View {
             if shouldShowToggle {
                 Button(action: { isExpanded.toggle() }) {
                     HStack(spacing: 6) {
-                        Text(isExpanded ? "收起" : "展开全部")
+                        Text(isExpanded ? "Collapse" : "Expand")
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .imageScale(.small)
                     }
