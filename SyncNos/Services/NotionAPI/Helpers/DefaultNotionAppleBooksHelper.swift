@@ -208,3 +208,14 @@ class DefaultNotionAppleBooksHelper: NotionAppleBooksHelperProtocol {
         return (properties: properties, children: children)
     }
 }
+
+protocol NotionAppleBooksHelperProtocol {
+    func buildIBooksLink(bookId: String, location: String?) -> String
+    func buildMetadataString(for highlight: HighlightRow) -> String
+    func buildHighlightProperties(bookId: String, bookTitle: String, author: String, highlight: HighlightRow, clearEmpty: Bool) -> [String: Any]
+    func buildHighlightRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int?) -> [[String: Any]]
+    func buildHighlightChildren(bookId: String, highlight: HighlightRow) -> [[String: Any]]
+    func styleName(for style: Int) -> String
+    func perBookDatabaseProperties(bookTitle: String, author: String, assetId: String) -> (title: String, properties: [String: Any])
+    func buildBookPageProperties(bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) -> (properties: [String: Any], children: [[String: Any]])
+}
