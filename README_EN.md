@@ -7,7 +7,7 @@
 [![](https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3-%E4%B8%AD%E6%96%87%E7%89%88-ff0000?style=flat)](README.md)
 [![](https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-000aff?style=flat)](README_EN.md)
 
-[<img src="../Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
+[<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
 
 SyncNos helps you sync highlights and notes from Apple Books and apps like GoodLinks to third-party tools (for example, Notion). This repository contains the complete macOS client source code and related documentation.
 
