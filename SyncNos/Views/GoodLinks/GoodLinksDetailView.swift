@@ -30,7 +30,7 @@ struct GoodLinksDetailView: View {
                                     // 收藏与标签
                                     HStack(spacing: 8) {
                                         if link.starred {
-                                            Label("已收藏", systemImage: "star.fill")
+                                            Label("Favorited", systemImage: "star.fill")
                                                 .font(.caption)
                                                 .foregroundColor(.yellow)
                                         }
@@ -63,7 +63,7 @@ struct GoodLinksDetailView: View {
                                             Image(systemName: "arrow.turn.up.left")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
-                                            Text("原始URL")
+                                            Text("Original URL")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                                 .fontWeight(.medium)
@@ -82,7 +82,7 @@ struct GoodLinksDetailView: View {
                                                 Image(systemName: "doc.text")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
-                                                Text("摘要")
+                                                Text("Summary")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                                     .fontWeight(.medium)
@@ -102,14 +102,14 @@ struct GoodLinksDetailView: View {
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 16) {
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text("添加")
+                                                Text("Added")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
                                                 Text(formatDate(link.addedAt))
                                                     .font(.caption)
                                             }
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text("修改")
+                                                Text("Modified")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
                                                 Text(formatDate(link.modifiedAt))
@@ -117,7 +117,7 @@ struct GoodLinksDetailView: View {
                                             }
                                             if link.readAt > 0 {
                                                 VStack(alignment: .leading, spacing: 2) {
-                                                    Text("阅读")
+                                                    Text("Read")
                                                         .font(.caption2)
                                                         .foregroundColor(.secondary)
                                                     Text(formatDate(link.readAt))
@@ -150,12 +150,12 @@ struct GoodLinksDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.secondary)
 
-                                Text("高亮笔记")
+                                Text("Highlights")
                                     .font(.headline)
                                     .foregroundColor(.primary)
 
                                 if !highlights.isEmpty {
-                                    Text("\(highlights.count) 条")
+                                    Text("\(highlights.count) item\(highlights.count == 1 ? "" : "s")")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -188,7 +188,7 @@ struct GoodLinksDetailView: View {
                                 )
                             } else {
                                 // 空状态提示
-                                Text("该链接暂无高亮笔记")
+                                Text("No highlights for this link yet")
                                     .font(.body)
                                     .foregroundColor(.secondary)
                                     .padding()
@@ -286,7 +286,7 @@ struct GoodLinksDetailView: View {
     
     /// 格式化时间戳为可读日期
     private func formatDate(_ timestamp: Double) -> String {
-        guard timestamp > 0 else { return "未知" }
+        guard timestamp > 0 else { return "Unknown" }
         let date = Date(timeIntervalSince1970: timestamp)
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
