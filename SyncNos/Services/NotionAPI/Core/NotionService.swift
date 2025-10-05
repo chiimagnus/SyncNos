@@ -20,7 +20,7 @@ final class NotionService: NotionServiceProtocol {
             notionVersion: core.notionVersion,
             logger: core.logger
         )
-        let helper = appleBooksHelper ?? DefaultNotionAppleBooksHelper()
+        let helper = appleBooksHelper ?? DIContainer.shared.notionAppleBooksHelper
 
         // Initialize operation modules
         self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper, appleBooksHelper: helper)
