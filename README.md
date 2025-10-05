@@ -5,14 +5,16 @@
 [![License](https://img.shields.io/badge/license-GPL3.0-green.svg)](LICENSE)
 
 [![](https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3-%E4%B8%AD%E6%96%87%E7%89%88-ff0000?style=flat)](README.md)
-[![](https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-000aff?style=flat)](Resource/README_EN.md)
+[![](https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-000aff?style=flat)](README_EN.md)
 
 [<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
 
-SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据，目标是让笔记可以被长期保存、搜索和同步到第三方工具（如Notion）。
+SyncNos 帮你把 Apple Books 和 GoodLinks 等软件上的高亮与注释同步到第三方工具（例如 Notion）。本项目包含 macOS 客户端的完整源代码与相关文档。
 
 ## 🚀 主要功能
 - 同步Apple Books 的数据：书名、作者；高亮笔记、注释、高亮笔记的颜色、创建时间和修改时间。
+- 同步 GoodLinks app上的文章、高亮笔记、注释等。
+- 自动同步功能。
 
 ## 快速开始
 - 在[Mac App Store下载](https://apps.apple.com/app/syncnos/id6752426176)
@@ -26,8 +28,6 @@ SyncBookNotes 帮你把 Apple Books 的高亮与注释变成可导出的数据�
 - 🎨 提交 UI/UX 改进方案
 - ✨ 添加新功能或优化现有功能
 - 📖 完善文档和使用说明
-
-简单明了地描述问题或改进点即可。
 
 ## 致谢
 - 感谢 [Notero](https://github.com/dvanoni/notero) 开源项目提供的Notion API示例。
