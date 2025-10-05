@@ -43,15 +43,15 @@ class NotionDatabaseOperations {
         } else {
             body["properties"] = [
                 // Primary title property (book title)
-                "Name": ["title": [:]],
+                NotionAppleBooksFields.name: ["title": [:]],
                 // Author as rich text
-                "Author": ["rich_text": [:]],
+                NotionAppleBooksFields.author: ["rich_text": [:]],
                 // Highlight count as number
-                "Highlight Count": ["number": [:]],
+                NotionAppleBooksFields.highlightCount: ["number": [:]],
                 // Asset ID for idempotent lookup
-                "Asset ID": ["rich_text": [:]],
+                NotionAppleBooksFields.assetId: ["rich_text": [:]],
                 // Book URL
-                "URL": ["url": [:]]
+                NotionAppleBooksFields.url: ["url": [:]]
             ]
         }
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
