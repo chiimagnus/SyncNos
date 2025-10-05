@@ -3,39 +3,20 @@ import Foundation
 /// Notion 页面操作类
 class NotionPageOperations {
     private let requestHelper: NotionRequestHelper
+    private let appleBooksHelper: NotionAppleBooksHelperProtocol
 
-    init(requestHelper: NotionRequestHelper) {
+    init(requestHelper: NotionRequestHelper, appleBooksHelper: NotionAppleBooksHelperProtocol = DefaultNotionAppleBooksHelper()) {
         self.requestHelper = requestHelper
+        self.appleBooksHelper = appleBooksHelper
     }
 
     func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
-        var properties: [String: Any] = [
-            "Name": [
-                "title": [["text": ["content": bookTitle]]]
-            ],
-            "Asset ID": [
-                "rich_text": [["text": ["content": assetId]]]
-            ],
-            "Author": [
-                "rich_text": [["text": ["content": author]]]
-            ]
-        ]
-        if let urlString = urlString, !urlString.isEmpty {
-            properties["URL"] = ["url": urlString]
-        }
-        var children: [[String: Any]] = []
-        if let header = header, !header.isEmpty {
-            children = [[
-                "object": "block",
-                "heading_2": [
-                    "rich_text": [["text": ["content": header]]]
-                ]
-            ]]
-        }
+        // Use helper to build properties and children
+        let pageInfo = appleBooksHelper.buildBookPageProperties(bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
         let body: [String: Any] = [
             "parent": ["type": "database_id", "database_id": databaseId],
-            "properties": properties,
-            "children": children
+            "properties": pageInfo.properties,
+            "children": pageInfo.children
         ]
         let data = try await requestHelper.performRequest(path: "pages", method: "POST", body: body)
         return try JSONDecoder().decode(NotionPage.self, from: data)
@@ -50,7 +31,6 @@ class NotionPageOperations {
     }
 
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
-        let url = URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children")
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
 

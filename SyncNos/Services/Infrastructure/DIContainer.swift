@@ -16,6 +16,7 @@ class DIContainer {
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
+    private var _notionAppleBooksHelper: NotionAppleBooksHelperProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -39,9 +40,16 @@ class DIContainer {
         return _notionConfigStore!
     }
 
+    var notionAppleBooksHelper: NotionAppleBooksHelperProtocol {
+        if _notionAppleBooksHelper == nil {
+            _notionAppleBooksHelper = DefaultNotionAppleBooksHelper()
+        }
+        return _notionAppleBooksHelper!
+    }
+
     var notionService: NotionServiceProtocol {
         if _notionService == nil {
-            _notionService = NotionService(configStore: notionConfigStore)
+            _notionService = NotionService(configStore: notionConfigStore, appleBooksHelper: notionAppleBooksHelper)
         }
         return _notionService!
     }
@@ -118,4 +126,7 @@ class DIContainer {
         self._autoSyncService = autoSyncService
     }
 
+    func register(notionAppleBooksHelper: NotionAppleBooksHelperProtocol) {
+        self._notionAppleBooksHelper = notionAppleBooksHelper
+    }
 }
