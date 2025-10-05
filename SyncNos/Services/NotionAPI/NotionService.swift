@@ -17,31 +17,17 @@ final class NotionService: NotionServiceProtocol {
     }
     // Lightweight exists check by querying minimal page
     func databaseExists(databaseId: String) async -> Bool {
-        guard let key = configStore.notionKey else { return false }
-        let url = apiBase.appendingPathComponent("databases/\(databaseId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        addCommonHeaders(to: &request, key: key)
+        // Keep behavior: return false when not configured or any non-2xx / error occurs
+        guard configStore.notionKey != nil else { return false }
         struct DatabaseMeta: Decodable { let id: String; let in_trash: Bool? }
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return false }
+            let data = try await performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
             if let meta = try? JSONDecoder().decode(DatabaseMeta.self, from: data), (meta.in_trash ?? false) {
                 return false
             }
             // Some trashed databases still return 200 on GET; verify by running a minimal query
-            let qURL = apiBase.appendingPathComponent("databases/\(databaseId)/query")
-            var qReq = URLRequest(url: qURL)
-            qReq.httpMethod = "POST"
-            addCommonHeaders(to: &qReq, key: key)
-            let body: [String: Any] = ["page_size": 1]
-            qReq.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-            let (_, qResp) = try await URLSession.shared.data(for: qReq)
-            if let qHttp = qResp as? HTTPURLResponse, (200...299).contains(qHttp.statusCode) {
-                return true
-            } else {
-                return false
-            }
+            _ = try await performRequest(path: "databases/\(databaseId)/query", method: "POST", body: ["page_size": 1])
+            return true
         } catch {
             return false
         }
@@ -52,12 +38,6 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         
-        let url = apiBase.appendingPathComponent("databases")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
-        
-        // Create properties for book-focused database: Name (title), Author (rich_text), Highlight Count (number)
         let body: [String: Any] = [
             "parent": [
                 "type": "page_id",
@@ -86,10 +66,7 @@ final class NotionService: NotionServiceProtocol {
                 "Modified At": ["date": [:]]
             ]
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "databases", method: "POST", body: body)
         return try JSONDecoder().decode(NotionDatabase.self, from: data)
     }
     
@@ -114,18 +91,12 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         
-        let url = apiBase.appendingPathComponent("search")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
         let body: [String: Any] = [
             "query": title,
             "filter": ["value": "database", "property": "object"],
             "sort": ["direction": "ascending", "timestamp": "last_edited_time"]
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "search", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(SearchResponse.self, from: data)
         for r in decoded.results where r.object == "database" {
             let t = (r.title ?? []).compactMap { $0.plain_text }.joined()
@@ -147,10 +118,6 @@ final class NotionService: NotionServiceProtocol {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("databases/\(databaseId)/query")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
         let body: [String: Any] = [
             "filter": [
                 "property": "Asset ID",
@@ -158,9 +125,7 @@ final class NotionService: NotionServiceProtocol {
             ],
             "page_size": 1
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
@@ -169,10 +134,6 @@ final class NotionService: NotionServiceProtocol {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("pages")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
         var properties: [String: Any] = [
             "Name": [
                 "title": [["text": ["content": bookTitle]]]
@@ -221,9 +182,7 @@ final class NotionService: NotionServiceProtocol {
             "properties": properties,
             "children": children
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "pages", method: "POST", body: body)
         return try JSONDecoder().decode(NotionPage.self, from: data)
     }
     
@@ -258,11 +217,7 @@ final class NotionService: NotionServiceProtocol {
             if let cursor = startCursor {
                 components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
             }
-            var request = URLRequest(url: components.url!)
-            request.httpMethod = "GET"
-            addCommonHeaders(to: &request, key: key)
-            let (data, response) = try await URLSession.shared.data(for: request)
-            try Self.ensureSuccess(response: response, data: data)
+            let data = try await performRequest(url: components.url!, method: "GET", body: nil)
             let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
             for block in decoded.results {
                 let holder = block.paragraph ?? block.bulleted_list_item
@@ -342,33 +297,14 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         let url = apiBase.appendingPathComponent("blocks/\(pageId)/children")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-        let body: [String: Any] = ["children": children]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
     
     func updatePageHighlightCount(pageId: String, count: Int) async throws {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("pages/\(pageId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-        let body: [String: Any] = [
-            "properties": [
-                "Highlight Count": ["number": count]
-            ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": ["Highlight Count": ["number": count]]])
     }
 
     // MARK: - Generic property/schema helpers
@@ -376,34 +312,14 @@ final class NotionService: NotionServiceProtocol {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("databases/\(databaseId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-        let body: [String: Any] = [
-            "properties": definitions
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "databases/\(databaseId)", method: "PATCH", body: ["properties": definitions])
     }
 
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("pages/\(pageId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-        let body: [String: Any] = [
-            "properties": properties
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
     }
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
@@ -411,21 +327,9 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
 
-        let url = apiBase.appendingPathComponent("blocks/\(blockId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-
         // 构建富文本内容
         let rt = buildHighlightRichText(for: highlight, bookId: bookId)
-
-        let body: [String: Any] = [
-            "bulleted_list_item": ["rich_text": rt]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": rt]])
     }
 
     // MARK: - Per-book database (方案2)
@@ -433,11 +337,6 @@ final class NotionService: NotionServiceProtocol {
         guard let pageId = configStore.notionPageId, let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-
-        let url = apiBase.appendingPathComponent("databases")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
 
         // Database title uses book title for clarity
         let dbTitle = "SyncNos - \(bookTitle)"
@@ -469,10 +368,7 @@ final class NotionService: NotionServiceProtocol {
                 "Link": ["url": [:]]
             ]
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "databases", method: "POST", body: body)
         return try JSONDecoder().decode(NotionDatabase.self, from: data)
     }
 
@@ -480,11 +376,6 @@ final class NotionService: NotionServiceProtocol {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-
-        let url = apiBase.appendingPathComponent("pages")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
 
         let properties = buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
         let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
@@ -497,10 +388,7 @@ final class NotionService: NotionServiceProtocol {
             "properties": properties,
             "children": children
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "pages", method: "POST", body: body)
         return try JSONDecoder().decode(NotionPage.self, from: data)
     }
 
@@ -508,10 +396,6 @@ final class NotionService: NotionServiceProtocol {
         guard let key = configStore.notionKey else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        let url = apiBase.appendingPathComponent("databases/\(databaseId)/query")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        addCommonHeaders(to: &request, key: key)
         let body: [String: Any] = [
             "filter": [
                 "property": "UUID",
@@ -519,9 +403,7 @@ final class NotionService: NotionServiceProtocol {
             ],
             "page_size": 1
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
+        let data = try await performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
@@ -531,20 +413,8 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
 
-        let url = apiBase.appendingPathComponent("pages/\(pageId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        addCommonHeaders(to: &request, key: key)
-
         let properties = buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight, clearEmpty: true)
-
-        let body: [String: Any] = [
-            "properties": properties
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        _ = data
+        let _ = try await performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
 
         // Replace page children with up-to-date content
         let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
@@ -612,11 +482,7 @@ final class NotionService: NotionServiceProtocol {
             if let cursor = startCursor {
                 components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
             }
-            var getReq = URLRequest(url: components.url!)
-            getReq.httpMethod = "GET"
-            addCommonHeaders(to: &getReq, key: key)
-            let (data, response) = try await URLSession.shared.data(for: getReq)
-            try Self.ensureSuccess(response: response, data: data)
+            let data = try await performRequest(url: components.url!, method: "GET", body: nil)
             let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
             existing.append(contentsOf: decoded.results)
             startCursor = decoded.has_more ? decoded.next_cursor : nil
@@ -624,14 +490,9 @@ final class NotionService: NotionServiceProtocol {
 
         // 2) Delete existing children
         for block in existing {
-            var del = URLRequest(url: apiBase.appendingPathComponent("blocks/\(block.id)"))
-            del.httpMethod = "DELETE"
-            addCommonHeaders(to: &del, key: key)
-            let (_, response) = try await URLSession.shared.data(for: del)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                // ignore failures for already-deleted or permissions; continue best-effort
-                continue
-            }
+            let delURL = apiBase.appendingPathComponent("blocks/\(block.id)")
+            // Best-effort delete: ignore failures
+            _ = try? await performRequest(url: delURL, method: "DELETE", body: nil)
         }
 
         // 3) Append new children
@@ -778,6 +639,39 @@ final class NotionService: NotionServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+    }
+    
+    // Centralized request sender to remove duplicated URLSession/request boilerplate
+    private func performRequest(path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        let url = apiBase.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        addCommonHeaders(to: &request, key: key)
+        if let b = body {
+            request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        return data
+    }
+
+    // Overload that accepts a full URL (used for URLComponents-built URLs)
+    private func performRequest(url: URL, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
+        guard let key = configStore.notionKey else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        addCommonHeaders(to: &request, key: key)
+        if let b = body {
+            request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try Self.ensureSuccess(response: response, data: data)
+        return data
     }
     
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
