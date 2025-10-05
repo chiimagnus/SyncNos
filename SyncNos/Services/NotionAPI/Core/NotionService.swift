@@ -144,17 +144,17 @@ final class NotionService: NotionServiceProtocol {
         // Build AppleBooks-specific schema in caller; here keep a backward-compatible default using constants
         let title = "SyncNos - \(bookTitle)"
         let properties: [String: Any] = [
-            NotionAppleBooksFields.text: ["title": [:]],
-            NotionAppleBooksFields.uuid: ["rich_text": [:]],
-            NotionAppleBooksFields.note: ["rich_text": [:]],
-            NotionAppleBooksFields.style: ["rich_text": [:]],
-            NotionAppleBooksFields.addedAt: ["date": [:]],
-            NotionAppleBooksFields.modifiedAt: ["date": [:]],
-            NotionAppleBooksFields.location: ["rich_text": [:]],
-            NotionAppleBooksFields.bookId: ["rich_text": [:]],
-            NotionAppleBooksFields.bookTitle: ["rich_text": [:]],
-            NotionAppleBooksFields.author: ["rich_text": [:]],
-            NotionAppleBooksFields.link: ["url": [:]]
+            NotionFields.text: ["title": [:]],
+            NotionFields.uuid: ["rich_text": [:]],
+            NotionFields.note: ["rich_text": [:]],
+            NotionFields.style: ["rich_text": [:]],
+            NotionFields.addedAt: ["date": [:]],
+            NotionFields.modifiedAt: ["date": [:]],
+            NotionFields.location: ["rich_text": [:]],
+            NotionFields.bookId: ["rich_text": [:]],
+            NotionFields.bookTitle: ["rich_text": [:]],
+            NotionFields.author: ["rich_text": [:]],
+            NotionFields.link: ["url": [:]]
         ]
         return try await databaseOps.createDatabase(title: title, pageId: pageId, properties: properties)
     }
