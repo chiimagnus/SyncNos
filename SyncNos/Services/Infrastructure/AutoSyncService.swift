@@ -50,7 +50,7 @@ final class DatabasePathHelper {
 final class AutoSyncService: AutoSyncServiceProtocol {
     private let logger = DIContainer.shared.loggerService
     private let databaseService = DIContainer.shared.databaseService
-    private let syncCoordinator = DIContainer.shared.syncCoordinator
+    private let appleBooksSyncService = DIContainer.shared.appleBooksSyncService
     private let notionConfig = DIContainer.shared.notionConfigStore
 
     private var timerCancellable: AnyCancellable?
@@ -171,7 +171,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             do {
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])
-                try await self.syncCoordinator.syncSmart(book: book, dbPath: annotationDBPath) { progress in
+                try await self.appleBooksSyncService.syncSmart(book: book, dbPath: annotationDBPath) { progress in
                     self.logger.debug("AutoSync progress[\(id)]: \(progress)")
                 }
                 // 成功
@@ -180,7 +180,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                 self.logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
                 // 失败后尝试降级到增量同步
                 do {
-                    try await self.syncCoordinator.sync(book: book, dbPath: annotationDBPath, incremental: true) { progress in
+                    try await self.appleBooksSyncService.sync(book: book, dbPath: annotationDBPath, incremental: true) { progress in
                         self.logger.debug("AutoSync fallback progress[\(id)]: \(progress)")
                     }
                     NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
