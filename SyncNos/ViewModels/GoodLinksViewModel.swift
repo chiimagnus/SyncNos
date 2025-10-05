@@ -12,12 +12,14 @@ final class GoodLinksViewModel: ObservableObject {
 
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
-    private let logger = DIContainer.shared.loggerService
+    private let logger: LoggerServiceProtocol
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-         syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService()) {
+         syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
+         logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
         self.service = service
         self.syncService = syncService
+        self.logger = logger
     }
 
     func loadRecentLinks(limit: Int = 0) {
@@ -27,10 +29,8 @@ final class GoodLinksViewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             do {
-                let dbPath = self.resolveDatabasePath()
-                let session = try self.service.makeReadOnlySession(dbPath: dbPath)
-                defer { session.close() }
-                let rows = try session.fetchRecentLinks(limit: limit)
+                let dbPath = self.service.resolveDatabasePath()
+                let rows = try self.service.fetchRecentLinks(dbPath: dbPath, limit: limit)
                 DispatchQueue.main.async {
                     self.links = rows
                     self.isLoading = false
@@ -52,11 +52,9 @@ final class GoodLinksViewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             do {
-                let dbPath = self.resolveDatabasePath()
+                let dbPath = self.service.resolveDatabasePath()
                 self.logger.info("[GoodLinks] 数据库路径: \(dbPath)")
-                let session = try self.service.makeReadOnlySession(dbPath: dbPath)
-                defer { session.close() }
-                let rows = try session.fetchHighlightsForLink(linkId: linkId, limit: limit, offset: offset)
+                let rows = try self.service.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
                 self.logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
                 DispatchQueue.main.async {
                     self.highlightsByLinkId[linkId] = rows
@@ -77,10 +75,8 @@ final class GoodLinksViewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             do {
-                let dbPath = self.resolveDatabasePath()
-                let session = try self.service.makeReadOnlySession(dbPath: dbPath)
-                defer { session.close() }
-                if let content = try session.fetchContent(linkId: linkId) {
+                let dbPath = self.service.resolveDatabasePath()
+                if let content = try self.service.fetchContent(dbPath: dbPath, linkId: linkId) {
                     self.logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
                     DispatchQueue.main.async {
                         self.contentByLinkId[linkId] = content
@@ -95,30 +91,6 @@ final class GoodLinksViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Path Helpers
-    private func resolveDatabasePath() -> String {
-        // If user granted access to group container/Data, prefer it; otherwise fall back to default path
-        if let url = GoodLinksBookmarkStore.shared.restore() {
-            _ = GoodLinksBookmarkStore.shared.startAccessing(url: url)
-            let path = url.path
-            // Normalize to Data/data.sqlite
-            let last = (path as NSString).lastPathComponent
-            if last == "Data" {
-                return (path as NSString).appendingPathComponent("data.sqlite")
-            }
-            if last.hasPrefix("group.com.ngocluu.goodlinks") || path.hasSuffix("/Group Containers/group.com.ngocluu.goodlinks") {
-                return ((path as NSString).appendingPathComponent("Data") as NSString).appendingPathComponent("data.sqlite")
-            }
-            // If user picked a deeper path that already contains data.sqlite's directory
-            let candidate = (path as NSString).appendingPathComponent("Data/data.sqlite")
-            if FileManager.default.fileExists(atPath: candidate) {
-                return candidate
-            }
-        }
-        // Fallback to the default known location
-        return GoodLinksConnectionService().defaultDatabasePath()
-    }
-
     // MARK: - Notion Sync (GoodLinks)
     /// 智能同步当前 GoodLinks 链接的高亮到 Notion（仅追加新条目，实际同步逻辑委托给 `GoodLinksSyncService`）
     func syncSmart(link: GoodLinksLinkRow, pageSize: Int = 200) {
@@ -130,7 +102,7 @@ final class GoodLinksViewModel: ObservableObject {
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
             do {
-                let dbPath = self.resolveDatabasePath()
+                let dbPath = self.service.resolveDatabasePath()
                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
                     Task { @MainActor in self?.syncProgressText = progressText }
                 }

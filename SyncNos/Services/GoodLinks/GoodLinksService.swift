@@ -64,6 +64,44 @@ final class GoodLinksDatabaseService: GoodLinksDatabaseServiceProtocol, GoodLink
     func makeReadOnlySession(dbPath: String) throws -> GoodLinksReadOnlySessionProtocol {
         try GoodLinksReadOnlySession(dbPath: dbPath)
     }
+
+    // MARK: - Convenience helpers for app layer
+    func resolveDatabasePath() -> String {
+        if let url = GoodLinksBookmarkStore.shared.restore() {
+            _ = GoodLinksBookmarkStore.shared.startAccessing(url: url)
+            let path = url.path
+            let last = (path as NSString).lastPathComponent
+            if last == "Data" {
+                return (path as NSString).appendingPathComponent("data.sqlite")
+            }
+            if last.hasPrefix("group.com.ngocluu.goodlinks") || path.hasSuffix("/Group Containers/group.com.ngocluu.goodlinks") {
+                return ((path as NSString).appendingPathComponent("Data") as NSString).appendingPathComponent("data.sqlite")
+            }
+            let candidate = (path as NSString).appendingPathComponent("Data/data.sqlite")
+            if FileManager.default.fileExists(atPath: candidate) {
+                return candidate
+            }
+        }
+        return GoodLinksConnectionService().defaultDatabasePath()
+    }
+
+    func fetchRecentLinks(dbPath: String, limit: Int) throws -> [GoodLinksLinkRow] {
+        let session = try makeReadOnlySession(dbPath: dbPath)
+        defer { session.close() }
+        return try session.fetchRecentLinks(limit: limit)
+    }
+
+    func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow] {
+        let session = try makeReadOnlySession(dbPath: dbPath)
+        defer { session.close() }
+        return try session.fetchHighlightsForLink(linkId: linkId, limit: limit, offset: offset)
+    }
+
+    func fetchContent(dbPath: String, linkId: String) throws -> GoodLinksContentRow? {
+        let session = try makeReadOnlySession(dbPath: dbPath)
+        defer { session.close() }
+        return try session.fetchContent(linkId: linkId)
+    }
 }
 
 // MARK: - GoodLinks Bookmark Store (security-scoped)
