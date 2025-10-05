@@ -20,15 +20,12 @@ final class NotionService: NotionServiceProtocol {
             notionVersion: core.notionVersion,
             logger: core.logger
         )
-        let helper = appleBooksHelper ?? DIContainer.shared.notionAppleBooksHelper
-
-        // Initialize operation modules
-        self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper, appleBooksHelper: helper)
-        self.pageOps = NotionPageOperations(requestHelper: requestHelper, appleBooksHelper: helper)
+        // Initialize operation modules (decoupled from AppleBooks)
+        self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper)
+        self.pageOps = NotionPageOperations(requestHelper: requestHelper)
         self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: core.logger)
         self.highlightOps = NotionHighlightOperations(
             requestHelper: requestHelper,
-            appleBooksHelper: helper,
             pageOperations: pageOps,
             logger: core.logger
         )
@@ -43,6 +40,13 @@ final class NotionService: NotionServiceProtocol {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         return try await databaseOps.createDatabase(title: title, pageId: pageId)
+    }
+
+    func createDatabase(title: String, properties: [String: Any]?) async throws -> NotionDatabase {
+        guard let pageId = core.configStore.notionPageId else {
+            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        }
+        return try await databaseOps.createDatabase(title: title, pageId: pageId, properties: properties)
     }
     
     
@@ -75,9 +79,13 @@ final class NotionService: NotionServiceProtocol {
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String? {
         return try await queryOps.findPageIdByAssetId(databaseId: databaseId, assetId: assetId)
     }
+
+    func findPageIdByPropertyEquals(databaseId: String, propertyName: String, value: String) async throws -> String? {
+        return try await queryOps.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: propertyName, value: value)
+    }
     
-    func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
-        return try await pageOps.createBookPage(databaseId: databaseId, bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
+    func createPage(in databaseId: String, properties: [String: Any], children: [[String: Any]]?) async throws -> NotionPage {
+        return try await pageOps.createPage(in: databaseId, properties: properties, children: children)
     }
     
     struct BlockChildrenResponse: Decodable {
@@ -124,8 +132,8 @@ final class NotionService: NotionServiceProtocol {
         try await pageOps.updatePageProperties(pageId: pageId, properties: properties)
     }
 
-    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
-        try await highlightOps.updateBlockContent(blockId: blockId, highlight: highlight, bookId: bookId)
+    func updateBulletedListItem(blockId: String, richText: [[String: Any]]) async throws {
+        try await pageOps.updateBulletedListItem(blockId: blockId, richText: richText)
     }
 
     // MARK: - Per-book database (方案2)
@@ -133,7 +141,22 @@ final class NotionService: NotionServiceProtocol {
         guard let pageId = core.configStore.notionPageId else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
-        return try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: pageId)
+        // Build AppleBooks-specific schema in caller; here keep a backward-compatible default using constants
+        let title = "SyncNos - \(bookTitle)"
+        let properties: [String: Any] = [
+            NotionAppleBooksFields.text: ["title": [:]],
+            NotionAppleBooksFields.uuid: ["rich_text": [:]],
+            NotionAppleBooksFields.note: ["rich_text": [:]],
+            NotionAppleBooksFields.style: ["rich_text": [:]],
+            NotionAppleBooksFields.addedAt: ["date": [:]],
+            NotionAppleBooksFields.modifiedAt: ["date": [:]],
+            NotionAppleBooksFields.location: ["rich_text": [:]],
+            NotionAppleBooksFields.bookId: ["rich_text": [:]],
+            NotionAppleBooksFields.bookTitle: ["rich_text": [:]],
+            NotionAppleBooksFields.author: ["rich_text": [:]],
+            NotionAppleBooksFields.link: ["url": [:]]
+        ]
+        return try await databaseOps.createDatabase(title: title, pageId: pageId, properties: properties)
     }
 
 

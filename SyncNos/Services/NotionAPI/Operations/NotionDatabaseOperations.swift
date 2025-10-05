@@ -3,11 +3,9 @@ import Foundation
 /// Notion 数据库操作类
 class NotionDatabaseOperations {
     private let requestHelper: NotionRequestHelper
-    private let appleBooksHelper: NotionAppleBooksHelperProtocol
 
-    init(requestHelper: NotionRequestHelper, appleBooksHelper: NotionAppleBooksHelperProtocol) {
+    init(requestHelper: NotionRequestHelper) {
         self.requestHelper = requestHelper
-        self.appleBooksHelper = appleBooksHelper
     }
 
     // Lightweight exists check by querying minimal page
@@ -58,10 +56,7 @@ class NotionDatabaseOperations {
         return try JSONDecoder().decode(NotionDatabase.self, from: data)
     }
 
-    func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String, pageId: String) async throws -> NotionDatabase {
-        let (dbTitle, properties) = appleBooksHelper.perBookDatabaseProperties(bookTitle: bookTitle, author: author, assetId: assetId)
-        return try await createDatabase(title: dbTitle, pageId: pageId, properties: properties)
-    }
+    // Removed AppleBooks-specific per-book database creation; callers should build properties and use createDatabase(title:pageId:properties:)
 
     func findDatabaseId(title: String, parentPageId: String) async throws -> String? {
         struct SearchResponse: Decodable {

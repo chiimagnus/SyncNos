@@ -110,28 +110,30 @@ protocol NotionConfigStoreProtocol: AnyObject {
 
 // MARK: - Notion Service Protocol
 protocol NotionServiceProtocol: AnyObject {
+    // Database
     func createDatabase(title: String) async throws -> NotionDatabase
-    // Extended sync helpers
+    func createDatabase(title: String, properties: [String: Any]?) async throws -> NotionDatabase
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?
-    func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String?
-    func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage
-    func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
-    func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String]
-    func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
-    func updatePageHighlightCount(pageId: String, count: Int) async throws
-    func appendBlocks(pageId: String, children: [[String: Any]]) async throws
-    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
-    // Generic property/schema helpers
-    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
+    func databaseExists(databaseId: String) async -> Bool
+
+    // Pages
+    func createPage(in databaseId: String, properties: [String: Any], children: [[String: Any]]?) async throws -> NotionPage
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws
+    func updatePageHighlightCount(pageId: String, count: Int) async throws
     /// Replace all page children with the provided blocks
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws
-    // Per-book database mode (方案2)
-    func databaseExists(databaseId: String) async -> Bool
-    func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
-    func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage
-    func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String?
-    func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws
+
+    // Blocks
+    func appendBlocks(pageId: String, children: [[String: Any]]) async throws
+    func updateBulletedListItem(blockId: String, richText: [[String: Any]]) async throws
+
+    // Queries
+    func findPageIdByPropertyEquals(databaseId: String, propertyName: String, value: String) async throws -> String?
+    func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
+    func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String]
+
+    // Schema helpers
+    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)

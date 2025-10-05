@@ -30,6 +30,19 @@ class NotionQueryOperations {
         return decoded.results.first?.id
     }
 
+    func findPageIdByPropertyEquals(databaseId: String, propertyName: String, value: String) async throws -> String? {
+        let body: [String: Any] = [
+            "filter": [
+                "property": propertyName,
+                "rich_text": ["equals": value]
+            ],
+            "page_size": 1
+        ]
+        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
+        let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
+        return decoded.results.first?.id
+    }
+
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String? {
         let body: [String: Any] = [
             "filter": [
@@ -78,9 +91,7 @@ class NotionQueryOperations {
                 for t in texts {
                     if let s = t.plain_text {
                         logger.verbose("DEBUG: 检查文本内容: \(s)")
-                        // 查找 "[uuid:" 和 "]" 之间的内容
-                        // Delegate extraction of UUID markers to helper if available via DI.
-                        if let extracted = DIContainer.shared.notionAppleBooksHelper.extractUUID(from: s) {
+                        if let extracted = Self.extractUUID(from: s) {
                             collected[extracted] = block.id
                             logger.debug("DEBUG: 找到UUID映射 - UUID: \(extracted), Block ID: \(block.id)")
                         }
@@ -91,5 +102,15 @@ class NotionQueryOperations {
         } while startCursor != nil
         logger.debug("DEBUG: 收集到 \(collected.count) 个UUID到块ID的映射")
         return collected
+    }
+
+    private static func extractUUID(from text: String) -> String? {
+        if let startRange = text.range(of: "[uuid:") {
+            let startIdx = startRange.upperBound
+            if let endRange = text.range(of: "]", range: startIdx..<text.endIndex) {
+                return String(text[startIdx..<endRange.lowerBound])
+            }
+        }
+        return nil
     }
 }

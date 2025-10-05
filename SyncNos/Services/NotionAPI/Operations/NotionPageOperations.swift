@@ -3,21 +3,19 @@ import Foundation
 /// Notion 页面操作类
 class NotionPageOperations {
     private let requestHelper: NotionRequestHelper
-    private let appleBooksHelper: NotionAppleBooksHelperProtocol
 
-    init(requestHelper: NotionRequestHelper, appleBooksHelper: NotionAppleBooksHelperProtocol) {
+    init(requestHelper: NotionRequestHelper) {
         self.requestHelper = requestHelper
-        self.appleBooksHelper = appleBooksHelper
     }
 
-    func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
-        // Use helper to build properties and children
-        let pageInfo = appleBooksHelper.buildBookPageProperties(bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
-        let body: [String: Any] = [
+    func createPage(in databaseId: String, properties: [String: Any], children: [[String: Any]]?) async throws -> NotionPage {
+        var body: [String: Any] = [
             "parent": ["type": "database_id", "database_id": databaseId],
-            "properties": pageInfo.properties,
-            "children": pageInfo.children
+            "properties": properties
         ]
+        if let children, !children.isEmpty {
+            body["children"] = children
+        }
         let data = try await requestHelper.performRequest(path: "pages", method: "POST", body: body)
         return try JSONDecoder().decode(NotionPage.self, from: data)
     }
@@ -32,6 +30,10 @@ class NotionPageOperations {
 
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
+    }
+
+    func updateBulletedListItem(blockId: String, richText: [[String: Any]]) async throws {
+        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": richText]])
     }
 
     func replacePageChildren(pageId: String, with children: [[String: Any]]) async throws {
