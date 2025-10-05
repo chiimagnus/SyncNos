@@ -35,7 +35,9 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
                 if page.isEmpty { break }
                 progress(String(format: NSLocalizedString("Plan 2: Full batch %d, count: %lld", comment: ""), batch + 1, page.count))
                 for h in page {
-                    _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
+                    let props = DIContainer.shared.notionAppleBooksHelper.buildHighlightProperties(bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h, clearEmpty: false)
+                    let children = DIContainer.shared.notionAppleBooksHelper.buildHighlightChildren(bookId: book.bookId, highlight: h)
+                    _ = try await notionService.createPage(in: databaseId, properties: props, children: children)
                 }
                 offset += pageSize
                 batch += 1
@@ -54,32 +56,24 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
             progress(String(format: NSLocalizedString("Plan 2: Processing batch %d...", comment: ""), batch + 1))
             for h in page {
                 do {
-                    if let existingPageId = try await notionService.findHighlightItemPageIdByUUID(databaseId: databaseId, uuid: h.uuid) {
-                        do {
-                            try await notionService.updateHighlightItem(pageId: existingPageId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
-                        } catch {
-                            if self.isDatabaseMissingError(error) {
-                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-                                databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
-                                _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
-                            } else { throw error }
-                        }
+                    if let existingPageId = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: NotionAppleBooksFields.uuid, value: h.uuid) {
+                        let props = DIContainer.shared.notionAppleBooksHelper.buildHighlightProperties(bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h, clearEmpty: true)
+                        try await notionService.updatePageProperties(pageId: existingPageId, properties: props)
+                        let children = DIContainer.shared.notionAppleBooksHelper.buildHighlightChildren(bookId: book.bookId, highlight: h)
+                        try await notionService.setPageChildren(pageId: existingPageId, children: children)
                     } else {
-                        do {
-                            _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
-                        } catch {
-                            if self.isDatabaseMissingError(error) {
-                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-                                databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
-                                _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
-                            } else { throw error }
-                        }
+                        let props = DIContainer.shared.notionAppleBooksHelper.buildHighlightProperties(bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h, clearEmpty: false)
+                        let children = DIContainer.shared.notionAppleBooksHelper.buildHighlightChildren(bookId: book.bookId, highlight: h)
+                        _ = try await notionService.createPage(in: databaseId, properties: props, children: children)
                     }
                 } catch {
                     if self.isDatabaseMissingError(error) {
-                        let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                        let perBook = DIContainer.shared.notionAppleBooksHelper.perBookDatabaseProperties(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                        let newDb = try await notionService.createDatabase(title: perBook.title, properties: perBook.properties)
                         databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
-                        _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
+                        let props = DIContainer.shared.notionAppleBooksHelper.buildHighlightProperties(bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h, clearEmpty: false)
+                        let children = DIContainer.shared.notionAppleBooksHelper.buildHighlightChildren(bookId: book.bookId, highlight: h)
+                        _ = try await notionService.createPage(in: databaseId, properties: props, children: children)
                     } else { throw error }
                 }
             }
@@ -108,7 +102,8 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
             if await notionService.databaseExists(databaseId: saved) { return (saved, false) }
             config.setDatabaseId(nil, forBook: book.bookId)
         }
-        let db = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+        let perBook = DIContainer.shared.notionAppleBooksHelper.perBookDatabaseProperties(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+        let db = try await notionService.createDatabase(title: perBook.title, properties: perBook.properties)
         config.setDatabaseId(db.id, forBook: book.bookId)
         return (db.id, true)
     }

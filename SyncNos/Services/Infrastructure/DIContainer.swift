@@ -49,7 +49,7 @@ class DIContainer {
 
     var notionService: NotionServiceProtocol {
         if _notionService == nil {
-            _notionService = NotionService(configStore: notionConfigStore, appleBooksHelper: notionAppleBooksHelper)
+            _notionService = NotionService(configStore: notionConfigStore)
         }
         return _notionService!
     }
