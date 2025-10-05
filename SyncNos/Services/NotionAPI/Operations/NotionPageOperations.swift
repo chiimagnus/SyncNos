@@ -8,14 +8,35 @@ class NotionPageOperations {
         self.requestHelper = requestHelper
     }
 
-    func createPage(in databaseId: String, properties: [String: Any], children: [[String: Any]]?) async throws -> NotionPage {
-        var body: [String: Any] = [
-            "parent": ["type": "database_id", "database_id": databaseId],
-            "properties": properties
+    func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
+        var properties: [String: Any] = [
+            "Name": [
+                "title": [["text": ["content": bookTitle]]]
+            ],
+            "Asset ID": [
+                "rich_text": [["text": ["content": assetId]]]
+            ],
+            "Author": [
+                "rich_text": [["text": ["content": author]]]
+            ]
         ]
-        if let children, !children.isEmpty {
-            body["children"] = children
+        if let urlString = urlString, !urlString.isEmpty {
+            properties["URL"] = ["url": urlString]
         }
+        var children: [[String: Any]] = []
+        if let header = header, !header.isEmpty {
+            children = [[
+                "object": "block",
+                "heading_2": [
+                    "rich_text": [["text": ["content": header]]]
+                ]
+            ]]
+        }
+        let body: [String: Any] = [
+            "parent": ["type": "database_id", "database_id": databaseId],
+            "properties": properties,
+            "children": children
+        ]
         let data = try await requestHelper.performRequest(path: "pages", method: "POST", body: body)
         return try JSONDecoder().decode(NotionPage.self, from: data)
     }
@@ -29,11 +50,8 @@ class NotionPageOperations {
     }
 
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
+        let url = URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children")
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
-    }
-
-    func updateBulletedListItem(blockId: String, richText: [[String: Any]]) async throws {
-        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": richText]])
     }
 
     func replacePageChildren(pageId: String, with children: [[String: Any]]) async throws {
