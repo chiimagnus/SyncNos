@@ -1,9 +1,6 @@
 import Foundation
 
-/// Notion 服务辅助方法
-class NotionHelperMethods {
-    // MARK: - Shared helper methods
-
+class DefaultNotionAppleBooksHelper: NotionAppleBooksHelperProtocol {
     // Build iBooks link URL
     func buildIBooksLink(bookId: String, location: String?) -> String {
         if let loc = location, !loc.isEmpty {
@@ -13,7 +10,6 @@ class NotionHelperMethods {
         }
     }
 
-    // Build metadata string from highlight
     func buildMetadataString(for highlight: HighlightRow) -> String {
         var metaParts: [String] = []
         if let s = highlight.style { metaParts.append("style:\(s)") }
@@ -22,7 +18,6 @@ class NotionHelperMethods {
         return metaParts.joined(separator: " | ")
     }
 
-    // Build highlight properties for per-book database
     func buildHighlightProperties(bookId: String, bookTitle: String, author: String, highlight: HighlightRow, clearEmpty: Bool = false) -> [String: Any] {
         var properties: [String: Any] = [
             "Text": [
@@ -84,17 +79,14 @@ class NotionHelperMethods {
         return properties
     }
 
-    // Build rich text for highlight bullet/list item
     func buildHighlightRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
         var rt: [[String: Any]] = []
 
-        // Highlight text with optional length limit
         let textContent = maxTextLength != nil && highlight.text.count > maxTextLength!
             ? String(highlight.text.prefix(maxTextLength!))
             : highlight.text
         rt.append(["text": ["content": textContent]])
 
-        // Optional note with length limit
         if let note = highlight.note, !note.isEmpty {
             let noteContent = maxTextLength != nil && note.count > maxTextLength!
                 ? String(note.prefix(maxTextLength!))
@@ -102,23 +94,63 @@ class NotionHelperMethods {
             rt.append(["text": ["content": " — Note: \(noteContent)"], "annotations": ["italic": true]])
         }
 
-        // Add metadata when available
         let metaString = buildMetadataString(for: highlight)
         if !metaString.isEmpty {
             rt.append(["text": ["content": " — \(metaString)"], "annotations": ["italic": true]])
         }
 
-        // Link to open in Apple Books
         let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
         rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
 
-        // UUID marker for idempotency
         rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
 
         return rt
     }
 
-    // Convert numeric style to human-friendly color name
+    func buildHighlightChildren(bookId: String, highlight: HighlightRow) -> [[String: Any]] {
+        var children: [[String: Any]] = []
+        children.append([
+            "object": "block",
+            "quote": [
+                "rich_text": [["text": ["content": highlight.text]]]
+            ]
+        ])
+        if let note = highlight.note, !note.isEmpty {
+            children.append([
+                "object": "block",
+                "paragraph": [
+                    "rich_text": [[
+                        "text": ["content": note],
+                        "annotations": ["italic": true]
+                    ]]
+                ]
+            ])
+        }
+        let metaString = buildMetadataString(for: highlight)
+        if !metaString.isEmpty {
+            children.append([
+                "object": "block",
+                "paragraph": [
+                    "rich_text": [[
+                        "text": ["content": metaString],
+                        "annotations": ["italic": true]
+                    ]]
+                ]
+            ])
+        }
+        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
+        children.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": [[
+                    "text": ["content": "Open ↗"],
+                    "href": linkUrl
+                ]]
+            ]
+        ])
+        return children
+    }
+
     func styleName(for style: Int) -> String {
         switch style {
         case 0: return "orange"
@@ -129,5 +161,50 @@ class NotionHelperMethods {
         case 5: return "purple"
         default: return "gray"
         }
+    }
+
+    func perBookDatabaseProperties(bookTitle: String, author: String, assetId: String) -> (title: String, properties: [String: Any]) {
+        let dbTitle = "SyncNos - \(bookTitle)"
+        let properties: [String: Any] = [
+            "Text": ["title": [:]],
+            "UUID": ["rich_text": [:]],
+            "Note": ["rich_text": [:]],
+            "Style": ["rich_text": [:]],
+            "Added At": ["date": [:]],
+            "Modified At": ["date": [:]],
+            "Location": ["rich_text": [:]],
+            "Book ID": ["rich_text": [:]],
+            "Book Title": ["rich_text": [:]],
+            "Author": ["rich_text": [:]],
+            "Link": ["url": [:]]
+        ]
+        return (title: dbTitle, properties: properties)
+    }
+
+    func buildBookPageProperties(bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) -> (properties: [String: Any], children: [[String: Any]]) {
+        var properties: [String: Any] = [
+            "Name": [
+                "title": [["text": ["content": bookTitle]]]
+            ],
+            "Asset ID": [
+                "rich_text": [["text": ["content": assetId]]]
+            ],
+            "Author": [
+                "rich_text": [["text": ["content": author]]]
+            ]
+        ]
+        if let urlString = urlString, !urlString.isEmpty {
+            properties["URL"] = ["url": urlString]
+        }
+        var children: [[String: Any]] = []
+        if let header = header, !header.isEmpty {
+            children = [[
+                "object": "block",
+                "heading_2": [
+                    "rich_text": [["text": ["content": header]]]
+                ]
+            ]]
+        }
+        return (properties: properties, children: children)
     }
 }

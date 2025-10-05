@@ -4,7 +4,6 @@ final class NotionService: NotionServiceProtocol {
     // Core service components
     private let core: NotionServiceCore
     private let requestHelper: NotionRequestHelper
-    private let helperMethods: NotionHelperMethods
 
     // Operation modules
     private let databaseOps: NotionDatabaseOperations
@@ -12,7 +11,7 @@ final class NotionService: NotionServiceProtocol {
     private let highlightOps: NotionHighlightOperations
     private let queryOps: NotionQueryOperations
 
-    init(configStore: NotionConfigStoreProtocol) {
+    init(configStore: NotionConfigStoreProtocol, appleBooksHelper: NotionAppleBooksHelperProtocol? = nil) {
         // Initialize core components
         self.core = NotionServiceCore(configStore: configStore)
         self.requestHelper = NotionRequestHelper(
@@ -21,15 +20,15 @@ final class NotionService: NotionServiceProtocol {
             notionVersion: core.notionVersion,
             logger: core.logger
         )
-        self.helperMethods = NotionHelperMethods()
+        let helper = appleBooksHelper ?? DefaultNotionAppleBooksHelper()
 
         // Initialize operation modules
-        self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper)
-        self.pageOps = NotionPageOperations(requestHelper: requestHelper)
+        self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper, appleBooksHelper: helper)
+        self.pageOps = NotionPageOperations(requestHelper: requestHelper, appleBooksHelper: helper)
         self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: core.logger)
         self.highlightOps = NotionHighlightOperations(
             requestHelper: requestHelper,
-            helperMethods: helperMethods,
+            appleBooksHelper: helper,
             pageOperations: pageOps,
             logger: core.logger
         )
