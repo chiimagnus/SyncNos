@@ -166,30 +166,30 @@ class DefaultNotionAppleBooksHelper: NotionAppleBooksHelperProtocol {
     func perBookDatabaseProperties(bookTitle: String, author: String, assetId: String) -> (title: String, properties: [String: Any]) {
         let dbTitle = "SyncNos - \(bookTitle)"
         let properties: [String: Any] = [
-            NotionAppleBooksFields.text: ["title": [:]],
-            NotionAppleBooksFields.uuid: ["rich_text": [:]],
-            NotionAppleBooksFields.note: ["rich_text": [:]],
-            NotionAppleBooksFields.style: ["rich_text": [:]],
-            NotionAppleBooksFields.addedAt: ["date": [:]],
-            NotionAppleBooksFields.modifiedAt: ["date": [:]],
-            NotionAppleBooksFields.location: ["rich_text": [:]],
-            NotionAppleBooksFields.bookId: ["rich_text": [:]],
-            NotionAppleBooksFields.bookTitle: ["rich_text": [:]],
-            NotionAppleBooksFields.author: ["rich_text": [:]],
-            NotionAppleBooksFields.link: ["url": [:]]
+            NotionFields.text: ["title": [:]],
+            NotionFields.uuid: ["rich_text": [:]],
+            NotionFields.note: ["rich_text": [:]],
+            NotionFields.style: ["rich_text": [:]],
+            NotionFields.addedAt: ["date": [:]],
+            NotionFields.modifiedAt: ["date": [:]],
+            NotionFields.location: ["rich_text": [:]],
+            NotionFields.bookId: ["rich_text": [:]],
+            NotionFields.bookTitle: ["rich_text": [:]],
+            NotionFields.author: ["rich_text": [:]],
+            NotionFields.link: ["url": [:]]
         ]
         return (title: dbTitle, properties: properties)
     }
 
     func buildBookPageProperties(bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) -> (properties: [String: Any], children: [[String: Any]]) {
         var properties: [String: Any] = [
-            NotionAppleBooksFields.name: [
+            NotionFields.name: [
                 "title": [["text": ["content": bookTitle]]]
             ],
-            NotionAppleBooksFields.assetId: [
+            NotionFields.assetId: [
                 "rich_text": [["text": ["content": assetId]]]
             ],
-            NotionAppleBooksFields.author: [
+            NotionFields.author: [
                 "rich_text": [["text": ["content": author]]]
             ]
         ]

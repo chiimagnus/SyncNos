@@ -1,7 +1,7 @@
 import Foundation
 
 // Centralized Notion field names and keys used by AppleBooks helper and Notion modules
-struct NotionAppleBooksFields {
+struct NotionFields {
     static let name = "Name"
     static let assetId = "Asset ID"
     static let author = "Author"
