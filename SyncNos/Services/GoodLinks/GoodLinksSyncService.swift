@@ -32,21 +32,17 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 3) 确保页面存在
         let pageId: String
-        if let existing = try await notionService.findPageIdByPropertyEquals(databaseId: databaseId, propertyName: "Asset ID", value: link.id) {
+        if let existing = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: link.id) {
             pageId = existing
         } else {
-            let title = (link.title?.isEmpty == false ? link.title! : link.url)
-            let properties: [String: Any] = [
-                "Name": ["title": [["text": ["content": title]]]],
-                "Asset ID": ["rich_text": [["text": ["content": link.id]]]],
-                "Author": ["rich_text": [["text": ["content": link.author ?? ""]]]],
-                "URL": ["url": link.url]
-            ]
-            let children: [[String: Any]] = [[
-                "object": "block",
-                "heading_2": ["rich_text": [["text": ["content": "Highlights"]]]]
-            ]]
-            let created = try await notionService.createPage(in: databaseId, properties: properties, children: children)
+            let created = try await notionService.createBookPage(
+                databaseId: databaseId,
+                bookTitle: (link.title?.isEmpty == false ? link.title! : link.url),
+                author: link.author ?? "",
+                assetId: link.id,
+                urlString: link.url,
+                header: "Highlights"
+            )
             pageId = created.id
         }
 

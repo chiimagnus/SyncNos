@@ -25,8 +25,8 @@ class NotionDatabaseOperations {
         }
     }
 
-    func createDatabase(title: String, pageId: String, properties: [String: Any]? = nil) async throws -> NotionDatabase {
-        var body: [String: Any] = [
+    func createDatabase(title: String, pageId: String) async throws -> NotionDatabase {
+        let body: [String: Any] = [
             "parent": [
                 "type": "page_id",
                 "page_id": pageId
@@ -34,29 +34,58 @@ class NotionDatabaseOperations {
             "title": [[
                 "type": "text",
                 "text": ["content": title]
-            ]]
-        ]
-        if let props = properties {
-            body["properties"] = props
-        } else {
-            body["properties"] = [
+            ]],
+            "properties": [
                 // Primary title property (book title)
-                NotionFields.name: ["title": [:]],
+                "Name": ["title": [:]],
                 // Author as rich text
-                NotionFields.author: ["rich_text": [:]],
+                "Author": ["rich_text": [:]],
                 // Highlight count as number
-                NotionFields.highlightCount: ["number": [:]],
+                "Highlight Count": ["number": [:]],
                 // Asset ID for idempotent lookup
-                NotionFields.assetId: ["rich_text": [:]],
+                "Asset ID": ["rich_text": [:]],
                 // Book URL
-                NotionFields.url: ["url": [:]]
+                "URL": ["url": [:]]
             ]
-        }
+        ]
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
         return try JSONDecoder().decode(NotionDatabase.self, from: data)
     }
 
-    // Removed AppleBooks-specific per-book database creation; callers should build properties and use createDatabase(title:pageId:properties:)
+    func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String, pageId: String) async throws -> NotionDatabase {
+        // Database title uses book title for clarity
+        let dbTitle = "SyncNos - \(bookTitle)"
+
+        // Properties for highlight items（Style 采用 rich_text 以承载 "颜色名_数字" 文本）
+        let body: [String: Any] = [
+            "parent": [
+                "type": "page_id",
+                "page_id": pageId
+            ],
+            "title": [[
+                "type": "text",
+                "text": ["content": dbTitle]
+            ]],
+            "properties": [
+                // Title property for highlight text
+                "Text": ["title": [:]],
+                // Metadata
+                "UUID": ["rich_text": [:]],
+                "Note": ["rich_text": [:]],
+                "Style": ["rich_text": [:]],
+                "Added At": ["date": [:]],
+                "Modified At": ["date": [:]],
+                "Location": ["rich_text": [:]],
+                // Book info for redundancy and filtering
+                "Book ID": ["rich_text": [:]],
+                "Book Title": ["rich_text": [:]],
+                "Author": ["rich_text": [:]],
+                "Link": ["url": [:]]
+            ]
+        ]
+        let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
+        return try JSONDecoder().decode(NotionDatabase.self, from: data)
+    }
 
     func findDatabaseId(title: String, parentPageId: String) async throws -> String? {
         struct SearchResponse: Decodable {
