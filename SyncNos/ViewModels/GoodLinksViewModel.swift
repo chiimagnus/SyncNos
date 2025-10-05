@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 final class GoodLinksViewModel: ObservableObject {
     @Published var links: [GoodLinksLinkRow] = []
