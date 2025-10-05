@@ -60,7 +60,9 @@ struct MainListView: View {
             // 切换数据源时重置选择
             selectedBookId = nil
             if contentSource == .goodLinks {
-                goodLinksVM.loadRecentLinks()
+                Task {
+                    await goodLinksVM.loadRecentLinks()
+                }
             }
         }
         .background {

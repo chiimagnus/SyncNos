@@ -200,13 +200,17 @@ struct GoodLinksDetailView: View {
                 }
                 .onAppear {
                     print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
-                    viewModel.loadHighlights(for: linkId)
-                    viewModel.loadContent(for: linkId)
+                    Task {
+                        await viewModel.loadHighlights(for: linkId)
+                        await viewModel.loadContent(for: linkId)
+                    }
                 }
                 .onChange(of: linkId) { newLinkId in
                     print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
-                    viewModel.loadHighlights(for: newLinkId)
-                    viewModel.loadContent(for: newLinkId)
+                    Task {
+                        await viewModel.loadHighlights(for: newLinkId)
+                        await viewModel.loadContent(for: newLinkId)
+                    }
                 }
                 .background(LiveResizeObserver(isResizing: $isLiveResizing))
                 .onChange(of: isLiveResizing) { resizing in
@@ -248,8 +252,10 @@ struct GoodLinksDetailView: View {
         .frame(minWidth: 400, idealWidth: 600)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
-                viewModel.loadHighlights(for: linkId)
-                viewModel.loadContent(for: linkId)
+                Task {
+                    await viewModel.loadHighlights(for: linkId)
+                    await viewModel.loadContent(for: linkId)
+                }
             }
         }
         .onReceive(
