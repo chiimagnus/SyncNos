@@ -291,51 +291,83 @@ final class NotionService: NotionServiceProtocol {
     }
     
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
-        guard let key = configStore.notionKey else {
-            throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
+        // 上层会批次调用此函数。这里实现安全的分片/降级递归，遇到单条失败尝试内容裁剪；仍失败则跳过该条，保证后续条目不被拖累。
+        func buildBlock(for h: HighlightRow) -> [String: Any] {
+            var rt: [[String: Any]] = []
+            // Highlight text（裁剪到 1800 字符，避免 Notion 每段 2000 限制）
+            let maxLen = 1800
+            let textContent = h.text.count > maxLen ? String(h.text.prefix(maxLen)) : h.text
+            rt.append(["text": ["content": textContent]])
+            // Optional note（同样裁剪）
+            if let note = h.note, !note.isEmpty {
+                let noteTrim = note.count > maxLen ? String(note.prefix(maxLen)) : note
+                rt.append(["text": ["content": " — Note: \(noteTrim)"], "annotations": ["italic": true]])
+            }
+            // Add metadata (style, creation, modification) when available
+            var metaParts: [String] = []
+            if let s = h.style { metaParts.append("style:\(s)") }
+            if let d = h.dateAdded { metaParts.append("added:\(Self.isoDateFormatter.string(from: d))") }
+            if let m = h.modified { metaParts.append("modified:\(Self.isoDateFormatter.string(from: m))") }
+            if !metaParts.isEmpty {
+                rt.append(["text": ["content": " — \(metaParts.joined(separator: " | "))"], "annotations": ["italic": true]])
+            }
+            // Optional link
+            let linkUrl: String
+            if let loc = h.location, !loc.isEmpty {
+                linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
+            } else {
+                linkUrl = "ibooks://assetid/\(bookId)"
+            }
+            rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
+            // UUID marker for idempotency
+            rt.append(["text": ["content": " [uuid:\(h.uuid)]"], "annotations": ["code": true]])
+            return [
+                "object": "block",
+                "bulleted_list_item": ["rich_text": rt]
+            ]
         }
-        let url = apiBase.appendingPathComponent("blocks/\(pageId)/children")
-        // Chunk into batches of up to 80 blocks to be safe
+
+        func appendSlice(_ slice: ArraySlice<HighlightRow>) async throws {
+            let children = slice.map { buildBlock(for: $0) }
+            do {
+                try await appendBlocks(pageId: pageId, children: children)
+            } catch {
+                // 如果一批失败，且数量>1，切半递归重试；数量==1 时尝试更激进的裁剪（再次失败则跳过）
+                if slice.count > 1 {
+                    let mid = slice.startIndex + slice.count / 2
+                    try await appendSlice(slice[slice.startIndex..<mid])
+                    try await appendSlice(slice[mid..<slice.endIndex])
+                } else if let h = slice.first {
+                    // 单条仍失败：进一步强裁剪文本到 1000
+                    let maxLen2 = 1000
+                    var rt: [[String: Any]] = []
+                    let textTrim = h.text.count > maxLen2 ? String(h.text.prefix(maxLen2)) : h.text
+                    rt.append(["text": ["content": textTrim]])
+                    let noteTrim: String? = (h.note?.isEmpty == false) ? (h.note!.count > maxLen2 ? String(h.note!.prefix(maxLen2)) : h.note!) : nil
+                    if let noteTrim { rt.append(["text": ["content": " — Note: \(noteTrim)"], "annotations": ["italic": true]]) }
+                    let linkUrl = (h.location?.isEmpty == false) ? "ibooks://assetid/\(bookId)#\(h.location!)" : "ibooks://assetid/\(bookId)"
+                    rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
+                    rt.append(["text": ["content": " [uuid:\(h.uuid)]"], "annotations": ["code": true]])
+                    let child: [[String: Any]] = [[
+                        "object": "block",
+                        "bulleted_list_item": ["rich_text": rt]
+                    ]]
+                    do {
+                        try await appendBlocks(pageId: pageId, children: child)
+                    } catch {
+                        // 彻底放弃该条，记录并跳过，避免整本失败
+                        logger.warning("Skip one highlight due to Notion API error: uuid=\(h.uuid) message=\(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        // 入口：按 80 一批，逐批递归发送
         let batchSize = 80
         var index = 0
         while index < highlights.count {
-            let slice = Array(highlights[index..<min(index + batchSize, highlights.count)])
-            var request = URLRequest(url: url)
-            request.httpMethod = "PATCH"
-            addCommonHeaders(to: &request, key: key)
-            let children: [[String: Any]] = slice.map { h in
-                var rt: [[String: Any]] = []
-                // Highlight text
-                rt.append(["text": ["content": h.text]])
-                // Optional note
-                if let note = h.note, !note.isEmpty {
-                    rt.append(["text": ["content": " — Note: \(note)"], "annotations": ["italic": true]])
-                }
-                // Add metadata (style, creation, modification) when available
-                var metaParts: [String] = []
-                if let s = h.style { metaParts.append("style:\(s)") }
-                if let d = h.dateAdded { metaParts.append("added:\(Self.isoDateFormatter.string(from: d))") }
-                if let m = h.modified { metaParts.append("modified:\(Self.isoDateFormatter.string(from: m))") }
-                if !metaParts.isEmpty {
-                    rt.append(["text": ["content": " — \(metaParts.joined(separator: " | "))"], "annotations": ["italic": true]])
-                }
-                // Optional link
-                let linkUrl: String
-                if let loc = h.location, !loc.isEmpty {
-                    linkUrl = "ibooks://assetid/\(bookId)#\(loc)"
-                } else {
-                    linkUrl = "ibooks://assetid/\(bookId)"
-                }
-                rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
-                // UUID marker for idempotency
-                rt.append(["text": ["content": " [uuid:\(h.uuid)]"], "annotations": ["code": true]])
-                return [
-                    "object": "block",
-                    "bulleted_list_item": ["rich_text": rt]
-                ]
-            }
-            // Delegate to generalized appendBlocks so that callers can reuse
-            try await appendBlocks(pageId: pageId, children: children)
+            let slice = highlights[index..<min(index + batchSize, highlights.count)]
+            try await appendSlice(slice)
             index += batchSize
         }
     }
