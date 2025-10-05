@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class AppleBookDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
     @Published var isLoadingPage = false
@@ -25,16 +26,20 @@ class AppleBookDetailViewModel: ObservableObject {
         self.syncCoordinator = syncCoordinator
     }
     
-    deinit { closeSession() }
+    deinit {
+        Task { @MainActor [weak self] in
+            self?.closeSession()
+        }
+    }
     
-    func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) {
+    func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) async {
         errorMessage = nil
         closeSession()
         highlights = []
         currentOffset = 0
         currentAssetId = assetId
         self.expectedTotalCount = expectedTotalCount
-        
+
         if let path = dbPath {
             do {
                 session = try databaseService.makeReadOnlySession(dbPath: path)
@@ -43,13 +48,13 @@ class AppleBookDetailViewModel: ObservableObject {
                 return
             }
         }
-        loadNextPage(dbPath: dbPath, assetId: assetId)
+        await loadNextPage(dbPath: dbPath, assetId: assetId)
     }
     
-    func loadNextPage(dbPath: String?, assetId: String) {
+    func loadNextPage(dbPath: String?, assetId: String) async {
         if isLoadingPage { return }
         if highlights.count >= expectedTotalCount { return }
-        
+
         if currentAssetId == nil {
             currentAssetId = assetId
         }
@@ -62,27 +67,21 @@ class AppleBookDetailViewModel: ObservableObject {
             }
         }
         guard let s = session, let asset = currentAssetId else { return }
-        
+
         isLoadingPage = true
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            do {
-                let rows = try s.fetchHighlightPage(assetId: asset, limit: self.pageSize, offset: self.currentOffset, since: nil)
-                let page = rows.map { r in
-                    Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
-                }
-                DispatchQueue.main.async {
-                    self.highlights.append(contentsOf: page)
-                    self.currentOffset += page.count
-                    self.isLoadingPage = false
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoadingPage = false
-                }
+
+        do {
+            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil)
+            let page = rows.map { r in
+                Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
             }
+            highlights.append(contentsOf: page)
+            currentOffset += page.count
+        } catch {
+            errorMessage = error.localizedDescription
         }
+
+        isLoadingPage = false
     }
     
     private func closeSession() {
