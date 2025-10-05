@@ -124,12 +124,17 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             let author = meta?.author ?? ""
             let book = BookListItem(bookId: id, authorName: author, bookTitle: title, ibooksURL: "ibooks://assetid/\(id)", highlightCount: 0)
             do {
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])
                 try await self.syncCoordinator.syncSmart(book: book, dbPath: annotationDBPath) { progress in
                     self.logger.debug("AutoSync progress[\(id)]: \(progress)")
                 }
             } catch {
                 self.logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
             }
+            NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
+            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) // 标记已完成（即使此前失败，界面可根据先后以最终状态为准）
         }
     }
 }

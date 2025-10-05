@@ -39,6 +39,16 @@ struct AppleBooksListView: View {
                                 Text("\(book.highlightCount) highlights").font(.caption)
                             }
                             Spacer()
+                            // Sync status icon
+                            if viewModel.syncingBookIds.contains(book.bookId) {
+                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                    .foregroundColor(.yellow)
+                                    .help("Syncing")
+                            } else if viewModel.syncedBookIds.contains(book.bookId) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .help("Synced")
+                            }
                         }
                         .padding(.vertical, 4)
                         .tag(book.bookId)
