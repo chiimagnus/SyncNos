@@ -67,7 +67,9 @@ struct AppleBooksListView: View {
                 let selectedPath = url.path
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
-                viewModel.loadBooks()
+                Task {
+                    await viewModel.loadBooks()
+                }
             }
         }
         .onDisappear {
@@ -83,7 +85,9 @@ struct AppleBooksListView: View {
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
             }
-            viewModel.loadBooks()
+            Task {
+                await viewModel.loadBooks()
+            }
         }
         .onChange(of: viewModel.books) { books in
             if selectedBookId == nil {
