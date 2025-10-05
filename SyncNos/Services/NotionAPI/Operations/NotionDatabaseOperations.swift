@@ -45,13 +45,7 @@ class NotionDatabaseOperations {
                 // Asset ID for idempotent lookup
                 "Asset ID": ["rich_text": [:]],
                 // Book URL
-                "URL": ["url": [:]],
-                // Extended properties for GoodLinks
-                "Tags": ["multi_select": [:]],
-                "Summary": ["rich_text": [:]],
-                "Starred": ["checkbox": [:]],
-                "Added At": ["date": [:]],
-                "Modified At": ["date": [:]]
+                "URL": ["url": [:]]
             ]
         ]
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)

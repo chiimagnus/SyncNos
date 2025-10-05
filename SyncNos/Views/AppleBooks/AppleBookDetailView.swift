@@ -117,7 +117,9 @@ struct AppleBookDetailView: View {
                             HStack {
                                 Spacer()
                                 Button(action: {
-                                    viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId)
+                                    Task {
+                                        await viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId)
+                                    }
                                 }) {
                                     if viewModel.isLoadingPage {
                                         ProgressView()
@@ -140,12 +142,16 @@ struct AppleBookDetailView: View {
         .frame(minWidth: 400, idealWidth: 600)
         .onAppear {
             if let book = selectedBook {
-                viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+                Task {
+                    await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+                }
             }
         }
         .onChange(of: selectedBookId) { _ in
             if let book = selectedBook {
-                viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+                Task {
+                    await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
+                }
             }
         }
         .navigationTitle("Apple Books")
