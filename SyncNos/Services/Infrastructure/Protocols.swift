@@ -159,6 +159,13 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject {
     func defaultDatabasePath() -> String
     func canOpenReadOnly(dbPath: String) -> Bool
     func makeReadOnlySession(dbPath: String) throws -> GoodLinksReadOnlySessionProtocol
+
+    // Convenience helpers that encapsulate session lifecycle so ViewModels
+    // don't need to manage security-scoped bookmarks or SQLite handles.
+    func resolveDatabasePath() -> String
+    func fetchRecentLinks(dbPath: String, limit: Int) throws -> [GoodLinksLinkRow]
+    func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
+    func fetchContent(dbPath: String, linkId: String) throws -> GoodLinksContentRow?
 }
 
 // MARK: - Auto Sync Service Protocol

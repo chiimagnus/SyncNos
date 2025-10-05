@@ -32,26 +32,6 @@ class NotionPageOperations {
                 ]
             ]]
         }
-        // Initial structure: Article (empty) + Highlights header
-        children.append([
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Article"]]]
-            ]
-        ])
-        // Placeholder empty paragraph; actual content will replace page children later
-        children.append([
-            "object": "block",
-            "paragraph": [
-                "rich_text": []
-            ]
-        ])
-        children.append([
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Highlights"]]]
-            ]
-        ])
         let body: [String: Any] = [
             "parent": ["type": "database_id", "database_id": databaseId],
             "properties": properties,

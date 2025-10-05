@@ -67,7 +67,9 @@ struct GoodLinksListView: View {
         }
         .onAppear {
             if viewModel.links.isEmpty {
-                viewModel.loadRecentLinks()
+                Task {
+                    await viewModel.loadRecentLinks()
+                }
             }
             // 默认选中第一条（若未选中且有数据）
             if selectedLinkId == nil, let firstId = viewModel.links.first?.id {
@@ -75,10 +77,14 @@ struct GoodLinksListView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.loadRecentLinks()
+            Task {
+                await viewModel.loadRecentLinks()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.loadRecentLinks()
+            Task {
+                await viewModel.loadRecentLinks()
+            }
         }
         .onChange(of: viewModel.links) { links in
             if selectedLinkId == nil, let firstId = links.first?.id {

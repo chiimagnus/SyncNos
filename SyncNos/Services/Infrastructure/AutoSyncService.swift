@@ -1,6 +1,52 @@
 import Foundation
 import Combine
 
+// MARK: - Database Path Helper
+
+final class DatabasePathHelper {
+    static func determineDatabaseRoot(from selectedPath: String) -> String {
+        let fm = FileManager.default
+        var rootCandidate = selectedPath
+
+        // 检查是否选择了容器目录（包含Data/Documents）
+        let maybeDataDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
+        let aeAnnoInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("AEAnnotation")
+        let bkLibInDataDocs = (maybeDataDocs as NSString).appendingPathComponent("BKLibrary")
+
+        if fm.fileExists(atPath: aeAnnoInDataDocs) || fm.fileExists(atPath: bkLibInDataDocs) {
+            rootCandidate = maybeDataDocs
+        } else {
+            // 检查是否直接选择了Data/Documents目录
+            let aeAnno = (selectedPath as NSString).appendingPathComponent("AEAnnotation")
+            let bkLib = (selectedPath as NSString).appendingPathComponent("BKLibrary")
+            if fm.fileExists(atPath: aeAnno) || fm.fileExists(atPath: bkLib) {
+                rootCandidate = selectedPath
+            }
+            // 如果用户选择了 `.../Data`，则自动补上 `Documents`
+            let lastPath = (selectedPath as NSString).lastPathComponent
+            if lastPath == "Data" {
+                let dataDocs = (selectedPath as NSString).appendingPathComponent("Documents")
+                let aeAnno2 = (dataDocs as NSString).appendingPathComponent("AEAnnotation")
+                let bkLib2 = (dataDocs as NSString).appendingPathComponent("BKLibrary")
+                if fm.fileExists(atPath: aeAnno2) || fm.fileExists(atPath: bkLib2) {
+                    rootCandidate = dataDocs
+                }
+            }
+            // 如果用户选择了容器根 `.../Containers/com.apple.iBooksX`，则进入 `Data/Documents`
+            if lastPath == "com.apple.iBooksX" || selectedPath.hasSuffix("/Containers/com.apple.iBooksX") {
+                let containerDocs = (selectedPath as NSString).appendingPathComponent("Data/Documents")
+                let aeAnno3 = (containerDocs as NSString).appendingPathComponent("AEAnnotation")
+                let bkLib3 = (containerDocs as NSString).appendingPathComponent("BKLibrary")
+                if fm.fileExists(atPath: aeAnno3) || fm.fileExists(atPath: bkLib3) {
+                    rootCandidate = containerDocs
+                }
+            }
+        }
+
+        return rootCandidate
+    }
+}
+
 final class AutoSyncService: AutoSyncServiceProtocol {
     private let logger = DIContainer.shared.loggerService
     private let databaseService = DIContainer.shared.databaseService
@@ -17,8 +63,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         // 尝试从 bookmark 恢复并解析 Data/Documents 根目录
         if let url = BookmarkStore.shared.restore() {
             let selectedPath = url.path
-            let vm = BookViewModel()
-            return vm.determineDatabaseRoot(from: selectedPath)
+            return DatabasePathHelper.determineDatabaseRoot(from: selectedPath)
         }
         return nil
     }
