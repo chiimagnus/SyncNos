@@ -98,6 +98,7 @@ class AppleBookDetailViewModel: ObservableObject {
         isSyncing = true
         Task {
             do {
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
                 try await self.syncCoordinator.syncSmart(book: book, dbPath: dbPath) { progress in
                     Task { @MainActor in self.syncProgressText = progress }
                 }
@@ -105,12 +106,14 @@ class AppleBookDetailViewModel: ObservableObject {
                     self.syncMessage = "同步完成"
                     self.syncProgressText = nil
                     self.isSyncing = false
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
                 }
             } catch {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription
                     self.syncProgressText = nil
                     self.isSyncing = false
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
                 }
             }
         }
@@ -122,6 +125,7 @@ class AppleBookDetailViewModel: ObservableObject {
         isSyncing = true
         Task {
             do {
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
                 try await self.syncCoordinator.sync(book: book, dbPath: dbPath, incremental: incremental) { progress in
                     Task { @MainActor in self.syncProgressText = progress }
                 }
@@ -129,12 +133,14 @@ class AppleBookDetailViewModel: ObservableObject {
                     self.syncMessage = incremental ? "增量同步完成" : "全量同步完成"
                     self.syncProgressText = nil
                     self.isSyncing = false
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
                 }
             } catch {
                 await MainActor.run {
                     self.syncMessage = error.localizedDescription
                     self.syncProgressText = nil
                     self.isSyncing = false
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
                 }
             }
         }

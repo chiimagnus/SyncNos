@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 // MARK: - BookViewModel
 
@@ -7,6 +8,9 @@ class BookViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    // UI Sync State
+    @Published var syncingBookIds: Set<String> = []
+    @Published var syncedBookIds: Set<String> = []
 
     private let databaseService: DatabaseServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
@@ -14,6 +18,7 @@ class BookViewModel: ObservableObject {
     private var dbRootOverride: String?
     private var annotationDBPath: String?
     private var booksDBPath: String?
+    private var cancellables: Set<AnyCancellable> = []
 
     // Public readonly accessors
     var annotationDatabasePath: String? { annotationDBPath }
@@ -24,6 +29,7 @@ class BookViewModel: ObservableObject {
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
+        subscribeSyncStatusNotifications()
     }
     
     // MARK: - Path Utility Methods
@@ -105,6 +111,31 @@ class BookViewModel: ObservableObject {
     }
         
     // MARK: - Private Methods
+    private func subscribeSyncStatusNotifications() {
+        NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .compactMap { info -> (String, String)? in
+                guard let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return nil }
+                return (bookId, status)
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (bookId, status) in
+                guard let self else { return }
+                switch status {
+                case "started":
+                    self.syncingBookIds.insert(bookId)
+                case "succeeded":
+                    self.syncingBookIds.remove(bookId)
+                    self.syncedBookIds.insert(bookId)
+                case "failed":
+                    self.syncingBookIds.remove(bookId)
+                    // 保留已完成状态不变
+                default:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+    }
     
     private func fetchBooksFromDatabase() throws -> [BookListItem] {
         guard let root = dbRootOverride else {
