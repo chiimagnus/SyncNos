@@ -12,7 +12,7 @@ class DIContainer {
     private var _notionConfigStore: NotionConfigStoreProtocol?
     private var _notionService: NotionServiceProtocol?
     private var _loggerService: LoggerServiceProtocol?
-    private var _syncCoordinator: NotionSyncCoordinatorProtocol?
+    private var _appleBooksSyncService: AppleBooksSyncServiceProtocol?
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
@@ -53,11 +53,13 @@ class DIContainer {
         return _loggerService!
     }
 
-    var syncCoordinator: NotionSyncCoordinatorProtocol {
-        if _syncCoordinator == nil {
-            _syncCoordinator = NotionSyncCoordinator()
+    
+
+    var appleBooksSyncService: AppleBooksSyncServiceProtocol {
+        if _appleBooksSyncService == nil {
+            _appleBooksSyncService = AppleBooksSyncService()
         }
-        return _syncCoordinator!
+        return _appleBooksSyncService!
     }
 
     var iapService: IAPServiceProtocol {
@@ -102,8 +104,10 @@ class DIContainer {
         self._loggerService = loggerService
     }
 
-    func register(syncCoordinator: NotionSyncCoordinatorProtocol) {
-        self._syncCoordinator = syncCoordinator
+    
+
+    func register(appleBooksSyncService: AppleBooksSyncServiceProtocol) {
+        self._appleBooksSyncService = appleBooksSyncService
     }
 
     func register(iapService: IAPServiceProtocol) {

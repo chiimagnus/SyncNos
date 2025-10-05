@@ -1,9 +1,8 @@
 import Foundation
 import SQLite3
 
-/// Implementation for the single database synchronization strategy (方案1)
-/// Uses one database with pages for each book
-final class SyncStrategySingleDB: SyncStrategyProtocol {
+/// Apple Books：单库多页策略（迁移自 SyncStrategySingleDB）
+final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
     private let databaseService: DatabaseServiceProtocol
     private let notionService: NotionServiceProtocol
     private let config: NotionConfigStoreProtocol
@@ -229,3 +228,5 @@ final class SyncStrategySingleDB: SyncStrategyProtocol {
         return counts.first { $0.assetId == assetId }?.count ?? 0
     }
 }
+
+

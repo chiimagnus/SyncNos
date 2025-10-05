@@ -1,9 +1,8 @@
 import Foundation
 import SQLite3
 
-/// Implementation for the per-book database synchronization strategy (方案2)
-/// Uses separate databases for each book with highlight entries
-final class SyncStrategyPerBook: SyncStrategyProtocol {
+/// Apple Books：每书单独数据库策略（迁移自 SyncStrategyPerBook）
+final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
     private let databaseService: DatabaseServiceProtocol
     private let notionService: NotionServiceProtocol
     private let config: NotionConfigStoreProtocol
@@ -121,3 +120,5 @@ final class SyncStrategyPerBook: SyncStrategyProtocol {
         return false
     }
 }
+
+
