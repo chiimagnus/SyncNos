@@ -147,7 +147,7 @@ class NotionHelperMethods {
         return (parent, blocks)
     }
 
-    // Build a single bulleted list item block for a highlight (parent rich_text + children)
+    // buildBulletedListItemBlock(for:bookId:maxTextLength:)：构建并返回一个完整的 Notion bulleted_list_item block，其中父级 rich_text 包含高亮文本与 [uuid:...] 标记，children 包含 note、metadata 与 Open 链接等子块（适合追加到“Highlights”列表时使用）。
     func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [String: Any] {
         let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
         let bulleted: [String: Any] = [
@@ -160,7 +160,7 @@ class NotionHelperMethods {
         ]
     }
 
-    // Build children blocks for a per-book database page (quote, optional note, metadata+link)
+    // buildPerBookPageChildren(for:bookId:)：为“每书库（per-book DB）”构建页面子块列表（用于 pages 的 children），包括：1) 引用（quote）块显示高亮文本；2) 可选的 note 段落；3) metadata + Open 链接段落。
     func buildPerBookPageChildren(for highlight: HighlightRow, bookId: String) -> [[String: Any]] {
         var children: [[String: Any]] = []
         // 1) Quote block for highlight text
