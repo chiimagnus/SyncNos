@@ -132,6 +132,9 @@ protocol NotionServiceProtocol: AnyObject {
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage
     func findHighlightItemPageIdByUUID(databaseId: String, uuid: String) async throws -> String?
     func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws
+    // Helpers added for consolidated DB management
+    func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
+    func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
