@@ -135,6 +135,18 @@ class NotionHelperMethods {
         ]
     }
 
+    // Build parent rich_text and ordered child blocks for nested-block approach
+    // Returns (parentRichText, childBlocks)
+    func buildParentAndChildren(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> ([[String: Any]], [[String: Any]]) {
+        let parent = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+        var blocks: [[String: Any]] = []
+        if let note = buildNoteChild(for: highlight, maxTextLength: maxTextLength) {
+            blocks.append(note)
+        }
+        blocks.append(buildMetaAndLinkChild(for: highlight, bookId: bookId))
+        return (parent, blocks)
+    }
+
     // Convert numeric style to human-friendly color name
     func styleName(for style: Int) -> String {
         switch style {
