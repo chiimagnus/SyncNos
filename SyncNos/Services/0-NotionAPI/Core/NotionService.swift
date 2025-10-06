@@ -25,7 +25,7 @@ final class NotionService: NotionServiceProtocol {
 
         // Initialize operation modules
         self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper)
-        self.pageOps = NotionPageOperations(requestHelper: requestHelper)
+        self.pageOps = NotionPageOperations(requestHelper: requestHelper, helperMethods: helperMethods)
         self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: core.logger)
         self.highlightOps = NotionHighlightOperations(
             requestHelper: requestHelper,
