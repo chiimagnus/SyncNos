@@ -17,16 +17,7 @@ class NotionHighlightOperations {
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         // 上层会批次调用此函数。这里实现安全的分片/降级递归，遇到单条失败尝试内容裁剪；仍失败则跳过该条，保证后续条目不被拖累。
         func buildBlock(for h: HighlightRow) -> [String: Any] {
-            // Use helper to build parent rich_text and ordered child blocks
-            let (parentRt, childBlocks) = helperMethods.buildParentAndChildren(for: h, bookId: bookId, maxTextLength: 1800)
-            let bulleted: [String: Any] = [
-                "rich_text": parentRt,
-                "children": childBlocks
-            ]
-            return [
-                "object": "block",
-                "bulleted_list_item": bulleted
-            ]
+            return helperMethods.buildBulletedListItemBlock(for: h, bookId: bookId, maxTextLength: 1800)
         }
 
         func appendSlice(_ slice: ArraySlice<HighlightRow>) async throws {
@@ -63,7 +54,7 @@ class NotionHighlightOperations {
 
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
         let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
-        let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
+        let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
 
         let body: [String: Any] = [
             "parent": [
@@ -82,56 +73,7 @@ class NotionHighlightOperations {
         _ = try await requestHelper.performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
 
         // Replace page children with up-to-date content
-        let children = buildHighlightChildren(bookId: bookId, highlight: highlight)
+        let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
         try await pageOperations.replacePageChildren(pageId: pageId, with: children)
-    }
-
-    // MARK: - Per-book item content
-    private func buildHighlightChildren(bookId: String, highlight: HighlightRow) -> [[String: Any]] {
-        var children: [[String: Any]] = []
-        // 1) Quote block for highlight text
-        children.append([
-            "object": "block",
-            "quote": [
-                "rich_text": [["text": ["content": highlight.text]]]
-            ]
-        ])
-        // 2) Note block if exists
-        if let note = highlight.note, !note.isEmpty {
-            children.append([
-                "object": "block",
-                "paragraph": [
-                    "rich_text": [[
-                        "text": ["content": note],
-                        "annotations": ["italic": true]
-                    ]]
-                ]
-            ])
-        }
-        // 3) Metadata line (style/added/modified)
-        let metaString = helperMethods.buildMetadataString(for: highlight)
-        if !metaString.isEmpty {
-            children.append([
-                "object": "block",
-                "paragraph": [
-                    "rich_text": [[
-                        "text": ["content": metaString],
-                        "annotations": ["italic": true]
-                    ]]
-                ]
-            ])
-        }
-        // 4) Open in Apple Books link
-        let linkUrl = helperMethods.buildIBooksLink(bookId: bookId, location: highlight.location)
-        children.append([
-            "object": "block",
-            "paragraph": [
-                "rich_text": [[
-                    "text": ["content": "Open ↗"],
-                    "href": linkUrl
-                ]]
-            ]
-        ])
-        return children
     }
 }
