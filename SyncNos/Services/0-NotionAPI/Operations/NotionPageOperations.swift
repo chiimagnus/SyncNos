@@ -120,7 +120,7 @@ class NotionPageOperations {
         var startCursor: String? = nil
         var existing: [NotionQueryOperations.BlockChildrenResponse.Block] = []
         repeat {
-            var components = URLComponents(url: URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children"), resolvingAgainstBaseURL: false)!
+            var components = requestHelper.makeURLComponents(path: "blocks/\(pageId)/children")
             if let cursor = startCursor {
                 components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
             }
@@ -132,7 +132,7 @@ class NotionPageOperations {
 
         // 2) Delete existing children
         for block in existing {
-            let delURL = URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(block.id)")
+            let delURL = requestHelper.makeURL(path: "blocks/\(block.id)")
             // Best-effort delete: ignore failures
             _ = try? await requestHelper.performRequest(url: delURL, method: "DELETE", body: nil)
         }
