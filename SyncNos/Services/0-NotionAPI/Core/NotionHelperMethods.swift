@@ -147,6 +147,30 @@ class NotionHelperMethods {
         return (parent, blocks)
     }
 
+    // Build paragraph blocks from a long text (used by GoodLinks sync)
+    func buildParagraphBlocks(from text: String, chunkSize: Int = 1800) -> [[String: Any]] {
+        let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        var children: [[String: Any]] = []
+        for p in paragraphs {
+            var start = p.startIndex
+            while start < p.endIndex {
+                let end = p.index(start, offsetBy: chunkSize, limitedBy: p.endIndex) ?? p.endIndex
+                let slice = String(p[start..<end])
+                children.append([
+                    "object": "block",
+                    "paragraph": [
+                        "rich_text": [["text": ["content": slice]]]
+                    ]
+                ])
+                start = end
+            }
+        }
+        return children
+    }
+
     // Convert numeric style to human-friendly color name
     func styleName(for style: Int) -> String {
         switch style {
