@@ -98,7 +98,8 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             ]
         ])
         if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let articleBlocks = Self.buildContentBlocks(from: contentText)
+            let helper = NotionHelperMethods()
+            let articleBlocks = helper.buildParagraphBlocks(from: contentText)
             pageChildren.append(contentsOf: articleBlocks)
         }
         pageChildren.append([
@@ -157,29 +158,4 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         GoodLinksTagParser.parseTagsString(raw)
     }
 
-    private static func buildContentBlocks(from text: String) -> [[String: Any]] {
-        let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
-            .components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        var children: [[String: Any]] = []
-        let chunkSize = 1800
-        for p in paragraphs {
-            var start = p.startIndex
-            while start < p.endIndex {
-                let end = p.index(start, offsetBy: chunkSize, limitedBy: p.endIndex) ?? p.endIndex
-                let slice = String(p[start..<end])
-                children.append([
-                    "object": "block",
-                    "paragraph": [
-                        "rich_text": [["text": ["content": slice]]]
-                    ]
-                ])
-                start = end
-            }
-        }
-        return children
-    }
 }
-
-
