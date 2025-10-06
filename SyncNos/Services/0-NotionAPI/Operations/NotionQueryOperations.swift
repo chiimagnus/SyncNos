@@ -49,6 +49,7 @@ class NotionQueryOperations {
         struct Block: Decodable {
             let id: String
             let type: String
+            let has_children: Bool?
             let paragraph: RichTextHolder?
             let bulleted_list_item: RichTextHolder?
             let numbered_list_item: RichTextHolder?
@@ -74,8 +75,13 @@ class NotionQueryOperations {
             let data = try await requestHelper.performRequest(url: components.url!, method: "GET", body: nil)
             let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
             for block in decoded.results {
-                let holder = block.paragraph ?? block.bulleted_list_item ?? block.numbered_list_item
-                let texts = holder?.rich_text ?? []
+                // try parent paragraph / bulleted / numbered first
+                // local alias for readability and to avoid nested-type lookup issues
+                typealias RichTextType = BlockChildrenResponse.RichText
+                var texts: [RichTextType] = []
+                if let p = block.paragraph?.rich_text { texts = p }
+                else if let b = block.bulleted_list_item?.rich_text { texts = b }
+                else if let n = block.numbered_list_item?.rich_text { texts = n }
                 for t in texts {
                     if let s = t.plain_text {
                         logger.verbose("DEBUG: 检查文本内容: \(s)")
@@ -90,6 +96,30 @@ class NotionQueryOperations {
                                 logger.debug("DEBUG: 未找到结束括号]")
                             }
                         }
+                    }
+                }
+
+                // If the block has children, fetch them and scan for metadata child blocks containing UUID
+                if block.has_children == true {
+                    do {
+                        var childComponents = requestHelper.makeURLComponents(path: "blocks/\(block.id)/children")
+                        let childData = try await requestHelper.performRequest(url: childComponents.url!, method: "GET", body: nil)
+                        let childDecoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: childData)
+                        for child in childDecoded.results {
+                            let childTexts = child.paragraph?.rich_text ?? child.bulleted_list_item?.rich_text ?? child.numbered_list_item?.rich_text ?? []
+                            for ct in childTexts {
+                                if let s = ct.plain_text, let startRange = s.range(of: "[uuid:") {
+                                    let startIdx = startRange.upperBound
+                                    if let endRange = s.range(of: "]", range: startIdx..<s.endIndex) {
+                                        let idPart = String(s[startIdx..<endRange.lowerBound])
+                                        collected[idPart] = block.id
+                                        logger.debug("DEBUG: 从子块找到UUID映射 - UUID: \(idPart), Parent Block ID: \(block.id)")
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        logger.debug("DEBUG: 无法读取子块 children for block \(block.id): \(error.localizedDescription)")
                     }
                 }
             }
