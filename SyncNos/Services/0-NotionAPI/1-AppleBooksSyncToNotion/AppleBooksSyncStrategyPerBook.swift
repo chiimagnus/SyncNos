@@ -57,7 +57,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                         do {
                             try await notionService.updateHighlightItem(pageId: existingPageId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                         } catch {
-                            if self.isDatabaseMissingError(error) {
+                            if NotionRequestHelper.isDatabaseMissingError(error) {
                                 let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
                                 databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
                                 _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
@@ -67,7 +67,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                         do {
                             _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                         } catch {
-                            if self.isDatabaseMissingError(error) {
+                            if NotionRequestHelper.isDatabaseMissingError(error) {
                                 let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
                                 databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
                                 _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
@@ -75,7 +75,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                         }
                     }
                 } catch {
-                    if self.isDatabaseMissingError(error) {
+                    if NotionRequestHelper.isDatabaseMissingError(error) {
                         let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
                         databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
                         _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
@@ -105,14 +105,4 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
     private func ensurePerBookDatabaseId(book: BookListItem) async throws -> (id: String, recreated: Bool) {
         return try await notionService.ensurePerBookDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
     }
-
-    private func isDatabaseMissingError(_ error: Error) -> Bool {
-        let ns = error as NSError
-        if ns.domain == "NotionService" {
-            return ns.code == 404 || ns.code == 400 || ns.code == 410
-        }
-        return false
-    }
 }
-
-
