@@ -97,8 +97,7 @@ class NotionHelperMethods {
         let textContent = truncateText(highlight.text, maxLen: maxTextLength)
         rt.append(["text": ["content": textContent]])
 
-        // 在父级 rich_text 中也附加 UUID（code 注解），便于直接解析去重
-        rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
+        // UUID marker moved to child metadata block for better structure
 
         return rt
     }
