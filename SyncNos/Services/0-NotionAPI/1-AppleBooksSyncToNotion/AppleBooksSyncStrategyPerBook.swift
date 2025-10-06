@@ -1,12 +1,12 @@
 import Foundation
-import SQLite3
+ 
 
 /// Apple Books：每书单独数据库策略（迁移自 SyncStrategyPerBook）
 final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
     private let databaseService: DatabaseServiceProtocol
     private let notionService: NotionServiceProtocol
     private let config: NotionConfigStoreProtocol
-    private let pageSize = 50
+    private let pageSize = NotionSyncConfig.appleBooksPerBookPageSize
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          notionService: NotionServiceProtocol = DIContainer.shared.notionService,
