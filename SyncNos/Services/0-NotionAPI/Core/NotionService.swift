@@ -59,6 +59,15 @@ final class NotionService: NotionServiceProtocol {
         return try await pageOps.createBookPage(databaseId: databaseId, bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
     }
 
+    /// Ensure a page for an asset exists; returns (pageId, created)
+    func ensurePageForAsset(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> (id: String, created: Bool) {
+        if let existing = try await queryOps.findPageIdByAssetId(databaseId: databaseId, assetId: assetId) {
+            return (existing, false)
+        }
+        let p = try await pageOps.createBookPage(databaseId: databaseId, bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
+        return (p.id, true)
+    }
+
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String> {
         return try await queryOps.collectExistingUUIDs(fromPageId: pageId)
     }
