@@ -108,7 +108,7 @@ class NotionHelperMethods {
             : note
         return [
             "object": "block",
-            "paragraph": [
+            "bulleted_list_item": [
                 "rich_text": [[
                     "text": ["content": noteContent],
                     "annotations": ["italic": true]
