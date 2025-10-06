@@ -134,7 +134,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                     modified: addedDate,
                     location: nil
                 )
-                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: 1800)
+                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: 1800, source: "goodLinks")
                 children.append(block)
             }
             try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: 80, trimOnFailureLengths: [1800, 1000])
