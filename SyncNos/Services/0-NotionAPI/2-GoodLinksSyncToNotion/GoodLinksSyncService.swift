@@ -117,25 +117,25 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         if !toAppend.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
-            // Build children and delegate append with retry to page operations
+            // Build children via NotionHelperMethods and delegate append with retry to page operations
+            let helper = NotionHelperMethods()
             var children: [[String: Any]] = []
             for h in toAppend {
-                var rt: [[String: Any]] = []
-                rt.append(["text": ["content": h.content]])
-                if let note = h.note, !note.isEmpty {
-                    rt.append(["text": ["content": " — Note: \(note)"], "annotations": ["italic": true]])
-                }
-                if h.time > 0 {
-                    let dateString = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: h.time))
-                    rt.append(["text": ["content": " — added:\(dateString)"], "annotations": ["italic": true]])
-                }
-                rt.append(["text": ["content": "  Open ↗"], "href": link.url])
-                rt.append(["text": ["content": " [uuid:\(h.id)]"], "annotations": ["code": true]])
-                let child: [String: Any] = [
-                    "object": "block",
-                    "bulleted_list_item": ["rich_text": rt]
-                ]
-                children.append(child)
+                // Map GoodLinksHighlightRow -> HighlightRow-compatible structure for helper
+                let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
+                // Use color -> style, time -> added/modified
+                let fakeHighlight = HighlightRow(
+                    assetId: link.id,
+                    uuid: h.id,
+                    text: h.content,
+                    note: h.note,
+                    style: h.color,
+                    dateAdded: addedDate,
+                    modified: addedDate,
+                    location: nil
+                )
+                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: 1800)
+                children.append(block)
             }
             try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: 80, trimOnFailureLengths: [1800, 1000])
         }
