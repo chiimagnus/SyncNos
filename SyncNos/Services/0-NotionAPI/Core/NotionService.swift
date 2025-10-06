@@ -46,55 +46,18 @@ final class NotionService: NotionServiceProtocol {
         return try await databaseOps.createDatabase(title: title, pageId: pageId)
     }
     
-    
     // MARK: - Extended helpers for sync
-    struct SearchResponse: Decodable {
-        struct Parent: Decodable { let type: String?; let page_id: String?; let database_id: String? }
-        struct Title: Decodable { let plain_text: String? }
-        struct Result: Decodable {
-            let id: String
-            let object: String
-            let parent: Parent?
-            let title: [Title]?
-        }
-        let results: [Result]
-        let has_more: Bool?
-        let next_cursor: String?
-    }
-    
     func findDatabaseId(title: String, parentPageId: String) async throws -> String? {
         return try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId)
     }
-    
-    struct QueryResponse: Decodable {
-        struct Page: Decodable { let id: String }
-        let results: [Page]
-        let has_more: Bool?
-        let next_cursor: String?
-    }
-    
+
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String? {
         return try await queryOps.findPageIdByAssetId(databaseId: databaseId, assetId: assetId)
     }
-    
+
     func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
         return try await pageOps.createBookPage(databaseId: databaseId, bookTitle: bookTitle, author: author, assetId: assetId, urlString: urlString, header: header)
     }
-    
-    struct BlockChildrenResponse: Decodable {
-        struct RichText: Decodable { let plain_text: String? }
-        struct RichTextHolder: Decodable { let rich_text: [RichText]? }
-        struct Block: Decodable {
-            let id: String
-            let type: String
-            let paragraph: RichTextHolder?
-            let bulleted_list_item: RichTextHolder?
-        }
-        let results: [Block]
-        let has_more: Bool
-        let next_cursor: String?
-    }
-
 
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String> {
         return try await queryOps.collectExistingUUIDs(fromPageId: pageId)
@@ -103,7 +66,7 @@ final class NotionService: NotionServiceProtocol {
     func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String] {
         return try await queryOps.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
     }
-    
+
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         try await highlightOps.appendHighlightBullets(pageId: pageId, bookId: bookId, highlights: highlights)
     }
