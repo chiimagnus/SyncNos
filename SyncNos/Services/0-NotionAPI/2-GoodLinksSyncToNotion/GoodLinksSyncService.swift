@@ -30,21 +30,16 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
         try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
-        // 3) 确保页面存在
-        let pageId: String
-        if let existing = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: link.id) {
-            pageId = existing
-        } else {
-            let created = try await notionService.createBookPage(
-                databaseId: databaseId,
-                bookTitle: (link.title?.isEmpty == false ? link.title! : link.url),
-                author: link.author ?? "",
-                assetId: link.id,
-                urlString: link.url,
-                header: "Highlights"
-            )
-            pageId = created.id
-        }
+        // 3) 确保页面存在（统一 ensure API）
+        let ensured = try await notionService.ensureBookPageInDatabase(
+            databaseId: databaseId,
+            bookTitle: (link.title?.isEmpty == false ? link.title! : link.url),
+            author: link.author ?? "",
+            assetId: link.id,
+            urlString: link.url,
+            header: "Highlights"
+        )
+        let pageId = ensured.id
 
         // 4) 读取高亮（分页）
         let session = try databaseService.makeReadOnlySession(dbPath: dbPath)

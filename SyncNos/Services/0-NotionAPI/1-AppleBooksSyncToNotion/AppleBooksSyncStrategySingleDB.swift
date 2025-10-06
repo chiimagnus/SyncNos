@@ -24,19 +24,16 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
 
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
 
-        // Ensure book page exists by Asset ID
-        let pageId: String
-        if let existing = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: book.bookId) {
-            pageId = existing
-        } else {
-            let created = try await notionService.createBookPage(databaseId: databaseId,
-                                                                 bookTitle: book.bookTitle,
-                                                                 author: book.authorName,
-                                                                 assetId: book.bookId,
-                                                                 urlString: book.ibooksURL,
-                                                                 header: "Highlights")
-            pageId = created.id
-        }
+        // Ensure book page exists by Asset ID (use unified ensure API)
+        let ensuredPage = try await notionService.ensureBookPageInDatabase(
+            databaseId: databaseId,
+            bookTitle: book.bookTitle,
+            author: book.authorName,
+            assetId: book.bookId,
+            urlString: book.ibooksURL,
+            header: "Highlights"
+        )
+        let pageId = ensuredPage.id
 
         // Prepare DB
         guard let path = dbPath else { return }
@@ -122,20 +119,17 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         }
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
 
-        // Ensure page
-        let pageId: String
-        let created: Bool
-        if let ex = try await notionService.findPageIdByAssetId(databaseId: databaseId, assetId: book.bookId) {
-            pageId = ex; created = false
-        } else {
-            let p = try await notionService.createBookPage(databaseId: databaseId,
-                                                            bookTitle: book.bookTitle,
-                                                            author: book.authorName,
-                                                            assetId: book.bookId,
-                                                            urlString: book.ibooksURL,
-                                                            header: "Highlights")
-            pageId = p.id; created = true
-        }
+        // Ensure page via unified ensure API
+        let ensureResult = try await notionService.ensureBookPageInDatabase(
+            databaseId: databaseId,
+            bookTitle: book.bookTitle,
+            author: book.authorName,
+            assetId: book.bookId,
+            urlString: book.ibooksURL,
+            header: "Highlights"
+        )
+        let pageId = ensureResult.id
+        let created = ensureResult.created
 
         guard let path = dbPath else { return }
         let handle = try databaseService.openReadOnlyDatabase(dbPath: path)

@@ -115,6 +115,8 @@ protocol NotionServiceProtocol: AnyObject {
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?
     func findPageIdByAssetId(databaseId: String, assetId: String) async throws -> String?
     func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage
+    /// Ensure a page exists in a database for the given asset; returns (pageId, created)
+    func ensureBookPageInDatabase(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> (id: String, created: Bool)
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
     func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String]
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
