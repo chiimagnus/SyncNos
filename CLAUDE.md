@@ -2,129 +2,70 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 1. Commands for Development
+## Project Overview
+SyncNos is a macOS application that synchronizes highlights and notes from Apple Books and GoodLinks to Notion. The app is built with SwiftUI for macOS 13+ using Swift 5.0+.
 
-### Building and Running
-- The project is an Xcode project, open `SyncNos.xcodeproj` to build and run
-- macOS deployment target is 13.0
-- Swift version is 5.0
-- Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
+## Architecture
+The application follows a clean architecture pattern with dependency injection using a DIContainer. Key architectural elements:
+- **Dependency Injection**: Uses DIContainer.swift for managing service dependencies
+- **Services Layer**: Organized in numbered directories (0-NotionAPI, 1-AppleBooks, 2-GoodLinks, Infrastructure, IAP)
+- **Models**: Core data models defined in Models.swift
+- **ViewModels**: Follow MVVM pattern with specific view models for each feature
+- **Views**: SwiftUI views organized in Components, AppleBooks, GoodLinks, and Settings directories
 
-### Testing
-- Currently no formal unit tests exist; tests for business logic need to be added in Services
-- Run application through Xcode to perform manual testing
-- No automated testing framework is configured
+## Key Services
+- `AppleBooksSyncService`: Handles Apple Books data synchronization
+- `GoodLinksDatabaseService`: Handles GoodLinks app integration
+- `NotionService`: Manages Notion API interactions
+- `AutoSyncService`: Provides automatic synchronization functionality
+- `IAPService`: Handles in-app purchases
+- `LoggerService`: Provides logging functionality
 
-### Code Structure
-- Models in `SyncNos/Models/` define the data structures
-- Services in `SyncNos/Services/` handle database access and business logic
-- ViewModels in `SyncNos/ViewModels/` connect data to UI
-- Views in `SyncNos/Views/` contain the SwiftUI UI components
+## Data Models
+- `BookListItem`: Lightweight model for book listings
+- `Highlight`: Represents individual highlights with text, notes, and metadata
+- `HighlightRow` and `BookRow`: UI-specific data representations
+- `ContentSource`: Enum for data source selection (Apple Books, GoodLinks)
 
-### Key Design Principles
-- Composition over inheritance using dependency injection
-- Interface-based design for testability and flexibility
-- Clear data flow and explicit dependencies
-- Single responsibility principle - each component has a focused purpose
+## Development Commands
+- **Build**: `xcodebuild -scheme SyncNos -configuration Debug`
+- **Build Release**: `xcodebuild -scheme SyncNos -configuration Release`
+- **Clean**: `xcodebuild clean -scheme SyncNos`
+- **Test**: Standard Xcode testing via `xcodebuild test` (if tests exist)
+- **Run**: Use Xcode IDE or `xcodebuild build` then run the resulting app
 
-## 2. High-Level Architecture
+## Build Environment
+- macOS 13+ required
+- Xcode 14+ recommended
+- Swift 5.0+ compatible
+- Project scheme: "SyncNos"
+- Build configurations: Debug, Release
 
-### Core Components
-1. **Database Access Layer**:
-   - Uses SQLite3 to access Apple Books annotation data directly
-   - Dynamically detects available columns in the database to handle different versions
-   - Implements proper error handling for database operations
-   - All database access is read-only for security
+## Project Structure
+```
+SyncNos/
+├── Models/                 # Data models
+├── Services/               # Business logic services
+│   ├── 0-NotionAPI/        # Notion integration
+│   ├── 1-AppleBooks/       # Apple Books integration
+│   ├── 2-GoodLinks/        # GoodLinks integration
+│   ├── Infrastructure/     # Core infrastructure
+│   └── IAP/                # In-app purchase
+├── ViewModels/             # View model layer
+├── Views/                  # SwiftUI views
+│   ├── AppleBooks/         # Apple Books UI
+│   ├── GoodLinks/          # GoodLinks UI
+│   ├── Components/         # Reusable components
+│   └── Setting/            # Settings UI
+├── Assets.xcassets/        # Asset catalog
+├── SyncNosApp.swift        # App entry point
+└── MainListView.swift      # Main application view
+```
 
-2. **Data Models**:
-   - `Highlight`: Represents a single highlight/note from Apple Books
-   - `HighlightRow`: Contains additional assetId for use in database operations
-   - `BookExport`: Represents a book with its highlights
-   - `BookListItem`: Lightweight model for listing books without loading all highlights
-   - `AssetHighlightCount`: Aggregated highlight count per asset/book
-   - `Filters`: Criteria for filtering books
-   - `BookRow`: Basic book information from database
-
-3. **Services**:
-   - `DatabaseService`: Main service that coordinates database operations; conforms to `DatabaseServiceProtocol`
-   - `DatabaseConnectionService`: Handles database connections and opening/closing
-   - `DatabaseQueryService`: Contains the actual SQL queries and data fetching logic
-   - `BookFilterService`: Handles filtering of books based on criteria
-   - `BookmarkStore`: Manages security-scoped bookmarks for accessing the database file; conforms to `BookmarkStoreProtocol`
-   - `NotionService`: Handles communication with the Notion API; conforms to `NotionServiceProtocol`
-   - `NotionConfigStore`: Manages Notion API credentials and configuration; conforms to `NotionConfigStoreProtocol`
-   - `LoggerService`: Provides leveled logging functionality; conforms to `LoggerServiceProtocol`
-   - All services use protocols for testability and dependency injection
-
-4. **Protocols for Dependency Injection**:
-   - `DatabaseServiceProtocol`: Defines database access methods
-   - `BookmarkStoreProtocol`: Defines bookmark management methods
-   - `NotionConfigStoreProtocol`: Defines Notion configuration storage
-   - `NotionServiceProtocol`: Defines Notion API communication interface
-   - `LoggerServiceProtocol`: Defines leveled logging interface with levels: verbose, debug, info, warning, error
-
-5. **UI Components**:
-   - `MainListView`: Main view showing the list of books with highlight counts
-   - `AppleBookDetailView`: Detail view showing highlights for a selected book with pagination
-   - Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
-   - `SettingsView`: Configuration interface for Apple Books container and Notion integration
-   - `NotionIntegrationView`: UI for configuring Notion API credentials and testing integration
-
-6. **ViewModels**:
-   - `BookViewModel`: Manages the data flow between services and MainListView
-   - `AppleBookDetailViewModel`: Manages pagination and data loading for AppleBookDetailView
-   - `NotionIntegrationViewModel`: Handles UI logic for Notion integration setup
-
-7. **Dependency Injection**:
-   - `DIContainer` provides shared instances of services and allows registration for testing
-   - Services are injected into ViewModels through initializer parameters with default values
-   - All service protocols defined in `Protocols.swift`
-
-### Data Flow
-1. Views observe ViewModels through @Published properties
-2. ViewModels coordinate with Services (accessed through DIContainer) to fetch data
-3. Services handle database access and return model objects
-4. ViewModels process and expose data to Views
-5. User interactions trigger updates through the same flow
-
-### Security Considerations
-- Uses App Sandbox with security-scoped bookmarks for accessing user's Apple Books database
-- All database access is read-only
-- Properly manages security-scoped resource access lifecycle
-- Notion API credentials stored in UserDefaults (standard for macOS apps) through NotionConfigStore
-
-### Notion Integration
-- `NotionService` handles all Notion API communications
-- `NotionConfigStore` manages credential storage and retrieval
-- Idempotent sync using UUID tracking to prevent duplicate highlights
-- Batch operations for efficient API usage
-- Rich formatting of highlights with metadata and iBooks links
-- Progress tracking during sync operations
-- Two sync modes supported: single database with book pages, or per-book databases with highlight entries
-
-### Database Access Patterns
-- Security-Scoped Access: Uses security-scoped bookmarks for accessing the Apple Books database within the App Sandbox
-- Dynamic Schema Detection: Dynamically detects available columns to handle different Apple Books database versions
-- Error Handling: Implements proper error handling for database operations
-- Pagination: Implements pagination for efficient loading of large datasets
-- Read-Only Access: All database access is read-only for security
-
-### UI/UX Patterns
-- Custom `WaterfallLayout` for adaptive masonry-style layout of highlights
-- Master-detail interface using `NavigationSplitView`
-- Progress indicators for long-running operations
-- Error states with user-friendly messages
-- Pagination with "Load More" functionality
-- Toolbar integration for primary actions
-
-### Architecture Patterns
-- MVVM (Model-View-ViewModel) for the macOS app
-- Service-oriented architecture with protocol-based interfaces
-- Separation of concerns between data access, business logic, and presentation layers
-- Dependency injection via `DIContainer` for testability
-- Protocol-oriented programming for flexibility
-
-### Logging
-- Centralized logging service with 5 levels (verbose, debug, info, warning, error)
-- Automatic logging includes file, function and line number information
-- Level can be adjusted based on debugging needs
+## Key Implementation Notes
+- Uses bookmark APIs for persistent file access permissions
+- Implements auto-sync functionality with UserDefaults management
+- Follows Apple's data access guidelines for protected containers
+- Includes in-app purchase support
+- Uses UserDefaults for configuration persistence
+- Implements proper error handling throughout services
