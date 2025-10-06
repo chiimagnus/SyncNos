@@ -17,7 +17,7 @@ class AppleBookDetailViewModel: ObservableObject {
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
     private var currentOffset = 0
-    private let pageSize = 50
+    private let pageSize = NotionSyncConfig.appleBooksDetailPageSize
     private var expectedTotalCount = 0
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,

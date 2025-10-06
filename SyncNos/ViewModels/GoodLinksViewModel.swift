@@ -77,7 +77,7 @@ final class GoodLinksViewModel: ObservableObject {
 
     // MARK: - Notion Sync (GoodLinks)
     /// 智能同步当前 GoodLinks 链接的高亮到 Notion（仅追加新条目，实际同步逻辑委托给 `GoodLinksSyncService`）
-    func syncSmart(link: GoodLinksLinkRow, pageSize: Int = 200) {
+    func syncSmart(link: GoodLinksLinkRow, pageSize: Int = NotionSyncConfig.goodLinksPageSize) {
         if isSyncing { return }
         syncMessage = nil
         syncProgressText = nil
