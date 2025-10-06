@@ -136,8 +136,6 @@ protocol NotionServiceProtocol: AnyObject {
     // Helpers added for consolidated DB management
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
-    // Ensure a page exists for a given asset inside a database. Returns (pageId, created)
-    func ensurePageForAsset(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> (id: String, created: Bool)
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
