@@ -3,9 +3,11 @@ import Foundation
 /// Notion 页面操作类
 class NotionPageOperations {
     private let requestHelper: NotionRequestHelper
+    private let helperMethods: NotionHelperMethods
 
-    init(requestHelper: NotionRequestHelper) {
+    init(requestHelper: NotionRequestHelper, helperMethods: NotionHelperMethods) {
         self.requestHelper = requestHelper
+        self.helperMethods = helperMethods
     }
 
     func createBookPage(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> NotionPage {
@@ -69,24 +71,8 @@ class NotionPageOperations {
                 } else if let single = slice.first {
                     // single item failed — try trimming if possible
                     if let length = trimLengths.first, length > 0 {
-                        // attempt to trim deeply nested rich_text contents if present
-                        let trimmed = single
-                        func trimBlock(_ block: [String: Any], to maxLen: Int) -> [String: Any] {
-                            var b = block
-                            if var bulleted = b["bulleted_list_item"] as? [String: Any], var rich = bulleted["rich_text"] as? [[String: Any]], !rich.isEmpty {
-                                // Trim first text element
-                                var first = rich[0]
-                                if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
-                                    text["content"] = String(content.prefix(maxLen))
-                                    first["text"] = text
-                                    rich[0] = first
-                                    bulleted["rich_text"] = rich
-                                    b["bulleted_list_item"] = bulleted
-                                }
-                            }
-                            return b
-                        }
-                        let trimmedSingle = trimBlock(trimmed, to: length)
+                        // attempt to trim deeply nested rich_text contents if present using helper
+                        let trimmedSingle = helperMethods.buildTrimmedBlock(single, to: length)
                         do {
                             try await appendBlocks(pageId: pageId, children: [trimmedSingle])
                         } catch {
