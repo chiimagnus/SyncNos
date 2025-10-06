@@ -97,8 +97,6 @@ class NotionHelperMethods {
         let textContent = truncateText(highlight.text, maxLen: maxTextLength)
         rt.append(["text": ["content": textContent]])
 
-        // UUID marker kept on parent for idempotency lookup — place on a new line within the same block
-        rt.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
         return rt
     }
 
@@ -125,6 +123,7 @@ class NotionHelperMethods {
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
+        rich.append(["text": ["content": "\nuuid:\(highlight.uuid)"], "annotations": ["italic": true]])
         return [
             "object": "block",
             "paragraph": [
