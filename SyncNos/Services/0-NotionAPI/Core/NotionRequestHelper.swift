@@ -66,6 +66,17 @@ class NotionRequestHelper {
         return URLComponents(url: makeURL(path: path), resolvingAgainstBaseURL: false)!
     }
 
+    // MARK: - Error helpers
+    /// Returns true when the given error represents a Notion 'database missing' or similar error
+    /// (e.g. 400/404/410) produced by `performRequest`.
+    static func isDatabaseMissingError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == "NotionService" {
+            return ns.code == 404 || ns.code == 400 || ns.code == 410
+        }
+        return false
+    }
+
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             let body = String(data: data, encoding: .utf8) ?? ""
