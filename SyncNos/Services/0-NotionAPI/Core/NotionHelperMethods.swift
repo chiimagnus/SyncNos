@@ -95,8 +95,7 @@ class NotionHelperMethods {
             : highlight.text
         rt.append(["text": ["content": textContent]])
 
-        // UUID marker kept on parent for idempotency lookup
-        rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
+        // UUID marker moved to child metadata block for better structure
 
         return rt
     }
@@ -118,15 +117,16 @@ class NotionHelperMethods {
         ]
     }
 
-    // Build a paragraph child block containing metadata (italic) and Open link
+    // Build a paragraph child block containing metadata (italic) and UUID marker (code)
+    // Metadata (style/added/modified) and uuid are placed together for easy parsing and updates.
     func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String) -> [String: Any] {
         var rich: [[String: Any]] = []
         let metaString = buildMetadataString(for: highlight)
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
-        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
-        rich.append(["text": ["content": "  Open ↗"], "href": linkUrl])
+        // Append UUID as a separate rich text element with code annotation
+        rich.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
         return [
             "object": "block",
             "paragraph": [
