@@ -66,7 +66,7 @@ class NotionQueryOperations {
         var collected: [String: String] = [:]
         var startCursor: String? = nil
         repeat {
-            var components = URLComponents(url: URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children"), resolvingAgainstBaseURL: false)!
+            var components = requestHelper.makeURLComponents(path: "blocks/\(pageId)/children")
             if let cursor = startCursor {
                 components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
             }

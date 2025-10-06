@@ -55,6 +55,17 @@ class NotionRequestHelper {
         return data
     }
 
+    // MARK: - URL helpers
+    /// Construct a full URL by appending a Notion API path to the configured apiBase.
+    func makeURL(path: String) -> URL {
+        return apiBase.appendingPathComponent(path)
+    }
+
+    /// Construct URLComponents for a Notion API path. Useful when adding query items.
+    func makeURLComponents(path: String) -> URLComponents {
+        return URLComponents(url: makeURL(path: path), resolvingAgainstBaseURL: false)!
+    }
+
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             let body = String(data: data, encoding: .utf8) ?? ""
