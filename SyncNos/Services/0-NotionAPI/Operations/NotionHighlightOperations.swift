@@ -17,21 +17,15 @@ class NotionHighlightOperations {
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         // 上层会批次调用此函数。这里实现安全的分片/降级递归，遇到单条失败尝试内容裁剪；仍失败则跳过该条，保证后续条目不被拖累。
         func buildBlock(for h: HighlightRow) -> [String: Any] {
-            // parent rich_text contains highlight text + uuid
-            let parentRt = helperMethods.buildParentRichText(for: h, bookId: bookId, maxTextLength: 1800)
-            // child blocks: note (optional) and metadata+link
-            var childBlocks: [[String: Any]] = []
-            if let noteChild = helperMethods.buildNoteChild(for: h, maxTextLength: 1800) {
-                childBlocks.append(noteChild)
-            }
-            childBlocks.append(helperMethods.buildMetaAndLinkChild(for: h, bookId: bookId))
-
+            // Use helper to build parent rich_text and ordered child blocks
+            let (parentRt, childBlocks) = helperMethods.buildParentAndChildren(for: h, bookId: bookId, maxTextLength: 1800)
+            let bulleted: [String: Any] = [
+                "rich_text": parentRt,
+                "children": childBlocks
+            ]
             return [
                 "object": "block",
-                "bulleted_list_item": [
-                    "rich_text": parentRt,
-                    "children": childBlocks
-                ]
+                "bulleted_list_item": bulleted
             ]
         }
 
@@ -47,20 +41,17 @@ class NotionHighlightOperations {
                     try await appendSlice(slice[mid..<slice.endIndex])
                 } else if let h = slice.first {
                     // 单条仍失败：进一步强裁剪文本到 1000
-                    // single item failure: aggressive trimming and child construction
-                    let parentRt = helperMethods.buildParentRichText(for: h, bookId: bookId, maxTextLength: 1000)
-                    var childBlocks: [[String: Any]] = []
-                    if let noteChild = helperMethods.buildNoteChild(for: h, maxTextLength: 1000) {
-                        childBlocks.append(noteChild)
-                    }
-                    childBlocks.append(helperMethods.buildMetaAndLinkChild(for: h, bookId: bookId))
-                    let child: [[String: Any]] = [[
+                    // single item failure: aggressive trimming and child construction via helper
+                    let (parentRt, childBlocks) = helperMethods.buildParentAndChildren(for: h, bookId: bookId, maxTextLength: 1000)
+                    let bulleted: [String: Any] = [
+                        "rich_text": parentRt,
+                        "children": childBlocks
+                    ]
+                    var child: [[String: Any]] = []
+                    child.append([
                         "object": "block",
-                        "bulleted_list_item": [
-                            "rich_text": parentRt,
-                            "children": childBlocks
-                        ]
-                    ]]
+                        "bulleted_list_item": bulleted
+                    ])
                     do {
                         try await pageOperations.appendBlocks(pageId: pageId, children: child)
                     } catch {
