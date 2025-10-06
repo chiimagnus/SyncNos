@@ -50,7 +50,7 @@ class NotionPageOperations {
     }
 
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
-        let url = URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children")
+        // let url = URL(string: "https://api.notion.com/v1/")!.appendingPathComponent("blocks/\(pageId)/children")
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
 
