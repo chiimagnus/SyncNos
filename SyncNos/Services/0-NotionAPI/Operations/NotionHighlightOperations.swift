@@ -31,35 +31,8 @@ class NotionHighlightOperations {
 
         func appendSlice(_ slice: ArraySlice<HighlightRow>) async throws {
             let children = slice.map { buildBlock(for: $0) }
-            do {
-                try await pageOperations.appendBlocks(pageId: pageId, children: children)
-            } catch {
-                // 如果一批失败，且数量>1，切半递归重试；数量==1 时尝试更激进的裁剪（再次失败则跳过）
-                if slice.count > 1 {
-                    let mid = slice.startIndex + slice.count / 2
-                    try await appendSlice(slice[slice.startIndex..<mid])
-                    try await appendSlice(slice[mid..<slice.endIndex])
-                } else if let h = slice.first {
-                    // 单条仍失败：进一步强裁剪文本到 1000
-                    // single item failure: aggressive trimming and child construction via helper
-                    let (parentRt, childBlocks) = helperMethods.buildParentAndChildren(for: h, bookId: bookId, maxTextLength: 1000)
-                    let bulleted: [String: Any] = [
-                        "rich_text": parentRt,
-                        "children": childBlocks
-                    ]
-                    var child: [[String: Any]] = []
-                    child.append([
-                        "object": "block",
-                        "bulleted_list_item": bulleted
-                    ])
-                    do {
-                        try await pageOperations.appendBlocks(pageId: pageId, children: child)
-                    } catch {
-                        // 彻底放弃该条，记录并跳过，避免整本失败
-                        logger.warning("Skip one highlight due to Notion API error: uuid=\(h.uuid) message=\(error.localizedDescription)")
-                    }
-                }
-            }
+            // Delegate robust append behavior to pageOperations.appendChildrenWithRetry
+            try await pageOperations.appendChildrenWithRetry(pageId: pageId, children: children)
         }
 
         // 入口：按 80 一批，逐批递归发送

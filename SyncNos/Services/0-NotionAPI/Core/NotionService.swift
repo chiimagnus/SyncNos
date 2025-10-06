@@ -118,6 +118,11 @@ final class NotionService: NotionServiceProtocol {
         try await pageOps.setPageChildren(pageId: pageId, children: children)
     }
 
+    // Expose append-with-retry so callers using the protocol can delegate to page operations
+    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int, trimOnFailureLengths: [Int]) async throws {
+        try await pageOps.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: batchSize, trimOnFailureLengths: trimOnFailureLengths)
+    }
+
     // MARK: - Ensure / find-or-create helpers (consolidated)
     /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {

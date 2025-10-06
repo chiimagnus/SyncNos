@@ -116,19 +116,9 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         if !toAppend.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
-            try await Self.appendGoodLinksHighlights(notionService: notionService, pageId: pageId, link: link, highlights: toAppend)
-        }
-
-        // 6) 更新计数
-        try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
-    }
-
-    private static func appendGoodLinksHighlights(notionService: NotionServiceProtocol, pageId: String, link: GoodLinksLinkRow, highlights: [GoodLinksHighlightRow]) async throws {
-        let batchSize = 80
-        var index = 0
-        while index < highlights.count {
-            let slice = Array(highlights[index..<min(index + batchSize, highlights.count)])
-            let children: [[String: Any]] = slice.map { h in
+            // Build children and delegate append with retry to page operations
+            var children: [[String: Any]] = []
+            for h in toAppend {
                 var rt: [[String: Any]] = []
                 rt.append(["text": ["content": h.content]])
                 if let note = h.note, !note.isEmpty {
@@ -140,14 +130,17 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                 }
                 rt.append(["text": ["content": "  Open ↗"], "href": link.url])
                 rt.append(["text": ["content": " [uuid:\(h.id)]"], "annotations": ["code": true]])
-                return [
+                let child: [String: Any] = [
                     "object": "block",
                     "bulleted_list_item": ["rich_text": rt]
                 ]
+                children.append(child)
             }
-            try await notionService.appendBlocks(pageId: pageId, children: children)
-            index += batchSize
+            try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: 80, trimOnFailureLengths: [1800, 1000])
         }
+
+        // 6) 更新计数
+        try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
     }
 
     private static var goodLinksPropertyDefinitions: [String: Any] {
