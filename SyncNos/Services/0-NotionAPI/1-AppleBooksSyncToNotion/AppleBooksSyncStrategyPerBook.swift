@@ -58,8 +58,8 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                             try await notionService.updateHighlightItem(pageId: existingPageId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                         } catch {
                             if NotionRequestHelper.isDatabaseMissingError(error) {
-                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-                                databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
+                                let ensured = try await notionService.ensurePerBookDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                                databaseId = ensured.id
                                 _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                             } else { throw error }
                         }
@@ -68,16 +68,16 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                             _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                         } catch {
                             if NotionRequestHelper.isDatabaseMissingError(error) {
-                                let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-                                databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
+                                let ensured = try await notionService.ensurePerBookDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                                databaseId = ensured.id
                                 _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                             } else { throw error }
                         }
                     }
                 } catch {
                     if NotionRequestHelper.isDatabaseMissingError(error) {
-                        let newDb = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-                        databaseId = newDb.id; config.setDatabaseId(databaseId, forBook: book.bookId)
+                        let ensured = try await notionService.ensurePerBookDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
+                        databaseId = ensured.id
                         _ = try await notionService.createHighlightItem(inDatabaseId: databaseId, bookId: book.bookId, bookTitle: book.bookTitle, author: book.authorName, highlight: h)
                     } else { throw error }
                 }
