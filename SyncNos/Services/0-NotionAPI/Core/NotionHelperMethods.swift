@@ -13,17 +13,20 @@ class NotionHelperMethods {
         }
     }
 
-    // Build metadata string from highlight
-    func buildMetadataString(for highlight: HighlightRow) -> String {
+    // Build metadata string from highlight. `source` selects style->color mapping.
+    func buildMetadataString(for highlight: HighlightRow, source: String = "appleBooks") -> String {
         var metaParts: [String] = []
-        if let s = highlight.style { metaParts.append("style:\(s)") }
+        if let s = highlight.style {
+            let name = styleName(for: s, source: source)
+            metaParts.append("style:\(name)")
+        }
         if let d = highlight.dateAdded { metaParts.append("added:\(NotionServiceCore.isoDateFormatter.string(from: d))") }
         if let m = highlight.modified { metaParts.append("modified:\(NotionServiceCore.isoDateFormatter.string(from: m))") }
         return metaParts.joined(separator: " | ")
     }
 
     // Build highlight properties for per-book database
-    func buildHighlightProperties(bookId: String, bookTitle: String, author: String, highlight: HighlightRow, clearEmpty: Bool = false) -> [String: Any] {
+    func buildHighlightProperties(bookId: String, bookTitle: String, author: String, highlight: HighlightRow, clearEmpty: Bool = false, source: String = "appleBooks") -> [String: Any] {
         var properties: [String: Any] = [
             "Text": [
                 "title": [["text": ["content": highlight.text]]]
@@ -49,8 +52,9 @@ class NotionHelperMethods {
         }
 
         if let style = highlight.style {
+            let colorName = styleName(for: style, source: source)
             properties["Style"] = [
-                "rich_text": [["text": ["content": styleName(for: style) + "_\(style)"]]]
+                "rich_text": [["text": ["content": colorName]]]
             ]
         } else if clearEmpty {
             properties["Style"] = ["rich_text": []]
@@ -119,9 +123,9 @@ class NotionHelperMethods {
 
     // Build a paragraph child block containing metadata (italic) and UUID marker (code)
     // Metadata (style/added/modified) and uuid are placed together for easy parsing and updates.
-    func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String) -> [String: Any] {
+    func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
         var rich: [[String: Any]] = []
-        let metaString = buildMetadataString(for: highlight)
+        let metaString = buildMetadataString(for: highlight, source: source)
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
@@ -137,20 +141,20 @@ class NotionHelperMethods {
 
     // Build parent rich_text and ordered child blocks for nested-block approach
     // Returns (parentRichText, childBlocks)
-    func buildParentAndChildren(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> ([[String: Any]], [[String: Any]]) {
+    func buildParentAndChildren(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> ([[String: Any]], [[String: Any]]) {
         let parent = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
         var blocks: [[String: Any]] = []
         if let note = buildNoteChild(for: highlight, maxTextLength: maxTextLength) {
             blocks.append(note)
         }
-        blocks.append(buildMetaAndLinkChild(for: highlight, bookId: bookId))
+        blocks.append(buildMetaAndLinkChild(for: highlight, bookId: bookId, source: source))
         return (parent, blocks)
     }
 
     // buildBulletedListItemBlock(for:bookId:maxTextLength:)：构建并返回一个完整的 Notion 列表项 block（现在使用数字列表），
     // 父级 rich_text 包含高亮文本，children 包含 note 与 metadata+uuid 子块。
-    func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [String: Any] {
-        let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+    func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [String: Any] {
+        let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength, source: source)
         let numbered: [String: Any] = [
             "rich_text": parentRt,
             "children": childBlocks
@@ -220,16 +224,31 @@ class NotionHelperMethods {
         return children
     }
 
-    // Convert numeric style to human-friendly color name
-    func styleName(for style: Int) -> String {
-        switch style {
-        case 0: return "orange"
-        case 1: return "green"
-        case 2: return "blue"
-        case 3: return "yellow"
-        case 4: return "pink"
-        case 5: return "purple"
-        default: return "gray"
+    // Convert numeric style to human-friendly color name. Mapping differs per source.
+    func styleName(for style: Int, source: String = "appleBooks") -> String {
+        switch source {
+        case "goodLinks":
+            // GoodLinks 有自己的一套颜色编码，映射到与 UI 使用一致的颜色名
+            // 对应 View 中 highlightColor(for:) 的映射：0: yellow, 1: green, 2: blue, 3: red, 4: purple
+            switch style {
+            case 0: return "yellow"
+            case 1: return "green"
+            case 2: return "blue"
+            case 3: return "red"
+            case 4: return "purple"
+            default: return "mint"
+            }
+        default:
+            // Apple Books mapping (existing)
+            switch style {
+            case 0: return "orange"
+            case 1: return "green"
+            case 2: return "blue"
+            case 3: return "yellow"
+            case 4: return "pink"
+            case 5: return "purple"
+            default: return "gray"
+            }
         }
     }
 }
