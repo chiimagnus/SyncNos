@@ -84,38 +84,55 @@ class NotionHelperMethods {
         return properties
     }
 
-    // Build rich text for highlight bullet/list item
-    func buildHighlightRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
+
+
+    // Build parent rich_text for nested-block approach (only highlight text + uuid)
+    func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
         var rt: [[String: Any]] = []
 
-        // Highlight text with optional length limit
         let textContent = maxTextLength != nil && highlight.text.count > maxTextLength!
             ? String(highlight.text.prefix(maxTextLength!))
             : highlight.text
         rt.append(["text": ["content": textContent]])
 
-        // Optional note with length limit
-        if let note = highlight.note, !note.isEmpty {
-            let noteContent = maxTextLength != nil && note.count > maxTextLength!
-                ? String(note.prefix(maxTextLength!))
-                : note
-            rt.append(["text": ["content": " — Note: \(noteContent)"], "annotations": ["italic": true]])
-        }
-
-        // Add metadata when available
-        let metaString = buildMetadataString(for: highlight)
-        if !metaString.isEmpty {
-            rt.append(["text": ["content": " — \(metaString)"], "annotations": ["italic": true]])
-        }
-
-        // Link to open in Apple Books
-        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
-        rt.append(["text": ["content": "  Open ↗"], "href": linkUrl])
-
-        // UUID marker for idempotency
+        // UUID marker kept on parent for idempotency lookup
         rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
 
         return rt
+    }
+
+    // Build a paragraph child block for the note (italic)
+    func buildNoteChild(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any]? {
+        guard let note = highlight.note, !note.isEmpty else { return nil }
+        let noteContent = maxTextLength != nil && note.count > maxTextLength!
+            ? String(note.prefix(maxTextLength!))
+            : note
+        return [
+            "object": "block",
+            "paragraph": [
+                "rich_text": [[
+                    "text": ["content": noteContent],
+                    "annotations": ["italic": true]
+                ]]
+            ]
+        ]
+    }
+
+    // Build a paragraph child block containing metadata (italic) and Open link
+    func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String) -> [String: Any] {
+        var rich: [[String: Any]] = []
+        let metaString = buildMetadataString(for: highlight)
+        if !metaString.isEmpty {
+            rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
+        }
+        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
+        rich.append(["text": ["content": "  Open ↗"], "href": linkUrl])
+        return [
+            "object": "block",
+            "paragraph": [
+                "rich_text": rich
+            ]
+        ]
     }
 
     // Convert numeric style to human-friendly color name
