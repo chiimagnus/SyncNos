@@ -103,13 +103,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
     // MARK: - Helpers
 
     private func ensurePerBookDatabaseId(book: BookListItem) async throws -> (id: String, recreated: Bool) {
-        if let saved = config.databaseIdForBook(assetId: book.bookId) {
-            if await notionService.databaseExists(databaseId: saved) { return (saved, false) }
-            config.setDatabaseId(nil, forBook: book.bookId)
-        }
-        let db = try await notionService.createPerBookHighlightDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
-        config.setDatabaseId(db.id, forBook: book.bookId)
-        return (db.id, true)
+        return try await notionService.ensurePerBookDatabase(bookTitle: book.bookTitle, author: book.authorName, assetId: book.bookId)
     }
 
     private func isDatabaseMissingError(_ error: Error) -> Bool {

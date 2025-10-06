@@ -117,4 +117,33 @@ final class NotionService: NotionServiceProtocol {
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws {
         try await pageOps.setPageChildren(pageId: pageId, children: children)
     }
+
+    // MARK: - Ensure / find-or-create helpers (consolidated)
+    /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
+    func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+        if let saved = core.configStore.databaseIdForSource(sourceKey) {
+            if await databaseOps.databaseExists(databaseId: saved) { return saved }
+            core.configStore.setDatabaseId(nil, forSource: sourceKey)
+        }
+
+        if let found = try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId) {
+            core.configStore.setDatabaseId(found, forSource: sourceKey)
+            return found
+        }
+
+        let created = try await databaseOps.createDatabase(title: title, pageId: parentPageId)
+        core.configStore.setDatabaseId(created.id, forSource: sourceKey)
+        return created.id
+    }
+
+    /// Ensure a per-book database exists (used by per-book strategy). Returns (id, recreated)
+    func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
+        if let saved = core.configStore.databaseIdForBook(assetId: assetId) {
+            if await databaseOps.databaseExists(databaseId: saved) { return (saved, false) }
+            core.configStore.setDatabaseId(nil, forBook: assetId)
+        }
+        let db = try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: core.configStore.notionPageId ?? "")
+        core.configStore.setDatabaseId(db.id, forBook: assetId)
+        return (db.id, true)
+    }
 }
