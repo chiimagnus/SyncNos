@@ -17,10 +17,21 @@ class NotionHighlightOperations {
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         // 上层会批次调用此函数。这里实现安全的分片/降级递归，遇到单条失败尝试内容裁剪；仍失败则跳过该条，保证后续条目不被拖累。
         func buildBlock(for h: HighlightRow) -> [String: Any] {
-            let rt = helperMethods.buildHighlightRichText(for: h, bookId: bookId, maxTextLength: 1800)
+            // parent rich_text contains highlight text + uuid
+            let parentRt = helperMethods.buildParentRichText(for: h, bookId: bookId, maxTextLength: 1800)
+            // child blocks: note (optional) and metadata+link
+            var childBlocks: [[String: Any]] = []
+            if let noteChild = helperMethods.buildNoteChild(for: h, maxTextLength: 1800) {
+                childBlocks.append(noteChild)
+            }
+            childBlocks.append(helperMethods.buildMetaAndLinkChild(for: h, bookId: bookId))
+
             return [
                 "object": "block",
-                "bulleted_list_item": ["rich_text": rt]
+                "bulleted_list_item": [
+                    "rich_text": parentRt,
+                    "children": childBlocks
+                ]
             ]
         }
 
@@ -36,10 +47,19 @@ class NotionHighlightOperations {
                     try await appendSlice(slice[mid..<slice.endIndex])
                 } else if let h = slice.first {
                     // 单条仍失败：进一步强裁剪文本到 1000
-                    let rt = helperMethods.buildHighlightRichText(for: h, bookId: bookId, maxTextLength: 1000)
+                    // single item failure: aggressive trimming and child construction
+                    let parentRt = helperMethods.buildParentRichText(for: h, bookId: bookId, maxTextLength: 1000)
+                    var childBlocks: [[String: Any]] = []
+                    if let noteChild = helperMethods.buildNoteChild(for: h, maxTextLength: 1000) {
+                        childBlocks.append(noteChild)
+                    }
+                    childBlocks.append(helperMethods.buildMetaAndLinkChild(for: h, bookId: bookId))
                     let child: [[String: Any]] = [[
                         "object": "block",
-                        "bulleted_list_item": ["rich_text": rt]
+                        "bulleted_list_item": [
+                            "rich_text": parentRt,
+                            "children": childBlocks
+                        ]
                     ]]
                     do {
                         try await pageOperations.appendBlocks(pageId: pageId, children: child)
@@ -62,9 +82,19 @@ class NotionHighlightOperations {
     }
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
-        // 构建富文本内容
-        let rt = helperMethods.buildHighlightRichText(for: highlight, bookId: bookId)
-        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": rt]])
+        // 构建 parent rich_text（highlight + uuid）并更新
+        let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId)
+        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": parentRt]])
+
+        // 构建并替换子块（note + metadata+link）
+        var childBlocks: [[String: Any]] = []
+        if let noteChild = helperMethods.buildNoteChild(for: highlight) {
+            childBlocks.append(noteChild)
+        }
+        childBlocks.append(helperMethods.buildMetaAndLinkChild(for: highlight, bookId: bookId))
+
+        // 使用 pageOperations.replacePageChildren 来替换指定 block 的 children（适用于 block 的 children endpoint）
+        try await pageOperations.replacePageChildren(pageId: blockId, with: childBlocks)
     }
 
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
