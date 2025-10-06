@@ -22,7 +22,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
 
-        let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
+        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
 
         // Ensure book page exists by Asset ID
         let pageId: String
@@ -120,7 +120,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         guard let parentPageId = config.notionPageId else {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
-        let databaseId = try await ensureSingleDatabaseId(parentPageId: parentPageId)
+        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
 
         // Ensure page
         let pageId: String
@@ -197,28 +197,6 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
 
     // MARK: - Helpers
 
-    private func ensureSingleDatabaseId(parentPageId: String) async throws -> String {
-        // Apple Books 专用库名
-        let desiredTitle = "SyncNos-AppleBooks"
-
-        // 优先使用 per-source 存储
-        let sourceKey = "appleBooks"
-        if let saved = config.databaseIdForSource(sourceKey) {
-            if await notionService.databaseExists(databaseId: saved) { return saved }
-            config.setDatabaseId(nil, forSource: sourceKey)
-        }
-
-        // 如果根据标题能搜索到，直接采用并保存
-        if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
-            config.setDatabaseId(found, forSource: sourceKey)
-            return found
-        }
-
-        // 创建新的 AppleBooks 数据库
-        let created = try await notionService.createDatabase(title: desiredTitle)
-        config.setDatabaseId(created.id, forSource: sourceKey)
-        return created.id
-    }
 
     private func getLatestHighlightCount(dbPath: String?, assetId: String) async throws -> Int {
         guard let path = dbPath else { return 0 }

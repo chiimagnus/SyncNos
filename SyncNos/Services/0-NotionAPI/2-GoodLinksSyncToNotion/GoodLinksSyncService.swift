@@ -27,7 +27,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         }
 
         // 2) 确保使用 GoodLinks 专属单库
-        let databaseId = try await ensureGoodLinksDatabaseId(parentPageId: parentPageId)
+        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
         try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
         // 3) 确保页面存在
@@ -121,23 +121,6 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 6) 更新计数
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
-    }
-
-    // MARK: - Helpers moved from ViewModel
-    private func ensureGoodLinksDatabaseId(parentPageId: String) async throws -> String {
-        let desiredTitle = "SyncNos-GoodLinks"
-        let sourceKey = "goodLinks"
-        if let saved = notionConfig.databaseIdForSource(sourceKey) {
-            if await notionService.databaseExists(databaseId: saved) { return saved }
-            notionConfig.setDatabaseId(nil, forSource: sourceKey)
-        }
-        if let found = try await notionService.findDatabaseId(title: desiredTitle, parentPageId: parentPageId) {
-            notionConfig.setDatabaseId(found, forSource: sourceKey)
-            return found
-        }
-        let created = try await notionService.createDatabase(title: desiredTitle)
-        notionConfig.setDatabaseId(created.id, forSource: sourceKey)
-        return created.id
     }
 
     private static func appendGoodLinksHighlights(notionService: NotionServiceProtocol, pageId: String, link: GoodLinksLinkRow, highlights: [GoodLinksHighlightRow]) async throws {
