@@ -6,8 +6,11 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
-    // Deprecated: specific keys removed, use perSourceDbPrefix instead
-    private let syncModeKey = "NOTION_SYNC_MODE" // "single" | "perBook"
+    // 说明：以下 UserDefaults 键用于持久化 Notion 配置与缓存的数据库映射
+    // - NOTION_SYNC_MODE：同步模式（"single" | "perBook"），默认 "single"
+    // - PER_BOOK_DB_ID_{assetId}：每本书独立数据库的 id 映射
+    // - PER_SOURCE_DB_ID_{sourceKey}：按来源（appleBooks/goodLinks ...）的单库 id 映射
+    private let syncModeKey = "NOTION_SYNC_MODE"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
     

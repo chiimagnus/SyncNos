@@ -17,7 +17,7 @@ class NotionHighlightOperations {
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         // 上层会批次调用此函数。这里实现安全的分片/降级递归，遇到单条失败尝试内容裁剪；仍失败则跳过该条，保证后续条目不被拖累。
         func buildBlock(for h: HighlightRow) -> [String: Any] {
-            return helperMethods.buildBulletedListItemBlock(for: h, bookId: bookId, maxTextLength: 1500)
+            return helperMethods.buildBulletedListItemBlock(for: h, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary)
         }
 
         func appendSlice(_ slice: ArraySlice<HighlightRow>) async throws {
@@ -26,8 +26,8 @@ class NotionHighlightOperations {
             try await pageOperations.appendChildrenWithRetry(pageId: pageId, children: children)
         }
 
-        // 入口：按 80 一批，逐批递归发送
-        let batchSize = 80
+        // 入口：按默认批次一批，逐批递归发送
+        let batchSize = NotionSyncConfig.defaultAppendBatchSize
         var index = 0
         while index < highlights.count {
             let slice = highlights[index..<min(index + batchSize, highlights.count)]

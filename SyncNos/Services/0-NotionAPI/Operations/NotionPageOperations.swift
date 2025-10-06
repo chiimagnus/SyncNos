@@ -56,7 +56,7 @@ class NotionPageOperations {
     }
 
     /// Append children with retry/split behavior. Exposed so callers can reuse the robust append behavior.
-    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int = 80, trimOnFailureLengths: [Int] = [1500, 1000]) async throws {
+    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: [Int] = NotionSyncConfig.defaultTrimOnFailureLengths) async throws {
         let logger = DIContainer.shared.loggerService
 
         func attemptAppendSlice(_ slice: ArraySlice<[String: Any]>, trimLengths: [Int]) async throws {

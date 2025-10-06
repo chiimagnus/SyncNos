@@ -1,5 +1,5 @@
 import Foundation
-import SQLite3
+ 
 
 /// Apple Books：单库多页策略（迁移自 SyncStrategySingleDB）
 final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
@@ -7,7 +7,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
     private let notionService: NotionServiceProtocol
     private let config: NotionConfigStoreProtocol
     private let logger = DIContainer.shared.loggerService
-    private let pageSize = 100
+    private let pageSize = NotionSyncConfig.appleBooksSingleDBPageSize
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          notionService: NotionServiceProtocol = DIContainer.shared.notionService,

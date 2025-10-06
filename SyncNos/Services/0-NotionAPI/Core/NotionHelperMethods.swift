@@ -238,7 +238,7 @@ class NotionHelperMethods {
     }
 
     // Build paragraph blocks from a long text (used by GoodLinks sync)
-    func buildParagraphBlocks(from text: String, chunkSize: Int = 1500) -> [[String: Any]] {
+    func buildParagraphBlocks(from text: String, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
         let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
