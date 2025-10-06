@@ -51,6 +51,7 @@ class NotionQueryOperations {
             let type: String
             let paragraph: RichTextHolder?
             let bulleted_list_item: RichTextHolder?
+            let numbered_list_item: RichTextHolder?
         }
         let results: [Block]
         let has_more: Bool
@@ -73,7 +74,7 @@ class NotionQueryOperations {
             let data = try await requestHelper.performRequest(url: components.url!, method: "GET", body: nil)
             let decoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: data)
             for block in decoded.results {
-                let holder = block.paragraph ?? block.bulleted_list_item
+                let holder = block.paragraph ?? block.bulleted_list_item ?? block.numbered_list_item
                 let texts = holder?.rich_text ?? []
                 for t in texts {
                     if let s = t.plain_text {

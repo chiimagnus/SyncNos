@@ -97,8 +97,8 @@ class NotionHelperMethods {
         let textContent = truncateText(highlight.text, maxLen: maxTextLength)
         rt.append(["text": ["content": textContent]])
 
-        // UUID marker moved to child metadata block for better structure
-
+        // UUID marker kept on parent for idempotency lookup
+        rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
         return rt
     }
 
@@ -125,8 +125,6 @@ class NotionHelperMethods {
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
-        // Append UUID as a separate rich text element with code annotation
-        rich.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
         return [
             "object": "block",
             "paragraph": [
