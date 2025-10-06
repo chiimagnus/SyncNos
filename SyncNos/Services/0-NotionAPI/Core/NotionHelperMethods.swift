@@ -90,13 +90,11 @@ class NotionHelperMethods {
 
 
 
-    // Build parent rich_text for nested-block approach (only highlight text + uuid)
+    // Build parent rich_text for nested-block approach (only highlight text)
     func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
         var rt: [[String: Any]] = []
 
-        let textContent = maxTextLength != nil && highlight.text.count > maxTextLength!
-            ? String(highlight.text.prefix(maxTextLength!))
-            : highlight.text
+        let textContent = truncateText(highlight.text, maxLen: maxTextLength)
         rt.append(["text": ["content": textContent]])
 
         // UUID marker moved to child metadata block for better structure
@@ -107,9 +105,7 @@ class NotionHelperMethods {
     // Build a paragraph child block for the note (italic)
     func buildNoteChild(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any]? {
         guard let note = highlight.note, !note.isEmpty else { return nil }
-        let noteContent = maxTextLength != nil && note.count > maxTextLength!
-            ? String(note.prefix(maxTextLength!))
-            : note
+        let noteContent = truncateText(note, maxLen: maxTextLength)
         return [
             "object": "block",
             "bulleted_list_item": [
@@ -184,19 +180,63 @@ class NotionHelperMethods {
         return children
     }
 
-    // Trim long content inside a bulleted block's first rich_text element to maxLen
+    // General-purpose text truncation helper
+    func truncateText(_ text: String, maxLen: Int?) -> String {
+        guard let maxLen = maxLen, maxLen > 0 else { return text }
+        return text.count > maxLen ? String(text.prefix(maxLen)) : text
+    }
+
+    // Trim long content inside a block's first rich_text element to maxLen.
+    // Supports multiple common block owner keys (bulleted/numbered/paragraph/quote)
     func buildTrimmedBlock(_ block: [String: Any], to maxLen: Int) -> [String: Any] {
         var b = block
-        if var bulleted = b["bulleted_list_item"] as? [String: Any], var rich = bulleted["rich_text"] as? [[String: Any]], !rich.isEmpty {
-            var first = rich[0]
-            if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
-                text["content"] = String(content.prefix(maxLen))
-                first["text"] = text
-                rich[0] = first
-                bulleted["rich_text"] = rich
-                b["bulleted_list_item"] = bulleted
+
+        func trimOwnerKey(_ ownerKey: String) -> Bool {
+            if var owner = b[ownerKey] as? [String: Any] {
+                if var rich = owner["rich_text"] as? [[String: Any]], !rich.isEmpty {
+                    var first = rich[0]
+                    if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
+                        text["content"] = String(content.prefix(maxLen))
+                        first["text"] = text
+                        rich[0] = first
+                        owner["rich_text"] = rich
+                        b[ownerKey] = owner
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
+        let ownerKeys = ["bulleted_list_item", "numbered_list_item", "paragraph", "quote"]
+        for key in ownerKeys {
+            if trimOwnerKey(key) { return b }
+        }
+
+        // Fallback: try to trim first child's rich_text if present
+        if var children = b["children"] as? [[String: Any]], !children.isEmpty {
+            var firstChild = children[0]
+            var modified = false
+            for key in ownerKeys {
+                if var owner = firstChild[key] as? [String: Any], var rich = owner["rich_text"] as? [[String: Any]], !rich.isEmpty {
+                    var first = rich[0]
+                    if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
+                        text["content"] = String(content.prefix(maxLen))
+                        first["text"] = text
+                        rich[0] = first
+                        owner["rich_text"] = rich
+                        firstChild[key] = owner
+                        modified = true
+                        break
+                    }
+                }
+            }
+            if modified {
+                children[0] = firstChild
+                b["children"] = children
             }
         }
+
         return b
     }
 
