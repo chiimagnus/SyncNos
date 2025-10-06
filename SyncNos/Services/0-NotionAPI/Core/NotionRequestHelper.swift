@@ -69,12 +69,22 @@ class NotionRequestHelper {
     // MARK: - Error helpers
     /// Returns true when the given error represents a Notion 'database missing' or similar error
     /// (e.g. 400/404/410) produced by `performRequest`.
+    ///
+    /// This helper unwraps nested/underlying errors (when present) to make the
+    /// check resilient to wrapped NSError instances.
     static func isDatabaseMissingError(_ error: Error) -> Bool {
-        let ns = error as NSError
-        if ns.domain == "NotionService" {
-            return ns.code == 404 || ns.code == 400 || ns.code == 410
+        func checkNSError(_ ns: NSError) -> Bool {
+            if ns.domain == "NotionService" {
+                return ns.code == 404 || ns.code == 400 || ns.code == 410
+            }
+            if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+                return checkNSError(underlying)
+            }
+            return false
         }
-        return false
+
+        let ns = error as NSError
+        return checkNSError(ns)
     }
 
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
