@@ -97,8 +97,8 @@ class NotionHelperMethods {
         let textContent = truncateText(highlight.text, maxLen: maxTextLength)
         rt.append(["text": ["content": textContent]])
 
-        // UUID marker kept on parent for idempotency lookup
-        rt.append(["text": ["content": " [uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
+        // UUID marker kept on parent for idempotency lookup — place on a new line within the same block
+        rt.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["code": true]])
         return rt
     }
 
