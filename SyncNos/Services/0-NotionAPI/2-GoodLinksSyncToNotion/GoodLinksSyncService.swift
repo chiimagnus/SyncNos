@@ -134,10 +134,10 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                     modified: addedDate,
                     location: nil
                 )
-                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: 1800, source: "goodLinks")
+                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: 1500, source: "goodLinks")
                 children.append(block)
             }
-            try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: 80, trimOnFailureLengths: [1800, 1000])
+            try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: 80, trimOnFailureLengths: [1500, 1000])
         }
 
         // 6) 更新计数
