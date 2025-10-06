@@ -147,6 +147,54 @@ class NotionHelperMethods {
         return (parent, blocks)
     }
 
+    // Build a single bulleted list item block for a highlight (parent rich_text + children)
+    func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [String: Any] {
+        let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+        let bulleted: [String: Any] = [
+            "rich_text": parentRt,
+            "children": childBlocks
+        ]
+        return [
+            "object": "block",
+            "bulleted_list_item": bulleted
+        ]
+    }
+
+    // Build children blocks for a per-book database page (quote, optional note, metadata+link)
+    func buildPerBookPageChildren(for highlight: HighlightRow, bookId: String) -> [[String: Any]] {
+        var children: [[String: Any]] = []
+        // 1) Quote block for highlight text
+        children.append([
+            "object": "block",
+            "quote": [
+                "rich_text": [["text": ["content": highlight.text]]]
+            ]
+        ])
+        // 2) Note block if exists
+        if let noteChild = buildNoteChild(for: highlight) {
+            children.append(noteChild)
+        }
+        // 3) Metadata + Open link
+        children.append(buildMetaAndLinkChild(for: highlight, bookId: bookId))
+        return children
+    }
+
+    // Trim long content inside a bulleted block's first rich_text element to maxLen
+    func buildTrimmedBlock(_ block: [String: Any], to maxLen: Int) -> [String: Any] {
+        var b = block
+        if var bulleted = b["bulleted_list_item"] as? [String: Any], var rich = bulleted["rich_text"] as? [[String: Any]], !rich.isEmpty {
+            var first = rich[0]
+            if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
+                text["content"] = String(content.prefix(maxLen))
+                first["text"] = text
+                rich[0] = first
+                bulleted["rich_text"] = rich
+                b["bulleted_list_item"] = bulleted
+            }
+        }
+        return b
+    }
+
     // Build paragraph blocks from a long text (used by GoodLinks sync)
     func buildParagraphBlocks(from text: String, chunkSize: Int = 1800) -> [[String: Any]] {
         let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
