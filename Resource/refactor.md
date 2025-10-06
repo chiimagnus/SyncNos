@@ -1,95 +1,133 @@
-### 主要发现（要点）
-- **重复的“查找或创建数据库 ID”逻辑**：`AppleBooksSyncStrategySingleDB.ensureSingleDatabaseId`、`GoodLinksSyncService.ensureGoodLinksDatabaseId`、`AppleBooksSyncStrategyPerBook.ensurePerBookDatabaseId` 都在实现同一类逻辑（从配置取，验证存在，按标题搜索，创建并保存），只是在 scope（per-source / per-book / per-all）上有差异。应统一抽出共享实现。
-- **分页追加与重试切片逻辑重复/散落**：`NotionHighlightOperations.appendHighlightBullets` 包含批次切割与失败时切半重试与裁剪逻辑；`GoodLinksSyncService.appendGoodLinksHighlights` 也实现类似的批次追加（只是构造 children 的逻辑不同）。应抽成可复用的“批量追加/降级”通用方法。
-- **构建 Notion block / children 的逻辑分散**：`NotionHelperMethods` 已有大量构建子块的方法（parent/children/metadata/buildHighlightChildren），但 `GoodLinksSyncService.buildContentBlocks` 与 `NotionHighlightOperations.buildHighlightChildren` 在“文本分块/分页”上存在重叠，部分通用代码可迁移到 `NotionHelperMethods`。
-- **请求 URL 构建的硬编码重复**：`NotionPageOperations.replacePageChildren` 使用字面量 `https://api.notion.com/v1/` 构建 `URLComponents`（而 `NotionServiceCore.apiBase` 已定义）。建议暴露或通过 `NotionRequestHelper` 提供 URL 构造器，避免硬编码。
-- **错误检查/状态判断零散**：`AppleBooksSyncStrategyPerBook.isDatabaseMissingError` 等对 Notion 错误码的判断散落，应统一放到核心层（例如 `NotionRequestHelper` 或 `NotionServiceCore` 的辅助位置）。
-- **配置映射集中在 `NotionConfigStore`**：`NotionConfigStore` 已包含 `databaseIdForSource`/`setDatabaseId(_:forSource:)` 与 `databaseIdForBook`/`setDatabaseId(_:forBook:)`，这是正确位置，使用统一的 ensure/lookup helper 可以直接复用该 store 而无需在多个策略中重复写逻辑。
 
-### 清理与合并总体目标（优先级）
-1. 抽取并复用“查找或创建数据库”逻辑（高）——减少三处重复，保证行为一致。
-2. 抽取“批量追加 + 切半重试 + 裁剪后跳过”通用器（高）——GoodLinks 与 Highlight 共用。
-3. 将 GoodLinks 的文本分块功能移入 `NotionHelperMethods`（中）并复用。
-4. 在 `NotionRequestHelper` 上增加 URL 构造/暴露方法以消除硬编码（中）。
-5. 将错误码判断（是否为数据库不存在 / 被删除等）移到核心位置（低）并统一使用（便于统一处理 400/404/410）。
-6. 删除/折叠显式重复注释或过时的注释（低）。
+# 一、审计发现（要点）
+- **重复/高度相近逻辑**
+  - 页面追加的“鲁棒性/切片/裁剪重试”逻辑集中在 `NotionPageOperations.appendChildrenWithRetry`，被 `NotionHighlightOperations.appendHighlightBullets`、`GoodLinksSyncService` 等调用（已在用，但构建 payload 的具体实现散落在多个位置）。
+  - 构造 Notion block/children 的辅助方法分布在 `NotionHelperMethods`（有多种构建函数）与 `NotionHighlightOperations.buildHighlightChildren`（per-book 专用）以及 `GoodLinksSyncService` 中单独构造段落的代码。存在重复的“rich_text/metadata/link/uuid”构造逻辑。
+  - “确保/查找/创建数据库或页面”的流程在 `NotionService`（高层封装）、各 Sync 策略（`AppleBooksSyncStrategySingleDB` / `AppleBooksSyncStrategyPerBook`）与 `GoodLinksSyncService` 中都有相似实现（查找/创建、更新配置存储）。`NotionService` 已提供部分 ensure 方法，但上层仍保留重复流程。
+  - 请求/错误处理在 `NotionRequestHelper` 中集中，但对“数据库缺失判断”和部分错误处理分散在策略层有重复分支（例如在策略里捕获并调用 `createPerBookHighlightDatabase`）。
+- **冗余/可删除项**
+  - `NotionConfigStore` 注释或过时键说明（如注释提到“Deprecated”）与实现不一致，可清理注释并统一 key 命名文档。
+  - 一些局部 logger debug/verbose 输出语句重复，建议集中并用可切换日志级别。
+- **职责划分需改善**
+  - `NotionHelperMethods` 负责“构建多种类型 block”，但部分“per-book item content”逻辑应归 `NotionHighlightOperations`；相反 `NotionHighlightOperations` 也实现了构建逻辑，职责交叉导致重复。
 
-### 具体实现方案（分步骤，含建议改动文件）
-- 步骤 A（添加通用 API）：在 `SyncNos/Services/0-NotionAPI/Core/` 下新增或在 `NotionService` 增加方法（推荐放在 `NotionService` 以便上层直接调用；实现委托给 `NotionDatabaseOperations` 与 `NotionConfigStore`）：
-  - 建议新增方法签名（示例）：
-  ```swift
-  // 在 NotionService.swift 中新增
-  func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
-  func ensurePerBookDatabaseIfMissing(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
-  ```
-  - 用途：合并 `ensureSingleDatabaseId`、`ensureGoodLinksDatabaseId`、`ensurePerBookDatabaseId` 的公共流程（check config -> databaseExists -> findDatabaseId -> createDatabase -> save into config）。保留少量参数差异（sourceKey / per-book assetId）。
+# 二、清理与合并方案（按优先级）
+1) 提取并统一“Block 构建”辅助函数（低风险，高收益）
+   - 目标：将所有构建 Notion block / children 的逻辑统一到 `NotionHelperMethods`（或新文件 `NotionSyncUtils.swift`，优先扩展 `NotionHelperMethods`）。
+   - 受影响文件：
+     - 修改 `SyncNos/Services/0-NotionAPI/Core/NotionHelperMethods.swift`：新增/标准化函数
+       - `buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int?) -> [String: Any]`
+       - `buildPerBookPageChildren(for highlight: HighlightRow, bookId: String) -> [[String: Any]]`（替代 `NotionHighlightOperations.buildHighlightChildren` 内部构建）
+       - `buildTrimmedBlock(_ block: [String: Any], to maxLen: Int) -> [String: Any]`（供 append 重试时复用）
+     - 删除/替换 `NotionHighlightOperations.buildHighlightChildren` 中重复构造，改为调用 `NotionHelperMethods`。
+     - 修改 `GoodLinksSyncService` 中段落构造（第 4.2~4.3 部分）改为使用 `NotionHelperMethods.buildParagraphBlocks`（已有）和新的 `buildPerBookPageChildren` 或 `buildBulletedListItemBlock`。
+   - 理由：去重、统一裁剪规则、减少 bug 面。
 
-  改动文件：`SyncNos/Services/0-NotionAPI/Core/NotionService.swift`（新增 wrapper），可能调用 `NotionDatabaseOperations.findDatabaseId` 与 `NotionConfigStore`。
+2) 将“append with retry / trim”保持在 `NotionPageOperations`，并提取裁剪工具（中风险，需回归测试）
+   - 目标：保持网络 append 的鲁棒实现集中，同时把裁剪单个 block 的实现从 `appendChildrenWithRetry` 内部抽出到 `NotionHelperMethods.buildTrimmedBlock`，使其他调用方（如直接调用 appendBlocks 的地方）也能复用。
+   - 受影响文件：
+     - `SyncNos/Services/0-NotionAPI/Operations/NotionPageOperations.swift`：把内部 `trimBlock` 提取并调用 `NotionHelperMethods.buildTrimmedBlock`（通过依赖注入或 `DIContainer.shared`）。
+     - `SyncNos/Services/0-NotionAPI/Operations/NotionHighlightOperations.swift`：不变或删除局部裁剪逻辑，统一委托给 pageOps。
+   - 理由：避免逻辑在两个地方实现不同裁剪策略，集中维护。
 
-- 步骤 B（抽取批次追加器）：在 `SyncNos/Services/0-NotionAPI/Operations/` 下提供一个 `NotionAppendHelper`（或把方法放到 `NotionPageOperations`）用于处理：
-  - 通用 append 批次大小、失败时切半重试、单条失败时裁剪并降级再试并记录日志/跳过。
-  - 暴露接口示例：
-  ```swift
-  // 伪签名
-  func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int, trimOnFailureLengths: [Int]) async throws
-  ```
-  - `NotionHighlightOperations.appendHighlightBullets` 与 `GoodLinksSyncService.appendGoodLinksHighlights` 将调用此 helper（只负责构造 `children`）。
+3) 抽象并统一“ensure/find/create DB/page”流程（中风险）
+   - 目标：上层策略（AppleBooks/GoodLinks）尽量调用 `NotionService` 提供的 ensure/lookup API，不在策略里重复逻辑。
+   - 受影响文件：
+     - `SyncNos/Services/0-NotionAPI/Core/NotionService.swift`：补充或暴露以下函数（若尚未完整）：
+       - `ensureDatabaseForSource(title: String, parentPageId:String, sourceKey:String)`（已存在 `ensureDatabaseIdForSource`，确保上层全部使用它）
+       - `ensurePerBookDatabase(bookTitle:author:assetId:)`（已有，确保策略使用此而非重复实现）
+     - 修改 `SyncNos/Services/0-NotionAPI/1-AppleBooksSyncToNotion/*` 与 `SyncNos/Services/0-NotionAPI/2-GoodLinksSyncToNotion/GoodLinksSyncService.swift`：移除 find/create 重复分支，调用 `notionService.ensure*`。
+   - 理由：集中配置与缓存一致性（`NotionConfigStore`）并减少 race/error 场景。
 
-  改动文件：新增 `NotionAppendHelper.swift` 或扩展 `NotionPageOperations.swift`；修改 `NotionHighlightOperations.swift`、`GoodLinksSyncService.swift`。
+4) 清理配置与常量（低风险）
+   - 目标：整理 `NotionConfigStore` 注释，确保 `perSourceDbPrefix` 与 `perBookDbPrefix` 一致且文档化；把默认 pageSize / batchSize / trimLengths 提为常量或配置（以便统一调整）。
+   - 受影响文件：
+     - `SyncNos/Services/0-NotionAPI/Configuration/NotionConfigStore.swift`
+     - 将 `pageSize` 常量从策略类移动到 `NotionSyncConfig.swift`（新文件）或 `NotionServiceCore`。
+   - 理由：避免不同策略因不同 pageSize 导致行为不一致。
 
-- 步骤 C（合并构造 block/paragraph 函数）：
-  - 将 `GoodLinksSyncService.buildContentBlocks` 移入 `NotionHelperMethods`（例如 `buildParagraphBlocks(from:)`），并提升 `NotionHelperMethods` 为真正的 stateless helper（目前已是 class，可继续）。
-  - 让 `GoodLinksSyncService` 调用 `NotionHelperMethods.buildParagraphBlocks(from:)`。
-  - 统一对超长文本进行 chunk 切分（chunkSize 常量集中定义）。
+5) 合并重复日志/错误判断（低风险）
+   - 目标：把 `NotionRequestHelper.isDatabaseMissingError` 保持为单一判断入口；删除策略中重复的错误代码判断（改为调用 helper）。
+   - 受影响文件：
+     - `SyncNos/Services/0-NotionAPI/Core/NotionRequestHelper.swift`
+     - 替换策略中直接判断 code 的地方，统一调用 `NotionRequestHelper.isDatabaseMissingError(error)`。
+   - 理由：统一错误判定，减少遗漏。
 
-  改动文件：`NotionHelperMethods.swift`（新增函数）、`GoodLinksSyncService.swift`（调用替换）。
+6) 删除/重写注释与过时代码（低风险）
+   - 目标：清理 `NotionConfigStore` 中“Deprecated”注释或不再使用的 key，删除未使用的 imports 或注释块。
+   - 受影响文件：多个（审查移除）。
 
-- 步骤 D（请求构造/URL 替换）：
-  - 在 `NotionRequestHelper` 暴露一个小方法 `func makeURL(path: String) -> URL` 或 `func makeURLComponents(path: String) -> URLComponents`，并把 `NotionPageOperations.replacePageChildren` 中硬编码的 `https://api.notion.com/v1/` 改为通过该方法构造 URL（避免重复字面量）。
-  - 这也便于未来支持 base URL 变化或 proxy。
+# 三、具体实施步骤（按次序、含回滚）
+- 步骤 A（短，低风险）— 抽取并暴露 helper 函数
+  1. 在 `NotionHelperMethods.swift` 增加 `buildBulletedListItemBlock`、`buildPerBookPageChildren`、`buildTrimmedBlock`。
+  2. 运行 unit tests（无则手动运行 app 的相关同步功能），验证编译无误。
+  3. 回滚：如果问题，用 Git revert 对该 commit 回滚。
 
-  改动文件：`NotionRequestHelper.swift`（新增方法），`NotionPageOperations.swift`（替换构造处）。
+- 步骤 B（中等风险）— 替换各处构造调用
+  1. 将 `NotionHighlightOperations.buildHighlightChildren` 改为调用 `NotionHelperMethods.buildPerBookPageChildren` 并适配返回类型。
+  2. 在 `GoodLinksSyncService` 使用 `NotionHelperMethods.buildParagraphBlocks`（已存在）并用新 helper 构建 highlight children。
+  3. 在每处变更后手动执行一次同步场景（GoodLinks/AppleBooks）以校验结果格式在 Notion 中正确渲染。
+  4. 回滚：若渲染或字段丢失，回滚并查明差异（payload 比较日志）。
 
-- 步骤 E（统一错误判断）：
-  - 把 `isDatabaseMissingError` 放到 `NotionRequestHelper` 或 `NotionServiceCore`（例如 `NotionServiceCore.isNotionServiceError(_:)`），并在 `AppleBooksSyncStrategyPerBook` 里替换原地实现为调用统一 helper。
-  - 这能让对 400/404/410 的判断集中和可维护。
+- 步骤 C（中等风险）— 抽取 trim 到 Helper 并调整 appendChildrenWithRetry
+  1. 将 `trimBlock` 的实现迁移到 `NotionHelperMethods.buildTrimmedBlock`，在 `NotionPageOperations.appendChildrenWithRetry` 调用该方法。
+  2. 运行整套同步流程验证在遇到超长文本时是否能按预期裁剪并最终写入或跳过。
+  3. 回滚：回滚改动并恢复原本内部函数。
 
-  改动文件：`NotionRequestHelper.swift` 或 `NotionServiceCore.swift`，以及 `AppleBooksSyncStrategyPerBook.swift`。
+- 步骤 D（中等风险）— 强制上层使用 `NotionService.ensure*`
+  1. 在 `AppleBooksSyncStrategySingleDB`, `AppleBooksSyncStrategyPerBook`, `GoodLinksSyncService` 中替换自实现的查找/创建逻辑，统一调用 `notionService.ensureDatabaseIdForSource` / `notionService.ensurePerBookDatabase` / `notionService.createBookPage` 等。
+  2. 确认 `NotionConfigStore` 的 key 映射行为正确（迁移步骤：若变更 key 名称需先兼容读取旧 key）；
+     - 推荐做兼容读取：先尝试旧 key，再写入新 key，最后清理旧 key（分两次 PR：兼容 -> 删旧）。
+  3. 回滚：恢复策略中原逻辑。
 
-- 步骤 F（回归与清理）：
-  - 运行 linter/编译，调整访问控制与注入（保留 DIContainer 注入点），删除不再使用的私有方法或注释。
-  - 更新/运行任何现有单元测试（若有），或手动在模拟 NotionKey 环境下执行一次同步流程以验证边界路径（per-book、single、goodlinks）。
+- 步骤 E（低风险）— 清理注释与常量
+  1. 在 `NotionServiceCore` 或新增 `NotionSyncConfig` 中集中 `pageSize`、`batchSize`、`trimLengths` 等常量。
+  2. 更新注释并移除已废弃代码说明。
+  3. 回滚：简单 revert。
 
-### 影响与注意事项
-- 兼容性：这些改动是内部重构（不改变外部协议如 `NotionServiceProtocol` 应保持兼容或同步更新接口）。优先把公共行为保留并通过单元测试/手动测试验证。
-- 错误语义：把错误判断集中后，可在未来统一增加重试、退避或更细粒度的错误分类（403 授权、401 无效 token 等）。
-- 代码组织：建议把新 helper（Append/DB ensure）放在 `Operations` 或 `Core` 下以便于 `NotionService` 注入并复用。
-- 日志：保留并统一日志点（`logger.debug` / `logger.warning`）以便在发生网络错误时能追踪失败条目（uuid）。
+# 四、测试与验证建议（必须）
+- 单元/集成测试：
+  - 为 `NotionHelperMethods` 中新增方法写单元测试（输入 highlight 构建 outputs，检查包含 uuid、link、note、metadata）。
+  - 对 `NotionPageOperations.appendChildrenWithRetry` 进行集成模拟（模拟 413 或 4xx 响应，验证裁剪与拆分逻辑）。
+- 手动验收：
+  - 在 Notion 测试空间（非生产页）跑完整 AppleBooks sync（full + incremental）、GoodLinks sync 并校验页面结构、字段、计数。
+- 回滚准备：
+  - 每步改动提交单独 PR；在 PR 描述中列出回归测试 checklist。
+  - 若出现问题，优先 revert 到上一次绿灯 PR。
 
-### 建议的最小改动清单（按文件）
-- 修改（新增/扩展）：
-  - `SyncNos/Services/0-NotionAPI/Core/NotionService.swift` — 新增 `ensureDatabaseIdForSource(...)` 与 `ensurePerBookDatabaseIfMissing(...)` wrapper。
-  - `SyncNos/Services/0-NotionAPI/Operations/NotionPageOperations.swift` — 调用 `NotionRequestHelper.makeURL(...)` 代替硬编码 URL；考虑把 append retry helper 放这里。
-  - 新增 `SyncNos/Services/0-NotionAPI/Operations/NotionAppendHelper.swift` 或把函数加入 `NotionPageOperations.swift`。
-  - `SyncNos/Services/0-NotionAPI/Core/NotionRequestHelper.swift` — 增加 `makeURL(path:)` 与 `isNotionError(_:)`（或暴露 error helpers）。
-  - `SyncNos/Services/0-NotionAPI/Core/NotionHelperMethods.swift` — 增加 `buildParagraphBlocks(from:)` 并保留现有方法。
-  - `SyncNos/Services/0-NotionAPI/2-GoodLinksSyncToNotion/GoodLinksSyncService.swift` — 删除本地 `buildContentBlocks`，调用 `NotionHelperMethods`；把 append 调用替换为 `NotionAppendHelper`。
-  - `SyncNos/Services/0-NotionAPI/1-AppleBooksSyncToNotion/AppleBooksSyncStrategySingleDB.swift` 与 `AppleBooksSyncStrategyPerBook.swift` — 替换本地 ensure DB 逻辑为调用 `NotionService.ensureDatabaseIdForSource(...)` / `ensurePerBook...`。
+# 五、依赖注入与影响范围
+- 可能需要在 `DIContainer` 中暴露 `NotionHelperMethods` 实例或允许 `NotionPageOperations` 通过构造器接收 helper。
+- 变更会影响所有调用上述功能的 ViewModel（`NotionIntegrationViewModel`、sync 按键等） —— 这些需在暗环境下验证。
 
-### 我已为你创建的 TODO（已创建、接下来的工作）
-- 已添加初始 TODOs（见我刚刚写入的 TODO 列表）：
-  - Audit 0-NotionAPI（正在进行）
-  - Consolidate HTTP request logic
-  - Merge iBooks link and metadata helpers
-  - Extract batch append/retry logic
-  - Unify database ID find-or-create logic
-  - Refactor NotionService to use consolidated helpers
+# 六、风险评估与时间预估
+- 风险等级：中等（因为改动会影响 API payload，需在 Notion 上验证）
+- 预估实现时间：
+  - 步骤 A + B：1–2 天（含测试）
+  - 步骤 C + D：1–2 天（含回归）
+  - 步骤 E 与文档：半天
+- 回滚成本：低（每步单 commit/PR，可 revert）
 
-下一步我可以：按照上面优先级直接开始实现第一个重构（A：将查找/创建数据库逻辑抽到 `NotionService` 并替换调用处）。在开始修改前我会把当前 TODO 列表更新（标记审计为已完成并把“确保数据库 ID”任务设为 in_progress），然后执行并提交编辑。是否现在开始按步骤 A 实施？  
+# 七、建议优先级（立刻开始的动作）
+- 优先做步骤 A（提取 helper）和测试（低风险、立刻可得回报）。
+- 紧接着做步骤 B（替换构造处），逐步观察差异。
+- 延后做配置 key 的 destructive 清理（先做兼容层，后删旧 key）。
 
-- 我会等待你的确认然后开始编辑；若你确认，我会先把 TODO 状态更新并开始实现第 A 步。  
+# 八、示例修改点引用（便于实施）
+- 需要新增/修改的文件/函数引用（示例）：
+  - 修改：`SyncNos/Services/0-NotionAPI/Core/NotionHelperMethods.swift`（新增 `buildBulletedListItemBlock`, `buildPerBookPageChildren`, `buildTrimmedBlock`）
+  - 修改：`SyncNos/Services/0-NotionAPI/Operations/NotionHighlightOperations.swift`（改为调用 helper）
+  - 修改：`SyncNos/Services/0-NotionAPI/Operations/NotionPageOperations.swift`（使用 helper 中的 trim）
+  - 修改：`SyncNos/Services/0-NotionAPI/1-AppleBooksSyncToNotion/AppleBooksSyncStrategySingleDB.swift` 与 `.../PerBook.swift`（移除重复 ensure 流程，调用 `notionService.ensure*`）
+  - 修改：`SyncNos/Services/0-NotionAPI/2-GoodLinksSyncToNotion/GoodLinksSyncService.swift`（使用 helper 来构造 children）
 
-总结要点：
-- **必须合并**：查找/创建数据库 ID 的重复逻辑、批量追加/切片重试逻辑、文本分块函数。
-- **建议**：新增 `ensureDatabaseIdForSource`、`NotionAppendHelper`、把 GoodLinks 的分块移动到 `NotionHelperMethods`、消除 API base 硬编码。
-- 我已创建并开始跟踪 TODO，将在你确认后按优先级进行代码编辑。
+# 九、后续我可以帮你做的事项（你选其一）
+- A) 我可以把方案拆成具体的 PR 列表并生成每个 PR 的变更补丁草案（代码修改草稿），你确认后我执行编辑。
+- B) 我可以先实现步骤 A（只改 `NotionHelperMethods` 并修改调用点），提交可运行的 edits（并运行 lints）。
+- C) 仅生成更详细的变更清单（含每个函数改写伪代码）供你手动实现。
+
+请选择要我立即执行的下一步（A/B/C），我会马上开始并在每次变更前更新 TODO 状态。  
+
+简短总结：
+- 发现重复点：Block 构造、append-with-retry 裁剪逻辑、ensure DB/page 流程分散。
+- 推荐合并点：把 block 构建统一到 `NotionHelperMethods`，把裁剪逻辑抽出并复用，强制上层使用 `NotionService.ensure*`。
+- 优先动作：先抽出并统一 helper（低风险），再替换调用处并严格测试。
