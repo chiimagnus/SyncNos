@@ -136,12 +136,12 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             return
         }
 
-        // 5) 既有页面：扫描并更新/追加（与 Apple Books 单库策略一致）
+        // 5) 既有页面：仅追加缺失的高亮，避免对已存在的条目执行覆盖性“删除后重建”
         let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
 
-        var toUpdate: [(String, HighlightRow)] = []
         var toAppendHighlights: [HighlightRow] = []
         for h in collected {
+            if existingMap[h.id] != nil { continue }
             let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
             let fakeHighlight = HighlightRow(
                 assetId: link.id,
@@ -153,18 +153,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                 modified: nil,
                 location: nil
             )
-            if let blockId = existingMap[h.id] {
-                toUpdate.append((blockId, fakeHighlight))
-            } else {
-                toAppendHighlights.append(fakeHighlight)
-            }
-        }
-
-        if !toUpdate.isEmpty {
-            progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
-            for (blockId, h) in toUpdate {
-                try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: link.id)
-            }
+            toAppendHighlights.append(fakeHighlight)
         }
 
         if !toAppendHighlights.isEmpty {
