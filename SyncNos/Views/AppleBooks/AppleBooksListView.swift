@@ -58,7 +58,7 @@ struct AppleBooksListView: View {
                                 selectedBookId = book.bookId
                                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
                             } label: {
-                                Label("立即同步 (上次: \(SyncTimestampStore.shared.getLastSyncTime(for: book.bookId).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "从未")", systemImage: "arrow.triangle.2.circlepath")
+                                Label("Sync Now (Last Time: \(SyncTimestampStore.shared.getLastSyncTime(for: book.bookId).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "Never")", systemImage: "arrow.triangle.2.circlepath")
                             }
                         }
                     }

@@ -64,7 +64,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Toggle("Auto Sync(24 hours)", isOn: $autoSyncEnabled)
+                    Toggle("Auto Sync(24 hours per time)", isOn: $autoSyncEnabled)
                         .toggleStyle(.switch)
                         .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
                         .onChange(of: autoSyncEnabled) { newValue in
