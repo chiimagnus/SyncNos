@@ -57,7 +57,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     private var notificationCancellable: AnyCancellable?
     private var isSyncing: Bool = false
 
-    private let intervalSeconds: TimeInterval = 15 * 60 // 15min，后续可做成设置项
+    private let intervalSeconds: TimeInterval = 24 * 60 * 60 // 24小时，后续可做成设置项
 
     private var booksRootPath: String? {
         // 尝试从 bookmark 恢复并解析 Data/Documents 根目录
@@ -89,9 +89,6 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             .sink { [weak self] _ in
                 self?.triggerSyncNow()
             }
-
-        // 启动后立即尝试一次
-        triggerSyncNow()
     }
 
     func stop() {
