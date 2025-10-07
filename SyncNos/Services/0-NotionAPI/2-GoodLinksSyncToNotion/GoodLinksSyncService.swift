@@ -40,6 +40,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             header: "Highlights"
         )
         let pageId = ensured.id
+        let created = ensured.created
 
         // 4) 读取高亮（分页）
         let session = try databaseService.makeReadOnlySession(dbPath: dbPath)
@@ -84,59 +85,78 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             try await notionService.updatePageProperties(pageId: pageId, properties: properties)
         }
 
-        // 4.3) 重建页面结构（Article + 内容 + Highlights header）
-        var pageChildren: [[String: Any]] = []
-        pageChildren.append([
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Article"]]]
-            ]
-        ])
-        if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let helper = NotionHelperMethods()
-            let articleBlocks = helper.buildParagraphBlocks(from: contentText)
-            pageChildren.append(contentsOf: articleBlocks)
+        // 4.3) 仅在首次创建页面时初始化结构（Article + 内容 + Highlights header）；避免在后续同步中重建导致删除旧内容
+        if created {
+            var pageChildren: [[String: Any]] = []
+            pageChildren.append([
+                "object": "block",
+                "heading_2": [
+                    "rich_text": [["text": ["content": "Article"]]]
+                ]
+            ])
+            if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let helper = NotionHelperMethods()
+                let articleBlocks = helper.buildParagraphBlocks(from: contentText)
+                pageChildren.append(contentsOf: articleBlocks)
+            }
+            pageChildren.append([
+                "object": "block",
+                "heading_2": [
+                    "rich_text": [["text": ["content": "Highlights"]]]
+                ]
+            ])
+            try await notionService.setPageChildren(pageId: pageId, children: pageChildren)
         }
-        pageChildren.append([
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Highlights"]]]
-            ]
-        ])
-        try await notionService.setPageChildren(pageId: pageId, children: pageChildren)
 
-        // 5) 去重并追加
+        // 5) 与 Apple Books 单库策略一致：构建增量更新/追加
         let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
-        let existingIds = Set(existingMap.keys)
-        let toAppend = collected.filter { !existingIds.contains($0.id) }
 
-        if !toAppend.isEmpty {
-            progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
-            // Build children via NotionHelperMethods and delegate append with retry to page operations
+        var toUpdate: [(String, HighlightRow)] = []
+        var toAppendHighlights: [HighlightRow] = []
+
+        for h in collected {
+            let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
+            let fakeHighlight = HighlightRow(
+                assetId: link.id,
+                uuid: h.id,
+                text: h.content,
+                note: h.note,
+                style: h.color,
+                dateAdded: addedDate,
+                modified: nil,
+                location: nil
+            )
+
+            if let blockId = existingMap[h.id] {
+                // GoodLinks 没有独立的 modified 字段，直接将现有条目加入更新队列以保持与 AppleBooks 的行为一致（但不基于 modified 做跳过判断）
+                toUpdate.append((blockId, fakeHighlight))
+            } else {
+                toAppendHighlights.append(fakeHighlight)
+            }
+        }
+
+        if !toUpdate.isEmpty {
+            progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
+            for (blockId, h) in toUpdate {
+                try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: link.id)
+            }
+        }
+
+        if !toAppendHighlights.isEmpty {
+            progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppendHighlights.count))
+            // 仍由 GoodLinks 自行构建 block，以确保颜色/元数据映射为 goodLinks
             let helper = NotionHelperMethods()
             var children: [[String: Any]] = []
-            for h in toAppend {
-                // Map GoodLinksHighlightRow -> HighlightRow-compatible structure for helper
-                let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
-                // Use color -> style, time -> added/modified
-                let fakeHighlight = HighlightRow(
-                    assetId: link.id,
-                    uuid: h.id,
-                    text: h.content,
-                    note: h.note,
-                    style: h.color,
-                    dateAdded: addedDate,
-                    modified: addedDate,
-                    location: nil
-                )
-                let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.url, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
+            for h in toAppendHighlights {
+                let block = helper.buildBulletedListItemBlock(for: h, bookId: link.url, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
                 children.append(block)
             }
             try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: NotionSyncConfig.defaultTrimOnFailureLengths)
         }
 
-        // 6) 更新计数
+        // 6) 更新计数并记录同步时间
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
+        let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
     }
 
     private static var goodLinksPropertyDefinitions: [String: Any] {
