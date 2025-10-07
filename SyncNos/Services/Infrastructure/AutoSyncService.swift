@@ -165,6 +165,17 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             let title = meta?.title ?? id
             let author = meta?.author ?? ""
             let book = BookListItem(bookId: id, authorName: author, bookTitle: title, ibooksURL: "ibooks://assetid/\(id)", highlightCount: 0)
+
+            // 如果该书在 intervalSeconds 之内已同步过，则跳过自动同步
+            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id) {
+                let elapsed = Date().timeIntervalSince(last)
+                if elapsed < intervalSeconds {
+                    self.logger.info("AutoSync skipped for \(id): last sync \(Int(elapsed))s ago")
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped"]) 
+                    continue
+                }
+            }
+
             do {
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])
