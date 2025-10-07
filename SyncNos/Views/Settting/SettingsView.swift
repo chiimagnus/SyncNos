@@ -69,8 +69,8 @@ struct SettingsView: View {
                         .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
                         .onChange(of: autoSyncEnabled) { newValue in
                             if newValue {
+                                // 仅启动定时器/监听，不立即触发一次全量同步
                                 DIContainer.shared.autoSyncService.start()
-                                NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
                             } else {
                                 DIContainer.shared.autoSyncService.stop()
                             }
