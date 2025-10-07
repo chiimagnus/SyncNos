@@ -91,7 +91,7 @@ final class GoodLinksViewModel: ObservableObject {
                     Task { @MainActor in self?.syncProgressText = progressText }
                 }
                 await MainActor.run {
-                    self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                    self.syncMessage = NSLocalizedString("Sync completed", comment: "")
                     self.syncProgressText = nil
                 }
             } catch {
