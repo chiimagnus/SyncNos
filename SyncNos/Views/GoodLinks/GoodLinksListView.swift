@@ -33,7 +33,7 @@ struct GoodLinksListView: View {
             } else {
                 List(selection: $selectedLinkId) {
                     ForEach(viewModel.links, id: \.id) { link in
-                        HStack(alignment: .top, spacing: 8) {
+                        HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
                                     .font(.headline)
@@ -57,13 +57,23 @@ struct GoodLinksListView: View {
                                 }
                             }
                             Spacer()
+                            // Sync status icon (与 AppleBooksListView 保持一致)
+                            if viewModel.syncingLinkIds.contains(link.id) {
+                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                    .foregroundColor(.yellow)
+                                    .help("Syncing")
+                            } else if viewModel.syncedLinkIds.contains(link.id) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .help("Synced")
+                            }
                         }
                         .padding(.vertical, 4)
                         .tag(link.id)
                         .contextMenu {
                             Button {
                                 selectedLinkId = link.id
-                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentGoodLinkToNotionRequested"), object: nil)
+                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
                             } label: {
                                 Label("立即同步 (上次: \(SyncTimestampStore.shared.getLastSyncTime(for: link.id).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "从未"))", systemImage: "arrow.triangle.2.circlepath")
                             }
