@@ -123,7 +123,7 @@ class NotionHelperMethods {
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
-        rich.append(["text": ["content": "\nuuid:\(highlight.uuid)"], "annotations": ["italic": true]])
+        rich.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["italic": true]])
         return [
             "object": "block",
             "paragraph": [
