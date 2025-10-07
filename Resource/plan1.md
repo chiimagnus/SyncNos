@@ -2,6 +2,11 @@
 
 目标：减少对 Notion 的重复 children 遍历请求，通过本地缓存 pageId 对应的 uuid->blockId 映射，并在 Notion 页面发生编辑时再刷新缓存，从而在绝大多数同步场景下避免全量抓取页面 children。
 
+1) 本地缓存映射 + 基于页面编辑时间的增量刷新（推荐先做）
+做法：第一次（或首次）fetch 全量并构建 uuid -> blockId 映射，持久化到本地（按 pageId）。后续 sync 先检查该 page 的 last_edited_time（或你保存的时间戳），只有在页面被改动时才重新 fetch 并更新映射；否则直接使用本地映射进行存在性判断/更新。
+优点：实现简单、节省大量重复网络请求；兼顾手工编辑风险（通过检测 last_edited_time 来触发重建）。
+风险/注意：Notion 对 children 的修改通常会更新 page 的 edited 时间，但边界情况需验证；需要处理映射失效和冲突（比如用户在 Notion 里移动/删除 block）。
+
 ## 核心思路
 - 首次访问或缓存失效时，调用现有的 `collectExistingUUIDToBlockIdMapping(fromPageId:)` 完整抓取并构建映射；将映射持久化到本地（按 `pageId` 索引），同时保存该 page 的 `last_edited_time`（或 Notion 返回的相应时间戳）。
 - 后续同步时先通过 Notion API 获取 page 的最新 `last_edited_time`（或从 `ensureBookPageInDatabase` / find 接口返回的 metadata），与本地缓存的时间比较：
