@@ -102,7 +102,7 @@ class NotionQueryOperations {
                 // If the block has children, fetch them and scan for metadata child blocks containing UUID
                 if block.has_children == true {
                     do {
-                        var childComponents = requestHelper.makeURLComponents(path: "blocks/\(block.id)/children")
+                        let childComponents = requestHelper.makeURLComponents(path: "blocks/\(block.id)/children")
                         let childData = try await requestHelper.performRequest(url: childComponents.url!, method: "GET", body: nil)
                         let childDecoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: childData)
                         for child in childDecoded.results {
