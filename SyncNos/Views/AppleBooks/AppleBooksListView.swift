@@ -53,7 +53,13 @@ struct AppleBooksListView: View {
                         .padding(.vertical, 4)
                         .tag(book.bookId)
                         .contextMenu {
-                            Button("Not yet realized", systemImage: "heart", action: {})
+                            Button {
+                                // 选中该书并触发详情页的同步请求
+                                selectedBookId = book.bookId
+                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
+                            } label: {
+                                Label("立即同步 (上次: \(SyncTimestampStore.shared.getLastSyncTime(for: book.bookId).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "从未")", systemImage: "arrow.triangle.2.circlepath")
+                            }
                         }
                     }
                 }
