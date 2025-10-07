@@ -60,6 +60,14 @@ struct GoodLinksListView: View {
                         }
                         .padding(.vertical, 4)
                         .tag(link.id)
+                        .contextMenu {
+                            Button {
+                                selectedLinkId = link.id
+                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentGoodLinkToNotionRequested"), object: nil)
+                            } label: {
+                                Label("立即同步 (上次: \(SyncTimestampStore.shared.getLastSyncTime(for: link.id).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "从未"))", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                        }
                     }
                 }
                 .listStyle(.sidebar)
