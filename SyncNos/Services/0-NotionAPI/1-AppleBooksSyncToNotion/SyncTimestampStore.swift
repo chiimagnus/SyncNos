@@ -29,20 +29,20 @@ final class SyncTimestampStore {
         logger.debug("DEBUG: 设置同步时间戳 for 书籍ID: \(bookId) = \(date)")
     }
 
-    /// 清除指定书籍的同步时间
-    /// - Parameter bookId: 书籍ID
-    func clearLastSyncTime(for bookId: String) {
-        let key = lastSyncKeyPrefix + bookId
-        userDefaults.removeObject(forKey: key)
-    }
+    // /// 清除指定书籍的同步时间
+    // /// - Parameter bookId: 书籍ID
+    // func clearLastSyncTime(for bookId: String) {
+    //     let key = lastSyncKeyPrefix + bookId
+    //     userDefaults.removeObject(forKey: key)
+    // }
 
-    /// 清除所有书籍的同步时间
-    func clearAllSyncTimes() {
-        let defaults = userDefaults.dictionaryRepresentation()
-        for key in defaults.keys where key.hasPrefix(lastSyncKeyPrefix) {
-            userDefaults.removeObject(forKey: key)
-        }
-    }
+    // /// 清除所有书籍的同步时间
+    // func clearAllSyncTimes() {
+    //     let defaults = userDefaults.dictionaryRepresentation()
+    //     for key in defaults.keys where key.hasPrefix(lastSyncKeyPrefix) {
+    //         userDefaults.removeObject(forKey: key)
+    //     }
+    // }
 }
 
 
