@@ -60,19 +60,19 @@ struct AppCommands: Commands {
         }
 
         // File 菜单 - 文件操作相关
-        CommandGroup(after: .newItem) {
-            // Button("Import Books", systemImage: "plus.rectangle") {
-            //     // 导入书籍的逻辑
-            // }
-            // .keyboardShortcut("i", modifiers: .command)
+        CommandGroup(replacing: .newItem) {
+            Button("Sync Current Book to Notion", systemImage: "arrow.triangle.2.circlepath") {
+                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
         }
 
         // Edit 菜单 - 编辑操作相关
         CommandGroup(after: .textEditing) {
-            Button("Find in Books", systemImage: "magnifyingglass") {
-                // 在书籍中搜索的逻辑
-            }
-            .keyboardShortcut("f", modifiers: [.command, .shift])
+            // Button("Find in Books", systemImage: "magnifyingglass") {
+            //     // 在书籍中搜索的逻辑
+            // }
+            // .keyboardShortcut("f", modifiers: [.command, .shift])
         }
 
         // View 菜单 - 视图相关
@@ -87,10 +87,6 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: .command)
 
-            Button("Sync Current Book to Notion", systemImage: "arrow.triangle.2.circlepath") {
-                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
 
             Divider()
 
