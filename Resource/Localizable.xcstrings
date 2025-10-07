@@ -708,6 +708,12 @@
     },
     "Auto Sync(24 hours per time)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto Sync(24 hours per time)"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5254,6 +5260,12 @@
     },
     "Sync Now (Last Time: %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Now (Last Time: %@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5264,6 +5276,12 @@
     },
     "Sync Now (Last Time: %@)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Now (Last Time: %@)"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5683,6 +5701,12 @@
     },
     "User Guide" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User Guide"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
