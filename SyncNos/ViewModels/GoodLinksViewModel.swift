@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
@@ -10,10 +11,14 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var isSyncing: Bool = false
     @Published var syncMessage: String?
     @Published var syncProgressText: String?
+    // UI Sync State per-link
+    @Published var syncingLinkIds: Set<String> = []
+    @Published var syncedLinkIds: Set<String> = []
 
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
+    private var cancellables: Set<AnyCancellable> = []
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
@@ -21,6 +26,7 @@ final class GoodLinksViewModel: ObservableObject {
         self.service = service
         self.syncService = syncService
         self.logger = logger
+        subscribeSyncStatusNotifications()
     }
 
     func loadRecentLinks(limit: Int = 0) async {
@@ -85,6 +91,8 @@ final class GoodLinksViewModel: ObservableObject {
 
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
+            // 发布开始通知
+            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "started"])
             do {
                 let dbPath = self.service.resolveDatabasePath()
                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
@@ -93,6 +101,8 @@ final class GoodLinksViewModel: ObservableObject {
                 await MainActor.run {
                     self.syncMessage = NSLocalizedString("同步完成", comment: "")
                     self.syncProgressText = nil
+                    // 发布完成通知
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "succeeded"])
                 }
             } catch {
                 let desc = error.localizedDescription
@@ -100,9 +110,35 @@ final class GoodLinksViewModel: ObservableObject {
                 await MainActor.run {
                     self.errorMessage = desc
                     self.syncProgressText = nil
+                    // 发布失败通知
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "failed"])
                 }
             }
         }
     }
 
+    private func subscribeSyncStatusNotifications() {
+        NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .compactMap { info -> (String, String)? in
+                guard let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return nil }
+                return (bookId, status)
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (bookId, status) in
+                guard let self else { return }
+                switch status {
+                case "started":
+                    self.syncingLinkIds.insert(bookId)
+                case "succeeded":
+                    self.syncingLinkIds.remove(bookId)
+                    self.syncedLinkIds.insert(bookId)
+                case "failed":
+                    self.syncingLinkIds.remove(bookId)
+                default:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+    }
 }
