@@ -4,7 +4,6 @@ import AppKit
 struct SettingsView: View {
     @State private var isLoading: Bool = false
     @State private var isPickingBooks: Bool = false
-    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
     @AppStorage("autoSyncEnabled") private var autoSyncEnabled: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
@@ -65,9 +64,9 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Toggle("Enable Auto Sync", isOn: $autoSyncEnabled)
+                    Toggle("Auto Sync(24 hours)", isOn: $autoSyncEnabled)
                         .toggleStyle(.switch)
-                        .controlSize(.mini)
+                        .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
                         .onChange(of: autoSyncEnabled) { newValue in
                             if newValue {
                                 DIContainer.shared.autoSyncService.start()
@@ -76,11 +75,6 @@ struct SettingsView: View {
                                 DIContainer.shared.autoSyncService.stop()
                             }
                         }
-
-                    Toggle("Enable Background Image", isOn: $backgroundImageEnabled)
-                        .help("Show a background image in the main window")
-                        .toggleStyle(.switch)
-                        .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
 
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
