@@ -37,9 +37,9 @@ class NotionHighlightOperations {
     }
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
-        // 构建 parent rich_text（highlight + uuid）并更新
+        // 构建 parent rich_text（highlight + uuid）并更新；父块类型与创建时一致：numbered_list_item
         let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId)
-        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["bulleted_list_item": ["rich_text": parentRt]])
+        _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
 
         // 构建并替换子块（note + metadata+link）
         var childBlocks: [[String: Any]] = []
