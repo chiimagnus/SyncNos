@@ -37,16 +37,16 @@ class NotionHighlightOperations {
     }
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
-        // 构建 parent rich_text（highlight + uuid）并更新；父块类型与创建时一致：numbered_list_item
-        let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId)
+        // 构建 parent rich_text（高亮首段）并更新；父块类型与创建时一致：numbered_list_item
+        let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary)
         _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
 
-        // 构建并替换子块（note + metadata+link）
+        // 构建并替换子块（高亮续块 + note 多块 + metadata bullet）
         var childBlocks: [[String: Any]] = []
-        if let noteChild = helperMethods.buildNoteChild(for: highlight) {
-            childBlocks.append(noteChild)
-        }
-        childBlocks.append(helperMethods.buildMetaAndLinkChild(for: highlight, bookId: bookId))
+        let chunkSize = NotionSyncConfig.maxTextLengthPrimary
+        childBlocks.append(contentsOf: helperMethods.buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
+        childBlocks.append(contentsOf: helperMethods.buildNoteChildren(for: highlight, chunkSize: chunkSize))
+        childBlocks.append(helperMethods.buildMetaAndLinkBulletChild(for: highlight, bookId: bookId))
 
         // 使用 pageOperations.replacePageChildren 来替换指定 block 的 children（适用于 block 的 children endpoint）
         try await pageOperations.replacePageChildren(pageId: blockId, with: childBlocks)
