@@ -1,3 +1,9 @@
+## v0.4.11
+- 将 Notion 上传从“单条截断 1500 字”改为按 ≤1500 字分块上传
+- Highligh 采用父块 + 子块结构
+- Note 切分为多个兄弟 bullet
+- metadata 单独为 bullet 子块
+
 ## v0.3.9
 - 新增赞助项，如果觉得不错，可以赞助一下，谢谢！
 - Add new sponsorship items. If you think it is good, you can sponsor them. Thank you!
