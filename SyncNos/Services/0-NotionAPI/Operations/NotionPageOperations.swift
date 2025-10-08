@@ -55,48 +55,13 @@ class NotionPageOperations {
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
 
-    /// Append children with retry/split behavior. Exposed so callers can reuse the robust append behavior.
-    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: [Int] = NotionSyncConfig.defaultTrimOnFailureLengths) async throws {
-        let logger = DIContainer.shared.loggerService
-
-        func attemptAppendSlice(_ slice: ArraySlice<[String: Any]>, trimLengths: [Int]) async throws {
-            let payloadChildren = Array(slice)
-            do {
-                try await appendBlocks(pageId: pageId, children: payloadChildren)
-            } catch {
-                if slice.count > 1 {
-                    let mid = slice.startIndex + slice.count / 2
-                    try await attemptAppendSlice(slice[slice.startIndex..<mid], trimLengths: trimLengths)
-                    try await attemptAppendSlice(slice[mid..<slice.endIndex], trimLengths: trimLengths)
-                } else if let single = slice.first {
-                    // single item failed — try trimming if possible
-                    if let length = trimLengths.first, length > 0 {
-                        // attempt to trim deeply nested rich_text contents if present using helper
-                        let trimmedSingle = helperMethods.buildTrimmedBlock(single, to: length)
-                        do {
-                            try await appendBlocks(pageId: pageId, children: [trimmedSingle])
-                        } catch {
-                            // if still fails and more trim lengths available, try next
-                            if trimLengths.count > 1 {
-                                let remaining = Array(trimLengths.dropFirst())
-                                // recurse with same single slice but next trim lengths
-                                try await attemptAppendSlice(slice, trimLengths: remaining)
-                            } else {
-                                logger.warning("Skip one highlight due to Notion API error when appending single child: \(error.localizedDescription)")
-                            }
-                        }
-                    } else {
-                        logger.warning("Skip one highlight due to Notion API error when appending single child: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-
+    /// Append children in batches without retry or trimming. Simpler and deterministic.
+    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: [Int] = []) async throws {
         var index = 0
         while index < children.count {
             let end = min(index + batchSize, children.count)
-            let slice = children[index..<end]
-            try await attemptAppendSlice(slice, trimLengths: trimOnFailureLengths)
+            let slice = Array(children[index..<end])
+            try await appendBlocks(pageId: pageId, children: slice)
             index = end
         }
     }

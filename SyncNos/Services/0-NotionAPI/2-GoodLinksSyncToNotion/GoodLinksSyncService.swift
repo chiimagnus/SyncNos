@@ -105,7 +105,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                     "rich_text": [["text": ["content": "Highlights"]]]
                 ]
             ])
-            try await notionService.appendChildrenWithRetry(pageId: pageId, children: pageChildren, batchSize: NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: NotionSyncConfig.defaultTrimOnFailureLengths)
+            try await notionService.appendChildrenWithRetry(pageId: pageId, children: pageChildren, batchSize: NotionSyncConfig.defaultAppendBatchSize)
 
             // 追加所有高亮（批量）
             if !collected.isEmpty {
@@ -127,7 +127,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                     let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
                     children.append(block)
                 }
-                try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: NotionSyncConfig.defaultTrimOnFailureLengths)
+                try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize)
             }
 
             // 更新计数与时间戳后返回
@@ -164,7 +164,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                 let block = helper.buildBulletedListItemBlock(for: h, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
                 children.append(block)
             }
-            try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: NotionSyncConfig.defaultTrimOnFailureLengths)
+            try await notionService.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize)
         }
 
         // 6) 更新计数并记录同步时间
