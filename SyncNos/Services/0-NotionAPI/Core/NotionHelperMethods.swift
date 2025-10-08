@@ -266,59 +266,7 @@ class NotionHelperMethods {
         ]
     }
 
-    // Trim long content inside a block's first rich_text element to maxLen.
-    // Supports multiple common block owner keys (bulleted/numbered/paragraph/quote)
-    func buildTrimmedBlock(_ block: [String: Any], to maxLen: Int) -> [String: Any] {
-        var b = block
-
-        func trimOwnerKey(_ ownerKey: String) -> Bool {
-            if var owner = b[ownerKey] as? [String: Any] {
-                if var rich = owner["rich_text"] as? [[String: Any]], !rich.isEmpty {
-                    var first = rich[0]
-                    if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
-                        text["content"] = String(content.prefix(maxLen))
-                        first["text"] = text
-                        rich[0] = first
-                        owner["rich_text"] = rich
-                        b[ownerKey] = owner
-                        return true
-                    }
-                }
-            }
-            return false
-        }
-
-        let ownerKeys = ["bulleted_list_item", "numbered_list_item", "paragraph", "quote"]
-        for key in ownerKeys {
-            if trimOwnerKey(key) { return b }
-        }
-
-        // Fallback: try to trim first child's rich_text if present
-        if var children = b["children"] as? [[String: Any]], !children.isEmpty {
-            var firstChild = children[0]
-            var modified = false
-            for key in ownerKeys {
-                if var owner = firstChild[key] as? [String: Any], var rich = owner["rich_text"] as? [[String: Any]], !rich.isEmpty {
-                    var first = rich[0]
-                    if var text = first["text"] as? [String: Any], let content = text["content"] as? String, content.count > maxLen {
-                        text["content"] = String(content.prefix(maxLen))
-                        first["text"] = text
-                        rich[0] = first
-                        owner["rich_text"] = rich
-                        firstChild[key] = owner
-                        modified = true
-                        break
-                    }
-                }
-            }
-            if modified {
-                children[0] = firstChild
-                b["children"] = children
-            }
-        }
-
-        return b
-    }
+    // buildTrimmedBlock 已移除：分块与批次策略替代了裁剪逻辑
 
     // Build paragraph blocks from a long text (used by GoodLinks sync)
     func buildParagraphBlocks(from text: String, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
