@@ -100,55 +100,6 @@ class NotionHelperMethods {
         return rt
     }
 
-    // Overload: build parent rich_text for a given chunk of text (preserves annotations if any)
-    func buildParentRichText(fromChunk chunk: String) -> [[String: Any]] {
-        return convertToRichTextChunks(chunk)
-    }
-
-    /// 将纯文本或带有简单 markdown-like 注释（**bold**, *italic*, `code`, [link](url)）转换为 Notion 的 rich_text 数组。
-    /// 该实现为简化实现，主要用于保留常见注释样式；复杂嵌套或跨 chunk 的样式可能不会被完全保留。
-    func convertToRichTextChunks(_ text: String) -> [[String: Any]] {
-        // 简化策略：目前仅支持整体块级别的注释识别（例如整段为 italic/bold/code）以及链接识别。
-        // 更复杂的 inline annotation 解析需使用 Markdown parser（可后续替换）。
-
-        var results: [[String: Any]] = []
-
-        // Quick link detection: [text](url)
-        // 如果匹配多个，只做简单的替换为 separate rich_text items
-        let pattern = "\\[([^\\]]+)\\]\\(([^\\)]+)\\)"
-        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
-            let nsText = text as NSString
-            var lastEnd = 0
-            let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsText.length))
-            if matches.isEmpty {
-                // 没有 link，作为单一文本项返回
-                results.append(["text": ["content": text]])
-                return results
-            }
-            for m in matches {
-                let rangeBefore = NSRange(location: lastEnd, length: m.range.location - lastEnd)
-                if rangeBefore.length > 0 {
-                    let before = nsText.substring(with: rangeBefore)
-                    results.append(["text": ["content": before]])
-                }
-                let linkText = nsText.substring(with: m.range(at: 1))
-                let linkUrl = nsText.substring(with: m.range(at: 2))
-                results.append(["text": ["content": linkText, "link": ["url": linkUrl]]])
-                lastEnd = m.range.location + m.range.length
-            }
-            if lastEnd < nsText.length {
-                let trailingRange = NSRange(location: lastEnd, length: nsText.length - lastEnd)
-                let trailing = nsText.substring(with: trailingRange)
-                results.append(["text": ["content": trailing]])
-            }
-            return results
-        }
-
-        // Fallback: return as single text rich_text
-        results.append(["text": ["content": text]])
-        return results
-    }
-
     // Build a paragraph child block for the note (italic)
     func buildNoteChild(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any]? {
         guard let note = highlight.note, !note.isEmpty else { return nil }
