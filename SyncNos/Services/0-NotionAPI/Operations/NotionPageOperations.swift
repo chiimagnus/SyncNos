@@ -55,8 +55,8 @@ class NotionPageOperations {
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
 
-    /// Append children in batches without retry or trimming. Simpler and deterministic.
-    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize, trimOnFailureLengths: [Int] = []) async throws {
+    /// Append children in batches. Simpler and deterministic (no retry/trim fallback).
+    func appendChildren(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize) async throws {
         var index = 0
         while index < children.count {
             let end = min(index + batchSize, children.count)

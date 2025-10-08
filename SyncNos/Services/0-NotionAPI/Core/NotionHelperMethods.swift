@@ -105,7 +105,8 @@ class NotionHelperMethods {
     // Build a paragraph child block for the note (italic)
     func buildNoteChild(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any]? {
         guard let note = highlight.note, !note.isEmpty else { return nil }
-        let noteContent = truncateText(note, maxLen: maxTextLength)
+        // 破坏性变更：移除运行时裁剪，依赖分块机制处理长文本
+        let noteContent = note
         return [
             "object": "block",
             "bulleted_list_item": [
@@ -183,11 +184,7 @@ class NotionHelperMethods {
         return children
     }
 
-    // General-purpose text truncation helper
-    func truncateText(_ text: String, maxLen: Int?) -> String {
-        guard let maxLen = maxLen, maxLen > 0 else { return text }
-        return text.count > maxLen ? String(text.prefix(maxLen)) : text
-    }
+    // 注意：truncateText 已被移除，分块策略代替裁剪行为
 
     /// 通用文本分块：优先按段落与字符边界，单块最大 chunkSize。
     /// 结果至少包含一个元素（可能为空字符串）。
