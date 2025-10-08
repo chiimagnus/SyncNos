@@ -87,6 +87,17 @@ class NotionRequestHelper {
         return checkNSError(ns)
     }
 
+    /// Returns true when the given error likely indicates content size/validation overflow from Notion
+    /// Heuristic: HTTP 400 or 413 with message containing certain keywords
+    static func isContentTooLargeError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == "NotionService" else { return false }
+        if ns.code != 400 && ns.code != 413 { return false }
+        let msg = (ns.userInfo[NSLocalizedDescriptionKey] as? String)?.lowercased() ?? ""
+        let keys = ["too long", "exceed", "length", "maximum", "validation", "content too large"]
+        return keys.contains { msg.contains($0) }
+    }
+
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             let body = String(data: data, encoding: .utf8) ?? ""

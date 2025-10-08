@@ -53,9 +53,82 @@ class NotionHighlightOperations {
     }
 
     func createHighlightItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
-        let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
-        let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+        // 预检：若单条内容过大，则直接写入占位条目
+        if isTooLarge(highlight) {
+            logger.warning("PerBook: content too large detected (pre-check), use placeholder. uuid=\(highlight.uuid)")
+            return try await createPlaceholderItem(inDatabaseId: databaseId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
+        }
 
+        do {
+            let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
+            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+
+            let body: [String: Any] = [
+                "parent": [
+                    "type": "database_id",
+                    "database_id": databaseId
+                ],
+                "properties": properties,
+                "children": children
+            ]
+            let data = try await requestHelper.performRequest(path: "pages", method: "POST", body: body)
+            return try JSONDecoder().decode(NotionPage.self, from: data)
+        } catch {
+            // 兜底：若服务端校验仍认为内容过大，则降级为占位条目
+            if NotionRequestHelper.isContentTooLargeError(error) {
+                logger.warning("PerBook: content too large (HTTP), fallback to placeholder. uuid=\(highlight.uuid)")
+                return try await createPlaceholderItem(inDatabaseId: databaseId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
+            }
+            throw error
+        }
+    }
+
+    func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws {
+        if isTooLarge(highlight) {
+            logger.warning("PerBook: content too large detected (pre-check) on update, use placeholder. uuid=\(highlight.uuid)")
+            try await updatePlaceholderItem(pageId: pageId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
+            return
+        }
+
+        do {
+            let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight, clearEmpty: true)
+            _ = try await requestHelper.performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
+
+            // Replace page children with up-to-date content
+            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+            try await pageOperations.replacePageChildren(pageId: pageId, with: children)
+        } catch {
+            if NotionRequestHelper.isContentTooLargeError(error) {
+                logger.warning("PerBook: content too large (HTTP) on update, fallback to placeholder. uuid=\(highlight.uuid)")
+                try await updatePlaceholderItem(pageId: pageId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
+                return
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Per-book Placeholder Helpers
+    private func isTooLarge(_ h: HighlightRow) -> Bool {
+        let limit = NotionSyncConfig.maxTextLengthPrimary
+        if h.text.count > limit { return true }
+        if let n = h.note, n.count > limit { return true }
+        return false
+    }
+
+    private func makePlaceholderProperties(bookId: String, bookTitle: String, author: String, h: HighlightRow) -> [String: Any] {
+        var props = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: h, clearEmpty: true)
+        props["Text"] = ["title": [["text": ["content": NotionSyncConfig.placeholderTooLargeText]]]]
+        props["Note"] = ["rich_text": []]
+        return props
+    }
+
+    private func makePlaceholderChildren(h: HighlightRow, bookId: String) -> [[String: Any]] {
+        return [ helperMethods.buildMetaAndLinkChild(for: h, bookId: bookId) ]
+    }
+
+    private func createPlaceholderItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
+        let properties = makePlaceholderProperties(bookId: bookId, bookTitle: bookTitle, author: author, h: highlight)
+        let children = makePlaceholderChildren(h: highlight, bookId: bookId)
         let body: [String: Any] = [
             "parent": [
                 "type": "database_id",
@@ -68,12 +141,10 @@ class NotionHighlightOperations {
         return try JSONDecoder().decode(NotionPage.self, from: data)
     }
 
-    func updateHighlightItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws {
-        let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight, clearEmpty: true)
+    private func updatePlaceholderItem(pageId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws {
+        let properties = makePlaceholderProperties(bookId: bookId, bookTitle: bookTitle, author: author, h: highlight)
         _ = try await requestHelper.performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
-
-        // Replace page children with up-to-date content
-        let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+        let children = makePlaceholderChildren(h: highlight, bookId: bookId)
         try await pageOperations.replacePageChildren(pageId: pageId, with: children)
     }
 }
