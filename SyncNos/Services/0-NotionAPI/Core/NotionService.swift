@@ -128,8 +128,8 @@ final class NotionService: NotionServiceProtocol {
     }
 
     // Expose append-with-retry so callers using the protocol can delegate to page operations
-    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int, trimOnFailureLengths: [Int]) async throws {
-        try await pageOps.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: batchSize, trimOnFailureLengths: trimOnFailureLengths)
+    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int) async throws {
+        try await pageOps.appendChildrenWithRetry(pageId: pageId, children: children, batchSize: batchSize)
     }
 
     // MARK: - Ensure / find-or-create helpers (consolidated)

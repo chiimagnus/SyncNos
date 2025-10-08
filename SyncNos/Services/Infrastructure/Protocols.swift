@@ -128,7 +128,7 @@ protocol NotionServiceProtocol: AnyObject {
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws
     /// Replace all page children with the provided blocks
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws
-    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int, trimOnFailureLengths: [Int]) async throws
+    func appendChildrenWithRetry(pageId: String, children: [[String: Any]], batchSize: Int) async throws
     // Per-book database mode (方案2)
     func databaseExists(databaseId: String) async -> Bool
     func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase
