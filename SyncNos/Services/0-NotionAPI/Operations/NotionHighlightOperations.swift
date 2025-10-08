@@ -22,8 +22,8 @@ class NotionHighlightOperations {
 
         func appendSlice(_ slice: ArraySlice<HighlightRow>) async throws {
             let children = slice.map { buildBlock(for: $0) }
-            // Delegate robust append behavior to pageOperations.appendChildrenWithRetry
-            try await pageOperations.appendChildrenWithRetry(pageId: pageId, children: children)
+            // 破坏性变更：直接按批次追加，不再尝试单条裁剪或降级
+            try await pageOperations.appendChildren(pageId: pageId, children: children)
         }
 
         // 入口：按默认批次一批，逐批递归发送

@@ -186,16 +186,8 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
             } catch {
                 self.logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
-                // 失败后尝试降级到增量同步
-                do {
-                    try await self.appleBooksSyncService.sync(book: book, dbPath: annotationDBPath, incremental: true) { progress in
-                        self.logger.debug("AutoSync fallback progress[\(id)]: \(progress)")
-                    }
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
-                } catch {
-                    self.logger.error("AutoSync fallback failed for \(id): \(error.localizedDescription)")
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
-                }
+                // 破坏性变更：移除降级到增量同步的尝试，直接视为失败并上报
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
             }
             NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
             // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
