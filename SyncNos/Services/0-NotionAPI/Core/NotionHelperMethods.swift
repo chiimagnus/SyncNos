@@ -94,7 +94,9 @@ class NotionHelperMethods {
     func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
         var rt: [[String: Any]] = []
 
-        let textContent = truncateText(highlight.text, maxLen: maxTextLength)
+        let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
+        let chunks = chunkText(highlight.text, chunkSize: chunkSize)
+        let textContent = chunks.first ?? ""
         rt.append(["text": ["content": textContent]])
 
         return rt
@@ -136,11 +138,15 @@ class NotionHelperMethods {
     // Returns (parentRichText, childBlocks)
     func buildParentAndChildren(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> ([[String: Any]], [[String: Any]]) {
         let parent = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+        let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
+
         var blocks: [[String: Any]] = []
-        if let note = buildNoteChild(for: highlight, maxTextLength: maxTextLength) {
-            blocks.append(note)
-        }
-        blocks.append(buildMetaAndLinkChild(for: highlight, bookId: bookId, source: source))
+        // 1) 高亮续块（从第二段起）使用 paragraph 子块
+        blocks.append(contentsOf: buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
+        // 2) note 切分为多个兄弟 bulleted_list_item
+        blocks.append(contentsOf: buildNoteChildren(for: highlight, chunkSize: chunkSize))
+        // 3) metadata + uuid 作为 bulleted_list_item，确保总在末尾
+        blocks.append(buildMetaAndLinkBulletChild(for: highlight, bookId: bookId, source: source))
         return (parent, blocks)
     }
 
@@ -181,6 +187,83 @@ class NotionHelperMethods {
     func truncateText(_ text: String, maxLen: Int?) -> String {
         guard let maxLen = maxLen, maxLen > 0 else { return text }
         return text.count > maxLen ? String(text.prefix(maxLen)) : text
+    }
+
+    /// 通用文本分块：优先按段落与字符边界，单块最大 chunkSize。
+    /// 结果至少包含一个元素（可能为空字符串）。
+    func chunkText(_ text: String, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [String] {
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        var parts: [String] = []
+
+        // 先按段落拆分（双换行）
+        let paragraphs = normalized
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for p in paragraphs {
+            var start = p.startIndex
+            while start < p.endIndex {
+                let end = p.index(start, offsetBy: chunkSize, limitedBy: p.endIndex) ?? p.endIndex
+                let slice = String(p[start..<end])
+                parts.append(slice)
+                start = end
+            }
+        }
+
+        if parts.isEmpty {
+            return [""]
+        }
+        return parts
+    }
+
+    /// 构建高亮续块（从第二段起）的 paragraph 子块
+    func buildHighlightContinuationChildren(for highlight: HighlightRow, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
+        let chunks = chunkText(highlight.text, chunkSize: chunkSize)
+        guard chunks.count > 1 else { return [] }
+        var children: [[String: Any]] = []
+        for c in chunks.dropFirst() {
+            children.append([
+                "object": "block",
+                "paragraph": [
+                    "rich_text": [["text": ["content": c]]]
+                ]
+            ])
+        }
+        return children
+    }
+
+    /// 将 note 切分为多个兄弟 bulleted_list_item 子块（斜体）
+    func buildNoteChildren(for highlight: HighlightRow, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
+        guard let note = highlight.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty else { return [] }
+        let chunks = chunkText(note, chunkSize: chunkSize)
+        return chunks.map { chunk in
+            [
+                "object": "block",
+                "bulleted_list_item": [
+                    "rich_text": [[
+                        "text": ["content": chunk],
+                        "annotations": ["italic": true]
+                    ]]
+                ]
+            ]
+        }
+    }
+
+    /// metadata + uuid 作为 bulleted_list_item 子块（列表场景）
+    func buildMetaAndLinkBulletChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
+        var rich: [[String: Any]] = []
+        let metaString = buildMetadataString(for: highlight, source: source)
+        if !metaString.isEmpty {
+            rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
+        }
+        rich.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["italic": true]])
+        return [
+            "object": "block",
+            "bulleted_list_item": [
+                "rich_text": rich
+            ]
+        ]
     }
 
     // Trim long content inside a block's first rich_text element to maxLen.
