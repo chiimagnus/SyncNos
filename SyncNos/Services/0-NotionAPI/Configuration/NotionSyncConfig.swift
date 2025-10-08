@@ -18,6 +18,10 @@ enum NotionSyncConfig {
     // MARK: - Text trimming
     /// 构建 Notion rich_text 时的首选最大文本长度（与上方裁剪阈值保持一致）
     static let maxTextLengthPrimary: Int = 1500
+
+    // MARK: - Placeholder
+    /// 当 per-book 模式下高亮/笔记内容过大时用于占位的文本
+    static let placeholderTooLargeText: String = "已跳过：内容过大"
 }
 
 
