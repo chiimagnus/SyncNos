@@ -75,7 +75,8 @@ class NotionRequestHelper {
     static func isDatabaseMissingError(_ error: Error) -> Bool {
         func checkNSError(_ ns: NSError) -> Bool {
             if ns.domain == "NotionService" {
-                return ns.code == 404 || ns.code == 400 || ns.code == 410
+                // 更精确：仅 404/410 视为缺失；避免将 400（校验失败/内容过大）误判为库缺失
+                return ns.code == 404 || ns.code == 410
             }
             if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
                 return checkNSError(underlying)
@@ -92,10 +93,20 @@ class NotionRequestHelper {
     static func isContentTooLargeError(_ error: Error) -> Bool {
         let ns = error as NSError
         guard ns.domain == "NotionService" else { return false }
-        if ns.code != 400 && ns.code != 413 { return false }
-        let msg = (ns.userInfo[NSLocalizedDescriptionKey] as? String)?.lowercased() ?? ""
-        let keys = ["too long", "exceed", "length", "maximum", "validation", "content too large"]
-        return keys.contains { msg.contains($0) }
+        // 413 明确表示内容/请求过大
+        if ns.code == 413 { return true }
+        // 400 经常用于校验失败，结合文案进行启发式判断
+        if ns.code == 400 {
+            let raw = (ns.userInfo[NSLocalizedDescriptionKey] as? String) ?? ""
+            let msg = raw.lowercased()
+            // 常见英文/中文关键字覆盖
+            let keys = [
+                "validation", "too long", "too_long", "content too large", "payload too large", "exceed", "exceeds", "length", "maximum", "max length", "over maximum", "limit",
+                "过长", "超出", "长度", "超过最大", "验证失败", "内容太长", "过大", "超大", "超出限制"
+            ]
+            if keys.contains(where: { msg.contains($0) }) { return true }
+        }
+        return false
     }
 
     private static func ensureSuccess(response: URLResponse, data: Data) throws {
