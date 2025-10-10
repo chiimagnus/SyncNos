@@ -13,39 +13,36 @@ class BookViewModel: ObservableObject {
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
 
-    // Sorting and filtering state
-    private var _sort: BookListSort?
-    private var _showWithTitleOnly: Bool?
-
-    var sort: BookListSort {
-        get {
-            if _sort == nil {
-                if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
-                   let sortKey = BookListSortKey(rawValue: savedSortKey) {
-                    _sort = BookListSort(key: sortKey, ascending: UserDefaults.standard.bool(forKey: "bookList_sort_ascending"))
-                } else {
-                    _sort = BookListSort(key: .title, ascending: true)
-                }
-            }
-            return _sort!
-        }
-        set {
-            _sort = newValue
-            UserDefaults.standard.set(newValue.key.rawValue, forKey: "bookList_sort_key")
-            UserDefaults.standard.set(newValue.ascending, forKey: "bookList_sort_ascending")
+    // Sorting and filtering state - Reactive properties with UserDefaults persistence
+    @Published var sortKey: BookListSortKey = .title {
+        didSet {
+            UserDefaults.standard.set(sortKey.rawValue, forKey: "bookList_sort_key")
+            objectWillChange.send() // Ensure UI updates when property changes
         }
     }
 
-    var showWithTitleOnly: Bool {
+    @Published var sortAscending: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sortAscending, forKey: "bookList_sort_ascending")
+            objectWillChange.send() // Ensure UI updates when property changes
+        }
+    }
+
+    @Published var showWithTitleOnly: Bool = false {
+        didSet {
+            UserDefaults.standard.set(showWithTitleOnly, forKey: "bookList_showWithTitleOnly")
+            objectWillChange.send() // Ensure UI updates when property changes
+        }
+    }
+
+    // Computed property to maintain backward compatibility with existing code that uses the old sort property
+    var sort: BookListSort {
         get {
-            if _showWithTitleOnly == nil {
-                _showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
-            }
-            return _showWithTitleOnly!
+            return BookListSort(key: sortKey, ascending: sortAscending)
         }
         set {
-            _showWithTitleOnly = newValue
-            UserDefaults.standard.set(newValue, forKey: "bookList_showWithTitleOnly")
+            sortKey = newValue.key
+            sortAscending = newValue.ascending
         }
     }
 
@@ -74,7 +71,7 @@ class BookViewModel: ObservableObject {
             // Apply sorting
             result.sort { book1, book2 in
                 var result: ComparisonResult
-                switch sort.key {
+                switch sortKey {
                 case .title:
                     result = book1.bookTitle.localizedCaseInsensitiveCompare(book2.bookTitle)
                 case .highlightCount:
@@ -94,7 +91,7 @@ class BookViewModel: ObservableObject {
                 }
 
                 // Apply ascending/descending order
-                return sort.ascending ? (result == .orderedAscending) : (result == .orderedDescending)
+                return sortAscending ? (result == .orderedAscending) : (result == .orderedDescending)
             }
 
             return result
@@ -106,6 +103,14 @@ class BookViewModel: ObservableObject {
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
+
+        // Load initial values from UserDefaults
+        if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
+           let sortKey = BookListSortKey(rawValue: savedSortKey) {
+            self.sortKey = sortKey
+        }
+        self.sortAscending = UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
+        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
 
         subscribeSyncStatusNotifications()
     }

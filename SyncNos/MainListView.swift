@@ -54,7 +54,7 @@ struct MainListView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             // Sort options submenu
-                            Picker("排序方式", selection: $viewModel.sort.key) {
+                            Picker("排序方式", selection: $viewModel.sortKey) {
                                 ForEach(BookListSortKey.allCases, id: \.self) { key in
                                     Text(key.displayName).tag(key)
                                 }
@@ -62,10 +62,7 @@ struct MainListView: View {
 
                             Divider()
 
-                            Toggle("升序", isOn: $viewModel.sort.ascending)
-                                .onChange(of: viewModel.sort.ascending) { _ in
-                                    // This will trigger the displayBooks computation
-                                }
+                            Toggle("升序", isOn: $viewModel.sortAscending)
 
                             Divider()
 
