@@ -14,18 +14,15 @@ class BookViewModel: ObservableObject {
     @Published var syncedBookIds: Set<String> = []
 
     // Sorting and filtering state
-    @AppStorage("bookList_sort_key") private var savedSortKey: String = BookListSortKey.title.rawValue
-    @AppStorage("bookList_sort_ascending") private var savedSortAscending: Bool = true
-    @AppStorage("bookList_showWithTitleOnly") private var savedShowWithTitleOnly: Bool = true
-
     private var _sort: BookListSort?
     private var _showWithTitleOnly: Bool?
 
     var sort: BookListSort {
         get {
             if _sort == nil {
-                if let sortKey = BookListSortKey(rawValue: savedSortKey) {
-                    _sort = BookListSort(key: sortKey, ascending: savedSortAscending)
+                if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
+                   let sortKey = BookListSortKey(rawValue: savedSortKey) {
+                    _sort = BookListSort(key: sortKey, ascending: UserDefaults.standard.bool(forKey: "bookList_sort_ascending"))
                 } else {
                     _sort = BookListSort(key: .title, ascending: true)
                 }
@@ -34,21 +31,21 @@ class BookViewModel: ObservableObject {
         }
         set {
             _sort = newValue
-            savedSortKey = newValue.key.rawValue
-            savedSortAscending = newValue.ascending
+            UserDefaults.standard.set(newValue.key.rawValue, forKey: "bookList_sort_key")
+            UserDefaults.standard.set(newValue.ascending, forKey: "bookList_sort_ascending")
         }
     }
 
     var showWithTitleOnly: Bool {
         get {
             if _showWithTitleOnly == nil {
-                _showWithTitleOnly = savedShowWithTitleOnly
+                _showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
             }
             return _showWithTitleOnly!
         }
         set {
             _showWithTitleOnly = newValue
-            savedShowWithTitleOnly = newValue
+            UserDefaults.standard.set(newValue, forKey: "bookList_showWithTitleOnly")
         }
     }
 
@@ -83,8 +80,8 @@ class BookViewModel: ObservableObject {
                 case .highlightCount:
                     result = book1.highlightCount < book2.highlightCount ? .orderedAscending : .orderedDescending
                 case .lastSync:
-                    let time1 = SyncTimestampStore.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
-                    let time2 = SyncTimestampStore.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
+                    let time1 = SyncTimestampStore.shared.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
+                    let time2 = SyncTimestampStore.shared.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
                     result = time1 < time2 ? .orderedAscending : .orderedDescending
                 case .lastEdited:
                     let time1 = book1.modifiedAt ?? Date.distantPast
