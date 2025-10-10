@@ -9,26 +9,10 @@ class AppleBookDetailViewModel: ObservableObject {
     @Published var syncProgressText: String?
     @Published var isSyncing: Bool = false
 
-    // Sorting and filtering state for highlights
-    private var _order: HighlightOrder?
-    private var _noteFilter: NoteFilter?
-    private var _selectedStyles: Set<Int>?
-
-    var order: HighlightOrder {
-        get {
-            if _order == nil {
-                if let savedOrderRaw = UserDefaults.standard.string(forKey: "detail_sort_key"),
-                   let order = HighlightOrder(rawValue: savedOrderRaw) {
-                    _order = order
-                } else {
-                    _order = .createdDesc
-                }
-            }
-            return _order!
-        }
-        set {
-            _order = newValue
-            UserDefaults.standard.set(newValue.rawValue, forKey: "detail_sort_key")
+    // Sorting and filtering state for highlights - Reactive properties with UserDefaults persistence
+    @Published var order: HighlightOrder = .createdDesc {
+        didSet {
+            UserDefaults.standard.set(order.rawValue, forKey: "detail_sort_key")
             // Reload data when order changes
             if currentAssetId != nil {
                 Task {
@@ -38,21 +22,9 @@ class AppleBookDetailViewModel: ObservableObject {
         }
     }
 
-    var noteFilter: NoteFilter {
-        get {
-            if _noteFilter == nil {
-                if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "detail_note_filter"),
-                   let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
-                    _noteFilter = filter
-                } else {
-                    _noteFilter = .any
-                }
-            }
-            return _noteFilter!
-        }
-        set {
-            _noteFilter = newValue
-            UserDefaults.standard.set(newValue.rawValue, forKey: "detail_note_filter")
+    @Published var noteFilter: NoteFilter = .any {
+        didSet {
+            UserDefaults.standard.set(noteFilter.rawValue, forKey: "detail_note_filter")
             // Reload data when note filter changes
             if currentAssetId != nil {
                 Task {
@@ -62,20 +34,9 @@ class AppleBookDetailViewModel: ObservableObject {
         }
     }
 
-    var selectedStyles: Set<Int> {
-        get {
-            if _selectedStyles == nil {
-                if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
-                    _selectedStyles = Set(savedStyles)
-                } else {
-                    _selectedStyles = []
-                }
-            }
-            return _selectedStyles!
-        }
-        set {
-            _selectedStyles = newValue
-            UserDefaults.standard.set(Array(newValue).sorted(), forKey: "detail_selected_styles")
+    @Published var selectedStyles: Set<Int> = [] {
+        didSet {
+            UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "detail_selected_styles")
             // Reload data when selected styles change
             if currentAssetId != nil {
                 Task {
@@ -100,6 +61,19 @@ class AppleBookDetailViewModel: ObservableObject {
          syncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService) {
         self.databaseService = databaseService
         self.syncService = syncService
+
+        // Load initial values from UserDefaults
+        if let savedOrderRaw = UserDefaults.standard.string(forKey: "detail_sort_key"),
+           let order = HighlightOrder(rawValue: savedOrderRaw) {
+            self.order = order
+        }
+        if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "detail_note_filter"),
+           let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
+            self.noteFilter = filter
+        }
+        if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
+            self.selectedStyles = Set(savedStyles)
+        }
     }
     
     deinit {
