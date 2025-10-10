@@ -168,22 +168,18 @@ struct AppleBookDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     // Sort options submenu
-                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                        Picker("Sort by", selection: $viewModel.order) {
-                            ForEach(HighlightOrder.allCases, id: \.self) { order in
-                                Text(order.displayName).tag(order)
-                            }
+                    Picker("Sort", selection: $viewModel.order) {
+                        ForEach(HighlightOrder.allCases, id: \.self) { order in
+                            Text(order.displayName).tag(order)
                         }
                     }
 
                     Divider()
 
                     // Note filter options
-                    Menu("Notes", systemImage: "note.text") {
-                        Picker("Note filter", selection: $viewModel.noteFilter) {
-                            ForEach(NoteFilter.allCases, id: \.self) { filter in
-                                Text(filter.displayName).tag(filter)
-                            }
+                    Picker("Note filter", selection: $viewModel.noteFilter) {
+                        ForEach(NoteFilter.allCases, id: \.self) { filter in
+                            Text(filter.displayName).tag(filter)
                         }
                     }
 
