@@ -10,10 +10,6 @@ class AppleBookDetailViewModel: ObservableObject {
     @Published var isSyncing: Bool = false
 
     // Sorting and filtering state for highlights
-    @AppStorage("detail_sort_key") private var savedOrder: String = HighlightOrder.createdDesc.rawValue
-    @AppStorage("detail_note_filter") private var savedNoteFilter: String = NoteFilter.any.rawValue
-    @AppStorage("detail_selected_styles") private var savedSelectedStyles: [Int] = []
-
     private var _order: HighlightOrder?
     private var _noteFilter: NoteFilter?
     private var _selectedStyles: Set<Int>?
@@ -21,7 +17,8 @@ class AppleBookDetailViewModel: ObservableObject {
     var order: HighlightOrder {
         get {
             if _order == nil {
-                if let order = HighlightOrder(rawValue: savedOrder) {
+                if let savedOrderRaw = UserDefaults.standard.string(forKey: "detail_sort_key"),
+                   let order = HighlightOrder(rawValue: savedOrderRaw) {
                     _order = order
                 } else {
                     _order = .createdDesc
@@ -31,7 +28,7 @@ class AppleBookDetailViewModel: ObservableObject {
         }
         set {
             _order = newValue
-            savedOrder = newValue.rawValue
+            UserDefaults.standard.set(newValue.rawValue, forKey: "detail_sort_key")
             // Reload data when order changes
             if currentAssetId != nil {
                 Task {
@@ -44,7 +41,8 @@ class AppleBookDetailViewModel: ObservableObject {
     var noteFilter: NoteFilter {
         get {
             if _noteFilter == nil {
-                if let filter = NoteFilter(rawValue: savedNoteFilter) {
+                if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "detail_note_filter"),
+                   let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
                     _noteFilter = filter
                 } else {
                     _noteFilter = .any
@@ -54,7 +52,7 @@ class AppleBookDetailViewModel: ObservableObject {
         }
         set {
             _noteFilter = newValue
-            savedNoteFilter = newValue.rawValue
+            UserDefaults.standard.set(newValue.rawValue, forKey: "detail_note_filter")
             // Reload data when note filter changes
             if currentAssetId != nil {
                 Task {
@@ -67,13 +65,17 @@ class AppleBookDetailViewModel: ObservableObject {
     var selectedStyles: Set<Int> {
         get {
             if _selectedStyles == nil {
-                _selectedStyles = Set(savedSelectedStyles)
+                if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
+                    _selectedStyles = Set(savedStyles)
+                } else {
+                    _selectedStyles = []
+                }
             }
             return _selectedStyles!
         }
         set {
             _selectedStyles = newValue
-            savedSelectedStyles = Array(newValue).sorted()
+            UserDefaults.standard.set(Array(newValue).sorted(), forKey: "detail_selected_styles")
             // Reload data when selected styles change
             if currentAssetId != nil {
                 Task {
