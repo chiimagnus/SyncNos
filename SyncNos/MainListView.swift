@@ -54,20 +54,18 @@ struct MainListView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             // Sort options submenu
-                            Menu("排序", systemImage: "arrow.up.arrow.down") {
-                                Picker("排序方式", selection: $viewModel.sort.key) {
-                                    ForEach(BookListSortKey.allCases, id: \.self) { key in
-                                        Text(key.displayName).tag(key)
-                                    }
+                            Picker("排序方式", selection: $viewModel.sort.key) {
+                                ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                    Text(key.displayName).tag(key)
                                 }
-
-                                Divider()
-
-                                Toggle("升序", isOn: $viewModel.sort.ascending)
-                                    .onChange(of: viewModel.sort.ascending) { _ in
-                                        // This will trigger the displayBooks computation
-                                    }
                             }
+
+                            Divider()
+
+                            Toggle("升序", isOn: $viewModel.sort.ascending)
+                                .onChange(of: viewModel.sort.ascending) { _ in
+                                    // This will trigger the displayBooks computation
+                                }
 
                             Divider()
 
