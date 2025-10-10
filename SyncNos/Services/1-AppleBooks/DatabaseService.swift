@@ -42,6 +42,15 @@ class DatabaseService: DatabaseServiceProtocol {
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow] {
         return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since)
     }
+
+    // New methods for filtering and sorting
+    func fetchHighlightStatsByAsset(db: OpaquePointer) throws -> [AssetHighlightStats] {
+        return try queryService.fetchHighlightStatsByAsset(db: db)
+    }
+
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow] {
+        return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since, order: order, noteFilter: noteFilter, styles: styles)
+    }
     
     // MARK: - Filter Methods
     func matches(book: BookRow, filters: Filters) -> Bool {

@@ -18,7 +18,7 @@ struct AppleBooksListView: View {
                         .multilineTextAlignment(.center)
                         .padding()
                 }
-            } else if viewModel.books.isEmpty {
+            } else if viewModel.displayBooks.isEmpty {
                 VStack {
                     Image(systemName: "books.vertical")
                         .foregroundColor(.secondary)
@@ -31,7 +31,7 @@ struct AppleBooksListView: View {
                 }
             } else {
                 List(selection: $selectedBookId) {
-                    ForEach(viewModel.books, id: \.bookId) { book in
+                    ForEach(viewModel.displayBooks, id: \.bookId) { book in
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(book.bookTitle).font(.headline)
@@ -95,9 +95,9 @@ struct AppleBooksListView: View {
                 await viewModel.loadBooks()
             }
         }
-        .onChange(of: viewModel.books) { books in
+        .onChange(of: viewModel.displayBooks) { displayBooks in
             if selectedBookId == nil {
-                selectedBookId = books.first?.bookId
+                selectedBookId = displayBooks.first?.bookId
             }
         }
     }
