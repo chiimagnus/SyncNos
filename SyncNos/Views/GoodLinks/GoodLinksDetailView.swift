@@ -9,222 +9,240 @@ struct GoodLinksDetailView: View {
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var frozenLayoutWidth: CGFloat? = nil
-    
+    @State private var showingSyncError = false
+    @State private var syncErrorMessage = ""
 
     var body: some View {
-        SyncAlertWrapper(syncMessage: viewModel.syncMessage, errorMessage: viewModel.errorMessage) {
-            Group {
-                if let linkId = selectedLinkId, !linkId.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
-                            if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                                // 文章信息卡片 - 使用统一卡片
-                                InfoHeaderCardView(
-                                    title: link.title?.isEmpty == false ? link.title! : link.url,
-                                    subtitle: link.author,
-                                    overrideWidth: frozenLayoutWidth
-                                ) {
-                                    // trailing 区域留空（可后续加分享/打开按钮）
-                                } content: {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        // 收藏与标签
-                                        HStack(spacing: 8) {
-                                            if link.starred {
-                                                Label("Favorited", systemImage: "star.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.yellow)
-                                            }
-                                            let tagsText = link.tagsFormatted
-                                            if !tagsText.isEmpty {
-                                                Label(tagsText, systemImage: "tag")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                    .lineLimit(1)
-                                            }
+        Group {
+            if let linkId = selectedLinkId, !linkId.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                            // 文章信息卡片 - 使用统一卡片
+                            InfoHeaderCardView(
+                                title: link.title?.isEmpty == false ? link.title! : link.url,
+                                subtitle: link.author,
+                                overrideWidth: frozenLayoutWidth
+                            ) {
+                                // trailing 区域留空（可后续加分享/打开按钮）
+                            } content: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    // 收藏与标签
+                                    HStack(spacing: 8) {
+                                        if link.starred {
+                                            Label("Favorited", systemImage: "star.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.yellow)
                                         }
-                                        // URL 与原始URL
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "link")
+                                        let tagsText = link.tagsFormatted
+                                        if !tagsText.isEmpty {
+                                            Label(tagsText, systemImage: "tag")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
-                                            Text("URL")
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    // URL 与原始URL
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "link")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("URL")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .fontWeight(.medium)
+                                        Text(link.url)
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                            .textSelection(.enabled)
+                                            .lineLimit(3)                                        
+                                    }
+
+                                    if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.turn.up.left")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Text("Original URL")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                                 .fontWeight(.medium)
-                                            Text(link.url)
+                                            Text(originalURL)
                                                 .font(.caption)
                                                 .foregroundColor(.blue)
                                                 .textSelection(.enabled)
-                                                .lineLimit(3)                                        
+                                                .lineLimit(2)
                                         }
+                                    }
 
-                                        if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
+                                    // 摘要
+                                    if let summary = link.summary, !summary.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
                                             HStack(spacing: 6) {
-                                                Image(systemName: "arrow.turn.up.left")
+                                                Image(systemName: "doc.text")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
-                                                Text("Original URL")
+                                                Text("Summary")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                                     .fontWeight(.medium)
-                                                Text(originalURL)
+                                            }
+                                            Text(summary)
+                                                .font(.body)
+                                                .foregroundColor(.primary)
+                                                .textSelection(.enabled)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .padding(.top, 4)
+                                    }
+
+                                    Divider()
+
+                                    // 时间与统计
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 16) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Added")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Text(formatDate(link.addedAt))
                                                     .font(.caption)
-                                                    .foregroundColor(.blue)
-                                                    .textSelection(.enabled)
-                                                    .lineLimit(2)
                                             }
-                                        }
-
-                                        // 摘要
-                                        if let summary = link.summary, !summary.isEmpty {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "doc.text")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                    Text("Summary")
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                        .fontWeight(.medium)
-                                                }
-                                                Text(summary)
-                                                    .font(.body)
-                                                    .foregroundColor(.primary)
-                                                    .textSelection(.enabled)
-                                                    .fixedSize(horizontal: false, vertical: true)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Modified")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Text(formatDate(link.modifiedAt))
+                                                    .font(.caption)
                                             }
-                                            .padding(.top, 4)
-                                        }
-
-                                        Divider()
-
-                                        // 时间与统计
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            HStack(spacing: 16) {
+                                            if link.readAt > 0 {
                                                 VStack(alignment: .leading, spacing: 2) {
-                                                    Text("Added")
+                                                    Text("Read")
                                                         .font(.caption2)
                                                         .foregroundColor(.secondary)
-                                                    Text(dateString(fromUnix: link.addedAt))
+                                                    Text(formatDate(link.readAt))
                                                         .font(.caption)
-                                                }
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text("Modified")
-                                                        .font(.caption2)
-                                                        .foregroundColor(.secondary)
-                                                    Text(dateString(fromUnix: link.modifiedAt))
-                                                        .font(.caption)
-                                                }
-                                                if link.readAt > 0 {
-                                                    VStack(alignment: .leading, spacing: 2) {
-                                                        Text("Read")
-                                                            .font(.caption2)
-                                                            .foregroundColor(.secondary)
-                                                        Text(dateString(fromUnix: link.readAt))
-                                                            .font(.caption)
-                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                            
-                            // 全文内容
-                            if let contentRow = viewModel.contentByLinkId[linkId], 
-                            let fullText = contentRow.content, 
-                            !fullText.isEmpty {
-                                ArticleContentCardView(
-                                    wordCount: contentRow.wordCount,
-                                    contentText: fullText,
-                                    overrideWidth: frozenLayoutWidth,
-                                    measuredWidth: $measuredLayoutWidth
-                                )
-                            }
+                        }
+                        
+                        // 全文内容
+                        if let contentRow = viewModel.contentByLinkId[linkId], 
+                           let fullText = contentRow.content, 
+                           !fullText.isEmpty {
+                            ArticleContentCardView(
+                                wordCount: contentRow.wordCount,
+                                contentText: fullText,
+                                overrideWidth: frozenLayoutWidth,
+                                measuredWidth: $measuredLayoutWidth
+                            )
+                        }
 
-                            // 高亮列表
-                            let highlights = viewModel.highlightsByLinkId[linkId] ?? []
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "quote.opening")
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
+                        // 高亮列表
+                        let highlights = viewModel.highlightsByLinkId[linkId] ?? []
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "quote.opening")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
 
-                                    Text("Highlights")
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
+                                Text("Highlights")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
 
-                                    if !highlights.isEmpty {
-                                        Text("\(highlights.count) item\(highlights.count == 1 ? "" : "s")")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                }
-                                .padding(.bottom, 4)
-                                
                                 if !highlights.isEmpty {
-                                    WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
-                                        ForEach(highlights, id: \.id) { item in
-                                            HighlightCardView(
-                                                colorMark: item.color.map { goodLinksColor(for: $0) } ?? Color.gray.opacity(0.5),
-                                                content: item.content,
-                                                note: item.note,
-                                                createdDate: dateString(fromUnix: item.time),
-                                                modifiedDate: nil
-                                            )
-                                        }
-                                    }
-                                    .overlay(
-                                        GeometryReader { proxy in
-                                            let w = proxy.size.width
-                                            Color.clear
-                                                .onAppear { measuredLayoutWidth = w }
-                                                .onChange(of: w) { newValue in
-                                                    measuredLayoutWidth = newValue
-                                                }
-                                        }
-                                    )
-                                } else {
-                                    // 空状态提示
-                                    Text("No highlights for this link yet")
-                                        .font(.body)
+                                    Text("\(highlights.count) item\(highlights.count == 1 ? "" : "s")")
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
-                                        .padding()
                                 }
+                                
+                                Spacer()
+                            }
+                            .padding(.bottom, 4)
+                            
+                            if !highlights.isEmpty {
+                                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                                    ForEach(highlights, id: \.id) { item in
+                                        HighlightCardView(
+                                            colorMark: item.color.map { highlightColor(for: $0) } ?? Color.gray.opacity(0.5),
+                                            content: item.content,
+                                            note: item.note,
+                                            createdDate: formatDate(item.time),
+                                            modifiedDate: nil
+                                        )
+                                    }
+                                }
+                                .overlay(
+                                    GeometryReader { proxy in
+                                        let w = proxy.size.width
+                                        Color.clear
+                                            .onAppear { measuredLayoutWidth = w }
+                                            .onChange(of: w) { newValue in
+                                                measuredLayoutWidth = newValue
+                                            }
+                                    }
+                                )
+                            } else {
+                                // 空状态提示
+                                Text("No highlights for this link yet")
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .padding()
                             }
                         }
-                        // .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
                     }
-                    .onAppear {
-                        print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
-                        Task {
-                            await viewModel.loadHighlights(for: linkId)
-                            await viewModel.loadContent(for: linkId)
-                        }
+                    // .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                }
+                .onAppear {
+                    print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
+                    Task {
+                        await viewModel.loadHighlights(for: linkId)
+                        await viewModel.loadContent(for: linkId)
                     }
-                    .onChange(of: linkId) { newLinkId in
-                        print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
-                        Task {
-                            await viewModel.loadHighlights(for: newLinkId)
-                            await viewModel.loadContent(for: newLinkId)
-                        }
+                }
+                .onChange(of: linkId) { newLinkId in
+                    print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
+                    Task {
+                        await viewModel.loadHighlights(for: newLinkId)
+                        await viewModel.loadContent(for: newLinkId)
                     }
-                    .resizeFreeze(isResizing: $isLiveResizing, measuredWidth: $measuredLayoutWidth, frozenWidth: $frozenLayoutWidth)
-                    .navigationTitle("GoodLinks")
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                                SharedSyncToolbar(
-                                    isSyncing: viewModel.isSyncing,
-                                    progressText: viewModel.syncProgressText,
-                                    label: "Sync",
-                                    help: "Sync highlights to Notion"
-                                ) {
-                                    Task { viewModel.syncSmart(link: link) }
+                }
+                .background(LiveResizeObserver(isResizing: $isLiveResizing))
+                .onChange(of: isLiveResizing) { resizing in
+                    if resizing {
+                        frozenLayoutWidth = measuredLayoutWidth
+                    } else {
+                        frozenLayoutWidth = nil
+                    }
+                }
+                .navigationTitle("GoodLinks")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        if viewModel.isSyncing {
+                            HStack(spacing: 8) {
+                                ProgressView().scaleEffect(0.8)
+                                if let progress = viewModel.syncProgressText {
+                                    Text(progress).font(.caption)
+                                } else {
+                                    Text("Syncing...").font(.caption)
                                 }
+                            }
+                            .help("Sync in progress")
+                        } else {
+                            if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                                Button {
+                                    Task {
+                                        viewModel.syncSmart(link: link)
+                                    }
+                                } label: {
+                                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                                }
+                                .help("Sync highlights to Notion")
                             }
                         }
                     }
@@ -246,6 +264,53 @@ struct GoodLinksDetailView: View {
             if let linkId = selectedLinkId, let link = viewModel.links.first(where: { $0.id == linkId }) {
                 Task { viewModel.syncSmart(link: link) }
             }
+        }
+        .alert("Sync Error", isPresented: $showingSyncError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(syncErrorMessage)
+        }
+        .onChange(of: viewModel.syncMessage) { newMessage in
+            if let message = newMessage {
+                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
+                if !isSuccess {
+                    syncErrorMessage = message
+                    showingSyncError = true
+                }
+            }
+        }
+        .onChange(of: viewModel.errorMessage) { newError in
+            if let err = newError, !err.isEmpty {
+                syncErrorMessage = err
+                showingSyncError = true
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// 格式化时间戳为可读日期
+    private func formatDate(_ timestamp: Double) -> String {
+        guard timestamp > 0 else { return "Unknown" }
+        let date = Date(timeIntervalSince1970: timestamp)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.string(from: date)
+    }
+    
+    /// 根据GoodLinks的颜色值返回对应的SwiftUI Color
+    /// GoodLinks使用整数表示颜色，具体映射可能需要根据实际情况调整
+    private func highlightColor(for colorCode: Int) -> Color {
+        switch colorCode {
+        case 0: return .yellow
+        case 1: return .green
+        case 2: return .blue
+        case 3: return .red
+        case 4: return .purple
+        default: return .mint
         }
     }
 }
