@@ -13,12 +13,16 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
     }
 
     func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow] {
+        return try fetchHighlightPage(assetId: assetId, limit: limit, offset: offset, since: since, order: nil, noteFilter: nil, styles: nil)
+    }
+
+    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow] {
         guard let db = handle else {
             let error = "Database session is closed"
             logger.error("Error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since)
+        return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since, order: order, noteFilter: noteFilter, styles: styles)
     }
 
     func fetchHighlightCountsByAsset() throws -> [AssetHighlightCount] {
@@ -28,6 +32,15 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
             throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
         }
         return try queryService.fetchHighlightCountsByAsset(db: db)
+    }
+
+    func fetchHighlightStatsByAsset() throws -> [AssetHighlightStats] {
+        guard let db = handle else {
+            let error = "Database session is closed"
+            logger.error("Error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+        return try queryService.fetchHighlightStatsByAsset(db: db)
     }
 
     func fetchBooks(assetIds: [String]) throws -> [BookRow] {

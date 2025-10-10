@@ -13,6 +13,45 @@ class BookViewModel: ObservableObject {
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
 
+    // Sorting and filtering state
+    @AppStorage("bookList_sort_key") private var savedSortKey: String = BookListSortKey.title.rawValue
+    @AppStorage("bookList_sort_ascending") private var savedSortAscending: Bool = true
+    @AppStorage("bookList_showWithTitleOnly") private var savedShowWithTitleOnly: Bool = true
+
+    private var _sort: BookListSort?
+    private var _showWithTitleOnly: Bool?
+
+    var sort: BookListSort {
+        get {
+            if _sort == nil {
+                if let sortKey = BookListSortKey(rawValue: savedSortKey) {
+                    _sort = BookListSort(key: sortKey, ascending: savedSortAscending)
+                } else {
+                    _sort = BookListSort(key: .title, ascending: true)
+                }
+            }
+            return _sort!
+        }
+        set {
+            _sort = newValue
+            savedSortKey = newValue.key.rawValue
+            savedSortAscending = newValue.ascending
+        }
+    }
+
+    var showWithTitleOnly: Bool {
+        get {
+            if _showWithTitleOnly == nil {
+                _showWithTitleOnly = savedShowWithTitleOnly
+            }
+            return _showWithTitleOnly!
+        }
+        set {
+            _showWithTitleOnly = newValue
+            savedShowWithTitleOnly = newValue
+        }
+    }
+
     private let databaseService: DatabaseServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
@@ -25,11 +64,52 @@ class BookViewModel: ObservableObject {
     var annotationDatabasePath: String? { annotationDBPath }
     var booksDatabasePath: String? { booksDBPath }
 
+    // Computed property for displaying books based on sort and filter
+    var displayBooks: [BookListItem] {
+        get {
+            var result = books
+
+            // Apply title filter
+            if showWithTitleOnly {
+                result = result.filter { $0.hasTitle }
+            }
+
+            // Apply sorting
+            result.sort { book1, book2 in
+                var result: ComparisonResult
+                switch sort.key {
+                case .title:
+                    result = book1.bookTitle.localizedCaseInsensitiveCompare(book2.bookTitle)
+                case .highlightCount:
+                    result = book1.highlightCount < book2.highlightCount ? .orderedAscending : .orderedDescending
+                case .lastSync:
+                    let time1 = SyncTimestampStore.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
+                    let time2 = SyncTimestampStore.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
+                    result = time1 < time2 ? .orderedAscending : .orderedDescending
+                case .lastEdited:
+                    let time1 = book1.modifiedAt ?? Date.distantPast
+                    let time2 = book2.modifiedAt ?? Date.distantPast
+                    result = time1 < time2 ? .orderedAscending : .orderedDescending
+                case .created:
+                    let time1 = book1.createdAt ?? Date.distantPast
+                    let time2 = book2.createdAt ?? Date.distantPast
+                    result = time1 < time2 ? .orderedAscending : .orderedDescending
+                }
+
+                // Apply ascending/descending order
+                return sort.ascending ? (result == .orderedAscending) : (result == .orderedDescending)
+            }
+
+            return result
+        }
+    }
+
     // MARK: - Initialization
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
+
         subscribeSyncStatusNotifications()
     }
     
@@ -98,20 +178,20 @@ class BookViewModel: ObservableObject {
             return []
         }
         logger.info("Books data root: \(root)")
-        
+
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
         let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
-        
+
         logger.debug("Looking for annotation DB in: \(annotationDir)")
         logger.debug("Looking for books DB in: \(booksDir)")
-        
+
         guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
             let error = "Annotation DB not found under \(annotationDir)"
             logger.error("Error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
         }
         logger.info("Found annotation DB: \(annotationDB)")
-        
+
         guard let booksDB = latestSQLiteFile(in: booksDir) else {
             let error = "Books DB not found under \(booksDir)"
             logger.error("Error: \(error)")
@@ -120,36 +200,55 @@ class BookViewModel: ObservableObject {
         logger.info("Found books DB: \(booksDB)")
         self.annotationDBPath = annotationDB
         self.booksDBPath = booksDB
-        
+
         // 使用只读会话封装连接生命周期
         let annotationSession = try databaseService.makeReadOnlySession(dbPath: annotationDB)
         defer { annotationSession.close(); logger.debug("Closed annotation DB session") }
         let booksSession = try databaseService.makeReadOnlySession(dbPath: booksDB)
         defer { booksSession.close(); logger.debug("Closed books DB session") }
-        
-        // 获取每本书的高亮数量（而不是把全部高亮读入内存）
-        let counts = try annotationSession.fetchHighlightCountsByAsset()
-        let assetIds = counts.map { $0.assetId }.sorted()
+
+        // 获取每本书的高亮统计信息（包括计数、创建时间、修改时间）
+        let stats = try annotationSession.fetchHighlightStatsByAsset()
+        let assetIds = stats.map { $0.assetId }.sorted()
         logger.info("Found \(assetIds.count) assets with highlights")
+
+        // 获取书籍信息（标题/作者）
         let books = try booksSession.fetchBooks(assetIds: assetIds)
-        logger.debug("Fetched \(books.count) books for counts")
-        
-        var countIndex: [String: Int] = [:]
-        for c in counts {
-            countIndex[c.assetId] = c.count
+        logger.debug("Fetched \(books.count) books from library DB")
+
+        // 创建书籍ID到书籍信息的映射
+        var bookInfoMap: [String: BookRow] = [:]
+        for book in books {
+            bookInfoMap[book.assetId] = book
         }
-        
+
+        // 创建书籍列表，包括有信息的和无信息的（缺失标题的）
         var result: [BookListItem] = []
-        for b in books {
-            let cnt = countIndex[b.assetId] ?? 0
-            result.append(BookListItem(bookId: b.assetId,
-                                       authorName: b.author,
-                                       bookTitle: b.title,
-                                       ibooksURL: "ibooks://assetid/\(b.assetId)",
-                                       highlightCount: cnt))
+        for stat in stats {
+            let bookInfo = bookInfoMap[stat.assetId]
+            let hasTitle = bookInfo != nil && !(bookInfo?.title ?? "").isEmpty
+            let bookTitle = bookInfo?.title ?? ""
+            let authorName = bookInfo?.author ?? ""
+
+            let bookItem = BookListItem(
+                bookId: stat.assetId,
+                authorName: authorName,
+                bookTitle: bookTitle,
+                ibooksURL: "ibooks://assetid/\(stat.assetId)",
+                highlightCount: stat.count,
+                createdAt: stat.minCreationDate,
+                modifiedAt: stat.maxModifiedDate,
+                hasTitle: hasTitle
+            )
+            result.append(bookItem)
         }
+
+        // 对于 BKLibrary 缺失的 assetId 也创建 BookListItem（如计划所述）
+        // 这 should have been handled already, but let's ensure we don't miss anything
+        // by including any asset IDs that were in the original counts but not in the stats
+
         let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
-        logger.info("Built list with \(sorted.count) books (counts only)")
+        logger.info("Built list with \(sorted.count) books (with stats and metadata)")
         return sorted
     }
     
