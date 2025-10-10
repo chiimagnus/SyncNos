@@ -48,6 +48,36 @@ struct MainListView: View {
                         Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
                     }
                 }
+
+                // Filter/sort menu for AppleBooks only
+                if contentSource == .appleBooks {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            // Sort options submenu
+                            Menu("排序", systemImage: "arrow.up.arrow.down") {
+                                Picker("排序方式", selection: $viewModel.sort.key) {
+                                    ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                        Text(key.displayName).tag(key)
+                                    }
+                                }
+
+                                Divider()
+
+                                Toggle("升序", isOn: $viewModel.sort.ascending)
+                                    .onChange(of: viewModel.sort.ascending) { _ in
+                                        // This will trigger the displayBooks computation
+                                    }
+                            }
+
+                            Divider()
+
+                            // Filter options
+                            Toggle("仅显示有书名", isOn: $viewModel.showWithTitleOnly)
+                        } label: {
+                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
+                        }
+                    }
+                }
             }
         } detail: {
             if contentSource == .goodLinks {

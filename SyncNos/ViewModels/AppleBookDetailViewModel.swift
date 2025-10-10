@@ -9,6 +9,80 @@ class AppleBookDetailViewModel: ObservableObject {
     @Published var syncProgressText: String?
     @Published var isSyncing: Bool = false
 
+    // Sorting and filtering state for highlights
+    @AppStorage("detail_sort_key") private var savedOrder: String = HighlightOrder.createdDesc.rawValue
+    @AppStorage("detail_note_filter") private var savedNoteFilter: String = NoteFilter.any.rawValue
+    @AppStorage("detail_selected_styles") private var savedSelectedStyles: [Int] = []
+
+    private var _order: HighlightOrder?
+    private var _noteFilter: NoteFilter?
+    private var _selectedStyles: Set<Int>?
+
+    var order: HighlightOrder {
+        get {
+            if _order == nil {
+                if let order = HighlightOrder(rawValue: savedOrder) {
+                    _order = order
+                } else {
+                    _order = .createdDesc
+                }
+            }
+            return _order!
+        }
+        set {
+            _order = newValue
+            savedOrder = newValue.rawValue
+            // Reload data when order changes
+            if currentAssetId != nil {
+                Task {
+                    await loadFirstPage()
+                }
+            }
+        }
+    }
+
+    var noteFilter: NoteFilter {
+        get {
+            if _noteFilter == nil {
+                if let filter = NoteFilter(rawValue: savedNoteFilter) {
+                    _noteFilter = filter
+                } else {
+                    _noteFilter = .any
+                }
+            }
+            return _noteFilter!
+        }
+        set {
+            _noteFilter = newValue
+            savedNoteFilter = newValue.rawValue
+            // Reload data when note filter changes
+            if currentAssetId != nil {
+                Task {
+                    await loadFirstPage()
+                }
+            }
+        }
+    }
+
+    var selectedStyles: Set<Int> {
+        get {
+            if _selectedStyles == nil {
+                _selectedStyles = Set(savedSelectedStyles)
+            }
+            return _selectedStyles!
+        }
+        set {
+            _selectedStyles = newValue
+            savedSelectedStyles = Array(newValue).sorted()
+            // Reload data when selected styles change
+            if currentAssetId != nil {
+                Task {
+                    await loadFirstPage()
+                }
+            }
+        }
+    }
+
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
@@ -48,12 +122,22 @@ class AppleBookDetailViewModel: ObservableObject {
                 return
             }
         }
-        await loadNextPage(dbPath: dbPath, assetId: assetId)
+        await loadFirstPage()
+    }
+
+    private func loadFirstPage() async {
+        if let assetId = currentAssetId {
+            await loadNextPage(dbPath: nil, assetId: assetId, reset: true)
+        }
     }
     
     func loadNextPage(dbPath: String?, assetId: String) async {
+        await loadNextPage(dbPath: dbPath, assetId: assetId, reset: false)
+    }
+
+    private func loadNextPage(dbPath: String?, assetId: String, reset: Bool) async {
         if isLoadingPage { return }
-        if highlights.count >= expectedTotalCount { return }
+        if !reset && highlights.count >= expectedTotalCount { return }
 
         if currentAssetId == nil {
             currentAssetId = assetId
@@ -68,14 +152,25 @@ class AppleBookDetailViewModel: ObservableObject {
         }
         guard let s = session, let asset = currentAssetId else { return }
 
+        if reset {
+            highlights = []
+            currentOffset = 0
+        }
+
         isLoadingPage = true
 
         do {
-            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil)
+            // Convert Set to Array for the API call
+            let stylesArray = selectedStyles.isEmpty ? nil : Array(selectedStyles)
+            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil, order: order, noteFilter: noteFilter, styles: stylesArray)
             let page = rows.map { r in
                 Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
             }
-            highlights.append(contentsOf: page)
+            if reset {
+                highlights = page
+            } else {
+                highlights.append(contentsOf: page)
+            }
             currentOffset += page.count
         } catch {
             errorMessage = error.localizedDescription

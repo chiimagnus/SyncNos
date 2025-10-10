@@ -144,20 +144,102 @@ class DatabaseQueryService {
         return results
     }
 
-    /// 拉取指定图书的一页高亮（MVP: 使用 LIMIT/OFFSET 分页）
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
-        return try fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: nil)
+    /// 按图书(assetId)聚合高亮统计信息，包括计数、创建时间、修改时间等，用于列表排序
+    func fetchHighlightStatsByAsset(db: OpaquePointer) throws -> [AssetHighlightStats] {
+        // 首先获取表结构信息，动态构建查询语句
+        let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, tableInfoSQL, -1, &stmt, nil) == SQLITE_OK else {
+            let error = "Prepare failed: table info (stats)"
+            logger.error("Database error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+
+        // 收集可用的列名
+        var availableColumns: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let columnName = sqlite3_column_text(stmt, 1) {
+                availableColumns.insert(String(cString: columnName))
+            }
+        }
+        sqlite3_finalize(stmt)
+
+        // 根据可用列构建查询语句
+        let hasCreationDate = availableColumns.contains("ZANNOTATIONCREATIONDATE")
+        let hasModificationDate = availableColumns.contains("ZANNOTATIONMODIFICATIONDATE")
+
+        var selectColumns: [String] = ["ZANNOTATIONASSETID", "COUNT(*) as c"]
+        if hasCreationDate {
+            selectColumns.append("MIN(ZANNOTATIONCREATIONDATE) as minC")
+        } else {
+            selectColumns.append("NULL as minC")
+        }
+        if hasModificationDate {
+            selectColumns.append("MAX(ZANNOTATIONMODIFICATIONDATE) as maxM")
+        } else {
+            selectColumns.append("NULL as maxM")
+        }
+
+        let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL GROUP BY ZANNOTATIONASSETID;"
+        logger.debug("Executing query: \(sql)")
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            let error = "Prepare failed: stats by asset"
+            logger.error("Database error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        var results: [AssetHighlightStats] = []
+        var count = 0
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let c0 = sqlite3_column_text(stmt, 0) else { continue }
+            let assetId = String(cString: c0)
+            let c = Int(sqlite3_column_int64(stmt, 1))
+
+            var minCreationDate: Date? = nil
+            var maxModifiedDate: Date? = nil
+
+            // 获取创建时间
+            let creationDateIndex = 2  // Always at index 2 since it's the 3rd column
+            if hasCreationDate && sqlite3_column_type(stmt, Int32(creationDateIndex)) != SQLITE_NULL {
+                let timeInterval = sqlite3_column_double(stmt, Int32(creationDateIndex))
+                minCreationDate = Date(timeIntervalSinceReferenceDate: timeInterval)
+            }
+
+            // 获取修改时间
+            let modificationDateIndex = hasCreationDate ? 3 : 2  // If hasCreationDate, it's at index 3, otherwise still index 2 (the NULL)
+            if hasModificationDate && sqlite3_column_type(stmt, Int32(modificationDateIndex)) != SQLITE_NULL {
+                let timeInterval = sqlite3_column_double(stmt, Int32(modificationDateIndex))
+                maxModifiedDate = Date(timeIntervalSinceReferenceDate: timeInterval)
+            }
+
+            results.append(AssetHighlightStats(assetId: assetId, count: c, minCreationDate: minCreationDate, maxModifiedDate: maxModifiedDate))
+            count += 1
+        }
+
+        logger.debug("Fetched stats for \(count) assets")
+        return results
     }
 
-    /// 拉取指定图书的一页高亮（支持增量同步）
+    /// 拉取指定图书的一页高亮（MVP: 使用 LIMIT/OFFSET 分页）
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
+        return try fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: nil, order: nil, noteFilter: nil, styles: nil)
+    }
+
+    /// 拉取指定图书的一页高亮（支持增量同步、排序和过滤）
     /// - Parameters:
     ///   - db: 数据库连接
     ///   - assetId: 书籍ID
     ///   - limit: 限制数量
     ///   - offset: 偏移量
     ///   - since: 只获取此时间之后修改的高亮（用于增量同步）
+    ///   - order: 排序方式
+    ///   - noteFilter: 笔记过滤
+    ///   - styles: 颜色过滤
     /// - Returns: 高亮数组
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil) throws -> [HighlightRow] {
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil, order: HighlightOrder? = nil, noteFilter: NoteFilter? = nil, styles: [Int]? = nil) throws -> [HighlightRow] {
         // Discover available columns for dynamic select and optional fields
         let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
         var stmt: OpaquePointer?
@@ -209,12 +291,44 @@ class DatabaseQueryService {
             whereConditions.append("ZANNOTATIONMODIFICATIONDATE >= ?")
         }
 
+        // 添加笔记过滤条件
+        if let noteFilter = noteFilter {
+            switch noteFilter {
+            case .hasNote:
+                whereConditions.append("ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) <> ''")
+            case .noNote:
+                whereConditions.append("(ZANNOTATIONNOTE IS NULL OR TRIM(ZANNOTATIONNOTE) = '')")
+            case .any:
+                break // No filter needed
+            }
+        }
+
+        // 添加颜色过滤条件
+        if let styles = styles, !styles.isEmpty {
+            let placeholders = Array(repeating: "?", count: styles.count).joined(separator: ",")
+            whereConditions.append("ZANNOTATIONSTYLE IN (\(placeholders))")
+        }
+
+        // 确定排序方式
         let orderBy: String
-        if availableColumns.contains("ZANNOTATIONCREATIONDATE") {
-            orderBy = "ZANNOTATIONCREATIONDATE DESC"
+        if let order = order {
+            switch order {
+            case .createdAsc:
+                orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE ASC" : "rowid ASC"
+            case .createdDesc:
+                orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE DESC" : "rowid DESC"
+            case .modifiedAsc:
+                orderBy = availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE ASC" : "rowid ASC"
+            case .modifiedDesc:
+                orderBy = availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE DESC" : "rowid DESC"
+            case .locationAsc:
+                orderBy = "CAST(ZANNOTATIONLOCATION AS INTEGER) ASC"
+            case .locationDesc:
+                orderBy = "CAST(ZANNOTATIONLOCATION AS INTEGER) DESC"
+            }
         } else {
-            // Fallback: use ROWID to get stable order
-            orderBy = "rowid DESC"
+            // 默认按创建时间降序排列
+            orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE DESC" : "rowid DESC"
         }
 
         let whereClause = whereConditions.joined(separator: " AND ")
@@ -239,6 +353,14 @@ class DatabaseQueryService {
             let timeInterval = since!.timeIntervalSinceReferenceDate
             sqlite3_bind_double(stmt, Int32(bindIndex), timeInterval)
             bindIndex += 1
+        }
+
+        // 绑定颜色过滤参数
+        if let styles = styles, !styles.isEmpty {
+            for style in styles {
+                sqlite3_bind_int64(stmt, Int32(bindIndex), Int64(style))
+                bindIndex += 1
+            }
         }
 
         sqlite3_bind_int64(stmt, Int32(bindIndex), Int64(limit))

@@ -74,6 +74,9 @@ protocol DatabaseServiceProtocol {
     func matches(book: BookRow, filters: Filters) -> Bool
     // High-level helper: create a read-only session that manages connection lifecycle
     func makeReadOnlySession(dbPath: String) throws -> DatabaseReadOnlySessionProtocol
+    // New methods for filtering and sorting
+    func fetchHighlightStatsByAsset(db: OpaquePointer) throws -> [AssetHighlightStats]
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
 }
 
 // MARK: - Database Read-Only Session Protocol
@@ -83,6 +86,9 @@ protocol DatabaseReadOnlySessionProtocol: AnyObject {
     func fetchHighlightCountsByAsset() throws -> [AssetHighlightCount]
     func fetchBooks(assetIds: [String]) throws -> [BookRow]
     func close()
+    // New methods for filtering and sorting
+    func fetchHighlightStatsByAsset() throws -> [AssetHighlightStats]
+    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
 }
 
 // MARK: - Bookmark Store Protocol
