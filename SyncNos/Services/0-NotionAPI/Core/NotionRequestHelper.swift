@@ -66,6 +66,23 @@ class NotionRequestHelper {
         return URLComponents(url: makeURL(path: path), resolvingAgainstBaseURL: false)!
     }
 
+    /// List children of a page/block with pagination support.
+    /// Returns tuple of (results array, nextCursor)
+    func listPageChildren(pageId: String, startCursor: String?, pageSize: Int = 100) async throws -> (results: [[String: Any]], nextCursor: String?) {
+        var comps = makeURLComponents(path: "blocks/\(pageId)/children")
+        var queryItems: [URLQueryItem] = [URLQueryItem(name: "page_size", value: "\(pageSize)")]
+        if let start = startCursor { queryItems.append(URLQueryItem(name: "start_cursor", value: start)) }
+        comps.queryItems = queryItems
+        guard let url = comps.url else {
+            throw NSError(domain: "NotionService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL for listing page children"])
+        }
+        let data = try await performRequest(url: url, method: "GET", body: nil)
+        let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] ?? [:]
+        let results = json["results"] as? [[String: Any]] ?? []
+        let next = json["next_cursor"] as? String
+        return (results, next)
+    }
+
     // MARK: - Error helpers
     /// Returns true when the given error represents a Notion 'database missing' or similar error
     /// (e.g. 400/404/410) produced by `performRequest`.
