@@ -45,6 +45,7 @@ class BookViewModel: ObservableObject {
     private let databaseService: DatabaseServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
+    private let syncTimestampStore: SyncTimestampStoreProtocol
     private var dbRootOverride: String?
     private var annotationDBPath: String?
     private var booksDBPath: String?
@@ -73,8 +74,8 @@ class BookViewModel: ObservableObject {
                 case .highlightCount:
                     result = book1.highlightCount < book2.highlightCount ? .orderedAscending : .orderedDescending
                 case .lastSync:
-                    let time1 = SyncTimestampStore.shared.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
-                    let time2 = SyncTimestampStore.shared.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
+                    let time1 = syncTimestampStore.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
+                    let time2 = syncTimestampStore.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
                     result = time1 < time2 ? .orderedAscending : .orderedDescending
                 case .lastEdited:
                     let time1 = book1.modifiedAt ?? Date.distantPast
@@ -96,9 +97,11 @@ class BookViewModel: ObservableObject {
 
     // MARK: - Initialization
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore) {
+         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore,
+         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
+        self.syncTimestampStore = syncTimestampStore
 
         // Load initial values from UserDefaults
         if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
