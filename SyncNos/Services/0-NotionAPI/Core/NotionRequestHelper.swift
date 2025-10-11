@@ -14,12 +14,25 @@ class NotionRequestHelper {
         self.logger = logger
     }
 
+    // Provide the effective notion version: prefer configStore override, fall back to injected notionVersion
+    private var effectiveNotionVersion: String {
+        if let cfg = (configStore as? NotionConfigStore)?.notionApiVersion, !cfg.isEmpty {
+            return cfg
+        }
+        return notionVersion
+    }
+
     // MARK: - Request Helpers
     private func addCommonHeaders(to request: inout URLRequest, key: String) {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        // Newer Notion API prefers `Notion-Version` header for versioning, but also supports
+        // the `Notion-Version` being omitted in favour of the current default. We keep it
+        // configurable via `notionVersion`.
+        request.setValue(effectiveNotionVersion, forHTTPHeaderField: "Notion-Version")
+        // Recommended to set a user-agent to help Notion identify the client
+        request.setValue("SyncNos/1.0 (macOS)", forHTTPHeaderField: "User-Agent")
     }
 
     // Centralized request sender to remove duplicated URLSession/request boilerplate

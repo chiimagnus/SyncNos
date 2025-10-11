@@ -6,6 +6,7 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
+    private let apiVersionKey = "NOTION_API_VERSION"
     // 说明：以下 UserDefaults 键用于持久化 Notion 配置与缓存的数据库映射
     // - NOTION_SYNC_MODE：同步模式（"single" | "perBook"），默认 "single"
     // - PER_BOOK_DB_ID_{assetId}：每本书独立数据库的 id 映射
@@ -37,6 +38,24 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
                 userDefaults.removeObject(forKey: pageIdKey)
             }
         }
+    }
+
+    // Notion API version (allow overriding the default in configuration)
+    var notionApiVersion: String? {
+        get { userDefaults.string(forKey: apiVersionKey) }
+        set {
+            if let value = newValue, !value.isEmpty {
+                userDefaults.set(value, forKey: apiVersionKey)
+            } else {
+                userDefaults.removeObject(forKey: apiVersionKey)
+            }
+        }
+    }
+
+    // Conform to protocol requirement
+    var notionApiVersionProtocol: String? {
+        get { notionApiVersion }
+        set { notionApiVersion = newValue }
     }
     
     var isConfigured: Bool {
