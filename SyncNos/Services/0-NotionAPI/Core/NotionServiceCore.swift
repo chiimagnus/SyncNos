@@ -5,7 +5,9 @@ class NotionServiceCore {
     let configStore: NotionConfigStoreProtocol
     let logger = DIContainer.shared.loggerService
     let apiBase = URL(string: "https://api.notion.com/v1/")!
-    let notionVersion = "2022-06-28"
+    // Updated to latest Notion API version (2025-09-01)
+    // See: https://developers.notion.com/ (API versioning)
+    let notionVersion = "2025-09-01"
 
     // ISO8601 formatter for highlight timestamps when syncing to Notion
     static let isoDateFormatter: ISO8601DateFormatter = {
