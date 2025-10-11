@@ -34,11 +34,7 @@ class NotionRequestHelper {
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
-        
-        // 使用并发限流器包裹网络请求
-        let (data, response) = try await DIContainer.shared.notionSyncLimiter.withPermit {
-            try await URLSession.shared.data(for: request)
-        }
+        let (data, response) = try await URLSession.shared.data(for: request)
         try Self.ensureSuccess(response: response, data: data)
         return data
     }
@@ -54,11 +50,7 @@ class NotionRequestHelper {
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
-        
-        // 使用并发限流器包裹网络请求
-        let (data, response) = try await DIContainer.shared.notionSyncLimiter.withPermit {
-            try await URLSession.shared.data(for: request)
-        }
+        let (data, response) = try await URLSession.shared.data(for: request)
         try Self.ensureSuccess(response: response, data: data)
         return data
     }
