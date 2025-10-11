@@ -15,6 +15,20 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var syncingLinkIds: Set<String> = []
     @Published var syncedLinkIds: Set<String> = []
 
+    // Sorting & Filtering state (persisted)
+    @Published var sortKey: GoodLinksSortKey = .modified {
+        didSet { UserDefaults.standard.set(sortKey.rawValue, forKey: "goodlinks_sort_key") }
+    }
+    @Published var sortAscending: Bool = false {
+        didSet { UserDefaults.standard.set(sortAscending, forKey: "goodlinks_sort_ascending") }
+    }
+    @Published var showStarredOnly: Bool = false {
+        didSet { UserDefaults.standard.set(showStarredOnly, forKey: "goodlinks_show_starred_only") }
+    }
+    @Published var searchText: String = "" {
+        didSet { UserDefaults.standard.set(searchText, forKey: "goodlinks_search_text") }
+    }
+
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
@@ -27,6 +41,11 @@ final class GoodLinksViewModel: ObservableObject {
         self.syncService = syncService
         self.logger = logger
         subscribeSyncStatusNotifications()
+
+        if let raw = UserDefaults.standard.string(forKey: "goodlinks_sort_key"), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
+        self.sortAscending = UserDefaults.standard.object(forKey: "goodlinks_sort_ascending") as? Bool ?? false
+        self.showStarredOnly = UserDefaults.standard.object(forKey: "goodlinks_show_starred_only") as? Bool ?? false
+        self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
     }
 
     func loadRecentLinks(limit: Int = 0) async {
@@ -45,6 +64,45 @@ final class GoodLinksViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    // Derived collection for UI
+    var displayLinks: [GoodLinksLinkRow] {
+        var arr = links
+        if showStarredOnly {
+            arr = arr.filter { $0.starred }
+        }
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let key = searchText.lowercased()
+            arr = arr.filter { link in
+                let inTitle = (link.title ?? "").lowercased().contains(key)
+                let inAuthor = (link.author ?? "").lowercased().contains(key)
+                let inURL = link.url.lowercased().contains(key)
+                let inTags = link.tagsFormatted.lowercased().contains(key)
+                return inTitle || inAuthor || inURL || inTags
+            }
+        }
+        arr.sort { a, b in
+            let cmp: ComparisonResult
+            switch sortKey {
+            case .title:
+                let t1 = (a.title?.isEmpty == false ? a.title! : a.url)
+                let t2 = (b.title?.isEmpty == false ? b.title! : b.url)
+                cmp = t1.localizedCaseInsensitiveCompare(t2)
+            case .highlightCount:
+                let c1 = a.highlightTotal ?? 0
+                let c2 = b.highlightTotal ?? 0
+                cmp = c1 == c2 ? .orderedSame : (c1 < c2 ? .orderedAscending : .orderedDescending)
+            case .added:
+                cmp = a.addedAt == b.addedAt ? .orderedSame : (a.addedAt < b.addedAt ? .orderedAscending : .orderedDescending)
+            case .modified:
+                cmp = a.modifiedAt == b.modifiedAt ? .orderedSame : (a.modifiedAt < b.modifiedAt ? .orderedAscending : .orderedDescending)
+            case .read:
+                cmp = a.readAt == b.readAt ? .orderedSame : (a.readAt < b.readAt ? .orderedAscending : .orderedDescending)
+            }
+            return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+        }
+        return arr
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
