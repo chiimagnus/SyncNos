@@ -147,9 +147,6 @@ protocol NotionServiceProtocol: AnyObject {
     // Helpers added for consolidated DB management
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
-    // New data_source_id methods (2025-09-03+)
-    func ensureDataSourceIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
-    func ensurePerBookDataSource(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
