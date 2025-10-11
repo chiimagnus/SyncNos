@@ -64,6 +64,29 @@ struct AppleBooksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            // Sort options submenu
+                            Picker("排序方式", selection: $viewModel.sortKey) {
+                                ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                    Text(key.displayName).tag(key)
+                                }
+                            }
+
+                            Divider()
+
+                            Toggle("升序", isOn: $viewModel.sortAscending)
+
+                            Divider()
+
+                            // Filter options
+                            Toggle("仅显示有书名", isOn: $viewModel.showWithTitleOnly)
+                        } label: {
+                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
+                        }
+                    }
+                }
             }
         }
         .onAppear {
