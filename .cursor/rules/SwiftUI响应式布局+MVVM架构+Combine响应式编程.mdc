@@ -8,15 +8,15 @@ alwaysApply: true
 
 ### 核心技术栈
 - **架构模式**: MVVM (Model-View-ViewModel)
-- **UI框架**: SwiftUI (iOS17+, iPadOS17+, macOS14+)
+- **UI框架**: SwiftUI (iOS17+, iPadOS17+, macOS13+)
 - **响应式编程**: Combine
 - **数据持久化**: SwiftData
-- **语言版本**: Swift 6.1+
+- **语言版本**: Swift 6.1+、Swift5+
 
 ### 平台支持
 - iOS 17.0+
 - iPadOS 17.0+
-- macOS 14.0+
+- macOS 13.0+
 
 ## MVVM架构规范
 
@@ -29,32 +29,31 @@ alwaysApply: true
 
 ### 2. ViewModels (视图模型)
 - 处理业务逻辑，管理状态
-- 使用 `@Observable` 宏 (iOS17+/macOS14+) 或 `@ObservableObject`
-- 包含 `@Published` 属性用于状态管理
+- 二选一：使用 `ObservableObject` + `@Published`，或使用 `@Observable`；不要混用
+- 使用 `ObservableObject` 时使用 `@Published`；使用 `@Observable` 时不要使用 `@Published`
 - 不直接引用 SwiftUI Views
 - **禁止使用单例模式** (`shared` 静态实例)
-- 使用 Combine 进行响应式数据流处理
+- 使用 Combine 进行响应式数据流处理（需 `$property`/`assign(to:)` 时，选择 `ObservableObject` + `@Published`）
 - 状态管理与UI逻辑，处理用户交互
 - 数据绑定，向View提供格式化数据
 - 调用Service执行业务操作，订阅数据变化（Combine）
 - 错误与加载状态统一处理
 
 #### ViewModel响应式编程规范
-- **必须使用@Published**: 所有需要触发UI更新的属性都必须标记为`@Published`
-- **计算属性响应式**: 依赖`@Published`属性的计算属性会自动响应变化
-- **Combine订阅**: 使用`$property.sink`或`@Published`属性的组合来处理复杂数据流
+- 使用 `ObservableObject` 时：用 `@Published` 标记需要触发 UI 的属性
+- 使用 `@Observable` 时：不要使用 `@Published`，直接声明属性；双向绑定用 `@Bindable`
+- **计算属性响应式**: 计算属性应自动响应上游可观察属性变化
+- Combine 订阅（仅 `ObservableObject`）：使用 `$property.sink` 或 `assign(to:)` 等
 - **避免手动通知**: 不要手动调用`objectWillChange.send()`，依赖`@Published`自动机制
 - 使用 Combine 操作符 (map, filter, debounce, etc.) 处理复杂数据流
 - 使用 `Set<AnyCancellable>` 管理订阅生命周期
 
 ### 3. Views (视图)
 - 纯UI展示，不包含业务逻辑
-- SwiftUI开发，@ObservedObject/@StateObject绑定ViewModel
-- 通过 `@State` 和 `@Bindable` 管理状态
+- 绑定策略：`ObservableObject` 用 `@StateObject/@ObservedObject`；`@Observable` 用 `@State`/`@Environment` + `@Bindable`（不要混用）
 - 组件化、可复用、条件渲染（加载/错误/空数据）
 - iOS设备适配（iPhone/iPad）、暗黑模式、主题切换
 - 响应式布局，支持不同屏幕尺寸
-- 使用 ScrollView 优化长内容展示
 
 ## 代码组织与职责分离
 
@@ -82,7 +81,7 @@ Feature/
 
 ### 推荐方式
 1. **按需创建**：每个视图创建独立的ViewModel实例
-2. **依赖注入**：通过 `.environment()` 传递ViewModel
+2. **依赖注入**：通过 `.environmentObject()`（ObservableObject）或 `.environment(...)`（@Observable）传递 ViewModel
 3. **生命周期管理**：
    - 短期：使用 `@State` 管理
    - 长期：使用 `@Environment` 或 `@StateObject`
@@ -94,21 +93,20 @@ Feature/
 
 ### 正确示例
 ```swift
-// ✅ 正确：按需创建
-@State private var viewModel = ItemViewModel()
+// ✅ 正确：按需创建（ObservableObject）
+@StateObject private var viewModel = ItemViewModel()
 
-// ✅ 正确：依赖注入
-.environment(ItemViewModel())
+// ✅ 正确：依赖注入（ObservableObject）
+.environmentObject(viewModel)
 
-// ✅ 正确：响应式ViewModel
-@Observable
-class ItemViewModel {
+// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
+class ItemViewModel: ObservableObject {
     @Published var items: [Item] = []
     @Published var filteredItems: [DisplayItem] = []
     @Published var isLoading = false
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
     init() {
         $items
             .map { items in
@@ -129,24 +127,23 @@ class ItemViewModel {
 
 ### 状态管理
 ```swift
-// ✅ 正确：按需创建ViewModel
+// ✅ 正确：按需创建ViewModel（ObservableObject）
 struct FeatureView: View {
-    @State private var viewModel = FeatureViewModel()
-    
+    @StateObject private var viewModel = FeatureViewModel()
+
     var body: some View {
         ContentView()
-            .environment(viewModel)
+            .environmentObject(viewModel)
     }
 }
 
-// ✅ 正确：响应式ViewModel
-@Observable
-class FeatureViewModel {
+// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
+class FeatureViewModel: ObservableObject {
     @Published var items: [Item] = []
     @Published var isLoading = false
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
     init() {
         $items
             .map { items in
@@ -228,10 +225,6 @@ class MyViewModel: ObservableObject {
 - ❌ 使用固定像素值布局
 - ❌ 复杂的 GeometryReader 嵌套
 - ❌ 忽略内存管理 (忘记调用 store(in:))
-- ❌ 在View中直接处理业务逻辑
-- ❌ 在Model中包含业务逻辑
-- ❌ 在ViewModel中直接操作UI
-- ❌ 在View中直接访问数据库
 
 ## 性能优化
 
@@ -244,39 +237,3 @@ class MyViewModel: ObservableObject {
 - 避免在 `body` 中进行复杂计算
 - 使用 `@State` 和 `@Binding` 优化状态传递
 - 合理使用 `@ViewBuilder` 优化视图构建
-
-## 测试与维护
-
-### 可测试性
-- ViewModel 应该易于单元测试
-- 业务逻辑与 UI 逻辑分离
-- 使用依赖注入便于测试
-
-### 代码质量
-- 遵循 Swift 命名规范
-- 保持函数和类的职责单一
-- 添加必要的注释和文档
-- 代码规范、类型安全、健壮性、详细注释
-- **在增加函数func前先看看其他文件是否已有相关实现**
-- 遵循Apple HIG，界面直观易用，专注iOS体验
-
-## 技术栈
-
-### 核心技术
-- **SwiftUI**：iOS UI开发
-- **Combine**：响应式数据流
-- **SwiftData**：本地数据持久化
-- **URLSession**：网络通信
-- **PhotosUI**：系统照片选择器
-- **AVFoundation**：媒体处理
-- **CoreGraphics**：图像处理
-
-## 参考资料
-
-- [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
-- [SwiftUI 官方文档](https://developer.apple.com/documentation/swiftui)
-- [Combine 官方文档](https://developer.apple.com/documentation/combine)
-- [SwiftData 官方文档](https://developer.apple.com/documentation/swiftdata)
-- [PhotosUI 官方文档](https://developer.apple.com/documentation/photosui)
-- [AVFoundation 官方文档](https://developer.apple.com/documentation/avfoundation)
-- [URLSession 官方文档](https://developer.apple.com/documentation/foundation/urlsession)
