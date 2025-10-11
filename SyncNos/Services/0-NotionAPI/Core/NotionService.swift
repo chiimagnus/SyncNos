@@ -152,17 +152,19 @@ final class NotionService: NotionServiceProtocol {
             }
         }
 
-        // 3) list child databases under the page
-        do {
-            let candidates = try await databaseOps.findDatabasesUnderPage(parentPageId: parentPageId)
-            if let first = candidates.first {
-                core.configStore.setDatabaseId(first, forSource: sourceKey)
-                core.configStore.setDatabaseId(first, forPage: parentPageId)
-                return first
+        // 3) list child databases under the page (guarded by feature flag)
+        if NotionSyncConfig.enablePageChildLookup {
+            do {
+                let candidates = try await databaseOps.findDatabasesUnderPage(parentPageId: parentPageId)
+                if let first = candidates.first {
+                    core.configStore.setDatabaseId(first, forSource: sourceKey)
+                    core.configStore.setDatabaseId(first, forPage: parentPageId)
+                    return first
+                }
+            } catch {
+                // If listing children fails (permissions, 404), fall back to search below
+                core.logger.warning("Failed to list page children: \(error.localizedDescription)")
             }
-        } catch {
-            // If listing children fails (permissions, 404), fall back to search below
-            core.logger.warning("Failed to list page children: \(error.localizedDescription)")
         }
 
         // 4) fallback to search-by-title (existing behavior)
