@@ -5,7 +5,6 @@ import Combine
 struct MainListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
-    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = true
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
 
     private var contentSource: ContentSource {
@@ -91,26 +90,20 @@ struct MainListView: View {
             }
         }
         .background {
-            if backgroundImageEnabled {
-                // 使用彩虹渐变背景
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.red.opacity(0.3),
-                        Color.orange.opacity(0.3),
-                        Color.yellow.opacity(0.3),
-                        Color.green.opacity(0.3),
-                        Color.blue.opacity(0.3),
-                        Color.purple.opacity(0.3),
-                        Color.pink.opacity(0.3)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            } else {
-                // 使用默认的背景
-                Color.clear
-            }
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.red.opacity(0.3),
+                    Color.orange.opacity(0.3),
+                    Color.yellow.opacity(0.3),
+                    Color.green.opacity(0.3),
+                    Color.blue.opacity(0.3),
+                    Color.purple.opacity(0.3),
+                    Color.pink.opacity(0.3)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
         
