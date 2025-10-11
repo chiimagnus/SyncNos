@@ -91,6 +91,31 @@ class NotionRequestHelper {
         return URLComponents(url: makeURL(path: path), resolvingAgainstBaseURL: false)!
     }
 
+    // MARK: - Discovery helpers
+    /// Returns array of data_source ids for a given database id by calling
+    /// GET /v1/databases/{database_id} and extracting the `data_sources` array.
+    func getDataSourceIds(forDatabaseId databaseId: String) async throws -> [String] {
+        let data = try await performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
+        let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] ?? [:]
+        let dss = json["data_sources"] as? [[String: Any]] ?? []
+        let ids = dss.compactMap { $0["id"] as? String }
+        if ids.isEmpty {
+            logger.warning("No data_sources found for database \(databaseId)")
+        } else {
+            logger.debug("Discovered data_source ids for database \(databaseId): \(ids)")
+        }
+        return ids
+    }
+
+    /// Returns the primary data_source id for a given database id. Throws if none found.
+    func getPrimaryDataSourceId(forDatabaseId databaseId: String) async throws -> String {
+        let ids = try await getDataSourceIds(forDatabaseId: databaseId)
+        guard let first = ids.first else {
+            throw NSError(domain: "NotionService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data_source found for database \(databaseId)"])
+        }
+        return first
+    }
+
     /// List children of a page/block with pagination support.
     /// Returns tuple of (results array, nextCursor)
     func listPageChildren(pageId: String, startCursor: String?, pageSize: Int = 100) async throws -> (results: [[String: Any]], nextCursor: String?) {

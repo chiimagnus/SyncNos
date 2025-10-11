@@ -33,6 +33,15 @@ final class NotionService: NotionServiceProtocol {
             pageOperations: pageOps,
             logger: core.logger
         )
+
+        // Run one-time migration from stored database_id -> data_source_id in background
+        Task {
+            if let concreteStore = configStore as? NotionConfigStore {
+                core.logger.info("Starting Notion config migration to data_source ids")
+                await concreteStore.migrateDatabaseIdsToDataSourceIds(requestHelper: requestHelper)
+                core.logger.info("Notion config migration completed")
+            }
+        }
     }
     // Lightweight exists check by querying minimal page
     func databaseExists(databaseId: String) async -> Bool {

@@ -63,11 +63,21 @@ class NotionHighlightOperations {
             let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
             let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
 
+            // Prefer data_source_id parent when creating pages
+            var parent: [String: Any] = ["type": "database_id", "database_id": databaseId]
+            if !databaseId.hasPrefix("ds_") {
+                do {
+                    let ds = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+                    parent = ["type": "data_source_id", "data_source_id": ds]
+                } catch {
+                    logger.warning("Failed to resolve data_source for database \(databaseId): \(error.localizedDescription). Using database_id as parent.")
+                }
+            } else {
+                parent = ["type": "data_source_id", "data_source_id": databaseId]
+            }
+
             let body: [String: Any] = [
-                "parent": [
-                    "type": "database_id",
-                    "database_id": databaseId
-                ],
+                "parent": parent,
                 "properties": properties,
                 "children": children
             ]

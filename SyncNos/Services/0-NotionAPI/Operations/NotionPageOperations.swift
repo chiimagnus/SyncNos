@@ -34,8 +34,21 @@ class NotionPageOperations {
                 ]
             ]]
         }
+        // Prefer to use data_source_id as parent if possible
+        var parent: [String: Any] = ["type": "database_id", "database_id": databaseId]
+        if !databaseId.hasPrefix("ds_") {
+            do {
+                let ds = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+                parent = ["type": "data_source_id", "data_source_id": ds]
+            } catch {
+                logger?.warning("Failed to resolve data_source for database \(databaseId): \(error.localizedDescription). Using database_id as parent.")
+            }
+        } else {
+            parent = ["type": "data_source_id", "data_source_id": databaseId]
+        }
+
         let body: [String: Any] = [
-            "parent": ["type": "database_id", "database_id": databaseId],
+            "parent": parent,
             "properties": properties,
             "children": children
         ]
