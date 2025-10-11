@@ -1,5 +1,6 @@
 import Foundation
 import StoreKit
+import Combine
 
 @MainActor
 final class IAPViewModel: ObservableObject {
@@ -9,14 +10,20 @@ final class IAPViewModel: ObservableObject {
     @Published var isProUnlocked: Bool = DIContainer.shared.iapService.isProUnlocked
 
     private let iap: IAPServiceProtocol
+    private var cancellables: Set<AnyCancellable> = []
 
     init(iap: IAPServiceProtocol = DIContainer.shared.iapService) {
         self.iap = iap
-        NotificationCenter.default.addObserver(forName: IAPService.statusChangedNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+
+        NotificationCenter.default
+            .publisher(for: IAPService.statusChangedNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+                }
             }
-        }
+            .store(in: &cancellables)
     }
 
     func onAppear() {
