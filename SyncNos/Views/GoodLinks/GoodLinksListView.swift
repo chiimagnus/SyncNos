@@ -32,7 +32,7 @@ struct GoodLinksListView: View {
                 // .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(selection: $selectedLinkId) {
-                    ForEach(viewModel.links, id: \.id) { link in
+                    ForEach(viewModel.displayLinks, id: \.id) { link in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
@@ -81,6 +81,37 @@ struct GoodLinksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Picker("排序", selection: $viewModel.sortKey) {
+                                ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
+                                    Text(key.displayName).tag(key)
+                                }
+                            }
+
+                            Divider()
+
+                            Toggle("升序", isOn: $viewModel.sortAscending)
+
+                            Divider()
+
+                            Toggle("仅收藏", isOn: $viewModel.showStarredOnly)
+
+                            Divider()
+
+                            // 轻量搜索（标题/作者/URL/标签）
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("搜索").font(.caption).foregroundColor(.secondary)
+                                TextField("关键词", text: $viewModel.searchText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth: 180)
+                            }
+                        } label: {
+                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
+                        }
+                    }
+                }
             }
         }
         .onAppear {
