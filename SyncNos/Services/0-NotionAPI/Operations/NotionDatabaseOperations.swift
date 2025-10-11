@@ -17,8 +17,9 @@ class NotionDatabaseOperations {
             if let meta = try? JSONDecoder().decode(DatabaseMeta.self, from: data), (meta.in_trash ?? false) {
                 return false
             }
-            // Some trashed databases still return 200 on GET; verify by running a minimal query
-            _ = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: ["page_size": 1])
+            // Some trashed databases still return 200 on GET; verify by running a minimal query using data_source_id
+            let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+            _ = try await requestHelper.performRequest(path: "data_sources/\(dataSourceId)/query", method: "POST", body: ["page_size": 1])
             return true
         } catch {
             return false

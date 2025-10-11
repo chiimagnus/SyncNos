@@ -134,7 +134,8 @@ final class NotionService: NotionServiceProtocol {
 
     // MARK: - Ensure / find-or-create helpers (consolidated)
     /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
-    func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+    /// Returns the data_source_id for the database (2025-09-03+)
+    func ensureDataSourceIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
         // 1) check per-source cache
         if let saved = core.configStore.databaseIdForSource(sourceKey) {
             if await databaseOps.databaseExists(databaseId: saved) { return saved }
@@ -181,8 +182,8 @@ final class NotionService: NotionServiceProtocol {
         return created.id
     }
 
-    /// Ensure a per-book database exists (used by per-book strategy). Returns (id, recreated)
-    func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
+    /// Ensure a per-book database exists (used by per-book strategy). Returns (data_source_id, recreated)
+    func ensurePerBookDataSource(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
         if let saved = core.configStore.databaseIdForBook(assetId: assetId) {
             if await databaseOps.databaseExists(databaseId: saved) { return (saved, false) }
             core.configStore.setDatabaseId(nil, forBook: assetId)
@@ -190,5 +191,19 @@ final class NotionService: NotionServiceProtocol {
         let db = try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: core.configStore.notionPageId ?? "")
         core.configStore.setDatabaseId(db.id, forBook: assetId)
         return (db.id, true)
+    }
+
+    // MARK: - Backward compatibility wrappers (deprecated)
+    /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
+    /// Returns the data_source_id for the database (2025-09-03+)
+    /// Deprecated: Use ensureDataSourceIdForSource instead
+    func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+        return try await ensureDataSourceIdForSource(title: title, parentPageId: parentPageId, sourceKey: sourceKey)
+    }
+
+    /// Ensure a per-book database exists (used by per-book strategy). Returns (data_source_id, recreated)
+    /// Deprecated: Use ensurePerBookDataSource instead
+    func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
+        return try await ensurePerBookDataSource(bookTitle: bookTitle, author: author, assetId: assetId)
     }
 }
