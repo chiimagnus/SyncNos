@@ -22,6 +22,10 @@ enum NotionSyncConfig {
     // MARK: - Placeholder
     /// 当 per-book 模式下高亮/笔记内容过大时用于占位的文本
     static let placeholderTooLargeText: String = "已跳过：内容过大"
+
+    // MARK: - Feature flags
+    /// 是否启用通过列举 page children 来复用已存在的 child_database（谨慎默认关闭）
+    static let enablePageChildLookup: Bool = false
 }
 
 
