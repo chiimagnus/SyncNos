@@ -46,3 +46,22 @@ struct GoodLinksContentRow: Codable, Equatable {
     let wordCount: Int
     let videoDuration: Int?
 }
+
+// MARK: - Sorting
+enum GoodLinksSortKey: String, CaseIterable {
+    case title = "title"
+    case highlightCount = "highlightCount"
+    case added = "added"
+    case modified = "modified"
+    case read = "read"
+
+    var displayName: String {
+        switch self {
+        case .title: return "标题"
+        case .highlightCount: return "高亮数量"
+        case .added: return "添加时间"
+        case .modified: return "修改时间"
+        case .read: return "阅读时间"
+        }
+    }
+}
