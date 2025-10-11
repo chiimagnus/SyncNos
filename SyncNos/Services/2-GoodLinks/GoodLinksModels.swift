@@ -61,7 +61,7 @@ enum GoodLinksSortKey: String, CaseIterable {
         case .highlightCount: return "高亮数量"
         case .added: return "添加时间"
         case .modified: return "修改时间"
-        case .read: return "阅读时间"
+        case .read: return "上次同步时间"
         }
     }
 }
