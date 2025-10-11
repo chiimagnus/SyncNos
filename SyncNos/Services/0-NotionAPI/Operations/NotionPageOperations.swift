@@ -34,9 +34,8 @@ class NotionPageOperations {
                 ]
             ]]
         }
-        let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
         let body: [String: Any] = [
-            "parent": ["type": "data_source_id", "data_source_id": dataSourceId],
+            "parent": ["type": "database_id", "database_id": databaseId],
             "properties": properties,
             "children": children
         ]

@@ -25,8 +25,7 @@ class NotionQueryOperations {
             ],
             "page_size": 1
         ]
-        let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
-        let data = try await requestHelper.performRequest(path: "data_sources/\(dataSourceId)/query", method: "POST", body: body)
+        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
@@ -39,8 +38,7 @@ class NotionQueryOperations {
             ],
             "page_size": 1
         ]
-        let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
-        let data = try await requestHelper.performRequest(path: "data_sources/\(dataSourceId)/query", method: "POST", body: body)
+        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
