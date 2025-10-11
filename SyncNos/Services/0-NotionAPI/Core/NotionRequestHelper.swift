@@ -34,9 +34,22 @@ class NotionRequestHelper {
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        return data
+
+        // Retry-on-rate-limit (429) with exponential backoff
+        let maxAttempts = 3
+        var attempt = 0
+        var backoffMillis: UInt64 = 500
+        while true {
+            attempt += 1
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
+                try await Task.sleep(nanoseconds: backoffMillis * 1_000_000)
+                backoffMillis *= 2
+                continue
+            }
+            try Self.ensureSuccess(response: response, data: data)
+            return data
+        }
     }
 
     // Overload that accepts a full URL (used for URLComponents-built URLs)
@@ -50,9 +63,21 @@ class NotionRequestHelper {
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try Self.ensureSuccess(response: response, data: data)
-        return data
+        // Retry-on-rate-limit (429) with exponential backoff
+        let maxAttempts = 3
+        var attempt = 0
+        var backoffMillis: UInt64 = 500
+        while true {
+            attempt += 1
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
+                try await Task.sleep(nanoseconds: backoffMillis * 1_000_000)
+                backoffMillis *= 2
+                continue
+            }
+            try Self.ensureSuccess(response: response, data: data)
+            return data
+        }
     }
 
     // MARK: - URL helpers
