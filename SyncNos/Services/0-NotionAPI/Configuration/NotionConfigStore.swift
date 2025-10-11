@@ -13,6 +13,7 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let syncModeKey = "NOTION_SYNC_MODE"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
+    private let perPageDbPrefix = "PER_PAGE_DB_ID_" // + pageId
     
     private init() {}
     
@@ -83,6 +84,21 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
 
     func setDatabaseId(_ id: String?, forSource sourceKey: String) {
         let key = perSourceDbPrefix + sourceKey
+        if let id, !id.isEmpty {
+            userDefaults.set(id, forKey: key)
+        } else {
+            userDefaults.removeObject(forKey: key)
+        }
+    }
+
+    // MARK: - Per-page database mapping
+    func databaseIdForPage(_ pageId: String) -> String? {
+        let key = perPageDbPrefix + pageId
+        return userDefaults.string(forKey: key)
+    }
+
+    func setDatabaseId(_ id: String?, forPage pageId: String) {
+        let key = perPageDbPrefix + pageId
         if let id, !id.isEmpty {
             userDefaults.set(id, forKey: key)
         } else {

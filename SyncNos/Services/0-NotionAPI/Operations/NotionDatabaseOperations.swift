@@ -87,6 +87,22 @@ class NotionDatabaseOperations {
         return try JSONDecoder().decode(NotionDatabase.self, from: data)
     }
 
+    /// Find databases (child_database) directly under a page by enumerating its children.
+    func findDatabasesUnderPage(parentPageId: String) async throws -> [String] {
+        var found: [String] = []
+        var cursor: String? = nil
+        repeat {
+            let (results, next) = try await requestHelper.listPageChildren(pageId: parentPageId, startCursor: cursor)
+            for child in results {
+                if let type = child["type"] as? String, type == "child_database", let id = child["id"] as? String {
+                    found.append(id)
+                }
+            }
+            cursor = next
+        } while cursor != nil
+        return found
+    }
+
     func findDatabaseId(title: String, parentPageId: String) async throws -> String? {
         struct SearchResponse: Decodable {
             struct Parent: Decodable { let type: String?; let page_id: String?; let database_id: String? }
