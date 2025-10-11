@@ -112,8 +112,8 @@ enum BookListSortKey: String, CaseIterable {
         switch self {
         case .title: return "标题"
         case .highlightCount: return "笔记数量"
-        case .lastSync: return "上次同步"
-        case .lastEdited: return "上次编辑"
+        case .lastSync: return "同步时间"
+        case .lastEdited: return "编辑时间"
         case .created: return "创建时间"
         }
     }
