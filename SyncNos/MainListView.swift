@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import Combine
 
 struct MainListView: View {
     @StateObject private var viewModel = BookViewModel()
