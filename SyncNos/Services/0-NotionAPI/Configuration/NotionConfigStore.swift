@@ -51,6 +51,12 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
             }
         }
     }
+
+    // Conform to protocol requirement
+    var notionApiVersionProtocol: String? {
+        get { notionApiVersion }
+        set { notionApiVersion = newValue }
+    }
     
     var isConfigured: Bool {
         return (notionKey?.isEmpty == false) && (notionPageId?.isEmpty == false)

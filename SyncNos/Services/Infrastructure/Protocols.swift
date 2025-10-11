@@ -104,6 +104,8 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
+    // Optional override for Notion API version
+    var notionApiVersion: String? { get set }
     // Generic mapping for future sources (e.g., WeRead/DeDao/GetBiji)
     func databaseIdForSource(_ sourceKey: String) -> String?
     func setDatabaseId(_ id: String?, forSource sourceKey: String)
