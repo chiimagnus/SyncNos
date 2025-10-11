@@ -97,16 +97,6 @@ struct GoodLinksListView: View {
                             Divider()
 
                             Toggle("仅收藏", isOn: $viewModel.showStarredOnly)
-
-                            Divider()
-
-                            // 轻量搜索（标题/作者/URL/标签）
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("搜索").font(.caption).foregroundColor(.secondary)
-                                TextField("关键词", text: $viewModel.searchText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(minWidth: 180)
-                            }
                         } label: {
                             Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
                         }
