@@ -135,18 +135,47 @@ final class NotionService: NotionServiceProtocol {
     // MARK: - Ensure / find-or-create helpers (consolidated)
     /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+        // 1) check per-source cache
         if let saved = core.configStore.databaseIdForSource(sourceKey) {
             if await databaseOps.databaseExists(databaseId: saved) { return saved }
             core.configStore.setDatabaseId(nil, forSource: sourceKey)
         }
 
+        // 2) check per-page cache
+        if let savedPage = core.configStore.databaseIdForPage(parentPageId) {
+            if await databaseOps.databaseExists(databaseId: savedPage) {
+                // mirror into per-source mapping for fast lookup
+                core.configStore.setDatabaseId(savedPage, forSource: sourceKey)
+                return savedPage
+            } else {
+                core.configStore.setDatabaseId(nil, forPage: parentPageId)
+            }
+        }
+
+        // 3) list child databases under the page
+        do {
+            let candidates = try await databaseOps.findDatabasesUnderPage(parentPageId: parentPageId)
+            if let first = candidates.first {
+                core.configStore.setDatabaseId(first, forSource: sourceKey)
+                core.configStore.setDatabaseId(first, forPage: parentPageId)
+                return first
+            }
+        } catch {
+            // If listing children fails (permissions, 404), fall back to search below
+            core.logger.warning("Failed to list page children: \(error.localizedDescription)")
+        }
+
+        // 4) fallback to search-by-title (existing behavior)
         if let found = try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId) {
             core.configStore.setDatabaseId(found, forSource: sourceKey)
+            core.configStore.setDatabaseId(found, forPage: parentPageId)
             return found
         }
 
+        // 5) create new database as last resort
         let created = try await databaseOps.createDatabase(title: title, pageId: parentPageId)
         core.configStore.setDatabaseId(created.id, forSource: sourceKey)
+        core.configStore.setDatabaseId(created.id, forPage: parentPageId)
         return created.id
     }
 
