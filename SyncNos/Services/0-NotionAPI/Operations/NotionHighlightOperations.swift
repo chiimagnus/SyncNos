@@ -63,10 +63,11 @@ class NotionHighlightOperations {
             let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
             let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
 
+            let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
             let body: [String: Any] = [
                 "parent": [
-                    "type": "database_id",
-                    "database_id": databaseId
+                    "type": "data_source_id",
+                    "data_source_id": dataSourceId
                 ],
                 "properties": properties,
                 "children": children
@@ -129,10 +130,11 @@ class NotionHighlightOperations {
     private func createPlaceholderItem(inDatabaseId databaseId: String, bookId: String, bookTitle: String, author: String, highlight: HighlightRow) async throws -> NotionPage {
         let properties = makePlaceholderProperties(bookId: bookId, bookTitle: bookTitle, author: author, h: highlight)
         let children = makePlaceholderChildren(h: highlight, bookId: bookId)
+        let dataSourceId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
         let body: [String: Any] = [
             "parent": [
-                "type": "database_id",
-                "database_id": databaseId
+                "type": "data_source_id",
+                "data_source_id": dataSourceId
             ],
             "properties": properties,
             "children": children
