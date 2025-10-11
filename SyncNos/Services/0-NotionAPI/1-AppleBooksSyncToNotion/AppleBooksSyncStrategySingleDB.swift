@@ -22,7 +22,8 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
 
-        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
+        // Prefer the explicit data_source API when available
+        let databaseId = try await notionService.ensureDataSourceIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
 
         // Ensure book page exists by Asset ID (use unified ensure API)
         let ensuredPage = try await notionService.ensureBookPageInDatabase(

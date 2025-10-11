@@ -33,6 +33,15 @@ final class NotionService: NotionServiceProtocol {
             pageOperations: pageOps,
             logger: core.logger
         )
+
+        // Run one-time migration from stored database_id -> data_source_id in background
+        Task {
+            if let concreteStore = configStore as? NotionConfigStore {
+                core.logger.info("Starting Notion config migration to data_source ids")
+                await concreteStore.migrateDatabaseIdsToDataSourceIds(requestHelper: requestHelper)
+                core.logger.info("Notion config migration completed")
+            }
+        }
     }
     // Lightweight exists check by querying minimal page
     func databaseExists(databaseId: String) async -> Bool {
@@ -179,6 +188,11 @@ final class NotionService: NotionServiceProtocol {
         core.configStore.setDatabaseId(created.id, forSource: sourceKey)
         core.configStore.setDatabaseId(created.id, forPage: parentPageId)
         return created.id
+    }
+
+    // Alias: return data_source id for source. Implementations may return the same id as ensureDatabaseIdForSource
+    func ensureDataSourceIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+        return try await ensureDatabaseIdForSource(title: title, parentPageId: parentPageId, sourceKey: sourceKey)
     }
 
     /// Ensure a per-book database exists (used by per-book strategy). Returns (id, recreated)

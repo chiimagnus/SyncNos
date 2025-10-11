@@ -13,12 +13,26 @@ class NotionDatabaseOperations {
         // Keep behavior: return false when not configured or any non-2xx / error occurs
         struct DatabaseMeta: Decodable { let id: String; let in_trash: Bool? }
         do {
+            if databaseId.hasPrefix("ds_") {
+                // Treat as data_source id and query the data_sources endpoint
+                _ = try await requestHelper.performRequest(path: "data_sources/\(databaseId)/query", method: "POST", body: ["page_size": 1])
+                return true
+            }
+
+            // First try GET /databases/{id} to detect trashed state
             let data = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
             if let meta = try? JSONDecoder().decode(DatabaseMeta.self, from: data), (meta.in_trash ?? false) {
                 return false
             }
-            // Some trashed databases still return 200 on GET; verify by running a minimal query
-            _ = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: ["page_size": 1])
+
+            // Try to discover primary data_source and query it. Fall back to old databases/{id}/query if discovery fails.
+            do {
+                let ds = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+                _ = try await requestHelper.performRequest(path: "data_sources/\(ds)/query", method: "POST", body: ["page_size": 1])
+            } catch {
+                _ = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: ["page_size": 1])
+            }
+
             return true
         } catch {
             return false

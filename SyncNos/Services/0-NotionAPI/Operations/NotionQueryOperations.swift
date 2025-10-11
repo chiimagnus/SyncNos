@@ -25,7 +25,18 @@ class NotionQueryOperations {
             ],
             "page_size": 1
         ]
-        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
+        // New Notion API uses data_sources/{id}/query. We accept a databaseId here
+        // which may already be a data_source id; attempt discovery when needed.
+        var targetId = databaseId
+        if !databaseId.hasPrefix("ds_") {
+            // try to discover primary data_source id
+            do {
+                targetId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+            } catch {
+                logger.warning("Failed to discover data_source for database \(databaseId): \(error.localizedDescription). Falling back to original id.")
+            }
+        }
+        let data = try await requestHelper.performRequest(path: "data_sources/\(targetId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
@@ -38,7 +49,15 @@ class NotionQueryOperations {
             ],
             "page_size": 1
         ]
-        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: body)
+        var targetId = databaseId
+        if !databaseId.hasPrefix("ds_") {
+            do {
+                targetId = try await requestHelper.getPrimaryDataSourceId(forDatabaseId: databaseId)
+            } catch {
+                logger.warning("Failed to discover data_source for database \(databaseId): \(error.localizedDescription). Falling back to original id.")
+            }
+        }
+        let data = try await requestHelper.performRequest(path: "data_sources/\(targetId)/query", method: "POST", body: body)
         let decoded = try JSONDecoder().decode(QueryResponse.self, from: data)
         return decoded.results.first?.id
     }
