@@ -22,6 +22,10 @@ enum NotionSyncConfig {
     // MARK: - Placeholder
     /// 当 per-book 模式下高亮/笔记内容过大时用于占位的文本
     static let placeholderTooLargeText: String = "已跳过：内容过大"
+    
+    // MARK: - Concurrency
+    /// 全局并发同步到 Notion 的最大请求数
+    static let defaultMaxConcurrentSyncs: Int = 10
 }
 
 

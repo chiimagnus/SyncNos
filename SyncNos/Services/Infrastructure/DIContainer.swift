@@ -17,6 +17,7 @@ class DIContainer {
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
+    private var _notionSyncLimiter: NotionSyncConcurrencyLimiter?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -90,6 +91,13 @@ class DIContainer {
         }
         return _syncTimestampStore!
     }
+    
+    var notionSyncLimiter: NotionSyncConcurrencyLimiter {
+        if _notionSyncLimiter == nil {
+            _notionSyncLimiter = NotionSyncConcurrencyLimiter(maxConcurrent: NotionSyncConfig.defaultMaxConcurrentSyncs)
+        }
+        return _notionSyncLimiter!
+    }
 
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
@@ -132,6 +140,10 @@ class DIContainer {
 
     func register(syncTimestampStore: SyncTimestampStoreProtocol) {
         self._syncTimestampStore = syncTimestampStore
+    }
+    
+    func register(notionSyncLimiter: NotionSyncConcurrencyLimiter) {
+        self._notionSyncLimiter = notionSyncLimiter
     }
 
 }
