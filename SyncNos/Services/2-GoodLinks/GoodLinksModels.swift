@@ -53,7 +53,7 @@ enum GoodLinksSortKey: String, CaseIterable {
     case highlightCount = "highlightCount"
     case added = "added"
     case modified = "modified"
-    case read = "read"
+    case lastSync = "lastSync"
 
     var displayName: String {
         switch self {
@@ -61,7 +61,7 @@ enum GoodLinksSortKey: String, CaseIterable {
         case .highlightCount: return "高亮数量"
         case .added: return "添加时间"
         case .modified: return "修改时间"
-        case .read: return "上次同步时间"
+        case .lastSync: return "上次同步时间"
         }
     }
 }
