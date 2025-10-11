@@ -157,4 +157,23 @@ class NotionRequestHelper {
             throw NSError(domain: "NotionService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"])
         }
     }
+
+    // MARK: - Data Source discovery
+    /// 获取某个 database 的 data_sources 数组（Notion 2025-09-03 起提供）
+    /// 返回原始字典数组，调用方可自行解析 id/name 等字段
+    func getDataSources(forDatabaseId databaseId: String) async throws -> [[String: Any]] {
+        let data = try await performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
+        let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] ?? [:]
+        let dataSources = json["data_sources"] as? [[String: Any]] ?? []
+        return dataSources
+    }
+
+    /// 获取首个 data_source 的 id；若不存在则抛错
+    func getPrimaryDataSourceId(forDatabaseId databaseId: String) async throws -> String {
+        let sources = try await getDataSources(forDatabaseId: databaseId)
+        if let id = sources.first?["id"] as? String, !id.isEmpty {
+            return id
+        }
+        throw NSError(domain: "NotionService", code: 404, userInfo: [NSLocalizedDescriptionKey: "No data_sources found for database \(databaseId)"])
+    }
 }
