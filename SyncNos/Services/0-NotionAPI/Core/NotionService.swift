@@ -190,6 +190,11 @@ final class NotionService: NotionServiceProtocol {
         return created.id
     }
 
+    // Alias: return data_source id for source. Implementations may return the same id as ensureDatabaseIdForSource
+    func ensureDataSourceIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
+        return try await ensureDatabaseIdForSource(title: title, parentPageId: parentPageId, sourceKey: sourceKey)
+    }
+
     /// Ensure a per-book database exists (used by per-book strategy). Returns (id, recreated)
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
         if let saved = core.configStore.databaseIdForBook(assetId: assetId) {

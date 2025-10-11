@@ -27,7 +27,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         }
 
         // 2) 确保使用 GoodLinks 专属单库
-        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
+        let databaseId = try await notionService.ensureDataSourceIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
         try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
         // 3) 确保页面存在（统一 ensure API）
