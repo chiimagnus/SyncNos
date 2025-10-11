@@ -5,7 +5,7 @@ import Combine
 struct MainListView: View {
     @StateObject private var viewModel = BookViewModel()
     @State private var selectedBookId: String? = nil
-    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = false
+    @AppStorage("backgroundImageEnabled") private var backgroundImageEnabled: Bool = true
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
 
     private var contentSource: ContentSource {
