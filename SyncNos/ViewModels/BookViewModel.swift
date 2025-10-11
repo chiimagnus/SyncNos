@@ -17,21 +17,18 @@ class BookViewModel: ObservableObject {
     @Published var sortKey: BookListSortKey = .title {
         didSet {
             UserDefaults.standard.set(sortKey.rawValue, forKey: "bookList_sort_key")
-            objectWillChange.send() // Ensure UI updates when property changes
         }
     }
 
     @Published var sortAscending: Bool = true {
         didSet {
             UserDefaults.standard.set(sortAscending, forKey: "bookList_sort_ascending")
-            objectWillChange.send() // Ensure UI updates when property changes
         }
     }
 
     @Published var showWithTitleOnly: Bool = false {
         didSet {
             UserDefaults.standard.set(showWithTitleOnly, forKey: "bookList_showWithTitleOnly")
-            objectWillChange.send() // Ensure UI updates when property changes
         }
     }
 

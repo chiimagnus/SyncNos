@@ -41,7 +41,7 @@ struct AppleBookDetailView: View {
     }
         
     private var selectedBook: BookListItem? {
-        viewModelList.books.first { $0.bookId == (selectedBookId ?? "") } ?? viewModelList.books.first
+        viewModelList.displayBooks.first { $0.bookId == (selectedBookId ?? "") } ?? viewModelList.displayBooks.first
     }
 
     var body: some View {
