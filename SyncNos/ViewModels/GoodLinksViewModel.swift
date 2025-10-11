@@ -98,7 +98,18 @@ final class GoodLinksViewModel: ObservableObject {
             case .modified:
                 cmp = a.modifiedAt == b.modifiedAt ? .orderedSame : (a.modifiedAt < b.modifiedAt ? .orderedAscending : .orderedDescending)
             case .read:
-                cmp = a.readAt == b.readAt ? .orderedSame : (a.readAt < b.readAt ? .orderedAscending : .orderedDescending)
+                // 使用 SyncTimestampStore 中记录的上次同步时间进行排序（若无记录则降序放在末尾/开头，取决于 sortAscending）
+                let t1 = SyncTimestampStore.shared.getLastSyncTime(for: a.id)
+                let t2 = SyncTimestampStore.shared.getLastSyncTime(for: b.id)
+                if t1 == nil && t2 == nil {
+                    cmp = .orderedSame
+                } else if t1 == nil {
+                    cmp = .orderedAscending
+                } else if t2 == nil {
+                    cmp = .orderedDescending
+                } else {
+                    cmp = t1! == t2! ? .orderedSame : (t1! < t2! ? .orderedAscending : .orderedDescending)
+                }
             }
             return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
         }
