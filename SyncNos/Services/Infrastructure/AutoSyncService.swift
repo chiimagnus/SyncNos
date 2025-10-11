@@ -160,38 +160,60 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             }
         }
 
+        // 并发上限（书本级并行数）
+        let maxConcurrentBooks = 10
+
+        // 预过滤近 24 小时已同步过的书籍，并即时发送跳过通知
+        let now = Date()
+        var eligibleIds: [String] = []
         for id in assetIds {
-            let meta = bookMeta[id]
-            let title = meta?.title ?? id
-            let author = meta?.author ?? ""
-            let book = BookListItem(bookId: id, authorName: author, bookTitle: title, ibooksURL: "ibooks://assetid/\(id)", highlightCount: 0)
+            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id), now.timeIntervalSince(last) < intervalSeconds {
+                self.logger.info("AutoSync skipped for \(id): recent sync")
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped"]) 
+                continue
+            }
+            eligibleIds.append(id)
+        }
+        if eligibleIds.isEmpty { return }
 
-            // 如果该书在 intervalSeconds 之内已同步过，则跳过自动同步
-            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id) {
-                let elapsed = Date().timeIntervalSince(last)
-                if elapsed < intervalSeconds {
-                    self.logger.info("AutoSync skipped for \(id): last sync \(Int(elapsed))s ago")
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped"]) 
-                    continue
+        // 局部引用，避免在并发闭包中强捕获 self 成员
+        let logger = self.logger
+        let syncService = self.appleBooksSyncService
+        let dbPathLocal = annotationDBPath
+
+        // 有界并发：最多同时处理 maxConcurrentBooks 本书
+        var nextIndex = 0
+        try await withTaskGroup(of: Void.self) { group in
+            func addTaskIfPossible() {
+                guard nextIndex < eligibleIds.count else { return }
+                let id = eligibleIds[nextIndex]; nextIndex += 1
+                let meta = bookMeta[id]
+                let title = meta?.title ?? id
+                let author = meta?.author ?? ""
+                let book = BookListItem(bookId: id, authorName: author, bookTitle: title, ibooksURL: "ibooks://assetid/\(id)", highlightCount: 0)
+
+                group.addTask {
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"]) 
+                    do {
+                        try await syncService.syncSmart(book: book, dbPath: dbPathLocal) { progress in
+                            logger.debug("AutoSync progress[\(id)]: \(progress)")
+                        }
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) 
+                    } catch {
+                        logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
+                    }
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
+                    // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
+                    try? await Task.sleep(nanoseconds: 50_000_000)
                 }
             }
 
-            do {
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])
-                try await self.appleBooksSyncService.syncSmart(book: book, dbPath: annotationDBPath) { progress in
-                    self.logger.debug("AutoSync progress[\(id)]: \(progress)")
-                }
-                // 成功
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                
-            } catch {
-                self.logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
-                // 破坏性变更：移除降级到增量同步的尝试，直接视为失败并上报
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])
-            }
-            NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
-            // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            // 初始填充任务
+            for _ in 0..<min(maxConcurrentBooks, eligibleIds.count) { addTaskIfPossible() }
+            // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
+            while await group.next() != nil { addTaskIfPossible() }
         }
     }
 }
