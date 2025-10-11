@@ -16,6 +16,7 @@ class DIContainer {
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
+    private var _syncTimestampStore: SyncTimestampStoreProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -83,6 +84,13 @@ class DIContainer {
         return _autoSyncService!
     }
 
+    var syncTimestampStore: SyncTimestampStoreProtocol {
+        if _syncTimestampStore == nil {
+            _syncTimestampStore = SyncTimestampStore.shared
+        }
+        return _syncTimestampStore!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -120,6 +128,10 @@ class DIContainer {
 
     func register(autoSyncService: AutoSyncServiceProtocol) {
         self._autoSyncService = autoSyncService
+    }
+
+    func register(syncTimestampStore: SyncTimestampStoreProtocol) {
+        self._syncTimestampStore = syncTimestampStore
     }
 
 }

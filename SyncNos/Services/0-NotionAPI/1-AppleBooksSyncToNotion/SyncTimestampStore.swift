@@ -1,6 +1,6 @@
 import Foundation
 
-final class SyncTimestampStore {
+final class SyncTimestampStore: SyncTimestampStoreProtocol {
     static let shared = SyncTimestampStore()
     private let logger = DIContainer.shared.loggerService
 

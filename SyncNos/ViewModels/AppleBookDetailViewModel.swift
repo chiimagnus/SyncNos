@@ -50,7 +50,6 @@ class AppleBookDetailViewModel: ObservableObject {
 
     private let databaseService: DatabaseServiceProtocol
     private let syncService: AppleBooksSyncServiceProtocol
-    private let logger = DIContainer.shared.loggerService
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
     private var currentOffset = 0
