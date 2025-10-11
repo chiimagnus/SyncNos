@@ -24,6 +24,7 @@ struct MainListView: View {
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
             .toolbar {
+                // 仅保留数据源切换菜单，具体过滤/排序由各自的 ListView 管理
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -45,64 +46,6 @@ struct MainListView: View {
                         }
                     } label: {
                         Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
-                    }
-                }
-
-                // Filter/sort menu for AppleBooks only
-                if contentSource == .appleBooks {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            // Sort options submenu
-                            Picker("排序方式", selection: $viewModel.sortKey) {
-                                ForEach(BookListSortKey.allCases, id: \.self) { key in
-                                    Text(key.displayName).tag(key)
-                                }
-                            }
-
-                            Divider()
-
-                            Toggle("升序", isOn: $viewModel.sortAscending)
-
-                            Divider()
-
-                            // Filter options
-                            Toggle("仅显示有书名", isOn: $viewModel.showWithTitleOnly)
-                        } label: {
-                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
-                        }
-                    }
-                }
-
-                // GoodLinks toolbar moved here from GoodLinksListView
-                if contentSource == .goodLinks {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            Picker("排序", selection: $goodLinksVM.sortKey) {
-                                ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
-                                    Text(key.displayName).tag(key)
-                                }
-                            }
-
-                            Divider()
-
-                            Toggle("升序", isOn: $goodLinksVM.sortAscending)
-
-                            Divider()
-
-                            Toggle("仅收藏", isOn: $goodLinksVM.showStarredOnly)
-
-                            Divider()
-
-                            // 轻量搜索（标题/作者/URL/标签）
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("搜索").font(.caption).foregroundColor(.secondary)
-                                TextField("关键词", text: $goodLinksVM.searchText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(minWidth: 180)
-                            }
-                        } label: {
-                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
-                        }
                     }
                 }
             }
