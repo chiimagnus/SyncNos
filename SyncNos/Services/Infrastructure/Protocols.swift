@@ -187,3 +187,10 @@ protocol AutoSyncServiceProtocol: AnyObject {
     func stop()
     func triggerSyncNow()
 }
+
+// MARK: - Sync Timestamp Store Protocol
+/// 抽象同步时间戳存取，避免直接依赖具体实现与单例
+protocol SyncTimestampStoreProtocol: AnyObject {
+    func getLastSyncTime(for bookId: String) -> Date?
+    func setLastSyncTime(for bookId: String, to date: Date)
+}
