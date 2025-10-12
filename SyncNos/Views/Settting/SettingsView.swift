@@ -2,10 +2,6 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
-    @State private var isLoading: Bool = false
-    @State private var isPickingBooks: Bool = false
-    @AppStorage("autoSync.appleBooks") private var autoSyncAppleBooks: Bool = false
-    @AppStorage("autoSync.goodLinks") private var autoSyncGoodLinks: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
@@ -134,40 +130,6 @@ struct SettingsView: View {
                     }
                 }
 
-                    // GoodLinks 数据目录授权
-                    Button(action: {
-                        GoodLinksPicker.pickGoodLinksFolder()
-                    }) {
-                        HStack {
-                            Label("Open GoodLinks data", systemImage: "link")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose GoodLinks group container and load data")
-
-                    Button(action: {
-                        guard !isPickingBooks else { return }
-                        isPickingBooks = true
-                        AppleBooksPicker.pickAppleBooksContainer()
-                        // 延迟重置状态，防止快速重复点击
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            isPickingBooks = false
-                        }
-                    }) {
-                        HStack {
-                            Label("Open Apple Books notes", systemImage: "book")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose Apple Books container directory and load notes")
                 }
                 .collapsible(false)
             }
