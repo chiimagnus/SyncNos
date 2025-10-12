@@ -5,7 +5,7 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Text("GoodLinks - Sync Settings")) {
+            Section(header: Label("GoodLinks - Sync Settings", systemImage: "bookmark")) {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)

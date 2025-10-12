@@ -4,7 +4,6 @@ import AppKit
 struct SettingsView: View {
     @State private var isLoading: Bool = false
     @State private var isPickingBooks: Bool = false
-    @AppStorage("autoSyncEnabled") private var autoSyncEnabled: Bool = false
     @AppStorage("autoSync.appleBooks") private var autoSyncAppleBooks: Bool = false
     @AppStorage("autoSync.goodLinks") private var autoSyncGoodLinks: Bool = false
     @State private var selectedLanguage: String = {
@@ -66,18 +65,6 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Toggle("Auto Sync(24 hours per time)", isOn: $autoSyncEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
-                        .onChange(of: autoSyncEnabled) { newValue in
-                            if newValue {
-                                // 仅启动定时器/监听，不立即触发一次全量同步
-                                DIContainer.shared.autoSyncService.start()
-                            } else {
-                                DIContainer.shared.autoSyncService.stop()
-                            }
-                        }
-
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
                             Text(language.1).tag(language.0)
@@ -131,19 +118,19 @@ struct SettingsView: View {
                 // Per-source auto sync toggles and navigation
                 NavigationLink(destination: AppleBooksSettingsView()) {
                     HStack {
-                        Text("Apple Books Settings")
+                        Label("Apple Books Settings", systemImage: "book")
                         Spacer()
-                        Toggle("", isOn: $autoSyncAppleBooks)
-                            .labelsHidden()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
                     }
                 }
 
                 NavigationLink(destination: GoodLinksSettingsView()) {
                     HStack {
-                        Text("GoodLinks Settings")
+                        Label("GoodLinks Settings", systemImage: "bookmark")
                         Spacer()
-                        Toggle("", isOn: $autoSyncGoodLinks)
-                            .labelsHidden()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
                     }
                 }
 
