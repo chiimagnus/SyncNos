@@ -4,7 +4,8 @@ import AppKit
 struct SettingsView: View {
     @State private var isLoading: Bool = false
     @State private var isPickingBooks: Bool = false
-    @AppStorage("autoSyncEnabled") private var autoSyncEnabled: Bool = false
+    @AppStorage("autoSync.appleBooks") private var autoSyncAppleBooks: Bool = false
+    @AppStorage("autoSync.goodLinks") private var autoSyncGoodLinks: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
@@ -64,18 +65,6 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Toggle("Auto Sync(24 hours per time)", isOn: $autoSyncEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini) //.controlSize(.mini) modifier 来让 Toggle 开关按钮变小一点。还有small, regular, large
-                        .onChange(of: autoSyncEnabled) { newValue in
-                            if newValue {
-                                // 仅启动定时器/监听，不立即触发一次全量同步
-                                DIContainer.shared.autoSyncService.start()
-                            } else {
-                                DIContainer.shared.autoSyncService.stop()
-                            }
-                        }
-
                     Picker("Language", selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
                             Text(language.1).tag(language.0)
@@ -115,7 +104,7 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Integrations")) {
-                    NavigationLink(destination: NotionIntegrationView()) {
+                NavigationLink(destination: NotionIntegrationView()) {
                         HStack {
                             Label("Notion Integration", systemImage: "n.square")
                             Spacer()
@@ -126,40 +115,26 @@ struct SettingsView: View {
                     }
                     .help("Configure Notion and run example API calls")
 
-                    // GoodLinks 数据目录授权
-                    Button(action: {
-                        GoodLinksPicker.pickGoodLinksFolder()
-                    }) {
-                        HStack {
-                            Label("Open GoodLinks data", systemImage: "link")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
+                // Per-source auto sync toggles and navigation
+                NavigationLink(destination: AppleBooksSettingsView()) {
+                    HStack {
+                        Label("Apple Books Settings", systemImage: "book")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose GoodLinks group container and load data")
+                }
 
-                    Button(action: {
-                        guard !isPickingBooks else { return }
-                        isPickingBooks = true
-                        AppleBooksPicker.pickAppleBooksContainer()
-                        // 延迟重置状态，防止快速重复点击
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            isPickingBooks = false
-                        }
-                    }) {
-                        HStack {
-                            Label("Open Apple Books notes", systemImage: "book")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
+                NavigationLink(destination: GoodLinksSettingsView()) {
+                    HStack {
+                        Label("GoodLinks Settings", systemImage: "bookmark")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Choose Apple Books container directory and load notes")
+                }
+
+                    // 移除：将数据目录授权按钮迁移到各来源设置页面
                 }
                 .collapsible(false)
             }

@@ -10,6 +10,7 @@ final class NotionIntegrationViewModel: ObservableObject {
 
     // Sync mode UI binding: "single" | "perBook"
     @Published var syncMode: String = "single"
+    // Per-source DB IDs moved to per-source settings view models; keep read-only copies for display
     @Published var appleBooksDbId: String = ""
     @Published var goodLinksDbId: String = ""
     
@@ -23,31 +24,15 @@ final class NotionIntegrationViewModel: ObservableObject {
         self.notionKeyInput = notionConfig.notionKey ?? ""
         self.notionPageIdInput = notionConfig.notionPageId ?? ""
         self.syncMode = notionConfig.syncMode ?? "single"
-        // Load optional per-source DB IDs if present
-        if let appleId = notionConfig.databaseIdForSource("appleBooks") {
-            self.appleBooksDbId = appleId
-        }
-        if let goodId = notionConfig.databaseIdForSource("goodLinks") {
-            self.goodLinksDbId = goodId
-        }
+        // Load optional per-source DB IDs (read-only display)
+        self.appleBooksDbId = notionConfig.databaseIdForSource("appleBooks") ?? ""
+        self.goodLinksDbId = notionConfig.databaseIdForSource("goodLinks") ?? ""
     }
     
     func saveCredentials() {
         notionConfig.notionKey = notionKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
         notionConfig.notionPageId = notionPageIdInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Persist optional per-source DB IDs (only if non-empty)
-        let appleTrimmed = appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines)
-        if appleTrimmed.isEmpty {
-            notionConfig.setDatabaseId(nil, forSource: "appleBooks")
-        } else {
-            notionConfig.setDatabaseId(appleTrimmed, forSource: "appleBooks")
-        }
-        let goodTrimmed = goodLinksDbId.trimmingCharacters(in: .whitespacesAndNewlines)
-        if goodTrimmed.isEmpty {
-            notionConfig.setDatabaseId(nil, forSource: "goodLinks")
-        } else {
-            notionConfig.setDatabaseId(goodTrimmed, forSource: "goodLinks")
-        }
+        // Per-source DB IDs are managed in their respective settings pages
         // Provide immediate feedback to the UI
         message = "Credentials saved"
         // Clear feedback after 2 seconds
