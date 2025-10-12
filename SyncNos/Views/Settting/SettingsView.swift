@@ -99,7 +99,7 @@ struct SettingsView: View {
                 }
                 .collapsible(false)
 
-                Section(header: Text("Integrations")) {
+                Section(header: Text("Sync Data To")) {
                     NavigationLink(destination: NotionIntegrationView()) {
                             HStack {
                                 Label("Notion API", systemImage: "n.square")
@@ -110,9 +110,10 @@ struct SettingsView: View {
                             }
                         }
                         .help("Configure Notion and run example API calls")
+                }
+                .collapsible(false)
 
-                    Divider()
-
+                Section(header: Text("Get Data From")) {
                     // Per-source auto sync toggles and navigation
                     NavigationLink(destination: AppleBooksSettingsView()) {
                         HStack {
