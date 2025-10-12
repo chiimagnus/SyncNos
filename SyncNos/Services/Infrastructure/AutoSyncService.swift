@@ -103,6 +103,12 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             logger.warning("AutoSync skipped: Notion not configured")
             return
         }
+        // Respect per-source auto sync flag for Apple Books. GoodLinks is placeholder.
+        let appleAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
+        guard appleAutoSyncEnabled else {
+            logger.info("AutoSync skipped: Apple Books auto-sync disabled")
+            return
+        }
         guard let root = booksRootPath else {
             logger.warning("AutoSync skipped: Apple Books root not selected")
             return
