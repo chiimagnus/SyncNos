@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GoodLinksSettingsView: View {
     @StateObject private var viewModel = GoodLinksSettingsViewModel()
+    @State private var isPickingGoodLinks: Bool = false
 
     var body: some View {
         List {
@@ -18,7 +19,12 @@ struct GoodLinksSettingsView: View {
 
                 // GoodLinks 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {
+                    guard !isPickingGoodLinks else { return }
+                    isPickingGoodLinks = true
                     GoodLinksPicker.pickGoodLinksFolder()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isPickingGoodLinks = false
+                    }
                 }) {
                     HStack {
                         Label("Open GoodLinks data", systemImage: "link")
@@ -47,7 +53,7 @@ struct GoodLinksSettingsView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("GoodLinks Settings")
+        .navigationTitle("GoodLinks")
     }
 }
 
