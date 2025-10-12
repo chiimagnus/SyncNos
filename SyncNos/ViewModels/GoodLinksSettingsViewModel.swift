@@ -11,14 +11,14 @@ final class GoodLinksSettingsViewModel: ObservableObject {
 
     init(notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.notionConfig = notionConfig
-        if let id = notionConfig.goodLinksDatabaseId() {
+        if let id = notionConfig.databaseIdForSource("goodLinks") {
             self.goodLinksDbId = id
         }
         self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
     }
 
     func save() {
-        notionConfig.setGoodLinksDatabaseId(goodLinksDbId.trimmingCharacters(in: .whitespacesAndNewlines))
+        notionConfig.setDatabaseId(goodLinksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "goodLinks")
         UserDefaults.standard.set(autoSync, forKey: "autoSync.goodLinks")
         message = "Settings saved"
         Task {
