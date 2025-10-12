@@ -97,7 +97,7 @@ struct AppCommands: Commands {
             .keyboardShortcut("1", modifiers: .command)
             .disabled(contentSourceRawValue == ContentSource.appleBooks.rawValue)
 
-            Button("GoodLinks", systemImage: "link") {
+            Button("GoodLinks", systemImage: "bookmark") {
                 contentSourceRawValue = ContentSource.goodLinks.rawValue
             }
             .keyboardShortcut("2", modifiers: .command)

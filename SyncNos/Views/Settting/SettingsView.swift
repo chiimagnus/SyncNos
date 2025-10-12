@@ -100,35 +100,64 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Integrations")) {
-                NavigationLink(destination: NotionIntegrationView()) {
+                    NavigationLink(destination: NotionIntegrationView()) {
+                            HStack {
+                                Label("Notion API", systemImage: "n.square")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.body.weight(.regular))
+                            }
+                        }
+                        .help("Configure Notion and run example API calls")
+
+                    Divider()
+
+                    // Per-source auto sync toggles and navigation
+                    NavigationLink(destination: AppleBooksSettingsView()) {
                         HStack {
-                            Label("Notion Integration", systemImage: "n.square")
+                            Label("Apple Books", systemImage: "book")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
                         }
                     }
-                    .help("Configure Notion and run example API calls")
 
-                // Per-source auto sync toggles and navigation
-                NavigationLink(destination: AppleBooksSettingsView()) {
-                    HStack {
-                        Label("Apple Books Settings", systemImage: "book")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
+                    NavigationLink(destination: GoodLinksSettingsView()) {
+                        HStack {
+                            Label("GoodLinks", systemImage: "bookmark")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
                     }
-                }
 
-                NavigationLink(destination: GoodLinksSettingsView()) {
-                    HStack {
-                        Label("GoodLinks Settings", systemImage: "bookmark")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("WeRead", systemImage: "")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
                     }
-                }
+
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("Get", systemImage: "")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("Dedao", systemImage: "")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
                 }
                 .collapsible(false)

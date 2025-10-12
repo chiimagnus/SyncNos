@@ -62,7 +62,7 @@ struct AppleBooksSettingsView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Apple Books Settings")
+        .navigationTitle("Apple Books")
     }
 }
 

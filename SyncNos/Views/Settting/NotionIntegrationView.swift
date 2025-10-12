@@ -59,7 +59,7 @@ struct NotionIntegrationView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Notion Integration")
+        .navigationTitle("Notion API")
     }
 }
 
