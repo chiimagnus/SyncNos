@@ -16,6 +16,21 @@ struct GoodLinksSettingsView: View {
                     .controlSize(.mini)
                     .help("GoodLinks auto-sync not implemented; this is a UI-only toggle for now")
 
+                HStack {
+                    Button(action: {
+                        GoodLinksPicker.pickGoodLinksFolder()
+                    }) {
+                        HStack {
+                            Label("Open GoodLinks data", systemImage: "link")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
                 Button("Save") {
                     viewModel.save()
                 }
