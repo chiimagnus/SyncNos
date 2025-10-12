@@ -16,7 +16,6 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     // Explicit per-source keys for well-known sources to avoid accidental cross-source reuse
     private let appleBooksSourceKey = "appleBooks"
     private let goodLinksSourceKey = "goodLinks"
-    private let perPageDbPrefix = "PER_PAGE_DB_ID_" // + pageId
     
     private init() {}
     
@@ -111,18 +110,5 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         setDatabaseId(id, forSource: goodLinksSourceKey)
     }
 
-    // MARK: - Per-page database mapping
-    func databaseIdForPage(_ pageId: String) -> String? {
-        let key = perPageDbPrefix + pageId
-        return userDefaults.string(forKey: key)
-    }
-
-    func setDatabaseId(_ id: String?, forPage pageId: String) {
-        let key = perPageDbPrefix + pageId
-        if let id, !id.isEmpty {
-            userDefaults.set(id, forKey: key)
-        } else {
-            userDefaults.removeObject(forKey: key)
-        }
-    }
+    // per-page mapping removed
 }
