@@ -32,13 +32,15 @@ struct NotionIntegrationView: View {
 
                 // Optional per-source DB IDs
                 LabeledContent("AppleBooks DB ID (optional)") {
-                    TextField("SyncNos-AppleBooks DB ID", text: $viewModel.appleBooksDbId)
-                        .textFieldStyle(.roundedBorder)
+                    // Now read-only; moved to AppleBooksSettingsView
+                    Text(viewModel.appleBooksDbId.isEmpty ? "(moved to AppleBooks settings)" : viewModel.appleBooksDbId)
+                        .foregroundColor(.secondary)
                 }
 
                 LabeledContent("GoodLinks DB ID (optional)") {
-                    TextField("SyncNos-GoodLinks DB ID", text: $viewModel.goodLinksDbId)
-                        .textFieldStyle(.roundedBorder)
+                    // Now read-only; moved to GoodLinksSettingsView
+                    Text(viewModel.goodLinksDbId.isEmpty ? "(moved to GoodLinks settings)" : viewModel.goodLinksDbId)
+                        .foregroundColor(.secondary)
                 }
 
                 Button("Save") {
