@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AppleBooksSettingsView: View {
     @StateObject private var viewModel = AppleBooksSettingsViewModel()
+    @State private var isPickingBooks: Bool = false
 
     var body: some View {
         List {
@@ -23,6 +24,27 @@ struct AppleBooksSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for Apple Books (checked means AutoSyncService will run)")
+
+                // Apple Books 数据目录授权按钮（从 SettingsView 移动过来）
+                Button(action: {
+                    guard !isPickingBooks else { return }
+                    isPickingBooks = true
+                    AppleBooksPicker.pickAppleBooksContainer()
+                    // 延迟重置状态，防止快速重复点击
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isPickingBooks = false
+                    }
+                }) {
+                    HStack {
+                        Label("Open Apple Books notes", systemImage: "book")
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                            .foregroundColor(.secondary)
+                            .font(.body.weight(.regular))
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Choose Apple Books container directory and load notes")
 
                 Button("Save") {
                     viewModel.save()
