@@ -13,6 +13,9 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let syncModeKey = "NOTION_SYNC_MODE"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
+    // Explicit per-source keys for well-known sources to avoid accidental cross-source reuse
+    private let appleBooksSourceKey = "appleBooks"
+    private let goodLinksSourceKey = "goodLinks"
     private let perPageDbPrefix = "PER_PAGE_DB_ID_" // + pageId
     
     private init() {}
@@ -89,6 +92,23 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         } else {
             userDefaults.removeObject(forKey: key)
         }
+    }
+
+    // MARK: - Convenience typed accessors for AppleBooks / GoodLinks
+    func appleBooksDatabaseId() -> String? {
+        return databaseIdForSource(appleBooksSourceKey)
+    }
+
+    func setAppleBooksDatabaseId(_ id: String?) {
+        setDatabaseId(id, forSource: appleBooksSourceKey)
+    }
+
+    func goodLinksDatabaseId() -> String? {
+        return databaseIdForSource(goodLinksSourceKey)
+    }
+
+    func setGoodLinksDatabaseId(_ id: String?) {
+        setDatabaseId(id, forSource: goodLinksSourceKey)
     }
 
     // MARK: - Per-page database mapping

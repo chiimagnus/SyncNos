@@ -141,16 +141,11 @@ final class NotionService: NotionServiceProtocol {
             core.configStore.setDatabaseId(nil, forSource: sourceKey)
         }
 
-        // 2) check per-page cache
-        if let savedPage = core.configStore.databaseIdForPage(parentPageId) {
-            if await databaseOps.databaseExists(databaseId: savedPage) {
-                // mirror into per-source mapping for fast lookup
-                core.configStore.setDatabaseId(savedPage, forSource: sourceKey)
-                return savedPage
-            } else {
-                core.configStore.setDatabaseId(nil, forPage: parentPageId)
-            }
-        }
+        // 2) NOTE: intentionally skip using a per-page cached database id for other sources.
+        // Previously we mirrored a per-page mapping into a per-source mapping which could
+        // cause cross-source reuse (e.g. AppleBooks using a GoodLinks DB). To enforce strict
+        // separation, only use per-source cache below and do NOT treat per-page mappings as
+        // a general-purpose database id for other sources.
 
         // 3) list child databases under the page (guarded by feature flag)
         if NotionSyncConfig.enablePageChildLookup {
