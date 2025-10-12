@@ -52,6 +52,8 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     private let databaseService = DIContainer.shared.databaseService
     private let appleBooksSyncService = DIContainer.shared.appleBooksSyncService
     private let notionConfig = DIContainer.shared.notionConfigStore
+    private let goodLinksService = DIContainer.shared.goodLinksService
+    private let goodLinksSyncService = GoodLinksSyncService()
 
     private var timerCancellable: AnyCancellable?
     private var notificationCancellable: AnyCancellable?
@@ -78,6 +80,8 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         // 监听数据源选择完成或刷新事件，触发一次同步
         notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
             .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
+            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")))
+            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshGoodLinksRequested")))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.triggerSyncNow()
@@ -103,30 +107,53 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             logger.warning("AutoSync skipped: Notion not configured")
             return
         }
-        guard let root = booksRootPath else {
-            logger.warning("AutoSync skipped: Apple Books root not selected")
-            return
+        // Determine Apple Books root if present
+        let root = booksRootPath
+
+        var annotationDB: String? = nil
+        var booksDB: String? = nil
+        if let root {
+            let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
+            let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
+            annotationDB = latestSQLiteFile(in: annotationDir)
+            booksDB = latestSQLiteFile(in: booksDir)
+            if annotationDB == nil {
+                logger.warning("AutoSync: Apple Books annotation DB not found; skipping books sync")
+            }
+        } else {
+            logger.info("AutoSync: Apple Books root not selected; skipping books sync")
         }
 
-        let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
-        let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
-        guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
-            logger.warning("AutoSync skipped: annotation DB not found")
-            return
-        }
-        let booksDB = latestSQLiteFile(in: booksDir)
+        // GoodLinks DB resolution
+        let goodLinksDBPath = goodLinksService.resolveDatabasePath()
 
         isSyncing = true
-        logger.info("AutoSync: start syncSmart for all books")
+        logger.info("AutoSync: start smart sync for available sources")
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            do {
-                try await self.syncAllBooksSmart(annotationDBPath: annotationDB, booksDBPath: booksDB)
-            } catch {
-                self.logger.error("AutoSync error: \(error.localizedDescription)")
+            defer {
+                self.isSyncing = false
+                self.logger.info("AutoSync: finished")
             }
-            self.isSyncing = false
-            self.logger.info("AutoSync: finished")
+            do {
+                // Books sync if annotation DB available
+                if let annotationDB {
+                    try await self.syncAllBooksSmart(annotationDBPath: annotationDB, booksDBPath: booksDB)
+                }
+            } catch {
+                self.logger.error("AutoSync books error: \(error.localizedDescription)")
+            }
+
+            // GoodLinks sync if db exists and accessible
+            do {
+                if !goodLinksDBPath.isEmpty, goodLinksService.canOpenReadOnly(dbPath: goodLinksDBPath) {
+                    try await self.syncAllGoodLinksSmart(dbPath: goodLinksDBPath)
+                } else {
+                    self.logger.info("AutoSync: GoodLinks DB not available; skipping GoodLinks sync")
+                }
+            } catch {
+                self.logger.error("AutoSync GoodLinks error: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -213,6 +240,64 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             // 初始填充任务
             for _ in 0..<min(maxConcurrentBooks, eligibleIds.count) { addTaskIfPossible() }
             // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
+            while await group.next() != nil { addTaskIfPossible() }
+        }
+    }
+
+    // MARK: - GoodLinks Smart Sync
+    private func syncAllGoodLinksSmart(dbPath: String) async throws {
+        let handle = try goodLinksService.openReadOnlyDatabase(dbPath: dbPath)
+        defer { goodLinksService.close(handle) }
+
+        let counts = try GoodLinksQueryService().fetchHighlightCountsByLink(db: handle)
+        let linkIds = counts.map { $0.linkId }.sorted()
+        if linkIds.isEmpty { return }
+
+        let maxConcurrentLinks = 10
+
+        let now = Date()
+        var eligibleIds: [String] = []
+        for id in linkIds {
+            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id), now.timeIntervalSince(last) < intervalSeconds {
+                self.logger.info("AutoSync skipped GoodLinks for \(id): recent sync")
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped", "source": "goodlinks"]) 
+                continue
+            }
+            eligibleIds.append(id)
+        }
+        if eligibleIds.isEmpty { return }
+
+        var nextIndex = 0
+        let logger = self.logger
+        let syncService = self.goodLinksSyncService
+
+        try await withTaskGroup(of: Void.self) { group in
+            func addTaskIfPossible() {
+                guard nextIndex < eligibleIds.count else { return }
+                let id = eligibleIds[nextIndex]; nextIndex += 1
+                group.addTask {
+                    NotificationCenter.default.post(name: Notification.Name("SyncLinkStarted"), object: id)
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started", "source": "goodlinks"]) 
+                    do {
+                        // fetch link row
+                        if let rows = try? goodLinksService.fetchRecentLinks(dbPath: dbPath, limit: 0), let linkRow = rows.first(where: { $0.id == id }) {
+                            try await syncService.syncHighlights(for: linkRow, dbPath: dbPath) { progress in
+                                logger.debug("AutoSync GoodLinks progress[\(id)]: \(progress)")
+                            }
+                        } else {
+                            logger.warning("AutoSync GoodLinks: link metadata not found for \(id)")
+                        }
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded", "source": "goodlinks"]) 
+                    } catch {
+                        logger.error("AutoSync GoodLinks failed for \(id): \(error.localizedDescription)")
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed", "source": "goodlinks"]) 
+                    }
+                    NotificationCenter.default.post(name: Notification.Name("SyncLinkFinished"), object: id)
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                }
+            }
+
+            for _ in 0..<min(maxConcurrentLinks, eligibleIds.count) { addTaskIfPossible() }
             while await group.next() != nil { addTaskIfPossible() }
         }
     }
