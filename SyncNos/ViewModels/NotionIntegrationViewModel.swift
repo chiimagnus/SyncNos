@@ -25,8 +25,8 @@ final class NotionIntegrationViewModel: ObservableObject {
         self.notionPageIdInput = notionConfig.notionPageId ?? ""
         self.syncMode = notionConfig.syncMode ?? "single"
         // Load optional per-source DB IDs (read-only display)
-        self.appleBooksDbId = notionConfig.appleBooksDatabaseId() ?? ""
-        self.goodLinksDbId = notionConfig.goodLinksDatabaseId() ?? ""
+        self.appleBooksDbId = notionConfig.databaseIdForSource("appleBooks") ?? ""
+        self.goodLinksDbId = notionConfig.databaseIdForSource("goodLinks") ?? ""
     }
     
     func saveCredentials() {
