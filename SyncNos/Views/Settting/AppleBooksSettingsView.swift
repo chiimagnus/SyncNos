@@ -24,26 +24,6 @@ struct AppleBooksSettingsView: View {
                     .controlSize(.mini)
                     .help("Enable automatic sync for Apple Books (checked means AutoSyncService will run)")
 
-                HStack {
-                    Button(action: {
-                        guard !ViewHelpers.isPickingBooks else { return }
-                        ViewHelpers.isPickingBooks = true
-                        AppleBooksPicker.pickAppleBooksContainer()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            ViewHelpers.isPickingBooks = false
-                        }
-                    }) {
-                        HStack {
-                            Label("Open Apple Books data", systemImage: "book")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                                .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-
                 Button("Save") {
                     viewModel.save()
                 }
