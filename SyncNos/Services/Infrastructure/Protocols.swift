@@ -107,9 +107,6 @@ protocol NotionConfigStoreProtocol: AnyObject {
     // Generic mapping for future sources (e.g., WeRead/DeDao/GetBiji)
     func databaseIdForSource(_ sourceKey: String) -> String?
     func setDatabaseId(_ id: String?, forSource sourceKey: String)
-    // Per-page database id mapping helpers
-    func databaseIdForPage(_ pageId: String) -> String?
-    func setDatabaseId(_ id: String?, forPage pageId: String)
     // Sync mode: "single" (方案1：单库+每本书一个页面) 或 "perBook" (方案2：每本书一个库+每条高亮为一条目)
     var syncMode: String? { get set }
     // Per-book database id mapping helpers

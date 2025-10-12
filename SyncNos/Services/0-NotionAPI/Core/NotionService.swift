@@ -141,38 +141,15 @@ final class NotionService: NotionServiceProtocol {
             core.configStore.setDatabaseId(nil, forSource: sourceKey)
         }
 
-        // 2) NOTE: intentionally skip using a per-page cached database id for other sources.
-        // Previously we mirrored a per-page mapping into a per-source mapping which could
-        // cause cross-source reuse (e.g. AppleBooks using a GoodLinks DB). To enforce strict
-        // separation, only use per-source cache below and do NOT treat per-page mappings as
-        // a general-purpose database id for other sources.
-
-        // 3) list child databases under the page (guarded by feature flag)
-        if NotionSyncConfig.enablePageChildLookup {
-            do {
-                let candidates = try await databaseOps.findDatabasesUnderPage(parentPageId: parentPageId)
-                if let first = candidates.first {
-                    core.configStore.setDatabaseId(first, forSource: sourceKey)
-                    core.configStore.setDatabaseId(first, forPage: parentPageId)
-                    return first
-                }
-            } catch {
-                // If listing children fails (permissions, 404), fall back to search below
-                core.logger.warning("Failed to list page children: \(error.localizedDescription)")
-            }
-        }
-
         // 4) fallback to search-by-title (existing behavior)
         if let found = try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId) {
             core.configStore.setDatabaseId(found, forSource: sourceKey)
-            core.configStore.setDatabaseId(found, forPage: parentPageId)
             return found
         }
 
         // 5) create new database as last resort
         let created = try await databaseOps.createDatabase(title: title, pageId: parentPageId)
         core.configStore.setDatabaseId(created.id, forSource: sourceKey)
-        core.configStore.setDatabaseId(created.id, forPage: parentPageId)
         return created.id
     }
 
