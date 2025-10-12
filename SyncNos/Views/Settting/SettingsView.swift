@@ -5,6 +5,8 @@ struct SettingsView: View {
     @State private var isLoading: Bool = false
     @State private var isPickingBooks: Bool = false
     @AppStorage("autoSyncEnabled") private var autoSyncEnabled: Bool = false
+    @AppStorage("autoSync.appleBooks") private var autoSyncAppleBooks: Bool = false
+    @AppStorage("autoSync.goodLinks") private var autoSyncGoodLinks: Bool = false
     @State private var selectedLanguage: String = {
         let currentLocale = Locale.current
         let languageCode = currentLocale.language.languageCode?.identifier
@@ -115,7 +117,7 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Integrations")) {
-                    NavigationLink(destination: NotionIntegrationView()) {
+                NavigationLink(destination: NotionIntegrationView()) {
                         HStack {
                             Label("Notion Integration", systemImage: "n.square")
                             Spacer()
@@ -125,6 +127,25 @@ struct SettingsView: View {
                         }
                     }
                     .help("Configure Notion and run example API calls")
+
+                // Per-source auto sync toggles and navigation
+                NavigationLink(destination: AppleBooksSettingsView()) {
+                    HStack {
+                        Text("Apple Books Settings")
+                        Spacer()
+                        Toggle("", isOn: $autoSyncAppleBooks)
+                            .labelsHidden()
+                    }
+                }
+
+                NavigationLink(destination: GoodLinksSettingsView()) {
+                    HStack {
+                        Text("GoodLinks Settings")
+                        Spacer()
+                        Toggle("", isOn: $autoSyncGoodLinks)
+                            .labelsHidden()
+                    }
+                }
 
                     // GoodLinks 数据目录授权
                     Button(action: {
