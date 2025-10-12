@@ -14,7 +14,7 @@ final class AppleBooksSettingsViewModel: ObservableObject {
     init(notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.notionConfig = notionConfig
         self.syncMode = notionConfig.syncMode ?? "single"
-        if let id = notionConfig.appleBooksDatabaseId() {
+        if let id = notionConfig.databaseIdForSource("appleBooks") {
             self.appleBooksDbId = id
         }
         // read autoSync flag from AppStorage via UserDefaults bridge
@@ -25,7 +25,7 @@ final class AppleBooksSettingsViewModel: ObservableObject {
     }
 
     func save() {
-        notionConfig.setAppleBooksDatabaseId(appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines))
+        notionConfig.setDatabaseId(appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "appleBooks")
         notionConfig.syncMode = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
         UserDefaults.standard.set(autoSync, forKey: "autoSync.appleBooks")
         message = "Settings saved"
