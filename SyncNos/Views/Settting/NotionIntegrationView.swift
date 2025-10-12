@@ -28,6 +28,19 @@ struct NotionIntegrationView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
+                Divider()
+
+                // Optional per-source DB IDs
+                LabeledContent("AppleBooks DB ID (optional)") {
+                    TextField("SyncNos-AppleBooks DB ID", text: $viewModel.appleBooksDbId)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                LabeledContent("GoodLinks DB ID (optional)") {
+                    TextField("SyncNos-GoodLinks DB ID", text: $viewModel.goodLinksDbId)
+                        .textFieldStyle(.roundedBorder)
+                }
+
                 Button("Save") {
                     viewModel.saveCredentials()
                 }
