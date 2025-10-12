@@ -159,6 +159,23 @@ struct SettingsView: View {
                         }
                     }
 
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("Logseq", systemImage: "")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    NavigationLink(destination: EmptyView()) {
+                        HStack {
+                            Label("Obsidian", systemImage: "")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .collapsible(false)
             }
