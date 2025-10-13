@@ -84,7 +84,7 @@ struct GoodLinksListView: View {
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
-                            Picker("排序", selection: $viewModel.sortKey) {
+                            Picker("Sort", selection: $viewModel.sortKey) {
                                 ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
                                     Text(key.displayName).tag(key)
                                 }
@@ -92,13 +92,13 @@ struct GoodLinksListView: View {
 
                             Divider()
 
-                            Toggle("升序", isOn: $viewModel.sortAscending)
+                            Toggle("Ascending", isOn: $viewModel.sortAscending)
 
                             Divider()
 
-                            Toggle("仅收藏", isOn: $viewModel.showStarredOnly)
+                            Toggle("Starred only", isOn: $viewModel.showStarredOnly)
                         } label: {
-                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
+                            Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                         }
                     }
                 }
