@@ -6,7 +6,7 @@ struct AppleBooksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Apple Books - Sync Settings", systemImage: "book")) {
+            Section(header: Label("Notion Sync Setting", systemImage: "book")) {
                 Picker("Sync Mode", selection: $viewModel.syncMode) {
                     Text("Single Database (One page per book)").tag("single")
                     Text("One database per book (Each highlight as an entry)").tag("perBook")
