@@ -68,7 +68,7 @@ struct AppleBooksListView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             // Sort options submenu
-                            Picker("排序方式", selection: $viewModel.sortKey) {
+                            Picker("Sort by", selection: $viewModel.sortKey) {
                                 ForEach(BookListSortKey.allCases, id: \.self) { key in
                                     Text(key.displayName).tag(key)
                                 }
@@ -76,14 +76,14 @@ struct AppleBooksListView: View {
 
                             Divider()
 
-                            Toggle("升序", isOn: $viewModel.sortAscending)
+                            Toggle("Ascending", isOn: $viewModel.sortAscending)
 
                             Divider()
 
                             // Filter options
-                            Toggle("仅显示有书名", isOn: $viewModel.showWithTitleOnly)
+                            Toggle("Books with titles only", isOn: $viewModel.showWithTitleOnly)
                         } label: {
-                            Label("过滤", systemImage: "line.3.horizontal.decrease.circle")
+                            Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                         }
                     }
                 }
