@@ -84,23 +84,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login/apple \
     - OpenSSL：`openssl rand -hex 32`  
   - 把这个值放到 `.env` 的 `APP_JWT_SECRET`，不要提交到 git。
 
-实操举例（在 Backend 目录下创建 `.env`）：  
-```bash
-cd Backend
-cat > .env <<'EOF'
-APPLE_TEAM_ID=YOUR_TEAM_ID
-APPLE_KEY_ID=YOUR_KEY_ID
-# 如果你的 iOS 客户端发起时使用 bundle id，client_id 填 bundle id；若用 Services ID 则填 services id
-APPLE_CLIENT_ID=com.your.app
-APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIB...<rest of key>...\n-----END PRIVATE KEY-----\n"
-APP_JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-APP_ACCESS_TOKEN_MINUTES=30
-APP_REFRESH_TOKEN_DAYS=7
-EOF
-```
-
-安全与注意事项（短）：
-- `.p8` 与 `APP_JWT_SECRET` 都是敏感信息，不要提交到版本库（把 `.env` 加入 `.gitignore`）。  
-- Key 只可下载一次；如果不小心丢失，需要在 Apple Developer Portal 重新建 Key 并更新 Key ID/.p8。  
-- 后端交换 `authorization_code` 时，`client_id` 必须和客户端请求时使用的 `client_id` 一致（iOS 原生通常用 Bundle ID）。  
-- 生产环境务必把私钥与密钥放到受保护的秘密管理系统（如 AWS Secrets Manager / GitHub Secrets / environment variables in CI），不要明文存储在仓库里。
+> 注意：
+> - `.p8` 与 `APP_JWT_SECRET` 都是敏感信息，不要提交到版本库（把 `.env` 加入 `.gitignore`）。  
+> - Key 只可下载一次；如果不小心丢失，需要在 Apple Developer Portal 重新建 Key 并更新 Key ID/.p8。  
+> - 后端交换 `authorization_code` 时，`client_id` 必须和客户端请求时使用的 `client_id` 一致（iOS 原生通常用 Bundle ID）。  
+> - 生产环境务必把私钥与密钥放到受保护的秘密管理系统（如 AWS Secrets Manager / GitHub Secrets / environment variables in CI），不要明文存储在仓库里。
