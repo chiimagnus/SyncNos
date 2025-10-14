@@ -9,7 +9,6 @@ struct LogWindow: View {
         VStack(spacing: 0) {
             HStack {
                 Picker("Level", selection: $viewModel.levelFilter) {
-                    Text("All").tag(LogLevel.verbose)
                     ForEach(LogLevel.allCases, id: \ .self) { level in
                         Text(level.description.capitalized).tag(level)
                     }
