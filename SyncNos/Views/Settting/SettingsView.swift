@@ -61,10 +61,12 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
-                    Picker("Language", selection: $selectedLanguage) {
+                    Picker(selection: $selectedLanguage) {
                         ForEach(supportedLanguages, id: \.0) { language in
                             Text(language.1).tag(language.0)
                         }
+                    } label: {
+                        Label("Language", systemImage: "globe")
                     }
                     .onChange(of: selectedLanguage) { newLanguage in
                         changeAppLanguage(to: newLanguage)
@@ -74,7 +76,7 @@ struct SettingsView: View {
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
                         HStack {
-                            Text("About")
+                            Label("About", systemImage: "info.circle")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
