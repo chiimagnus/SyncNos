@@ -3,7 +3,7 @@ import Combine
 
 final class LogViewModel: ObservableObject {
     @Published private(set) var entries: [LogEntry] = []
-    @Published var levelFilter: LogLevel = .verbose
+    @Published var levelFilter: LogLevel = .info
 
     private var cancellables = Set<AnyCancellable>()
     private let logger: LoggerServiceProtocol
@@ -43,6 +43,20 @@ final class LogViewModel: ObservableObject {
 
     func export(to url: URL) throws {
         try logger.exportLogs(to: url)
+    }
+
+    /// Export currently filtered entries (entries array) to file.
+    func exportFiltered(to url: URL) throws {
+        var lines: [String] = []
+        let formatter = DateFormatter()
+        formatter.timeStyle = .medium
+        for e in entries {
+            let time = formatter.string(from: e.timestamp)
+            let line = "\(time) [\(e.level.description)] \(e.file):\(e.line) \(e.function) - \(e.message)"
+            lines.append(line)
+        }
+        let content = lines.joined(separator: "\n")
+        try content.write(to: url, atomically: true, encoding: .utf8)
     }
 }
 

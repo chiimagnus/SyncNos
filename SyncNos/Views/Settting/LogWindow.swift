@@ -66,7 +66,8 @@ struct LogWindow: View {
     private func shareLogs() {
         let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("syncnos-logs.txt")
         do {
-            try viewModel.export(to: tempURL)
+            // 导出当前过滤后的日志，而不是全部日志
+            try viewModel.exportFiltered(to: tempURL)
 
             guard let contentView = NSApp.keyWindow?.contentView else { return }
             let picker = NSSharingServicePicker(items: [tempURL])
