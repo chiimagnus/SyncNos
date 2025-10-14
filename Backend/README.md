@@ -1,5 +1,7 @@
 # SyncNos Backend Documentation
 
+这是一份关于Sign in with Apple的技术文档
+
 ## 快速开始（FastAPI Apple 登录 MVP）
 
 1. 创建并激活虚拟环境（推荐）
@@ -102,7 +104,3 @@ EOF
 - Key 只可下载一次；如果不小心丢失，需要在 Apple Developer Portal 重新建 Key 并更新 Key ID/.p8。  
 - 后端交换 `authorization_code` 时，`client_id` 必须和客户端请求时使用的 `client_id` 一致（iOS 原生通常用 Bundle ID）。  
 - 生产环境务必把私钥与密钥放到受保护的秘密管理系统（如 AWS Secrets Manager / GitHub Secrets / environment variables in CI），不要明文存储在仓库里。
-
-如果你愿意我可以：
-- a) 帮你把 README 中的 `.env` 示例改成更明确的模板（我已做了部分修改），或  
-- b) 把 `.p8` 的读取方式改为支持从文件路径读取（在 `.env` 中只放文件路径，避免把私钥多行放入 `.env`），你希望哪种？
