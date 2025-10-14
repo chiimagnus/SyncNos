@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import SQLite3
 import StoreKit
 
@@ -25,9 +26,26 @@ enum LogLevel: Int, CaseIterable, Comparable {
     }
 }
 
+// MARK: - Log Entry
+struct LogEntry: Identifiable, Equatable {
+    let id: UUID
+    let timestamp: Date
+    let level: LogLevel
+    let message: String
+    let file: String
+    let function: String
+    let line: Int
+}
+
 // MARK: - Logger Service Protocol
 protocol LoggerServiceProtocol {
     var currentLevel: LogLevel { get set }
+
+    /// Publisher that emits each new `LogEntry`.
+    var logPublisher: AnyPublisher<LogEntry, Never> { get }
+
+    /// Returns all stored logs (used for initial population / filtering).
+    func getAllLogs() -> [LogEntry]
 
     func log(_ level: LogLevel, message: String, file: String, function: String, line: Int)
 
@@ -36,6 +54,12 @@ protocol LoggerServiceProtocol {
     func info(_ message: String, file: String, function: String, line: Int)
     func warning(_ message: String, file: String, function: String, line: Int)
     func error(_ message: String, file: String, function: String, line: Int)
+
+    /// Clear in-memory stored logs.
+    func clearLogs()
+
+    /// Export stored logs to the provided file URL.
+    func exportLogs(to url: URL) throws
 }
 
 // MARK: - Logger Extension with Default Parameters
