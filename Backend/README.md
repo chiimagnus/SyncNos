@@ -1,3 +1,5 @@
+# SyncNos Backend Documentation
+
 ## 快速开始（FastAPI Apple 登录 MVP）
 
 1. 创建并激活虚拟环境（推荐）
@@ -55,10 +57,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login/apple \
 
 - 访问 `http://127.0.0.1:8000/docs` 查看 Swagger UI
 
-
----
-
-你指的是 README 里 `.env` 需要的那些值吗？下面把每一项怎么拿到/生成写清楚，按步骤做即可（简洁版）：
+## 填写.env文件中的值
 
 - APPLE_TEAM_ID（Team ID）  
   在 Apple Developer 账户页面右上角的 Account -> Membership（或 Account overview）能看到 Team ID；也可以在 Certificates, Identifiers & Profiles 的页面 URL/账户信息里找到。
