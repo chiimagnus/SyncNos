@@ -1,29 +1,35 @@
+## v0.5.2
+- **日志与调试**：新增日志窗口及导出/分享功能，改进日志筛选与级别选项，增强调试体验。
+- **界面微调**：若干设置视图标签与图标优化，提升可读性与一致性。
+
+## v0.5.1
+- **后端与认证**：初始化 FastAPI 后端骨架，添加用户认证与 Apple OAuth 支持（后端初始实现）。
+- **账户与权限**：改善 AccountViewModel 的 token 获取逻辑并为项目添加 Apple Sign In 权限配置（entitlements）。
+- **本地化与文档**：更新 AppleBooks/GoodLinks 的本地化字符串与相关文档、Changelog 条目。
+
 ## v0.4.15
-- **设置**：引入按源的设置（AppleBooks/GoodLinks），将数据授权按钮移入各源设置页；优化设置导航与图标，移除全局 autoSync 并使用每源开关。
-- **UI**：设置视图若干界面调整与可访问性改进；修复设置标题与布局问题。
+- **设置重构**：将设置拆分为按源（AppleBooks/GoodLinks）管理，移动数据授权按钮到对应源设置，移除全局 autoSync，采用每源开关与更清晰的导航与图标。
+- **Notion 集成修复**：修复 Notion 相关 ViewModel 使用通用 `databaseIdForSource` 的问题，改进 per-source 配置使用流程。
 
 ## v0.4.14
-- **Notion 配置**：为 AppleBooks 与 GoodLinks 增加可选的数据库 ID 配置与更好的配置存储管理。
-- **GoodLinks/列表**：重构并改进 GoodLinks 的排序与筛选逻辑，将工具栏移动至主列表以统一体验。
+- **Notion 配置增强**：为 AppleBooks 与 GoodLinks 提供可选的数据库 ID 配置，重构 `NotionConfigStore` 与 `NotionService` 以改善配置管理。
+- **GoodLinks 改进**：重构 GoodLinks 列表的排序与筛选逻辑，并将工具栏移至主列表以统一体验；若干视图与枚举重命名与清理。
 
 ## v0.4.13
-- **并发与性能**：AutoSync 支持并发同步（最多 10 本书）；引入 feature flag 与页面映射相关实验性功能。
+- **Notion 功能扩展（实验性）**：引入页面级数据库映射与子数据库查找功能、feature flag 以控制子块/子库查找行为；增加 Notion API 版本升级与限流重试支持。
+- **并发同步**：AutoSyncService 支持并发同步（最高 10 本书），提高同步吞吐量与稳定性。
 
 ## v0.4.12.1
-- **界面与修复**：MainList 背景处理与默认背景修复；GoodLinks 排序/筛选实现与逻辑修正。
-- **代码重构**：抽象时间戳存储并移除未使用导入，多个 ViewModel 清理与 Combine 优化（IAP 状态监听）。
+- **界面与修复**：修复 MainList 背景处理与默认背景设置，完善 GoodLinks 的排序与筛选实现。
+- **ViewModel 与性能优化**：抽象并注入时间戳存储（SyncTimestampStore）、移除未使用导入、清理多个 ViewModel；使用 Combine 优化 IAP 状态监听与移除冗余的对象变更通知。
 
 ## v0.4.12
-- **功能**：为 AppleBooks 实现高亮/书籍的排序与筛选功能；将排序/筛选状态从 `@AppStorage` 改为 `UserDefaults` 注入以简化状态管理。
-- **复用性**：提取部分共享 UI 组件并进行若干视图重构与项目文件更新。
+- **AppleBooks 功能**：为高亮和书籍实现排序与筛选功能，并将相关菜单结构简化以提升可用性。
+- **状态管理重构**：将排序/筛选状态从 `@AppStorage` 替换为通过 `UserDefaults` 注入以简化状态依赖与测试。
+- **复用性改进**：提取共享 UI 组件以减少重复并对若干视图做重构和项目文件更新。
 
 ## v0.4.11.2
-- 将 Notion 上传从“单条截断 1500 字”改为按 ≤1500 字分块上传
-- Highligh 采用父块 + 子块结构
-- Note 切分为多个兄弟 bullet
-- metadata 单独为 bullet 子块
-- 移除单条截断逻辑
-- perbookdb同步模式下，跳过单条笔记字数过大的情况。
+- **Notion 上传改进**：将单条截断逻辑替换为按 ≤1500 字分块上传，Highligh/Note/metadata 结构改为父块 + 子块、多个兄弟 bullet 与 metadata 子块，避免 perbookdb 模式下单条笔记因字数过大而阻塞同步。
 
 ## v0.3.9
 - 新增赞助项，如果觉得不错，可以赞助一下，谢谢！
