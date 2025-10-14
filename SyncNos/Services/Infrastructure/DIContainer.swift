@@ -17,6 +17,7 @@ class DIContainer {
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
+    private var _authService: AuthServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -91,6 +92,13 @@ class DIContainer {
         return _syncTimestampStore!
     }
 
+    var authService: AuthServiceProtocol {
+        if _authService == nil {
+            _authService = AuthService()
+        }
+        return _authService!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -132,6 +140,10 @@ class DIContainer {
 
     func register(syncTimestampStore: SyncTimestampStoreProtocol) {
         self._syncTimestampStore = syncTimestampStore
+    }
+
+    func register(authService: AuthServiceProtocol) {
+        self._authService = authService
     }
 
 }

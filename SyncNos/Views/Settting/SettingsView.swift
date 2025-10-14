@@ -82,6 +82,18 @@ struct SettingsView: View {
                         }
                     }
                     .help("Show application about information")
+
+                    // 添加 Apple 账号与登录 的 NavigationLink
+                    NavigationLink(destination: AppleAccountView()) {
+                        HStack {
+                            Label("Apple Account", systemImage: "apple.logo")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Manage Apple sign-in and account info")
                 }
                 .collapsible(false)
 
