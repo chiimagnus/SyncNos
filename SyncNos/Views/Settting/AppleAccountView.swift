@@ -128,7 +128,7 @@ struct AppleAccountView: View {
                         if accountViewModel.loginMethods.isEmpty {
                             Text("暂无").foregroundColor(.secondary)
                         } else {
-                            ForEach(Array(accountViewModel.loginMethods.enumerated()), id: \\.0) { _, m in
+                            ForEach(Array(accountViewModel.loginMethods.enumerated()), id: \.0) { _, m in
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("\(m.providerName)").bold()
                                     Text("key: \(m.providerKey)")

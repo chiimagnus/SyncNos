@@ -38,11 +38,13 @@ final class AccountViewModel: ObservableObject {
     private func setLoading(_ loading: Bool) { self.isLoading = loading }
 
     private func storedAccessToken() -> String? {
-        keychain.read(service: accessKey, account: "syncnos")?.flatMap { String(data: $0, encoding: .utf8) }
+        guard let data = keychain.read(service: accessKey, account: "syncnos") else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private func storedRefreshToken() -> String? {
-        keychain.read(service: refreshKey, account: "syncnos")?.flatMap { String(data: $0, encoding: .utf8) }
+        guard let data = keychain.read(service: refreshKey, account: "syncnos") else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private func store(tokens: AuthTokens) {
