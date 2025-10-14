@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct LogWindow: View {
     @StateObject private var viewModel = LogViewModel()
@@ -22,10 +23,10 @@ struct LogWindow: View {
                 }
                 .help("Clear logs")
 
-                Button(action: { exportLogs() }) {
-                    Image(systemName: "square.and.arrow.up")
+                Button(action: { shareLogs() }) {
+                    Image(systemName: "square.and.arrow.up.on.square")
                 }
-                .help("Export logs")
+                .help("Share logs")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -62,19 +63,16 @@ struct LogWindow: View {
         return "\(formatter.string(from: entry.timestamp)) [\(entry.level.description)] \(entry.file):\(entry.line) - \(entry.message)"
     }
 
-    private func exportLogs() {
-        let panel = NSSavePanel()
-        panel.allowedFileTypes = ["txt"]
-        panel.nameFieldStringValue = "syncnos-logs.txt"
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                do {
-                    try viewModel.export(to: url)
-                    // optionally show success
-                } catch {
-                    // optionally show error
-                }
-            }
+    private func shareLogs() {
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("syncnos-logs.txt")
+        do {
+            try viewModel.export(to: tempURL)
+
+            guard let contentView = NSApp.keyWindow?.contentView else { return }
+            let picker = NSSharingServicePicker(items: [tempURL])
+            picker.show(relativeTo: contentView.bounds, of: contentView, preferredEdge: .minY)
+        } catch {
+            // optionally show error
         }
     }
 }
