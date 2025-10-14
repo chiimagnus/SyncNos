@@ -108,6 +108,10 @@ struct AppCommands: Commands {
 
         // Window 菜单 - 窗口管理相关
         CommandGroup(after: .windowList) {
+            Button("Show Logs", systemImage: "doc.text.magnifyingglass") {
+                openWindow(id: "log")
+            }
+            .keyboardShortcut("l", modifiers: .command)
             // Button("Book Detail Window", systemImage: "book") {
             //     // 打开书籍详情窗口的逻辑
             // }
