@@ -194,3 +194,13 @@ protocol SyncTimestampStoreProtocol: AnyObject {
     func getLastSyncTime(for bookId: String) -> Date?
     func setLastSyncTime(for bookId: String, to date: Date)
 }
+
+// MARK: - Auth Service Protocol
+protocol AuthServiceProtocol: AnyObject {
+    func loginWithApple(authorizationCode: String) async throws -> AuthTokens
+    func refresh(refreshToken: String) async throws -> AuthTokens
+    func logout(refreshToken: String) async throws
+    func fetchProfile(accessToken: String) async throws -> AccountProfile
+    func fetchLoginMethods(accessToken: String) async throws -> [LoginMethod]
+    func deleteAccount(accessToken: String) async throws
+}
