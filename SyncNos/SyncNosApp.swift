@@ -44,6 +44,12 @@ struct SyncNosApp: App {
             UserGuideView()
         }
         .windowResizability(.contentSize)
+
+        // 日志窗口（单实例）
+        Window("Logs", id: "log") {
+            LogWindow()
+        }
+        .windowResizability(.contentSize)
         
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {
