@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import requests
 import jwt
 
@@ -36,7 +36,7 @@ def exchange_code_for_tokens(authorization_code: str) -> Dict[str, Any]:
         "client_secret": client_secret,
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    last_err: Exception | None = None
+    last_err: Optional[Exception] = None
     for _ in range(2):
         try:
             resp = requests.post(APPLE_TOKEN_URL, data=data, headers=headers, timeout=15)
