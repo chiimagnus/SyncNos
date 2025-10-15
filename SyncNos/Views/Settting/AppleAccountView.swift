@@ -9,15 +9,7 @@ struct AppleAccountView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Apple登录（macOS）
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Apple 账号登录")
-                        .font(.title3)
-                        .bold()
-
-                    Text("使用系统原生 Sign in with Apple 完成授权，成功后与后端交换令牌并拉取账户信息。")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-
+                VStack {
                     SignInWithAppleButton(.signIn) { request in
                         appleViewModel.configure(request: request)
                     } onCompletion: { result in
@@ -38,7 +30,6 @@ struct AppleAccountView: View {
                         }
                     }
                     .signInWithAppleButtonStyle(.black)
-                    .frame(height: 44)
                     .cornerRadius(8)
 
                     Group {
@@ -66,6 +57,7 @@ struct AppleAccountView: View {
                                 Text("User Identifier：\(user.userIdentifier)")
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
+                                #if DEBUG
                                 if let code = user.authorizationCode, !code.isEmpty {
                                     Text("authorization_code：\(code)")
                                         .font(.footnote)
@@ -78,6 +70,7 @@ struct AppleAccountView: View {
                                         .foregroundColor(.secondary)
                                         .textSelection(.enabled)
                                 }
+                                #endif
                                 Button("重置状态") { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
@@ -90,10 +83,6 @@ struct AppleAccountView: View {
                             }
                         }
                     }
-
-                    Text("提示：首次授权可能返回邮箱与姓名，后续授权通常不再返回。")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
 
                 Divider().padding(.vertical)
@@ -135,7 +124,6 @@ struct AppleAccountView: View {
                                         .font(.footnote)
                                         .foregroundColor(.secondary)
                                 }
-                                Divider()
                             }
                         }
                     }
