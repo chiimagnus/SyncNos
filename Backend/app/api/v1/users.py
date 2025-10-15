@@ -16,8 +16,7 @@ class LoginMethodOut(BaseModel):
     provider_key: str
     created_at: str
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 class UserProfileOut(BaseModel):
@@ -28,8 +27,7 @@ class UserProfileOut(BaseModel):
     updated_at: Optional[str]
     login_methods: List[LoginMethodOut] = []
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 
 def _current_user(db: Session, user: dbm.User = Depends(get_current_user)) -> dbm.User:

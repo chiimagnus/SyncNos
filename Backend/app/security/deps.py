@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,7 +12,7 @@ from ..security.jwt import parse_token
 
 def get_current_user(
     db: Session = Depends(get_db),
-    authorization: str | None = Header(default=None, convert_underscores=False),
+    authorization: Optional[str] = Header(default=None, convert_underscores=False),
 ) -> dbm.User:
     """Extract access token from Authorization header and return current user.
 
