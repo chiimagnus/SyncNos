@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 
 import requests
 from jose import jwt as jose_jwt
+from jose.exceptions import JWTClaimsError
+import hashlib
 
 from ..core.config import settings
 
@@ -41,8 +43,14 @@ def verify_apple_id_token(id_token: str, audience: str, nonce: Optional[str] = N
         audience=audience,
         issuer="https://appleid.apple.com",
         options={"verify_at_hash": False},
-        nonce=nonce,
     )
+
+    # If nonce provided from client, verify that token's nonce matches SHA256(rawNonce)
+    if nonce is not None:
+        expected = hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+        token_nonce = payload.get("nonce")
+        if token_nonce != expected:
+            raise JWTClaimsError("Invalid nonce")
     return payload
 
 
