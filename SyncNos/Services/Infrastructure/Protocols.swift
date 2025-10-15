@@ -221,7 +221,7 @@ protocol SyncTimestampStoreProtocol: AnyObject {
 
 // MARK: - Auth Service Protocol
 protocol AuthServiceProtocol: AnyObject {
-    func loginWithApple(authorizationCode: String) async throws -> AuthTokens
+    func loginWithApple(authorizationCode: String, nonce: String?) async throws -> AuthTokens
     func refresh(refreshToken: String) async throws -> AuthTokens
     func logout(refreshToken: String) async throws
     func fetchProfile(accessToken: String) async throws -> AccountProfile

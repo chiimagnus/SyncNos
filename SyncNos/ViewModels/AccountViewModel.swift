@@ -21,8 +21,8 @@ final class AccountViewModel: ObservableObject {
         Task { await loadInternal() }
     }
 
-    func loginWithApple(authorizationCode: String) {
-        Task { await loginWithAppleInternal(code: authorizationCode) }
+    func loginWithApple(authorizationCode: String, nonce: String?) {
+        Task { await loginWithAppleInternal(code: authorizationCode, nonce: nonce) }
     }
 
     func logout() {
@@ -77,13 +77,35 @@ final class AccountViewModel: ObservableObject {
         await setLoading(true)
         await MainActor.run { self.errorMessage = nil }
         do {
-            let access = try await ensureAccessToken()
-            async let p: AccountProfile = auth.fetchProfile(accessToken: access)
-            async let m: [LoginMethod] = auth.fetchLoginMethods(accessToken: access)
-            let (profile, methods) = try await (p, m)
-            await MainActor.run {
-                self.profile = profile
-                self.loginMethods = methods
+            var access = try await ensureAccessToken()
+            do {
+                async let p1: AccountProfile = auth.fetchProfile(accessToken: access)
+                async let m1: [LoginMethod] = auth.fetchLoginMethods(accessToken: access)
+                let (profile, methods) = try await (p1, m1)
+                await MainActor.run {
+                    self.profile = profile
+                    self.loginMethods = methods
+                }
+            } catch {
+                // 若 401，尝试刷新一次再重试
+                if let nsErr = error as NSError?, nsErr.domain == "AuthService" && (nsErr.code == 401 || nsErr.code == 403) {
+                    if let refresh = storedRefreshToken() {
+                        let tokens = try await auth.refresh(refreshToken: refresh)
+                        store(tokens: tokens)
+                        access = tokens.accessToken
+                        async let p2: AccountProfile = auth.fetchProfile(accessToken: access)
+                        async let m2: [LoginMethod] = auth.fetchLoginMethods(accessToken: access)
+                        let (profile2, methods2) = try await (p2, m2)
+                        await MainActor.run {
+                            self.profile = profile2
+                            self.loginMethods = methods2
+                        }
+                    } else {
+                        throw error
+                    }
+                } else {
+                    throw error
+                }
             }
         } catch {
             await MainActor.run { self.errorMessage = error.localizedDescription }
@@ -91,11 +113,11 @@ final class AccountViewModel: ObservableObject {
         await setLoading(false)
     }
 
-    private func loginWithAppleInternal(code: String) async {
+    private func loginWithAppleInternal(code: String, nonce: String?) async {
         await setLoading(true)
         await MainActor.run { self.errorMessage = nil }
         do {
-            let tokens = try await auth.loginWithApple(authorizationCode: code)
+            let tokens = try await auth.loginWithApple(authorizationCode: code, nonce: nonce)
             store(tokens: tokens)
             try await Task.sleep(nanoseconds: 200_000_000)
             await loadInternal()
