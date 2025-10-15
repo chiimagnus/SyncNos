@@ -59,6 +59,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login/apple \
 
 - 访问 `http://127.0.0.1:8000/docs` 查看 Swagger UI
 
+---
+
+更多开发细节与 Sign in with Apple 改造说明，请参阅：
+
+- `Backend/docs/sign_in_with_apple.md`：包含 JWKS 验签、nonce 流程、前端/后端代码片段、测试与故障排查指南。
+
+
 ## 填写.env文件中的值
 
 - APPLE_TEAM_ID（Team ID）  
