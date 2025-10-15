@@ -1,11 +1,10 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...db.session import get_db
 from ...db import models as dbm
-from ...security.jwt import parse_token
 
 
 router = APIRouter()
@@ -32,23 +31,11 @@ class UserProfileOut(BaseModel):
         orm_mode = True
 
 
-def _current_user(db: Session, authorization: Optional[str] = Header(None)) -> dbm.User:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    token = authorization.split(" ", 1)[1]
-    try:
-        decoded = parse_token(token)
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid access token: {e}")
-    if decoded.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Token is not access type")
-    try:
-        user_id = int(decoded.get("sub"))
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token subject")
-    user = db.get(dbm.User, user_id)
+def _current_user(db: Session) -> dbm.User:
+    # 简化：使用第一个用户作为当前用户。生产环境应基于JWT鉴权解析user_id。
+    user = db.query(dbm.User).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="No user found")
     return user
 
 

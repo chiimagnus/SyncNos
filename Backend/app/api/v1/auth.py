@@ -5,12 +5,11 @@ from pydantic import BaseModel
 import jwt
 from sqlalchemy.orm import Session
 
-from ...services.apple_oauth import exchange_code_for_tokens, verify_id_token
+from ...services.apple_oauth import exchange_code_for_tokens
 from ...db.session import get_db
 from ...db import models as dbm
 from ...repositories import users as user_repo
 from ...security.jwt import create_access_token, create_refresh_token, parse_token
-from hashlib import sha256
 
 
 router = APIRouter()
@@ -41,11 +40,8 @@ def login_with_apple(payload: AppleLoginRequest, db: Session = Depends(get_db)):
     if not id_token:
         raise HTTPException(status_code=401, detail="No id_token in Apple response")
 
-    # 生产：使用 Apple JWKS 验签 id_token
-    try:
-        decoded = verify_id_token(id_token)
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid id_token: {e}")
+    # 仅解析（不在此处对 Apple 公钥验签，最小 MVP），生产应验签 JWKS
+    decoded = jwt.decode(id_token, options={"verify_signature": False, "verify_aud": False})
     apple_sub = decoded.get("sub")
     email = decoded.get("email")
     name = None  # Apple 可能不返回 name
@@ -67,11 +63,9 @@ def login_with_apple(payload: AppleLoginRequest, db: Session = Depends(get_db)):
     exp = decoded.get("exp")
     if not jti or not exp:
         raise HTTPException(status_code=500, detail="Failed to issue refresh token")
-    # 存储 jti 的哈希（避免明文 jti 落库）
-    jti_hash = sha256(jti.encode()).hexdigest()
     db_token = dbm.RefreshToken(
         user_id=user.id,
-        jti=jti_hash,
+        jti=jti,
         revoked=False,
         expires_at=datetime.fromtimestamp(exp, tz=timezone.utc),
     )
@@ -104,9 +98,7 @@ def refresh_tokens(payload: RefreshRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Malformed refresh token")
 
     # 校验刷新令牌状态
-    # 对比 jti 哈希
-    jti_hash = sha256(jti.encode()).hexdigest()
-    db_token = db.query(dbm.RefreshToken).filter(dbm.RefreshToken.jti == jti_hash).first()
+    db_token = db.query(dbm.RefreshToken).filter(dbm.RefreshToken.jti == jti).first()
     if not db_token or db_token.revoked:
         raise HTTPException(status_code=401, detail="Refresh token is revoked or not found")
     if db_token.expires_at <= datetime.now(timezone.utc):
@@ -118,11 +110,10 @@ def refresh_tokens(payload: RefreshRequest, db: Session = Depends(get_db)):
     decoded_new = parse_token(new_refresh)
     new_jti = decoded_new.get("jti")
     new_exp = decoded_new.get("exp")
-    new_jti_hash = sha256(new_jti.encode()).hexdigest()
     db.add(
         dbm.RefreshToken(
             user_id=user_id,
-            jti=new_jti_hash,
+            jti=new_jti,
             revoked=False,
             expires_at=datetime.fromtimestamp(new_exp, tz=timezone.utc),
         )
@@ -146,8 +137,7 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
     if decoded.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Token is not refresh type")
     jti = decoded.get("jti")
-    jti_hash = sha256(jti.encode()).hexdigest()
-    db_token = db.query(dbm.RefreshToken).filter(dbm.RefreshToken.jti == jti_hash).first()
+    db_token = db.query(dbm.RefreshToken).filter(dbm.RefreshToken.jti == jti).first()
     if not db_token:
         raise HTTPException(status_code=404, detail="Refresh token not found")
     db_token.revoked = True
