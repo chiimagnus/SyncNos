@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional
 from dotenv import load_dotenv
 
 # 加载项目根目录下的 .env（若存在）
@@ -13,7 +12,6 @@ class Settings(BaseSettings):
     apple_key_id: str = Field(..., alias="APPLE_KEY_ID")
     apple_client_id: str = Field(..., alias="APPLE_CLIENT_ID")  # Services ID
     apple_private_key: str = Field(..., alias="APPLE_PRIVATE_KEY")  # 内容或多行字符串
-    apple_private_key_path: Optional[str] = Field(None, alias="APPLE_PRIVATE_KEY_PATH")  # 私钥文件路径（可选）
 
     # App JWT
     app_jwt_secret: str = Field(..., alias="APP_JWT_SECRET")
