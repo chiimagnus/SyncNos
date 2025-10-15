@@ -10,6 +10,8 @@ from ...db.session import get_db
 from ...db import models as dbm
 from ...repositories import users as user_repo
 from ...security.jwt import create_access_token, create_refresh_token, parse_token
+from ...security.apple_jwks import verify_apple_id_token
+from ...core.config import settings
 
 
 router = APIRouter()
@@ -17,6 +19,7 @@ router = APIRouter()
 
 class AppleLoginRequest(BaseModel):
     authorization_code: str
+    nonce: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -40,10 +43,14 @@ def login_with_apple(payload: AppleLoginRequest, db: Session = Depends(get_db)):
     if not id_token:
         raise HTTPException(status_code=401, detail="No id_token in Apple response")
 
-    # 仅解析（不在此处对 Apple 公钥验签，最小 MVP），生产应验签 JWKS
-    decoded = jwt.decode(id_token, options={"verify_signature": False, "verify_aud": False})
-    apple_sub = decoded.get("sub")
-    email = decoded.get("email")
+    # 使用 Apple 公钥 (JWKS) 验签，并校验 iss/aud/exp/iat/nonce（若提供）
+    try:
+        verified = verify_apple_id_token(id_token, audience=settings.apple_client_id, nonce=payload.nonce)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid Apple id_token: {e}")
+
+    apple_sub = verified.get("sub")
+    email = verified.get("email")
     name = None  # Apple 可能不返回 name
     if not apple_sub:
         raise HTTPException(status_code=401, detail="Invalid id_token: missing sub")
