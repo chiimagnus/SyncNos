@@ -18,9 +18,10 @@ final class AuthService: AuthServiceProtocol {
     }
 
     // MARK: - Public API
-    func loginWithApple(authorizationCode: String) async throws -> AuthTokens {
+    func loginWithApple(authorizationCode: String, nonce: String? = nil) async throws -> AuthTokens {
         let url = BackendConfig.baseURL.appending(path: "auth/login/apple")
-        let payload = ["authorization_code": authorizationCode]
+        var payload: [String: Any] = ["authorization_code": authorizationCode]
+        if let nonce { payload["nonce"] = nonce }
         return try await postJSON(url: url, body: payload)
     }
 

@@ -26,7 +26,7 @@ struct AppleAccountView: View {
                         case .success:
                             if case .succeeded(let user) = appleViewModel.state, let code = user.authorizationCode, !code.isEmpty {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    accountViewModel.loginWithApple(authorizationCode: code)
+                                    accountViewModel.loginWithApple(authorizationCode: code, nonce: appleViewModel.rawNonce)
                                 }
                             } else {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
