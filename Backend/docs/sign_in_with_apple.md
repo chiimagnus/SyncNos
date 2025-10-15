@@ -17,7 +17,7 @@
 
 - 客户端通过系统 `Sign in with Apple` 获取 `authorization_code`（授权码）及 `identity_token`（id_token）。
 - 客户端将 `authorization_code`（以及可选的 `nonce`）发送到后端 `/api/v1/auth/login/apple`。
-- 后端用 `authorization_code` 向 Apple Token Endpoint 交换 `id_token`/access/refresh；使用 Apple JWKS 对 `id_token` 做 RS256 验签并校验 `iss`/`aud`/`exp`/`nonce`。
+- 后端用 `authorization_code` 向 Apple Token Endpoint 交换 `id_token`/access/refresh；使用 Apple JWKS 对 `id_token` 做 RS256 验签并校验 `iss`/`aud`/`exp`/`iat`；如果请求提供 `nonce`，后端会对比 `SHA256(rawNonce)` 与 `id_token` 的 `nonce` 字段。
 - 后端根据 `sub` 在本地 DB 查找或创建用户，并签发本地 HS256 access/refresh token 返回给客户端。
 
 ## 后端配置
@@ -42,17 +42,19 @@ pip install -r requirements.txt
 
 - 文件：`Backend/app/security/apple_jwks.py`
 - 功能：从 `https://appleid.apple.com/auth/keys` 拉取 JWKS 并缓存；使用 `python-jose[cryptography]` 的 `jose.jwt.decode` 对 `id_token` 验签。
-- 关键点：
+ - 关键点：
   - 校验 `issuer == "https://appleid.apple.com"`
   - 校验 `audience == settings.apple_client_id`
   - 验证 `exp/iat`
-  - 如果请求提供 `nonce`，必须校验 `nonce` 字段一致
+  - 如果请求提供 `nonce`，后端将对 `rawNonce` 做 SHA256 并与 `id_token` 的 `nonce` 字段比较，二者必须一致
 
 示例调用：
 
 ```python
 from app.security.apple_jwks import verify_apple_id_token
-payload = verify_apple_id_token(id_token, audience=settings.apple_client_id, nonce=maybe_nonce)
+# pass the original rawNonce (if available); the verifier will compute SHA256(rawNonce)
+# and compare it with the token's `nonce` claim after signature verification
+payload = verify_apple_id_token(id_token, audience=settings.apple_client_id, nonce=maybe_raw_nonce)
 ```
 
 错误处理：`jose` 会抛出具体异常（如 `ExpiredSignatureError`、`JWTClaimsError`），你的端点应捕获并返回 401。
@@ -92,12 +94,3 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login/apple \
 
 - 问：如何本地测试 JWKS 验签？
   - 答：可以在测试中通过替换 `apple_jwks._jwks_cache` 为一个包含你自签名公钥的 JWKS，并用 `python-jose` 生成对应签名的 id_token 进行单元测试。
-
----
-
-如果你希望，我可以继续：
-
-- 把这份指南改成 repository 的 docs 页面并在 CI 中加入后端 JWKS 的单元测试；或
-- 提供一个小脚本，帮助你生成测试用的 RS256 id_token（用于单元测试）。
-
-
