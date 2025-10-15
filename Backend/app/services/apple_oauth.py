@@ -36,9 +36,18 @@ def exchange_code_for_tokens(authorization_code: str) -> Dict[str, Any]:
         "client_secret": client_secret,
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    resp = requests.post(APPLE_TOKEN_URL, data=data, headers=headers, timeout=15)
-    if resp.status_code != 200:
-        raise ValueError(f"Apple token endpoint error: {resp.status_code} {resp.text}")
-    return resp.json()
+    last_err: Exception | None = None
+    for _ in range(2):
+        try:
+            resp = requests.post(APPLE_TOKEN_URL, data=data, headers=headers, timeout=15)
+            if resp.status_code != 200:
+                last_err = ValueError(f"Apple token endpoint error: {resp.status_code} {resp.text}")
+                continue
+            return resp.json()
+        except Exception as e:
+            last_err = e
+    if last_err:
+        raise last_err
+    raise RuntimeError("Unknown error exchanging Apple code for tokens")
 
 

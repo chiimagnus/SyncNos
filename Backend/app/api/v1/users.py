@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ...db.session import get_db
 from ...db import models as dbm
+from ...security.deps import get_current_user
 
 
 router = APIRouter()
@@ -31,17 +32,12 @@ class UserProfileOut(BaseModel):
         orm_mode = True
 
 
-def _current_user(db: Session) -> dbm.User:
-    # 简化：使用第一个用户作为当前用户。生产环境应基于JWT鉴权解析user_id。
-    user = db.query(dbm.User).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="No user found")
+def _current_user(db: Session, user: dbm.User = Depends(get_current_user)) -> dbm.User:
     return user
 
 
 @router.get("/profile", response_model=UserProfileOut)
-def get_profile(db: Session = Depends(get_db)):
-    user = _current_user(db)
+def get_profile(db: Session = Depends(get_db), user: dbm.User = Depends(get_current_user)):
     return UserProfileOut(
         id=user.id,
         email=user.email,
@@ -66,8 +62,7 @@ class UserStatsOut(BaseModel):
 
 
 @router.get("/stats", response_model=UserStatsOut)
-def get_stats(db: Session = Depends(get_db)):
-    user = _current_user(db)
+def get_stats(db: Session = Depends(get_db), user: dbm.User = Depends(get_current_user)):
     return UserStatsOut(
         user_id=user.id,
         login_methods=len(user.logins),
@@ -80,8 +75,7 @@ class LoginMethodsOut(BaseModel):
 
 
 @router.get("/login-methods", response_model=LoginMethodsOut)
-def list_login_methods(db: Session = Depends(get_db)):
-    user = _current_user(db)
+def list_login_methods(db: Session = Depends(get_db), user: dbm.User = Depends(get_current_user)):
     methods = [
         LoginMethodOut(
             provider_name=lm.provider_name,
@@ -94,8 +88,7 @@ def list_login_methods(db: Session = Depends(get_db)):
 
 
 @router.delete("/me")
-def delete_me(db: Session = Depends(get_db)):
-    user = _current_user(db)
+def delete_me(db: Session = Depends(get_db), user: dbm.User = Depends(get_current_user)):
     db.delete(user)
     db.commit()
     return {"success": True}

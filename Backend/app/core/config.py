@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     app_jwt_secret: str = Field(..., alias="APP_JWT_SECRET")
     access_token_minutes: int = Field(30, alias="APP_ACCESS_TOKEN_MINUTES")
     refresh_token_days: int = Field(7, alias="APP_REFRESH_TOKEN_DAYS")
+    apple_jwks_ttl: int = Field(3600, alias="APPLE_JWKS_TTL")
 
     # Database
     database_url: str = Field("sqlite:///./app.db", alias="DATABASE_URL")
