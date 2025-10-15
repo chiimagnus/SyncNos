@@ -11,7 +11,7 @@ from ..core.config import settings
 
 APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
 
-_jwks_cache: Dict[str, Any] | None = None
+_jwks_cache: Optional[Dict[str, Any]] = None
 _jwks_cached_at: float = 0.0
 
 
