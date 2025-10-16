@@ -2,3 +2,5 @@ buildServer.json
 /Backend/.venv
 *.db
 Backend/.env
+/.iflow
+/.specify
