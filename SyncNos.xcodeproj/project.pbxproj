@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
 		D8529F732E7354C900FE0D95 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = D8529F722E7354C900FE0D95 /* CLAUDE.md */; };
-		D8920ADC2EA0D7F3009F9C8F /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = D8920ADB2EA0D7F3009F9C8F /* MarkdownUI */; };
 		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 /* End PBXBuildFile section */
 
@@ -38,7 +37,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D8920ADC2EA0D7F3009F9C8F /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,7 +84,6 @@
 			);
 			name = SyncNos;
 			packageProductDependencies = (
-				D8920ADB2EA0D7F3009F9C8F /* MarkdownUI */,
 			);
 			productName = SyncNos;
 			productReference = D8CE88DA2E713DB50025AD6E /* SyncNos.app */;
@@ -117,9 +114,6 @@
 			);
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				D8920ADA2EA0D7F3009F9C8F /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D81167BD2E70A140000D0173 /* Products */;
 			projectDirPath = "";
@@ -376,25 +370,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		D8920ADA2EA0D7F3009F9C8F /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.4.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		D8920ADB2EA0D7F3009F9C8F /* MarkdownUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D8920ADA2EA0D7F3009F9C8F /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
-			productName = MarkdownUI;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D81167B42E70A13F000D0173 /* Project object */;
 }
