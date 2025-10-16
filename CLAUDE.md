@@ -1,307 +1,218 @@
-# CLAUDE.md
+# SyncNos - iFlow Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 项目概述
 
-## Project Overview
-SyncNos is a macOS application that synchronizes highlights and notes from Apple Books and GoodLinks to Notion. The app is built with SwiftUI for macOS 13+ using Swift 5.0+.
+SyncNos 是一个原生 macOS 应用程序，使用 SwiftUI 和 Swift 5.0 开发，专注于将 Apple Books 和 GoodLinks 应用中的高亮笔记同步到 Notion。项目采用现代化的 MVVM 架构，结合 Combine 响应式编程，严格遵循 SwiftUI 最佳实践。
 
-## Architecture
-The application follows a clean architecture pattern with dependency injection using a DIContainer. Key architectural elements:
-- **Dependency Injection**: Uses DIContainer.swift for managing service dependencies
-- **Services Layer**: Organized in numbered directories (0-NotionAPI, 1-AppleBooks, 2-GoodLinks, Infrastructure, IAP)
-- **Models**: Core data models defined in Models.swift
-- **ViewModels**: Follow MVVM pattern with specific view models for each feature
-- **Views**: SwiftUI views organized in Components, AppleBooks, GoodLinks, and Settings directories
+## 技术栈与架构
 
-## Key Services
-- `AppleBooksSyncService`: Handles Apple Books data synchronization
-- `GoodLinksDatabaseService`: Handles GoodLinks app integration
-- `NotionService`: Manages Notion API interactions
-- `AutoSyncService`: Provides automatic synchronization functionality
-- `IAPService`: Handles in-app purchases
-- `LoggerService`: Provides logging functionality
+### 核心框架
+- **平台**: macOS 13+ (部署目标 15.4)
+- **语言**: Swift 5.0
+- **UI框架**: SwiftUI 5.0
+- **架构模式**: MVVM + Combine 响应式编程
+- **依赖管理**: 原生 Swift Package Manager
 
-## Data Models
-- `BookListItem`: Lightweight model for book listings
-- `Highlight`: Represents individual highlights with text, notes, and metadata
-- `HighlightRow` and `BookRow`: UI-specific data representations
-- `ContentSource`: Enum for data source selection (Apple Books, GoodLinks)
-
-## Development Commands
-- **Build**: `xcodebuild -scheme SyncNos -configuration Debug`
-- **Build Release**: `xcodebuild -scheme SyncNos -configuration Release`
-- **Clean**: `xcodebuild clean -scheme SyncNos`
-- **Test**: Standard Xcode testing via `xcodebuild test` (if tests exist)
-- **Run**: Use Xcode IDE or `xcodebuild build` then run the resulting app
-
-## Build Environment
-- macOS 13+ required
-- Xcode 14+ recommended
-- Swift 5.0+ compatible
-- Project scheme: "SyncNos"
-- Build configurations: Debug, Release
-
-## Project Structure
+### 项目结构
 ```
 SyncNos/
-├── Models/                 # Data models
-├── Services/               # Business logic services
-│   ├── 0-NotionAPI/        # Notion integration
-│   ├── 1-AppleBooks/       # Apple Books integration
-│   ├── 2-GoodLinks/        # GoodLinks integration
-│   ├── Infrastructure/     # Core infrastructure
-│   └── IAP/                # In-app purchase
-├── ViewModels/             # View model layer
-├── Views/                  # SwiftUI views
-│   ├── AppleBooks/         # Apple Books UI
-│   ├── GoodLinks/          # GoodLinks UI
-│   ├── Components/         # Reusable components
-│   └── Setting/            # Settings UI
-├── Assets.xcassets/        # Asset catalog
-├── SyncNosApp.swift        # App entry point
-└── MainListView.swift      # Main application view
+├── Models/                    # 数据模型层
+├── Services/                  # 业务逻辑层
+│   ├── 0-NotionAPI/          # Notion API 集成
+│   ├── 1-AppleBooks/         # Apple Books 数据访问
+│   ├── 2-GoodLinks/          # GoodLinks 数据访问
+│   ├── Infrastructure/       # 基础设施服务
+│   └── IAP/                  # 应用内购买
+├── ViewModels/               # 视图模型层
+├── Views/                    # SwiftUI 视图层
+└── SyncNosApp.swift         # 应用入口
+
+Backend/                      # FastAPI 后端服务
+├── app/                      # Python FastAPI 应用
+│   ├── api/v1/              # REST API 端点
+│   ├── core/                # 核心配置
+│   ├── security/            # Apple 登录认证
+│   └── services/            # 业务服务
+└── requirements.txt         # Python 依赖
 ```
 
-## Key Implementation Notes
-- Uses bookmark APIs for persistent file access permissions
-- Implements auto-sync functionality with UserDefaults management
-- Follows Apple's data access guidelines for protected containers
-- Includes in-app purchase support
-- Uses UserDefaults for configuration persistence
-- Implements proper error handling throughout services
+## 构建与运行
 
-# 最佳实践指南：SwiftUI响应式布局 + MVVM架构 + Combine响应式编程
+### macOS 客户端
+```bash
+# 使用 Xcode 打开项目
+open SyncNos.xcodeproj
 
-## 项目架构要求
-
-### 核心技术栈
-- **架构模式**: MVVM (Model-View-ViewModel)
-- **UI框架**: SwiftUI (iOS17+, iPadOS17+, macOS13+)
-- **响应式编程**: Combine
-- **数据持久化**: SwiftData
-- **语言版本**: Swift 6.1+、Swift5+
-
-### 平台支持
-- iOS 17.0+
-- iPadOS 17.0+
-- macOS 13.0+
-
-## MVVM架构规范
-
-### 1. Models (数据模型)
-- 纯数据结构，不包含业务逻辑
-- 使用 `@Model` 宏用于 SwiftData
-- 只包含属性和简单的数据处理方法
-- 不直接引用 SwiftUI 或 Combine
-- 数据结构应该清晰、简洁
-
-### 2. ViewModels (视图模型)
-- 处理业务逻辑，管理状态
-- 二选一：使用 `ObservableObject` + `@Published`，或使用 `@Observable`；不要混用
-- 使用 `ObservableObject` 时使用 `@Published`；使用 `@Observable` 时不要使用 `@Published`
-- 不直接引用 SwiftUI Views
-- **禁止使用单例模式** (`shared` 静态实例)
-- 使用 Combine 进行响应式数据流处理（需 `$property`/`assign(to:)` 时，选择 `ObservableObject` + `@Published`）
-- 状态管理与UI逻辑，处理用户交互
-- 数据绑定，向View提供格式化数据
-- 调用Service执行业务操作，订阅数据变化（Combine）
-- 错误与加载状态统一处理
-
-#### ViewModel响应式编程规范
-- 使用 `ObservableObject` 时：用 `@Published` 标记需要触发 UI 的属性
-- 使用 `@Observable` 时：不要使用 `@Published`，直接声明属性；双向绑定用 `@Bindable`
-- **计算属性响应式**: 计算属性应自动响应上游可观察属性变化
-- Combine 订阅（仅 `ObservableObject`）：使用 `$property.sink` 或 `assign(to:)` 等
-- **避免手动通知**: 不要手动调用`objectWillChange.send()`，依赖`@Published`自动机制
-- 使用 Combine 操作符 (map, filter, debounce, etc.) 处理复杂数据流
-- 使用 `Set<AnyCancellable>` 管理订阅生命周期
-
-### 3. Views (视图)
-- 纯UI展示，不包含业务逻辑
-- 绑定策略：`ObservableObject` 用 `@StateObject/@ObservedObject`；`@Observable` 用 `@State`/`@Environment` + `@Bindable`（不要混用）
-- 组件化、可复用、条件渲染（加载/错误/空数据）
-- iOS设备适配（iPhone/iPad）、暗黑模式、主题切换
-- 响应式布局，支持不同屏幕尺寸
-
-## 代码组织与职责分离
-
-### 文件结构
-```
-Feature/
-├── Views/
-│   ├── FeatureView.swift
-│   └── Components/
-├── ViewModels/
-│   └── FeatureViewModel.swift
-├── Models/
-│   └── FeatureModel.swift
-└── Services/
-    └── FeatureService.swift
+# 或使用 xcodebuild 命令行构建
+xcodebuild -scheme SyncNos -configuration Debug build
 ```
 
-### 职责分离原则
-- **Views**: 只负责UI展示和用户交互响应
-- **ViewModels**: 处理业务逻辑、数据转换、状态管理
-- **Models**: 数据结构定义和简单数据处理
-- **Services**: 网络请求、数据存储等基础设施逻辑
+### Python 后端服务
+```bash
+cd Backend/
 
-## ViewModel 实例化策略
+# 创建虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate  # macOS/Linux
 
-### 推荐方式
-1. **按需创建**：每个视图创建独立的ViewModel实例
-2. **依赖注入**：通过 `.environmentObject()`（ObservableObject）或 `.environment(...)`（@Observable）传递 ViewModel
-3. **生命周期管理**：
-   - 短期：使用 `@State` 管理
-   - 长期：使用 `@Environment` 或 `@StateObject`
+# 安装依赖
+pip install -r requirements.txt
 
-### 禁止方式
-- ❌ 使用 `static let shared` 单例模式
-- ❌ 在ViewModel中创建全局状态
-- ❌ 多个视图共享同一个ViewModel实例
+# 配置环境变量 (创建 .env 文件)
+cp .env.example .env
+# 编辑 .env 文件填入 Apple 登录配置
 
-### 正确示例
+# 启动服务
+uvicorn app.main:app --reload --port 8000
+
+# 访问 API 文档
+open http://127.0.0.1:8000/docs
+```
+
+## 开发约定与最佳实践
+
+### 架构原则
+1. **组合优于继承**: 使用依赖注入和协议组合
+2. **接口优于单例**: 通过 DIContainer 管理服务依赖
+3. **显式优于隐式**: 清晰的数据流和依赖关系
+4. **SOLID 原则**: 严格的单一职责和接口隔离
+
+### 编码规范
+- **MVVM 架构**: View → ViewModel → Service → Model
+- **Combine 响应式**: 使用 `@Published` 和 `ObservableObject`
+- **SwiftUI 最佳实践**: 使用 `@State`, `@ObservedObject`, `@EnvironmentObject`
+- **错误处理**: 使用 `Result` 类型和 `throw` 机制
+- **日志记录**: 统一使用 `LoggerService` 进行分级日志
+
+### 依赖注入模式
 ```swift
-// ✅ 正确：按需创建（ObservableObject）
-@StateObject private var viewModel = ItemViewModel()
-
-// ✅ 正确：依赖注入（ObservableObject）
-.environmentObject(viewModel)
-
-// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
-class ItemViewModel: ObservableObject {
-    @Published var items: [Item] = []
-    @Published var filteredItems: [DisplayItem] = []
-    @Published var isLoading = false
-
-    private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        $items
-            .map { items in
-                items.map { DisplayItem(from: $0) }
-            }
-            .assign(to: &$filteredItems)
-    }
-}
-```
-
-## SwiftUI最佳实践
-
-### 响应式布局
-- 优先使用 SwiftUI 内置的响应式布局系统
-- 合理使用 Size Classes 进行设备适配
-- 避免过度使用 GeometryReader
-- 使用 ScrollView 优化长内容展示
-
-### 状态管理
-```swift
-// ✅ 正确：按需创建ViewModel（ObservableObject）
-struct FeatureView: View {
-    @StateObject private var viewModel = FeatureViewModel()
-
-    var body: some View {
-        ContentView()
-            .environmentObject(viewModel)
-    }
+// 服务协议定义
+protocol NotionServiceProtocol {
+    func syncToNotion(data: SyncData) async throws
 }
 
-// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
-class FeatureViewModel: ObservableObject {
-    @Published var items: [Item] = []
-    @Published var isLoading = false
-
-    private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        $items
-            .map { items in
-                items.map { transformItem($0) }
-            }
-            .sink { [weak self] transformedItems in
-                // 处理转换后的数据
-            }
-            .store(in: &cancellables)
-    }
-}
-```
-
-### 组件化开发
-- 每个组件职责单一
-- 组件可复用、可测试
-- 合理使用 ViewModifier 和 ViewBuilder
-- 避免过深层次的视图嵌套
-
-## Combine响应式编程
-
-### 数据流处理
-```swift
-// ViewModel中的响应式数据处理
-class MyViewModel: ObservableObject {
-    @Published var sourceData: [DataModel] = []
-    @Published var processedData: [DisplayModel] = []
-    @Published var searchText = ""
-    @Published var searchResults: [Item] = []
+// DIContainer 管理
+class DIContainer {
+    static let shared = DIContainer()
     
-    private var cancellables = Set<AnyCancellable>()
-    
-    init() {
-        // 响应式数据转换
-        $sourceData
-            .map { data in
-                // 业务逻辑处理
-                return data.map { DisplayModel(from: $0) }
-            }
-            .assign(to: &$processedData)
-            
-        // 搜索功能
-        $searchText
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .flatMap { text in
-                text.isEmpty ? Just([]).eraseToAnyPublisher() : 
-                self.searchService.search(text).catch { _ in Just([]) }.eraseToAnyPublisher()
-            }
-            .assign(to: &$searchResults)
+    var notionService: NotionServiceProtocol {
+        NotionService(configStore: notionConfigStore)
     }
 }
 
-### 响应式编程最佳实践
-1. **数据源响应**: 使用`@Published`属性作为数据源
-2. **自动转换**: 通过`.map`、`.filter`等操作符处理数据
-3. **链式操作**: 使用`.assign(to:)`或`.sink`订阅结果
-4. **内存管理**: 使用`Set<AnyCancellable>`管理订阅生命周期
-5. **错误处理**: 使用`.catch`、`.replaceError`处理错误情况
+// ViewModel 中使用
+@MainActor
+final class MyViewModel: ObservableObject {
+    private let notionService: NotionServiceProtocol
+    
+    init(notionService: NotionServiceProtocol = DIContainer.shared.notionService) {
+        self.notionService = notionService
+    }
+}
 ```
 
-### 错误处理
-- 使用 `catch` 操作符处理错误
-- 统一错误处理机制
-- 避免在 View 层处理复杂错误逻辑
+### 数据同步策略
+1. **单库模式**: 所有内容在一个 Notion 数据库中
+2. **分库模式**: 每本书/链接单独一个数据库
+3. **幂等同步**: 使用 UUID 确保不重复同步
+4. **增量同步**: 基于时间戳的增量更新
 
-## 禁止事项
+### 安全与权限
+- **App Sandbox**: 使用安全范围书签访问用户数据
+- **只读访问**: 数据库访问仅限读取权限
+- **密钥管理**: API 密钥安全存储在 Keychain
+- **Apple 登录**: 使用 JWT 和 Apple 的公钥验证
 
-### 架构层面
-- ❌ 在 View 中直接处理业务逻辑
-- ❌ 在 Model 中包含业务逻辑
-- ❌ 使用单例模式创建 ViewModel
-- ❌ 多个 View 共享同一个 ViewModel 实例
-- ❌ 在 ViewModel 中直接操作 UI
-- ❌ 在View中直接访问数据库
+## 核心功能模块
 
-### 代码实现
-- ❌ 手动计算屏幕尺寸和比例
-- ❌ 使用固定像素值布局
-- ❌ 复杂的 GeometryReader 嵌套
-- ❌ 忽略内存管理 (忘记调用 store(in:))
+### Apple Books 集成
+- **数据库访问**: 读取本地 SQLite 数据库 (AEAnnotation + BKLibrary)
+- **数据提取**: 书籍信息、高亮文本、笔记、样式、时间戳
+- **文件监控**: 自动检测最新的数据库文件
+- **分页加载**: 大量高亮数据的分页处理
 
-## 性能优化
+### GoodLinks 集成
+- **数据库访问**: 读取 GoodLinks SQLite 数据库
+- **内容提取**: 文章链接、标题、内容、标签、高亮
+- **标签解析**: 支持 GoodLinks 的标签系统
+- **全文内容**: 获取文章完整正文
 
-### 响应式数据流
-- 合理使用 `@Published` 避免不必要的更新
-- 使用 `removeDuplicates()` 减少重复计算
-- 使用 `debounce()` 优化用户输入响应
+### Notion API 集成
+- **数据库操作**: 创建、查询、更新 Notion 数据库
+- **页面管理**: 创建和管理 Notion 页面
+- **富文本支持**: 高亮和笔记的富文本格式
+- **批量操作**: 支持批量创建和更新
 
-### 视图渲染
-- 避免在 `body` 中进行复杂计算
-- 使用 `@State` 和 `@Binding` 优化状态传递
-- 合理使用 `@ViewBuilder` 优化视图构建
+### 自动同步服务
+- **后台同步**: 定时自动同步功能
+- **状态监控**: 同步状态实时显示
+- **错误重试**: 失败重试机制
+- **用户配置**: 可配置的同步频率
+
+## 测试与验证
+
+### 手动测试流程
+1. **Apple Books 测试**:
+   - 确保有高亮笔记的书籍存在
+   - 验证数据库文件访问权限
+   - 测试同步到 Notion 的功能
+
+2. **GoodLinks 测试**:
+   - 准备包含高亮的 GoodLinks 数据
+   - 验证数据库连接和读取
+   - 测试标签解析和内容提取
+
+3. **Notion 集成测试**:
+   - 验证 API 密钥和页面 ID 配置
+   - 测试数据库创建和页面同步
+   - 验证富文本格式和链接
+
+### 调试与日志
+- **日志级别**: Debug, Info, Warning, Error
+- **日志查看**: 内置日志窗口查看器
+- **错误追踪**: 详细的错误信息和堆栈跟踪
+- **性能监控**: 同步操作的时间统计
+
+## 部署与发布
+
+### App Store 发布
+- **Bundle ID**: `com.chiimagnus.macOS`
+- **版本管理**: 遵循语义化版本控制
+- **审核准备**: 符合 macOS App Store 审核指南
+- **隐私合规**: 遵循 Apple 隐私政策
+
+### 后端部署
+- **环境配置**: 生产环境变量管理
+- **容器化**: 支持 Docker 容器部署
+- **监控**: 集成日志和性能监控
+- **安全**: HTTPS 和 API 安全认证
+
+## 相关资源
+
+- **Apple 文档**: [Apple Books 数据访问说明](Resource/Apple%20Books%20数据访问说明（简要）.md)
+- **GoodLinks 文档**: [GoodLinks 数据访问说明](SyncNos/Services/2-GoodLinks/GoodLinks数据访问说明.md)
+- **技术博客**: [微信公众号文章](https://mp.weixin.qq.com/s/jeTko_mQbCe3DXUNpmjHHA)
+- **Notion API**: [Notion Developers](https://developers.notion.com/)
+- **Apple 登录**: [Sign in with Apple](https://developer.apple.com/sign-in-with-apple/)
+
+## 开发路线图
+
+### 当前功能 ✅
+- Apple Books 高亮同步
+- GoodLinks 文章同步
+- Notion 单库/分库模式
+- 自动同步功能
+- Apple 登录认证
+- 应用内购买
+
+### 未来规划 🚧
+- 微信读书集成
+- 得到 App 集成
+- 自定义同步规则
+- 高级过滤和搜索
+- 数据导出功能
+- iOS/iPadOS 版本
+
+---
+
+**注意**: 本项目专注于 macOS 原生体验，使用最新的 SwiftUI 和 Swift 特性，致力于提供最佳的用户体验和代码质量。
