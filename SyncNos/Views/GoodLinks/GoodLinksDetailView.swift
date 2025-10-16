@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 import AppKit
 
 struct GoodLinksDetailView: View {
@@ -87,10 +88,8 @@ struct GoodLinksDetailView: View {
                                                     .foregroundColor(.secondary)
                                                     .fontWeight(.medium)
                                             }
-                                            Text(summary)
-                                                .font(.body)
-                                                .foregroundColor(.primary)
-                                                .textSelection(.enabled)
+                                            Markdown(summary)
+                                                .appMarkdownDefaults()
                                                 .fixedSize(horizontal: false, vertical: true)
                                         }
                                         .padding(.top, 4)

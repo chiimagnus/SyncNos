@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 
 struct UserGuideView: View {
     var body: some View {
@@ -9,8 +10,11 @@ struct UserGuideView: View {
                     .fontWeight(.bold)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("1. Open Settings, fill in the Notion API token and Page ID in the \"Credentials\" section, then click Save.")
-                    Text("2. Authorize the integration in [Notion integrations 🔗](https://www.notion.so/profile/integrations).")
+                    Markdown("""
+                    1. Open Settings, fill in the Notion API token and Page ID in the \"Credentials\" section, then click Save.
+                    2. Authorize the integration in [Notion integrations 🔗](https://www.notion.so/profile/integrations).
+                    """)
+                        .appMarkdownDefaults()
                 }
 
                 Spacer()
