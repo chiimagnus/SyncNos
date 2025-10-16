@@ -1,5 +1,4 @@
 import SwiftUI
-import MarkdownUI
 
 /// 通用的高亮卡片视图
 struct HighlightCardView<AccessoryContent: View>: View {
@@ -37,8 +36,9 @@ struct HighlightCardView<AccessoryContent: View>: View {
                 // 右侧内容区域
                 VStack(alignment: .leading, spacing: 8) {
                     // 高亮内容
-                    Markdown(content)
-                        .appMarkdownDefaults()
+                    Text(content)
+                        .font(.body)
+                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         // .frame(maxWidth: .infinity, alignment: .leading)
                     
@@ -48,8 +48,10 @@ struct HighlightCardView<AccessoryContent: View>: View {
                             // Image(systemName: "note.text")
                             //     .font(.caption)
                             //     .foregroundColor(.orange)
-                            Markdown(note)
-                                .appMarkdownDefaults()
+                            Text(note)
+                                .font(.callout)
+                                .foregroundColor(.primary)
+                                .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         // .frame(maxWidth: .infinity, alignment: .leading)

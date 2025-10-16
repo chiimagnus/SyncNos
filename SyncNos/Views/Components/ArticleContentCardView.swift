@@ -1,5 +1,4 @@
 import SwiftUI
-import MarkdownUI
 
 /// 展示文章全文的内容卡片。支持在 live resize 期间通过 `overrideWidth` 冻结最大宽度，
 /// 并通过 `measuredWidth` 绑定向上层上报当前可用宽度用于冻结策略。
@@ -48,21 +47,18 @@ struct ArticleContentCardView: View {
             }
             .padding(.bottom, 4)
 
-            Group {
-                if isExpanded {
-                    Markdown(contentText)
-                        .appMarkdownDefaults()
-                } else {
-                    Markdown(MarkdownPreviewBuilder.buildPreview(from: contentText, maxCharacters: 1200))
-                        .appMarkdownDefaults()
-                }
-            }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-            )
+            Text(contentText)
+                .font(.body)
+                .foregroundColor(.primary)
+                .textSelection(.enabled)
+                .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                .fixedSize(horizontal: false, vertical: isExpanded)
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+                )
 
             if shouldShowToggle {
                 Button(action: { isExpanded.toggle() }) {
