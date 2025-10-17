@@ -104,11 +104,6 @@ struct AppleBooksListView: View {
                 await viewModel.loadBooks()
             }
         }
-        .onChange(of: viewModel.displayBooks) { displayBooks in
-            if selectionIds.isEmpty, let first = displayBooks.first?.bookId {
-                selectionIds = [first]
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SelectAllRequested")).receive(on: DispatchQueue.main)) { _ in
             let all = Set(viewModel.displayBooks.map { $0.bookId })
             if !all.isEmpty { selectionIds = all }
