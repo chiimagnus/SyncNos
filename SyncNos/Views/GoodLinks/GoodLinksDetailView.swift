@@ -258,13 +258,6 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .onReceive(
-            NotificationCenter.default.publisher(for: Notification.Name("SyncCurrentBookToNotionRequested")).receive(on: DispatchQueue.main)
-        ) { _ in
-            if let linkId = selectedLinkId, let link = viewModel.links.first(where: { $0.id == linkId }) {
-                Task { viewModel.syncSmart(link: link) }
-            }
-        }
         .alert("Sync Error", isPresented: $showingSyncError) {
             Button("OK", role: .cancel) { }
         } message: {
