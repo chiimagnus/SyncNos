@@ -57,11 +57,11 @@ enum GoodLinksSortKey: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .title: return "标题"
-        case .highlightCount: return "高亮数量"
-        case .added: return "添加时间"
-        case .modified: return "修改时间"
-        case .lastSync: return "上次同步时间"
+        case .title: return NSLocalizedString("Title", comment: "GoodLinks sort option")
+        case .highlightCount: return NSLocalizedString("Highlight Count", comment: "GoodLinks sort option")
+        case .added: return NSLocalizedString("Added Time", comment: "GoodLinks sort option")
+        case .modified: return NSLocalizedString("Modified Time", comment: "GoodLinks sort option")
+        case .lastSync: return NSLocalizedString("Last Sync Time", comment: "GoodLinks sort option")
         }
     }
 }
