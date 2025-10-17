@@ -35,9 +35,8 @@ struct HighlightCardView<AccessoryContent: View>: View {
                 
                 // 右侧内容区域
                 VStack(alignment: .leading, spacing: 8) {
-                    // 高亮内容
-                    Text(content)
-                        .font(.body)
+                    // 高亮内容（支持 Markdown）
+                    MarkdownTextView(text: content)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         // .frame(maxWidth: .infinity, alignment: .leading)
@@ -48,9 +47,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
                             // Image(systemName: "note.text")
                             //     .font(.caption)
                             //     .foregroundColor(.orange)
-                            Text(note)
-                                .font(.callout)
-                                .foregroundColor(.primary)
+                            MarkdownTextView(text: note)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                         }

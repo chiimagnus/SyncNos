@@ -47,9 +47,7 @@ struct ArticleContentCardView: View {
             }
             .padding(.bottom, 4)
 
-            Text(contentText)
-                .font(.body)
-                .foregroundColor(.primary)
+            MarkdownTextView(text: contentText)
                 .textSelection(.enabled)
                 .lineLimit(isExpanded ? nil : collapsedLineLimit)
                 .fixedSize(horizontal: false, vertical: isExpanded)
