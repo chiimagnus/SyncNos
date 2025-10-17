@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GoodLinksListView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
-    @Binding var selectedLinkId: String?
+    @Binding var selectionIds: Set<String>
 
     var body: some View {
         Group {
@@ -31,7 +31,7 @@ struct GoodLinksListView: View {
                 }
                 // .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: $selectedLinkId) {
+                List(selection: $selectionIds) {
                     ForEach(viewModel.displayLinks, id: \.id) { link in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -72,10 +72,16 @@ struct GoodLinksListView: View {
                         .tag(link.id)
                         .contextMenu {
                             Button {
-                                selectedLinkId = link.id
+                                selectionIds = [link.id]
                                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
                             } label: {
                                 Label("Sync Now (Last Time: \(SyncTimestampStore.shared.getLastSyncTime(for: link.id).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "Never"))", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            Divider()
+                            Button {
+                                viewModel.batchSync(linkIds: selectionIds, concurrency: 10)
+                            } label: {
+                                Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
                         }
                     }
@@ -90,8 +96,8 @@ struct GoodLinksListView: View {
                 }
             }
             // 默认选中第一条（若未选中且有数据）
-            if selectedLinkId == nil, let firstId = viewModel.links.first?.id {
-                selectedLinkId = firstId
+            if selectionIds.isEmpty, let firstId = viewModel.links.first?.id {
+                selectionIds = [firstId]
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
@@ -105,12 +111,22 @@ struct GoodLinksListView: View {
             }
         }
         .onChange(of: viewModel.links) { links in
-            if selectedLinkId == nil, let firstId = links.first?.id {
-                selectedLinkId = firstId
+            if selectionIds.isEmpty, let firstId = links.first?.id {
+                selectionIds = [firstId]
             }
         }
         .onDisappear {
             GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SelectAllRequested")).receive(on: DispatchQueue.main)) { _ in
+            let all = Set(viewModel.displayLinks.map { $0.id })
+            if !all.isEmpty { selectionIds = all }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DeselectAllRequested")).receive(on: DispatchQueue.main)) { _ in
+            selectionIds.removeAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
+            viewModel.batchSync(linkIds: selectionIds, concurrency: 10)
         }
     }
 }

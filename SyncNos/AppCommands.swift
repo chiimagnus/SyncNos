@@ -65,14 +65,22 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+
+            Button("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle") {
+                NotificationCenter.default.post(name: Notification.Name("SyncSelectedToNotionRequested"), object: nil)
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option])
         }
 
         // Edit 菜单 - 编辑操作相关
         CommandGroup(after: .textEditing) {
-            // Button("Find in Books", systemImage: "magnifyingglass") {
-            //     // 在书籍中搜索的逻辑
-            // }
-            // .keyboardShortcut("f", modifiers: [.command, .shift])
+            Button("Select All Items", systemImage: "checkmark.circle") {
+                NotificationCenter.default.post(name: Notification.Name("SelectAllRequested"), object: nil)
+            }
+            .keyboardShortcut("a", modifiers: [.command])
+            Button("Deselect All Items", systemImage: "circle") {
+                NotificationCenter.default.post(name: Notification.Name("DeselectAllRequested"), object: nil)
+            }
         }
 
         // View 菜单 - 视图相关
@@ -114,7 +122,7 @@ struct AppCommands: Commands {
                     UserDefaults.standard.set(new, forKey: "bookList_sort_key")
                     NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": new])
                 })) {
-                    ForEach(BookListSortKey.allCases, id: \ .self) { k in
+                    ForEach(BookListSortKey.allCases, id: \.self) { k in
                         Text(k.displayName).tag(k.rawValue)
                     }
                 }
@@ -142,7 +150,7 @@ struct AppCommands: Commands {
                     UserDefaults.standard.set(new, forKey: "goodlinks_sort_key")
                     NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": new])
                 })) {
-                    ForEach(GoodLinksSortKey.allCases, id: \ .self) { k in
+                    ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
                         Text(k.displayName).tag(k.rawValue)
                     }
                 }
