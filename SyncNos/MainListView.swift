@@ -75,7 +75,12 @@ struct MainListView: View {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    Text("Select an item").foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(contentSource.title)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        Text("Please select an item").foregroundColor(.secondary)
+                    }
                 }
             } else {
                 if selectedBookIds.count == 1 {
@@ -89,7 +94,12 @@ struct MainListView: View {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    Text("Select a book to view details").foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(contentSource.title)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        Text("Please select an item").foregroundColor(.secondary)
+                    }
                 }
             }
         }
