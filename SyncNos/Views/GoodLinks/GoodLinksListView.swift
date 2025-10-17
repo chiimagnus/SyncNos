@@ -110,11 +110,6 @@ struct GoodLinksListView: View {
                 await viewModel.loadRecentLinks()
             }
         }
-        .onChange(of: viewModel.links) { links in
-            if selectionIds.isEmpty, let firstId = links.first?.id {
-                selectionIds = [firstId]
-            }
-        }
         .onDisappear {
             GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
         }
