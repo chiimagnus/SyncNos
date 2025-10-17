@@ -337,7 +337,7 @@ extension BookViewModel {
                                 try await self.appleBooksSyncService.syncSmart(book: book, dbPath: dbPath) { _ in }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
                             } catch {
-                                self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
                             }
                         }
