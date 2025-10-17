@@ -183,10 +183,10 @@ struct MarkdownRendererView: View {
         } else if let code = node as? Markdown.InlineCode {
             return SwiftUI.Text(code.code).font(theme.fontMonospaced)
         } else if let link = node as? Markdown.Link {
-            let label = inlineText(from: link)
+            var label = inlineText(from: link)
                 .foregroundColor(theme.linkColor)
                 .underline()
-            // 提供基础可视化；可在外层通过 AttributedString 链接属性或手势打开
+            // 纯 Text 无法直接附加点击事件；如需点击打开可改为 Button + action 渲染器
             return label
         } else if node is Markdown.SoftBreak {
             return SwiftUI.Text("\n")

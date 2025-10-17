@@ -4,10 +4,12 @@ import SwiftUI
 struct MarkdownTextView: View {
     let text: String
     var theme: MarkdownRenderTheme = .init()
+    var openLinks: Bool = true
 
-    init(text: String, theme: MarkdownRenderTheme = .init()) {
+    init(text: String, theme: MarkdownRenderTheme = .init(), openLinks: Bool = true) {
         self.text = text
         self.theme = theme
+        self.openLinks = openLinks
     }
 
     var body: some View {
