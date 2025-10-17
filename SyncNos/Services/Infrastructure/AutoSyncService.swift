@@ -167,7 +167,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         }
 
         // 并发上限（书本级并行数）
-        let maxConcurrentBooks = 10
+        let maxConcurrentBooks = NotionSyncConfig.batchConcurrency
 
         // 预过滤近 24 小时已同步过的书籍，并即时发送跳过通知
         let now = Date()
