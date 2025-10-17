@@ -314,7 +314,7 @@ class BookViewModel: ObservableObject {
 // MARK: - Batch Sync (Apple Books)
 extension BookViewModel {
     /// 批量同步所选书籍到 Notion，使用并发限流（默认 10 并发）
-    func batchSync(bookIds: Set<String>, concurrency: Int = 10) {
+    func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard let dbPath = self.annotationDatabasePath else {
             logger.warning("[AppleBooks] annotationDatabasePath is nil; skip batchSync")
@@ -324,6 +324,7 @@ extension BookViewModel {
         let ids = Array(bookIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
+        let syncService = self.appleBooksSyncService
 
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -334,7 +335,7 @@ extension BookViewModel {
                         await limiter.withPermit {
                             NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
                             do {
-                                try await self.appleBooksSyncService.syncSmart(book: book, dbPath: dbPath) { _ in }
+                                try await syncService.syncSmart(book: book, dbPath: dbPath) { _ in }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
                             } catch {
                                 await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
