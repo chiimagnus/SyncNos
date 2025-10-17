@@ -11,6 +11,8 @@ struct GoodLinksDetailView: View {
     @State private var frozenLayoutWidth: CGFloat? = nil
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
+    @State private var externalIsSyncing: Bool = false
+    @State private var externalSyncProgress: String? = nil
 
     var body: some View {
         Group {
@@ -222,8 +224,18 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        if viewModel.isSyncing {
+                ToolbarItem(placement: .primaryAction) {
+                        if externalIsSyncing {
+                            HStack(spacing: 8) {
+                                ProgressView().scaleEffect(0.8)
+                                if let progress = externalSyncProgress {
+                                    Text(progress).font(.caption)
+                                } else {
+                                    Text("Syncing...").font(.caption)
+                                }
+                            }
+                            .help("Sync in progress")
+                        } else if viewModel.isSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
                                 if let progress = viewModel.syncProgressText {
@@ -270,6 +282,23 @@ struct GoodLinksDetailView: View {
                 if !isSuccess {
                     syncErrorMessage = message
                     showingSyncError = true
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
+            if bookId == (selectedLinkId ?? "") {
+                externalIsSyncing = true
+                externalSyncProgress = info["progress"] as? String
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
+            if bookId == (selectedLinkId ?? "") {
+                switch status {
+                case "started": externalIsSyncing = true
+                case "succeeded", "failed", "skipped": externalIsSyncing = false; externalSyncProgress = nil
+                default: break
                 }
             }
         }
