@@ -48,19 +48,6 @@ struct MainListView: View {
                         Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        if contentSource == .goodLinks {
-                            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
-                        } else {
-                            viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-                        }
-                    } label: {
-                        Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .disabled((contentSource == .goodLinks ? selectedLinkIds.isEmpty : selectedBookIds.isEmpty))
-                    .help("Sync Selected to Notion")
-                }
             }
         } detail: {
             if contentSource == .goodLinks {
