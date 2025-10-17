@@ -75,7 +75,7 @@ struct MainListView: View {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack {
                         Text(contentSource.title)
                             .font(.largeTitle)
                             .fontWeight(.bold)
@@ -94,7 +94,7 @@ struct MainListView: View {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack {
                         Text(contentSource.title)
                             .font(.largeTitle)
                             .fontWeight(.bold)
