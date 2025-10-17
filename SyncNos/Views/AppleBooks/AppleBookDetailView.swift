@@ -148,6 +148,10 @@ struct AppleBookDetailView: View {
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
                 }
+                // 若返回时该 book 正在批量同步，立即显示外部同步状态
+                if let id = selectedBookId, viewModelList.syncingBookIds.contains(id) {
+                    externalIsSyncing = true
+                }
             }
         }
         .onChange(of: selectedBookId) { _ in
@@ -155,6 +159,14 @@ struct AppleBookDetailView: View {
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
                 }
+            }
+            // 切换到某个 item 时，依据 ViewModel 中的 syncing 集合立即更新外部同步显示
+            if let id = selectedBookId {
+                externalIsSyncing = viewModelList.syncingBookIds.contains(id)
+                if !externalIsSyncing { externalSyncProgress = nil }
+            } else {
+                externalIsSyncing = false
+                externalSyncProgress = nil
             }
         }
         .navigationTitle("Apple Books")
@@ -285,6 +297,11 @@ struct AppleBookDetailView: View {
                     showingSyncError = true
                 }
             }
+        }
+        .onChange(of: selectedBookId) { _ in
+            // 切换选中项时清理外部同步显示，避免遗留状态影响新选中项
+            externalIsSyncing = false
+            externalSyncProgress = nil
         }
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
