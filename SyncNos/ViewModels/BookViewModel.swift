@@ -110,6 +110,23 @@ class BookViewModel: ObservableObject {
         }
         self.sortAscending = UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
         self.showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
+        // 订阅来自 AppCommands 的过滤/排序变更通知
+        NotificationCenter.default.publisher(for: Notification.Name("AppleBooksFilterChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let keyRaw = userInfo["sortKey"] as? String, let k = BookListSortKey(rawValue: keyRaw) {
+                    self.sortKey = k
+                }
+                if let asc = userInfo["sortAscending"] as? Bool {
+                    self.sortAscending = asc
+                }
+                if let showTitleOnly = userInfo["showWithTitleOnly"] as? Bool {
+                    self.showWithTitleOnly = showTitleOnly
+                }
+            }
+            .store(in: &cancellables)
 
         subscribeSyncStatusNotifications()
     }

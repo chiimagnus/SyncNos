@@ -64,29 +64,6 @@ struct AppleBooksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            // Sort options submenu
-                            Picker("Sort by", selection: $viewModel.sortKey) {
-                                ForEach(BookListSortKey.allCases, id: \.self) { key in
-                                    Text(key.displayName).tag(key)
-                                }
-                            }
-
-                            Divider()
-
-                            Toggle("Ascending", isOn: $viewModel.sortAscending)
-
-                            Divider()
-
-                            // Filter options
-                            Toggle("Books with titles only", isOn: $viewModel.showWithTitleOnly)
-                        } label: {
-                            Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
-                        }
-                    }
-                }
             }
         }
         .onAppear {

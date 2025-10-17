@@ -41,11 +41,28 @@ final class GoodLinksViewModel: ObservableObject {
         self.syncService = syncService
         self.logger = logger
         subscribeSyncStatusNotifications()
-
         if let raw = UserDefaults.standard.string(forKey: "goodlinks_sort_key"), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
         self.sortAscending = UserDefaults.standard.object(forKey: "goodlinks_sort_ascending") as? Bool ?? false
         self.showStarredOnly = UserDefaults.standard.object(forKey: "goodlinks_show_starred_only") as? Bool ?? false
         self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
+
+        // 订阅来自 AppCommands 的过滤/排序变更通知
+        NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFilterChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let keyRaw = userInfo["sortKey"] as? String, let k = GoodLinksSortKey(rawValue: keyRaw) {
+                    self.sortKey = k
+                }
+                if let asc = userInfo["sortAscending"] as? Bool {
+                    self.sortAscending = asc
+                }
+                if let starredOnly = userInfo["showStarredOnly"] as? Bool {
+                    self.showStarredOnly = starredOnly
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func loadRecentLinks(limit: Int = 0) async {
