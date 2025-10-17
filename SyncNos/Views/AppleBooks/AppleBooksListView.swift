@@ -62,7 +62,7 @@ struct AppleBooksListView: View {
                             }
                             Divider()
                             Button {
-                                viewModel.batchSync(bookIds: selectionIds, concurrency: 10)
+                                viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
@@ -114,7 +114,7 @@ struct AppleBooksListView: View {
             selectionIds.removeAll()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(bookIds: selectionIds, concurrency: 10)
+            viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
     }
 }

@@ -51,9 +51,9 @@ struct MainListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         if contentSource == .goodLinks {
-                            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: 10)
+                            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                         } else {
-                            viewModel.batchSync(bookIds: selectedBookIds, concurrency: 10)
+                            viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                         }
                     } label: {
                         Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
@@ -72,7 +72,7 @@ struct MainListView: View {
                     GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
                 } else if selectedLinkIds.count > 1 {
                     MultipleSelectionPlaceholderView(count: selectedLinkIds.count) {
-                        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: 10)
+                        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
                     Text("Select an item").foregroundColor(.secondary)
@@ -86,7 +86,7 @@ struct MainListView: View {
                     AppleBookDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
                 } else if selectedBookIds.count > 1 {
                     MultipleSelectionPlaceholderView(count: selectedBookIds.count) {
-                        viewModel.batchSync(bookIds: selectedBookIds, concurrency: 10)
+                        viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
                     Text("Select a book to view details").foregroundColor(.secondary)

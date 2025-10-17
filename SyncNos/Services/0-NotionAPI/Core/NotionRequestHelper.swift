@@ -6,6 +6,7 @@ class NotionRequestHelper {
     private let apiBase: URL
     private let notionVersion: String
     private let logger: LoggerServiceProtocol
+    private static let globalLimiter = NotionRateLimiter(rps: NotionSyncConfig.notionRequestsPerSecond)
 
     init(configStore: NotionConfigStoreProtocol, apiBase: URL, notionVersion: String, logger: LoggerServiceProtocol) {
         self.configStore = configStore
@@ -35,16 +36,24 @@ class NotionRequestHelper {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
 
-        // Retry-on-rate-limit (429) with exponential backoff
-        let maxAttempts = 3
+        // Global RPS limiter + Retry-on-rate-limit (429) with exponential backoff
+        let maxAttempts = NotionSyncConfig.retryMaxAttempts
         var attempt = 0
-        var backoffMillis: UInt64 = 500
+        var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
         while true {
             attempt += 1
+            await Self.globalLimiter.acquire()
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
-                try await Task.sleep(nanoseconds: backoffMillis * 1_000_000)
-                backoffMillis *= 2
+                // Try Retry-After header first
+                if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"), let seconds = Double(retryAfter) {
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000) + jitterNs)
+                } else {
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
+                    backoffMillis = min(backoffMillis * 2, 32_000)
+                }
                 continue
             }
             try Self.ensureSuccess(response: response, data: data)
@@ -63,16 +72,23 @@ class NotionRequestHelper {
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
-        // Retry-on-rate-limit (429) with exponential backoff
-        let maxAttempts = 3
+        // Global RPS limiter + Retry-on-rate-limit (429) with exponential backoff
+        let maxAttempts = NotionSyncConfig.retryMaxAttempts
         var attempt = 0
-        var backoffMillis: UInt64 = 500
+        var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
         while true {
             attempt += 1
+            await Self.globalLimiter.acquire()
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
-                try await Task.sleep(nanoseconds: backoffMillis * 1_000_000)
-                backoffMillis *= 2
+                if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"), let seconds = Double(retryAfter) {
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000) + jitterNs)
+                } else {
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
+                    backoffMillis = min(backoffMillis * 2, 32_000)
+                }
                 continue
             }
             try Self.ensureSuccess(response: response, data: data)

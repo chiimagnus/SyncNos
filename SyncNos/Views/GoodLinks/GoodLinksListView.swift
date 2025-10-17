@@ -79,7 +79,7 @@ struct GoodLinksListView: View {
                             }
                             Divider()
                             Button {
-                                viewModel.batchSync(linkIds: selectionIds, concurrency: 10)
+                                viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
@@ -126,7 +126,7 @@ struct GoodLinksListView: View {
             selectionIds.removeAll()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(linkIds: selectionIds, concurrency: 10)
+            viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
     }
 }

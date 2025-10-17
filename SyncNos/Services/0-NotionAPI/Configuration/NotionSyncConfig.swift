@@ -26,6 +26,20 @@ enum NotionSyncConfig {
     // MARK: - Feature flags
     /// 是否启用通过列举 page children 来复用已存在的 child_database（谨慎默认关闭）
     static let enablePageChildLookup: Bool = false
+
+    // MARK: - Concurrency & Rate limiting
+    /// 批量同步并发上限（统一用于手动批量与自动同步）
+    static let batchConcurrency: Int = 3
+    /// Notion 全局请求速率（RPS）上限，用于请求级限流
+    static let notionRequestsPerSecond: Int = 3
+
+    // MARK: - Retry on 429
+    /// 429 最大重试次数
+    static let retryMaxAttempts: Int = 6
+    /// 429 指数退避起始毫秒
+    static let retryBaseBackoffMs: UInt64 = 500
+    /// 退避抖动（毫秒）
+    static let retryJitterMs: UInt64 = 250
 }
 
 
