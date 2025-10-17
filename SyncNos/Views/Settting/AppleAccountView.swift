@@ -8,7 +8,7 @@ struct AppleAccountView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Apple登录（macOS）
+                // Apple Sign In (macOS)
                 VStack {
                     SignInWithAppleButton(.signIn) { request in
                         appleViewModel.configure(request: request)
@@ -38,22 +38,22 @@ struct AppleAccountView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "info.circle")
                                     .foregroundColor(.secondary)
-                                Text("点击上方按钮开始授权")
+                                Text("Click the button above to start authorization")
                                     .foregroundColor(.secondary)
                                     .font(.subheadline)
                             }
                         case .processing:
                             HStack(spacing: 8) {
                                 ProgressView()
-                                Text("正在请求授权...")
+                                Text("Requesting authorization...")
                                     .font(.subheadline)
                             }
                         case .succeeded(let user):
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("授权成功")
+                                Text("Authorization successful")
                                     .font(.headline)
-                                if let name = user.fullName, !name.isEmpty { Text("姓名：\(name)") }
-                                if let mail = user.email, !mail.isEmpty { Text("邮箱：\(mail)") }
+                                if let name = user.fullName, !name.isEmpty { Text("Name: \(name)") }
+                                if let mail = user.email, !mail.isEmpty { Text("Email: \(mail)") }
                                 Text("User Identifier：\(user.userIdentifier)")
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
@@ -71,14 +71,14 @@ struct AppleAccountView: View {
                                         .textSelection(.enabled)
                                 }
                                 #endif
-                                Button("重置状态") { appleViewModel.reset() }
+                                Button("Reset status") { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
                         case .failed(let message):
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("授权失败").font(.headline)
+                                Text("Authorization failed").font(.headline)
                                 Text(message).foregroundColor(.red).font(.subheadline)
-                                Button("重试") { appleViewModel.reset() }
+                                Button("Retry") { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
                         }
@@ -87,10 +87,10 @@ struct AppleAccountView: View {
 
                 Divider().padding(.vertical)
 
-                // 账户信息
+                // Account information
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text("账户信息").font(.title3).bold()
+                        Text("Account information").font(.title3).bold()
                         Spacer()
                         if accountViewModel.isLoading { ProgressView() }
                     }
@@ -100,22 +100,22 @@ struct AppleAccountView: View {
                     }
 
                     if let p = accountViewModel.profile {
-                        GroupBox(label: Text("基本信息")) {
+                        GroupBox(label: Text("Basic information")) {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("User ID: \(p.userId)")
-                                if let name = p.displayName, !name.isEmpty { Text("显示名称: \(name)") }
-                                if let email = p.email, !email.isEmpty { Text("邮箱: \(email)") }
-                                if let created = p.createdAt { Text("创建时间: \(created)").font(.footnote).foregroundColor(.secondary) }
+                                if let name = p.displayName, !name.isEmpty { Text("Display name: \(name)") }
+                                if let email = p.email, !email.isEmpty { Text("Email: \(email)") }
+                                if let created = p.createdAt { Text("Creation time: \(created)").font(.footnote).foregroundColor(.secondary) }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
-                        Text("未加载到用户信息").foregroundColor(.secondary)
+                        Text("User information not loaded").foregroundColor(.secondary)
                     }
 
-                    GroupBox(label: Text("登录方式")) {
+                    GroupBox(label: Text("Login methods")) {
                         if accountViewModel.loginMethods.isEmpty {
-                            Text("暂无").foregroundColor(.secondary)
+                            Text("None").foregroundColor(.secondary)
                         } else {
                             ForEach(Array(accountViewModel.loginMethods.enumerated()), id: \.0) { _, m in
                                 VStack(alignment: .leading, spacing: 4) {
@@ -129,11 +129,11 @@ struct AppleAccountView: View {
                     }
 
                     HStack(spacing: 12) {
-                        Button("刷新信息") { accountViewModel.load() }
+                        Button("Refresh information") { accountViewModel.load() }
                             .buttonStyle(.bordered)
-                        Button("退出登录") { accountViewModel.logout() }
+                        Button("Sign out") { accountViewModel.logout() }
                             .buttonStyle(.bordered)
-                        Button("注销账号") { accountViewModel.deleteAccount() }
+                        Button("Delete account") { accountViewModel.deleteAccount() }
                             .buttonStyle(.borderedProminent)
                             .tint(.red)
                     }
@@ -141,7 +141,7 @@ struct AppleAccountView: View {
             }
             .padding()
         }
-        .navigationTitle("Apple 账号与登录")
+        .navigationTitle("Apple Account & Sign In")
         .onAppear { accountViewModel.load() }
     }
 }

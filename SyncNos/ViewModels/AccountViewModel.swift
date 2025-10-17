@@ -65,7 +65,7 @@ final class AccountViewModel: ObservableObject {
         if let token = storedAccessToken() { return token }
         // 如果没有 access，尝试 refresh
         guard let refresh = storedRefreshToken() else {
-            throw NSError(domain: "AccountVM", code: -1, userInfo: [NSLocalizedDescriptionKey: "未登录"])
+            throw NSError(domain: "AccountVM", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Not logged in", comment: "")])
         }
         let tokens = try await auth.refresh(refreshToken: refresh)
         store(tokens: tokens)
@@ -77,11 +77,12 @@ final class AccountViewModel: ObservableObject {
         await setLoading(true)
         await MainActor.run { self.errorMessage = nil }
         do {
-            var access = try await ensureAccessToken()
+            // 第一次尝试获取数据
+            let accessToken = try await ensureAccessToken()
             do {
-                async let p1: AccountProfile = auth.fetchProfile(accessToken: access)
-                async let m1: [LoginMethod] = auth.fetchLoginMethods(accessToken: access)
-                let (profile, methods) = try await (p1, m1)
+                async let profileTask: AccountProfile = auth.fetchProfile(accessToken: accessToken)
+                async let methodsTask: [LoginMethod] = auth.fetchLoginMethods(accessToken: accessToken)
+                let (profile, methods) = try await (profileTask, methodsTask)
                 await MainActor.run {
                     self.profile = profile
                     self.loginMethods = methods
@@ -92,10 +93,11 @@ final class AccountViewModel: ObservableObject {
                     if let refresh = storedRefreshToken() {
                         let tokens = try await auth.refresh(refreshToken: refresh)
                         store(tokens: tokens)
-                        access = tokens.accessToken
-                        async let p2: AccountProfile = auth.fetchProfile(accessToken: access)
-                        async let m2: [LoginMethod] = auth.fetchLoginMethods(accessToken: access)
-                        let (profile2, methods2) = try await (p2, m2)
+                        // 使用新的token重新获取数据
+                        let newAccessToken = tokens.accessToken
+                        async let profileTask2: AccountProfile = auth.fetchProfile(accessToken: newAccessToken)
+                        async let methodsTask2: [LoginMethod] = auth.fetchLoginMethods(accessToken: newAccessToken)
+                        let (profile2, methods2) = try await (profileTask2, methodsTask2)
                         await MainActor.run {
                             self.profile = profile2
                             self.loginMethods = methods2

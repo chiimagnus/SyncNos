@@ -110,11 +110,11 @@ enum BookListSortKey: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .title: return "标题"
-        case .highlightCount: return "笔记数量"
-        case .lastSync: return "同步时间"
-        case .lastEdited: return "编辑时间"
-        case .created: return "创建时间"
+        case .title: return NSLocalizedString("Title", comment: "Book list sort option")
+        case .highlightCount: return NSLocalizedString("Note Count", comment: "Book list sort option")
+        case .lastSync: return NSLocalizedString("Sync Time", comment: "Book list sort option")
+        case .lastEdited: return NSLocalizedString("Edit Time", comment: "Book list sort option")
+        case .created: return NSLocalizedString("Creation Time", comment: "Book list sort option")
         }
     }
 }
