@@ -3,7 +3,8 @@ import AppKit
 
 struct MainListView: View {
     @StateObject private var viewModel = BookViewModel()
-    @State private var selectedBookId: String? = nil
+    @State private var selectedBookIds: Set<String> = []
+    @State private var selectedLinkIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
 
     private var contentSource: ContentSource {
@@ -16,9 +17,9 @@ struct MainListView: View {
         NavigationSplitView {
             Group {
                 if contentSource == .goodLinks {
-                    GoodLinksListView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
+                    GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
                 } else {
-                    AppleBooksListView(viewModel: viewModel, selectedBookId: $selectedBookId)
+                    AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -47,17 +48,55 @@ struct MainListView: View {
                         Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        if contentSource == .goodLinks {
+                            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: 10)
+                        } else {
+                            viewModel.batchSync(bookIds: selectedBookIds, concurrency: 10)
+                        }
+                    } label: {
+                        Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled((contentSource == .goodLinks ? selectedLinkIds.isEmpty : selectedBookIds.isEmpty))
+                    .help("Sync Selected to Notion")
+                }
             }
         } detail: {
             if contentSource == .goodLinks {
-                GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: $selectedBookId)
+                if selectedLinkIds.count == 1 {
+                    let singleLinkBinding = Binding<String?>(
+                        get: { selectedLinkIds.first },
+                        set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
+                    )
+                    GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
+                } else if selectedLinkIds.count > 1 {
+                    MultipleSelectionPlaceholderView(count: selectedLinkIds.count) {
+                        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: 10)
+                    }
+                } else {
+                    Text("Select an item").foregroundColor(.secondary)
+                }
             } else {
-                AppleBookDetailView(viewModelList: viewModel, selectedBookId: $selectedBookId)
+                if selectedBookIds.count == 1 {
+                    let singleBookBinding = Binding<String?>(
+                        get: { selectedBookIds.first },
+                        set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
+                    )
+                    AppleBookDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
+                } else if selectedBookIds.count > 1 {
+                    MultipleSelectionPlaceholderView(count: selectedBookIds.count) {
+                        viewModel.batchSync(bookIds: selectedBookIds, concurrency: 10)
+                    }
+                } else {
+                    Text("Select a book to view details").foregroundColor(.secondary)
+                }
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
             // 切换数据源时重置选择
-            selectedBookId = nil
+            selectedBookIds.removeAll()
+            selectedLinkIds.removeAll()
             if contentSource == .goodLinks {
                 Task {
                     await goodLinksVM.loadRecentLinks()

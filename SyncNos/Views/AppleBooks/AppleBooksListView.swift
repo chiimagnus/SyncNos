@@ -3,7 +3,7 @@ import AppKit
 
 struct AppleBooksListView: View {
     @ObservedObject var viewModel: BookViewModel
-    @Binding var selectedBookId: String?
+    @Binding var selectionIds: Set<String>
 
     var body: some View {
         Group {
@@ -30,7 +30,7 @@ struct AppleBooksListView: View {
                     }
                 }
             } else {
-                List(selection: $selectedBookId) {
+                List(selection: $selectionIds) {
                     ForEach(viewModel.displayBooks, id: \.bookId) { book in
                         HStack {
                             VStack(alignment: .leading) {
@@ -55,10 +55,16 @@ struct AppleBooksListView: View {
                         .contextMenu {
                             Button {
                                 // 选中该书并触发详情页的同步请求
-                                selectedBookId = book.bookId
+                                selectionIds = [book.bookId]
                                 NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
                             } label: {
                                 Label("Sync Now (Last Time: \(SyncTimestampStore.shared.getLastSyncTime(for: book.bookId).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "Never")", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            Divider()
+                            Button {
+                                viewModel.batchSync(bookIds: selectionIds, concurrency: 10)
+                            } label: {
+                                Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
                         }
                     }
@@ -96,9 +102,19 @@ struct AppleBooksListView: View {
             }
         }
         .onChange(of: viewModel.displayBooks) { displayBooks in
-            if selectedBookId == nil {
-                selectedBookId = displayBooks.first?.bookId
+            if selectionIds.isEmpty, let first = displayBooks.first?.bookId {
+                selectionIds = [first]
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SelectAllRequested")).receive(on: DispatchQueue.main)) { _ in
+            let all = Set(viewModel.displayBooks.map { $0.bookId })
+            if !all.isEmpty { selectionIds = all }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DeselectAllRequested")).receive(on: DispatchQueue.main)) { _ in
+            selectionIds.removeAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
+            viewModel.batchSync(bookIds: selectionIds, concurrency: 10)
         }
     }
 }
