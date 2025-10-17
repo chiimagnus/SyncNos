@@ -335,7 +335,10 @@ extension BookViewModel {
                         await limiter.withPermit {
                             NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
                             do {
-                                try await syncService.syncSmart(book: book, dbPath: dbPath) { _ in }
+                                try await syncService.syncSmart(book: book, dbPath: dbPath) { progress in
+                                    // 广播该书的同步进度，供详情页监听并显示
+                                    NotificationCenter.default.post(name: Notification.Name("SyncProgressUpdated"), object: nil, userInfo: ["bookId": id, "progress": progress])
+                                }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
                             } catch {
                                 await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
