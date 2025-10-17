@@ -228,3 +228,36 @@ final class GoodLinksViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 }
+
+// MARK: - Batch Sync (GoodLinks)
+extension GoodLinksViewModel {
+    /// 批量同步所选 GoodLinks 到 Notion，使用并发限流（默认 10 并发）
+    func batchSync(linkIds: Set<String>, concurrency: Int = 10) {
+        guard !linkIds.isEmpty else { return }
+        let dbPath = service.resolveDatabasePath()
+        let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
+        let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for id in linkIds {
+                    guard let link = itemsById[id] else { continue }
+                    group.addTask { [weak self] in
+                        guard let self else { return }
+                        await limiter.withPermit {
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
+                            do {
+                                try await self.syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { _ in }
+                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
+                            } catch {
+                                self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
+                            }
+                        }
+                    }
+                }
+                await group.waitForAll()
+            }
+        }
+    }
+}

@@ -43,6 +43,7 @@ class BookViewModel: ObservableObject {
     }
 
     private let databaseService: DatabaseServiceProtocol
+    private let appleBooksSyncService: AppleBooksSyncServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
     private let syncTimestampStore: SyncTimestampStoreProtocol
@@ -98,10 +99,12 @@ class BookViewModel: ObservableObject {
     // MARK: - Initialization
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore,
-         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore) {
+         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
+         appleBooksSyncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
         self.syncTimestampStore = syncTimestampStore
+        self.appleBooksSyncService = appleBooksSyncService
 
         // Load initial values from UserDefaults
         if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
@@ -305,5 +308,43 @@ class BookViewModel: ObservableObject {
         let latestFile = sorted.first?.path
         logger.debug("Latest SQLite file in \(dir): \(latestFile ?? "none")")
         return latestFile
+    }
+}
+
+// MARK: - Batch Sync (Apple Books)
+extension BookViewModel {
+    /// 批量同步所选书籍到 Notion，使用并发限流（默认 10 并发）
+    func batchSync(bookIds: Set<String>, concurrency: Int = 10) {
+        guard !bookIds.isEmpty else { return }
+        guard let dbPath = self.annotationDatabasePath else {
+            logger.warning("[AppleBooks] annotationDatabasePath is nil; skip batchSync")
+            return
+        }
+
+        let ids = Array(bookIds)
+        let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
+        let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for id in ids {
+                    guard let book = itemsById[id] else { continue }
+                    group.addTask { [weak self] in
+                        guard let self else { return }
+                        await limiter.withPermit {
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
+                            do {
+                                try await self.appleBooksSyncService.syncSmart(book: book, dbPath: dbPath) { _ in }
+                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
+                            } catch {
+                                self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
+                            }
+                        }
+                    }
+                }
+                await group.waitForAll()
+            }
+        }
     }
 }
