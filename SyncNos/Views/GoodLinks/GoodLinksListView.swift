@@ -99,10 +99,6 @@ struct GoodLinksListView: View {
                     await viewModel.loadRecentLinks()
                 }
             }
-            // 默认选中第一条（若未选中且有数据）
-            if selectionIds.isEmpty, let firstId = viewModel.links.first?.id {
-                selectionIds = [firstId]
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
             Task {
