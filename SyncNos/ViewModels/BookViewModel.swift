@@ -327,6 +327,11 @@ extension BookViewModel {
         let syncService = self.appleBooksSyncService
 
         Task {
+            // 在开始批量同步前，主线程标记这些 id 为正在同步，确保 UI 显示一致
+            await MainActor.run {
+                self.syncingBookIds.formUnion(bookIds)
+            }
+
             await withTaskGroup(of: Void.self) { group in
                 for id in ids {
                     guard let book = itemsById[id] else { continue }
@@ -343,6 +348,12 @@ extension BookViewModel {
                             } catch {
                                 await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
+                            }
+
+                            // 每个任务完成后，从主线程移除 syncing 标记
+                            await MainActor.run {
+                                self.syncingBookIds.remove(id)
+                                if case .none = self.syncedBookIds.firstIndex(of: id) { }
                             }
                         }
                     }
