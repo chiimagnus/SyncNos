@@ -206,12 +206,22 @@ struct GoodLinksDetailView: View {
                         await viewModel.loadHighlights(for: linkId)
                         await viewModel.loadContent(for: linkId)
                     }
+                    if let id = selectedLinkId, viewModel.syncingLinkIds.contains(id) {
+                        externalIsSyncing = true
+                    }
                 }
                 .onChange(of: linkId) { newLinkId in
                     print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
                     Task {
                         await viewModel.loadHighlights(for: newLinkId)
                         await viewModel.loadContent(for: newLinkId)
+                    }
+                    if let id = selectedLinkId {
+                        externalIsSyncing = viewModel.syncingLinkIds.contains(id)
+                        if !externalIsSyncing { externalSyncProgress = nil }
+                    } else {
+                        externalIsSyncing = false
+                        externalSyncProgress = nil
                     }
                 }
                 .background(LiveResizeObserver(isResizing: $isLiveResizing))
@@ -224,7 +234,7 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                    ToolbarItem(placement: .primaryAction) {
                         if externalIsSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
@@ -284,6 +294,10 @@ struct GoodLinksDetailView: View {
                     showingSyncError = true
                 }
             }
+        }
+        .onChange(of: selectedLinkId) { _ in
+            externalIsSyncing = false
+            externalSyncProgress = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
