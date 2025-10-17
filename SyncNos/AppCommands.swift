@@ -105,71 +105,63 @@ struct AppCommands: Commands {
 
             Divider()
 
-            // 全局 Filter 菜单（按当前 contentSource 切换显示内容）
-            Menu {
-                if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
-                    // Apple Books 的 Filter 子菜单
-                    Picker("Sort by", selection: Binding(get: {
-                        UserDefaults.standard.string(forKey: "bookList_sort_key") ?? BookListSortKey.title.rawValue
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "bookList_sort_key")
-                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": new])
-                    })) {
-                        ForEach(BookListSortKey.allCases, id: \ .self) { k in
-                            Text(k.displayName).tag(k.rawValue)
-                        }
+            // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
+            if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
+                // Apple Books 的一级命令
+                Picker("Sort", selection: Binding(get: {
+                    UserDefaults.standard.string(forKey: "bookList_sort_key") ?? BookListSortKey.title.rawValue
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "bookList_sort_key")
+                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": new])
+                })) {
+                    ForEach(BookListSortKey.allCases, id: \ .self) { k in
+                        Text(k.displayName).tag(k.rawValue)
                     }
-
-                    Divider()
-
-                    Toggle("Ascending", isOn: Binding(get: {
-                        UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "bookList_sort_ascending")
-                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
-                    }))
-
-                    Divider()
-
-                    Toggle("Books with titles only", isOn: Binding(get: {
-                        UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "bookList_showWithTitleOnly")
-                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": new])
-                    }))
-                } else {
-                    // GoodLinks 的 Filter 子菜单
-                    Picker("Sort", selection: Binding(get: {
-                        UserDefaults.standard.string(forKey: "goodlinks_sort_key") ?? GoodLinksSortKey.modified.rawValue
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "goodlinks_sort_key")
-                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": new])
-                    })) {
-                        ForEach(GoodLinksSortKey.allCases, id: \ .self) { k in
-                            Text(k.displayName).tag(k.rawValue)
-                        }
-                    }
-
-                    Divider()
-
-                    Toggle("Ascending", isOn: Binding(get: {
-                        UserDefaults.standard.bool(forKey: "goodlinks_sort_ascending")
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "goodlinks_sort_ascending")
-                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
-                    }))
-
-                    Divider()
-
-                    Toggle("Starred only", isOn: Binding(get: {
-                        UserDefaults.standard.bool(forKey: "goodlinks_show_starred_only")
-                    }, set: { new in
-                        UserDefaults.standard.set(new, forKey: "goodlinks_show_starred_only")
-                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": new])
-                    }))
                 }
-            } label: {
-                Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+
+                Toggle("Ascending", isOn: Binding(get: {
+                    UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "bookList_sort_ascending")
+                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
+                }))
+
+                Toggle("Books with titles only", isOn: Binding(get: {
+                    UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "bookList_showWithTitleOnly")
+                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": new])
+                }))
+
+                Divider()
+            } else {
+                // GoodLinks 的一级命令
+                Picker("Sort", selection: Binding(get: {
+                    UserDefaults.standard.string(forKey: "goodlinks_sort_key") ?? GoodLinksSortKey.modified.rawValue
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "goodlinks_sort_key")
+                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": new])
+                })) {
+                    ForEach(GoodLinksSortKey.allCases, id: \ .self) { k in
+                        Text(k.displayName).tag(k.rawValue)
+                    }
+                }
+
+                Toggle("Ascending", isOn: Binding(get: {
+                    UserDefaults.standard.bool(forKey: "goodlinks_sort_ascending")
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "goodlinks_sort_ascending")
+                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
+                }))
+
+                Toggle("Starred only", isOn: Binding(get: {
+                    UserDefaults.standard.bool(forKey: "goodlinks_show_starred_only")
+                }, set: { new in
+                    UserDefaults.standard.set(new, forKey: "goodlinks_show_starred_only")
+                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": new])
+                }))
+
+                Divider()
             }
         }
 
