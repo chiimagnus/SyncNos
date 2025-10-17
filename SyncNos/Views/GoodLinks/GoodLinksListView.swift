@@ -81,27 +81,6 @@ struct GoodLinksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            Picker("Sort", selection: $viewModel.sortKey) {
-                                ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
-                                    Text(key.displayName).tag(key)
-                                }
-                            }
-
-                            Divider()
-
-                            Toggle("Ascending", isOn: $viewModel.sortAscending)
-
-                            Divider()
-
-                            Toggle("Starred only", isOn: $viewModel.showStarredOnly)
-                        } label: {
-                            Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
-                        }
-                    }
-                }
             }
         }
         .onAppear {
