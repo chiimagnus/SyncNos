@@ -12,6 +12,9 @@ struct AppleBookDetailView: View {
     @State private var frozenLayoutWidth: CGFloat? = nil
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
+    // External (batch) sync state for the currently selected book
+    @State private var externalIsSyncing: Bool = false
+    @State private var externalSyncProgress: String? = nil
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -231,9 +234,19 @@ struct AppleBookDetailView: View {
                 }
             }
 
-            // Sync button
+            // Sync button / progress (shows per-item batch progress when available)
             ToolbarItem(placement: .primaryAction) {
-                if viewModel.isSyncing {
+                if externalIsSyncing {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        if let progress = externalSyncProgress {
+                            Text(progress).font(.caption)
+                        } else {
+                            Text("Syncing...").font(.caption)
+                        }
+                    }
+                    .help("Sync in progress")
+                } else if viewModel.isSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = viewModel.syncProgressText {
@@ -270,6 +283,24 @@ struct AppleBookDetailView: View {
                 if !isSuccess {
                     syncErrorMessage = message
                     showingSyncError = true
+                }
+            }
+        }
+        // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
+            if bookId == (selectedBookId ?? "") {
+                externalIsSyncing = true
+                externalSyncProgress = info["progress"] as? String
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
+            if bookId == (selectedBookId ?? "") {
+                switch status {
+                case "started": externalIsSyncing = true
+                case "succeeded", "failed", "skipped": externalIsSyncing = false; externalSyncProgress = nil
+                default: break
                 }
             }
         }

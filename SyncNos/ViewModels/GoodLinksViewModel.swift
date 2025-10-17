@@ -248,7 +248,9 @@ extension GoodLinksViewModel {
                         await limiter.withPermit {
                             NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
                             do {
-                                try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { _ in }
+                                try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { progress in
+                                    NotificationCenter.default.post(name: Notification.Name("SyncProgressUpdated"), object: nil, userInfo: ["bookId": id, "progress": progress])
+                                }
                                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
                             } catch {
                                 await MainActor.run { self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)") }
