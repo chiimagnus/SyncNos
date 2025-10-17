@@ -10,6 +10,7 @@
 		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
 		D8529F732E7354C900FE0D95 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = D8529F722E7354C900FE0D95 /* CLAUDE.md */; };
 		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
+		D8F97E212EA1F2E900CC0A1A /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = D8F97E202EA1F2E900CC0A1A /* Markdown */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D8F97E212EA1F2E900CC0A1A /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +86,7 @@
 			);
 			name = SyncNos;
 			packageProductDependencies = (
+				D8F97E202EA1F2E900CC0A1A /* Markdown */,
 			);
 			productName = SyncNos;
 			productReference = D8CE88DA2E713DB50025AD6E /* SyncNos.app */;
@@ -114,6 +117,9 @@
 			);
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D8F97E1F2EA1F2E900CC0A1A /* XCRemoteSwiftPackageReference "swift-markdown" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D81167BD2E70A140000D0173 /* Products */;
 			projectDirPath = "";
@@ -370,6 +376,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D8F97E1F2EA1F2E900CC0A1A /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-markdown";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D8F97E202EA1F2E900CC0A1A /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D8F97E1F2EA1F2E900CC0A1A /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D81167B42E70A13F000D0173 /* Project object */;
 }
