@@ -61,11 +61,6 @@ struct AppCommands: Commands {
 
         // File 菜单 - 文件操作相关
         CommandGroup(replacing: .newItem) {
-            Button("Sync Current Book to Notion", systemImage: "arrow.triangle.2.circlepath") {
-                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
-
             Button("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle") {
                 NotificationCenter.default.post(name: Notification.Name("SyncSelectedToNotionRequested"), object: nil)
             }

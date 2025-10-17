@@ -54,14 +54,6 @@ struct AppleBooksListView: View {
                         .tag(book.bookId)
                         .contextMenu {
                             Button {
-                                // 选中该书并触发详情页的同步请求
-                                selectionIds = [book.bookId]
-                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
-                            } label: {
-                                Label("Sync Now (Last Time: \(SyncTimestampStore.shared.getLastSyncTime(for: book.bookId).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "Never")", systemImage: "arrow.triangle.2.circlepath")
-                            }
-                            Divider()
-                            Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
