@@ -40,22 +40,42 @@ struct MarkdownRendererView: View {
 
     private func renderBlock(_ block: Markdown.Markup) -> AnyView {
         if let heading = block as? Markdown.Heading {
+            let md = headingMarkdown(heading)
+            if let attr = try? AttributedString(markdown: md) {
+                return AnyView(
+                    SwiftUI.Text(attr)
+                        .font(theme.fontForHeading(level: heading.level))
+                        .foregroundColor(theme.textPrimary)
+                        .padding(.bottom, theme.headingBottomSpacing)
+                        .background(Color.clear)
+                )
+            }
             let text = inlineText(from: heading)
             return AnyView(
                 text
-                .font(theme.fontForHeading(level: heading.level))
-                .foregroundColor(theme.textPrimary)
-                .padding(.bottom, theme.headingBottomSpacing)
-                .background(Color.clear)
+                    .font(theme.fontForHeading(level: heading.level))
+                    .foregroundColor(theme.textPrimary)
+                    .padding(.bottom, theme.headingBottomSpacing)
+                    .background(Color.clear)
             )
         } else if let para = block as? Markdown.Paragraph {
-            let text = inlineText(from: para)
-            return AnyView(
-                text
-                .font(theme.fontBody)
-                .foregroundColor(theme.textPrimary)
-                .background(Color.clear)
-            )
+            let md = inlineMarkdown(from: para)
+            if let attr = try? AttributedString(markdown: md) {
+                return AnyView(
+                    SwiftUI.Text(attr)
+                        .font(theme.fontBody)
+                        .foregroundColor(theme.textPrimary)
+                        .background(Color.clear)
+                )
+            } else {
+                let textFallback = inlineText(from: para)
+                return AnyView(
+                    textFallback
+                        .font(theme.fontBody)
+                        .foregroundColor(theme.textPrimary)
+                        .background(Color.clear)
+                )
+            }
         } else if let quote = block as? Markdown.BlockQuote {
             let childViews = renderBlocks(children(of: quote))
             return AnyView(
@@ -183,10 +203,9 @@ struct MarkdownRendererView: View {
         } else if let code = node as? Markdown.InlineCode {
             return SwiftUI.Text(code.code).font(theme.fontMonospaced)
         } else if let link = node as? Markdown.Link {
-            var label = inlineText(from: link)
+            let label = inlineText(from: link)
                 .foregroundColor(theme.linkColor)
                 .underline()
-            // 纯 Text 无法直接附加点击事件；如需点击打开可改为 Button + action 渲染器
             return label
         } else if node is Markdown.SoftBreak {
             return SwiftUI.Text("\n")
@@ -196,6 +215,45 @@ struct MarkdownRendererView: View {
             // 递归处理未知内联节点
             return inlineText(from: node)
         }
+    }
+
+    // MARK: - Markdown String Reconstruction for Inline
+
+    private func inlineMarkdown(from node: Markdown.Markup) -> String {
+        var result = ""
+        for child in node.children {
+            result += inlineFragmentMarkdown(from: child)
+        }
+        return result
+    }
+
+    private func inlineFragmentMarkdown(from node: Markdown.Markup) -> String {
+        if let t = node as? Markdown.Text {
+            return t.string
+        } else if let em = node as? Markdown.Emphasis {
+            return "*" + inlineMarkdown(from: em) + "*"
+        } else if let strong = node as? Markdown.Strong {
+            return "**" + inlineMarkdown(from: strong) + "**"
+        } else if let del = node as? Markdown.Strikethrough {
+            return "~~" + inlineMarkdown(from: del) + "~~"
+        } else if let code = node as? Markdown.InlineCode {
+            return "`" + code.code + "`"
+        } else if let link = node as? Markdown.Link {
+            let label = inlineMarkdown(from: link)
+            let dest = link.destination ?? ""
+            return "[" + label + "](\(dest))"
+        } else if node is Markdown.SoftBreak {
+            return "\n"
+        } else if node is Markdown.LineBreak {
+            return "  \n"
+        } else {
+            return inlineMarkdown(from: node)
+        }
+    }
+
+    private func headingMarkdown(_ heading: Markdown.Heading) -> String {
+        let hashes = String(repeating: "#", count: max(1, min(6, heading.level)))
+        return hashes + " " + inlineMarkdown(from: heading)
     }
 }
 
