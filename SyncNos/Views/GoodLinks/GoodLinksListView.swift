@@ -72,13 +72,6 @@ struct GoodLinksListView: View {
                         .tag(link.id)
                         .contextMenu {
                             Button {
-                                selectionIds = [link.id]
-                                NotificationCenter.default.post(name: Notification.Name("SyncCurrentBookToNotionRequested"), object: nil)
-                            } label: {
-                                Label("Sync Now (Last Time: \(SyncTimestampStore.shared.getLastSyncTime(for: link.id).map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "Never"))", systemImage: "arrow.triangle.2.circlepath")
-                            }
-                            Divider()
-                            Button {
                                 viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
