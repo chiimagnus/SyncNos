@@ -156,6 +156,8 @@ protocol NotionServiceProtocol: AnyObject {
     // Generic property/schema helpers
     func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws
+    /// Fetch a date property from a page by property name. Returns nil if missing or not a date.
+    func fetchPageDateProperty(pageId: String, name: String) async throws -> Date?
     /// Replace all page children with the provided blocks
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws
     func appendChildren(pageId: String, children: [[String: Any]], batchSize: Int) async throws
@@ -215,8 +217,14 @@ protocol AutoSyncServiceProtocol: AnyObject {
 // MARK: - Sync Timestamp Store Protocol
 /// 抽象同步时间戳存取，避免直接依赖具体实现与单例
 protocol SyncTimestampStoreProtocol: AnyObject {
-    func getLastSyncTime(for bookId: String) -> Date?
-    func setLastSyncTime(for bookId: String, to date: Date)
+    /// Get last sync time for given id and source (e.g., "appleBooks" | "goodLinks").
+    func getLastSyncTime(for id: String, source: String) async -> Date?
+    /// Set last sync time for given id and source.
+    func setLastSyncTime(for id: String, source: String, to date: Date) async throws
+    /// Batch prefetch to warm cache for ids; non-throwing best-effort.
+    func prefetch(for ids: [String], source: String) async
+    /// Get cached last sync time if available (no IO).
+    func cachedLastSync(for id: String) -> Date?
 }
 
 // MARK: - Auth Service Protocol
