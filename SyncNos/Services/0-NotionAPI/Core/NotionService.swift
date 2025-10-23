@@ -88,6 +88,11 @@ final class NotionService: NotionServiceProtocol {
         try await pageOps.updatePageHighlightCount(pageId: pageId, count: count)
     }
 
+    // MARK: - Generic property/schema helpers
+    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws {
+        try await databaseOps.ensureDatabaseProperties(databaseId: databaseId, definitions: definitions)
+    }
+
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws {
         try await pageOps.updatePageProperties(pageId: pageId, properties: properties)
     }
