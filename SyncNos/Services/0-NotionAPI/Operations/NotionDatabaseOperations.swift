@@ -45,9 +45,7 @@ class NotionDatabaseOperations {
                 // Asset ID for idempotent lookup
                 "Asset ID": ["rich_text": [:]],
                 // Book URL
-                "URL": ["url": [:]],
-                // Last Sync Time for page-level incremental sync
-                "Last Sync Time": ["date": [:]]
+                "URL": ["url": [:]]
             ]
         ]
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
@@ -82,9 +80,7 @@ class NotionDatabaseOperations {
                 "Book ID": ["rich_text": [:]],
                 "Book Title": ["rich_text": [:]],
                 "Author": ["rich_text": [:]],
-                "Link": ["url": [:]],
-                // Last Sync Time for per-book database meta tracking
-                "Last Sync Time": ["date": [:]]
+                "Link": ["url": [:]]
             ]
         ]
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
