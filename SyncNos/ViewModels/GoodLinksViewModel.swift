@@ -238,8 +238,23 @@ extension GoodLinksViewModel {
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
         let syncService = self.syncService
+        let notionConfig = DIContainer.shared.notionConfigStore
+        let notionService = DIContainer.shared.notionService
 
         Task {
+            // 预先 resolve/ensure 一次 GoodLinks databaseId，避免首次并发创建多个数据库
+            do {
+                if let parentPageId = notionConfig.notionPageId {
+                    if let persisted = notionConfig.databaseIdForSource("goodLinks") {
+                        _ = await notionService.databaseExists(databaseId: persisted) // 仅验证，不清理
+                    } else {
+                        let id = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
+                        notionConfig.setDatabaseId(id, forSource: "goodLinks")
+                    }
+                }
+            } catch {
+                await MainActor.run { self.logger.error("[GoodLinks] pre-resolve databaseId failed: \(error.localizedDescription)") }
+            }
             await withTaskGroup(of: Void.self) { group in
                 for id in linkIds {
                     guard let link = itemsById[id] else { continue }
