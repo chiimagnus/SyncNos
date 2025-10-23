@@ -154,6 +154,7 @@ protocol NotionServiceProtocol: AnyObject {
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws
     // Generic property/schema helpers
+    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
     func updatePageProperties(pageId: String, properties: [String: Any]) async throws
     /// Replace all page children with the provided blocks
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws

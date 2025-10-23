@@ -39,7 +39,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         } else {
             databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
         }
-        // 数据库的属性在创建时已经确定；运行时同步期间不再修改 schema
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
         // 3) 确保页面存在（统一 ensure API）
         let ensured = try await notionService.ensureBookPageInDatabase(
