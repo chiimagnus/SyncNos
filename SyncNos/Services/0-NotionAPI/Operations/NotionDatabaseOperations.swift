@@ -8,20 +8,21 @@ class NotionDatabaseOperations {
         self.requestHelper = requestHelper
     }
 
-    // Lightweight exists check by querying minimal page
+    // 仅当明确 404/410（确实不存在/被删除）返回 false；其他错误一律返回 true，避免误清缓存
     func databaseExists(databaseId: String) async -> Bool {
-        // Keep behavior: return false when not configured or any non-2xx / error occurs
         struct DatabaseMeta: Decodable { let id: String; let in_trash: Bool? }
         do {
             let data = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
             if let meta = try? JSONDecoder().decode(DatabaseMeta.self, from: data), (meta.in_trash ?? false) {
                 return false
             }
-            // Some trashed databases still return 200 on GET; verify by running a minimal query
-            _ = try await requestHelper.performRequest(path: "databases/\(databaseId)/query", method: "POST", body: ["page_size": 1])
             return true
         } catch {
-            return false
+            let ns = error as NSError
+            if ns.domain == "NotionService" && (ns.code == 404 || ns.code == 410) {
+                return false
+            }
+            return true
         }
     }
 

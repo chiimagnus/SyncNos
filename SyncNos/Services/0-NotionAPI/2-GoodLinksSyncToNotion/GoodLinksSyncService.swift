@@ -26,8 +26,19 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
 
-        // 2) 确保使用 GoodLinks 专属单库
-        let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
+        // 2) 解析 GoodLinks 单库：优先使用已持久化的 ID；仅当明确不存在时才清理并创建
+        let databaseId: String
+        if let persisted = notionConfig.databaseIdForSource("goodLinks") {
+            if await notionService.databaseExists(databaseId: persisted) {
+                databaseId = persisted
+            } else {
+                // 仅在明确不存在时才清理旧 ID
+                notionConfig.setDatabaseId(nil, forSource: "goodLinks")
+                databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
+            }
+        } else {
+            databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
+        }
         try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
 
         // 3) 确保页面存在（统一 ensure API）
