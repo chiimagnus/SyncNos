@@ -23,6 +23,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         }
 
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: ["Last Sync Time": ["date": [:]]])
 
         // Ensure book page exists by Asset ID (use unified ensure API)
         let ensuredPage = try await notionService.ensureBookPageInDatabase(
@@ -41,7 +42,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         defer { databaseService.close(handle) }
 
         // Incremental window
-        let since: Date? = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
+        let since: Date? = incremental ? await DIContainer.shared.syncTimestampStore.getLastSyncTime(for: book.bookId, source: "appleBooks") : nil
         if incremental { progress(String(format: NSLocalizedString("Performing incremental sync, last sync time: %@", comment: ""), since?.description ?? "从未")) }
 
         // Full: build existing set
@@ -91,7 +92,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
             return
         }
 
@@ -149,13 +150,13 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
             return
         }
 
         // existing page → scan & update/append
         let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
-        let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+        let last = await DIContainer.shared.syncTimestampStore.getLastSyncTime(for: book.bookId, source: "appleBooks")
         progress(NSLocalizedString("Scanning local highlights...", comment: ""))
         var toAppend: [HighlightRow] = []
         var toUpdate: [(String, HighlightRow)] = []
@@ -186,7 +187,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
         progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
-        let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+        let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
     }
 
     // MARK: - Helpers

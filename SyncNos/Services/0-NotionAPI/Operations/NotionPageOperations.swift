@@ -96,4 +96,36 @@ class NotionPageOperations {
     func setPageChildren(pageId: String, children: [[String: Any]]) async throws {
         try await replacePageChildren(pageId: pageId, with: children)
     }
+
+    // MARK: - Generic helpers for page properties
+    /// Create a generic page in a database with provided properties (no children by default)
+    func createGenericPage(inDatabaseId databaseId: String, properties: [String: Any]) async throws -> NotionPage {
+        let body: [String: Any] = [
+            "parent": [
+                "type": "database_id",
+                "database_id": databaseId
+            ],
+            "properties": properties
+        ]
+        let data = try await requestHelper.performRequest(path: "pages", method: "POST", body: body)
+        return try JSONDecoder().decode(NotionPage.self, from: data)
+    }
+
+    /// Fetch a date property from a page by property name. Returns nil if missing or malformed.
+    func fetchPageDateProperty(pageId: String, name: String) async throws -> Date? {
+        let url = requestHelper.makeURL(path: "pages/\(pageId)")
+        let data = try await requestHelper.performRequest(url: url, method: "GET", body: nil)
+        // Parse JSON: properties -> name -> date -> start
+        let obj = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let dict = obj as? [String: Any],
+              let props = dict["properties"] as? [String: Any],
+              let prop = props[name] as? [String: Any],
+              let date = prop["date"] as? [String: Any],
+              let start = date["start"] as? String,
+              !start.isEmpty else {
+            return nil
+        }
+        let fmt = ISO8601DateFormatter()
+        return fmt.date(from: start)
+    }
 }

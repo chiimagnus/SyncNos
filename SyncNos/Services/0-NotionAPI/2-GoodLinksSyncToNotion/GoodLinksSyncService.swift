@@ -28,7 +28,9 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 2) 确保使用 GoodLinks 专属单库
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
-        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: Self.goodLinksPropertyDefinitions)
+        var defs = Self.goodLinksPropertyDefinitions
+        defs["Last Sync Time"] = ["date": [:]]
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: defs)
 
         // 3) 确保页面存在（统一 ensure API）
         let ensured = try await notionService.ensureBookPageInDatabase(
@@ -132,7 +134,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
             // 更新计数与时间戳后返回
             try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: link.id, source: "goodLinks", to: t)
             return
         }
 
@@ -169,7 +171,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 6) 更新计数并记录同步时间
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
-        let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
+        let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: link.id, source: "goodLinks", to: t)
     }
 
     private static var goodLinksPropertyDefinitions: [String: Any] {

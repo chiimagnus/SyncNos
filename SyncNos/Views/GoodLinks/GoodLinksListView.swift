@@ -80,8 +80,8 @@ struct GoodLinksListView: View {
                             // 显示上次同步时间，仅在单选且该项被选中时显示
                             if selectionIds.count == 1 && selectionIds.contains(link.id) {
                                 Divider()
-                                let last = SyncTimestampStore.shared.getLastSyncTime(for: link.id)
-                                if let lastDate = last {
+                                let lastDate = viewModel.lastSyncById[link.id]
+                                if let lastDate = lastDate {
                                     Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
                                 } else {
                                     Text("Last Sync: Never")
