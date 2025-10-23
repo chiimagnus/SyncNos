@@ -204,7 +204,7 @@ struct SettingsView: View {
                 Text("")
             }
         }
-        .frame(minWidth: 400, idealWidth: 425, maxWidth: 425, idealHeight: 600)
+        .frame(width: 425)
     }
 }
 
