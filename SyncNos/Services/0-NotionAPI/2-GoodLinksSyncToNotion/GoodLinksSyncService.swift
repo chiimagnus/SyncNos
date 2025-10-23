@@ -143,6 +143,11 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
             // 更新计数与时间戳后返回
             try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
+            // 写入 Notion 页级 "Last Sync Time"
+            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            try await notionService.updatePageProperties(pageId: pageId, properties: [
+                "Last Sync Time": ["date": ["start": nowString]]
+            ])
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
             return
         }
@@ -180,6 +185,11 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 6) 更新计数并记录同步时间
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
+        // 写入 Notion 页级 "Last Sync Time"
+        let nowString2 = NotionServiceCore.isoDateFormatter.string(from: Date())
+        try await notionService.updatePageProperties(pageId: pageId, properties: [
+            "Last Sync Time": ["date": ["start": nowString2]]
+        ])
         let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
     }
 
@@ -189,7 +199,8 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             "Summary": ["rich_text": [:]],
             "Starred": ["checkbox": [:]],
             "Added At": ["date": [:]],
-            "Modified At": ["date": [:]]
+            "Modified At": ["date": [:]],
+            "Last Sync Time": ["date": [:]]
         ]
     }
 

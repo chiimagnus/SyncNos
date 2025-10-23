@@ -23,6 +23,14 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         }
 
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
+        // 确保数据库包含 "Last Sync Time" 字段（date）
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: [
+            "Last Sync Time": ["date": [:]]
+        ])
+        // 确保数据库包含 "Last Sync Time" 字段（date）
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: [
+            "Last Sync Time": ["date": [:]]
+        ])
 
         // Ensure book page exists by Asset ID (use unified ensure API)
         let ensuredPage = try await notionService.ensureBookPageInDatabase(
@@ -91,6 +99,11 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
+            // 写入 Notion 页级 "Last Sync Time"
+            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            try await notionService.updatePageProperties(pageId: pageId, properties: [
+                "Last Sync Time": ["date": ["start": nowString]]
+            ])
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
             return
         }
@@ -111,6 +124,12 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         }
         progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: book.highlightCount)
+        // 写入 Notion 页级 "Last Sync Time" + 本地时间戳
+        let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+        try await notionService.updatePageProperties(pageId: pageId, properties: [
+            "Last Sync Time": ["date": ["start": nowString]]
+        ])
+        let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
     }
 
     func syncSmart(book: BookListItem, dbPath: String?, progress: @escaping (String) -> Void) async throws {
@@ -118,6 +137,10 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
         }
         let databaseId = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-AppleBooks", parentPageId: parentPageId, sourceKey: "appleBooks")
+        // 确保数据库包含 "Last Sync Time" 字段（date）
+        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: [
+            "Last Sync Time": ["date": [:]]
+        ])
 
         // Ensure page via unified ensure API
         let ensureResult = try await notionService.ensureBookPageInDatabase(
@@ -149,6 +172,11 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
+            // 写入 Notion 页级 "Last Sync Time"
+            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            try await notionService.updatePageProperties(pageId: pageId, properties: [
+                "Last Sync Time": ["date": ["start": nowString]]
+            ])
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
             return
         }
@@ -186,6 +214,11 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         let latest = try await getLatestHighlightCount(dbPath: dbPath, assetId: book.bookId)
         progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
+        // 写入 Notion 页级 "Last Sync Time"
+        let nowString2 = NotionServiceCore.isoDateFormatter.string(from: Date())
+        try await notionService.updatePageProperties(pageId: pageId, properties: [
+            "Last Sync Time": ["date": ["start": nowString2]]
+        ])
         let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
     }
 

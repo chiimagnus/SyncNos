@@ -46,7 +46,9 @@ class NotionDatabaseOperations {
                 // Asset ID for idempotent lookup
                 "Asset ID": ["rich_text": [:]],
                 // Book URL
-                "URL": ["url": [:]]
+                "URL": ["url": [:]],
+                // Last Sync Time for page-level timestamp writes
+                "Last Sync Time": ["date": [:]]
             ]
         ]
         let data = try await requestHelper.performRequest(path: "databases", method: "POST", body: body)
