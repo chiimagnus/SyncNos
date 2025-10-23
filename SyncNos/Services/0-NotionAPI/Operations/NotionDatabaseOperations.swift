@@ -134,8 +134,4 @@ class NotionDatabaseOperations {
         }
         return nil
     }
-
-    func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws {
-        _ = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "PATCH", body: ["properties": definitions])
-    }
 }
