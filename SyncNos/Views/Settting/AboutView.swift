@@ -41,7 +41,7 @@ struct AboutView: View {
                 .padding(.top, 4)
         }
         .padding(20)
-        .frame(minWidth: 400, idealWidth: 425, maxWidth: 425)
+        .frame(width: 425, height: 400)
         .navigationTitle("About")
     }
 
