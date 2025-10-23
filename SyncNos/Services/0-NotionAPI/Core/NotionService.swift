@@ -97,10 +97,6 @@ final class NotionService: NotionServiceProtocol {
         try await pageOps.updatePageProperties(pageId: pageId, properties: properties)
     }
 
-    func fetchPageDateProperty(pageId: String, name: String) async throws -> Date? {
-        return try await pageOps.fetchPageDateProperty(pageId: pageId, name: name)
-    }
-
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
         try await highlightOps.updateBlockContent(blockId: blockId, highlight: highlight, bookId: bookId)
     }
