@@ -1,5 +1,25 @@
 import Foundation
 
+// 串行化按来源的 ensure（避免并发创建多个同名数据库）
+private actor NotionSourceEnsureLock {
+    private var waitersByKey: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+    func begin(key: String) async {
+        if waitersByKey[key] != nil {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                waitersByKey[key]!.append(c)
+            }
+        } else {
+            waitersByKey[key] = []
+        }
+    }
+
+    func end(key: String) {
+        let waiters = waitersByKey.removeValue(forKey: key) ?? []
+        for w in waiters { w.resume() }
+    }
+}
+
 final class NotionService: NotionServiceProtocol {
     // Core service components
     private let core: NotionServiceCore
@@ -11,6 +31,8 @@ final class NotionService: NotionServiceProtocol {
     private let pageOps: NotionPageOperations
     private let highlightOps: NotionHighlightOperations
     private let queryOps: NotionQueryOperations
+    // 串行化 ensure（按来源）
+    private static let sourceEnsureLock = NotionSourceEnsureLock()
 
     init(configStore: NotionConfigStoreProtocol) {
         // Initialize core components
@@ -135,7 +157,11 @@ final class NotionService: NotionServiceProtocol {
     // MARK: - Ensure / find-or-create helpers (consolidated)
     /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
-        // 1) check per-source cache
+        // 并发串行化，避免并发创建多个数据库
+        await Self.sourceEnsureLock.begin(key: sourceKey)
+        defer { Task { await Self.sourceEnsureLock.end(key: sourceKey) } }
+
+        // 1) 双检：进入锁后再次检查与验证存在
         if let saved = core.configStore.databaseIdForSource(sourceKey) {
             if await databaseOps.databaseExists(databaseId: saved) { return saved }
             core.configStore.setDatabaseId(nil, forSource: sourceKey)
