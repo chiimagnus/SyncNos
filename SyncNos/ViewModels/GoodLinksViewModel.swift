@@ -14,7 +14,6 @@ final class GoodLinksViewModel: ObservableObject {
     // UI Sync State per-link
     @Published var syncingLinkIds: Set<String> = []
     @Published var syncedLinkIds: Set<String> = []
-    @Published var lastSyncById: [String: Date] = [:]
 
     // Sorting & Filtering state (persisted)
     @Published var sortKey: GoodLinksSortKey = .modified {
@@ -74,20 +73,6 @@ final class GoodLinksViewModel: ObservableObject {
             let dbPath = service.resolveDatabasePath()
             let rows = try service.fetchRecentLinks(dbPath: dbPath, limit: limit)
             links = rows
-            // 异步后台预取 Notion last sync 时间并刷新排序（不阻塞 UI）
-            let ids = rows.map { $0.id }
-            Task { [weak self] in
-                await DIContainer.shared.syncTimestampStore.prefetch(for: ids, source: "goodLinks")
-                var map: [String: Date] = [:]
-                for id in ids {
-                    if let d = DIContainer.shared.syncTimestampStore.cachedLastSync(for: id) {
-                        map[id] = d
-                    }
-                }
-                await MainActor.run {
-                    self?.lastSyncById = map
-                }
-            }
             logger.info("[GoodLinks] loaded links: \(rows.count)")
         } catch {
             let desc = error.localizedDescription
@@ -130,8 +115,9 @@ final class GoodLinksViewModel: ObservableObject {
             case .modified:
                 cmp = a.modifiedAt == b.modifiedAt ? .orderedSame : (a.modifiedAt < b.modifiedAt ? .orderedAscending : .orderedDescending)
             case .lastSync:
-                let t1 = lastSyncById[a.id]
-                let t2 = lastSyncById[b.id]
+                // 使用 SyncTimestampStore 中记录的上次同步时间进行排序（若无记录则降序放在末尾/开头，取决于 sortAscending）
+                let t1 = SyncTimestampStore.shared.getLastSyncTime(for: a.id)
+                let t2 = SyncTimestampStore.shared.getLastSyncTime(for: b.id)
                 if t1 == nil && t2 == nil {
                     cmp = .orderedSame
                 } else if t1 == nil {
