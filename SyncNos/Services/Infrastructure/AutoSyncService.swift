@@ -169,11 +169,12 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         // 并发上限（书本级并行数）
         let maxConcurrentBooks = NotionSyncConfig.batchConcurrency
 
-        // 预过滤近 24 小时已同步过的书籍，并即时发送跳过通知
+        // 预取 last sync 缓存，并预过滤近 24 小时已同步过的书籍
         let now = Date()
+        await DIContainer.shared.syncTimestampStore.prefetch(for: assetIds, source: "appleBooks")
         var eligibleIds: [String] = []
         for id in assetIds {
-            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id), now.timeIntervalSince(last) < intervalSeconds {
+            if let last = DIContainer.shared.syncTimestampStore.cachedLastSync(for: id), now.timeIntervalSince(last) < intervalSeconds {
                 self.logger.info("AutoSync skipped for \(id): recent sync")
                 NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped"]) 
                 continue

@@ -87,7 +87,7 @@ class DIContainer {
 
     var syncTimestampStore: SyncTimestampStoreProtocol {
         if _syncTimestampStore == nil {
-            _syncTimestampStore = SyncTimestampStore.shared
+            _syncTimestampStore = NotionTimestampStore()
         }
         return _syncTimestampStore!
     }

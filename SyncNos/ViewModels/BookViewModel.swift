@@ -11,6 +11,7 @@ class BookViewModel: ObservableObject {
     // UI Sync State
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
+    @Published var lastSyncById: [String: Date] = [:]
 
     // Sorting and filtering state - Reactive properties with UserDefaults persistence
     @Published var sortKey: BookListSortKey = .title {
@@ -75,8 +76,8 @@ class BookViewModel: ObservableObject {
                 case .highlightCount:
                     result = book1.highlightCount < book2.highlightCount ? .orderedAscending : .orderedDescending
                 case .lastSync:
-                    let time1 = syncTimestampStore.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
-                    let time2 = syncTimestampStore.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
+                    let time1 = lastSyncById[book1.bookId] ?? Date.distantPast
+                    let time2 = lastSyncById[book2.bookId] ?? Date.distantPast
                     result = time1 < time2 ? .orderedAscending : .orderedDescending
                 case .lastEdited:
                     let time1 = book1.modifiedAt ?? Date.distantPast
@@ -156,6 +157,20 @@ class BookViewModel: ObservableObject {
         do {
             let books = try fetchBooksFromDatabase()
             self.books = books
+            // 异步后台预取 Notion last sync 时间并刷新排序（不阻塞 UI）
+            let ids = books.map { $0.bookId }
+            Task { [weak self] in
+                await DIContainer.shared.syncTimestampStore.prefetch(for: ids, source: "appleBooks")
+                var map: [String: Date] = [:]
+                for id in ids {
+                    if let d = DIContainer.shared.syncTimestampStore.cachedLastSync(for: id) {
+                        map[id] = d
+                    }
+                }
+                await MainActor.run {
+                    self?.lastSyncById = map
+                }
+            }
             logger.info("Successfully loaded \(books.count) books")
         } catch {
             let errorDesc = error.localizedDescription

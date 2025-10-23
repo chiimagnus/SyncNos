@@ -24,7 +24,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
         let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
         defer { databaseService.close(handle) }
 
-        let since = incremental ? SyncTimestampStore.shared.getLastSyncTime(for: book.bookId) : nil
+        let since = incremental ? await DIContainer.shared.syncTimestampStore.getLastSyncTime(for: book.bookId, source: "appleBooks") : nil
         if ensured.recreated {
             progress(NSLocalizedString("Detected database recreation, performing full sync...", comment: ""))
             var offset = 0
@@ -39,7 +39,7 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
                 offset += pageSize
                 batch += 1
             }
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
             return
         }
 
@@ -87,16 +87,16 @@ final class AppleBooksSyncStrategyPerBook: AppleBooksSyncStrategyProtocol {
         }
 
         if incremental {
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
         }
     }
 
     func syncSmart(book: BookListItem, dbPath: String?, progress: @escaping (String) -> Void) async throws {
-        let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+        let last = await DIContainer.shared.syncTimestampStore.getLastSyncTime(for: book.bookId, source: "appleBooks")
         progress(last == nil ? NSLocalizedString("Plan 2: Initial sync (full)", comment: "") : NSLocalizedString("Plan 2: Incremental sync", comment: ""))
         try await sync(book: book, dbPath: dbPath, incremental: last != nil, progress: progress)
         if last == nil {
-            let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: book.bookId, to: t)
+            let t = Date(); try await DIContainer.shared.syncTimestampStore.setLastSyncTime(for: book.bookId, source: "appleBooks", to: t)
         }
     }
 
