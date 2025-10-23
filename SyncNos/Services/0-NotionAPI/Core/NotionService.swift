@@ -5,6 +5,7 @@ final class NotionService: NotionServiceProtocol {
     private let core: NotionServiceCore
     private let requestHelper: NotionRequestHelper
     private let helperMethods: NotionHelperMethods
+    private static let ensureCoordinator = NotionEnsureCoordinator()
 
     // Operation modules
     private let databaseOps: NotionDatabaseOperations
@@ -135,19 +136,24 @@ final class NotionService: NotionServiceProtocol {
     // MARK: - Ensure / find-or-create helpers (consolidated)
     /// Ensure a single (per-source) database exists: check config -> exists -> find by title -> create
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String {
-        // 1) check per-source cache
-        if let saved = core.configStore.databaseIdForSource(sourceKey) {
-            if await databaseOps.databaseExists(databaseId: saved) { return saved }
-            core.configStore.setDatabaseId(nil, forSource: sourceKey)
-        }
+        // 使用协调器按 sourceKey 串行化，避免并发重复创建
+        await Self.ensureCoordinator.begin(key: sourceKey)
+        defer { Task { await Self.ensureCoordinator.end(key: sourceKey) } }
 
-        // 4) fallback to search-by-title (existing behavior)
+        // 1) 优先使用缓存且验证存在
+        if let saved = core.configStore.databaseIdForSource(sourceKey), await databaseOps.databaseExists(databaseId: saved) {
+            return saved
+        }
+        // 缓存失效时清理
+        core.configStore.setDatabaseId(nil, forSource: sourceKey)
+
+        // 2) 搜索同名数据库（限定父页面）
         if let found = try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId) {
             core.configStore.setDatabaseId(found, forSource: sourceKey)
             return found
         }
 
-        // 5) create new database as last resort
+        // 3) 最后手段：创建新数据库
         let created = try await databaseOps.createDatabase(title: title, pageId: parentPageId)
         core.configStore.setDatabaseId(created.id, forSource: sourceKey)
         return created.id
