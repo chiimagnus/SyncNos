@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct AppleBooksListView: View {
     @ObservedObject var viewModel: BookViewModel
@@ -68,15 +67,13 @@ struct AppleBooksListView: View {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
 
-                            // 显示上次同步时间，仅在单选且该项被选中时显示
-                            if selectionIds.count == 1 && selectionIds.contains(book.bookId) {
-                                Divider()
-                                let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
-                                if let lastDate = last {
-                                    Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
-                                } else {
-                                    Text("Last Sync: Never")
-                                }
+                            // 显示上次同步时间（针对当前右键的行）
+                            Divider()
+                            let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+                            if let lastDate = last {
+                                Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
+                            } else {
+                                Text("Last Sync: Never")
                             }
                         }
                     }
