@@ -14,9 +14,8 @@ final class SyncTimestampStore: SyncTimestampStoreProtocol {
     /// - Returns: 上次同步的日期，如果没有则返回nil
     func getLastSyncTime(for bookId: String) -> Date? {
         let key = lastSyncKeyPrefix + bookId
-        let date = userDefaults.object(forKey: key) as? Date
-        logger.debug("DEBUG: 获取同步时间戳 for 书籍ID: \(bookId) = \(date?.description ?? "nil")")
-        return date
+        // 降低日志噪声：此方法在排序/列表渲染时高频调用，不打印逐条日志
+        return userDefaults.object(forKey: key) as? Date
     }
 
     /// 设置指定书籍的上次同步时间
@@ -26,7 +25,8 @@ final class SyncTimestampStore: SyncTimestampStoreProtocol {
     func setLastSyncTime(for bookId: String, to date: Date) {
         let key = lastSyncKeyPrefix + bookId
         userDefaults.set(date, forKey: key)
-        logger.debug("DEBUG: 设置同步时间戳 for 书籍ID: \(bookId) = \(date)")
+        // 如需详细排查时可打开：
+        // logger.debug("Set last sync time for id=\(bookId) = \(date)")
     }
 
     // /// 清除指定书籍的同步时间
