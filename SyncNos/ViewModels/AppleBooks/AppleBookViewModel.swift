@@ -1,10 +1,10 @@
 import Foundation
 import Combine
 
-// MARK: - BookViewModel
+// MARK: - AppleBookViewModel
 
 @MainActor
-class BookViewModel: ObservableObject {
+class AppleBookViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -351,7 +351,7 @@ private func latestSQLiteFileStandalone(in dir: String, logger: LoggerServicePro
 }
 
 // MARK: - Batch Sync (Apple Books)
-extension BookViewModel {
+extension AppleBookViewModel {
     /// 批量同步所选书籍到 Notion，使用并发限流（默认 10 并发）
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }

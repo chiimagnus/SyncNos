@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 struct MainListView: View {
-    @StateObject private var viewModel = BookViewModel()
+    @StateObject private var viewModel = AppleBookViewModel()
     @State private var selectedBookIds: Set<String> = []
     @State private var selectedLinkIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
