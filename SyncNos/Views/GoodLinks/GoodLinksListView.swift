@@ -6,7 +6,7 @@ struct GoodLinksListView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading {
+            if viewModel.isLoading || viewModel.isComputingList {
                 ProgressView("Loading links...")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
@@ -101,6 +101,8 @@ struct GoodLinksListView: View {
             }
         }
         .onAppear {
+            // 切换到 GoodLinks 时，确保第一帧进入加载态，然后异步加载/重算
+            viewModel.triggerRecompute()
             if viewModel.links.isEmpty {
                 Task {
                     await viewModel.loadRecentLinks()
