@@ -153,17 +153,33 @@ class BookViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        do {
-            let books = try fetchBooksFromDatabase()
-            self.books = books
-            logger.info("Successfully loaded \(books.count) books")
-        } catch {
-            let errorDesc = error.localizedDescription
-            logger.error("Error loading books: \(errorDesc)")
-            errorMessage = errorDesc
-        }
+        // 将同步 SQLite 读取与文件系统扫描移到后台，避免阻塞主线程
+        // 先在主线程上捕获依赖与路径，避免跨 actor 访问
+        let dbService = self.databaseService
+        let logger = self.logger
+        let root = self.dbRootOverride
 
-        isLoading = false
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let books = try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
+                    DispatchQueue.main.async {
+                        self.books = books
+                        logger.info("Successfully loaded \(books.count) books")
+                        self.isLoading = false
+                        continuation.resume()
+                    }
+                } catch {
+                    let errorDesc = error.localizedDescription
+                    DispatchQueue.main.async {
+                        logger.error("Error loading books: \(errorDesc)")
+                        self.errorMessage = errorDesc
+                        self.isLoading = false
+                        continuation.resume()
+                    }
+                }
+            }
+        }
     }
         
     // MARK: - Private Methods
@@ -194,82 +210,16 @@ class BookViewModel: ObservableObject {
     }
     
     private func fetchBooksFromDatabase() throws -> [BookListItem] {
-        guard let root = dbRootOverride else {
-            logger.warning("Books data root not selected; skipping load until user picks a folder")
-            return []
+        // 保留一个主线程版本以便未来复用；内部委托给无隔离的纯函数
+        let root = dbRootOverride
+        let sorted = try computeBooksFromDatabase(root: root, databaseService: databaseService, logger: logger)
+        // 在主线程中更新路径缓存
+        if let root {
+            let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
+            let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
+            if let annotationDB = latestSQLiteFile(in: annotationDir) { self.annotationDBPath = annotationDB }
+            if let booksDB = latestSQLiteFile(in: booksDir) { self.booksDBPath = booksDB }
         }
-        logger.info("Books data root: \(root)")
-
-        let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
-        let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
-
-        logger.debug("Looking for annotation DB in: \(annotationDir)")
-        logger.debug("Looking for books DB in: \(booksDir)")
-
-        guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
-            let error = "Annotation DB not found under \(annotationDir)"
-            logger.error("Error: \(error)")
-            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
-        }
-        logger.info("Found annotation DB: \(annotationDB)")
-
-        guard let booksDB = latestSQLiteFile(in: booksDir) else {
-            let error = "Books DB not found under \(booksDir)"
-            logger.error("Error: \(error)")
-            throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
-        }
-        logger.info("Found books DB: \(booksDB)")
-        self.annotationDBPath = annotationDB
-        self.booksDBPath = booksDB
-
-        // 使用只读会话封装连接生命周期
-        let annotationSession = try databaseService.makeReadOnlySession(dbPath: annotationDB)
-        defer { annotationSession.close(); logger.debug("Closed annotation DB session") }
-        let booksSession = try databaseService.makeReadOnlySession(dbPath: booksDB)
-        defer { booksSession.close(); logger.debug("Closed books DB session") }
-
-        // 获取每本书的高亮统计信息（包括计数、创建时间、修改时间）
-        let stats = try annotationSession.fetchHighlightStatsByAsset()
-        let assetIds = stats.map { $0.assetId }.sorted()
-        logger.info("Found \(assetIds.count) assets with highlights")
-
-        // 获取书籍信息（标题/作者）
-        let books = try booksSession.fetchBooks(assetIds: assetIds)
-        logger.debug("Fetched \(books.count) books from library DB")
-
-        // 创建书籍ID到书籍信息的映射
-        var bookInfoMap: [String: BookRow] = [:]
-        for book in books {
-            bookInfoMap[book.assetId] = book
-        }
-
-        // 创建书籍列表，包括有信息的和无信息的（缺失标题的）
-        var result: [BookListItem] = []
-        for stat in stats {
-            let bookInfo = bookInfoMap[stat.assetId]
-            let hasTitle = bookInfo != nil && !(bookInfo?.title ?? "").isEmpty
-            let bookTitle = bookInfo?.title ?? ""
-            let authorName = bookInfo?.author ?? ""
-
-            let bookItem = BookListItem(
-                bookId: stat.assetId,
-                authorName: authorName,
-                bookTitle: bookTitle,
-                ibooksURL: "ibooks://assetid/\(stat.assetId)",
-                highlightCount: stat.count,
-                createdAt: stat.minCreationDate,
-                modifiedAt: stat.maxModifiedDate,
-                hasTitle: hasTitle
-            )
-            result.append(bookItem)
-        }
-
-        // 对于 BKLibrary 缺失的 assetId 也创建 BookListItem（如计划所述）
-        // 这 should have been handled already, but let's ensure we don't miss anything
-        // by including any asset IDs that were in the original counts but not in the stats
-
-        let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
-        logger.info("Built list with \(sorted.count) books (with stats and metadata)")
         return sorted
     }
     
@@ -309,6 +259,95 @@ class BookViewModel: ObservableObject {
         logger.debug("Latest SQLite file in \(dir): \(latestFile ?? "none")")
         return latestFile
     }
+}
+
+// MARK: - Nonisolated heavy computation helpers
+/// 将 Apple Books 的磁盘扫描 + SQLite 聚合封装为无隔离纯函数，便于在后台线程执行
+private func computeBooksFromDatabase(root: String?, databaseService: DatabaseServiceProtocol, logger: LoggerServiceProtocol) throws -> [BookListItem] {
+    guard let root = root else {
+        logger.warning("Books data root not selected; skipping load until user picks a folder")
+        return []
+    }
+    logger.info("Books data root: \(root)")
+
+    let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
+    let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
+
+    logger.debug("Looking for annotation DB in: \(annotationDir)")
+    logger.debug("Looking for books DB in: \(booksDir)")
+
+    guard let annotationDB = latestSQLiteFileStandalone(in: annotationDir, logger: logger) else {
+        let error = "Annotation DB not found under \(annotationDir)"
+        logger.error("Error: \(error)")
+        throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
+    }
+    logger.info("Found annotation DB: \(annotationDB)")
+
+    guard let booksDB = latestSQLiteFileStandalone(in: booksDir, logger: logger) else {
+        let error = "Books DB not found under \(booksDir)"
+        logger.error("Error: \(error)")
+        throw NSError(domain: "SyncBookNotes", code: 10, userInfo: [NSLocalizedDescriptionKey: error])
+    }
+    logger.info("Found books DB: \(booksDB)")
+
+    // 使用只读会话封装连接生命周期
+    let annotationSession = try databaseService.makeReadOnlySession(dbPath: annotationDB)
+    defer { annotationSession.close(); logger.debug("Closed annotation DB session") }
+    let booksSession = try databaseService.makeReadOnlySession(dbPath: booksDB)
+    defer { booksSession.close(); logger.debug("Closed books DB session") }
+
+    // 获取每本书的高亮统计信息（包括计数、创建时间、修改时间）
+    let stats = try annotationSession.fetchHighlightStatsByAsset()
+    let assetIds = stats.map { $0.assetId }.sorted()
+    logger.info("Found \(assetIds.count) assets with highlights")
+
+    // 获取书籍信息（标题/作者）
+    let books = try booksSession.fetchBooks(assetIds: assetIds)
+    logger.debug("Fetched \(books.count) books from library DB")
+
+    // 创建书籍ID到书籍信息的映射
+    var bookInfoMap: [String: BookRow] = [:]
+    for book in books { bookInfoMap[book.assetId] = book }
+
+    // 创建书籍列表
+    var result: [BookListItem] = []
+    result.reserveCapacity(stats.count)
+    for stat in stats {
+        let bookInfo = bookInfoMap[stat.assetId]
+        let hasTitle = bookInfo != nil && !(bookInfo?.title ?? "").isEmpty
+        let bookTitle = bookInfo?.title ?? ""
+        let authorName = bookInfo?.author ?? ""
+        result.append(BookListItem(
+            bookId: stat.assetId,
+            authorName: authorName,
+            bookTitle: bookTitle,
+            ibooksURL: "ibooks://assetid/\(stat.assetId)",
+            highlightCount: stat.count,
+            createdAt: stat.minCreationDate,
+            modifiedAt: stat.maxModifiedDate,
+            hasTitle: hasTitle
+        ))
+    }
+
+    let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
+    logger.info("Built list with \(sorted.count) books (with stats and metadata)")
+    return sorted
+}
+
+/// 独立的 SQLite 文件扫描，便于在后台线程使用
+private func latestSQLiteFileStandalone(in dir: String, logger: LoggerServiceProtocol) -> String? {
+    let url = URL(fileURLWithPath: dir)
+    var isDir: ObjCBool = false
+    if !FileManager.default.fileExists(atPath: dir, isDirectory: &isDir) { return nil }
+    if !isDir.boolValue { return nil }
+    guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey]) else { return nil }
+    let sqliteFiles = files.filter { $0.pathExtension == "sqlite" }
+    guard !sqliteFiles.isEmpty else { return nil }
+    let sorted = sqliteFiles.sorted { a, b in
+        (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast >
+        (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast
+    }
+    return sorted.first?.path
 }
 
 // MARK: - Batch Sync (Apple Books)
