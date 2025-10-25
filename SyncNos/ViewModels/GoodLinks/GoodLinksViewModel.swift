@@ -76,7 +76,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
 
         Publishers.CombineLatest4($links, $sortKey, $sortAscending, $showStarredOnly)
-            .combineLatest(debouncedSearch, recomputeTrigger.prepend(()))
+            .combineLatest(debouncedSearch, recomputeTrigger)
             // 主线程置计算标记为 true，确保第一帧显示“加载中”
             .receive(on: DispatchQueue.main)
             .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = true })
