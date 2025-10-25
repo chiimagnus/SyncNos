@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct GoodLinksListView: View {
-    @EnvironmentObject var viewModel: GoodLinksViewModel
+    @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectionIds: Set<String>
 
     var body: some View {
