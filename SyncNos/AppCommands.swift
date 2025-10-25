@@ -47,18 +47,6 @@ struct AppCommands: Commands {
             .keyboardShortcut(",", modifiers: .command)
         }
 
-        CommandGroup(after: .appSettings) {
-            Button("Please give five stars", systemImage: "heart") {
-                openAppStoreReview()
-            }
-            Button("Report Issues & Suggestions", systemImage: "ladybug") {
-                openGitHubRepo()
-            }
-            Button("View Source Code", systemImage: "link") {
-                openGitHubSource()
-            }
-        }
-
         // File 菜单 - 文件操作相关
         CommandGroup(replacing: .newItem) {
             Button("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle") {
@@ -169,22 +157,34 @@ struct AppCommands: Commands {
         }
 
         // Window 菜单 - 窗口管理相关
-        CommandGroup(after: .windowList) {
-            Button("Show Logs", systemImage: "doc.text.magnifyingglass") {
-                openWindow(id: "log")
-            }
-            .keyboardShortcut("l", modifiers: .command)
-            // Button("Book Detail Window", systemImage: "book") {
-            //     // 打开书籍详情窗口的逻辑
-            // }
-            // .keyboardShortcut("1", modifiers: [.command, .shift])
-        }
+        CommandGroup(replacing: .singleWindowList) {}
 
         // Help 菜单 - 帮助相关
         CommandGroup(replacing: .help) {
             Button("SyncNos User Guide", systemImage: "questionmark.circle") {
                 openWindow(id: "userguide")
             }
+
+            Divider()
+
+            Button("Please give five stars", systemImage: "heart") {
+                openAppStoreReview()
+            }
+
+            Button("Report Issues & Suggestions", systemImage: "ladybug") {
+                openGitHubRepo()
+            }
+
+            Button("View Source Code", systemImage: "link") {
+                openGitHubSource()
+            }
+
+            Divider()
+
+            Button("Show Logs", systemImage: "doc.text.magnifyingglass") {
+                openWindow(id: "log")
+            }
+            .keyboardShortcut("l", modifiers: .command)
         }
     }
 
