@@ -79,6 +79,22 @@ struct AppleBooksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .focusedSceneValue(\.selectionCommands, SelectionCommands(
+                    selectAll: {
+                        let all = Set(viewModel.displayBooks.map { $0.bookId })
+                        if !all.isEmpty { selectionIds = all }
+                    },
+                    deselectAll: {
+                        selectionIds.removeAll()
+                    },
+                    canSelectAll: {
+                        let total = viewModel.displayBooks.count
+                        return total > 0 && selectionIds.count < total
+                    },
+                    canDeselect: {
+                        !selectionIds.isEmpty
+                    }
+                ))
             }
         }
         .onAppear {
@@ -108,13 +124,7 @@ struct AppleBooksListView: View {
                 await viewModel.loadBooks()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SelectAllRequested")).receive(on: DispatchQueue.main)) { _ in
-            let all = Set(viewModel.displayBooks.map { $0.bookId })
-            if !all.isEmpty { selectionIds = all }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DeselectAllRequested")).receive(on: DispatchQueue.main)) { _ in
-            selectionIds.removeAll()
-        }
+        
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
             viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
