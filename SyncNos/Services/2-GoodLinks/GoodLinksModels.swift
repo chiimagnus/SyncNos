@@ -24,6 +24,11 @@ struct GoodLinksLinkRow: Codable, Equatable {
     var tagsFormatted: String {
         GoodLinksTagParser.formatTagsWithSemicolon(tags)
     }
+
+    // Deeplink to open the link in GoodLinks app
+    var openInGoodLinksURLString: String {
+        "goodlinks://x-callback-url/open?id=\(id)"
+    }
 }
 
 struct GoodLinksHighlightRow: Codable, Equatable {
@@ -33,6 +38,15 @@ struct GoodLinksHighlightRow: Codable, Equatable {
     let color: Int?
     let note: String?
     let time: Double
+
+    // Deeplink to open the specific highlight in GoodLinks app
+    // The highlight id contains a '#' fragment which must be percent-encoded in query
+    var openInGoodLinksHighlightURLString: String {
+        let forbidden = CharacterSet(charactersIn: "&=?#")
+        let allowed = CharacterSet.urlQueryAllowed.subtracting(forbidden)
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: allowed) ?? id
+        return "goodlinks://x-callback-url/open-highlight?id=\(encoded)"
+    }
 }
 
 struct GoodLinksLinkHighlightCount: Equatable {

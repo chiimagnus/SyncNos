@@ -26,7 +26,10 @@ struct GoodLinksDetailView: View {
                                 subtitle: link.author,
                                 overrideWidth: frozenLayoutWidth
                             ) {
-                                // trailing 区域留空（可后续加分享/打开按钮）
+                                if let url = URL(string: link.openInGoodLinksURLString) {
+                                    Link("Open in GoodLinks", destination: url)
+                                        .font(.subheadline)
+                                }
                             } content: {
                                 VStack(alignment: .leading, spacing: 10) {
                                     // 收藏与标签
@@ -175,7 +178,20 @@ struct GoodLinksDetailView: View {
                                             note: item.note,
                                             createdDate: formatDate(item.time),
                                             modifiedDate: nil
-                                        )
+                                        ) {
+                                            Button {
+                                                if let url = URL(string: item.openInGoodLinksHighlightURLString) {
+                                                    NSWorkspace.shared.open(url)
+                                                }
+                                            } label: {
+                                                Image(systemName: "link")
+                                                    .imageScale(.medium)
+                                                    .foregroundColor(.primary)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .help("Open in GoodLinks")
+                                            .accessibilityLabel("Open in GoodLinks")
+                                        }
                                     }
                                 }
                                 .overlay(
