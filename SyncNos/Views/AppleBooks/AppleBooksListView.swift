@@ -53,6 +53,15 @@ struct AppleBooksListView: View {
                         .padding(.vertical, 4)
                         .tag(book.bookId)
                         .contextMenu {
+                            // Open in Apple Books (if available)
+                            if let ibooksURLString = book.ibooksURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let ibooksURL = URL(string: ibooksURLString) {
+                                Button {
+                                    NSWorkspace.shared.open(ibooksURL)
+                                } label: {
+                                    Label("Open in Apple Books", systemImage: "book")
+                                }
+                            }
+
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
