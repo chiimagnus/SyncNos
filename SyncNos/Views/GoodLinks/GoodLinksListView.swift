@@ -71,6 +71,15 @@ struct GoodLinksListView: View {
                         .padding(.vertical, 4)
                         .tag(link.id)
                         .contextMenu {
+                            // Open in GoodLinks
+                            if let openURL = URL(string: link.openInGoodLinksURLString) {
+                                Button {
+                                    NSWorkspace.shared.open(openURL)
+                                } label: {
+                                    Label("Open in GoodLinks", systemImage: "link")
+                                }
+                            }
+
                             Button {
                                 viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
