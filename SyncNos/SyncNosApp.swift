@@ -33,12 +33,6 @@ struct SyncNosApp: App {
         }
         .windowResizability(.contentSize)
         
-        // 自定义 About 窗口（单实例）
-        // Window("About SyncNos", id: "about") {
-        //     AboutView()
-        // }
-        // .windowResizability(.contentSize)
-
         // 用户指南窗口（单实例）
         Window("SyncNos User Guide", id: "userguide") {
             UserGuideView()

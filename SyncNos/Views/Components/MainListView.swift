@@ -94,6 +94,10 @@ struct MainListView: View {
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()
+            // 在切换到 GoodLinks 前预置计算标记，确保首帧进入“加载中”占位
+            if contentSource == .goodLinks {
+                goodLinksVM.prepareForDisplaySwitch()
+            }
         }
         .background {
             LinearGradient(
