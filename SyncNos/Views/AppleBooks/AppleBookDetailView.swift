@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 struct AppleBookDetailView: View {
-    @ObservedObject var viewModelList: BookViewModel
+    @ObservedObject var viewModelList: AppleBookViewModel
     @Binding var selectedBookId: String?
     @StateObject private var viewModel = AppleBookDetailViewModel()
     @State private var isSyncing = false
@@ -333,7 +333,7 @@ struct AppleBookDetailView_Previews: PreviewProvider {
                                        highlightCount: 123)
         
         // Preview for new initializer
-        let listVM = BookViewModel()
+        let listVM = AppleBookViewModel()
         return AppleBookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
     }
 }
