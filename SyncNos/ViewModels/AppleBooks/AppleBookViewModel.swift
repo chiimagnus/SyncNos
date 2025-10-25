@@ -31,17 +31,6 @@ class AppleBookViewModel: ObservableObject {
         }
     }
 
-    // Computed property to maintain backward compatibility with existing code that uses the old sort property
-    var sort: BookListSort {
-        get {
-            return BookListSort(key: sortKey, ascending: sortAscending)
-        }
-        set {
-            sortKey = newValue.key
-            sortAscending = newValue.ascending
-        }
-    }
-
     private let databaseService: DatabaseServiceProtocol
     private let appleBooksSyncService: AppleBooksSyncServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
@@ -207,57 +196,6 @@ class AppleBookViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-    }
-    
-    private func fetchBooksFromDatabase() throws -> [BookListItem] {
-        // 保留一个主线程版本以便未来复用；内部委托给无隔离的纯函数
-        let root = dbRootOverride
-        let sorted = try computeBooksFromDatabase(root: root, databaseService: databaseService, logger: logger)
-        // 在主线程中更新路径缓存
-        if let root {
-            let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
-            let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
-            if let annotationDB = latestSQLiteFile(in: annotationDir) { self.annotationDBPath = annotationDB }
-            if let booksDB = latestSQLiteFile(in: booksDir) { self.booksDBPath = booksDB }
-        }
-        return sorted
-    }
-    
-    private func latestSQLiteFile(in dir: String) -> String? {
-        let url = URL(fileURLWithPath: dir)
-        logger.debug("Checking directory: \(dir)")
-        
-        // 检查目录是否存在
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: dir, isDirectory: &isDir) {
-            logger.warning("Directory does not exist: \(dir)")
-            return nil
-        }
-        
-        if !isDir.boolValue {
-            logger.warning("Path is not a directory: \(dir)")
-            return nil
-        }
-        
-        guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey]) else {
-            logger.error("Failed to list contents of directory: \(dir)")
-            return nil
-        }
-        let sqliteFiles = files.filter { $0.pathExtension == "sqlite" }
-        guard !sqliteFiles.isEmpty else {
-            logger.warning("No SQLite files found in directory: \(dir)")
-            return nil
-        }
-        let sorted = sqliteFiles.sorted { a, b in
-            guard let dateA = try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                  let dateB = try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                return false
-            }
-            return dateA > dateB
-        }
-        let latestFile = sorted.first?.path
-        logger.debug("Latest SQLite file in \(dir): \(latestFile ?? "none")")
-        return latestFile
     }
 }
 

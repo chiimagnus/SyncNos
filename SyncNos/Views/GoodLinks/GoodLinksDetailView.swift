@@ -217,7 +217,6 @@ struct GoodLinksDetailView: View {
                     .padding()
                 }
                 .onAppear {
-                    print("[GoodLinksDetailView] onAppear: linkId=\(linkId)")
                     Task {
                         await viewModel.loadHighlights(for: linkId)
                         await viewModel.loadContent(for: linkId)
@@ -227,7 +226,6 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 .onChange(of: linkId) { newLinkId in
-                    print("[GoodLinksDetailView] linkId changed to: \(newLinkId)")
                     Task {
                         await viewModel.loadHighlights(for: newLinkId)
                         await viewModel.loadContent(for: newLinkId)

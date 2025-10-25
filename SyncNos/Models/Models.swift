@@ -119,11 +119,6 @@ enum BookListSortKey: String, CaseIterable {
     }
 }
 
-struct BookListSort {
-    var key: BookListSortKey
-    var ascending: Bool
-}
-
 enum NoteFilter: String, CaseIterable {
     case any = "any"
     case hasNote = "hasNote"
