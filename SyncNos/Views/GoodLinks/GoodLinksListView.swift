@@ -86,7 +86,7 @@ struct GoodLinksListView: View {
 
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
-                            let last = SyncTimestampStore.shared.getLastSyncTime(for: link.id)
+                            let last = viewModel.lastSync(for: link.id)
                             if let lastDate = last {
                                 Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
                             } else {

@@ -134,6 +134,29 @@ class AppleBookViewModel: ObservableObject {
         dbRootOverride = path
     }
     
+    /// 恢复已保存的书签并申请访问权限，同时计算并设置数据库根目录
+    /// - Returns: 是否成功开始访问安全作用域
+    @discardableResult
+    func restoreBookmarkAndConfigureRoot() -> Bool {
+        guard let url = bookmarkStore.restore() else { return false }
+        let started = bookmarkStore.startAccessing(url: url)
+        logger.debug("Using restored bookmark on appear, startAccess=\(started)")
+        let selectedPath = url.path
+        let rootCandidate = determineDatabaseRoot(from: selectedPath)
+        setDbRootOverride(rootCandidate)
+        return started
+    }
+    
+    /// 结束对当前安全作用域目录的访问
+    func stopAccessingIfNeeded() {
+        bookmarkStore.stopAccessingIfNeeded()
+    }
+    
+    /// 供视图查询上次同步时间，避免视图直接依赖存储实现
+    func lastSync(for bookId: String) -> Date? {
+        syncTimestampStore.getLastSyncTime(for: bookId)
+    }
+    
     func loadBooks() async {
         isLoading = true
         errorMessage = nil
@@ -147,10 +170,12 @@ class AppleBookViewModel: ObservableObject {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let books = try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
+                    let result = try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
                     DispatchQueue.main.async {
-                        self.books = books
-                        logger.info("Successfully loaded \(books.count) books")
+                        self.books = result.books
+                        self.annotationDBPath = result.annotationDB
+                        self.booksDBPath = result.booksDB
+                        logger.info("Successfully loaded \(result.books.count) books")
                         self.isLoading = false
                         continuation.resume()
                     }
@@ -197,10 +222,10 @@ class AppleBookViewModel: ObservableObject {
 
 // MARK: - Nonisolated heavy computation helpers
 /// 将 Apple Books 的磁盘扫描 + SQLite 聚合封装为无隔离纯函数，便于在后台线程执行
-private func computeBooksFromDatabase(root: String?, databaseService: DatabaseServiceProtocol, logger: LoggerServiceProtocol) throws -> [BookListItem] {
+private func computeBooksFromDatabase(root: String?, databaseService: DatabaseServiceProtocol, logger: LoggerServiceProtocol) throws -> (books: [BookListItem], annotationDB: String, booksDB: String) {
     guard let root = root else {
         logger.warning("Books data root not selected; skipping load until user picks a folder")
-        return []
+        return ([], "", "")
     }
     logger.info("Books data root: \(root)")
 
@@ -265,7 +290,7 @@ private func computeBooksFromDatabase(root: String?, databaseService: DatabaseSe
 
     let sorted = result.sorted { $0.bookTitle.localizedCaseInsensitiveCompare($1.bookTitle) == .orderedAscending }
     logger.info("Built list with \(sorted.count) books (with stats and metadata)")
-    return sorted
+    return (sorted, annotationDB, booksDB)
 }
 
 /// 独立的 SQLite 文件扫描，便于在后台线程使用

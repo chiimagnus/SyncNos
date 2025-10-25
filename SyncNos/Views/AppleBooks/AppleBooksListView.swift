@@ -69,7 +69,7 @@ struct AppleBooksListView: View {
 
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
-                            let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
+                            let last = viewModel.lastSync(for: book.bookId)
                             if let lastDate = last {
                                 Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
                             } else {
@@ -84,13 +84,7 @@ struct AppleBooksListView: View {
         .onAppear {
             // 切换到 Apple Books 时，确保第一帧进入加载态，然后异步加载/重算
             viewModel.triggerRecompute()
-            if let url = BookmarkStore.shared.restore() {
-                let started = BookmarkStore.shared.startAccessing(url: url)
-                DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
-                let selectedPath = url.path
-                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
-                viewModel.setDbRootOverride(rootCandidate)
-            }
+            _ = viewModel.restoreBookmarkAndConfigureRoot()
             if viewModel.books.isEmpty {
                 Task {
                     await viewModel.loadBooks()
@@ -98,7 +92,7 @@ struct AppleBooksListView: View {
             }
         }
         .onDisappear {
-            BookmarkStore.shared.stopAccessingIfNeeded()
+            viewModel.stopAccessingIfNeeded()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
