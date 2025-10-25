@@ -33,11 +33,7 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         // 替换系统自带的 About 面板，改为打开我们的自定义 About 窗口
-        CommandGroup(replacing: .appInfo) {
-            // Button("About SyncNos", systemImage: "info.circle") {
-            //     openWindow(id: "about")
-            // }
-        }
+        CommandGroup(replacing: .appInfo) {}
 
         // SyncNos 应用菜单 - 应用设置相关
         CommandGroup(replacing: .appSettings) {
@@ -56,14 +52,16 @@ struct AppCommands: Commands {
         }
 
         // Edit 菜单 - 编辑操作相关
-        CommandGroup(after: .textEditing) {
-            Button("Select All Items", systemImage: "checkmark.circle") {
+        CommandGroup(replacing: .pasteboard) {
+            Button("Select All", systemImage: "character.textbox") {
                 NotificationCenter.default.post(name: Notification.Name("SelectAllRequested"), object: nil)
             }
             .keyboardShortcut("a", modifiers: [.command])
-            Button("Deselect All Items", systemImage: "circle") {
+
+            Button("Deselect", systemImage: "textformat.size.smaller") {
                 NotificationCenter.default.post(name: Notification.Name("DeselectAllRequested"), object: nil)
             }
+            .keyboardShortcut(.escape) // cmd+esc
         }
 
         // View 菜单 - 视图相关
