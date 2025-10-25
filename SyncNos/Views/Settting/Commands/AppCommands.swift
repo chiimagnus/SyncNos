@@ -5,6 +5,7 @@ import AppKit
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
 
     init() {
         // 禁用自动窗口标签，从而隐藏 "Show Tab" 和 "Show All Tabs" 菜单项
@@ -51,17 +52,19 @@ struct AppCommands: Commands {
             .keyboardShortcut("s", modifiers: [.command, .option])
         }
 
-        // Edit 菜单 - 编辑操作相关
+        // Edit 菜单 - 编辑操作相关（仅在列表获得焦点时启用）
         CommandGroup(replacing: .pasteboard) {
             Button("Select All", systemImage: "character.textbox") {
-                NotificationCenter.default.post(name: Notification.Name("SelectAllRequested"), object: nil)
+                selectionCommands?.selectAll()
             }
             .keyboardShortcut("a", modifiers: [.command])
+            .disabled(!(selectionCommands?.canSelectAll() ?? false))
 
             Button("Deselect", systemImage: "character.textbox.badge.sparkles") {
-                NotificationCenter.default.post(name: Notification.Name("DeselectAllRequested"), object: nil)
+                selectionCommands?.deselectAll()
             }
-            .keyboardShortcut(.escape) // cmd+esc
+            .keyboardShortcut(.escape)
+            .disabled(!(selectionCommands?.canDeselect() ?? false))
         }
 
         // View 菜单 - 视图相关
