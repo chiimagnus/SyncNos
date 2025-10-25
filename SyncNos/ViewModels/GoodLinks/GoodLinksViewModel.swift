@@ -36,16 +36,19 @@ final class GoodLinksViewModel: ObservableObject {
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
+    private let syncTimestampStore: SyncTimestampStoreProtocol
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
-         logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
+         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore) {
         self.service = service
         self.syncService = syncService
         self.logger = logger
+        self.syncTimestampStore = syncTimestampStore
         subscribeSyncStatusNotifications()
         if let raw = UserDefaults.standard.string(forKey: "goodlinks_sort_key"), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
         self.sortAscending = UserDefaults.standard.object(forKey: "goodlinks_sort_ascending") as? Bool ?? false
@@ -90,7 +93,8 @@ final class GoodLinksViewModel: ObservableObject {
                     sortKey: sortKey,
                     sortAscending: sortAscending,
                     showStarredOnly: showStarredOnly,
-                    searchText: searchText
+                    searchText: searchText,
+                    syncTimestampStore: syncTimestampStore
                 )
             }
             // 回到主线程发布结果，驱动 UI
@@ -135,7 +139,8 @@ final class GoodLinksViewModel: ObservableObject {
                                           sortKey: GoodLinksSortKey,
                                           sortAscending: Bool,
                                           showStarredOnly: Bool,
-                                          searchText: String) -> [GoodLinksLinkRow] {
+                                          searchText: String,
+                                          syncTimestampStore: SyncTimestampStoreProtocol) -> [GoodLinksLinkRow] {
         var arr = links
         if showStarredOnly {
             arr = arr.filter { $0.starred }
@@ -156,7 +161,7 @@ final class GoodLinksViewModel: ObservableObject {
         // 预取 lastSync 映射，避免比较器中频繁读取
         var lastSyncCache: [String: Date?] = [:]
         if sortKey == .lastSync {
-            lastSyncCache = Dictionary(uniqueKeysWithValues: arr.map { ($0.id, SyncTimestampStore.shared.getLastSyncTime(for: $0.id)) })
+            lastSyncCache = Dictionary(uniqueKeysWithValues: arr.map { ($0.id, syncTimestampStore.getLastSyncTime(for: $0.id)) })
         }
 
         arr.sort { a, b in
@@ -203,36 +208,64 @@ final class GoodLinksViewModel: ObservableObject {
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
         logger.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
-
-        do {
-            let dbPath = service.resolveDatabasePath()
-            logger.info("[GoodLinks] 数据库路径: \(dbPath)")
-            let rows = try service.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
-            highlightsByLinkId[linkId] = rows
-            logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[GoodLinks] loadHighlights error: \(desc)")
-            errorMessage = desc
+        let service = self.service
+        let logger = self.logger
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let dbPath = service.resolveDatabasePath()
+                    logger.info("[GoodLinks] 数据库路径: \(dbPath)")
+                    let rows = try service.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
+                    DispatchQueue.main.async {
+                        self.highlightsByLinkId[linkId] = rows
+                        logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
+                        continuation.resume()
+                    }
+                } catch {
+                    let desc = error.localizedDescription
+                    DispatchQueue.main.async {
+                        logger.error("[GoodLinks] loadHighlights error: \(desc)")
+                        self.errorMessage = desc
+                        continuation.resume()
+                    }
+                }
+            }
         }
     }
     
     func loadContent(for linkId: String) async {
         logger.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
-
-        do {
-            let dbPath = service.resolveDatabasePath()
-            if let content = try service.fetchContent(dbPath: dbPath, linkId: linkId) {
-                contentByLinkId[linkId] = content
-                logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
-            } else {
-                logger.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
+        let service = self.service
+        let logger = self.logger
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let dbPath = service.resolveDatabasePath()
+                    let content = try service.fetchContent(dbPath: dbPath, linkId: linkId)
+                    DispatchQueue.main.async {
+                        if let content {
+                            self.contentByLinkId[linkId] = content
+                            logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
+                        } else {
+                            logger.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
+                        }
+                        continuation.resume()
+                    }
+                } catch {
+                    let desc = error.localizedDescription
+                    DispatchQueue.main.async {
+                        logger.error("[GoodLinks] loadContent error: \(desc)")
+                        self.errorMessage = desc
+                        continuation.resume()
+                    }
+                }
             }
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[GoodLinks] loadContent error: \(desc)")
-            errorMessage = desc
         }
+    }
+
+    // 供视图层查询上次同步时间，避免直接访问单例
+    func lastSync(for linkId: String) -> Date? {
+        syncTimestampStore.getLastSyncTime(for: linkId)
     }
 
     // MARK: - Notion Sync (GoodLinks)
