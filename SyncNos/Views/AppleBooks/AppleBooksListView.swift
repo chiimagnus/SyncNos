@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AppleBooksListView: View {
-    @EnvironmentObject var viewModel: AppleBookViewModel
+    @ObservedObject var viewModel: AppleBookViewModel
     @Binding var selectionIds: Set<String>
 
     var body: some View {

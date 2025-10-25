@@ -163,26 +163,26 @@ class AppleBookViewModel: ObservableObject {
 
         // 将同步 SQLite 读取与文件系统扫描移到后台，避免阻塞主线程
         // 先在主线程上捕获依赖与路径，避免跨 actor 访问
+        let dbService = self.databaseService
+        let logger = self.logger
         let root = self.dbRootOverride
-        let dbServiceBox = NonSendableBox(value: self.databaseService)
-        let loggerBox = NonSendableBox(value: self.logger)
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let result = try computeBooksFromDatabase(root: root, databaseService: dbServiceBox.value, logger: loggerBox.value)
+                    let result = try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
                     DispatchQueue.main.async {
                         self.books = result.books
                         self.annotationDBPath = result.annotationDB
                         self.booksDBPath = result.booksDB
-                        loggerBox.value.info("Successfully loaded \(result.books.count) books")
+                        logger.info("Successfully loaded \(result.books.count) books")
                         self.isLoading = false
                         continuation.resume()
                     }
                 } catch {
                     let errorDesc = error.localizedDescription
                     DispatchQueue.main.async {
-                        loggerBox.value.error("Error loading books: \(errorDesc)")
+                        logger.error("Error loading books: \(errorDesc)")
                         self.errorMessage = errorDesc
                         self.isLoading = false
                         continuation.resume()
@@ -417,5 +417,3 @@ extension AppleBookViewModel {
         }
     }
 }
-
-private struct NonSendableBox<T>: @unchecked Sendable { let value: T }
