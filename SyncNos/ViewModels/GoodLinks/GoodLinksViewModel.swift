@@ -195,6 +195,14 @@ final class GoodLinksViewModel: ObservableObject {
         recomputeTrigger.send(())
     }
 
+    /// 在切换到 GoodLinks 列表之前调用，确保首帧显示“加载中”并后台重算
+    func prepareForDisplaySwitch() {
+        // 先标记计算中，让视图首帧立即走占位分支
+        isComputingList = true
+        // 触发一次派生重算（在后台队列进行 filter/sort/tags 解析）
+        recomputeTrigger.send(())
+    }
+
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
         logger.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
 
