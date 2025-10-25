@@ -9,6 +9,8 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
     @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
     @Published var isLoading: Bool = false
+    // 列表派生计算状态：用于切换瞬间显示“加载中”并避免主线程渲染巨大 List
+    @Published var isComputingList: Bool = false
     @Published var errorMessage: String?
     @Published var isSyncing: Bool = false
     @Published var syncMessage: String?
@@ -36,6 +38,7 @@ final class GoodLinksViewModel: ObservableObject {
     private let logger: LoggerServiceProtocol
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
+    private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
@@ -73,10 +76,14 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
 
         Publishers.CombineLatest4($links, $sortKey, $sortAscending, $showStarredOnly)
-            .combineLatest(debouncedSearch)
+            .combineLatest(debouncedSearch, recomputeTrigger.prepend(()))
+            // 主线程置计算标记为 true，确保第一帧显示“加载中”
+            .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = true })
             // 在后台队列进行 filter/sort/tags 解析等重计算
             .receive(on: computeQueue)
-            .map { combined, searchText -> [GoodLinksLinkRow] in
+            .map { tuple -> [GoodLinksLinkRow] in
+                let (combined, searchText, _) = tuple
                 let (links, sortKey, sortAscending, showStarredOnly) = combined
                 return Self.buildDisplayLinks(
                     links: links,
@@ -88,6 +95,7 @@ final class GoodLinksViewModel: ObservableObject {
             }
             // 回到主线程发布结果，驱动 UI
             .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
             .assign(to: &$displayLinks)
     }
 
@@ -180,6 +188,11 @@ final class GoodLinksViewModel: ObservableObject {
             }
         }
         return arr
+    }
+
+    // 主动触发一次派生重算（供视图 onAppear/切换场景调用）
+    func triggerRecompute() {
+        recomputeTrigger.send(())
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
