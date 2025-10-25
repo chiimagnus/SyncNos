@@ -58,7 +58,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("a", modifiers: [.command])
 
-            Button("Deselect", systemImage: "textformat.size.smaller") {
+            Button("Deselect", systemImage: "character.textbox.badge.sparkles") {
                 NotificationCenter.default.post(name: Notification.Name("DeselectAllRequested"), object: nil)
             }
             .keyboardShortcut(.escape) // cmd+esc
