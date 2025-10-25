@@ -4,6 +4,8 @@ import Combine
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
     @Published var links: [GoodLinksLinkRow] = []
+    // 后台计算产物：用于列表渲染的派生结果
+    @Published var displayLinks: [GoodLinksLinkRow] = []
     @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
     @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
     @Published var isLoading: Bool = false
@@ -33,6 +35,7 @@ final class GoodLinksViewModel: ObservableObject {
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
     private var cancellables: Set<AnyCancellable> = []
+    private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
@@ -63,6 +66,29 @@ final class GoodLinksViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // Combine 管道：在后台队列计算派生的 displayLinks，主线程发布结果
+        let debouncedSearch = $searchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+
+        Publishers.CombineLatest4($links, $sortKey, $sortAscending, $showStarredOnly)
+            .combineLatest(debouncedSearch)
+            // 在后台队列进行 filter/sort/tags 解析等重计算
+            .receive(on: computeQueue)
+            .map { combined, searchText -> [GoodLinksLinkRow] in
+                let (links, sortKey, sortAscending, showStarredOnly) = combined
+                return Self.buildDisplayLinks(
+                    links: links,
+                    sortKey: sortKey,
+                    sortAscending: sortAscending,
+                    showStarredOnly: showStarredOnly,
+                    searchText: searchText
+                )
+            }
+            // 回到主线程发布结果，驱动 UI
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$displayLinks)
     }
 
     func loadRecentLinks(limit: Int = 0) async {
@@ -96,52 +122,62 @@ final class GoodLinksViewModel: ObservableObject {
         }
     }
 
-    // Derived collection for UI
-    var displayLinks: [GoodLinksLinkRow] {
+    // 后台计算函数（纯函数，无 UI 依赖）
+    private static func buildDisplayLinks(links: [GoodLinksLinkRow],
+                                          sortKey: GoodLinksSortKey,
+                                          sortAscending: Bool,
+                                          showStarredOnly: Bool,
+                                          searchText: String) -> [GoodLinksLinkRow] {
         var arr = links
         if showStarredOnly {
             arr = arr.filter { $0.starred }
         }
-        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let key = searchText.lowercased()
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            let key = trimmed.lowercased()
             arr = arr.filter { link in
                 let inTitle = (link.title ?? "").lowercased().contains(key)
                 let inAuthor = (link.author ?? "").lowercased().contains(key)
                 let inURL = link.url.lowercased().contains(key)
+                // tagsFormatted 解析可能较重，放在后台队列中执行
                 let inTags = link.tagsFormatted.lowercased().contains(key)
                 return inTitle || inAuthor || inURL || inTags
             }
         }
+
+        // 预取 lastSync 映射，避免比较器中频繁读取
+        var lastSyncCache: [String: Date?] = [:]
+        if sortKey == .lastSync {
+            lastSyncCache = Dictionary(uniqueKeysWithValues: arr.map { ($0.id, SyncTimestampStore.shared.getLastSyncTime(for: $0.id)) })
+        }
+
         arr.sort { a, b in
-            let cmp: ComparisonResult
             switch sortKey {
             case .title:
                 let t1 = (a.title?.isEmpty == false ? a.title! : a.url)
                 let t2 = (b.title?.isEmpty == false ? b.title! : b.url)
-                cmp = t1.localizedCaseInsensitiveCompare(t2)
+                let cmp = t1.localizedCaseInsensitiveCompare(t2)
+                return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
             case .highlightCount:
                 let c1 = a.highlightTotal ?? 0
                 let c2 = b.highlightTotal ?? 0
-                cmp = c1 == c2 ? .orderedSame : (c1 < c2 ? .orderedAscending : .orderedDescending)
+                if c1 == c2 { return false }
+                return sortAscending ? (c1 < c2) : (c1 > c2)
             case .added:
-                cmp = a.addedAt == b.addedAt ? .orderedSame : (a.addedAt < b.addedAt ? .orderedAscending : .orderedDescending)
+                if a.addedAt == b.addedAt { return false }
+                return sortAscending ? (a.addedAt < b.addedAt) : (a.addedAt > b.addedAt)
             case .modified:
-                cmp = a.modifiedAt == b.modifiedAt ? .orderedSame : (a.modifiedAt < b.modifiedAt ? .orderedAscending : .orderedDescending)
+                if a.modifiedAt == b.modifiedAt { return false }
+                return sortAscending ? (a.modifiedAt < b.modifiedAt) : (a.modifiedAt > b.modifiedAt)
             case .lastSync:
-                // 使用 SyncTimestampStore 中记录的上次同步时间进行排序（若无记录则降序放在末尾/开头，取决于 sortAscending）
-                let t1 = SyncTimestampStore.shared.getLastSyncTime(for: a.id)
-                let t2 = SyncTimestampStore.shared.getLastSyncTime(for: b.id)
-                if t1 == nil && t2 == nil {
-                    cmp = .orderedSame
-                } else if t1 == nil {
-                    cmp = .orderedAscending
-                } else if t2 == nil {
-                    cmp = .orderedDescending
-                } else {
-                    cmp = t1! == t2! ? .orderedSame : (t1! < t2! ? .orderedAscending : .orderedDescending)
-                }
+                let t1 = lastSyncCache[a.id] ?? nil
+                let t2 = lastSyncCache[b.id] ?? nil
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return sortAscending }
+                if t2 == nil { return !sortAscending }
+                if t1! == t2! { return false }
+                return sortAscending ? (t1! < t2!) : (t1! > t2!)
             }
-            return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
         }
         return arr
     }
