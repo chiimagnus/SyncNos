@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 struct GoodLinksDetailView: View {
-    @EnvironmentObject var viewModel: GoodLinksViewModel
+    @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
     
     // Freeze layout width during live resize to avoid heavy recomputation.
