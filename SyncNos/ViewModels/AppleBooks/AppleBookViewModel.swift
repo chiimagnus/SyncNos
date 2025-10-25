@@ -6,7 +6,11 @@ import Combine
 @MainActor
 class AppleBookViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
+    // 后台计算产物：用于列表渲染的派生结果
+    @Published var displayBooks: [BookListItem] = []
     @Published var isLoading = false
+    // 列表派生计算状态：用于切换瞬间显示"加载中"并避免主线程渲染巨大 List
+    @Published var isComputingList: Bool = false
     @Published var errorMessage: String?
     // UI Sync State
     @Published var syncingBookIds: Set<String> = []
@@ -40,50 +44,12 @@ class AppleBookViewModel: ObservableObject {
     private var annotationDBPath: String?
     private var booksDBPath: String?
     private var cancellables: Set<AnyCancellable> = []
+    private let computeQueue = DispatchQueue(label: "AppleBookViewModel.compute", qos: .userInitiated)
+    private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     // Public readonly accessors
     var annotationDatabasePath: String? { annotationDBPath }
     var booksDatabasePath: String? { booksDBPath }
-
-    // Computed property for displaying books based on sort and filter
-    var displayBooks: [BookListItem] {
-        get {
-            var result = books
-
-            // Apply title filter
-            if showWithTitleOnly {
-                result = result.filter { $0.hasTitle }
-            }
-
-            // Apply sorting
-            result.sort { book1, book2 in
-                var result: ComparisonResult
-                switch sortKey {
-                case .title:
-                    result = book1.bookTitle.localizedCaseInsensitiveCompare(book2.bookTitle)
-                case .highlightCount:
-                    result = book1.highlightCount < book2.highlightCount ? .orderedAscending : .orderedDescending
-                case .lastSync:
-                    let time1 = syncTimestampStore.getLastSyncTime(for: book1.bookId) ?? Date.distantPast
-                    let time2 = syncTimestampStore.getLastSyncTime(for: book2.bookId) ?? Date.distantPast
-                    result = time1 < time2 ? .orderedAscending : .orderedDescending
-                case .lastEdited:
-                    let time1 = book1.modifiedAt ?? Date.distantPast
-                    let time2 = book2.modifiedAt ?? Date.distantPast
-                    result = time1 < time2 ? .orderedAscending : .orderedDescending
-                case .created:
-                    let time1 = book1.createdAt ?? Date.distantPast
-                    let time2 = book2.createdAt ?? Date.distantPast
-                    result = time1 < time2 ? .orderedAscending : .orderedDescending
-                }
-
-                // Apply ascending/descending order
-                return sortAscending ? (result == .orderedAscending) : (result == .orderedDescending)
-            }
-
-            return result
-        }
-    }
 
     // MARK: - Initialization
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
@@ -102,6 +68,7 @@ class AppleBookViewModel: ObservableObject {
         }
         self.sortAscending = UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
         self.showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
+        
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: Notification.Name("AppleBooksFilterChanged"))
             .compactMap { $0.userInfo as? [String: Any] }
@@ -121,6 +88,30 @@ class AppleBookViewModel: ObservableObject {
             .store(in: &cancellables)
 
         subscribeSyncStatusNotifications()
+        
+        // Combine 管道：在后台队列计算派生的 displayBooks，主线程发布结果
+        Publishers.CombineLatest4($books, $sortKey, $sortAscending, $showWithTitleOnly)
+            .combineLatest(recomputeTrigger)
+            // 主线程置计算标记为 true，确保第一帧显示"加载中"
+            .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = true })
+            // 在后台队列进行 filter/sort 等重计算
+            .receive(on: computeQueue)
+            .map { tuple -> [BookListItem] in
+                let (combined, _) = tuple
+                let (books, sortKey, sortAscending, showWithTitleOnly) = combined
+                return Self.buildDisplayBooks(
+                    books: books,
+                    sortKey: sortKey,
+                    sortAscending: sortAscending,
+                    showWithTitleOnly: showWithTitleOnly,
+                    syncTimestampStore: syncTimestampStore
+                )
+            }
+            // 回到主线程发布结果，驱动 UI
+            .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
+            .assign(to: &$displayBooks)
     }
     
     // MARK: - Path Utility Methods
@@ -133,6 +124,11 @@ class AppleBookViewModel: ObservableObject {
     }
     
     // MARK: - Public Methods
+    
+    /// 主动触发一次派生重算（供视图 onAppear/切换场景调用）
+    func triggerRecompute() {
+        recomputeTrigger.send(())
+    }
     
     func setDbRootOverride(_ path: String?) {
         dbRootOverride = path
@@ -286,6 +282,62 @@ private func latestSQLiteFileStandalone(in dir: String, logger: LoggerServicePro
         (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast
     }
     return sorted.first?.path
+}
+
+/// 将排序和过滤逻辑封装为纯函数，便于在后台线程执行
+private extension AppleBookViewModel {
+    static func buildDisplayBooks(
+        books: [BookListItem],
+        sortKey: BookListSortKey,
+        sortAscending: Bool,
+        showWithTitleOnly: Bool,
+        syncTimestampStore: SyncTimestampStoreProtocol
+    ) -> [BookListItem] {
+        var result = books
+        
+        // Apply title filter
+        if showWithTitleOnly {
+            result = result.filter { $0.hasTitle }
+        }
+        
+        // 预取 lastSync 映射，避免比较器中频繁读取
+        var lastSyncCache: [String: Date?] = [:]
+        if sortKey == .lastSync {
+            lastSyncCache = Dictionary(uniqueKeysWithValues: result.map { ($0.bookId, syncTimestampStore.getLastSyncTime(for: $0.bookId)) })
+        }
+        
+        // Apply sorting
+        result.sort { book1, book2 in
+            switch sortKey {
+            case .title:
+                let cmp = book1.bookTitle.localizedCaseInsensitiveCompare(book2.bookTitle)
+                return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+            case .highlightCount:
+                if book1.highlightCount == book2.highlightCount { return false }
+                return sortAscending ? (book1.highlightCount < book2.highlightCount) : (book1.highlightCount > book2.highlightCount)
+            case .lastSync:
+                let time1 = lastSyncCache[book1.bookId] ?? nil
+                let time2 = lastSyncCache[book2.bookId] ?? nil
+                if time1 == nil && time2 == nil { return false }
+                if time1 == nil { return sortAscending }
+                if time2 == nil { return !sortAscending }
+                if time1! == time2! { return false }
+                return sortAscending ? (time1! < time2!) : (time1! > time2!)
+            case .lastEdited:
+                let time1 = book1.modifiedAt ?? Date.distantPast
+                let time2 = book2.modifiedAt ?? Date.distantPast
+                if time1 == time2 { return false }
+                return sortAscending ? (time1 < time2) : (time1 > time2)
+            case .created:
+                let time1 = book1.createdAt ?? Date.distantPast
+                let time2 = book2.createdAt ?? Date.distantPast
+                if time1 == time2 { return false }
+                return sortAscending ? (time1 < time2) : (time1 > time2)
+            }
+        }
+        
+        return result
+    }
 }
 
 // MARK: - Batch Sync (Apple Books)
