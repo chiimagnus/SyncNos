@@ -94,11 +94,6 @@ struct MainListView: View {
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()
-            if contentSource == .goodLinks {
-                Task {
-                    await goodLinksVM.loadRecentLinks()
-                }
-            }
         }
         .background {
             LinearGradient(

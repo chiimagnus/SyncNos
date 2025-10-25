@@ -69,18 +69,31 @@ final class GoodLinksViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        do {
-            let dbPath = service.resolveDatabasePath()
-            let rows = try service.fetchRecentLinks(dbPath: dbPath, limit: limit)
-            links = rows
-            logger.info("[GoodLinks] loaded links: \(rows.count)")
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[GoodLinks] loadRecentLinks error: \(desc)")
-            errorMessage = desc
+        // 将同步 SQLite 读取移至后台线程，避免阻塞主线程
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async { [service, logger] in
+                do {
+                    let dbPath = service.resolveDatabasePath()
+                    let rows = try service.fetchRecentLinks(dbPath: dbPath, limit: limit)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self else { continuation.resume(); return }
+                        self.links = rows
+                        logger.info("[GoodLinks] loaded links: \(rows.count)")
+                        self.isLoading = false
+                        continuation.resume()
+                    }
+                } catch {
+                    let desc = error.localizedDescription
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self else { continuation.resume(); return }
+                        logger.error("[GoodLinks] loadRecentLinks error: \(desc)")
+                        self.errorMessage = desc
+                        self.isLoading = false
+                        continuation.resume()
+                    }
+                }
+            }
         }
-
-        isLoading = false
     }
 
     // Derived collection for UI
