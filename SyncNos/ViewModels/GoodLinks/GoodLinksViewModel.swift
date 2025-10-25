@@ -199,8 +199,6 @@ final class GoodLinksViewModel: ObservableObject {
     func prepareForDisplaySwitch() {
         // 先标记计算中，让视图首帧立即走占位分支
         isComputingList = true
-        // 触发一次派生重算（在后台队列进行 filter/sort/tags 解析）
-        recomputeTrigger.send(())
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
