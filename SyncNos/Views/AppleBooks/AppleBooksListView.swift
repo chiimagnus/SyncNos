@@ -6,7 +6,7 @@ struct AppleBooksListView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading {
+            if viewModel.isLoading || viewModel.isComputingList {
                 ProgressView("Loading books...")
             } else if viewModel.errorMessage != nil {
                 VStack {
@@ -17,7 +17,7 @@ struct AppleBooksListView: View {
                         .multilineTextAlignment(.center)
                         .padding()
                 }
-            } else if viewModel.displayBooks.isEmpty {
+            } else if viewModel.books.isEmpty {
                 VStack {
                     Image(systemName: "books.vertical")
                         .foregroundColor(.secondary)
@@ -82,12 +82,16 @@ struct AppleBooksListView: View {
             }
         }
         .onAppear {
+            // 切换到 Apple Books 时，确保第一帧进入加载态，然后异步加载/重算
+            viewModel.triggerRecompute()
             if let url = BookmarkStore.shared.restore() {
                 let started = BookmarkStore.shared.startAccessing(url: url)
                 DIContainer.shared.loggerService.debug("Using restored bookmark on appear, startAccess=\(started)")
                 let selectedPath = url.path
                 let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
                 viewModel.setDbRootOverride(rootCandidate)
+            }
+            if viewModel.books.isEmpty {
                 Task {
                     await viewModel.loadBooks()
                 }
