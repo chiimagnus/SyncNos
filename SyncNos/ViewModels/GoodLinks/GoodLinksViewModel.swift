@@ -1,8 +1,12 @@
 import Foundation
 import Combine
 
+// 为后台 GCD 闭包传递非 Sendable 依赖的轻量包装
+private struct NonSendableBox<T>: @unchecked Sendable { let value: T }
+
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
+    private struct NonSendableBox<T>: @unchecked Sendable { let value: T }
     @Published var links: [GoodLinksLinkRow] = []
     // 后台计算产物：用于列表渲染的派生结果
     @Published var displayLinks: [GoodLinksLinkRow] = []
@@ -109,14 +113,16 @@ final class GoodLinksViewModel: ObservableObject {
 
         // 将同步 SQLite 读取移至后台线程，避免阻塞主线程
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async { [service, logger] in
+            let serviceBox = NonSendableBox(value: self.service)
+            let loggerBox = NonSendableBox(value: self.logger)
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    let rows = try service.fetchRecentLinks(dbPath: dbPath, limit: limit)
+                    let dbPath = serviceBox.value.resolveDatabasePath()
+                    let rows = try serviceBox.value.fetchRecentLinks(dbPath: dbPath, limit: limit)
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { continuation.resume(); return }
                         self.links = rows
-                        logger.info("[GoodLinks] loaded links: \(rows.count)")
+                        loggerBox.value.info("[GoodLinks] loaded links: \(rows.count)")
                         self.isLoading = false
                         continuation.resume()
                     }
@@ -124,7 +130,7 @@ final class GoodLinksViewModel: ObservableObject {
                     let desc = error.localizedDescription
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { continuation.resume(); return }
-                        logger.error("[GoodLinks] loadRecentLinks error: \(desc)")
+                        loggerBox.value.error("[GoodLinks] loadRecentLinks error: \(desc)")
                         self.errorMessage = desc
                         self.isLoading = false
                         continuation.resume()
@@ -208,23 +214,23 @@ final class GoodLinksViewModel: ObservableObject {
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
         logger.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
-        let service = self.service
-        let logger = self.logger
+        let serviceBox = NonSendableBox(value: self.service)
+        let loggerBox = NonSendableBox(value: self.logger)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    logger.info("[GoodLinks] 数据库路径: \(dbPath)")
-                    let rows = try service.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
+                    let dbPath = serviceBox.value.resolveDatabasePath()
+                    loggerBox.value.info("[GoodLinks] 数据库路径: \(dbPath)")
+                    let rows = try serviceBox.value.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
                     DispatchQueue.main.async {
                         self.highlightsByLinkId[linkId] = rows
-                        logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
+                        loggerBox.value.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
                         continuation.resume()
                     }
                 } catch {
                     let desc = error.localizedDescription
                     DispatchQueue.main.async {
-                        logger.error("[GoodLinks] loadHighlights error: \(desc)")
+                        loggerBox.value.error("[GoodLinks] loadHighlights error: \(desc)")
                         self.errorMessage = desc
                         continuation.resume()
                     }
@@ -235,26 +241,26 @@ final class GoodLinksViewModel: ObservableObject {
     
     func loadContent(for linkId: String) async {
         logger.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
-        let service = self.service
-        let logger = self.logger
+        let serviceBox = NonSendableBox(value: self.service)
+        let loggerBox = NonSendableBox(value: self.logger)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    let content = try service.fetchContent(dbPath: dbPath, linkId: linkId)
+                    let dbPath = serviceBox.value.resolveDatabasePath()
+                    let content = try serviceBox.value.fetchContent(dbPath: dbPath, linkId: linkId)
                     DispatchQueue.main.async {
                         if let content {
                             self.contentByLinkId[linkId] = content
-                            logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
+                            loggerBox.value.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
                         } else {
-                            logger.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
+                            loggerBox.value.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
                         }
                         continuation.resume()
                     }
                 } catch {
                     let desc = error.localizedDescription
                     DispatchQueue.main.async {
-                        logger.error("[GoodLinks] loadContent error: \(desc)")
+                        loggerBox.value.error("[GoodLinks] loadContent error: \(desc)")
                         self.errorMessage = desc
                         continuation.resume()
                     }

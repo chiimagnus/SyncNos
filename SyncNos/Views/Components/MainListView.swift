@@ -17,9 +17,11 @@ struct MainListView: View {
         NavigationSplitView {
             Group {
                 if contentSource == .goodLinks {
-                    GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
+                    GoodLinksListView(selectionIds: $selectedLinkIds)
+                        .environmentObject(goodLinksVM)
                 } else {
-                    AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
+                    AppleBooksListView(selectionIds: $selectedBookIds)
+                        .environmentObject(viewModel)
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -56,7 +58,8 @@ struct MainListView: View {
                         get: { selectedLinkIds.first },
                         set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
                     )
-                    GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
+                    GoodLinksDetailView(selectedLinkId: singleLinkBinding)
+                        .environmentObject(goodLinksVM)
                 } else if selectedLinkIds.count > 1 {
                     MultipleSelectionPlaceholderView(count: selectedLinkIds.count) {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
@@ -75,7 +78,8 @@ struct MainListView: View {
                         get: { selectedBookIds.first },
                         set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
                     )
-                    AppleBookDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
+                    AppleBookDetailView(selectedBookId: singleBookBinding)
+                        .environmentObject(viewModel)
                 } else if selectedBookIds.count > 1 {
                     MultipleSelectionPlaceholderView(count: selectedBookIds.count) {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
