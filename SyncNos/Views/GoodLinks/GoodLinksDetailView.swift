@@ -4,7 +4,8 @@ import AppKit
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
-    
+    @StateObject private var detailViewModel = GoodLinksDetailViewModel()
+
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
@@ -13,6 +14,10 @@ struct GoodLinksDetailView: View {
     @State private var syncErrorMessage = ""
     @State private var externalIsSyncing: Bool = false
     @State private var externalSyncProgress: String? = nil
+
+    private var selectedLink: GoodLinksLinkRow? {
+        viewModel.links.first { $0.id == (selectedLinkId ?? "") }
+    }
 
     var body: some View {
         Group {
@@ -148,8 +153,19 @@ struct GoodLinksDetailView: View {
                         }
 
                         // 高亮列表
-                        let highlights = viewModel.highlightsByLinkId[linkId] ?? []
+                        let sourceHighlights = viewModel.highlightsByLinkId[linkId] ?? []
                         VStack(alignment: .leading, spacing: 8) {
+                            // Filter bar
+                            FilterBar(
+                                noteFilter: $detailViewModel.noteFilter,
+                                selectedStyles: $detailViewModel.selectedStyles,
+                                colorTheme: .goodLinks,
+                                sortField: .created,
+                                isAscending: false
+                            ) {
+                                detailViewModel.resetFilters()
+                            }
+
                             HStack(spacing: 6) {
                                 Image(systemName: "quote.opening")
                                     .font(.headline)
@@ -159,19 +175,19 @@ struct GoodLinksDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.primary)
 
-                                if !highlights.isEmpty {
-                                    Text("\(highlights.count) item\(highlights.count == 1 ? "" : "s")")
+                                if !detailViewModel.highlights.isEmpty {
+                                    Text("\(detailViewModel.highlights.count) item\(detailViewModel.highlights.count == 1 ? "" : "s")")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                
+
                                 Spacer()
                             }
-                            .padding(.bottom, 4)
-                            
-                            if !highlights.isEmpty {
+                            .padding(.top, 4)
+
+                            if !detailViewModel.highlights.isEmpty {
                                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
-                                    ForEach(highlights, id: \.id) { item in
+                                    ForEach(detailViewModel.highlights, id: \.id) { item in
                                         HighlightCardView(
                                             colorMark: item.color.map { highlightColor(for: $0) } ?? Color.gray.opacity(0.5),
                                             content: item.content,
@@ -309,9 +325,17 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
+        .onAppear {
+            if let link = selectedLink {
+                detailViewModel.setLink(link)
+            }
+        }
         .onChange(of: selectedLinkId) { _ in
             externalIsSyncing = false
             externalSyncProgress = nil
+            if let link = selectedLink {
+                detailViewModel.setLink(link)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
