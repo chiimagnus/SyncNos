@@ -133,22 +133,15 @@ enum NoteFilter: String, CaseIterable {
     }
 }
 
-enum HighlightOrder: String, CaseIterable {
-    case createdAsc = "createdAsc"
-    case createdDesc = "createdDesc"
-    case modifiedAsc = "modifiedAsc"
-    case modifiedDesc = "modifiedDesc"
-    case locationAsc = "locationAsc"
-    case locationDesc = "locationDesc"
+// 新的高亮排序模型：由排序字段和方向组合，替代旧的 HighlightOrder
+enum HighlightSortField: String, CaseIterable {
+    case created = "created"
+    case modified = "modified"
 
     var displayName: String {
         switch self {
-        case .createdAsc: return "创建时间 (升序)"
-        case .createdDesc: return "创建时间 (降序)"
-        case .modifiedAsc: return "修改时间 (升序)"
-        case .modifiedDesc: return "修改时间 (降序)"
-        case .locationAsc: return "位置 (升序)"
-        case .locationDesc: return "位置 (降序)"
+        case .created: return "创建时间"
+        case .modified: return "修改时间"
         }
     }
 }
