@@ -75,7 +75,7 @@ struct MainListView: View {
                         get: { selectedBookIds.first },
                         set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
                     )
-                    AppleBookDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
+                    AppleBooksDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
                 } else if selectedBookIds.count > 1 {
                     MultipleSelectionPlaceholderView(count: selectedBookIds.count) {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)

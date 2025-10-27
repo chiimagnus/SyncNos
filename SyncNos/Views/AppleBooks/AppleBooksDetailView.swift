@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct AppleBookDetailView: View {
+struct AppleBooksDetailView: View {
     @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
     @StateObject private var viewModel = AppleBooksDetailViewModel()
@@ -275,7 +275,7 @@ struct AppleBookDetailView: View {
     }
 }
 
-struct AppleBookDetailView_Previews: PreviewProvider {
+struct AppleBooksDetailView_Previews: PreviewProvider {
     static var previews: some View {
         let sampleBook = BookListItem(bookId: "sample-id",
                                        authorName: "Sample Author",
@@ -285,6 +285,6 @@ struct AppleBookDetailView_Previews: PreviewProvider {
         
         // Preview for new initializer
         let listVM = AppleBooksViewModel()
-        return AppleBookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
+        return AppleBooksDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
     }
 }
