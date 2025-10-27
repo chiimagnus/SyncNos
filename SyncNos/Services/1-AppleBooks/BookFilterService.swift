@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Book Filter Service
 /// 专门处理书籍过滤逻辑的类，遵循单一职责原则
-class BookFilterService {
+final class BookFilterService: Sendable {
     
     // MARK: - Filtering Methods
     func matches(book: BookRow, filters: Filters) -> Bool {

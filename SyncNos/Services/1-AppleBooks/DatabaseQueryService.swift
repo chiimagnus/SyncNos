@@ -3,7 +3,7 @@ import SQLite3
 
 // MARK: - Database Query Service
 /// 专门处理数据库查询的类，遵循单一职责原则
-class DatabaseQueryService {
+final class DatabaseQueryService: Sendable {
     private let logger = DIContainer.shared.loggerService
     
     // MARK: - Queries

@@ -157,7 +157,6 @@ struct GoodLinksDetailView: View {
                         }
 
                         // 高亮列表
-                        let sourceHighlights = viewModel.highlightsByLinkId[linkId] ?? []
                         VStack(alignment: .leading, spacing: 8) {
                             // Filter bar
                             FilterBar(
