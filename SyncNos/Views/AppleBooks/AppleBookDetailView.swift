@@ -74,7 +74,19 @@ struct AppleBookDetailView: View {
                                 }
                             }
                         }
-                        
+
+                        // Filter bar
+                        FilterBar(
+                            noteFilter: $viewModel.noteFilter,
+                            selectedStyles: $viewModel.selectedStyles,
+                            colorTheme: .appleBooks,
+                            sortField: viewModel.sortField,
+                            isAscending: viewModel.isAscending
+                        ) {
+                            viewModel.noteFilter = .any
+                            viewModel.selectedStyles = []
+                        }
+
                         // Highlights section (Waterfall / Masonry)
                         WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                             ForEach(viewModel.highlights, id: \.uuid) { highlight in
@@ -179,7 +191,7 @@ struct AppleBookDetailView: View {
             }
         }
         .toolbar {
-            // Filter/sort menu
+            // Sort menu
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     // Sort field with checkmark
@@ -197,63 +209,10 @@ struct AppleBookDetailView: View {
                     Button {
                         viewModel.isAscending.toggle()
                     } label: {
-                        Label("ascend", systemImage: viewModel.isAscending ? "checkmark" : "")
+                        Label("Ascending", systemImage: viewModel.isAscending ? "checkmark" : "")
                     }
-
-                    // Divider()
-
-                    // // Note filter options
-                    // Picker("Note filter", selection: $viewModel.noteFilter) {
-                    //     ForEach(NoteFilter.allCases, id: \.self) { filter in
-                    //         Text(filter.displayName).tag(filter)
-                    //     }
-                    // }
-
-                    // Divider()
-
-                    // // Color filter options
-                    // Menu("Colors", systemImage: "paintpalette") {
-                    //     VStack {
-                    //         HStack {
-                    //             ForEach(0...5, id: \.self) { colorIndex in
-                    //                 let color = AppleBookDetailView.highlightStyleColor(for: colorIndex)
-                    //                 let colorName = ["Yellow", "Green", "Blue", "Cyan", "Pink", "Purple"][colorIndex]
-                    //                 Button(action: {
-                    //                     if viewModel.selectedStyles.contains(colorIndex) {
-                    //                         viewModel.selectedStyles.remove(colorIndex)
-                    //                     } else {
-                    //                         viewModel.selectedStyles.insert(colorIndex)
-                    //                     }
-                    //                 }) {
-                    //                     Circle()
-                    //                         .fill(color)
-                    //                         .frame(width: 16, height: 16)
-                    //                         .overlay(
-                    //                             Circle()
-                    //                                 .stroke(viewModel.selectedStyles.contains(colorIndex) ? Color.black : Color.clear, lineWidth: 2)
-                    //                         )
-                    //                 }
-                    //                 .help("\(colorName)\(viewModel.selectedStyles.contains(colorIndex) ? " (Selected)" : "")")
-                    //             }
-                    //         }
-
-                    //         Divider()
-
-                    //         HStack {
-                    //             Button("Select All") {
-                    //                 viewModel.selectedStyles = Set(0...5)
-                    //             }
-                    //             .buttonStyle(.borderless)
-
-                    //             Button("Clear") {
-                    //                 viewModel.selectedStyles = []
-                    //             }
-                    //             .buttonStyle(.borderless)
-                    //         }
-                    //     }
-                    // }
                 } label: {
-                    Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
                 .menuIndicator(.hidden)
             }
