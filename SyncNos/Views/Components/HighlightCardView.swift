@@ -7,6 +7,8 @@ struct HighlightCardView<AccessoryContent: View>: View {
     let note: String?
     let createdDate: String?
     let modifiedDate: String?
+    let locationText: String?
+    let openURL: URL?
     let accessory: () -> AccessoryContent
     
     init(
@@ -15,6 +17,8 @@ struct HighlightCardView<AccessoryContent: View>: View {
         note: String? = nil,
         createdDate: String? = nil,
         modifiedDate: String? = nil,
+        locationText: String? = nil,
+        openURL: URL? = nil,
         @ViewBuilder accessory: @escaping () -> AccessoryContent = { EmptyView() }
     ) {
         self.colorMark = colorMark
@@ -22,6 +26,8 @@ struct HighlightCardView<AccessoryContent: View>: View {
         self.note = note
         self.createdDate = createdDate
         self.modifiedDate = modifiedDate
+        self.locationText = locationText
+        self.openURL = openURL
         self.accessory = accessory
     }
     
@@ -62,8 +68,8 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         )
                     }
                     
-                    // 时间信息
-                    HStack(spacing: 12) {
+                    // 时间与位置信息（逐行显示，避免挤在一行）
+                    VStack(alignment: .leading, spacing: 4) {
                         if let created = createdDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar.badge.plus")
@@ -74,7 +80,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
                                     .foregroundColor(.secondary)
                             }
                         }
-                        
+
                         if let modified = modifiedDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar.badge.clock")
@@ -84,6 +90,34 @@ struct HighlightCardView<AccessoryContent: View>: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+                        }
+
+                        if let loc = locationText, !loc.isEmpty {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(loc)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let u = openURL {
+                            HStack(spacing: 4) {
+                                Image(systemName: "link")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Link(destination: u) {
+                                    Text(u.absoluteString)
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                        .textSelection(.enabled)
+                                        .multilineTextAlignment(.leading)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
