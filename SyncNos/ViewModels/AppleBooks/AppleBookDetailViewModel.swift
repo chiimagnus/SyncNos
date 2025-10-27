@@ -145,7 +145,16 @@ class AppleBookDetailViewModel: ObservableObject {
             let stylesArray = selectedStyles.isEmpty ? nil : Array(selectedStyles)
             let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil, sortField: sortField, ascending: isAscending, noteFilter: noteFilter, styles: stylesArray)
             let page = rows.map { r in
-                Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
+                Highlight(
+                    uuid: r.uuid,
+                    text: r.text,
+                    note: r.note,
+                    style: r.style,
+                    dateAdded: r.dateAdded,
+                    modified: r.modified,
+                    location: r.location,
+                    locationDisplay: AppleBooksLocationParser.displayString(from: r.location)
+                )
             }
             if reset {
                 highlights = page
@@ -159,6 +168,8 @@ class AppleBookDetailViewModel: ObservableObject {
 
         isLoadingPage = false
     }
+    
+    // 位置展示逻辑已移动到 AppleBooksLocationParser
     
     private func closeSession() {
         session?.close()
