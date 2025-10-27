@@ -182,10 +182,12 @@ struct AppleBookDetailView: View {
             // Filter/sort menu
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    // Sort options submenu
-                    Picker("Sort", selection: $viewModel.order) {
-                        ForEach(HighlightOrder.allCases, id: \.self) { order in
-                            Text(order.displayName).tag(order)
+                    // Sort options directly in main menu
+                    ForEach(HighlightOrder.allCases, id: \.self) { order in
+                        Button {
+                            viewModel.order = order
+                        } label: {
+                            Text(order.displayName)
                         }
                     }
 
@@ -281,6 +283,7 @@ struct AppleBookDetailView: View {
                         .help("Sync highlights to Notion")
                     }
                 }
+            }
             }
         }
         .alert("Sync Error", isPresented: $showingSyncError) {
