@@ -1,10 +1,10 @@
 import Foundation
 import Combine
 
-// MARK: - AppleBookViewModel
+// MARK: - AppleBooksViewModel
 
 @MainActor
-class AppleBookViewModel: ObservableObject {
+class AppleBooksViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
     // 后台计算产物：用于列表渲染的派生结果
     @Published var displayBooks: [BookListItem] = []
@@ -44,7 +44,7 @@ class AppleBookViewModel: ObservableObject {
     private var annotationDBPath: String?
     private var booksDBPath: String?
     private var cancellables: Set<AnyCancellable> = []
-    private let computeQueue = DispatchQueue(label: "AppleBookViewModel.compute", qos: .userInitiated)
+    private let computeQueue = DispatchQueue(label: "AppleBooksViewModel.compute", qos: .userInitiated)
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     // Public readonly accessors
@@ -310,7 +310,7 @@ private func latestSQLiteFileStandalone(in dir: String, logger: LoggerServicePro
 }
 
 /// 将排序和过滤逻辑封装为纯函数，便于在后台线程执行
-private extension AppleBookViewModel {
+private extension AppleBooksViewModel {
     static func buildDisplayBooks(
         books: [BookListItem],
         sortKey: BookListSortKey,
@@ -366,7 +366,7 @@ private extension AppleBookViewModel {
 }
 
 // MARK: - Batch Sync (Apple Books)
-extension AppleBookViewModel {
+extension AppleBooksViewModel {
     /// 批量同步所选书籍到 Notion，使用并发限流（默认 10 并发）
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
