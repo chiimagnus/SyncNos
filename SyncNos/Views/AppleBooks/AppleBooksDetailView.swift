@@ -75,23 +75,6 @@ struct AppleBooksDetailView: View {
                             }
                         }
 
-                        // Filter bar
-                        FilterBar(
-                            noteFilter: $viewModel.noteFilter,
-                            selectedStyles: $viewModel.selectedStyles,
-                            colorTheme: .appleBooks,
-                            sortField: viewModel.sortField,
-                            isAscending: viewModel.isAscending,
-                            onSortFieldChanged: { field in
-                                viewModel.sortField = field
-                            },
-                            onAscendingChanged: { ascending in
-                                viewModel.isAscending = ascending
-                            }
-                        ) {
-                            viewModel.noteFilter = .any
-                            viewModel.selectedStyles = []
-                        }
 
                         // Highlights section (Waterfall / Masonry)
                         WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
@@ -197,8 +180,28 @@ struct AppleBooksDetailView: View {
             }
         }
         .toolbar {
-            // Sync button / progress (shows per-item batch progress when available)
+            // Filter bar in toolbar
             ToolbarItem(placement: .primaryAction) {
+                FiltetSortBar(
+                    noteFilter: $viewModel.noteFilter,
+                    selectedStyles: $viewModel.selectedStyles,
+                    colorTheme: .appleBooks,
+                    sortField: viewModel.sortField,
+                    isAscending: viewModel.isAscending,
+                    onSortFieldChanged: { field in
+                        viewModel.sortField = field
+                    },
+                    onAscendingChanged: { ascending in
+                        viewModel.isAscending = ascending
+                    }
+                ) {
+                    viewModel.noteFilter = .any
+                    viewModel.selectedStyles = []
+                }
+            }
+
+            // Sync button / progress (shows per-item batch progress when available)
+            ToolbarItem(placement: .cancellationAction) {
                 if externalIsSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
