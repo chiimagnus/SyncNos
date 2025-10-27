@@ -182,12 +182,12 @@ struct AppleBookDetailView: View {
             // Filter/sort menu
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    // Sort field
+                    // Sort field with checkmark
                     ForEach(HighlightSortField.allCases, id: \.self) { field in
                         Button {
                             viewModel.sortField = field
                         } label: {
-                            Text(field.displayName)
+                            Label(field.displayName, systemImage: viewModel.sortField == field ? "checkmark" : "")
                         }
                     }
 
