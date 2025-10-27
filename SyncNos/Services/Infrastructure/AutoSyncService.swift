@@ -189,7 +189,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
         // 有界并发：最多同时处理 maxConcurrentBooks 本书
         var nextIndex = 0
-        try await withTaskGroup(of: Void.self) { group in
+        await withTaskGroup(of: Void.self) { group in
             func addTaskIfPossible() {
                 guard nextIndex < eligibleIds.count else { return }
                 let id = eligibleIds[nextIndex]; nextIndex += 1

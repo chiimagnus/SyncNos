@@ -64,3 +64,6 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         close()
     }
 }
+
+// MARK: - Sendable Conformance
+extension DatabaseReadOnlySession: @unchecked Sendable {}

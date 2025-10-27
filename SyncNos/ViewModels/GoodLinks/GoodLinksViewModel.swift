@@ -137,22 +137,23 @@ final class GoodLinksViewModel: ObservableObject {
 
         // 将同步 SQLite 读取移至后台线程，避免阻塞主线程
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async { [service, logger] in
+            // 在主线程上获取服务引用，然后安全传递给后台队列
+            let serviceForTask = service
+            let loggerForTask = logger
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    let rows = try service.fetchRecentLinks(dbPath: dbPath, limit: limit)
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self else { continuation.resume(); return }
+                    let dbPath = serviceForTask.resolveDatabasePath()
+                    let rows = try serviceForTask.fetchRecentLinks(dbPath: dbPath, limit: limit)
+                    Task { @MainActor in
                         self.links = rows
-                        logger.info("[GoodLinks] loaded links: \(rows.count)")
+                        loggerForTask.info("[GoodLinks] loaded links: \(rows.count)")
                         self.isLoading = false
                         continuation.resume()
                     }
                 } catch {
                     let desc = error.localizedDescription
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self else { continuation.resume(); return }
-                        logger.error("[GoodLinks] loadRecentLinks error: \(desc)")
+                    Task { @MainActor in
+                        loggerForTask.error("[GoodLinks] loadRecentLinks error: \(desc)")
                         self.errorMessage = desc
                         self.isLoading = false
                         continuation.resume()
@@ -235,24 +236,25 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
-        logger.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
-        let service = self.service
-        let logger = self.logger
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            // 在主线程上获取服务引用，然后安全传递给后台队列
+            let serviceForTask = service
+            let loggerForTask = logger
             DispatchQueue.global(qos: .userInitiated).async {
+                loggerForTask.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    logger.info("[GoodLinks] 数据库路径: \(dbPath)")
-                    let rows = try service.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
-                    DispatchQueue.main.async {
+                    let dbPath = serviceForTask.resolveDatabasePath()
+                    loggerForTask.info("[GoodLinks] 数据库路径: \(dbPath)")
+                    let rows = try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
+                    Task { @MainActor in
                         self.highlightsByLinkId[linkId] = rows
-                        logger.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
+                        loggerForTask.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
                         continuation.resume()
                     }
                 } catch {
                     let desc = error.localizedDescription
-                    DispatchQueue.main.async {
-                        logger.error("[GoodLinks] loadHighlights error: \(desc)")
+                    Task { @MainActor in
+                        loggerForTask.error("[GoodLinks] loadHighlights error: \(desc)")
                         self.errorMessage = desc
                         continuation.resume()
                     }
@@ -262,27 +264,28 @@ final class GoodLinksViewModel: ObservableObject {
     }
     
     func loadContent(for linkId: String) async {
-        logger.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
-        let service = self.service
-        let logger = self.logger
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            // 在主线程上获取服务引用，然后安全传递给后台队列
+            let serviceForTask = service
+            let loggerForTask = logger
             DispatchQueue.global(qos: .userInitiated).async {
+                loggerForTask.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
                 do {
-                    let dbPath = service.resolveDatabasePath()
-                    let content = try service.fetchContent(dbPath: dbPath, linkId: linkId)
-                    DispatchQueue.main.async {
+                    let dbPath = serviceForTask.resolveDatabasePath()
+                    let content = try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
+                    Task { @MainActor in
                         if let content {
                             self.contentByLinkId[linkId] = content
-                            logger.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
+                            loggerForTask.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
                         } else {
-                            logger.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
+                            loggerForTask.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
                         }
                         continuation.resume()
                     }
                 } catch {
                     let desc = error.localizedDescription
-                    DispatchQueue.main.async {
-                        logger.error("[GoodLinks] loadContent error: \(desc)")
+                    Task { @MainActor in
+                        loggerForTask.error("[GoodLinks] loadContent error: \(desc)")
                         self.errorMessage = desc
                         continuation.resume()
                     }

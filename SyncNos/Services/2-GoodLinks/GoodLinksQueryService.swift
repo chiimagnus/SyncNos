@@ -3,7 +3,7 @@ import SQLite3
 
 // MARK: - GoodLinks Query Service
 
-final class GoodLinksQueryService {
+final class GoodLinksQueryService: Sendable {
     private let logger = DIContainer.shared.loggerService
 
     func fetchRecentLinks(db: OpaquePointer, limit: Int) throws -> [GoodLinksLinkRow] {

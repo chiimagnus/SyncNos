@@ -38,7 +38,7 @@ struct LogEntry: Identifiable, Equatable {
 }
 
 // MARK: - Logger Service Protocol
-protocol LoggerServiceProtocol {
+protocol LoggerServiceProtocol: Sendable {
     var currentLevel: LogLevel { get set }
 
     /// Publisher that emits each new `LogEntry`.
@@ -86,7 +86,7 @@ extension LoggerServiceProtocol {
 }
 
 // MARK: - Database Service Protocol
-protocol DatabaseServiceProtocol {
+protocol DatabaseServiceProtocol: Sendable {
     func canOpenReadOnly(dbPath: String) -> Bool
     func openReadOnlyDatabase(dbPath: String) throws -> OpaquePointer
     func close(_ db: OpaquePointer?)
@@ -105,7 +105,7 @@ protocol DatabaseServiceProtocol {
 
 // MARK: - Database Read-Only Session Protocol
 /// 以会话形式封装数据库连接，避免在 ViewModel 中直接持有 SQLite 句柄
-protocol DatabaseReadOnlySessionProtocol: AnyObject {
+protocol DatabaseReadOnlySessionProtocol: AnyObject, Sendable {
     func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow]
     func fetchHighlightCountsByAsset() throws -> [AssetHighlightCount]
     func fetchBooks(assetIds: [String]) throws -> [BookRow]
@@ -191,7 +191,7 @@ protocol IAPServiceProtocol: AnyObject {
 }
 
 // MARK: - GoodLinks Protocol Bridge (exposed to app layer)
-protocol GoodLinksDatabaseServiceExposed: AnyObject {
+protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func defaultDatabasePath() -> String
     func canOpenReadOnly(dbPath: String) -> Bool
     func makeReadOnlySession(dbPath: String) throws -> GoodLinksReadOnlySessionProtocol

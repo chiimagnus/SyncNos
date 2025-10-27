@@ -3,7 +3,7 @@ import SQLite3
 
 // MARK: - GoodLinks Connection Service
 
-final class GoodLinksConnectionService {
+final class GoodLinksConnectionService: Sendable {
     private let logger = DIContainer.shared.loggerService
 
     func defaultDatabasePath() -> String {

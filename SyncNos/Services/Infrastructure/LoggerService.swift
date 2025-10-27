@@ -1,9 +1,9 @@
 import Foundation
-import Combine
+@preconcurrency import Combine
 import AppKit
 
 // MARK: - Logger Service Implementation
-class LoggerService: LoggerServiceProtocol {
+final class LoggerService: LoggerServiceProtocol {
     static let shared = LoggerService()
 
     private let subject = PassthroughSubject<LogEntry, Never>()
@@ -64,3 +64,6 @@ class LoggerService: LoggerServiceProtocol {
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
 }
+
+// MARK: - Sendable Conformance
+extension LoggerService: @unchecked Sendable {}
