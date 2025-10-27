@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-class AppleBookDetailViewModel: ObservableObject {
+class AppleBooksDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
     @Published var isLoadingPage = false
     @Published var errorMessage: String?
