@@ -244,6 +244,7 @@ struct AppleBookDetailView: View {
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                 }
+                .menuIndicator(.hidden)
             }
 
             // Sync button / progress (shows per-item batch progress when available)
