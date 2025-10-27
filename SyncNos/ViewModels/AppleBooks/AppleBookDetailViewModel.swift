@@ -193,31 +193,4 @@ class AppleBookDetailViewModel: ObservableObject {
             }
         }
     }
-
-    func syncToNotion(book: BookListItem, dbPath: String?, incremental: Bool = false) {
-        syncMessage = nil
-        syncProgressText = nil
-        isSyncing = true
-        Task {
-            do {
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
-                try await self.syncService.sync(book: book, dbPath: dbPath, incremental: incremental) { progress in
-                    Task { @MainActor in self.syncProgressText = progress }
-                }
-                await MainActor.run {
-                    self.syncMessage = incremental ? "增量同步完成" : "全量同步完成"
-                    self.syncProgressText = nil
-                    self.isSyncing = false
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
-                }
-            } catch {
-                await MainActor.run {
-                    self.syncMessage = error.localizedDescription
-                    self.syncProgressText = nil
-                    self.isSyncing = false
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
-                }
-            }
-        }
-    }
 }
