@@ -83,9 +83,7 @@ struct AppleBookDetailView: View {
                                     content: highlight.text,
                                     note: highlight.note,
                                     createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
-                                        modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) },
-                                        locationText: highlight.locationDisplay,
-                                        openURL: URL(string: "ibooks://assetid/\(book.bookId)" + (highlight.location.flatMap{ !$0.isEmpty ? "#\($0)" : nil } ?? ""))
+                                    modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
                                 ) {
                                     Button {
                                         if let location = highlight.location {
