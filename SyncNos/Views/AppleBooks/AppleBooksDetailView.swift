@@ -201,7 +201,7 @@ struct AppleBooksDetailView: View {
             }
 
             // Sync button / progress (shows per-item batch progress when available)
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .primaryAction) {
                 if externalIsSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
