@@ -54,7 +54,6 @@ struct FiltetSortBar: View {
     var isAscending: Bool
     var onSortFieldChanged: ((HighlightSortField) -> Void)?
     var onAscendingChanged: ((Bool) -> Void)?
-    var onResetFilters: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -156,10 +155,7 @@ struct FiltetSortBar_Previews: PreviewProvider {
                 onAscendingChanged: { ascending in
                     isAscending = ascending
                 }
-            ) {
-                noteFilter = .any
-                selectedStyles = []
-            }
+            )
         }
     }
 
