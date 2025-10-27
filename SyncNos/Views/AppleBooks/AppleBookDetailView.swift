@@ -284,7 +284,6 @@ struct AppleBookDetailView: View {
                     }
                 }
             }
-            }
         }
         .alert("Sync Error", isPresented: $showingSyncError) {
             Button("OK", role: .cancel) { }
