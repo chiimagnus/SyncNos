@@ -271,9 +271,7 @@ struct GoodLinksDetailView: View {
                             onAscendingChanged: { ascending in
                                 viewModel.highlightIsAscending = ascending
                             }
-                        ) {
-                            viewModel.resetHighlightFilters()
-                        }
+                        )
                     }
 
                     // Sync button / progress
