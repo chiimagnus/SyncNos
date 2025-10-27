@@ -9,15 +9,20 @@ class AppleBookDetailViewModel: ObservableObject {
     @Published var syncProgressText: String?
     @Published var isSyncing: Bool = false
 
-    // Sorting and filtering state for highlights - Reactive properties with UserDefaults persistence
-    @Published var order: HighlightOrder = .createdDesc {
+    // Sorting and filtering state for highlights - field + direction, with UserDefaults persistence
+    @Published var sortField: HighlightSortField = .created {
         didSet {
-            UserDefaults.standard.set(order.rawValue, forKey: "detail_sort_key")
-            // Reload data when order changes
+            UserDefaults.standard.set(sortField.rawValue, forKey: "detail_sort_field")
             if currentAssetId != nil {
-                Task {
-                    await loadFirstPage()
-                }
+                Task { await loadFirstPage() }
+            }
+        }
+    }
+    @Published var isAscending: Bool = false { // 默认降序
+        didSet {
+            UserDefaults.standard.set(isAscending, forKey: "detail_sort_ascending")
+            if currentAssetId != nil {
+                Task { await loadFirstPage() }
             }
         }
     }
@@ -62,10 +67,11 @@ class AppleBookDetailViewModel: ObservableObject {
         self.syncService = syncService
 
         // Load initial values from UserDefaults
-        if let savedOrderRaw = UserDefaults.standard.string(forKey: "detail_sort_key"),
-           let order = HighlightOrder(rawValue: savedOrderRaw) {
-            self.order = order
+        if let savedFieldRaw = UserDefaults.standard.string(forKey: "detail_sort_field"),
+           let field = HighlightSortField(rawValue: savedFieldRaw) {
+            self.sortField = field
         }
+        self.isAscending = UserDefaults.standard.object(forKey: "detail_sort_ascending") as? Bool ?? false
         if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "detail_note_filter"),
            let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
             self.noteFilter = filter
@@ -137,7 +143,7 @@ class AppleBookDetailViewModel: ObservableObject {
         do {
             // Convert Set to Array for the API call
             let stylesArray = selectedStyles.isEmpty ? nil : Array(selectedStyles)
-            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil, order: order, noteFilter: noteFilter, styles: stylesArray)
+            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil, sortField: sortField, ascending: isAscending, noteFilter: noteFilter, styles: stylesArray)
             let page = rows.map { r in
                 Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
             }

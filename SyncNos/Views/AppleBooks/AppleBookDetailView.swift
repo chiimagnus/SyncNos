@@ -182,13 +182,22 @@ struct AppleBookDetailView: View {
             // Filter/sort menu
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    // Sort options directly in main menu
-                    ForEach(HighlightOrder.allCases, id: \.self) { order in
+                    // Sort field
+                    ForEach(HighlightSortField.allCases, id: \.self) { field in
                         Button {
-                            viewModel.order = order
+                            viewModel.sortField = field
                         } label: {
-                            Text(order.displayName)
+                            Text(field.displayName)
                         }
+                    }
+
+                    Divider()
+
+                    // Ascend toggle (默认不勾选 = 降序)
+                    Button {
+                        viewModel.isAscending.toggle()
+                    } label: {
+                        Label("ascend", systemImage: viewModel.isAscending ? "checkmark" : "")
                     }
 
                     // Divider()

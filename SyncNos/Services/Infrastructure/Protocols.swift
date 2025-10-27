@@ -100,7 +100,7 @@ protocol DatabaseServiceProtocol {
     func makeReadOnlySession(dbPath: String) throws -> DatabaseReadOnlySessionProtocol
     // New methods for filtering and sorting
     func fetchHighlightStatsByAsset(db: OpaquePointer) throws -> [AssetHighlightStats]
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
 }
 
 // MARK: - Database Read-Only Session Protocol
@@ -112,7 +112,7 @@ protocol DatabaseReadOnlySessionProtocol: AnyObject {
     func close()
     // New methods for filtering and sorting
     func fetchHighlightStatsByAsset() throws -> [AssetHighlightStats]
-    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, order: HighlightOrder?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
+    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow]
 }
 
 // MARK: - Bookmark Store Protocol
