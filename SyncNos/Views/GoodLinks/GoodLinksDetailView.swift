@@ -160,8 +160,14 @@ struct GoodLinksDetailView: View {
                                 noteFilter: $detailViewModel.noteFilter,
                                 selectedStyles: $detailViewModel.selectedStyles,
                                 colorTheme: .goodLinks,
-                                sortField: .created,
-                                isAscending: false
+                                sortField: detailViewModel.sortField,
+                                isAscending: detailViewModel.isAscending,
+                                onSortFieldChanged: { field in
+                                    detailViewModel.sortField = field
+                                },
+                                onAscendingChanged: { ascending in
+                                    detailViewModel.isAscending = ascending
+                                }
                             ) {
                                 detailViewModel.resetFilters()
                             }

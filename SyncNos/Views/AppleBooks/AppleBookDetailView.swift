@@ -81,7 +81,13 @@ struct AppleBookDetailView: View {
                             selectedStyles: $viewModel.selectedStyles,
                             colorTheme: .appleBooks,
                             sortField: viewModel.sortField,
-                            isAscending: viewModel.isAscending
+                            isAscending: viewModel.isAscending,
+                            onSortFieldChanged: { field in
+                                viewModel.sortField = field
+                            },
+                            onAscendingChanged: { ascending in
+                                viewModel.isAscending = ascending
+                            }
                         ) {
                             viewModel.noteFilter = .any
                             viewModel.selectedStyles = []
@@ -191,32 +197,6 @@ struct AppleBookDetailView: View {
             }
         }
         .toolbar {
-            // Sort menu
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    // Sort field with checkmark
-                    ForEach(HighlightSortField.allCases, id: \.self) { field in
-                        Button {
-                            viewModel.sortField = field
-                        } label: {
-                            Label(field.displayName, systemImage: viewModel.sortField == field ? "checkmark" : "")
-                        }
-                    }
-
-                    Divider()
-
-                    // Ascend toggle (默认不勾选 = 降序)
-                    Button {
-                        viewModel.isAscending.toggle()
-                    } label: {
-                        Label("Ascending", systemImage: viewModel.isAscending ? "checkmark" : "")
-                    }
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
-                }
-                .menuIndicator(.hidden)
-            }
-
             // Sync button / progress (shows per-item batch progress when available)
             ToolbarItem(placement: .primaryAction) {
                 if externalIsSyncing {
