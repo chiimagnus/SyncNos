@@ -4,7 +4,6 @@ import AppKit
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
-    @StateObject private var detailViewModel = GoodLinksDetailViewModel()
 
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
@@ -17,6 +16,11 @@ struct GoodLinksDetailView: View {
 
     private var selectedLink: GoodLinksLinkRow? {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
+    }
+
+    private var filteredHighlights: [GoodLinksHighlightRow] {
+        guard let linkId = selectedLinkId else { return [] }
+        return viewModel.getFilteredHighlights(for: linkId)
     }
 
     var body: some View {
@@ -157,19 +161,19 @@ struct GoodLinksDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             // Filter bar
                             FilterBar(
-                                noteFilter: $detailViewModel.noteFilter,
-                                selectedStyles: $detailViewModel.selectedStyles,
+                                noteFilter: $viewModel.highlightNoteFilter,
+                                selectedStyles: $viewModel.highlightSelectedStyles,
                                 colorTheme: .goodLinks,
-                                sortField: detailViewModel.sortField,
-                                isAscending: detailViewModel.isAscending,
+                                sortField: viewModel.highlightSortField,
+                                isAscending: viewModel.highlightIsAscending,
                                 onSortFieldChanged: { field in
-                                    detailViewModel.sortField = field
+                                    viewModel.highlightSortField = field
                                 },
                                 onAscendingChanged: { ascending in
-                                    detailViewModel.isAscending = ascending
+                                    viewModel.highlightIsAscending = ascending
                                 }
                             ) {
-                                detailViewModel.resetFilters()
+                                viewModel.resetHighlightFilters()
                             }
 
                             HStack(spacing: 6) {
@@ -181,8 +185,8 @@ struct GoodLinksDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.primary)
 
-                                if !detailViewModel.highlights.isEmpty {
-                                    Text("\(detailViewModel.highlights.count) item\(detailViewModel.highlights.count == 1 ? "" : "s")")
+                                if !filteredHighlights.isEmpty {
+                                    Text("\(filteredHighlights.count) item\(filteredHighlights.count == 1 ? "" : "s")")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -191,9 +195,9 @@ struct GoodLinksDetailView: View {
                             }
                             .padding(.top, 4)
 
-                            if !detailViewModel.highlights.isEmpty {
+                            if !filteredHighlights.isEmpty {
                                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
-                                    ForEach(detailViewModel.highlights, id: \.id) { item in
+                                    ForEach(filteredHighlights, id: \.id) { item in
                                         HighlightCardView(
                                             colorMark: item.color.map { highlightColor(for: $0) } ?? Color.gray.opacity(0.5),
                                             content: item.content,
@@ -331,17 +335,13 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .onAppear {
-            if let link = selectedLink {
-                detailViewModel.setLink(link)
-            }
-        }
         .onChange(of: selectedLinkId) { _ in
             externalIsSyncing = false
             externalSyncProgress = nil
-            if let link = selectedLink {
-                detailViewModel.setLink(link)
-            }
+        }
+        .onChange(of: viewModel.highlightsByLinkId) { _ in
+            // Trigger UI update when highlights are loaded
+            // The filteredHighlights computed property will automatically refresh
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
