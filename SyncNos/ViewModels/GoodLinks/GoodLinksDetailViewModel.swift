@@ -25,6 +25,25 @@ class GoodLinksDetailViewModel: ObservableObject {
         }
     }
 
+    // Sorting state
+    @Published var sortField: HighlightSortField = .created {
+        didSet {
+            UserDefaults.standard.set(sortField.rawValue, forKey: "goodlinks_detail_sort_field")
+            if currentLinkId != nil {
+                loadHighlights()
+            }
+        }
+    }
+
+    @Published var isAscending: Bool = false {
+        didSet {
+            UserDefaults.standard.set(isAscending, forKey: "goodlinks_detail_sort_ascending")
+            if currentLinkId != nil {
+                loadHighlights()
+            }
+        }
+    }
+
     private var currentLinkId: String?
     private let service: GoodLinksDatabaseServiceExposed
 
@@ -39,6 +58,11 @@ class GoodLinksDetailViewModel: ObservableObject {
         if let savedStyles = UserDefaults.standard.array(forKey: "goodlinks_detail_selected_styles") as? [Int] {
             self.selectedStyles = Set(savedStyles)
         }
+        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: "goodlinks_detail_sort_field"),
+           let sortField = HighlightSortField(rawValue: savedSortFieldRaw) {
+            self.sortField = sortField
+        }
+        self.isAscending = UserDefaults.standard.object(forKey: "goodlinks_detail_sort_ascending") as? Bool ?? false
     }
 
     func setLink(_ link: GoodLinksLinkRow) {
@@ -63,7 +87,7 @@ class GoodLinksDetailViewModel: ObservableObject {
                 )
 
                 // Apply filters
-                linkHighlights = self.applyFilters(to: linkHighlights)
+                linkHighlights = self.applyFiltersAndSorting(to: linkHighlights)
 
                 Task { @MainActor in
                     self.highlights = linkHighlights
@@ -78,7 +102,7 @@ class GoodLinksDetailViewModel: ObservableObject {
         }
     }
 
-    private func applyFilters(to highlights: [GoodLinksHighlightRow]) -> [GoodLinksHighlightRow] {
+    private func applyFiltersAndSorting(to highlights: [GoodLinksHighlightRow]) -> [GoodLinksHighlightRow] {
         var filtered = highlights
 
         // Apply note filter
@@ -96,6 +120,24 @@ class GoodLinksDetailViewModel: ObservableObject {
             filtered = filtered.filter { highlight in
                 guard let color = highlight.color else { return false }
                 return selectedStyles.contains(color)
+            }
+        }
+
+        // Apply sorting (GoodLinks only has 'time' field, so created/modified use the same logic)
+        filtered = filtered.sorted { lhs, rhs in
+            switch sortField {
+            case .created:
+                if isAscending {
+                    return lhs.time < rhs.time
+                } else {
+                    return lhs.time > rhs.time
+                }
+            case .modified:
+                if isAscending {
+                    return lhs.time < rhs.time
+                } else {
+                    return lhs.time > rhs.time
+                }
             }
         }
 

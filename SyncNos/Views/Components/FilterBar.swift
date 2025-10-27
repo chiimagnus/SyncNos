@@ -56,6 +56,8 @@ struct FilterBar: View {
     // Sort state (for displaying current sort)
     var sortField: HighlightSortField
     var isAscending: Bool
+    var onSortFieldChanged: ((HighlightSortField) -> Void)?
+    var onAscendingChanged: ((Bool) -> Void)?
 
     // Callbacks
     var onResetFilters: (() -> Void)?
@@ -85,8 +87,8 @@ struct FilterBar: View {
                 Divider()
                     .frame(height: 20)
 
-                // Current sort display
-                HStack(spacing: 6) {
+                // Sort menu
+                HStack(spacing: 8) {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -95,19 +97,37 @@ struct FilterBar: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    Text(sortField.displayName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                    Menu {
+                        // Sort field with checkmark
+                        ForEach(HighlightSortField.allCases, id: \.self) { field in
+                            Button {
+                                onSortFieldChanged?(field)
+                            } label: {
+                                Label(field.displayName, systemImage: sortField == field ? "checkmark" : "")
+                            }
+                        }
 
-                    Text(isAscending ? "↑" : "↓")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        Divider()
+
+                        // Ascend toggle
+                        Button {
+                            onAscendingChanged?(!isAscending)
+                        } label: {
+                            Label("Ascending", systemImage: isAscending ? "checkmark" : "")
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(sortField.displayName)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+
+                            Text(isAscending ? "↑" : "↓")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.secondary.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 Spacer()
 
@@ -196,27 +216,45 @@ struct FilterBar: View {
 }
 
 struct FilterBar_Previews: PreviewProvider {
+    struct PreviewView: View {
+        @State private var noteFilter: NoteFilter = .any
+        @State private var selectedStyles: Set<Int> = []
+        @State private var sortField: HighlightSortField = .created
+        @State private var isAscending = false
+
+        let colorTheme: HighlightColorTheme
+
+        var body: some View {
+            FilterBar(
+                noteFilter: $noteFilter,
+                selectedStyles: $selectedStyles,
+                colorTheme: colorTheme,
+                sortField: sortField,
+                isAscending: isAscending,
+                onSortFieldChanged: { field in
+                    sortField = field
+                },
+                onAscendingChanged: { ascending in
+                    isAscending = ascending
+                }
+            ) {
+                noteFilter = .any
+                selectedStyles = []
+            }
+        }
+    }
+
     static var previews: some View {
         VStack(spacing: 20) {
-            FilterBar(
-                noteFilter: .constant(.any),
-                selectedStyles: .constant([]),
-                colorTheme: .appleBooks,
-                sortField: .created,
-                isAscending: false
-            ) {
-                print("Reset filters")
-            }
+            PreviewView(colorTheme: .appleBooks)
 
-            FilterBar(
-                noteFilter: .constant(.hasNote),
-                selectedStyles: .constant([0, 2]),
-                colorTheme: .goodLinks,
-                sortField: .modified,
-                isAscending: true
-            ) {
-                print("Reset filters")
-            }
+            PreviewView(colorTheme: .goodLinks)
+                .onAppear {
+                    // Second preview with different initial state
+                    DispatchQueue.main.async {
+                        // This won't work in preview, but shows intent
+                    }
+                }
         }
         .padding()
         .frame(width: 700)
