@@ -57,7 +57,7 @@ struct FiltetSortBar: View {
     var onResetFilters: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack {
             // 高级筛选菜单
             Menu {
                 // 笔记筛选
@@ -91,12 +91,12 @@ struct FiltetSortBar: View {
                 }
             } label: {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.title3)
             }
+            .menuIndicator(.hidden)
             .help("Filters")
 
             // 颜色筛选按钮组
-            HStack(spacing: 6) {
+            HStack {
                 ForEach(0..<colorTheme.colorCount, id: \.self) { colorIndex in
                     let (color, name) = colorTheme.colorInfo(for: colorIndex)
                     let isSelected = selectedStyles.isEmpty || selectedStyles.contains(colorIndex)
@@ -129,23 +129,8 @@ struct FiltetSortBar: View {
                     .help("\(name)\(isSelected ? " (Selected)" : "")")
                 }
             }
-
-            Divider()
-                .frame(height: 20)
-
-            // 重置按钮
-            Button(action: {
-                onResetFilters?()
-            }) {
-                Image(systemName: "arrow.counterclockwise")
-            }
-            .buttonStyle(.plain)
-            .help("Reset filters")
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.secondary.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
