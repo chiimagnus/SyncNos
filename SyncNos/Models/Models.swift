@@ -23,8 +23,6 @@ struct Highlight: Codable {
     let dateAdded: Date?
     let modified: Date?
     let location: String?
-    // Apple Books 专用的人类可读位置描述（例如：第3章 第2节 位置57 或 第12页）
-    let locationDisplay: String?
 }
 
 struct HighlightRow { 
@@ -139,13 +137,11 @@ enum NoteFilter: String, CaseIterable {
 enum HighlightSortField: String, CaseIterable {
     case created = "created"
     case modified = "modified"
-    case location = "location"
 
     var displayName: String {
         switch self {
         case .created: return "创建时间"
-        case .modified: return "编辑时间"
-        case .location: return "位置"
+        case .modified: return "修改时间"
         }
     }
 }

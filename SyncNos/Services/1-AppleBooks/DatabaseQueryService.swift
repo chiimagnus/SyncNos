@@ -319,21 +319,6 @@ class DatabaseQueryService {
                 return availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE \(direction)" : "rowid \(direction)"
             case .modified:
                 return availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE \(direction)" : "rowid \(direction)"
-            case .location:
-                if availableColumns.contains("ZANNOTATIONLOCATION") {
-                    // 解析常见位置：loc= / page= / epubcfi(...)
-                    // 对 epubcfi：取括号内内容，去除非数字字符后转为整数作为近似排序键
-                    let innerCFI = "substr(ZANNOTATIONLOCATION, instr(ZANNOTATIONLOCATION,'(')+1, instr(ZANNOTATIONLOCATION,')') - instr(ZANNOTATIONLOCATION,'(') - 1)"
-                    let digitsOnly = "replace(replace(replace(replace(replace(\(innerCFI), '/', ''), '.', ''), ',', ''), '-', ''), ' ', '')"
-                    let expr = "CASE " +
-                    "WHEN ZANNOTATIONLOCATION LIKE 'loc=%' THEN CAST(substr(ZANNOTATIONLOCATION, 5) AS INTEGER) " +
-                    "WHEN ZANNOTATIONLOCATION LIKE 'page=%' THEN CAST(substr(ZANNOTATIONLOCATION, 6) AS INTEGER) " +
-                    "WHEN ZANNOTATIONLOCATION LIKE 'epubcfi(%' THEN CAST(\(digitsOnly) AS INTEGER) " +
-                    "ELSE CAST(ZANNOTATIONLOCATION AS INTEGER) END \(direction)"
-                    return expr
-                } else {
-                    return "rowid \(direction)"
-                }
             }
         }()
 
