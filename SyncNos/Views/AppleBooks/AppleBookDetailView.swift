@@ -189,58 +189,58 @@ struct AppleBookDetailView: View {
                         }
                     }
 
-                    Divider()
+                    // Divider()
 
-                    // Note filter options
-                    Picker("Note filter", selection: $viewModel.noteFilter) {
-                        ForEach(NoteFilter.allCases, id: \.self) { filter in
-                            Text(filter.displayName).tag(filter)
-                        }
-                    }
+                    // // Note filter options
+                    // Picker("Note filter", selection: $viewModel.noteFilter) {
+                    //     ForEach(NoteFilter.allCases, id: \.self) { filter in
+                    //         Text(filter.displayName).tag(filter)
+                    //     }
+                    // }
 
-                    Divider()
+                    // Divider()
 
-                    // Color filter options
-                    Menu("Colors", systemImage: "paintpalette") {
-                        VStack {
-                            HStack {
-                                ForEach(0...5, id: \.self) { colorIndex in
-                                    let color = AppleBookDetailView.highlightStyleColor(for: colorIndex)
-                                    let colorName = ["Yellow", "Green", "Blue", "Cyan", "Pink", "Purple"][colorIndex]
-                                    Button(action: {
-                                        if viewModel.selectedStyles.contains(colorIndex) {
-                                            viewModel.selectedStyles.remove(colorIndex)
-                                        } else {
-                                            viewModel.selectedStyles.insert(colorIndex)
-                                        }
-                                    }) {
-                                        Circle()
-                                            .fill(color)
-                                            .frame(width: 16, height: 16)
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(viewModel.selectedStyles.contains(colorIndex) ? Color.black : Color.clear, lineWidth: 2)
-                                            )
-                                    }
-                                    .help("\(colorName)\(viewModel.selectedStyles.contains(colorIndex) ? " (Selected)" : "")")
-                                }
-                            }
+                    // // Color filter options
+                    // Menu("Colors", systemImage: "paintpalette") {
+                    //     VStack {
+                    //         HStack {
+                    //             ForEach(0...5, id: \.self) { colorIndex in
+                    //                 let color = AppleBookDetailView.highlightStyleColor(for: colorIndex)
+                    //                 let colorName = ["Yellow", "Green", "Blue", "Cyan", "Pink", "Purple"][colorIndex]
+                    //                 Button(action: {
+                    //                     if viewModel.selectedStyles.contains(colorIndex) {
+                    //                         viewModel.selectedStyles.remove(colorIndex)
+                    //                     } else {
+                    //                         viewModel.selectedStyles.insert(colorIndex)
+                    //                     }
+                    //                 }) {
+                    //                     Circle()
+                    //                         .fill(color)
+                    //                         .frame(width: 16, height: 16)
+                    //                         .overlay(
+                    //                             Circle()
+                    //                                 .stroke(viewModel.selectedStyles.contains(colorIndex) ? Color.black : Color.clear, lineWidth: 2)
+                    //                         )
+                    //                 }
+                    //                 .help("\(colorName)\(viewModel.selectedStyles.contains(colorIndex) ? " (Selected)" : "")")
+                    //             }
+                    //         }
 
-                            Divider()
+                    //         Divider()
 
-                            HStack {
-                                Button("Select All") {
-                                    viewModel.selectedStyles = Set(0...5)
-                                }
-                                .buttonStyle(.borderless)
+                    //         HStack {
+                    //             Button("Select All") {
+                    //                 viewModel.selectedStyles = Set(0...5)
+                    //             }
+                    //             .buttonStyle(.borderless)
 
-                                Button("Clear") {
-                                    viewModel.selectedStyles = []
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                        }
-                    }
+                    //             Button("Clear") {
+                    //                 viewModel.selectedStyles = []
+                    //             }
+                    //             .buttonStyle(.borderless)
+                    //         }
+                    //     }
+                    // }
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                 }
