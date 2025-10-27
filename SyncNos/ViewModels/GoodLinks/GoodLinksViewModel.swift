@@ -33,6 +33,20 @@ final class GoodLinksViewModel: ObservableObject {
         didSet { UserDefaults.standard.set(searchText, forKey: "goodlinks_search_text") }
     }
 
+    // Highlight detail filtering & sorting state (for detail view)
+    @Published var highlightNoteFilter: NoteFilter = .any {
+        didSet { UserDefaults.standard.set(highlightNoteFilter.rawValue, forKey: "goodlinks_highlight_note_filter") }
+    }
+    @Published var highlightSelectedStyles: Set<Int> = [] {
+        didSet { UserDefaults.standard.set(Array(highlightSelectedStyles).sorted(), forKey: "goodlinks_highlight_selected_styles") }
+    }
+    @Published var highlightSortField: HighlightSortField = .created {
+        didSet { UserDefaults.standard.set(highlightSortField.rawValue, forKey: "goodlinks_highlight_sort_field") }
+    }
+    @Published var highlightIsAscending: Bool = false {
+        didSet { UserDefaults.standard.set(highlightIsAscending, forKey: "goodlinks_highlight_sort_ascending") }
+    }
+
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
@@ -54,6 +68,20 @@ final class GoodLinksViewModel: ObservableObject {
         self.sortAscending = UserDefaults.standard.object(forKey: "goodlinks_sort_ascending") as? Bool ?? false
         self.showStarredOnly = UserDefaults.standard.object(forKey: "goodlinks_show_starred_only") as? Bool ?? false
         self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
+
+        // Load highlight detail filter/sort settings
+        if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "goodlinks_highlight_note_filter"),
+           let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
+            self.highlightNoteFilter = filter
+        }
+        if let savedStyles = UserDefaults.standard.array(forKey: "goodlinks_highlight_selected_styles") as? [Int] {
+            self.highlightSelectedStyles = Set(savedStyles)
+        }
+        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: "goodlinks_highlight_sort_field"),
+           let sortField = HighlightSortField(rawValue: savedSortFieldRaw) {
+            self.highlightSortField = sortField
+        }
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: "goodlinks_highlight_sort_ascending") as? Bool ?? false
 
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFilterChanged"))
@@ -378,5 +406,59 @@ extension GoodLinksViewModel {
                 await group.waitForAll()
             }
         }
+    }
+}
+
+// MARK: - Highlight Detail Filtering & Sorting
+extension GoodLinksViewModel {
+    /// Get filtered and sorted highlights for a specific link
+    func getFilteredHighlights(for linkId: String) -> [GoodLinksHighlightRow] {
+        guard let sourceHighlights = highlightsByLinkId[linkId] else { return [] }
+
+        var filtered = sourceHighlights
+
+        // Apply note filter
+        switch highlightNoteFilter {
+        case .any:
+            break // No filtering
+        case .hasNote:
+            filtered = filtered.filter { $0.note != nil && !$0.note!.isEmpty }
+        case .noNote:
+            filtered = filtered.filter { $0.note == nil || $0.note!.isEmpty }
+        }
+
+        // Apply color filter
+        if !highlightSelectedStyles.isEmpty {
+            filtered = filtered.filter { highlight in
+                guard let color = highlight.color else { return false }
+                return highlightSelectedStyles.contains(color)
+            }
+        }
+
+        // Apply sorting (GoodLinks only has 'time' field, so created/modified use the same logic)
+        filtered = filtered.sorted { lhs, rhs in
+            switch highlightSortField {
+            case .created:
+                if highlightIsAscending {
+                    return lhs.time < rhs.time
+                } else {
+                    return lhs.time > rhs.time
+                }
+            case .modified:
+                if highlightIsAscending {
+                    return lhs.time < rhs.time
+                } else {
+                    return lhs.time > rhs.time
+                }
+            }
+        }
+
+        return filtered
+    }
+
+    /// Reset highlight filters to default
+    func resetHighlightFilters() {
+        highlightNoteFilter = .any
+        highlightSelectedStyles = []
     }
 }
