@@ -18,6 +18,7 @@
 ## 构建与开发命令
 
 ### macOS 应用 (Xcode)
+
 ```bash
 # 在 Xcode 中打开
 open SyncNos.xcodeproj
@@ -27,6 +28,12 @@ xcodebuild -scheme SyncNos -configuration Debug build
 
 # 构建 Release 配置
 xcodebuild -scheme SyncNos -configuration Release build
+
+# 清理构建文件夹
+rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-*
+
+# 清理并重建
+rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-* && xcodebuild -scheme SyncNos -configuration Debug build
 
 # 运行应用
 open build/Debug/SyncNos.app
@@ -38,6 +45,7 @@ open build/Debug/SyncNos.app
 - Swift 5.0+
 
 ### Python 后端 (FastAPI)
+
 ```bash
 cd Backend/
 
@@ -77,13 +85,30 @@ APP_JWT_SECRET=your_jwt_secret
 SyncNos/
 ├── SyncNosApp.swift              # 应用入口
 ├── Views/                        # SwiftUI 视图（UI 层）
-│   ├── Components/
+│   ├── Components/               # 可复用 UI 组件
+│   │   ├── FilterBar.swift       # 统一筛选排序栏
+│   │   ├── HighlightCardView.swift
+│   │   ├── InfoHeaderCardView.swift
+│   │   ├── ArticleContentCardView.swift
+│   │   ├── WaterfallLayout.swift # 瀑布流布局
+│   │   └── MainListView.swift
 │   ├── AppleBooks/
+│   │   ├── AppleBooksListView.swift
+│   │   └── AppleBookDetailView.swift
 │   ├── GoodLinks/
+│   │   ├── GoodLinksListView.swift
+│   │   └── GoodLinksDetailView.swift
 │   └── Settting/
+│       ├── General/
+│       └── Sync/
 ├── ViewModels/                   # ObservableObject 视图模型
 │   ├── AppleBooks/
+│   │   ├── AppleBookViewModel.swift         # 列表管理
+│   │   ├── AppleBookDetailViewModel.swift   # 详情页分页
+│   │   └── AppleBooksSettingsViewModel.swift
 │   ├── GoodLinks/
+│   │   ├── GoodLinksViewModel.swift         # 统一视图模型
+│   │   └── GoodLinksSettingsViewModel.swift
 │   ├── Account/
 │   ├── Notion/
 │   └── LogViewModel.swift
@@ -91,12 +116,21 @@ SyncNos/
 │   └── Models.swift              # BookRow, Highlight 等
 └── Services/                     # 业务逻辑和数据访问
     ├── 0-NotionAPI/              # Notion 集成
-    │   ├── Core/
-    │   ├── Operations/
-    │   └── 1-AppleBooksSyncToNotion/
+    │   ├── Core/                 # NotionService, HTTP 客户端
+    │   ├── Operations/           # CRUD 操作
+    │   └── 1-AppleBooksSyncToNotion/  # 同步策略
     ├── 1-AppleBooks/             # Apple Books SQLite 访问
+    │   ├── DatabaseService.swift
+    │   ├── DatabaseReadOnlySession.swift
+    │   └── BookmarkStore.swift
     ├── 2-GoodLinks/              # GoodLinks 数据库访问
+    │   ├── GoodLinksService.swift
+    │   └── GoodLinksQueryService.swift
     ├── Infrastructure/           # 依赖注入、日志、认证等
+    │   ├── DIContainer.swift     # 中心服务容器
+    │   ├── LoggerService.swift
+    │   ├── AutoSyncService.swift
+    │   └── ConcurrencyLimiter.swift
     └── IAP/                      # 应用内购买
 ```
 
@@ -116,8 +150,7 @@ DIContainer.shared.autoSyncService
 
 **1. Apple Books 数据访问** (Services/1-AppleBooks/)
 - `DatabaseService`: SQLite 连接和查询管理
-- `DatabaseConnectionService`: 只读数据库连接
-- `DatabaseQueryService`: SQL 查询执行
+- `DatabaseReadOnlySession`: 只读数据库会话，支持分页
 - `BookFilterService`: 书籍过滤逻辑
 - `BookmarkStore`: macOS 书签持久化
 
@@ -139,8 +172,8 @@ DIContainer.shared.autoSyncService
 - `GoodLinksTagParser`: 标签提取和解析
 
 **4. 基础设施** (Services/Infrastructure/)
-- `AutoSyncService`: 后台同步调度（Services/Infrastructure/AutoSyncService.swift）
-- `LoggerService`: 统一日志记录（Services/Infrastructure/LoggerService.swift）
+- `AutoSyncService`: 后台同步调度
+- `LoggerService`: 统一日志记录
 - `AuthService`: Apple Sign In 集成
 - `ConcurrencyLimiter`: API 调用速率限制
 - `KeychainHelper`: 安全凭证存储
@@ -170,7 +203,7 @@ Backend/
 │   ├── models/                   # 数据模型
 │   └── security/                 # JWT 和 Apple 认证
 ├── requirements.txt
-└── .env                          # 环境配置
+└── .env                          # 环境配置（不在 git 中）
 ```
 
 后端处理 Apple Sign In OAuth 流程和 macOS 应用的 JWT 令牌颁发。
@@ -181,7 +214,7 @@ Backend/
 
 视图模型使用响应式模式，配备 `@Published` 属性和 Combine 操作符：
 
-**Services/ViewModels/AppleBooks/AppleBookViewModel.swift:5**
+**ViewModels/AppleBooks/AppleBookViewModel.swift:5**
 ```swift
 class AppleBookViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
@@ -226,6 +259,50 @@ protocol DatabaseServiceProtocol {
 - `HighlightRow`: 带关联书籍 ID 的高亮
 - `AssetHighlightStats`: 每个资源的聚合统计
 
+### FilterBar 组件
+
+**Views/Components/FilterBar.swift** - 统一筛选排序组件：
+
+功能特性：
+- 笔记筛选（全部/有笔记/无笔记）
+- 颜色筛选（Apple Books: 橙色/绿色/蓝色/黄色/粉色/紫色；GoodLinks: 黄色/绿色/蓝色/红色/紫色/薄荷色）
+- 排序字段和方向（创建时间/修改时间，升序/降序）
+- 一键重置功能
+- 通过 UserDefaults 持久化状态
+
+在详情视图中的使用：
+```swift
+FilterBar(
+    noteFilter: $viewModel.highlightNoteFilter,
+    selectedStyles: $viewModel.highlightSelectedStyles,
+    colorTheme: .appleBooks,  // 或 .goodLinks
+    sortField: viewModel.highlightSortField,
+    isAscending: viewModel.highlightIsAscending,
+    onSortFieldChanged: { field in
+        viewModel.highlightSortField = field
+    },
+    onAscendingChanged: { ascending in
+        viewModel.highlightIsAscending = ascending
+    }
+) {
+    viewModel.resetHighlightFilters()
+}
+```
+
+### ViewModel 架构差异
+
+**Apple Books**（两个 ViewModel）：
+- `AppleBookViewModel`: 列表管理、批量同步
+- `AppleBookDetailViewModel`: 详情页面分页加载（每页 500 条高亮）、数据库会话管理
+
+**GoodLinks**（一个 ViewModel）：
+- `GoodLinksViewModel`: 统一管理 - 列表、高亮存储（`highlightsByLinkId`）、详情筛选排序
+- 更简单的架构，因为 GoodLinks 高亮数量较少
+
+这种差异是**有意的、合理的**：
+- Apple Books: 复杂数据 → 需要专用的详情 ViewModel
+- GoodLinks: 简单数据 → 统一 ViewModel 更高效
+
 ## 重要说明
 
 ### Apple Books 数据库访问
@@ -265,13 +342,22 @@ protocol DatabaseServiceProtocol {
 - 使用 Combine 进行响应式数据流
 - 遵循文件结构：Views/、ViewModels/、Models/、Services/
 - 通过 DIContainer 使用依赖注入
+- 使用 `@StateObject` 管理长期存在的视图模型
+- 为 ObservableObject 实现 `@Published` 属性
 
 **不应该做的：**
-- 为视图模型使用单例
+- 为视图模型使用单例模式
 - 混用 ObservableObject 与 @Observable
 - 在视图中放置业务逻辑
 - 在视图间共享视图模型实例
 - 使用手动状态管理
+- 在视图 body 中执行重型计算
+- 使用 `static let shared` 实例
+
+**ViewModel 实例化：**
+- 按视图创建：`@StateObject private var viewModel = ViewModel()`
+- 依赖注入：`.environmentObject(viewModel)`
+- 避免在视图间共享 ViewModel 实例
 
 ## 配置文件
 
@@ -280,3 +366,41 @@ protocol DatabaseServiceProtocol {
 - **Backend/requirements.txt**: Python 依赖
 - **Backend/.env**: Apple 凭证（不在 git 中，已加入.ignore）
 - **buildServer.json**: 构建服务器配置
+- **Resource/Localizable.xcstrings**: 翻译文件（中文/英文）
+
+## 快速参考
+
+### 常用开发任务
+
+**构建和运行：**
+```bash
+# Debug 构建
+xcodebuild -scheme SyncNos -configuration Debug build
+
+# 清理构建
+rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-*
+
+# 在 Xcode 中打开
+open SyncNos.xcodeproj
+```
+
+**FilterBar 集成：**
+- 导入：`import SwiftUI`
+- 添加到视图：放在详情视图的 VStack 中
+- 绑定属性：笔记筛选、选中样式、排序字段
+- 提供回调：onSortFieldChanged、onAscendingChanged、onResetFilters
+- 选择主题：`.appleBooks` 或 `.goodLinks`
+
+**服务访问：**
+```swift
+// 从 DI 容器获取服务
+let service = DIContainer.shared.goodLinksService
+let notionService = DIContainer.shared.notionService
+
+// 创建只读会话
+let session = try service.makeReadOnlySession(dbPath: dbPath)
+```
+
+**数据库路径：**
+- Apple Books: `~/Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/*.sqlite`
+- GoodLinks: 使用 `service.resolveDatabasePath()`
