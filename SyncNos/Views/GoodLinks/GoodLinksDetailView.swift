@@ -277,7 +277,7 @@ struct GoodLinksDetailView: View {
                     }
 
                     // Sync button / progress
-                    ToolbarItem(placement: .cancellationAction) {
+                    ToolbarItem(placement: .primaryAction) {
                         if externalIsSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
