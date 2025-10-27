@@ -2,9 +2,9 @@ import SwiftUI
 import AppKit
 
 struct AppleBookDetailView: View {
-    @ObservedObject var viewModelList: AppleBookViewModel
+    @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
-    @StateObject private var viewModel = AppleBookDetailViewModel()
+    @StateObject private var viewModel = AppleBooksDetailViewModel()
     @State private var isSyncing = false
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
@@ -284,7 +284,7 @@ struct AppleBookDetailView_Previews: PreviewProvider {
                                        highlightCount: 123)
         
         // Preview for new initializer
-        let listVM = AppleBookViewModel()
+        let listVM = AppleBooksViewModel()
         return AppleBookDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
     }
 }
