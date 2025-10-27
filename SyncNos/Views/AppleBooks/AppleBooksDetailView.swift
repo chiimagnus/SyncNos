@@ -194,10 +194,7 @@ struct AppleBooksDetailView: View {
                     onAscendingChanged: { ascending in
                         viewModel.isAscending = ascending
                     }
-                ) {
-                    viewModel.noteFilter = .any
-                    viewModel.selectedStyles = []
-                }
+                )
             }
 
             // Sync button / progress (shows per-item batch progress when available)
