@@ -158,22 +158,6 @@ struct GoodLinksDetailView: View {
 
                         // 高亮列表
                         VStack(alignment: .leading, spacing: 8) {
-                            // Filter bar
-                            FilterBar(
-                                noteFilter: $viewModel.highlightNoteFilter,
-                                selectedStyles: $viewModel.highlightSelectedStyles,
-                                colorTheme: .goodLinks,
-                                sortField: viewModel.highlightSortField,
-                                isAscending: viewModel.highlightIsAscending,
-                                onSortFieldChanged: { field in
-                                    viewModel.highlightSortField = field
-                                },
-                                onAscendingChanged: { ascending in
-                                    viewModel.highlightIsAscending = ascending
-                                }
-                            ) {
-                                viewModel.resetHighlightFilters()
-                            }
 
                             HStack(spacing: 6) {
                                 Image(systemName: "quote.opening")
@@ -273,7 +257,27 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
+                    // Filter bar in toolbar
                     ToolbarItem(placement: .primaryAction) {
+                        FiltetSortBar(
+                            noteFilter: $viewModel.highlightNoteFilter,
+                            selectedStyles: $viewModel.highlightSelectedStyles,
+                            colorTheme: .goodLinks,
+                            sortField: viewModel.highlightSortField,
+                            isAscending: viewModel.highlightIsAscending,
+                            onSortFieldChanged: { field in
+                                viewModel.highlightSortField = field
+                            },
+                            onAscendingChanged: { ascending in
+                                viewModel.highlightIsAscending = ascending
+                            }
+                        ) {
+                            viewModel.resetHighlightFilters()
+                        }
+                    }
+
+                    // Sync button / progress
+                    ToolbarItem(placement: .cancellationAction) {
                         if externalIsSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
