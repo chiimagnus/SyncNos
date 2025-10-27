@@ -62,3 +62,6 @@ class DatabaseService: DatabaseServiceProtocol {
         return try DatabaseReadOnlySession(dbPath: dbPath)
     }
 }
+
+// MARK: - Sendable Conformance
+extension DatabaseService: @unchecked Sendable {}

@@ -3,7 +3,7 @@ import SQLite3
 
 // MARK: - Database Connection Service
 /// 专门处理数据库连接的类，遵循单一职责原则
-class DatabaseConnectionService {
+final class DatabaseConnectionService: Sendable {
     private let logger = DIContainer.shared.loggerService
 
     // Bridge C macro SQLITE_TRANSIENT for Swift
