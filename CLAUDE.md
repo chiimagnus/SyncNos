@@ -1,64 +1,64 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文档为 Claude Code (claude.ai/code) 在此代码库中工作提供指导。
 
-## Project Overview
+## 项目概述
 
-**SyncNos** is a SwiftUI macOS application that synchronizes reading highlights and notes from Apple Books and GoodLinks to Notion databases. It features a Python FastAPI backend for Apple Sign In authentication.
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books 和 GoodLinks 中的读书高亮和笔记同步到 Notion 数据库。它包含一个 Python FastAPI 后端用于 Apple Sign In 认证。
 
-### Core Features
-- Apple Books highlight/note extraction from SQLite database
-- GoodLinks article sync with tags and highlights
-- Notion database synchronization with two strategies:
-  - **Single DB mode**: All content in one Notion database
-  - **Per-book mode**: Separate database per book/article
-- Automatic background sync with configurable intervals
-- Apple Sign In authentication via FastAPI backend
+### 核心功能
+- 从 SQLite 数据库中提取 Apple Books 高亮/笔记
+- 同步 GoodLinks 文章标签和高亮
+- Notion 数据库同步，支持两种策略：
+  - **单一数据库模式**：所有内容在一个 Notion 数据库中
+  - **每本书独立模式**：每本书/文章有独立的数据库
+- 自动后台同步，可配置时间间隔
+- 通过 FastAPI 后端实现 Apple Sign In 认证
 
-## Build & Development Commands
+## 构建与开发命令
 
-### macOS App (Xcode)
+### macOS 应用 (Xcode)
 ```bash
-# Open in Xcode
+# 在 Xcode 中打开
 open SyncNos.xcodeproj
 
-# Build Debug configuration
+# 构建 Debug 配置
 xcodebuild -scheme SyncNos -configuration Debug build
 
-# Build Release configuration
+# 构建 Release 配置
 xcodebuild -scheme SyncNos -configuration Release build
 
-# Run the app
+# 运行应用
 open build/Debug/SyncNos.app
 ```
 
-**Requirements:**
+**环境要求：**
 - macOS 13.0+
 - Xcode 15.0+
 - Swift 5.0+
 
-### Python Backend (FastAPI)
+### Python 后端 (FastAPI)
 ```bash
 cd Backend/
 
-# Create virtual environment
+# 创建虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Configure environment
-# Edit .env with Apple credentials
+# 配置环境
+# 编辑 .env 文件，设置 Apple 凭证
 
-# Run development server
+# 运行开发服务器
 uvicorn app.main:app --reload --port 8000
 
-# Access API docs
+# 访问 API 文档
 # http://127.0.0.1:8000/docs
 ```
 
-**Backend Environment Variables** (Backend/.env):
+**后端环境变量** (Backend/.env):
 ```bash
 APPLE_TEAM_ID=YOUR_TEAM_ID
 APPLE_KEY_ID=YOUR_KEY_ID
@@ -67,119 +67,119 @@ APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
 APP_JWT_SECRET=your_jwt_secret
 ```
 
-## Architecture
+## 架构
 
-### SwiftUI App Structure
+### SwiftUI 应用结构
 
-The app follows **MVVM architecture** with strict separation of concerns:
+应用遵循 **MVVM 架构**，具有严格关注点分离：
 
 ```
 SyncNos/
-├── SyncNosApp.swift              # App entry point
-├── Views/                        # SwiftUI Views (UI layer)
+├── SyncNosApp.swift              # 应用入口
+├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── Components/
 │   ├── AppleBooks/
 │   ├── GoodLinks/
 │   └── Settting/
-├── ViewModels/                   # ObservableObject ViewModels
+├── ViewModels/                   # ObservableObject 视图模型
 │   ├── AppleBooks/
 │   ├── GoodLinks/
 │   ├── Account/
 │   ├── Notion/
 │   └── LogViewModel.swift
-├── Models/                       # Data models
-│   └── Models.swift              # BookRow, Highlight, etc.
-└── Services/                     # Business logic & data access
-    ├── 0-NotionAPI/              # Notion integration
+├── Models/                       # 数据模型
+│   └── Models.swift              # BookRow, Highlight 等
+└── Services/                     # 业务逻辑和数据访问
+    ├── 0-NotionAPI/              # Notion 集成
     │   ├── Core/
     │   ├── Operations/
     │   └── 1-AppleBooksSyncToNotion/
-    ├── 1-AppleBooks/             # Apple Books SQLite access
-    ├── 2-GoodLinks/              # GoodLinks database access
-    ├── Infrastructure/           # DI, Logger, Auth, etc.
-    └── IAP/                      # In-app purchases
+    ├── 1-AppleBooks/             # Apple Books SQLite 访问
+    ├── 2-GoodLinks/              # GoodLinks 数据库访问
+    ├── Infrastructure/           # 依赖注入、日志、认证等
+    └── IAP/                      # 应用内购买
 ```
 
-### Dependency Injection
+### 依赖注入
 
-Services are managed via `DIContainer.shared` (Services/Infrastructure/DIContainer.swift:4):
+服务通过 `DIContainer.shared` 管理（Services/Infrastructure/DIContainer.swift:4）：
 
 ```swift
-// Access services
+// 访问服务
 DIContainer.shared.notionService
 DIContainer.shared.databaseService
 DIContainer.shared.appleBooksSyncService
 DIContainer.shared.autoSyncService
 ```
 
-### Key Service Layers
+### 关键服务层
 
-**1. Apple Books Data Access** (Services/1-AppleBooks/)
-- `DatabaseService`: SQLite connection & query management
-- `DatabaseConnectionService`: Read-only DB connections
-- `DatabaseQueryService`: SQL query execution
-- `BookFilterService`: Filtering logic for books
-- `BookmarkStore`: macOS bookmark persistence
+**1. Apple Books 数据访问** (Services/1-AppleBooks/)
+- `DatabaseService`: SQLite 连接和查询管理
+- `DatabaseConnectionService`: 只读数据库连接
+- `DatabaseQueryService`: SQL 查询执行
+- `BookFilterService`: 书籍过滤逻辑
+- `BookmarkStore`: macOS 书签持久化
 
-**2. Notion API Integration** (Services/0-NotionAPI/)
-- `NotionService`: Main orchestrator (Services/0-NotionAPI/Core/NotionService.swift:23)
-- `NotionServiceCore`: Configuration & HTTP client
-- Operation modules:
-  - `NotionDatabaseOperations`: Database creation & property management
-  - `NotionPageOperations`: Page CRUD operations
-  - `NotionHighlightOperations`: Highlight formatting & sync
-  - `NotionQueryOperations`: Query existing data
-- Sync strategies:
-  - `AppleBooksSyncStrategySingleDB`: Single database mode
-  - `AppleBooksSyncStrategyPerBook`: Per-book database mode
+**2. Notion API 集成** (Services/0-NotionAPI/)
+- `NotionService`: 主要协调器（Services/0-NotionAPI/Core/NotionService.swift:23）
+- `NotionServiceCore`: 配置和 HTTP 客户端
+- 操作模块：
+  - `NotionDatabaseOperations`: 数据库创建和属性管理
+  - `NotionPageOperations`: 页面 CRUD 操作
+  - `NotionHighlightOperations`: 高亮格式化和同步
+  - `NotionQueryOperations`: 查询现有数据
+- 同步策略：
+  - `AppleBooksSyncStrategySingleDB`: 单一数据库模式
+  - `AppleBooksSyncStrategyPerBook`: 每本书独立数据库模式
 
-**3. GoodLinks Integration** (Services/2-GoodLinks/)
-- `GoodLinksService`: Database query & sync orchestrator
-- `GoodLinksQueryService`: Article & highlight queries
-- `GoodLinksTagParser`: Tag extraction & parsing
+**3. GoodLinks 集成** (Services/2-GoodLinks/)
+- `GoodLinksService`: 数据库查询和同步协调器
+- `GoodLinksQueryService`: 文章和高亮查询
+- `GoodLinksTagParser`: 标签提取和解析
 
-**4. Infrastructure** (Services/Infrastructure/)
-- `AutoSyncService`: Background sync scheduling (Services/Infrastructure/AutoSyncService.swift)
-- `LoggerService`: Unified logging (Services/Infrastructure/LoggerService.swift)
-- `AuthService`: Apple Sign In integration
-- `ConcurrencyLimiter`: Rate limiting for API calls
-- `KeychainHelper`: Secure credential storage
+**4. 基础设施** (Services/Infrastructure/)
+- `AutoSyncService`: 后台同步调度（Services/Infrastructure/AutoSyncService.swift）
+- `LoggerService`: 统一日志记录（Services/Infrastructure/LoggerService.swift）
+- `AuthService`: Apple Sign In 集成
+- `ConcurrencyLimiter`: API 调用速率限制
+- `KeychainHelper`: 安全凭证存储
 
-### Main App Entry Point
+### 主应用入口
 
-**SyncNosApp.swift:5** initializes:
-1. Bookmark restoration for Apple Books database access
-2. IAP transaction monitoring
-3. Auto-sync service startup (if enabled)
+**SyncNosApp.swift:5** 初始化：
+1. Apple Books 数据库访问的书签恢复
+2. IAP 交易监控
+3. 自动同步服务启动（如果启用）
 
-App windows:
-- MainListView: Book/article selection & sync
-- Settings: Notion configuration, sync options
-- UserGuide: Help documentation
-- Logs: Sync operation logs
+应用窗口：
+- MainListView: 书籍/文章选择和同步
+- Settings: Notion 配置、同步选项
+- UserGuide: 帮助文档
+- Logs: 同步操作日志
 
-### Python Backend Structure
+### Python 后端结构
 
 ```
 Backend/
 ├── app/
-│   ├── main.py                   # FastAPI app entry
-│   ├── api/                      # Route handlers
-│   ├── core/                     # Core config & security
-│   ├── services/                 # Business logic
-│   ├── models/                   # Data models
-│   └── security/                 # JWT & Apple auth
+│   ├── main.py                   # FastAPI 应用入口
+│   ├── api/                      # 路由处理器
+│   ├── core/                     # 核心配置和安全
+│   ├── services/                 # 业务逻辑
+│   ├── models/                   # 数据模型
+│   └── security/                 # JWT 和 Apple 认证
 ├── requirements.txt
-└── .env                          # Environment config
+└── .env                          # 环境配置
 ```
 
-The backend handles Apple Sign In OAuth flow and JWT token issuance for the macOS app.
+后端处理 Apple Sign In OAuth 流程和 macOS 应用的 JWT 令牌颁发。
 
-## Development Patterns
+## 开发模式
 
-### ViewModels (ObservableObject + Combine)
+### 视图模型 (ObservableObject + Combine)
 
-ViewModels use reactive patterns with `@Published` properties and Combine operators:
+视图模型使用响应式模式，配备 `@Published` 属性和 Combine 操作符：
 
 **Services/ViewModels/AppleBooks/AppleBookViewModel.swift:5**
 ```swift
@@ -190,111 +190,93 @@ class AppleBookViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        // Reactive data processing with Combine
+        // 使用 Combine 进行响应式数据处理
         $books
-            .map { /* filtering/transformation */ }
+            .map { /* 过滤/转换 */ }
             .assign(to: &$filteredBooks)
     }
 }
 ```
 
-### Service Protocols
+### 服务协议
 
-All services implement protocols for testability:
+所有服务都实现协议以支持测试：
 
 **Services/Infrastructure/Protocols.swift:1**
 ```swift
 protocol DatabaseServiceProtocol {
     func canOpenReadOnly(dbPath: String) -> Bool
     func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow]
-    // ... other methods
+    // ... 其他方法
 }
 ```
 
-### Concurrency
+### 并发处理
+- **Swift**: 使用 `async/await` 进行服务操作
+- **SQLite**: 同步调用封装在 `DatabaseReadOnlySession` 中
+- **Notion API**: 使用 `ConcurrencyLimiter` 进行速率限制
+- **基于 Actor 的锁**: `NotionSourceEnsureLock` 防止并发数据库创建
 
-- **Swift**: `async/await` for service operations
-- **SQLite**: Synchronous calls wrapped in `DatabaseReadOnlySession`
-- **Notion API**: Rate-limited with `ConcurrencyLimiter`
-- **Actor-based locking**: `NotionSourceEnsureLock` prevents concurrent database creation
+### 数据模型
 
-### Data Models
+关键模型（Models/Models.swift:18）：
+- `Highlight`: 带 UUID、文本、笔记和时间戳的单个高亮
+- `BookListItem`: 不包含完整高亮加载的书籍元数据
+- `BookRow`: 简单书籍信息
+- `HighlightRow`: 带关联书籍 ID 的高亮
+- `AssetHighlightStats`: 每个资源的聚合统计
 
-Key models (Models/Models.swift:18):
-- `Highlight`: Individual highlight with UUID, text, note, timestamps
-- `BookListItem`: Book metadata without full highlight load
-- `BookRow`: Simple book information
-- `HighlightRow`: Highlight with associated book ID
-- `AssetHighlightStats`: Aggregated statistics per asset
+## 重要说明
 
-## Important Notes
+### Apple Books 数据库访问
+- 从 `~/Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/*.sqlite` 读取
+- 使用 macOS 安全范围书签进行持久访问
+- **只读** 连接以避免损坏源数据库
 
-### Apple Books Database Access
-- Reads from `~/Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/*.sqlite`
-- Uses macOS security-scoped bookmarks for persistent access
-- **Read-only** connections to avoid corrupting source database
+### 同步策略
 
-### Sync Strategies
+**单一数据库**（默认）：
+- 一个 Notion 数据库包含所有书籍/文章
+- 书籍页面创建为子页面
+- 高亮作为项目符号添加
 
-**Single Database** (default):
-- One Notion database for all books/articles
-- Book pages created as child pages
-- Highlights added as bullet points
+**每本书独立数据库**：
+- 每本书/文章创建新的 Notion 数据库
+- 每个高亮成为数据库项目
+- 更好的组织但需要更多 Notion 数据库
 
-**Per-Book Database**:
-- New Notion database per book/article
-- Each highlight becomes a database item
-- Better organization but more Notion databases
+### 速率限制
+- Notion API: 3 请求/秒（在 `NotionSyncConfig` 中可配置）
+- 批处理操作：可配置的并发限制
+- 重试逻辑：自动指数退避
 
-### Rate Limiting
-- Notion API: 3 requests/second (configurable in `NotionSyncConfig`)
-- Batch operations: Configurable concurrency limits
-- Retry logic: Automatic with exponential backoff
+### 国际化
+- 支持中文（zh-Hans）和英文（en）
+- 用户可以在设置中切换语言
+- UI 字符串使用 `LocalizedStringResource`
 
-### Internationalization
-- Supports Chinese (zh-Hans) and English (en)
-- User can switch language in Settings
-- UI strings use `LocalizedStringResource`
+## Cursor 规则
 
-## Cursor Rules
+**.cursor/rules/SwiftUI响应式布局+MVVM架构+Combine响应式编程.mdc:1** 包含严格的架构指南：
 
-**.cursor/rules/SwiftUI响应式布局+MVVM架构+Combine响应式编程.mdc:1** contains strict architectural guidelines:
+**应该做的：**
+- 使用 MVVM 搭配 ObservableObject + @Published 或 @Observable
+- 保持视图纯函数性（无业务逻辑）
+- 使用 Combine 进行响应式数据流
+- 遵循文件结构：Views/、ViewModels/、Models/、Services/
+- 通过 DIContainer 使用依赖注入
 
-**DO:**
-- Use MVVM with ObservableObject + @Published or @Observable
-- Keep Views pure (no business logic)
-- Use Combine for reactive data streams
-- Follow file structure: Views/, ViewModels/, Models/, Services/
-- Use dependency injection via DIContainer
+**不应该做的：**
+- 为视图模型使用单例
+- 混用 ObservableObject 与 @Observable
+- 在视图中放置业务逻辑
+- 在视图间共享视图模型实例
+- 使用手动状态管理
 
-**DON'T:**
-- Use singletons for ViewModels
-- Mix ObservableObject with @Observable
-- Put business logic in Views
-- Share ViewModel instances between views
-- Use manual state management
+## 配置文件
 
-## Configuration Files
-
-- **SyncNos.xcodeproj/project.pbxproj**: Xcode project settings
-- **SyncNos/SyncNos.entitlements**: App sandboxing & capabilities
-- **Backend/requirements.txt**: Python dependencies
-- **Backend/.env**: Apple credentials (NOT in git)
-- **buildServer.json**: Build server configuration
-
-## Testing
-
-**No unit tests found** in the current codebase. Test infrastructure would need to be added following Xcode test conventions.
-
-## Deployment
-
-### Mac App Store
-- Product bundle ID: `com.chiimagnus.macOS`
-- Current version: 0.5.5
-- App sandbox enabled with network permissions
-- Available on Mac App Store
-
-### Distribution
-- Code signing: Automatic (Development team: RDQHYSDFFG)
-- Hardened runtime enabled
-- App Transport Security configured for Notion API
+- **SyncNos.xcodeproj/project.pbxproj**: Xcode 项目设置
+- **SyncNos/SyncNos.entitlements**: 应用沙盒和功能
+- **Backend/requirements.txt**: Python 依赖
+- **Backend/.env**: Apple 凭证（不在 git 中，已加入.ignore）
+- **buildServer.json**: 构建服务器配置
