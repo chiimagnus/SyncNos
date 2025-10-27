@@ -225,7 +225,7 @@ class DatabaseQueryService {
 
     /// 拉取指定图书的一页高亮（MVP: 使用 LIMIT/OFFSET 分页）
     func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int) throws -> [HighlightRow] {
-        return try fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: nil, order: nil, noteFilter: nil, styles: nil)
+        return try fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: nil, sortField: nil, ascending: nil, noteFilter: nil, styles: nil)
     }
 
     /// 拉取指定图书的一页高亮（支持增量同步、排序和过滤）
@@ -239,7 +239,7 @@ class DatabaseQueryService {
     ///   - noteFilter: 笔记过滤
     ///   - styles: 颜色过滤
     /// - Returns: 高亮数组
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil, order: HighlightOrder? = nil, noteFilter: NoteFilter? = nil, styles: [Int]? = nil) throws -> [HighlightRow] {
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil, sortField: HighlightSortField? = nil, ascending: Bool? = nil, noteFilter: NoteFilter? = nil, styles: [Int]? = nil) throws -> [HighlightRow] {
         // Discover available columns for dynamic select and optional fields
         let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
         var stmt: OpaquePointer?
@@ -310,31 +310,22 @@ class DatabaseQueryService {
         }
 
         // 确定排序方式
-        let orderBy: String
-        if let order = order {
-            switch order {
-            case .createdAsc:
-                orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE ASC" : "rowid ASC"
-            case .createdDesc:
-                orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE DESC" : "rowid DESC"
-            case .modifiedAsc:
-                orderBy = availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE ASC" : "rowid ASC"
-            case .modifiedDesc:
-                orderBy = availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE DESC" : "rowid DESC"
-            case .locationAsc:
-                orderBy = "CAST(ZANNOTATIONLOCATION AS INTEGER) ASC"
-            case .locationDesc:
-                orderBy = "CAST(ZANNOTATIONLOCATION AS INTEGER) DESC"
+        let isAsc = ascending ?? false // 默认降序
+        let direction = isAsc ? "ASC" : "DESC"
+        let field = sortField ?? .created
+        let orderBy: String = {
+            switch field {
+            case .created:
+                return availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE \(direction)" : "rowid \(direction)"
+            case .modified:
+                return availableColumns.contains("ZANNOTATIONMODIFICATIONDATE") ? "ZANNOTATIONMODIFICATIONDATE \(direction)" : "rowid \(direction)"
             }
-        } else {
-            // 默认按创建时间降序排列
-            orderBy = availableColumns.contains("ZANNOTATIONCREATIONDATE") ? "ZANNOTATIONCREATIONDATE DESC" : "rowid DESC"
-        }
+        }()
 
         let whereClause = whereConditions.joined(separator: " AND ")
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE \(whereClause) ORDER BY \(orderBy) LIMIT ? OFFSET ?;"
         logger.verbose("DEBUG: 执行查询: \(sql)")
-        logger.verbose("DEBUG: 查询参数 - assetId: \(assetId), limit: \(limit), offset: \(offset)" + (since != nil ? ", since: \(since!)" : ""))
+        logger.verbose("DEBUG: 查询参数 - assetId: \(assetId), limit: \(limit), offset: \(offset)" + (since != nil ? ", since: \(since!)" : "") + ", sortField: \(field.rawValue), ascending: \(isAsc)")
 
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: highlight page"
