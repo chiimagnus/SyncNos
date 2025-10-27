@@ -108,13 +108,13 @@ enum BookListSortKey: String, CaseIterable {
     case lastEdited = "lastEdited"
     case created = "created"
 
-    var displayName: String {
+    var displayName: LocalizedStringResource {
         switch self {
-        case .title: return NSLocalizedString("Title", comment: "Book list sort option")
-        case .highlightCount: return NSLocalizedString("Note Count", comment: "Book list sort option")
-        case .lastSync: return NSLocalizedString("Sync Time", comment: "Book list sort option")
-        case .lastEdited: return NSLocalizedString("Edit Time", comment: "Book list sort option")
-        case .created: return NSLocalizedString("Creation Time", comment: "Book list sort option")
+        case .title: return "Title"
+        case .highlightCount: return "Note Count"
+        case .lastSync: return "Sync Time"
+        case .lastEdited: return "Edit Time"
+        case .created: return "Creation Time"
         }
     }
 }
@@ -124,11 +124,11 @@ enum NoteFilter: String, CaseIterable {
     case hasNote = "hasNote"
     case noNote = "noNote"
 
-    var displayName: String {
+    var displayName: LocalizedStringResource {
         switch self {
-        case .any: return "全部"
-        case .hasNote: return "仅含笔记"
-        case .noNote: return "仅不含笔记"
+        case .any: return "All"
+        case .hasNote: return "Has Notes"
+        case .noNote: return "No Notes"
         }
     }
 }
@@ -138,10 +138,10 @@ enum HighlightSortField: String, CaseIterable {
     case created = "created"
     case modified = "modified"
 
-    var displayName: String {
+    var displayName: LocalizedStringResource {
         switch self {
-        case .created: return "创建时间"
-        case .modified: return "修改时间"
+        case .created: return "Creation Time"
+        case .modified: return "Modified Time"
         }
     }
 }

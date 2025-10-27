@@ -69,13 +69,13 @@ enum GoodLinksSortKey: String, CaseIterable {
     case modified = "modified"
     case lastSync = "lastSync"
 
-    var displayName: String {
+    var displayName: LocalizedStringResource {
         switch self {
-        case .title: return NSLocalizedString("Title", comment: "GoodLinks sort option")
-        case .highlightCount: return NSLocalizedString("Highlight Count", comment: "GoodLinks sort option")
-        case .added: return NSLocalizedString("Added Time", comment: "GoodLinks sort option")
-        case .modified: return NSLocalizedString("Modified Time", comment: "GoodLinks sort option")
-        case .lastSync: return NSLocalizedString("Last Sync Time", comment: "GoodLinks sort option")
+        case .title: return "Title"
+        case .highlightCount: return "Highlight Count"
+        case .added: return "Added Time"
+        case .modified: return "Modified Time"
+        case .lastSync: return "Last Sync Time"
         }
     }
 }
