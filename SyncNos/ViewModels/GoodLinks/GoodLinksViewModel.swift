@@ -36,7 +36,6 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var displayLinks: [GoodLinksLinkRow] = []
     @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
     @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
-    @Published var articleBlocksByLinkId: [String: [ArticleBlock]] = [:]
     @Published var isLoading: Bool = false
     // 列表派生计算状态：用于切换瞬间显示“加载中”并避免主线程渲染巨大 List
     @Published var isComputingList: Bool = false
@@ -406,17 +405,8 @@ final class GoodLinksViewModel: ObservableObject {
                 if let content {
                     self.contentByLinkId[linkId] = content
                     loggerForTask.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
-                    // 解析为 blocks（图片 URL 按相对位置）
-                    if let text = content.content {
-                        let parser = ArticleContentParser()
-                        let blocks = parser.parseToBlocks(text)
-                        self.articleBlocksByLinkId[linkId] = blocks
-                    } else {
-                        self.articleBlocksByLinkId.removeValue(forKey: linkId)
-                    }
                 } else {
                     loggerForTask.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
-                    self.articleBlocksByLinkId.removeValue(forKey: linkId)
                 }
             }
         } catch {

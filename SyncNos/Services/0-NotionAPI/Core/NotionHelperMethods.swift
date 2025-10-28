@@ -289,39 +289,6 @@ class NotionHelperMethods {
         return children
     }
 
-    // Build mixed blocks (paragraph + external image) from parsed article blocks
-    func buildArticleMixedBlocks(from blocks: [ArticleBlock], chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
-        var children: [[String: Any]] = []
-        for block in blocks {
-            switch block {
-            case .paragraph(let text):
-                // 与 buildParagraphBlocks 一致的分块策略
-                let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-                var start = normalized.startIndex
-                while start < normalized.endIndex {
-                    let end = normalized.index(start, offsetBy: chunkSize, limitedBy: normalized.endIndex) ?? normalized.endIndex
-                    let slice = String(normalized[start..<end])
-                    children.append([
-                        "object": "block",
-                        "paragraph": [
-                            "rich_text": [["text": ["content": slice]]]
-                        ]
-                    ])
-                    start = end
-                }
-            case .image(let url):
-                children.append([
-                    "object": "block",
-                    "image": [
-                        "type": "external",
-                        "external": ["url": url.absoluteString]
-                    ]
-                ])
-            }
-        }
-        return children
-    }
-
     // Convert numeric style to human-friendly color name. Mapping differs per source.
     func styleName(for style: Int, source: String = "appleBooks") -> String {
         switch source {
