@@ -18,40 +18,12 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var isSyncing: Bool = false
 
     // Sorting and filtering state for highlights - field + direction, with UserDefaults persistence
-    @Published var sortField: HighlightSortField = .created {
-        didSet {
-            UserDefaults.standard.set(sortField.rawValue, forKey: "detail_sort_field")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(sortField.rawValue, forKey: "highlight_sort_field")
-            // Debounced reload is handled by the Combine pipeline
-        }
-    }
-    @Published var isAscending: Bool = false { // 默认降序
-        didSet {
-            UserDefaults.standard.set(isAscending, forKey: "detail_sort_ascending")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(isAscending, forKey: "highlight_sort_ascending")
-            // Debounced reload is handled by the Combine pipeline
-        }
-    }
+    @Published var sortField: HighlightSortField = .created
+    @Published var isAscending: Bool = false // 默认降序
 
-    @Published var noteFilter: NoteFilter = false {
-        didSet {
-            UserDefaults.standard.set(noteFilter, forKey: "detail_note_filter")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(noteFilter, forKey: "highlight_has_notes")
-            // Debounced reload is handled by the Combine pipeline
-        }
-    }
+    @Published var noteFilter: NoteFilter = false
 
-    @Published var selectedStyles: Set<Int> = [] {
-        didSet {
-            UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "detail_selected_styles")
-            // Keep global highlight menu state in sync (reserved for future color filtering)
-            UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "highlight_selected_styles")
-            // Debounced reload is handled by the Combine pipeline
-        }
-    }
+    @Published var selectedStyles: Set<Int> = []
 
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
@@ -131,6 +103,44 @@ class AppleBooksDetailViewModel: ObservableObject {
                 if self.currentAssetId != nil {
                     Task { await self.loadFirstPage() }
                 }
+            }
+            .store(in: &cancellables)
+
+        // Debounced persistence of detail preferences to reduce UserDefaults I/O
+        $sortField
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue.rawValue, forKey: "detail_sort_field")
+                UserDefaults.standard.set(newValue.rawValue, forKey: "highlight_sort_field")
+            }
+            .store(in: &cancellables)
+
+        $isAscending
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "detail_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: "highlight_sort_ascending")
+            }
+            .store(in: &cancellables)
+
+        $noteFilter
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "detail_note_filter")
+                UserDefaults.standard.set(newValue, forKey: "highlight_has_notes")
+            }
+            .store(in: &cancellables)
+
+        $selectedStyles
+            .map { Array($0).sorted() }
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { arr in
+                UserDefaults.standard.set(arr, forKey: "detail_selected_styles")
+                UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
             }
             .store(in: &cancellables)
     }

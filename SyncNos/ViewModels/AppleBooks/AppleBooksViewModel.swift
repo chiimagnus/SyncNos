@@ -3,8 +3,21 @@ import Combine
 
 // MARK: - AppleBooksViewModel
 
+// Centralized notification names to avoid typos and allow self-decoupling filters
+private enum ABVMNotifications {
+    static let appleBooksFilterChanged = Notification.Name("AppleBooksFilterChanged")
+    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+    static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
+}
+
 @MainActor
 class AppleBooksViewModel: ObservableObject {
+    // Centralized UserDefaults keys
+    private enum Keys {
+        static let sortKey = "bookList_sort_key"
+        static let sortAscending = "bookList_sort_ascending"
+        static let showWithTitleOnly = "bookList_showWithTitleOnly"
+    }
     @Published var books: [BookListItem] = []
     // 后台计算产物：用于列表渲染的派生结果
     @Published var displayBooks: [BookListItem] = []
@@ -17,23 +30,11 @@ class AppleBooksViewModel: ObservableObject {
     @Published var syncedBookIds: Set<String> = []
 
     // Sorting and filtering state - Reactive properties with UserDefaults persistence
-    @Published var sortKey: BookListSortKey = .title {
-        didSet {
-            UserDefaults.standard.set(sortKey.rawValue, forKey: "bookList_sort_key")
-        }
-    }
+    @Published var sortKey: BookListSortKey = .title
 
-    @Published var sortAscending: Bool = true {
-        didSet {
-            UserDefaults.standard.set(sortAscending, forKey: "bookList_sort_ascending")
-        }
-    }
+    @Published var sortAscending: Bool = true
 
-    @Published var showWithTitleOnly: Bool = false {
-        didSet {
-            UserDefaults.standard.set(showWithTitleOnly, forKey: "bookList_showWithTitleOnly")
-        }
-    }
+    @Published var showWithTitleOnly: Bool = false
 
     private let databaseService: DatabaseServiceProtocol
     private let appleBooksSyncService: AppleBooksSyncServiceProtocol
@@ -62,15 +63,15 @@ class AppleBooksViewModel: ObservableObject {
         self.appleBooksSyncService = appleBooksSyncService
 
         // Load initial values from UserDefaults
-        if let savedSortKey = UserDefaults.standard.string(forKey: "bookList_sort_key"),
+        if let savedSortKey = UserDefaults.standard.string(forKey: Keys.sortKey),
            let sortKey = BookListSortKey(rawValue: savedSortKey) {
             self.sortKey = sortKey
         }
-        self.sortAscending = UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
-        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
+        self.sortAscending = UserDefaults.standard.bool(forKey: Keys.sortAscending)
+        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: Keys.showWithTitleOnly)
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
-        NotificationCenter.default.publisher(for: Notification.Name("AppleBooksFilterChanged"))
+        NotificationCenter.default.publisher(for: ABVMNotifications.appleBooksFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -112,6 +113,31 @@ class AppleBooksViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
             .assign(to: &$displayBooks)
+
+        // Debounced persistence of list preferences to reduce UserDefaults I/O
+        $sortKey
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
+            }
+            .store(in: &cancellables)
+
+        $sortAscending
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
+            }
+            .store(in: &cancellables)
+
+        $showWithTitleOnly
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: Keys.showWithTitleOnly)
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Path Utility Methods
@@ -167,42 +193,40 @@ class AppleBooksViewModel: ObservableObject {
         let logger = self.logger
         let root = self.dbRootOverride
 
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let result = try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
-                    DispatchQueue.main.async {
-                        self.books = result.books
-                        self.annotationDBPath = result.annotationDB
-                        self.booksDBPath = result.booksDB
-                        logger.info("Successfully loaded \(result.books.count) books")
-                        self.isLoading = false
-                        continuation.resume()
-                    }
-                } catch {
-                    let errorDesc = error.localizedDescription
-                    DispatchQueue.main.async {
-                        logger.error("Error loading books: \(errorDesc)")
-                        self.errorMessage = errorDesc
-                        self.isLoading = false
-                        continuation.resume()
-                    }
-                }
+        do {
+            let result = try await Task.detached(priority: .userInitiated) { () throws -> (books: [BookListItem], annotationDB: String, booksDB: String) in
+                try computeBooksFromDatabase(root: root, databaseService: dbService, logger: logger)
+            }.value
+            await MainActor.run {
+                self.books = result.books
+                self.annotationDBPath = result.annotationDB
+                self.booksDBPath = result.booksDB
+                logger.info("Successfully loaded \(result.books.count) books")
+                self.isLoading = false
+            }
+        } catch {
+            let errorDesc = error.localizedDescription
+            await MainActor.run {
+                logger.error("Error loading books: \(errorDesc)")
+                self.errorMessage = errorDesc
+                self.isLoading = false
             }
         }
     }
         
     // MARK: - Private Methods
     private func subscribeSyncStatusNotifications() {
-        NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged"))
-            .compactMap { $0.userInfo as? [String: Any] }
-            .compactMap { info -> (String, String)? in
-                guard let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return nil }
-                return (bookId, status)
-            }
+        NotificationCenter.default.publisher(for: ABVMNotifications.syncBookStatusChanged)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (bookId, status) in
+            .sink { [weak self] notification in
                 guard let self else { return }
+                if let sender = notification.object as? AppleBooksViewModel, sender === self {
+                    // Ignore self-emitted events to prevent duplicate state updates
+                    return
+                }
+                guard let info = notification.userInfo as? [String: Any],
+                      let bookId = info["bookId"] as? String,
+                      let status = info["status"] as? String else { return }
                 switch status {
                 case "started":
                     self.syncingBookIds.insert(bookId)
@@ -211,7 +235,6 @@ class AppleBooksViewModel: ObservableObject {
                     self.syncedBookIds.insert(bookId)
                 case "failed":
                     self.syncingBookIds.remove(bookId)
-                    // 保留已完成状态不变
                 default:
                     break
                 }
@@ -392,22 +415,23 @@ extension AppleBooksViewModel {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
+                            NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])                        
                             do {
                                 try await syncService.syncSmart(book: book, dbPath: dbPath) { progress in
                                     // 广播该书的同步进度，供详情页监听并显示
-                                    NotificationCenter.default.post(name: Notification.Name("SyncProgressUpdated"), object: nil, userInfo: ["bookId": id, "progress": progress])
+                                    NotificationCenter.default.post(name: ABVMNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                 }
-                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
+                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])                        
+                                await MainActor.run {
+                                    self.syncingBookIds.remove(id)
+                                    self.syncedBookIds.insert(id)
+                                }
                             } catch {
                                 await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
-                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
-                            }
-
-                            // 每个任务完成后，从主线程移除 syncing 标记
-                            await MainActor.run {
-                                self.syncingBookIds.remove(id)
-                                if case .none = self.syncedBookIds.firstIndex(of: id) { }
+                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])                        
+                                await MainActor.run {
+                                    self.syncingBookIds.remove(id)
+                                }
                             }
                         }
                     }

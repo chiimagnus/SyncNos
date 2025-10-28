@@ -29,49 +29,16 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var syncedLinkIds: Set<String> = []
 
     // Sorting & Filtering state (persisted)
-    @Published var sortKey: GoodLinksSortKey = .modified {
-        didSet { UserDefaults.standard.set(sortKey.rawValue, forKey: "goodlinks_sort_key") }
-    }
-    @Published var sortAscending: Bool = false {
-        didSet { UserDefaults.standard.set(sortAscending, forKey: "goodlinks_sort_ascending") }
-    }
-    @Published var showStarredOnly: Bool = false {
-        didSet { UserDefaults.standard.set(showStarredOnly, forKey: "goodlinks_show_starred_only") }
-    }
-    @Published var searchText: String = "" {
-        didSet { UserDefaults.standard.set(searchText, forKey: "goodlinks_search_text") }
-    }
+    @Published var sortKey: GoodLinksSortKey = .modified
+    @Published var sortAscending: Bool = false
+    @Published var showStarredOnly: Bool = false
+    @Published var searchText: String = ""
 
     // Highlight detail filtering & sorting state (for detail view)
-    @Published var highlightNoteFilter: NoteFilter = false {
-        didSet {
-            UserDefaults.standard.set(highlightNoteFilter, forKey: "goodlinks_highlight_note_filter")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(highlightNoteFilter, forKey: "highlight_has_notes")
-        }
-    }
-    @Published var highlightSelectedStyles: Set<Int> = [] {
-        didSet {
-            let arr = Array(highlightSelectedStyles).sorted()
-            UserDefaults.standard.set(arr, forKey: "goodlinks_highlight_selected_styles")
-            // Keep global highlight menu state in sync (reserved for future color filtering)
-            UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
-        }
-    }
-    @Published var highlightSortField: HighlightSortField = .created {
-        didSet {
-            UserDefaults.standard.set(highlightSortField.rawValue, forKey: "goodlinks_highlight_sort_field")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(highlightSortField.rawValue, forKey: "highlight_sort_field")
-        }
-    }
-    @Published var highlightIsAscending: Bool = false {
-        didSet {
-            UserDefaults.standard.set(highlightIsAscending, forKey: "goodlinks_highlight_sort_ascending")
-            // Keep global highlight menu state in sync
-            UserDefaults.standard.set(highlightIsAscending, forKey: "highlight_sort_ascending")
-        }
-    }
+    @Published var highlightNoteFilter: NoteFilter = false
+    @Published var highlightSelectedStyles: Set<Int> = []
+    @Published var highlightSortField: HighlightSortField = .created
+    @Published var highlightIsAscending: Bool = false
 
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
@@ -191,36 +158,101 @@ final class GoodLinksViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
             .assign(to: &$displayLinks)
+
+        // Debounced persistence for GoodLinks preferences
+        $sortKey
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue.rawValue, forKey: "goodlinks_sort_key")
+            }
+            .store(in: &cancellables)
+
+        $sortAscending
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "goodlinks_sort_ascending")
+            }
+            .store(in: &cancellables)
+
+        $showStarredOnly
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "goodlinks_show_starred_only")
+            }
+            .store(in: &cancellables)
+
+        $searchText
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "goodlinks_search_text")
+            }
+            .store(in: &cancellables)
+
+        $highlightNoteFilter
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "goodlinks_highlight_note_filter")
+                UserDefaults.standard.set(newValue, forKey: "highlight_has_notes")
+            }
+            .store(in: &cancellables)
+
+        $highlightSelectedStyles
+            .map { Array($0).sorted() }
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { arr in
+                UserDefaults.standard.set(arr, forKey: "goodlinks_highlight_selected_styles")
+                UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+            }
+            .store(in: &cancellables)
+
+        $highlightSortField
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue.rawValue, forKey: "goodlinks_highlight_sort_field")
+                UserDefaults.standard.set(newValue.rawValue, forKey: "highlight_sort_field")
+            }
+            .store(in: &cancellables)
+
+        $highlightIsAscending
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: "goodlinks_highlight_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: "highlight_sort_ascending")
+            }
+            .store(in: &cancellables)
     }
 
     func loadRecentLinks(limit: Int = 0) async {
         isLoading = true
         errorMessage = nil
 
-        // 将同步 SQLite 读取移至后台线程，避免阻塞主线程
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            // 在主线程上获取服务引用，然后安全传递给后台队列
-            let serviceForTask = service
-            let loggerForTask = logger
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let dbPath = serviceForTask.resolveDatabasePath()
-                    let rows = try serviceForTask.fetchRecentLinks(dbPath: dbPath, limit: limit)
-                    Task { @MainActor in
-                        self.links = rows
-                        loggerForTask.info("[GoodLinks] loaded links: \(rows.count)")
-                        self.isLoading = false
-                        continuation.resume()
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    Task { @MainActor in
-                        loggerForTask.error("[GoodLinks] loadRecentLinks error: \(desc)")
-                        self.errorMessage = desc
-                        self.isLoading = false
-                        continuation.resume()
-                    }
-                }
+        let serviceForTask = service
+        let loggerForTask = logger
+        do {
+            let (rows, _) = try await Task.detached(priority: .userInitiated) { () throws -> ([GoodLinksLinkRow], String) in
+                let dbPath = serviceForTask.resolveDatabasePath()
+                let rows = try serviceForTask.fetchRecentLinks(dbPath: dbPath, limit: limit)
+                return (rows, dbPath)
+            }.value
+            await MainActor.run {
+                self.links = rows
+                loggerForTask.info("[GoodLinks] loaded links: \(rows.count)")
+                self.isLoading = false
+            }
+        } catch {
+            let desc = error.localizedDescription
+            await MainActor.run {
+                loggerForTask.error("[GoodLinks] loadRecentLinks error: \(desc)")
+                self.errorMessage = desc
+                self.isLoading = false
             }
         }
     }
@@ -298,60 +330,50 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            // 在主线程上获取服务引用，然后安全传递给后台队列
-            let serviceForTask = service
-            let loggerForTask = logger
-            DispatchQueue.global(qos: .userInitiated).async {
+        let serviceForTask = service
+        let loggerForTask = logger
+        do {
+            let rows = try await Task.detached(priority: .userInitiated) { () throws -> [GoodLinksHighlightRow] in
                 loggerForTask.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
-                do {
-                    let dbPath = serviceForTask.resolveDatabasePath()
-                    loggerForTask.info("[GoodLinks] 数据库路径: \(dbPath)")
-                    let rows = try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
-                    Task { @MainActor in
-                        self.highlightsByLinkId[linkId] = rows
-                        loggerForTask.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
-                        continuation.resume()
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    Task { @MainActor in
-                        loggerForTask.error("[GoodLinks] loadHighlights error: \(desc)")
-                        self.errorMessage = desc
-                        continuation.resume()
-                    }
-                }
+                let dbPath = serviceForTask.resolveDatabasePath()
+                loggerForTask.info("[GoodLinks] 数据库路径: \(dbPath)")
+                return try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
+            }.value
+            await MainActor.run {
+                self.highlightsByLinkId[linkId] = rows
+                loggerForTask.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
+            }
+        } catch {
+            let desc = error.localizedDescription
+            await MainActor.run {
+                loggerForTask.error("[GoodLinks] loadHighlights error: \(desc)")
+                self.errorMessage = desc
             }
         }
     }
     
     func loadContent(for linkId: String) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            // 在主线程上获取服务引用，然后安全传递给后台队列
-            let serviceForTask = service
-            let loggerForTask = logger
-            DispatchQueue.global(qos: .userInitiated).async {
+        let serviceForTask = service
+        let loggerForTask = logger
+        do {
+            let content = try await Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
                 loggerForTask.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
-                do {
-                    let dbPath = serviceForTask.resolveDatabasePath()
-                    let content = try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
-                    Task { @MainActor in
-                        if let content {
-                            self.contentByLinkId[linkId] = content
-                            loggerForTask.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
-                        } else {
-                            loggerForTask.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
-                        }
-                        continuation.resume()
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    Task { @MainActor in
-                        loggerForTask.error("[GoodLinks] loadContent error: \(desc)")
-                        self.errorMessage = desc
-                        continuation.resume()
-                    }
+                let dbPath = serviceForTask.resolveDatabasePath()
+                return try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
+            }.value
+            await MainActor.run {
+                if let content {
+                    self.contentByLinkId[linkId] = content
+                    loggerForTask.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
+                } else {
+                    loggerForTask.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
                 }
+            }
+        } catch {
+            let desc = error.localizedDescription
+            await MainActor.run {
+                loggerForTask.error("[GoodLinks] loadContent error: \(desc)")
+                self.errorMessage = desc
             }
         }
     }
@@ -372,7 +394,7 @@ final class GoodLinksViewModel: ObservableObject {
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
             // 发布开始通知
-            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "started"])
+            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "started"])
             do {
                 let dbPath = self.service.resolveDatabasePath()
                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
@@ -382,7 +404,7 @@ final class GoodLinksViewModel: ObservableObject {
                     self.syncMessage = NSLocalizedString("同步完成", comment: "")
                     self.syncProgressText = nil
                     // 发布完成通知
-                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "succeeded"])
+                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])
                 }
             } catch {
                 let desc = error.localizedDescription
@@ -391,7 +413,7 @@ final class GoodLinksViewModel: ObservableObject {
                     self.errorMessage = desc
                     self.syncProgressText = nil
                     // 发布失败通知
-                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "failed"])
+                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "failed"])
                 }
             }
         }
@@ -399,14 +421,16 @@ final class GoodLinksViewModel: ObservableObject {
 
     private func subscribeSyncStatusNotifications() {
         NotificationCenter.default.publisher(for: GLNotifications.syncBookStatusChanged)
-            .compactMap { $0.userInfo as? [String: Any] }
-            .compactMap { info -> (String, String)? in
-                guard let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return nil }
-                return (bookId, status)
-            }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] (bookId, status) in
+            .sink { [weak self] notification in
                 guard let self else { return }
+                if let sender = notification.object as? GoodLinksViewModel, sender === self {
+                    // Ignore self-emitted to prevent duplicate UI state
+                    return
+                }
+                guard let info = notification.userInfo as? [String: Any],
+                      let bookId = info["bookId"] as? String,
+                      let status = info["status"] as? String else { return }
                 switch status {
                 case "started":
                     self.syncingLinkIds.insert(bookId)
