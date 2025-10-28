@@ -81,14 +81,8 @@ struct FiltetSortBar: View {
                 Divider()
 
                 // 笔记筛选
-                Section("Notes") {
-                    ForEach(NoteFilter.allCases, id: \.self) { filter in
-                        Button {
-                            noteFilter = filter
-                        } label: {
-                            Label(filter.displayName, systemImage: noteFilter == filter ? "checkmark" : "")
-                        }
-                    }
+                Section("Filter") {
+                    Toggle("Has Notes", isOn: $noteFilter)
                 }
             } label: {
                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -137,7 +131,7 @@ struct FiltetSortBar: View {
 
 struct FiltetSortBar_Previews: PreviewProvider {
     struct CompactPreviewView: View {
-        @State private var noteFilter: NoteFilter = .any
+        @State private var noteFilter: NoteFilter = false
         @State private var selectedStyles: Set<Int> = []
         @State private var sortField: HighlightSortField = .created
         @State private var isAscending = false

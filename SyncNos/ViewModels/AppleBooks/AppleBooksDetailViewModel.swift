@@ -27,9 +27,9 @@ class AppleBooksDetailViewModel: ObservableObject {
         }
     }
 
-    @Published var noteFilter: NoteFilter = .any {
+    @Published var noteFilter: NoteFilter = false {
         didSet {
-            UserDefaults.standard.set(noteFilter.rawValue, forKey: "detail_note_filter")
+            UserDefaults.standard.set(noteFilter, forKey: "detail_note_filter")
             // Reload data when note filter changes
             if currentAssetId != nil {
                 Task {
@@ -72,10 +72,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             self.sortField = field
         }
         self.isAscending = UserDefaults.standard.object(forKey: "detail_sort_ascending") as? Bool ?? false
-        if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "detail_note_filter"),
-           let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
-            self.noteFilter = filter
-        }
+        self.noteFilter = UserDefaults.standard.bool(forKey: "detail_note_filter")
         if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
             self.selectedStyles = Set(savedStyles)
         }

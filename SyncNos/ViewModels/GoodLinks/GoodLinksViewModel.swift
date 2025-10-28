@@ -34,8 +34,8 @@ final class GoodLinksViewModel: ObservableObject {
     }
 
     // Highlight detail filtering & sorting state (for detail view)
-    @Published var highlightNoteFilter: NoteFilter = .any {
-        didSet { UserDefaults.standard.set(highlightNoteFilter.rawValue, forKey: "goodlinks_highlight_note_filter") }
+    @Published var highlightNoteFilter: NoteFilter = false {
+        didSet { UserDefaults.standard.set(highlightNoteFilter, forKey: "goodlinks_highlight_note_filter") }
     }
     @Published var highlightSelectedStyles: Set<Int> = [] {
         didSet { UserDefaults.standard.set(Array(highlightSelectedStyles).sorted(), forKey: "goodlinks_highlight_selected_styles") }
@@ -70,10 +70,7 @@ final class GoodLinksViewModel: ObservableObject {
         self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
 
         // Load highlight detail filter/sort settings
-        if let savedNoteFilterRaw = UserDefaults.standard.string(forKey: "goodlinks_highlight_note_filter"),
-           let filter = NoteFilter(rawValue: savedNoteFilterRaw) {
-            self.highlightNoteFilter = filter
-        }
+        self.highlightNoteFilter = UserDefaults.standard.bool(forKey: "goodlinks_highlight_note_filter")
         if let savedStyles = UserDefaults.standard.array(forKey: "goodlinks_highlight_selected_styles") as? [Int] {
             self.highlightSelectedStyles = Set(savedStyles)
         }
@@ -421,13 +418,8 @@ extension GoodLinksViewModel {
         var filtered = sourceHighlights
 
         // Apply note filter
-        switch highlightNoteFilter {
-        case .any:
-            break // No filtering
-        case .hasNote:
+        if highlightNoteFilter {
             filtered = filtered.filter { $0.note != nil && !$0.note!.isEmpty }
-        case .noNote:
-            filtered = filtered.filter { $0.note == nil || $0.note!.isEmpty }
         }
 
         // Apply color filter
@@ -461,7 +453,7 @@ extension GoodLinksViewModel {
 
     /// Reset highlight filters to default
     func resetHighlightFilters() {
-        highlightNoteFilter = .any
+        highlightNoteFilter = false
         highlightSelectedStyles = []
     }
 }
