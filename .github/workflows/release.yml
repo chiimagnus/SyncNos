@@ -39,10 +39,12 @@ jobs:
 
           # 尝试获取上一个版本的 changelog（处理首次推送）
           # 使用相对 commit 数而不是 remote fetch
-          if git log --oneline -n 2 | wc -l | grep -q 2; then
-            # 有历史记录，获取上一个版本
+          COMMIT_COUNT=$(git log --oneline -n 2 2>/dev/null | wc -l)
+          if [ "$COMMIT_COUNT" -eq 2 ]; then
+            # 有历史记录（至少有2个commit），获取上一个版本
             PREVIOUS_CONTENT=$(git show HEAD~1:$CHANGELOG_FILE 2>/dev/null || echo "")
-            PREVIOUS_VERSION=$(echo "$PREVIOUS_CONTENT" | grep "^## " | head -n 1 | sed 's/^## //' | tr -d ' ')
+            # 使用相同的版本格式匹配
+            PREVIOUS_VERSION=$(echo "$PREVIOUS_CONTENT" | grep "^## v[0-9]" | head -n 1 | sed 's/^## //' | tr -d ' ')
           else
             # 首次推送，没有上一个版本
             PREVIOUS_VERSION=""
