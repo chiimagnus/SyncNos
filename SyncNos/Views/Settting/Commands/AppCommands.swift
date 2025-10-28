@@ -4,6 +4,12 @@ import SwiftUI
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
+    @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
+    @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
+    @AppStorage("goodlinks_sort_key") private var goodlinksSortKey: String = GoodLinksSortKey.modified.rawValue
+    @AppStorage("goodlinks_sort_ascending") private var goodlinksSortAscending: Bool = false
+    @AppStorage("goodlinks_show_starred_only") private var goodlinksShowStarredOnly: Bool = false
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
 
     init() {
@@ -98,59 +104,91 @@ struct AppCommands: Commands {
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
             if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
-                // Apple Books 的一级命令
-                Picker("Sort", selection: Binding(get: {
-                    UserDefaults.standard.string(forKey: "bookList_sort_key") ?? BookListSortKey.title.rawValue
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "bookList_sort_key")
-                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": new])
-                })) {
+                // Apple Books 的排序和筛选菜单
+                Menu("Sort", systemImage: "line.3.horizontal.decrease.circle") {
                     ForEach(BookListSortKey.allCases, id: \.self) { k in
-                        Text(k.displayName).tag(k.rawValue)
+                        Button {
+                            bookListSortKey = k.rawValue
+                            NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                        } label: {
+                            if bookListSortKey == k.rawValue {
+                                Label(k.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(k.displayName)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        bookListSortAscending.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
+                    } label: {
+                        if bookListSortAscending {
+                            Label("Ascending", systemImage: "checkmark")
+                        } else {
+                            Label("Ascending", systemImage: "xmark")
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        bookListShowWithTitleOnly.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly])
+                    } label: {
+                        if bookListShowWithTitleOnly {
+                            Label("Books with titles only", systemImage: "checkmark")
+                        } else {
+                            Text("Books with titles only")
+                        }
                     }
                 }
-
-                Toggle("Ascending", isOn: Binding(get: {
-                    UserDefaults.standard.bool(forKey: "bookList_sort_ascending")
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "bookList_sort_ascending")
-                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
-                }))
-
-                Toggle("Books with titles only", isOn: Binding(get: {
-                    UserDefaults.standard.bool(forKey: "bookList_showWithTitleOnly")
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "bookList_showWithTitleOnly")
-                    NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": new])
-                }))
 
                 Divider()
             } else {
-                // GoodLinks 的一级命令
-                Picker("Sort", selection: Binding(get: {
-                    UserDefaults.standard.string(forKey: "goodlinks_sort_key") ?? GoodLinksSortKey.modified.rawValue
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "goodlinks_sort_key")
-                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": new])
-                })) {
+                // GoodLinks 的排序和筛选菜单
+                Menu("Sort", systemImage: "line.3.horizontal.decrease.circle") {
                     ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
-                        Text(k.displayName).tag(k.rawValue)
+                        Button {
+                            goodlinksSortKey = k.rawValue
+                            NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                        } label: {
+                            if goodlinksSortKey == k.rawValue {
+                                Label(k.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(k.displayName)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        goodlinksSortAscending.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": goodlinksSortAscending])
+                    } label: {
+                        if goodlinksSortAscending {
+                            Label("Ascending", systemImage: "checkmark")
+                        } else {
+                            Label("Ascending", systemImage: "xmark")
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        goodlinksShowStarredOnly.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": goodlinksShowStarredOnly])
+                    } label: {
+                        if goodlinksShowStarredOnly {
+                            Label("Starred only", systemImage: "checkmark")
+                        } else {
+                            Text("Starred only")
+                        }
                     }
                 }
-
-                Toggle("Ascending", isOn: Binding(get: {
-                    UserDefaults.standard.bool(forKey: "goodlinks_sort_ascending")
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "goodlinks_sort_ascending")
-                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": new])
-                }))
-
-                Toggle("Starred only", isOn: Binding(get: {
-                    UserDefaults.standard.bool(forKey: "goodlinks_show_starred_only")
-                }, set: { new in
-                    UserDefaults.standard.set(new, forKey: "goodlinks_show_starred_only")
-                    NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": new])
-                }))
 
                 Divider()
             }
