@@ -1,6 +1,3 @@
-## v0.5.7.3
-新增了一个GitHub action。
-
 ## v0.5.7.2
 
 *Changed*
