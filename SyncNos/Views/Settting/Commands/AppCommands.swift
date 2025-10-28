@@ -229,13 +229,16 @@ struct AppCommands: Commands {
                 }
 
                 Section("Filter") {
-                    Toggle("Has Notes", isOn: Binding(
-                        get: { highlightHasNotes },
-                        set: { isOn in
-                            highlightHasNotes = isOn
-                            NotificationCenter.default.post(name: Notification.Name("HighlightFilterChanged"), object: nil, userInfo: ["hasNotes": isOn])
+                    Button {
+                        highlightHasNotes.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("HighlightFilterChanged"), object: nil, userInfo: ["hasNotes": highlightHasNotes])
+                    } label: {
+                        if highlightHasNotes {
+                            Label("Has Notes", systemImage: "checkmark")
+                        } else {
+                            Text("Has Notes")
                         }
-                    ))
+                    }
 
                     // 颜色筛选（与 FiltetSortBar 的行为一致）
                     let theme: HighlightColorTheme = (ContentSource(rawValue: contentSourceRawValue) == .appleBooks) ? .appleBooks : .goodLinks
