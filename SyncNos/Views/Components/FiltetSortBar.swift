@@ -85,7 +85,7 @@ struct FiltetSortBar: View {
                     Button {
                         onAscendingChanged?(!isAscending)
                     } label: {
-                        Label("Ascending", systemImage: isAscending ? "checkmark" : "")
+                        Label("Ascending", systemImage: isAscending ? "checkmark" : "xmark")
                     }
                 }
             } label: {
