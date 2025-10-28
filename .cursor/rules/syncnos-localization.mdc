@@ -1,0 +1,149 @@
+---
+description: 当进行i18n本地化的时候需要用到。
+alwaysApply: false
+---
+# 本地化策略和字符串目录管理
+
+## 🎯 项目本地化概览
+
+SyncNos 支持多语言本地化，当前支持以下语言：
+- **English (en)** - 主要开发语言
+- **Chinese, Simplified (zh-Hans)** - 简体中文
+- **French (fr)** - 法语
+- **German (de)** - 德语
+- **Japanese (ja)** - 日语
+- **Korean (ko)** - 韩语
+- **Portuguese (Brazil) (pt-BR)** - 巴西葡萄牙语
+- **Russian (ru)** - 俄语
+- **Spanish (Spain) (es-ES)** - 西班牙语
+
+## 📁 字符串目录结构
+
+### 当前状态
+- **Localizable.xcstrings** (10048行) - 主字符串目录，包含所有本地化字符串
+
+### 计划拆分结构（进行中）
+```
+Resource/
+├── Localizable.xcstrings              # 保留：基础UI字符串（Articles, Books, Filter等）
+├── Localizable-2.xcstrings           # 同步相关字符串（进度消息、状态更新）
+├── Localizable-3.xcstrings           # 设置相关字符串（配置选项）
+└── Localizable-4.xcstrings           # 其他字符串（错误消息、帮助文本）
+```
+
+## 🚀 本地化使用指南
+
+### SwiftUI 中的使用
+
+```swift
+// 基础UI字符串（自动使用Localizable.xcstrings）
+Text("Articles")
+Text("Books")
+Text("Filter")
+
+// 指定特定字符串目录
+Text(String(localized: "Sync Complete", table: "Localizable-2"))
+```
+
+### 传统API使用
+
+```swift
+// 默认Localizable.xcstrings
+NSLocalizedString("Articles", comment: "")
+
+// 指定字符串目录
+NSLocalizedString("Sync Complete", tableName: "Localizable-2", comment: "")
+```
+
+## ⚡ 本地化最佳实践
+
+### 1. 字符串键命名
+- 使用英文作为键名
+- 使用驼峰命名法
+- 描述性强，避免缩写
+- 例如：`syncComplete`, `errorLoadingBooks`
+
+### 2. 注释添加
+```swift
+NSLocalizedString("syncComplete", comment: "Message shown when sync finishes successfully")
+```
+
+### 3. 格式化字符串
+```swift
+String(format: NSLocalizedString("foundHighlights", comment: ""), count)
+// 对应本地化："Found %lld highlights"
+```
+
+### 4. 复数处理
+使用字符串目录的复数变体功能处理不同语言的复数规则。
+
+## 🔧 字符串目录管理
+
+### 添加新字符串
+1. 在代码中使用 `NSLocalizedString` 或 `String(localized:)`
+2. Xcode会自动检测并添加到相应的字符串目录
+3. 手动添加翻译或导出给翻译人员
+
+### 导出/导入翻译
+- **导出**: Product → Export Localizations
+- **导入**: Product → Import Localizations
+
+### 翻译状态检查
+在字符串目录编辑器中，百分比显示翻译完成度。
+
+## 📋 字符串分类指南
+
+### Localizable.xcstrings（保留）
+- 基础UI组件：Articles, Books, Filter, Highlight, Restart
+- 通用按钮和标签
+- 导航元素
+
+### Localizable-2.xcstrings（同步相关）
+- 同步进度消息：`Fetched %lld highlights...`
+- 状态更新：`Sync Complete`, `Sync Failed`
+- 调试信息：`DEBUG: Full sync...`
+
+### Localizable-3.xcstrings（设置相关）
+- 配置选项：`Notion Database ID`
+- 用户偏好：`Auto Sync (24 hours)`
+- API设置：`Apple Sign In`
+
+### Localizable-4.xcstrings（其他）
+- 错误消息：`Error: Please allow access...`
+- 帮助文本：配置说明、用户指导
+- 其他杂项字符串
+
+## ⚠️ 注意事项
+
+### 文件大小管理
+- 当前主文件过大（10048行），正在逐步拆分
+- 新字符串优先添加到专用目录
+- 避免在单个目录中放置过多字符串
+
+### 翻译一致性
+- 术语保持一致（如"Sync" vs "Synchronization"）
+- 技术术语使用标准翻译
+- 保持语气和风格一致
+
+### 代码审查
+- 本地化字符串变更需要仔细审查
+- 确保所有新字符串都有适当的注释
+- 验证格式化字符串的参数正确
+
+## 🛠️ 开发工具支持
+
+### Xcode 功能
+- **字符串目录编辑器**: 可视化编辑翻译
+- **预览本地化**: 在不同语言间切换预览
+- **导出/导入**: 支持XLIFF格式的专业翻译工作流
+
+### 自动化检查
+- 构建时自动检测缺失翻译
+- 警告未本地化的字符串
+- 验证格式化字符串参数
+
+## 📚 相关资源
+
+- [Apple本地化文档](https://developer.apple.com/documentation/xcode/localization/)
+- [字符串目录使用指南](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog/)
+- 项目中的 `Localizable.xcstrings` 文件
