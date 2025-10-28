@@ -9,6 +9,7 @@ struct GoodLinksLinkRow: Codable, Equatable {
     let title: String?
     let summary: String?
     let author: String?
+    let preview: String?
     let tags: String?
     let starred: Bool
     let readAt: Double

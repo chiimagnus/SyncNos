@@ -154,6 +154,17 @@ struct GoodLinksDetailView: View {
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth
                             )
+                        } else if let link = viewModel.links.first(where: { $0.id == linkId }),
+                                  let preview = link.preview,
+                                  !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            // 当 GoodLinks content 表无正文时，优先回退显示 link.preview
+                            let wc = preview.split { $0.isWhitespace || $0.isNewline }.count
+                            ArticleContentCardView(
+                                wordCount: wc,
+                                contentText: preview,
+                                overrideWidth: frozenLayoutWidth,
+                                measuredWidth: $measuredLayoutWidth
+                            )
                         }
 
                         // 高亮列表
