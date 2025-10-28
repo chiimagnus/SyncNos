@@ -12,6 +12,24 @@ private enum GLNotifications {
 
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
+    // Centralized UserDefaults keys
+    private enum Keys {
+        static let sortKey = "goodlinks_sort_key"
+        static let sortAscending = "goodlinks_sort_ascending"
+        static let showStarredOnly = "goodlinks_show_starred_only"
+        static let searchText = "goodlinks_search_text"
+
+        static let hlNoteFilter = "goodlinks_highlight_note_filter"
+        static let hlSelectedStyles = "goodlinks_highlight_selected_styles"
+        static let hlSortField = "goodlinks_highlight_sort_field"
+        static let hlSortAscending = "goodlinks_highlight_sort_ascending"
+
+        // Global highlight menu keys
+        static let globalHasNotes = "highlight_has_notes"
+        static let globalSelectedStyles = "highlight_selected_styles"
+        static let globalSortField = "highlight_sort_field"
+        static let globalSortAscending = "highlight_sort_ascending"
+    }
     @Published var links: [GoodLinksLinkRow] = []
     // 后台计算产物：用于列表渲染的派生结果
     @Published var displayLinks: [GoodLinksLinkRow] = []
@@ -57,30 +75,30 @@ final class GoodLinksViewModel: ObservableObject {
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         subscribeSyncStatusNotifications()
-        if let raw = UserDefaults.standard.string(forKey: "goodlinks_sort_key"), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
-        self.sortAscending = UserDefaults.standard.object(forKey: "goodlinks_sort_ascending") as? Bool ?? false
-        self.showStarredOnly = UserDefaults.standard.object(forKey: "goodlinks_show_starred_only") as? Bool ?? false
-        self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
+        if let raw = UserDefaults.standard.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
+        self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? false
+        self.showStarredOnly = UserDefaults.standard.object(forKey: Keys.showStarredOnly) as? Bool ?? false
+        self.searchText = UserDefaults.standard.string(forKey: Keys.searchText) ?? ""
 
         // Load highlight detail filter/sort settings (GoodLinks-specific defaults)
-        self.highlightNoteFilter = UserDefaults.standard.bool(forKey: "goodlinks_highlight_note_filter")
-        if let savedStyles = UserDefaults.standard.array(forKey: "goodlinks_highlight_selected_styles") as? [Int] {
+        self.highlightNoteFilter = UserDefaults.standard.bool(forKey: Keys.hlNoteFilter)
+        if let savedStyles = UserDefaults.standard.array(forKey: Keys.hlSelectedStyles) as? [Int] {
             self.highlightSelectedStyles = Set(savedStyles)
         }
-        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: "goodlinks_highlight_sort_field"),
+        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: Keys.hlSortField),
            let sortField = HighlightSortField(rawValue: savedSortFieldRaw) {
             self.highlightSortField = sortField
         }
-        self.highlightIsAscending = UserDefaults.standard.object(forKey: "goodlinks_highlight_sort_ascending") as? Bool ?? false
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.hlSortAscending) as? Bool ?? false
 
         // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
-        if let globalSortRaw = UserDefaults.standard.string(forKey: "highlight_sort_field"),
+        if let globalSortRaw = UserDefaults.standard.string(forKey: Keys.globalSortField),
            let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
             self.highlightSortField = globalSortField
         }
-        self.highlightIsAscending = UserDefaults.standard.object(forKey: "highlight_sort_ascending") as? Bool ?? self.highlightIsAscending
-        self.highlightNoteFilter = UserDefaults.standard.object(forKey: "highlight_has_notes") as? Bool ?? self.highlightNoteFilter
-        if let globalStyles = UserDefaults.standard.array(forKey: "highlight_selected_styles") as? [Int] {
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.globalSortAscending) as? Bool ?? self.highlightIsAscending
+        self.highlightNoteFilter = UserDefaults.standard.object(forKey: Keys.globalHasNotes) as? Bool ?? self.highlightNoteFilter
+        if let globalStyles = UserDefaults.standard.array(forKey: Keys.globalSelectedStyles) as? [Int] {
             self.highlightSelectedStyles = Set(globalStyles)
         }
 
@@ -164,7 +182,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue.rawValue, forKey: "goodlinks_sort_key")
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
             }
             .store(in: &cancellables)
 
@@ -172,7 +190,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: "goodlinks_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
             }
             .store(in: &cancellables)
 
@@ -180,7 +198,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: "goodlinks_show_starred_only")
+                UserDefaults.standard.set(newValue, forKey: Keys.showStarredOnly)
             }
             .store(in: &cancellables)
 
@@ -188,7 +206,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: "goodlinks_search_text")
+                UserDefaults.standard.set(newValue, forKey: Keys.searchText)
             }
             .store(in: &cancellables)
 
@@ -196,8 +214,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: "goodlinks_highlight_note_filter")
-                UserDefaults.standard.set(newValue, forKey: "highlight_has_notes")
+                UserDefaults.standard.set(newValue, forKey: Keys.hlNoteFilter)
+                UserDefaults.standard.set(newValue, forKey: Keys.globalHasNotes)
             }
             .store(in: &cancellables)
 
@@ -206,8 +224,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { arr in
-                UserDefaults.standard.set(arr, forKey: "goodlinks_highlight_selected_styles")
-                UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+                UserDefaults.standard.set(arr, forKey: Keys.hlSelectedStyles)
+                UserDefaults.standard.set(arr, forKey: Keys.globalSelectedStyles)
             }
             .store(in: &cancellables)
 
@@ -215,8 +233,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue.rawValue, forKey: "goodlinks_highlight_sort_field")
-                UserDefaults.standard.set(newValue.rawValue, forKey: "highlight_sort_field")
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.hlSortField)
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.globalSortField)
             }
             .store(in: &cancellables)
 
@@ -224,8 +242,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: "goodlinks_highlight_sort_ascending")
-                UserDefaults.standard.set(newValue, forKey: "highlight_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: Keys.hlSortAscending)
+                UserDefaults.standard.set(newValue, forKey: Keys.globalSortAscending)
             }
             .store(in: &cancellables)
     }
@@ -390,6 +408,8 @@ final class GoodLinksViewModel: ObservableObject {
         syncMessage = nil
         syncProgressText = nil
         isSyncing = true
+        // Mark UI state for this link immediately
+        syncingLinkIds.insert(link.id)
 
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
@@ -405,6 +425,9 @@ final class GoodLinksViewModel: ObservableObject {
                     self.syncProgressText = nil
                     // 发布完成通知
                     NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])
+                    // Update UI state directly
+                    self.syncingLinkIds.remove(link.id)
+                    self.syncedLinkIds.insert(link.id)
                 }
             } catch {
                 let desc = error.localizedDescription
@@ -414,6 +437,8 @@ final class GoodLinksViewModel: ObservableObject {
                     self.syncProgressText = nil
                     // 发布失败通知
                     NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "failed"])
+                    // Update UI state directly
+                    self.syncingLinkIds.remove(link.id)
                 }
             }
         }
