@@ -59,19 +59,6 @@ struct FiltetSortBar: View {
         HStack {
             // 高级筛选菜单
             Menu {
-                // 笔记筛选
-                Section("Notes") {
-                    ForEach(NoteFilter.allCases, id: \.self) { filter in
-                        Button {
-                            noteFilter = filter
-                        } label: {
-                            Label(filter.displayName, systemImage: noteFilter == filter ? "checkmark" : "")
-                        }
-                    }
-                }
-
-                Divider()
-
                 // 排序选项
                 Section("Sort") {
                     ForEach(HighlightSortField.allCases, id: \.self) { field in
@@ -82,10 +69,25 @@ struct FiltetSortBar: View {
                         }
                     }
 
+                    Divider()
+
                     Button {
                         onAscendingChanged?(!isAscending)
                     } label: {
                         Label("Ascending", systemImage: isAscending ? "checkmark" : "xmark")
+                    }
+                }
+
+                Divider()
+
+                // 笔记筛选
+                Section("Notes") {
+                    ForEach(NoteFilter.allCases, id: \.self) { filter in
+                        Button {
+                            noteFilter = filter
+                        } label: {
+                            Label(filter.displayName, systemImage: noteFilter == filter ? "checkmark" : "")
+                        }
                     }
                 }
             } label: {
