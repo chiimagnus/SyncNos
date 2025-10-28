@@ -151,6 +151,7 @@ struct GoodLinksDetailView: View {
                             ArticleContentCardView(
                                 wordCount: contentRow.wordCount,
                                 contentText: fullText,
+                                blocks: viewModel.articleBlocksByLinkId[linkId],
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth
                             )
