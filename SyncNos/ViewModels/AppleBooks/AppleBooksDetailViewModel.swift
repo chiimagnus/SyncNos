@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 class AppleBooksDetailViewModel: ObservableObject {
@@ -13,6 +14,8 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var sortField: HighlightSortField = .created {
         didSet {
             UserDefaults.standard.set(sortField.rawValue, forKey: "detail_sort_field")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(sortField.rawValue, forKey: "highlight_sort_field")
             if currentAssetId != nil {
                 Task { await loadFirstPage() }
             }
@@ -21,6 +24,8 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var isAscending: Bool = false { // 默认降序
         didSet {
             UserDefaults.standard.set(isAscending, forKey: "detail_sort_ascending")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(isAscending, forKey: "highlight_sort_ascending")
             if currentAssetId != nil {
                 Task { await loadFirstPage() }
             }
@@ -30,6 +35,8 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var noteFilter: NoteFilter = false {
         didSet {
             UserDefaults.standard.set(noteFilter, forKey: "detail_note_filter")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(noteFilter, forKey: "highlight_has_notes")
             // Reload data when note filter changes
             if currentAssetId != nil {
                 Task {
@@ -42,6 +49,8 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var selectedStyles: Set<Int> = [] {
         didSet {
             UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "detail_selected_styles")
+            // Keep global highlight menu state in sync (reserved for future color filtering)
+            UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "highlight_selected_styles")
             // Reload data when selected styles change
             if currentAssetId != nil {
                 Task {
@@ -60,6 +69,7 @@ class AppleBooksDetailViewModel: ObservableObject {
     private var currentOffset = 0
     private let pageSize = NotionSyncConfig.appleBooksDetailPageSize
     private var expectedTotalCount = 0
+    private var cancellables: Set<AnyCancellable> = []
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          syncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService) {
@@ -76,6 +86,45 @@ class AppleBooksDetailViewModel: ObservableObject {
         if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
             self.selectedStyles = Set(savedStyles)
         }
+
+        // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
+        if let globalSortRaw = UserDefaults.standard.string(forKey: "highlight_sort_field"),
+           let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
+            self.sortField = globalSortField
+        }
+        self.isAscending = UserDefaults.standard.object(forKey: "highlight_sort_ascending") as? Bool ?? self.isAscending
+        self.noteFilter = UserDefaults.standard.object(forKey: "highlight_has_notes") as? Bool ?? self.noteFilter
+        if let globalStyles = UserDefaults.standard.array(forKey: "highlight_selected_styles") as? [Int] {
+            self.selectedStyles = Set(globalStyles)
+        }
+
+        // Subscribe to global highlight sort changes from AppCommands
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let keyRaw = userInfo["sortKey"] as? String, let k = HighlightSortField(rawValue: keyRaw) {
+                    self.sortField = k
+                }
+                if let asc = userInfo["sortAscending"] as? Bool {
+                    self.isAscending = asc
+                }
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to global highlight filter changes from AppCommands
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let hasNotes = userInfo["hasNotes"] as? Bool {
+                    self.noteFilter = hasNotes
+                }
+                // Future: handle color filters when menu supports it
+            }
+            .store(in: &cancellables)
     }
     
     deinit {

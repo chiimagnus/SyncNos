@@ -35,16 +35,33 @@ final class GoodLinksViewModel: ObservableObject {
 
     // Highlight detail filtering & sorting state (for detail view)
     @Published var highlightNoteFilter: NoteFilter = false {
-        didSet { UserDefaults.standard.set(highlightNoteFilter, forKey: "goodlinks_highlight_note_filter") }
+        didSet {
+            UserDefaults.standard.set(highlightNoteFilter, forKey: "goodlinks_highlight_note_filter")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(highlightNoteFilter, forKey: "highlight_has_notes")
+        }
     }
     @Published var highlightSelectedStyles: Set<Int> = [] {
-        didSet { UserDefaults.standard.set(Array(highlightSelectedStyles).sorted(), forKey: "goodlinks_highlight_selected_styles") }
+        didSet {
+            let arr = Array(highlightSelectedStyles).sorted()
+            UserDefaults.standard.set(arr, forKey: "goodlinks_highlight_selected_styles")
+            // Keep global highlight menu state in sync (reserved for future color filtering)
+            UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+        }
     }
     @Published var highlightSortField: HighlightSortField = .created {
-        didSet { UserDefaults.standard.set(highlightSortField.rawValue, forKey: "goodlinks_highlight_sort_field") }
+        didSet {
+            UserDefaults.standard.set(highlightSortField.rawValue, forKey: "goodlinks_highlight_sort_field")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(highlightSortField.rawValue, forKey: "highlight_sort_field")
+        }
     }
     @Published var highlightIsAscending: Bool = false {
-        didSet { UserDefaults.standard.set(highlightIsAscending, forKey: "goodlinks_highlight_sort_ascending") }
+        didSet {
+            UserDefaults.standard.set(highlightIsAscending, forKey: "goodlinks_highlight_sort_ascending")
+            // Keep global highlight menu state in sync
+            UserDefaults.standard.set(highlightIsAscending, forKey: "highlight_sort_ascending")
+        }
     }
 
     private let service: GoodLinksDatabaseServiceExposed
@@ -69,7 +86,7 @@ final class GoodLinksViewModel: ObservableObject {
         self.showStarredOnly = UserDefaults.standard.object(forKey: "goodlinks_show_starred_only") as? Bool ?? false
         self.searchText = UserDefaults.standard.string(forKey: "goodlinks_search_text") ?? ""
 
-        // Load highlight detail filter/sort settings
+        // Load highlight detail filter/sort settings (GoodLinks-specific defaults)
         self.highlightNoteFilter = UserDefaults.standard.bool(forKey: "goodlinks_highlight_note_filter")
         if let savedStyles = UserDefaults.standard.array(forKey: "goodlinks_highlight_selected_styles") as? [Int] {
             self.highlightSelectedStyles = Set(savedStyles)
@@ -79,6 +96,17 @@ final class GoodLinksViewModel: ObservableObject {
             self.highlightSortField = sortField
         }
         self.highlightIsAscending = UserDefaults.standard.object(forKey: "goodlinks_highlight_sort_ascending") as? Bool ?? false
+
+        // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
+        if let globalSortRaw = UserDefaults.standard.string(forKey: "highlight_sort_field"),
+           let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
+            self.highlightSortField = globalSortField
+        }
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: "highlight_sort_ascending") as? Bool ?? self.highlightIsAscending
+        self.highlightNoteFilter = UserDefaults.standard.object(forKey: "highlight_has_notes") as? Bool ?? self.highlightNoteFilter
+        if let globalStyles = UserDefaults.standard.array(forKey: "highlight_selected_styles") as? [Int] {
+            self.highlightSelectedStyles = Set(globalStyles)
+        }
 
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFilterChanged"))
@@ -95,6 +123,34 @@ final class GoodLinksViewModel: ObservableObject {
                 if let starredOnly = userInfo["showStarredOnly"] as? Bool {
                     self.showStarredOnly = starredOnly
                 }
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to global highlight sort changes from AppCommands
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let keyRaw = userInfo["sortKey"] as? String, let k = HighlightSortField(rawValue: keyRaw) {
+                    self.highlightSortField = k
+                }
+                if let asc = userInfo["sortAscending"] as? Bool {
+                    self.highlightIsAscending = asc
+                }
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to global highlight filter changes from AppCommands
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+            .compactMap { $0.userInfo as? [String: Any] }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] userInfo in
+                guard let self else { return }
+                if let hasNotes = userInfo["hasNotes"] as? Bool {
+                    self.highlightNoteFilter = hasNotes
+                }
+                // Future: handle color filters when menu supports it
             }
             .store(in: &cancellables)
 
