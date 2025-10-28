@@ -16,7 +16,7 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         return try fetchHighlightPage(assetId: assetId, limit: limit, offset: offset, since: since, sortField: nil, ascending: nil, noteFilter: nil, styles: nil)
     }
 
-    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow] {
+    func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: Bool?, styles: [Int]?) throws -> [HighlightRow] {
         guard let db = handle else {
             let error = "Database session is closed"
             logger.error("Error: \(error)")

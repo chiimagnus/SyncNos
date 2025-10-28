@@ -239,7 +239,7 @@ final class DatabaseQueryService: Sendable {
     ///   - noteFilter: 笔记过滤
     ///   - styles: 颜色过滤
     /// - Returns: 高亮数组
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil, sortField: HighlightSortField? = nil, ascending: Bool? = nil, noteFilter: NoteFilter? = nil, styles: [Int]? = nil) throws -> [HighlightRow] {
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date? = nil, sortField: HighlightSortField? = nil, ascending: Bool? = nil, noteFilter: Bool? = nil, styles: [Int]? = nil) throws -> [HighlightRow] {
         // Discover available columns for dynamic select and optional fields
         let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
         var stmt: OpaquePointer?
@@ -292,15 +292,8 @@ final class DatabaseQueryService: Sendable {
         }
 
         // 添加笔记过滤条件
-        if let noteFilter = noteFilter {
-            switch noteFilter {
-            case .hasNote:
-                whereConditions.append("ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) <> ''")
-            case .noNote:
-                whereConditions.append("(ZANNOTATIONNOTE IS NULL OR TRIM(ZANNOTATIONNOTE) = '')")
-            case .any:
-                break // No filter needed
-            }
+        if let noteFilter = noteFilter, noteFilter {
+            whereConditions.append("ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) <> ''")
         }
 
         // 添加颜色过滤条件

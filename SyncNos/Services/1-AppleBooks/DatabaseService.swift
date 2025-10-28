@@ -48,7 +48,7 @@ class DatabaseService: DatabaseServiceProtocol {
         return try queryService.fetchHighlightStatsByAsset(db: db)
     }
 
-    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: NoteFilter?, styles: [Int]?) throws -> [HighlightRow] {
+    func fetchHighlightPage(db: OpaquePointer, assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: Bool?, styles: [Int]?) throws -> [HighlightRow] {
         return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since, sortField: sortField, ascending: ascending, noteFilter: noteFilter, styles: styles)
     }
     

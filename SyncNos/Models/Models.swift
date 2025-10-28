@@ -119,19 +119,8 @@ enum BookListSortKey: String, CaseIterable {
     }
 }
 
-enum NoteFilter: String, CaseIterable {
-    case any = "any"
-    case hasNote = "hasNote"
-    case noNote = "noNote"
-
-    var displayName: LocalizedStringResource {
-        switch self {
-        case .any: return "All"
-        case .hasNote: return "Has Notes"
-        case .noNote: return "No Notes"
-        }
-    }
-}
+// Note filter: true = show only highlights with notes, false = show all
+typealias NoteFilter = Bool
 
 // 新的高亮排序模型：由排序字段和方向组合，替代旧的 HighlightOrder
 enum HighlightSortField: String, CaseIterable {
