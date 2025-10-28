@@ -106,42 +106,44 @@ struct AppCommands: Commands {
             if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
                 // Apple Books 的排序和筛选菜单
                 Menu("Sort", systemImage: "line.3.horizontal.decrease.circle") {
-                    ForEach(BookListSortKey.allCases, id: \.self) { k in
+                    Section("Sort") {
+                        ForEach(BookListSortKey.allCases, id: \.self) { k in
+                            Button {
+                                bookListSortKey = k.rawValue
+                                NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            } label: {
+                                if bookListSortKey == k.rawValue {
+                                    Label(k.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(k.displayName)
+                                }
+                            }
+                        }
+
+                        Divider()
+
                         Button {
-                            bookListSortKey = k.rawValue
-                            NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            bookListSortAscending.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
                         } label: {
-                            if bookListSortKey == k.rawValue {
-                                Label(k.displayName, systemImage: "checkmark")
+                            if bookListSortAscending {
+                                Label("Ascending", systemImage: "checkmark")
                             } else {
-                                Text(k.displayName)
+                                Label("Ascending", systemImage: "xmark")
                             }
                         }
                     }
 
-                    Divider()
-
-                    Button {
-                        bookListSortAscending.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
-                    } label: {
-                        if bookListSortAscending {
-                            Label("Ascending", systemImage: "checkmark")
-                        } else {
-                            Label("Ascending", systemImage: "xmark")
-                        }
-                    }
-
-                    Divider()
-
-                    Button {
-                        bookListShowWithTitleOnly.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly])
-                    } label: {
-                        if bookListShowWithTitleOnly {
-                            Label("Books with titles only", systemImage: "checkmark")
-                        } else {
-                            Text("Books with titles only")
+                    Section("Filter") {
+                        Button {
+                            bookListShowWithTitleOnly.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly])
+                        } label: {
+                            if bookListShowWithTitleOnly {
+                                Label("Books with titles only", systemImage: "checkmark")
+                            } else {
+                                Text("Books with titles only")
+                            }
                         }
                     }
                 }
@@ -150,42 +152,44 @@ struct AppCommands: Commands {
             } else {
                 // GoodLinks 的排序和筛选菜单
                 Menu("Sort", systemImage: "line.3.horizontal.decrease.circle") {
-                    ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
+                    Section("Sort") {
+                        ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
+                            Button {
+                                goodlinksSortKey = k.rawValue
+                                NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            } label: {
+                                if goodlinksSortKey == k.rawValue {
+                                    Label(k.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(k.displayName)
+                                }
+                            }
+                        }
+                        
+                        Divider()
+
                         Button {
-                            goodlinksSortKey = k.rawValue
-                            NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            goodlinksSortAscending.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": goodlinksSortAscending])
                         } label: {
-                            if goodlinksSortKey == k.rawValue {
-                                Label(k.displayName, systemImage: "checkmark")
+                            if goodlinksSortAscending {
+                                Label("Ascending", systemImage: "checkmark")
                             } else {
-                                Text(k.displayName)
+                                Label("Ascending", systemImage: "xmark")
                             }
                         }
                     }
 
-                    Divider()
-
-                    Button {
-                        goodlinksSortAscending.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["sortAscending": goodlinksSortAscending])
-                    } label: {
-                        if goodlinksSortAscending {
-                            Label("Ascending", systemImage: "checkmark")
-                        } else {
-                            Label("Ascending", systemImage: "xmark")
-                        }
-                    }
-
-                    Divider()
-
-                    Button {
-                        goodlinksShowStarredOnly.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": goodlinksShowStarredOnly])
-                    } label: {
-                        if goodlinksShowStarredOnly {
-                            Label("Starred only", systemImage: "checkmark")
-                        } else {
-                            Text("Starred only")
+                    Section("Filter") {
+                        Button {
+                            goodlinksShowStarredOnly.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("GoodLinksFilterChanged"), object: nil, userInfo: ["showStarredOnly": goodlinksShowStarredOnly])
+                        } label: {
+                            if goodlinksShowStarredOnly {
+                                Label("Starred only", systemImage: "checkmark")
+                            } else {
+                                Text("Starred only")
+                            }
                         }
                     }
                 }
