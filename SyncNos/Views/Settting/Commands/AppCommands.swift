@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // 将应用菜单命令抽取到单独文件，便于维护与测试
 struct AppCommands: Commands {
