@@ -1,6 +1,15 @@
 import Foundation
 import Combine
 
+// Localized notification name definitions to avoid stringly-typed usage
+private enum GLNotifications {
+    static let goodLinksFilterChanged = Notification.Name("GoodLinksFilterChanged")
+    static let highlightSortChanged = Notification.Name("HighlightSortChanged")
+    static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
+    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+    static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
+}
+
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
     @Published var links: [GoodLinksLinkRow] = []
@@ -109,7 +118,7 @@ final class GoodLinksViewModel: ObservableObject {
         }
 
         // 订阅来自 AppCommands 的过滤/排序变更通知
-        NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFilterChanged"))
+        NotificationCenter.default.publisher(for: GLNotifications.goodLinksFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -127,7 +136,7 @@ final class GoodLinksViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to global highlight sort changes from AppCommands
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+        NotificationCenter.default.publisher(for: GLNotifications.highlightSortChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -142,7 +151,7 @@ final class GoodLinksViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to global highlight filter changes from AppCommands
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+        NotificationCenter.default.publisher(for: GLNotifications.highlightFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -363,7 +372,7 @@ final class GoodLinksViewModel: ObservableObject {
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
             // 发布开始通知
-            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "started"])
+            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "started"])
             do {
                 let dbPath = self.service.resolveDatabasePath()
                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
@@ -373,7 +382,7 @@ final class GoodLinksViewModel: ObservableObject {
                     self.syncMessage = NSLocalizedString("同步完成", comment: "")
                     self.syncProgressText = nil
                     // 发布完成通知
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "succeeded"])
+                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "succeeded"])
                 }
             } catch {
                 let desc = error.localizedDescription
@@ -382,14 +391,14 @@ final class GoodLinksViewModel: ObservableObject {
                     self.errorMessage = desc
                     self.syncProgressText = nil
                     // 发布失败通知
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": link.id, "status": "failed"])
+                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": link.id, "status": "failed"])
                 }
             }
         }
     }
 
     private func subscribeSyncStatusNotifications() {
-        NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged"))
+        NotificationCenter.default.publisher(for: GLNotifications.syncBookStatusChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .compactMap { info -> (String, String)? in
                 guard let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return nil }
@@ -446,15 +455,15 @@ extension GoodLinksViewModel {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"])                        
+                            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "started"])                        
                             do {
                                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { progress in
-                                    NotificationCenter.default.post(name: Notification.Name("SyncProgressUpdated"), object: nil, userInfo: ["bookId": id, "progress": progress])
+                                    NotificationCenter.default.post(name: GLNotifications.syncProgressUpdated, object: nil, userInfo: ["bookId": id, "progress": progress])
                                 }
-                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
+                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
                             } catch {
                                 await MainActor.run { self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)") }
-                                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"])                        
+                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "failed"])                        
                             }
                         }
                     }

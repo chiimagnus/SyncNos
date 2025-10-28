@@ -1,6 +1,13 @@
 import Foundation
 import Combine
 
+// Centralized notification names to avoid typos and improve maintainability
+private enum ABNotifications {
+    static let highlightSortChanged = Notification.Name("HighlightSortChanged")
+    static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
+    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+}
+
 @MainActor
 class AppleBooksDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
@@ -16,9 +23,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             UserDefaults.standard.set(sortField.rawValue, forKey: "detail_sort_field")
             // Keep global highlight menu state in sync
             UserDefaults.standard.set(sortField.rawValue, forKey: "highlight_sort_field")
-            if currentAssetId != nil {
-                Task { await loadFirstPage() }
-            }
+            // Debounced reload is handled by the Combine pipeline
         }
     }
     @Published var isAscending: Bool = false { // 默认降序
@@ -26,9 +31,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             UserDefaults.standard.set(isAscending, forKey: "detail_sort_ascending")
             // Keep global highlight menu state in sync
             UserDefaults.standard.set(isAscending, forKey: "highlight_sort_ascending")
-            if currentAssetId != nil {
-                Task { await loadFirstPage() }
-            }
+            // Debounced reload is handled by the Combine pipeline
         }
     }
 
@@ -37,12 +40,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             UserDefaults.standard.set(noteFilter, forKey: "detail_note_filter")
             // Keep global highlight menu state in sync
             UserDefaults.standard.set(noteFilter, forKey: "highlight_has_notes")
-            // Reload data when note filter changes
-            if currentAssetId != nil {
-                Task {
-                    await loadFirstPage()
-                }
-            }
+            // Debounced reload is handled by the Combine pipeline
         }
     }
 
@@ -51,12 +49,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "detail_selected_styles")
             // Keep global highlight menu state in sync (reserved for future color filtering)
             UserDefaults.standard.set(Array(selectedStyles).sorted(), forKey: "highlight_selected_styles")
-            // Reload data when selected styles change
-            if currentAssetId != nil {
-                Task {
-                    await loadFirstPage()
-                }
-            }
+            // Debounced reload is handled by the Combine pipeline
         }
     }
 
@@ -99,7 +92,7 @@ class AppleBooksDetailViewModel: ObservableObject {
         }
 
         // Subscribe to global highlight sort changes from AppCommands
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+        NotificationCenter.default.publisher(for: ABNotifications.highlightSortChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -114,7 +107,7 @@ class AppleBooksDetailViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to global highlight filter changes from AppCommands
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+        NotificationCenter.default.publisher(for: ABNotifications.highlightFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -123,6 +116,21 @@ class AppleBooksDetailViewModel: ObservableObject {
                     self.noteFilter = hasNotes
                 }
                 // Future: handle color filters when menu supports it
+            }
+            .store(in: &cancellables)
+
+        // Debounce frequent filter/sort toggles to avoid excessive reloads
+        Publishers.CombineLatest4($sortField, $isAscending, $noteFilter, $selectedStyles)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .removeDuplicates { lhs, rhs in
+                // Manual dedupe for tuple with Set
+                lhs.0 == rhs.0 && lhs.1 == rhs.1 && lhs.2 == rhs.2 && lhs.3 == rhs.3
+            }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.currentAssetId != nil {
+                    Task { await self.loadFirstPage() }
+                }
             }
             .store(in: &cancellables)
     }
