@@ -504,15 +504,24 @@ extension GoodLinksViewModel {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "started"])                        
+                            // Update local UI state and post started
+                            await MainActor.run { self.syncingLinkIds.insert(id) }
+                            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])                        
                             do {
                                 try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { progress in
-                                    NotificationCenter.default.post(name: GLNotifications.syncProgressUpdated, object: nil, userInfo: ["bookId": id, "progress": progress])
+                                    NotificationCenter.default.post(name: GLNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                 }
-                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "succeeded"])                        
+                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])                        
+                                await MainActor.run {
+                                    self.syncingLinkIds.remove(id)
+                                    self.syncedLinkIds.insert(id)
+                                }
                             } catch {
                                 await MainActor.run { self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)") }
-                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: nil, userInfo: ["bookId": id, "status": "failed"])                        
+                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])                        
+                                await MainActor.run {
+                                    self.syncingLinkIds.remove(id)
+                                }
                             }
                         }
                     }
