@@ -27,6 +27,7 @@ final class GoodLinksViewModel: ObservableObject {
         // Global highlight menu keys
         static let globalHasNotes = "highlight_has_notes"
         static let globalSelectedStyles = "highlight_selected_styles"
+        static let globalSelectedMask = "highlight_selected_mask"
         static let globalSortField = "highlight_sort_field"
         static let globalSortAscending = "highlight_sort_ascending"
     }
@@ -100,6 +101,17 @@ final class GoodLinksViewModel: ObservableObject {
         self.highlightNoteFilter = UserDefaults.standard.object(forKey: Keys.globalHasNotes) as? Bool ?? self.highlightNoteFilter
         if let globalStyles = UserDefaults.standard.array(forKey: Keys.globalSelectedStyles) as? [Int] {
             self.highlightSelectedStyles = Set(globalStyles)
+        }
+        // Initialize mask to reflect current selection for App menu checkmarks
+        do {
+            let arr = Array(self.highlightSelectedStyles).sorted()
+            if arr.isEmpty {
+                UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
+            } else {
+                var mask = 0
+                for i in arr { mask |= (1 << i) }
+                UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
+            }
         }
 
         // 订阅来自 AppCommands 的过滤/排序变更通知
@@ -228,6 +240,14 @@ final class GoodLinksViewModel: ObservableObject {
             .sink { arr in
                 UserDefaults.standard.set(arr, forKey: Keys.hlSelectedStyles)
                 UserDefaults.standard.set(arr, forKey: Keys.globalSelectedStyles)
+                // Maintain a compact mask for App menu binding
+                if arr.isEmpty {
+                    UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
+                } else {
+                    var mask = 0
+                    for i in arr { mask |= (1 << i) }
+                    UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
+                }
             }
             .store(in: &cancellables)
 
