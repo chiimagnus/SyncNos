@@ -10,6 +10,9 @@ struct AppCommands: Commands {
     @AppStorage("goodlinks_sort_key") private var goodlinksSortKey: String = GoodLinksSortKey.modified.rawValue
     @AppStorage("goodlinks_sort_ascending") private var goodlinksSortAscending: Bool = false
     @AppStorage("goodlinks_show_starred_only") private var goodlinksShowStarredOnly: Bool = false
+    @AppStorage("highlight_sort_key") private var highlightSortKey: String = HighlightSortKey.created.rawValue
+    @AppStorage("highlight_sort_ascending") private var highlightSortAscending: Bool = false
+    @AppStorage("highlight_has_notes") private var highlightHasNotes: Bool = false
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
 
     init() {
@@ -196,6 +199,57 @@ struct AppCommands: Commands {
 
                 Divider()
             }
+
+            // Highlight 菜单 - 全局高亮排序和筛选
+            Menu("Highlight", systemImage: "highlighter") {
+                Section("Sort") {
+                    ForEach(HighlightSortKey.allCases, id: \.self) { k in
+                        Button {
+                            highlightSortKey = k.rawValue
+                            NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                        } label: {
+                            if highlightSortKey == k.rawValue {
+                                Label(k.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(k.displayName)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        highlightSortAscending.toggle()
+                        NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortAscending": highlightSortAscending])
+                    } label: {
+                        if highlightSortAscending {
+                            Label("Ascending", systemImage: "checkmark")
+                        } else {
+                            Label("Ascending", systemImage: "xmark")
+                        }
+                    }
+                }
+
+                Section("Filter") {
+                    Toggle("Has Notes", isOn: Binding(
+                        get: { highlightHasNotes },
+                        set: { isOn in
+                            highlightHasNotes = isOn
+                            NotificationCenter.default.post(name: Notification.Name("HighlightFilterChanged"), object: nil, userInfo: ["hasNotes": isOn])
+                        }
+                    ))
+
+                    // TODO: 颜色筛选可以后续添加
+                    Button {
+                        // 颜色筛选逻辑可以后续实现
+                    } label: {
+                        Text("Color (Coming Soon)")
+                    }
+                    .disabled(true)
+                }
+            }
+
+            Divider()
         }
 
         // Window 菜单 - 窗口管理相关
