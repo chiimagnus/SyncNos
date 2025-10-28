@@ -134,17 +134,3 @@ enum HighlightSortField: String, CaseIterable {
         }
     }
 }
-
-// Global highlight sort key for menu commands
-enum HighlightSortKey: String, CaseIterable {
-    case created = "created"
-    case modified = "modified"
-
-    var displayName: LocalizedStringResource {
-        switch self {
-        case .created: return "Create Time"
-        case .modified: return "Modified Time"
-        }
-    }
-}
-
