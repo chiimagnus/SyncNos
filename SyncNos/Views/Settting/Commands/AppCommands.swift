@@ -13,6 +13,8 @@ struct AppCommands: Commands {
     @AppStorage("highlight_sort_field") private var highlightSortField: String = HighlightSortField.created.rawValue
     @AppStorage("highlight_sort_ascending") private var highlightSortAscending: Bool = false
     @AppStorage("highlight_has_notes") private var highlightHasNotes: Bool = false
+    // 使用位掩码缓存颜色选择，用于刷新菜单的 checkmark 显示；0 表示“全部”（即空集语义）
+    @AppStorage("highlight_selected_mask") private var highlightSelectedMask: Int = 0
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
 
     init() {
@@ -235,13 +237,62 @@ struct AppCommands: Commands {
                         }
                     ))
 
-                    // TODO: 颜色筛选可以后续添加
-                    Button {
-                        // 颜色筛选逻辑可以后续实现
-                    } label: {
-                        Text("Color (Coming Soon)")
+                    // 颜色筛选（与 FiltetSortBar 的行为一致）
+                    let theme: HighlightColorTheme = (ContentSource(rawValue: contentSourceRawValue) == .appleBooks) ? .appleBooks : .goodLinks
+                    // 从位掩码恢复当前集合（0 表示空集 => 全选）
+                    let currentSet: Set<Int> = {
+                        if highlightSelectedMask == 0 { return [] }
+                        var s: Set<Int> = []
+                        for i in 0..<theme.colorCount {
+                            if (highlightSelectedMask & (1 << i)) != 0 {
+                                s.insert(i)
+                            }
+                        }
+                        return s
+                    }()
+
+                    ForEach(0..<theme.colorCount, id: \.self) { colorIndex in
+                        let (_, name) = theme.colorInfo(for: colorIndex)
+                        // FiltetSortBar 中的 isSelected 规则：空集表示“全部选中”
+                        let isSelected = currentSet.isEmpty || currentSet.contains(colorIndex)
+                        Button {
+                            var newSet = currentSet
+                            if newSet.isEmpty {
+                                newSet = [colorIndex]
+                            } else if newSet.contains(colorIndex) {
+                                newSet.remove(colorIndex)
+                                if newSet.isEmpty {
+                                    newSet = []
+                                }
+                            } else {
+                                newSet.insert(colorIndex)
+                                if newSet.count == theme.colorCount {
+                                    newSet = [] // 全选即视为不过滤
+                                }
+                            }
+                            let arr = Array(newSet).sorted()
+                            UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+                            // 同步写位掩码以驱动 @AppStorage 重绘
+                            if newSet.isEmpty {
+                                highlightSelectedMask = 0
+                            } else {
+                                var mask = 0
+                                for i in newSet { mask |= (1 << i) }
+                                highlightSelectedMask = mask
+                            }
+                            NotificationCenter.default.post(
+                                name: Notification.Name("HighlightFilterChanged"),
+                                object: nil,
+                                userInfo: ["selectedStyles": arr]
+                            )
+                        } label: {
+                            if isSelected {
+                                Label(name, systemImage: "checkmark")
+                            } else {
+                                Text(name)
+                            }
+                        }
                     }
-                    .disabled(true)
                 }
             }
 

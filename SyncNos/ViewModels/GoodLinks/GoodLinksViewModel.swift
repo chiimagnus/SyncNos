@@ -144,7 +144,9 @@ final class GoodLinksViewModel: ObservableObject {
                 if let hasNotes = userInfo["hasNotes"] as? Bool {
                     self.highlightNoteFilter = hasNotes
                 }
-                // Future: handle color filters when menu supports it
+                if let styles = userInfo["selectedStyles"] as? [Int] {
+                    self.highlightSelectedStyles = Set(styles)
+                }
             }
             .store(in: &cancellables)
 
