@@ -87,7 +87,9 @@ class AppleBooksDetailViewModel: ObservableObject {
                 if let hasNotes = userInfo["hasNotes"] as? Bool {
                     self.noteFilter = hasNotes
                 }
-                // Future: handle color filters when menu supports it
+                if let styles = userInfo["selectedStyles"] as? [Int] {
+                    self.selectedStyles = Set(styles)
+                }
             }
             .store(in: &cancellables)
 
