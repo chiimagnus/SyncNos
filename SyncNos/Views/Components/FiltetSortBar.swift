@@ -82,7 +82,15 @@ struct FiltetSortBar: View {
 
                 // 笔记筛选
                 Section("Filter") {
-                    Toggle("Has Notes", isOn: $noteFilter)
+                    Button {
+                        noteFilter.toggle()
+                    } label: {
+                        if noteFilter {
+                            Label("Has Notes", systemImage: "checkmark")
+                        } else {
+                            Text("Has Notes")
+                        }
+                    }
                 }
             } label: {
                 Image(systemName: "line.3.horizontal.decrease.circle")
