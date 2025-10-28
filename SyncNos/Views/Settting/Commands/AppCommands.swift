@@ -10,7 +10,7 @@ struct AppCommands: Commands {
     @AppStorage("goodlinks_sort_key") private var goodlinksSortKey: String = GoodLinksSortKey.modified.rawValue
     @AppStorage("goodlinks_sort_ascending") private var goodlinksSortAscending: Bool = false
     @AppStorage("goodlinks_show_starred_only") private var goodlinksShowStarredOnly: Bool = false
-    @AppStorage("highlight_sort_key") private var highlightSortKey: String = HighlightSortKey.created.rawValue
+    @AppStorage("highlight_sort_field") private var highlightSortField: String = HighlightSortField.created.rawValue
     @AppStorage("highlight_sort_ascending") private var highlightSortAscending: Bool = false
     @AppStorage("highlight_has_notes") private var highlightHasNotes: Bool = false
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
@@ -199,12 +199,12 @@ struct AppCommands: Commands {
             // Highlight 菜单 - 全局高亮排序和筛选
             Menu("Highlight", systemImage: "highlighter") {
                 Section("Sort") {
-                    ForEach(HighlightSortKey.allCases, id: \.self) { k in
+                    ForEach(HighlightSortField.allCases, id: \.self) { k in
                         Button {
-                            highlightSortKey = k.rawValue
+                            highlightSortField = k.rawValue
                             NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
                         } label: {
-                            if highlightSortKey == k.rawValue {
+                            if highlightSortField == k.rawValue {
                                 Label(k.displayName, systemImage: "checkmark")
                             } else {
                                 Text(k.displayName)
