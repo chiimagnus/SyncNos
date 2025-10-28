@@ -1,3 +1,76 @@
+## v0.5.7.2
+
+*Changed*
+
+- 界面优化：更新 AppCommands 菜单图标以提高清晰度，在 FiltetSortBar 和 AppCommands 中用 Button 替换 Toggle 以进行笔记筛选，保持 ViewModels 中高亮选择的紧凑遮罩。
+- 功能增强：在 ViewModels 中实现颜色筛选选择，统一筛选与排序体验。
+
+## v0.5.7.1
+
+*Added*
+
+- 全局设置：在 AppleBooks 和 GoodLinks 视图模型中同步全局高亮设置，在 AppCommands 中添加全局高亮排序和筛选选项。
+
+*Changed*
+
+- 状态管理优化：优化 UserDefaults 使用并在 ViewModels 中增强防抖机制，增强 GoodLinksViewModel 中的同步通知，改进应用重启流程。
+- 文档更新：移除 ViewModels 改进计划文档，精简项目文档结构。
+
+## v0.5.7
+
+*Changed*
+
+- 架构重构：简化 AppCommands 结构，移除详情视图中未使用的重置筛选功能，更新详情视图中的工具栏项目位置。
+- 组件更新：用 FiltetSortBar 替换 FilterBar 在 AppleBooks 和 GoodLinks 详情视图中，增强并发性和服务级别的 Sendable 合规性。
+
+## v0.5.6.7
+
+*Changed*
+
+- 代码优化：从 AppleBookDetailViewModel 中移除 syncToNotion 方法，将高亮筛选和排序合并到 GoodLinksViewModel 中以提升一致性。
+- 功能增强：在 GoodLinksDetailViewModel 和 UI 组件中增强排序功能，添加 GoodLinksDetailViewModel 和 FilterBar 以增强筛选选项。
+
+## v0.5.6.6
+
+*Changed*
+
+- 解析优化：增强 AppleBooksLocationParser 中的 EPUB CFI 解析能力，优化 AppleBookDetailView 中的高亮排序机制。
+- 界面改进：细化排序字段显示，修正 AppleBookDetailView 中的语法错误，简化排序选项并隐藏菜单指示器。
+
+## v0.5.6.5
+
+*Changed*
+
+- 交互改进：为 AppleBooksListView 和 GoodLinksListView 实现选择命令，更新 AppCommands 中的取消选择按钮图标。
+
+## v0.5.6.3
+
+*Added*
+
+- 深度集成：为 Apple Books 和 GoodLinks 添加上下文菜单选项以直接打开应用，为 GoodLinks 添加深度链接功能。
+
+*Changed*
+
+- UI 改进：在 AppleBooksListView 和 GoodLinksListView 中优化最后同步时间显示逻辑，提升用户体验反馈。
+
+## v0.5.6.2
+
+*Added*
+
+- Notion 集成增强：为 Notion 数据库添加"最后同步时间"属性并更新页面属性，提供更详细的同步状态信息。
+
+## v0.5.6.1
+
+*Changed*
+
+- 数据库管理：在 NotionService 中实现数据库创建的序列化机制，确保数据库操作的一致性和稳定性。
+
+## v0.5.5.1
+
+*Changed*
+
+- 文档调整：回滚计划文档，保持项目文档的简洁性和实用性。
+
 ## v0.5.5
 
 *Added*
