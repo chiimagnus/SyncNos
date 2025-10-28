@@ -110,7 +110,7 @@ struct AppCommands: Commands {
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
             if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
                 // Apple Books 的排序和筛选菜单
-                Menu("Books", systemImage: "line.3.horizontal.decrease.circle") {
+                Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
                         ForEach(BookListSortKey.allCases, id: \.self) { k in
                             Button {
@@ -154,7 +154,7 @@ struct AppCommands: Commands {
                 }
             } else {
                 // GoodLinks 的排序和筛选菜单
-                Menu("Articles", systemImage: "line.3.horizontal.decrease.circle") {
+                Menu("Articles", systemImage: "doc.text") {
                     Section("Sort") {
                         ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
                             Button {
