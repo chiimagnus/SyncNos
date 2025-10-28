@@ -53,8 +53,56 @@ struct LanguageView: View {
         alert.messageText = NSLocalizedString("Language Changed", comment: "Language change confirmation title")
         alert.informativeText = NSLocalizedString("Please restart the application for the language change to take effect.", comment: "Language change restart instruction")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
-        alert.runModal()
+
+        let okButton = alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
+        let restartButton = alert.addButton(withTitle: NSLocalizedString("Restart", comment: "Restart button"))
+
+        // 设置第一个按钮为默认按钮，第二个为替代按钮
+        okButton.keyEquivalent = "\r" // 回车键
+        restartButton.keyEquivalent = "\t" // Tab 键
+
+        let response = alert.runModal()
+
+        if response == .alertSecondButtonReturn {
+            // 用户点击了 Restart 按钮，执行重启
+            restartApplication()
+        }
+    }
+
+    private func restartApplication() {
+        let appBundlePath = Bundle.main.bundlePath
+
+        // 创建临时脚本文件来重启应用
+        let script = """
+        sleep 0.5
+        open "\(appBundlePath)"
+        """
+        let tempDirectory = NSTemporaryDirectory()
+        let scriptPath = "\(tempDirectory)/restart_\(UUID().uuidString).sh"
+
+        // 写入脚本文件
+        do {
+            try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+
+            // 设置脚本执行权限
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: scriptPath
+            )
+
+            // 启动脚本（在后台执行）
+            let task = Process()
+            task.launchPath = "/bin/bash"
+            task.arguments = [scriptPath]
+            task.launch()
+        } catch {
+            print("Failed to restart application: \(error)")
+        }
+
+        // 立即退出当前应用
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApplication.shared.terminate(nil)
+        }
     }
 
     var body: some View {
