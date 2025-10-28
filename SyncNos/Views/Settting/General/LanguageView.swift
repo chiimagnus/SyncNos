@@ -31,6 +31,8 @@ struct LanguageView: View {
         return supportedCodes.contains(languageCode ?? "") ? languageCode! : "en"
     }()
 
+    @State private var showRestartAlert = false
+
     let supportedLanguages = [
         ("en", "English"),
         ("zh-Hans", "中文(简体)"),
@@ -49,24 +51,7 @@ struct LanguageView: View {
         UserDefaults.standard.synchronize()
 
         // 显示重启提示
-        let alert = NSAlert()
-        alert.messageText = NSLocalizedString("Language Changed", comment: "Language change confirmation title")
-        alert.informativeText = NSLocalizedString("Please restart the application for the language change to take effect.", comment: "Language change restart instruction")
-        alert.alertStyle = .informational
-
-        let okButton = alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
-        let restartButton = alert.addButton(withTitle: NSLocalizedString("Restart", comment: "Restart button"))
-
-        // 设置第一个按钮为默认按钮，第二个为替代按钮
-        okButton.keyEquivalent = "\r" // 回车键
-        restartButton.keyEquivalent = "\t" // Tab 键
-
-        let response = alert.runModal()
-
-        if response == .alertSecondButtonReturn {
-            // 用户点击了 Restart 按钮，执行重启
-            restartApplication()
-        }
+        showRestartAlert = true
     }
 
     private func restartApplication() {
@@ -117,6 +102,16 @@ struct LanguageView: View {
             changeAppLanguage(to: newLanguage)
         }
         .help("Change application language")
+        .alert("Language Changed", isPresented: $showRestartAlert) {
+            Button("OK") {
+                // 仅关闭提示
+            }
+            Button("Restart") {
+                restartApplication()
+            }
+        } message: {
+            Text("Please restart the application for the language change to take effect.")
+        }
     }
 }
 
@@ -125,5 +120,3 @@ struct LanguageView_Previews: PreviewProvider {
         LanguageView()
     }
 }
-
-
