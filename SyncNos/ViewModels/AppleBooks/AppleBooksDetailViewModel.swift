@@ -62,6 +62,17 @@ class AppleBooksDetailViewModel: ObservableObject {
         if let globalStyles = UserDefaults.standard.array(forKey: "highlight_selected_styles") as? [Int] {
             self.selectedStyles = Set(globalStyles)
         }
+        // Initialize mask for App menu checkmarks (0 means all/empty selection)
+        do {
+            let arr = Array(self.selectedStyles).sorted()
+            if arr.isEmpty {
+                UserDefaults.standard.set(0, forKey: "highlight_selected_mask")
+            } else {
+                var mask = 0
+                for i in arr { mask |= (1 << i) }
+                UserDefaults.standard.set(mask, forKey: "highlight_selected_mask")
+            }
+        }
 
         // Subscribe to global highlight sort changes from AppCommands
         NotificationCenter.default.publisher(for: ABNotifications.highlightSortChanged)
@@ -143,6 +154,14 @@ class AppleBooksDetailViewModel: ObservableObject {
             .sink { arr in
                 UserDefaults.standard.set(arr, forKey: "detail_selected_styles")
                 UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+                // Maintain a compact mask for App menu binding
+                if arr.isEmpty {
+                    UserDefaults.standard.set(0, forKey: "highlight_selected_mask")
+                } else {
+                    var mask = 0
+                    for i in arr { mask |= (1 << i) }
+                    UserDefaults.standard.set(mask, forKey: "highlight_selected_mask")
+                }
             }
             .store(in: &cancellables)
     }
