@@ -107,7 +107,10 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             ])
             if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let helper = NotionHelperMethods()
-                let articleBlocks = helper.buildParagraphBlocks(from: contentText)
+                // 使用解析器生成“段落+图片”混合 blocks，保持相对顺序
+                let parser = ArticleContentParser()
+                let blocks = parser.parseToBlocks(contentText)
+                let articleBlocks = helper.buildArticleMixedBlocks(from: blocks)
                 pageChildren.append(contentsOf: articleBlocks)
             }
             pageChildren.append([
