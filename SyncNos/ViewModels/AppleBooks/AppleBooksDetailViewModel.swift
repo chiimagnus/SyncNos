@@ -186,24 +186,57 @@ class AppleBooksDetailViewModel: ObservableObject {
 
         isLoadingPage = true
 
+        // Capture state for background fetch to avoid main-actor blocking and race conditions
+        let currentOffsetLocal = self.currentOffset
+        let sortFieldLocal = self.sortField
+        let isAscendingLocal = self.isAscending
+        let noteFilterLocal = self.noteFilter
+        let selectedStylesLocal = self.selectedStyles
+        let pageSizeLocal = self.pageSize
+
         do {
-            // Convert Set to Array for the API call
-            let stylesArray = selectedStyles.isEmpty ? nil : Array(selectedStyles)
-            let rows = try s.fetchHighlightPage(assetId: asset, limit: pageSize, offset: currentOffset, since: nil, sortField: sortField, ascending: isAscending, noteFilter: noteFilter, styles: stylesArray)
+            let stylesArray = selectedStylesLocal.isEmpty ? nil : Array(selectedStylesLocal)
+            let rows = try await Task.detached(priority: .userInitiated) { () throws -> [HighlightRow] in
+                try s.fetchHighlightPage(
+                    assetId: asset,
+                    limit: pageSizeLocal,
+                    offset: currentOffsetLocal,
+                    since: nil,
+                    sortField: sortFieldLocal,
+                    ascending: isAscendingLocal,
+                    noteFilter: noteFilterLocal,
+                    styles: stylesArray
+                )
+            }.value
+
+            // If the current asset changed during the fetch, ignore these results
+            guard asset == currentAssetId else {
+                isLoadingPage = false
+                return
+            }
+
             let page = rows.map { r in
-                Highlight(uuid: r.uuid, text: r.text, note: r.note, style: r.style, dateAdded: r.dateAdded, modified: r.modified, location: r.location)
+                Highlight(
+                    uuid: r.uuid,
+                    text: r.text,
+                    note: r.note,
+                    style: r.style,
+                    dateAdded: r.dateAdded,
+                    modified: r.modified,
+                    location: r.location
+                )
             }
             if reset {
                 highlights = page
             } else {
                 highlights.append(contentsOf: page)
             }
-            currentOffset += page.count
+            currentOffset = currentOffsetLocal + page.count
+            isLoadingPage = false
         } catch {
             errorMessage = error.localizedDescription
+            isLoadingPage = false
         }
-
-        isLoadingPage = false
     }
     
     private func closeSession() {
