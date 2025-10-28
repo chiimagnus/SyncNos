@@ -15,66 +15,6 @@
 - 自动后台同步，可配置时间间隔
 - 通过 FastAPI 后端实现 Apple Sign In 认证
 
-## 构建与开发命令
-
-### macOS 应用 (Xcode)
-
-```bash
-# 在 Xcode 中打开
-open SyncNos.xcodeproj
-
-# 构建 Debug 配置
-xcodebuild -scheme SyncNos -configuration Debug build
-
-# 构建 Release 配置
-xcodebuild -scheme SyncNos -configuration Release build
-
-# 清理构建文件夹
-rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-*
-
-# 清理并重建
-rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-* && xcodebuild -scheme SyncNos -configuration Debug build
-
-# 运行应用
-open build/Debug/SyncNos.app
-```
-
-**环境要求：**
-- macOS 13.0+
-- Xcode 15.0+
-- Swift 5.0+
-
-### Python 后端 (FastAPI)
-
-```bash
-cd Backend/
-
-# 创建虚拟环境
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境
-# 编辑 .env 文件，设置 Apple 凭证
-
-# 运行开发服务器
-uvicorn app.main:app --reload --port 8000
-
-# 访问 API 文档
-# http://127.0.0.1:8000/docs
-```
-
-**后端环境变量** (Backend/.env):
-```bash
-APPLE_TEAM_ID=YOUR_TEAM_ID
-APPLE_KEY_ID=YOUR_KEY_ID
-APPLE_CLIENT_ID=com.example.app.services
-APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-APP_JWT_SECRET=your_jwt_secret
-```
-
 ## 架构
 
 ### SwiftUI 应用结构
@@ -191,23 +131,6 @@ DIContainer.shared.autoSyncService
 - UserGuide: 帮助文档
 - Logs: 同步操作日志
 
-### Python 后端结构
-
-```
-Backend/
-├── app/
-│   ├── main.py                   # FastAPI 应用入口
-│   ├── api/                      # 路由处理器
-│   ├── core/                     # 核心配置和安全
-│   ├── services/                 # 业务逻辑
-│   ├── models/                   # 数据模型
-│   └── security/                 # JWT 和 Apple 认证
-├── requirements.txt
-└── .env                          # 环境配置（不在 git 中）
-```
-
-后端处理 Apple Sign In OAuth 流程和 macOS 应用的 JWT 令牌颁发。
-
 ## 开发模式
 
 ### 视图模型 (ObservableObject + Combine)
@@ -259,50 +182,6 @@ protocol DatabaseServiceProtocol {
 - `HighlightRow`: 带关联书籍 ID 的高亮
 - `AssetHighlightStats`: 每个资源的聚合统计
 
-### FilterBar 组件
-
-**Views/Components/FilterBar.swift** - 统一筛选排序组件：
-
-功能特性：
-- 笔记筛选（全部/有笔记/无笔记）
-- 颜色筛选（Apple Books: 橙色/绿色/蓝色/黄色/粉色/紫色；GoodLinks: 黄色/绿色/蓝色/红色/紫色/薄荷色）
-- 排序字段和方向（创建时间/修改时间，升序/降序）
-- 一键重置功能
-- 通过 UserDefaults 持久化状态
-
-在详情视图中的使用：
-```swift
-FilterBar(
-    noteFilter: $viewModel.highlightNoteFilter,
-    selectedStyles: $viewModel.highlightSelectedStyles,
-    colorTheme: .appleBooks,  // 或 .goodLinks
-    sortField: viewModel.highlightSortField,
-    isAscending: viewModel.highlightIsAscending,
-    onSortFieldChanged: { field in
-        viewModel.highlightSortField = field
-    },
-    onAscendingChanged: { ascending in
-        viewModel.highlightIsAscending = ascending
-    }
-) {
-    viewModel.resetHighlightFilters()
-}
-```
-
-### ViewModel 架构差异
-
-**Apple Books**（两个 ViewModel）：
-- `AppleBookViewModel`: 列表管理、批量同步
-- `AppleBookDetailViewModel`: 详情页面分页加载（每页 500 条高亮）、数据库会话管理
-
-**GoodLinks**（一个 ViewModel）：
-- `GoodLinksViewModel`: 统一管理 - 列表、高亮存储（`highlightsByLinkId`）、详情筛选排序
-- 更简单的架构，因为 GoodLinks 高亮数量较少
-
-这种差异是**有意的、合理的**：
-- Apple Books: 复杂数据 → 需要专用的详情 ViewModel
-- GoodLinks: 简单数据 → 统一 ViewModel 更高效
-
 ## 重要说明
 
 ### Apple Books 数据库访问
@@ -328,13 +207,15 @@ FilterBar(
 - 重试逻辑：自动指数退避
 
 ### 国际化
-- 支持中文（zh-Hans）和英文（en）
+- 支持中文（zh-Hans）和英文（en）等i18n语言
 - 用户可以在设置中切换语言
 - UI 字符串使用 `LocalizedStringResource`
 
 ## Cursor 规则
 
-**.cursor/rules/SwiftUI响应式布局+MVVM架构+Combine响应式编程.mdc:1** 包含严格的架构指南：
+### .cursor/rules/SwiftUI响应式布局+MVVM架构+Combine响应式编程.mdc
+
+**架构指南**：包含严格的 MVVM + SwiftUI + Combine 架构规范
 
 **应该做的：**
 - 使用 MVVM 搭配 ObservableObject + @Published 或 @Observable
@@ -359,6 +240,30 @@ FilterBar(
 - 依赖注入：`.environmentObject(viewModel)`
 - 避免在视图间共享 ViewModel 实例
 
+### .cursor/rules/syncnos-localization.mdc
+
+**本地化指南**：提供 i18n 本地化工作的详细指导
+
+**核心内容**：
+- **多语言支持**：9种语言（英、中、法、德、日、韩、巴西葡、俄、西）
+- **字符串目录管理**：
+  - 主目录：Localizable.xcstrings（10048行）
+  - 拆分计划：按功能拆分为 Localizable-{2,3,4}.xcstrings
+- **使用规范**：
+  - SwiftUI：`Text("Articles")` 或 `Text(String(localized: "Sync", table: "Localizable-2"))`
+  - 传统 API：`NSLocalizedString("Articles", comment: "")`
+- **最佳实践**：
+  - 英文键名、驼峰命名
+  - 添加注释说明
+  - 正确处理格式化字符串和复数
+- **字符串分类**：
+  - 基础 UI 组件（保留在主目录）
+  - 同步相关进度消息
+  - 设置相关配置选项
+  - 错误消息和帮助文本
+
+**导出/导入**：Product → Export/Import Localizations
+
 ## 配置文件
 
 - **SyncNos.xcodeproj/project.pbxproj**: Xcode 项目设置
@@ -367,40 +272,3 @@ FilterBar(
 - **Backend/.env**: Apple 凭证（不在 git 中，已加入.ignore）
 - **buildServer.json**: 构建服务器配置
 - **Resource/Localizable.xcstrings**: 翻译文件（中文/英文）
-
-## 快速参考
-
-### 常用开发任务
-
-**构建和运行：**
-```bash
-# Debug 构建
-xcodebuild -scheme SyncNos -configuration Debug build
-
-# 清理构建
-rm -rf ~/Library/Developer/Xcode/DerivedData/SyncNos-*
-
-# 在 Xcode 中打开
-open SyncNos.xcodeproj
-```
-
-**FilterBar 集成：**
-- 导入：`import SwiftUI`
-- 添加到视图：放在详情视图的 VStack 中
-- 绑定属性：笔记筛选、选中样式、排序字段
-- 提供回调：onSortFieldChanged、onAscendingChanged、onResetFilters
-- 选择主题：`.appleBooks` 或 `.goodLinks`
-
-**服务访问：**
-```swift
-// 从 DI 容器获取服务
-let service = DIContainer.shared.goodLinksService
-let notionService = DIContainer.shared.notionService
-
-// 创建只读会话
-let session = try service.makeReadOnlySession(dbPath: dbPath)
-```
-
-**数据库路径：**
-- Apple Books: `~/Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/*.sqlite`
-- GoodLinks: 使用 `service.resolveDatabasePath()`
