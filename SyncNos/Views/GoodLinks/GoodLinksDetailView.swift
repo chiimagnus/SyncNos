@@ -38,6 +38,7 @@ struct GoodLinksDetailView: View {
                                 if let url = URL(string: link.openInGoodLinksURLString) {
                                     Link("Open in GoodLinks", destination: url)
                                         .font(.subheadline)
+                                        .foregroundColor(.blue)
                                 }
                             } content: {
                                 VStack(alignment: .leading, spacing: 10) {
@@ -165,6 +166,7 @@ struct GoodLinksDetailView: View {
                                         Text("未检测到正文内容，请")
                                         if let url = URL(string: link.openInGoodLinksURLString) {
                                             Link("Open in GoodLinks", destination: url)
+                                                .foregroundColor(.blue)
                                         }
                                         Text("，然后重新下载此文章。")
                                     }
