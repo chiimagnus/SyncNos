@@ -9,6 +9,7 @@ struct ArticleContentCardView: View {
     @Binding var measuredWidth: CGFloat
     let collapsedLineLimit: Int
     let revealThreshold: Int?
+    let customSlot: AnyView?
 
     @State private var isExpanded: Bool = false
 
@@ -26,6 +27,24 @@ struct ArticleContentCardView: View {
         self._measuredWidth = measuredWidth
         self.collapsedLineLimit = collapsedLineLimit
         self.revealThreshold = revealThreshold
+        self.customSlot = nil
+    }
+
+    init(
+        wordCount: Int,
+        overrideWidth: CGFloat? = nil,
+        measuredWidth: Binding<CGFloat>,
+        collapsedLineLimit: Int = 12,
+        revealThreshold: Int? = 800,
+        customSlot: AnyView
+    ) {
+        self.wordCount = wordCount
+        self.contentText = ""
+        self.overrideWidth = overrideWidth
+        self._measuredWidth = measuredWidth
+        self.collapsedLineLimit = collapsedLineLimit
+        self.revealThreshold = revealThreshold
+        self.customSlot = customSlot
     }
 
     var body: some View {
@@ -47,18 +66,28 @@ struct ArticleContentCardView: View {
             }
             .padding(.bottom, 4)
 
-            Text(contentText)
-                .font(.body)
-                .foregroundColor(.primary)
-                .textSelection(.enabled)
-                .lineLimit(isExpanded ? nil : collapsedLineLimit)
-                .fixedSize(horizontal: false, vertical: isExpanded)
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-                )
+            Group {
+                if let slot = customSlot {
+                    slot
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(contentText)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .textSelection(.enabled)
+                        .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                        .fixedSize(horizontal: false, vertical: isExpanded)
+                }
+            }
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.06)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+            )
 
             if shouldShowToggle {
                 Button(action: { isExpanded.toggle() }) {
@@ -88,6 +117,7 @@ struct ArticleContentCardView: View {
 
 private extension ArticleContentCardView {
     var shouldShowToggle: Bool {
+        if customSlot != nil { return false }
         if let threshold = revealThreshold {
             return contentText.count > threshold
         }
