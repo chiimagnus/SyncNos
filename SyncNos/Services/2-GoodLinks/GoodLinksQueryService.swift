@@ -9,8 +9,7 @@ final class GoodLinksQueryService: Sendable {
     func fetchRecentLinks(db: OpaquePointer, limit: Int) throws -> [GoodLinksLinkRow] {
         // 当 limit <= 0 时，展示全部条目（不加 LIMIT）
         // 使用一次性聚合 + LEFT JOIN，实时统计高亮数量，避免依赖可能过期的 link.highlightTotal
-        // 同时选择 link.preview 作为正文回退显示来源
-        let baseSQL = "SELECT link.id, link.url, link.originalURL, link.title, link.summary, link.author, link.preview, link.tags, link.starred, link.readAt, link.addedAt, link.modifiedAt, COALESCE(h.cnt, 0) AS highlightTotal FROM link LEFT JOIN (SELECT linkID, COUNT(*) AS cnt FROM highlight GROUP BY linkID) AS h ON h.linkID = link.id ORDER BY link.modifiedAt DESC"
+        let baseSQL = "SELECT link.id, link.url, link.originalURL, link.title, link.summary, link.author, link.tags, link.starred, link.readAt, link.addedAt, link.modifiedAt, COALESCE(h.cnt, 0) AS highlightTotal FROM link LEFT JOIN (SELECT linkID, COUNT(*) AS cnt FROM highlight GROUP BY linkID) AS h ON h.linkID = link.id ORDER BY link.modifiedAt DESC"
         let sql = limit > 0 ? baseSQL + " LIMIT ?;" : baseSQL + ";"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -27,14 +26,13 @@ final class GoodLinksQueryService: Sendable {
             let title = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
             let summary = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
             let author = sqlite3_column_text(stmt, 5).map { String(cString: $0) }
-            let preview = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
-            let tags = sqlite3_column_text(stmt, 7).map { String(cString: $0) }
-            let starred = sqlite3_column_int64(stmt, 8) != 0
-            let readAt = sqlite3_column_double(stmt, 9)
-            let addedAt = sqlite3_column_double(stmt, 10)
-            let modifiedAt = sqlite3_column_double(stmt, 11)
-            let highlightTotal: Int? = sqlite3_column_type(stmt, 12) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 12))
-            rows.append(GoodLinksLinkRow(id: id, url: url, originalURL: originalURL, title: title, summary: summary, author: author, preview: preview, tags: tags, starred: starred, readAt: readAt, addedAt: addedAt, modifiedAt: modifiedAt, highlightTotal: highlightTotal))
+            let tags = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
+            let starred = sqlite3_column_int64(stmt, 7) != 0
+            let readAt = sqlite3_column_double(stmt, 8)
+            let addedAt = sqlite3_column_double(stmt, 9)
+            let modifiedAt = sqlite3_column_double(stmt, 10)
+            let highlightTotal: Int? = sqlite3_column_type(stmt, 11) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 11))
+            rows.append(GoodLinksLinkRow(id: id, url: url, originalURL: originalURL, title: title, summary: summary, author: author, tags: tags, starred: starred, readAt: readAt, addedAt: addedAt, modifiedAt: modifiedAt, highlightTotal: highlightTotal))
         }
         return rows
     }
