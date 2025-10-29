@@ -1,14 +1,20 @@
 import SwiftUI
 
 struct MultipleSelectionPlaceholderView: View {
+    let title: String
     let count: Int
     let onSyncSelected: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "rectangle.stack")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
+            Image(nsImage: NSImage(named: "AppIcon")!)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+            Text(title)
+                .font(.system(size: 56, weight: .bold, design: .rounded))
+                .fontWidth(.compressed)
+                .minimumScaleFactor(0.8)
             Text("Multiple Selected (\(count))")
                 .font(.title3)
                 .foregroundColor(.primary)
@@ -17,8 +23,10 @@ struct MultipleSelectionPlaceholderView: View {
             } label: {
                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
             }
+            
+            // if ...
+            Text("This area will show the sync queue progress and management buttons (coming soon!)")
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
