@@ -77,7 +77,7 @@ xcodebuild -scheme SyncNos -configuration Debug build
 
 ## 📄 许可证
 
-本项目采用 [GPL-3.0 License](LICENSE)。
+本项目采用 [AGPL-3.0 License](LICENSE)。
 
 ---
 
