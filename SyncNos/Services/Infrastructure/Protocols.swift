@@ -228,3 +228,9 @@ protocol AuthServiceProtocol: AnyObject {
     func fetchLoginMethods(accessToken: String) async throws -> [LoginMethod]
     func deleteAccount(accessToken: String) async throws
 }
+
+// MARK: - Sync Activity Monitor Protocol
+/// 汇总应用范围内的同步活动，用于退出拦截提示等场景。
+protocol SyncActivityMonitorProtocol: AnyObject {
+    var isSyncing: Bool { get }
+}

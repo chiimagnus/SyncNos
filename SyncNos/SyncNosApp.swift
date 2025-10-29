@@ -3,6 +3,7 @@ import AppKit
 import StoreKit
 @main
 struct SyncNosApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     init() {
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
@@ -20,6 +21,9 @@ struct SyncNosApp: App {
         if autoSyncEnabled {
             DIContainer.shared.autoSyncService.start()
         }
+
+        // 初始化同步状态监控，确保尽早开始监听通知
+        _ = DIContainer.shared.syncActivityMonitor
     }
 
     var body: some Scene {
