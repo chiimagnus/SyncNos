@@ -58,7 +58,7 @@ struct MainListView: View {
                     )
                     GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
                 } else if selectedLinkIds.count > 1 {
-                    MultipleSelectionPlaceholderView(count: selectedLinkIds.count) {
+                    MultipleSelectionPlaceholderView(title: contentSource.title, count: selectedLinkIds.count) {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
@@ -68,7 +68,6 @@ struct MainListView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 120, height: 120)
-                            .opacity(0.9)
 
                         Text(contentSource.title)
                             .font(.system(size: 56, weight: .bold, design: .rounded))
@@ -78,6 +77,9 @@ struct MainListView: View {
                         Text("Please select an item")
                             .font(.title3)
                             .foregroundColor(.secondary)
+                        
+                        // if ...
+                        Text("This area will show the sync queue progress and management buttons (coming soon!)")
                     }
                     .padding()
                 }
@@ -89,7 +91,7 @@ struct MainListView: View {
                     )
                     AppleBooksDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
                 } else if selectedBookIds.count > 1 {
-                    MultipleSelectionPlaceholderView(count: selectedBookIds.count) {
+                    MultipleSelectionPlaceholderView(title: contentSource.title, count: selectedBookIds.count) {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
@@ -99,7 +101,6 @@ struct MainListView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 120, height: 120)
-                            .opacity(0.9)
 
                         Text(contentSource.title)
                             .font(.system(size: 56, weight: .bold, design: .rounded))
