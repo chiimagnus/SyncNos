@@ -109,14 +109,6 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                 let helper = NotionHelperMethods()
                 let articleBlocks = helper.buildParagraphBlocks(from: contentText)
                 pageChildren.append(contentsOf: articleBlocks)
-            } else if let preview = link.preview, !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let helper = NotionHelperMethods()
-                let articleBlocks = helper.buildParagraphBlocks(from: preview)
-                pageChildren.append(contentsOf: articleBlocks)
-            } else if let summary = link.summary, !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let helper = NotionHelperMethods()
-                let articleBlocks = helper.buildParagraphBlocks(from: summary)
-                pageChildren.append(contentsOf: articleBlocks)
             }
             pageChildren.append([
                 "object": "block",
