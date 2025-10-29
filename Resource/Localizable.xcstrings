@@ -715,6 +715,64 @@
         }
       }
     },
+    "and re-download this article." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "und laden Sie diesen Artikel erneut herunter."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "and re-download this article."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "y vuelva a descargar este artículo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "et retéléchargez cet article."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "そしてこの記事を再ダウンロードしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기사를 다시 다운로드하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e baixe novamente este artigo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "и перезагрузите эту статью."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "并重新下载这篇文章。"
+          }
+        }
+      }
+    },
     "Appending %lld new highlights..." : {
       "localizations" : {
         "de" : {
@@ -4798,6 +4856,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名称: %@"
+          }
+        }
+      }
+    },
+    "No article content detected. Please" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Artikelinhalt erkannt. Bitte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No article content detected. Please"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se detectó contenido del artículo. Por favor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun contenu d'article détecté. Veuillez"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記事コンテンツが検出されませんでした。どうぞ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기사 콘텐츠가 감지되지 않았습니다. 부탁드립니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum conteúdo de artigo detectado. Por favor"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Содержимое статьи не обнаружено. Пожалуйста"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到文章内容。请"
           }
         }
       }
@@ -9391,6 +9507,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SyncNos 用户指南"
+          }
+        }
+      }
+    },
+    "This area will show the sync queue progress and management buttons (coming soon!)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Bereich zeigt den Fortschritt der Synchronisierungswarteschlange und die Verwaltungsbuttons an (kommt bald!)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This area will show the sync queue progress and management buttons (coming soon!)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta área mostrará el progreso de la cola de sincronización y los botones de gestión (¡próximamente!)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette zone affichera la progression de la file d'attente de synchronisation et les boutons de gestion (bientôt disponible !)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この領域には同期キューの進行状況と管理ボタンが表示されます（近日公開！）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 영역에는 동기화 대기열 진행 상황과 관리 버튼이 표시됩니다 (곧 출시됩니다!)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta área mostrará o progresso da fila de sincronização e os botões de gerenciamento (em breve!)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В этой области будет отображаться прогресс очереди синхронизации и кнопки управления (скоро!)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此区域将显示同步队列进度和管理按钮（即将推出！）"
           }
         }
       }
