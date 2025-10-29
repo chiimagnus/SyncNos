@@ -154,6 +154,19 @@ struct GoodLinksDetailView: View {
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth
                             )
+                        } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text("未检测到正文内容，请")
+                                if let url = URL(string: link.openInGoodLinksURLString) {
+                                    Link("Open in GoodLinks", destination: url)
+                                } else {
+                                    Text("Open in GoodLinks")
+                                }
+                                Text("，然后重新下载此文章。")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding()
                         }
 
                         // 高亮列表
