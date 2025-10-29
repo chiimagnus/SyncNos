@@ -163,12 +163,12 @@ struct GoodLinksDetailView: View {
                                 revealThreshold: nil,
                                 customSlot: AnyView(
                                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                        Text("未检测到正文内容，请")
+                                        Text("No article content detected. Please")
                                         if let url = URL(string: link.openInGoodLinksURLString) {
                                             Link("Open in GoodLinks", destination: url)
                                                 .foregroundColor(.blue)
                                         }
-                                        Text("，然后重新下载此文章。")
+                                        Text("and re-download this article.")
                                     }
                                 )
                             )
