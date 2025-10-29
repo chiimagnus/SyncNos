@@ -62,12 +62,24 @@ struct MainListView: View {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack {
+                    VStack(spacing: 20) {
+                        // App Logo
+                        Image(nsImage: NSImage(named: "AppIcon")!)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
+                            .opacity(0.9)
+
                         Text(contentSource.title)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        Text("Please select an item").foregroundColor(.secondary)
+                            .font(.system(size: 56, weight: .bold, design: .rounded))
+                            .fontWidth(.compressed)
+                            .minimumScaleFactor(0.8)
+
+                        Text("Please select an item")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
                 }
             } else {
                 if selectedBookIds.count == 1 {
@@ -81,12 +93,24 @@ struct MainListView: View {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack {
+                    VStack(spacing: 20) {
+                        // App Logo
+                        Image(nsImage: NSImage(named: "AppIcon")!)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
+                            .opacity(0.9)
+
                         Text(contentSource.title)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        Text("Please select an item").foregroundColor(.secondary)
+                            .font(.system(size: 56, weight: .bold, design: .rounded))
+                            .fontWidth(.compressed)
+                            .minimumScaleFactor(0.8)
+
+                        Text("Please select an item")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
                 }
             }
         }
