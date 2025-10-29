@@ -95,7 +95,7 @@ struct AppleBooksDetailView: View {
                                             NSWorkspace.shared.open(url)
                                         }
                                     } label: {
-                                        Image(systemName: "book")
+                                        Image(systemName: "location")
                                             .imageScale(.medium)
                                             .foregroundColor(.primary)
                                     }
