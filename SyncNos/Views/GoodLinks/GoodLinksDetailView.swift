@@ -211,7 +211,7 @@ struct GoodLinksDetailView: View {
                                                     NSWorkspace.shared.open(url)
                                                 }
                                             } label: {
-                                                Image(systemName: "link")
+                                                Image(systemName: "location")
                                                     .imageScale(.medium)
                                                     .foregroundColor(.primary)
                                             }
