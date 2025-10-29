@@ -54,6 +54,19 @@ struct LanguageView: View {
     }
 
     private func restartApplication() {
+        // 若正在同步，先弹出统一的退出确认
+        if DIContainer.shared.syncActivityMonitor.isSyncing {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = String(localized: "quit.confirm.title", table: "Localizable-2")
+            alert.addButton(withTitle: String(localized: "quit.button.cancel", table: "Localizable-2")) // 默认：不退出
+            alert.addButton(withTitle: String(localized: "quit.button.quit", table: "Localizable-2"))
+            let response = alert.runModal()
+            guard response == .alertSecondButtonReturn else { return }
+            // 避免接下来 NSApp.terminate(nil) 再次弹窗
+            NotificationCenter.default.post(name: Notification.Name("BypassQuitConfirmationOnce"), object: nil)
+        }
+
         let appBundlePath = Bundle.main.bundlePath
 
         // 创建临时脚本文件来重启应用
