@@ -77,7 +77,7 @@ struct ArticleContentCardView: View {
                     Text(contentText)
                         .font(.body)
                         .foregroundColor(.primary)
-                        .textSelection(.enabled)
+                        .textSelection(.disabled)
                         .lineLimit(isExpanded ? nil : collapsedLineLimit)
                         .fixedSize(horizontal: false, vertical: isExpanded)
                 }
