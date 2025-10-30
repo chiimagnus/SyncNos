@@ -153,7 +153,8 @@ struct GoodLinksDetailView: View {
                                 wordCount: contentRow.wordCount,
                                 contentText: fullText,
                                 overrideWidth: frozenLayoutWidth,
-                                measuredWidth: $measuredLayoutWidth
+                                measuredWidth: $measuredLayoutWidth,
+                                resetId: linkId
                             )
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
@@ -170,7 +171,8 @@ struct GoodLinksDetailView: View {
                                         }
                                         Text("and re-download this article.")
                                     }
-                                )
+                                ),
+                                resetId: linkId
                             )
                         }
 
