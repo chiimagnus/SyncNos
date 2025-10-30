@@ -27,8 +27,13 @@ struct GoodLinksDetailView: View {
     var body: some View {
         Group {
             if let linkId = selectedLinkId, !linkId.isEmpty {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            // Top anchor used for programmatic scrolling when content shrinks
+                            Color.clear
+                                .frame(height: 0)
+                                .id("goodlinksDetailTop")
                         if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             // 文章信息卡片 - 使用统一卡片
                             InfoHeaderCardView(
@@ -242,9 +247,18 @@ struct GoodLinksDetailView: View {
                                     .padding()
                             }
                         }
+                        }
+                        // .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
                     }
-                    // .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+                    // when the article collapses, ensure we scroll to top to avoid empty space
+                    .onChange(of: articleIsExpanded) { expanded in
+                        if !expanded {
+                            withAnimation {
+                                proxy.scrollTo("goodlinksDetailTop", anchor: .top)
+                            }
+                        }
+                    }
                 }
                 .onAppear {
                     Task {
