@@ -59,6 +59,12 @@ struct MainListView: View {
                     GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
                 } else if selectedLinkIds.count > 1 {
                     MultipleSelectionPlaceholderView(title: contentSource.title, count: selectedLinkIds.count) {
+                        let items = selectedLinkIds.compactMap { id -> [String: Any]? in
+                            guard let link = goodLinksVM.displayLinks.first(where: { $0.id == id }) else { return nil }
+                            let title = (link.title?.isEmpty == false ? link.title! : link.url)
+                            return ["id": id, "title": title, "subtitle": link.author ?? ""]
+                        }
+                        NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
@@ -92,6 +98,11 @@ struct MainListView: View {
                     AppleBooksDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
                 } else if selectedBookIds.count > 1 {
                     MultipleSelectionPlaceholderView(title: contentSource.title, count: selectedBookIds.count) {
+                        let items = selectedBookIds.compactMap { id -> [String: Any]? in
+                            guard let b = viewModel.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                            return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
+                        }
+                        NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
