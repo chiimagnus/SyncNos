@@ -6,15 +6,15 @@ struct SyncQueueView: View {
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Sync Queue")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Spacer()
-                    Text("Concurrency: \(viewModel.concurrencyLimit)")
-                        .foregroundColor(.secondary)
-                        .font(.subheadline)
-                }
+                // HStack {
+                //     Text("Sync Queue")
+                //         .font(.title)
+                //         .fontWeight(.bold)
+                //     Spacer()
+                //     Text("Concurrency: \(viewModel.concurrencyLimit)")
+                //         .foregroundColor(.secondary)
+                //         .font(.subheadline)
+                // }
 
                 GroupBox(label: Label("Running", systemImage: "arrow.triangle.2.circlepath.circle.fill")) {
                     queueSection(title: "Apple Books", tasks: viewModel.runningAppleBooks)
@@ -27,11 +27,15 @@ struct SyncQueueView: View {
                     Divider()
                     queueSection(title: "GoodLinks", tasks: viewModel.queuedGoodLinks)
                 }
-
-                Spacer(minLength: 0)
             }
             .padding()
-            .frame(minWidth: 520, minHeight: 420)
+            .frame(width: 425)
+        }
+        .navigationTitle("Sync Queue")
+        .toolbar {
+            ToolbarItem {
+                Text("")
+            }
         }
     }
 
