@@ -298,8 +298,8 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
-                    // Filter bar in toolbar
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        // Filter bar in toolbar
                         FiltetSortBar(
                             noteFilter: $viewModel.highlightNoteFilter,
                             selectedStyles: $viewModel.highlightSelectedStyles,
@@ -313,10 +313,8 @@ struct GoodLinksDetailView: View {
                                 viewModel.highlightIsAscending = ascending
                             }
                         )
-                    }
 
-                    // Sync button / progress
-                    ToolbarItem(placement: .primaryAction) {
+                        // Sync button / progress
                         if externalIsSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)

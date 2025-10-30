@@ -192,8 +192,8 @@ struct AppleBooksDetailView: View {
             }
         }
         .toolbar {
-            // Filter bar in toolbar
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                // Filter bar in toolbar
                 FiltetSortBar(
                     noteFilter: $viewModel.noteFilter,
                     selectedStyles: $viewModel.selectedStyles,
@@ -207,10 +207,8 @@ struct AppleBooksDetailView: View {
                         viewModel.isAscending = ascending
                     }
                 )
-            }
 
-            // Sync button / progress (shows per-item batch progress when available)
-            ToolbarItem(placement: .primaryAction) {
+                // Sync button / progress (shows per-item batch progress when available)
                 if externalIsSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
