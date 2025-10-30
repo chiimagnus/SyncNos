@@ -24,6 +24,8 @@ struct SyncNosApp: App {
 
         // 初始化同步状态监控，确保尽早开始监听通知
         _ = DIContainer.shared.syncActivityMonitor
+        // 初始化同步队列存储，确保尽早开始监听入队/状态事件
+        _ = DIContainer.shared.syncQueueStore
     }
 
     var body: some Scene {
@@ -46,6 +48,12 @@ struct SyncNosApp: App {
         // 日志窗口（单实例）
         Window("Logs", id: "log") {
             LogWindow()
+        }
+        .windowResizability(.contentSize)
+
+        // 同步队列窗口（单实例）
+        Window("Sync Queue", id: "syncqueue") {
+            SyncQueueView()
         }
         .windowResizability(.contentSize)
         

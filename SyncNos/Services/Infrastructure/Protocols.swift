@@ -234,3 +234,11 @@ protocol AuthServiceProtocol: AnyObject {
 protocol SyncActivityMonitorProtocol: AnyObject {
     var isSyncing: Bool { get }
 }
+
+// MARK: - Sync Queue Store Protocol
+protocol SyncQueueStoreProtocol: AnyObject {
+    /// 当前任务的快照（线程安全读取）
+    var snapshot: [SyncQueueTask] { get }
+    /// 任务流（主线程交付）
+    var tasksPublisher: AnyPublisher<[SyncQueueTask], Never> { get }
+}
