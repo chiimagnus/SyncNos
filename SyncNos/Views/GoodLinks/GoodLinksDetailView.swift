@@ -9,6 +9,7 @@ struct GoodLinksDetailView: View {
     @State private var isLiveResizing: Bool = false
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var frozenLayoutWidth: CGFloat? = nil
+    @State private var articleIsExpanded: Bool = false
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
     @State private var externalIsSyncing: Bool = false
@@ -153,7 +154,8 @@ struct GoodLinksDetailView: View {
                                 wordCount: contentRow.wordCount,
                                 contentText: fullText,
                                 overrideWidth: frozenLayoutWidth,
-                                measuredWidth: $measuredLayoutWidth
+                                measuredWidth: $measuredLayoutWidth,
+                                isExpanded: $articleIsExpanded
                             )
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
@@ -170,7 +172,8 @@ struct GoodLinksDetailView: View {
                                         }
                                         Text("and re-download this article.")
                                     }
-                                )
+                                ),
+                                isExpanded: $articleIsExpanded
                             )
                         }
 
@@ -355,6 +358,7 @@ struct GoodLinksDetailView: View {
             }
         }
         .onChange(of: selectedLinkId) { _ in
+            articleIsExpanded = false
             externalIsSyncing = false
             externalSyncProgress = nil
         }
