@@ -10,8 +10,10 @@ struct ArticleContentCardView: View {
     let collapsedLineLimit: Int
     let revealThreshold: Int?
     let customSlot: AnyView?
+    let resetId: String?
 
     @State private var isExpanded: Bool = false
+    @State private var trackedResetId: String?
 
     init(
         wordCount: Int,
@@ -19,7 +21,8 @@ struct ArticleContentCardView: View {
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
         collapsedLineLimit: Int = 12,
-        revealThreshold: Int? = 800
+        revealThreshold: Int? = 800,
+        resetId: String? = nil
     ) {
         self.wordCount = wordCount
         self.contentText = contentText
@@ -28,6 +31,8 @@ struct ArticleContentCardView: View {
         self.collapsedLineLimit = collapsedLineLimit
         self.revealThreshold = revealThreshold
         self.customSlot = nil
+        self.resetId = resetId
+        self._trackedResetId = State(initialValue: resetId)
     }
 
     init(
@@ -36,6 +41,7 @@ struct ArticleContentCardView: View {
         measuredWidth: Binding<CGFloat>,
         collapsedLineLimit: Int = 12,
         revealThreshold: Int? = 800,
+        resetId: String? = nil,
         customSlot: AnyView
     ) {
         self.wordCount = wordCount
@@ -45,6 +51,8 @@ struct ArticleContentCardView: View {
         self.collapsedLineLimit = collapsedLineLimit
         self.revealThreshold = revealThreshold
         self.customSlot = customSlot
+        self.resetId = resetId
+        self._trackedResetId = State(initialValue: resetId)
     }
 
     var body: some View {
@@ -112,6 +120,12 @@ struct ArticleContentCardView: View {
             }
         )
         .frame(maxWidth: overrideWidth, alignment: .leading)
+        .onChange(of: resetId) { newResetId in
+            if newResetId != trackedResetId {
+                trackedResetId = newResetId
+                isExpanded = false
+            }
+        }
     }
 }
 
