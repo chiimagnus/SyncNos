@@ -10,8 +10,15 @@ struct ArticleContentCardView: View {
     let collapsedLineLimit: Int
     let revealThreshold: Int?
     let customSlot: AnyView?
+    // Optional binding provided by parent to control expanded state.
+    let isExpandedBinding: Binding<Bool>?
 
-    @State private var isExpanded: Bool = false
+    @State private var isExpandedInternal: Bool = false
+
+    private var expandedBinding: Binding<Bool> {
+        if let b = isExpandedBinding { return b }
+        return Binding(get: { self.isExpandedInternal }, set: { self.isExpandedInternal = $0 })
+    }
 
     init(
         wordCount: Int,
@@ -19,7 +26,8 @@ struct ArticleContentCardView: View {
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
         collapsedLineLimit: Int = 12,
-        revealThreshold: Int? = 800
+        revealThreshold: Int? = 800,
+        isExpanded: Binding<Bool>? = nil
     ) {
         self.wordCount = wordCount
         self.contentText = contentText
@@ -28,6 +36,7 @@ struct ArticleContentCardView: View {
         self.collapsedLineLimit = collapsedLineLimit
         self.revealThreshold = revealThreshold
         self.customSlot = nil
+        self.isExpandedBinding = isExpanded
     }
 
     init(
@@ -36,7 +45,8 @@ struct ArticleContentCardView: View {
         measuredWidth: Binding<CGFloat>,
         collapsedLineLimit: Int = 12,
         revealThreshold: Int? = 800,
-        customSlot: AnyView
+        customSlot: AnyView,
+        isExpanded: Binding<Bool>? = nil
     ) {
         self.wordCount = wordCount
         self.contentText = ""
@@ -45,6 +55,7 @@ struct ArticleContentCardView: View {
         self.collapsedLineLimit = collapsedLineLimit
         self.revealThreshold = revealThreshold
         self.customSlot = customSlot
+        self.isExpandedBinding = isExpanded
     }
 
     var body: some View {
@@ -78,8 +89,8 @@ struct ArticleContentCardView: View {
                         .font(.body)
                         .foregroundColor(.primary)
                         .textSelection(.disabled)
-                        .lineLimit(isExpanded ? nil : collapsedLineLimit)
-                        .fixedSize(horizontal: false, vertical: isExpanded)
+                        .lineLimit(expandedBinding.wrappedValue ? nil : collapsedLineLimit)
+                        .fixedSize(horizontal: false, vertical: expandedBinding.wrappedValue)
                 }
             }
             .padding()
@@ -90,10 +101,10 @@ struct ArticleContentCardView: View {
             )
 
             if shouldShowToggle {
-                Button(action: { isExpanded.toggle() }) {
+                Button(action: { expandedBinding.wrappedValue.toggle() }) {
                     HStack(spacing: 6) {
-                        Text(isExpanded ? "Collapse" : "Expand")
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        Text(expandedBinding.wrappedValue ? "Collapse" : "Expand")
+                        Image(systemName: expandedBinding.wrappedValue ? "chevron.up" : "chevron.down")
                             .imageScale(.small)
                     }
                     .font(.caption)
