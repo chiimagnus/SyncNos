@@ -30,7 +30,7 @@ struct GoodLinksDetailView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
-                            // Top anchor used for programmatic scrolling when content shrinks
+                            // Top anchor used for programmatic scrolling when content changes
                             Color.clear
                                 .frame(height: 0)
                                 .id("goodlinksDetailTop")
@@ -257,6 +257,12 @@ struct GoodLinksDetailView: View {
                             withAnimation {
                                 proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                             }
+                        }
+                    }
+                    // Scroll to top when selected link changes
+                    .onChange(of: linkId) { _ in
+                        withAnimation {
+                            proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                         }
                     }
                 }
