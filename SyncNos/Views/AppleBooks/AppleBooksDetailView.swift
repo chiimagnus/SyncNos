@@ -50,94 +50,106 @@ struct AppleBooksDetailView: View {
     var body: some View {
         Group {
             if let book = selectedBook {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Book header using unified card
-                        InfoHeaderCardView(
-                            title: book.bookTitle,
-                            subtitle: "by \(book.authorName)",
-                            overrideWidth: frozenLayoutWidth
-                        ) {
-                            if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
-                                Link("Open in Apple Books", destination: ibooksURL)
-                                    .font(.subheadline)
-                            }
-                        } content: {
-                            HStack(spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "highlighter")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Top anchor used for programmatic scrolling when content changes
+                            Color.clear
+                                .frame(height: 0)
+                                .id("appleBooksDetailTop")
+                            // Book header using unified card
+                            InfoHeaderCardView(
+                                title: book.bookTitle,
+                                subtitle: "by \(book.authorName)",
+                                overrideWidth: frozenLayoutWidth
+                            ) {
+                                if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
+                                    Link("Open in Apple Books", destination: ibooksURL)
+                                        .font(.subheadline)
+                                }
+                            } content: {
+                                HStack(spacing: 12) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "highlighter")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("\(book.highlightCount) highlights")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
                             }
-                        }
 
 
-                        // Highlights section (Waterfall / Masonry)
-                        WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
-                            ForEach(viewModel.highlights, id: \.uuid) { highlight in
-                                HighlightCardView(
-                                    colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
-                                    content: highlight.text,
-                                    note: highlight.note,
-                                    createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
-                                    modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
-                                ) {
-                                    Button {
-                                        if let location = highlight.location {
-                                            let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
-                                            NSWorkspace.shared.open(url)
-                                        } else {
-                                            let url = URL(string: "ibooks://assetid/\(book.bookId)")!
-                                            NSWorkspace.shared.open(url)
+                            // Highlights section (Waterfall / Masonry)
+                            WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                                ForEach(viewModel.highlights, id: \.uuid) { highlight in
+                                    HighlightCardView(
+                                        colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
+                                        content: highlight.text,
+                                        note: highlight.note,
+                                        createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
+                                        modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
+                                    ) {
+                                        Button {
+                                            if let location = highlight.location {
+                                                let url = URL(string: "ibooks://assetid/\(book.bookId)#\(location)")!
+                                                NSWorkspace.shared.open(url)
+                                            } else {
+                                                let url = URL(string: "ibooks://assetid/\(book.bookId)")!
+                                                NSWorkspace.shared.open(url)
+                                            }
+                                        } label: {
+                                            Image(systemName: "location")
+                                                .imageScale(.medium)
+                                                .foregroundColor(.primary)
                                         }
-                                    } label: {
-                                        Image(systemName: "location")
-                                            .imageScale(.medium)
-                                            .foregroundColor(.primary)
+                                        .buttonStyle(.plain)
+                                        .help("Open in Apple Books")
+                                        .accessibilityLabel("Open in Apple Books")
                                     }
-                                    .buttonStyle(.plain)
-                                    .help("Open in Apple Books")
-                                    .accessibilityLabel("Open in Apple Books")
                                 }
+                            }
+                            .padding(.top)
+                            .overlay(
+                                GeometryReader { proxy in
+                                    let w = proxy.size.width
+                                    Color.clear
+                                        .onAppear { measuredLayoutWidth = w }
+                                        .onChange(of: w) { newValue in
+                                            measuredLayoutWidth = newValue
+                                        }
+                                }
+                            )
+
+                            if viewModel.canLoadMore {
+                                HStack {
+                                    Spacer()
+                                    Button(action: {
+                                        Task {
+                                            await viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId)
+                                        }
+                                    }) {
+                                        if viewModel.isLoadingPage {
+                                            ProgressView()
+                                        } else {
+                                            Text("Load more")
+                                        }
+                                    }
+                                    // .buttonStyle(.borderedProminent)
+                                    Spacer()
+                                }
+                                .padding(.top, 8)
                             }
                         }
-                        .padding(.top)
-                        .overlay(
-                            GeometryReader { proxy in
-                                let w = proxy.size.width
-                                Color.clear
-                                    .onAppear { measuredLayoutWidth = w }
-                                    .onChange(of: w) { newValue in
-                                        measuredLayoutWidth = newValue
-                                    }
-                            }
-                        )
-
-                        if viewModel.canLoadMore {
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    Task {
-                                        await viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId)
-                                    }
-                                }) {
-                                    if viewModel.isLoadingPage {
-                                        ProgressView()
-                                    } else {
-                                        Text("Load more")
-                                    }
-                                }
-                                // .buttonStyle(.borderedProminent)
-                                Spacer()
-                            }
-                            .padding(.top, 8)
+                        .padding()
+                    }
+                    // Scroll to top when selected book changes
+                    .onChange(of: selectedBookId) { _ in
+                        withAnimation {
+                            proxy.scrollTo("appleBooksDetailTop", anchor: .top)
                         }
                     }
-                    .padding()
                 }
             } else {
                 Text("Select a book to view details").foregroundColor(.secondary)
