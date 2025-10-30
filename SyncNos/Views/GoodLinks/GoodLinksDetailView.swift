@@ -155,6 +155,7 @@ struct GoodLinksDetailView: View {
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth
                             )
+                            .id(linkId) // reset internal view state (eg. expansion) when switching links
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
                                 wordCount: 0,
@@ -172,6 +173,7 @@ struct GoodLinksDetailView: View {
                                     }
                                 )
                             )
+                            .id(linkId) // ensure distinct identity per link
                         }
 
                         // 高亮列表
