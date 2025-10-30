@@ -155,6 +155,7 @@ struct GoodLinksDetailView: View {
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth
                             )
+                            .id(linkId) // 切换文章时重置展开状态
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
                                 wordCount: 0,
@@ -172,6 +173,7 @@ struct GoodLinksDetailView: View {
                                     }
                                 )
                             )
+                            .id(linkId) // 切换文章时重置展开状态
                         }
 
                         // 高亮列表
