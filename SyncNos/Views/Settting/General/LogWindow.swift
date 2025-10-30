@@ -7,31 +7,6 @@ struct LogWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker("Level", selection: $viewModel.levelFilter) {
-                    ForEach(LogLevel.allCases, id: \ .self) { level in
-                        Text(level.description.capitalized).tag(level)
-                    }
-                }
-                .pickerStyle(MenuPickerStyle())
-
-                Spacer()
-
-                Button(action: { viewModel.clear() }) {
-                    Image(systemName: "trash")
-                }
-                .help("Clear logs")
-
-                Button(action: { shareLogs() }) {
-                    Image(systemName: "square.and.arrow.up.on.square")
-                }
-                .help("Share logs")
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-
-            Divider()
-
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
@@ -54,6 +29,27 @@ struct LogWindow: View {
             }
         }
         .frame(minWidth: 600, minHeight: 300)
+        .navigationTitle("Logs")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Picker("Level", selection: $viewModel.levelFilter) {
+                    ForEach(LogLevel.allCases, id: \ .self) { level in
+                        Text(level.description.capitalized).tag(level)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+
+                Button(action: { viewModel.clear() }) {
+                    Image(systemName: "trash")
+                }
+                .help("Clear logs")
+
+                Button(action: { shareLogs() }) {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                }
+                .help("Share logs")
+            }
+        }
     }
 
     private func formatted(entry: LogEntry) -> String {
