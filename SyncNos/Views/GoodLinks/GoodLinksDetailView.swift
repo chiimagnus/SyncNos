@@ -153,7 +153,8 @@ struct GoodLinksDetailView: View {
                                 wordCount: contentRow.wordCount,
                                 contentText: fullText,
                                 overrideWidth: frozenLayoutWidth,
-                                measuredWidth: $measuredLayoutWidth
+                                measuredWidth: $measuredLayoutWidth,
+                                resetId: linkId
                             )
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
@@ -161,6 +162,7 @@ struct GoodLinksDetailView: View {
                                 overrideWidth: frozenLayoutWidth,
                                 measuredWidth: $measuredLayoutWidth,
                                 revealThreshold: nil,
+                                resetId: linkId,
                                 customSlot: AnyView(
                                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                                         Text("No article content detected. Please")
