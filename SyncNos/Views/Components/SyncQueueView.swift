@@ -4,33 +4,35 @@ struct SyncQueueView: View {
     @StateObject private var viewModel = SyncQueueViewModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Sync Queue")
-                    .font(.title)
-                    .fontWeight(.bold)
-                Spacer()
-                Text("Concurrency: \(viewModel.concurrencyLimit)")
-                    .foregroundColor(.secondary)
-                    .font(.subheadline)
-            }
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Sync Queue")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Text("Concurrency: \(viewModel.concurrencyLimit)")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                }
 
-            GroupBox(label: Label("Running", systemImage: "arrow.triangle.2.circlepath.circle.fill")) {
-                queueSection(title: "Apple Books", tasks: viewModel.runningAppleBooks)
-                Divider()
-                queueSection(title: "GoodLinks", tasks: viewModel.runningGoodLinks)
-            }
+                GroupBox(label: Label("Running", systemImage: "arrow.triangle.2.circlepath.circle.fill")) {
+                    queueSection(title: "Apple Books", tasks: viewModel.runningAppleBooks)
+                    Divider()
+                    queueSection(title: "GoodLinks", tasks: viewModel.runningGoodLinks)
+                }
 
-            GroupBox(label: Label("Waiting", systemImage: "clock")) {
-                queueSection(title: "Apple Books", tasks: viewModel.queuedAppleBooks)
-                Divider()
-                queueSection(title: "GoodLinks", tasks: viewModel.queuedGoodLinks)
-            }
+                GroupBox(label: Label("Waiting", systemImage: "clock")) {
+                    queueSection(title: "Apple Books", tasks: viewModel.queuedAppleBooks)
+                    Divider()
+                    queueSection(title: "GoodLinks", tasks: viewModel.queuedGoodLinks)
+                }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .padding()
+            .frame(minWidth: 520, minHeight: 420)
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 420)
     }
 
     @ViewBuilder
