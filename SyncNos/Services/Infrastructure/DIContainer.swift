@@ -19,6 +19,7 @@ class DIContainer {
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
     private var _syncActivityMonitor: SyncActivityMonitorProtocol?
+    private var _syncQueueStore: SyncQueueStoreProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -107,6 +108,13 @@ class DIContainer {
         return _syncActivityMonitor!
     }
 
+    var syncQueueStore: SyncQueueStoreProtocol {
+        if _syncQueueStore == nil {
+            _syncQueueStore = SyncQueueStore()
+        }
+        return _syncQueueStore!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -156,6 +164,10 @@ class DIContainer {
 
     func register(syncActivityMonitor: SyncActivityMonitorProtocol) {
         self._syncActivityMonitor = syncActivityMonitor
+    }
+
+    func register(syncQueueStore: SyncQueueStoreProtocol) {
+        self._syncQueueStore = syncQueueStore
     }
 
 }

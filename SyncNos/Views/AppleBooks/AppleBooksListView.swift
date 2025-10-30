@@ -62,6 +62,11 @@ struct AppleBooksListView: View {
                             }
 
                             Button {
+                                let items = selectionIds.compactMap { id -> [String: Any]? in
+                                    guard let b = viewModel.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                                    return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
+                                }
+                                NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
@@ -126,6 +131,11 @@ struct AppleBooksListView: View {
         }
         
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
+            let items = selectionIds.compactMap { id -> [String: Any]? in
+                guard let b = viewModel.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
+            }
+            NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
             viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
     }
