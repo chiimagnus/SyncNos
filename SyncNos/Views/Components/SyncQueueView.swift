@@ -115,6 +115,8 @@ struct SyncQueueView: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                     
+                    sourceBadge(for: task.source)
+                    
                     Spacer()
                     
                     // Progress indicator for running tasks
@@ -141,6 +143,29 @@ struct SyncQueueView: View {
             Spacer()
         }
         .padding(.vertical, 6)
+    }
+    
+    private func sourceBadge(for source: SyncSource) -> some View {
+        switch source {
+        case .appleBooks:
+            return AnyView(
+                Label("Apple Books", systemImage: "book")
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .tint(Color.yellow)
+                    .background(Color.yellow.opacity(0.18), in: Capsule())
+            )
+        case .goodLinks:
+            return AnyView(
+                Label("GoodLinks", systemImage: "link")
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .tint(Color.red)
+                    .background(Color.red.opacity(0.12), in: Capsule())
+            )
+        }
     }
     
     private func statusIndicator(for task: SyncQueueTask) -> some View {
