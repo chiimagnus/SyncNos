@@ -6,7 +6,7 @@ struct MultipleSelectionPlaceholderView: View {
     let onSyncSelected: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             Image(nsImage: NSImage(named: "AppIcon")!)
                 .resizable()
                 .scaledToFit()
@@ -23,10 +23,11 @@ struct MultipleSelectionPlaceholderView: View {
             } label: {
                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
             }
-            
-            // if ...
-            Text("This area will show the sync queue progress and management buttons (coming soon!)")
+
+            SyncQueueView()
+                .frame(minHeight: 200)
         }
+        .padding()
     }
 }
 
