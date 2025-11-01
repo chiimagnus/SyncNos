@@ -37,11 +37,6 @@ final class LoggerService: LoggerServiceProtocol {
         // 存储内存中
         storedLogs.append(entry)
 
-        // 输出到控制台（保持现有行为）
-        let timeString = DateFormatter.localizedString(from: timestamp, dateStyle: .none, timeStyle: .medium)
-        let logMessage = "\(timeString) [\(level.description)] \(fileName):\(line) \(function) - \(message)"
-        print(logMessage)
-
         // 通过 publisher 发布
         subject.send(entry)
     }

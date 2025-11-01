@@ -93,7 +93,7 @@ struct LanguageView: View {
             task.arguments = [scriptPath]
             task.launch()
         } catch {
-            print("Failed to restart application: \(error)")
+            LoggerService.shared.log(.error, message: "Failed to restart application: \(error)")
         }
 
         // 立即退出当前应用
