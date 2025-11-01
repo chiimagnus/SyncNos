@@ -435,32 +435,35 @@ final class GoodLinksViewModel: ObservableObject {
 
         Task {
             defer { Task { @MainActor in self.isSyncing = false } }
-            // 发布开始通知
-            NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "started"])
-            do {
-                let dbPath = self.service.resolveDatabasePath()
-                try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
-                    Task { @MainActor in self?.syncProgressText = progressText }
-                }
-                await MainActor.run {
-                    self.syncMessage = NSLocalizedString("同步完成", comment: "")
-                    self.syncProgressText = nil
-                    // 发布完成通知
-                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])
-                    // Update UI state directly
-                    self.syncingLinkIds.remove(link.id)
-                    self.syncedLinkIds.insert(link.id)
-                }
-            } catch {
-                let desc = error.localizedDescription
-                logger.error("[GoodLinks] syncSmart error: \(desc)")
-                await MainActor.run {
-                    self.errorMessage = desc
-                    self.syncProgressText = nil
-                    // 发布失败通知
-                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "failed"])
-                    // Update UI state directly
-                    self.syncingLinkIds.remove(link.id)
+            let limiter = DIContainer.shared.syncConcurrencyLimiter
+            await limiter.withPermit {
+                // 发布开始通知（获得许可后）
+                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "started"])
+                do {
+                    let dbPath = self.service.resolveDatabasePath()
+                    try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
+                        Task { @MainActor in self?.syncProgressText = progressText }
+                    }
+                    await MainActor.run {
+                        self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                        self.syncProgressText = nil
+                        // 发布完成通知
+                        NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])
+                        // Update UI state directly
+                        self.syncingLinkIds.remove(link.id)
+                        self.syncedLinkIds.insert(link.id)
+                    }
+                } catch {
+                    let desc = error.localizedDescription
+                    logger.error("[GoodLinks] syncSmart error: \(desc)")
+                    await MainActor.run {
+                        self.errorMessage = desc
+                        self.syncProgressText = nil
+                        // 发布失败通知
+                        NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "failed"])
+                        // Update UI state directly
+                        self.syncingLinkIds.remove(link.id)
+                    }
                 }
             }
         }
