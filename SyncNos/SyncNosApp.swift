@@ -51,12 +51,6 @@ struct SyncNosApp: App {
         }
         .windowResizability(.contentSize)
 
-        // 同步队列窗口（单实例）
-        Window("Sync Queue", id: "syncqueue") {
-            SyncQueueView()
-        }
-        .windowResizability(.contentSize)
-        
         // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
         .commands {
             AppCommands()

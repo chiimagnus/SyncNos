@@ -331,11 +331,6 @@ struct AppCommands: Commands {
                 openWindow(id: "log")
             }
             .keyboardShortcut("l", modifiers: .command)
-
-            Button("Show Sync Queue", systemImage: "list.bullet.rectangle") {
-                openWindow(id: "syncqueue")
-            }
-            .keyboardShortcut("q", modifiers: [.command, .option])
         }
     }
 
