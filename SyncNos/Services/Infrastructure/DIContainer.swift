@@ -20,6 +20,7 @@ class DIContainer {
     private var _authService: AuthServiceProtocol?
     private var _syncActivityMonitor: SyncActivityMonitorProtocol?
     private var _syncQueueStore: SyncQueueStoreProtocol?
+    private var _syncConcurrencyLimiter: ConcurrencyLimiter?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -115,6 +116,14 @@ class DIContainer {
         return _syncQueueStore!
     }
 
+    // 全局并发限制器：统一限制所有 Notion 同步的并发度（AppleBooks/GoodLinks/AutoSync 合计）
+    var syncConcurrencyLimiter: ConcurrencyLimiter {
+        if _syncConcurrencyLimiter == nil {
+            _syncConcurrencyLimiter = ConcurrencyLimiter(limit: NotionSyncConfig.batchConcurrency)
+        }
+        return _syncConcurrencyLimiter!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -168,6 +177,10 @@ class DIContainer {
 
     func register(syncQueueStore: SyncQueueStoreProtocol) {
         self._syncQueueStore = syncQueueStore
+    }
+
+    func register(syncConcurrencyLimiter: ConcurrencyLimiter) {
+        self._syncConcurrencyLimiter = syncConcurrencyLimiter
     }
 
 }

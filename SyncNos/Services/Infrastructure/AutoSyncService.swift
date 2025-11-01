@@ -199,20 +199,24 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                 let book = BookListItem(bookId: id, authorName: author, bookTitle: title, ibooksURL: "ibooks://assetid/\(id)", highlightCount: 0)
 
                 group.addTask {
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"]) 
-                    do {
-                        try await syncService.syncSmart(book: book, dbPath: dbPathLocal) { progress in
-                            logger.debug("AutoSync progress[\(id)]: \(progress)")
+                    // 与手动批量共享全局并发限制器，确保全局并发不超过 NotionSyncConfig.batchConcurrency
+                    let limiter = DIContainer.shared.syncConcurrencyLimiter
+                    await limiter.withPermit {
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStarted"), object: id)
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"]) 
+                        do {
+                            try await syncService.syncSmart(book: book, dbPath: dbPathLocal) { progress in
+                                logger.debug("AutoSync progress[\(id)]: \(progress)")
+                            }
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) 
+                        } catch {
+                            logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
                         }
-                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) 
-                    } catch {
-                        logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
-                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
+                        // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
+                        try? await Task.sleep(nanoseconds: 50_000_000)
                     }
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
-                    // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
-                    try? await Task.sleep(nanoseconds: 50_000_000)
                 }
             }
 
