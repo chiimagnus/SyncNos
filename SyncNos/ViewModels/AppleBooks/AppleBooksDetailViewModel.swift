@@ -290,23 +290,26 @@ class AppleBooksDetailViewModel: ObservableObject {
         syncProgressText = nil
         isSyncing = true
         Task {
-            do {
-                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
-                try await self.syncService.syncSmart(book: book, dbPath: dbPath) { progress in
-                    Task { @MainActor in self.syncProgressText = progress }
-                }
-                await MainActor.run {
-                    self.syncMessage = "同步完成"
-                    self.syncProgressText = nil
-                    self.isSyncing = false
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
-                }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
-                    self.syncProgressText = nil
-                    self.isSyncing = false
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
+            let limiter = DIContainer.shared.syncConcurrencyLimiter
+            await limiter.withPermit {
+                do {
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
+                    try await self.syncService.syncSmart(book: book, dbPath: dbPath) { progress in
+                        Task { @MainActor in self.syncProgressText = progress }
+                    }
+                    await MainActor.run {
+                        self.syncMessage = "同步完成"
+                        self.syncProgressText = nil
+                        self.isSyncing = false
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.syncProgressText = nil
+                        self.isSyncing = false
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
+                    }
                 }
             }
         }
