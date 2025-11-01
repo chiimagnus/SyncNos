@@ -68,8 +68,8 @@ struct MainListView: View {
                         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack(spacing: 20) {
-                        // App Logo
+                    VStack(spacing: 24) {
+                        // App Logo 
                         Image(nsImage: NSImage(named: "AppIcon")!)
                             .resizable()
                             .scaledToFit()
@@ -83,9 +83,9 @@ struct MainListView: View {
                         Text("Please select an item")
                             .font(.title3)
                             .foregroundColor(.secondary)
-                        
-                        // if ...
-                        Text("This area will show the sync queue progress and management buttons (coming soon!)")
+
+                        SyncQueueView()
+                            .frame(minHeight: 300)
                     }
                     .padding()
                 }
@@ -106,7 +106,7 @@ struct MainListView: View {
                         viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
                     }
                 } else {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 24) {
                         // App Logo
                         Image(nsImage: NSImage(named: "AppIcon")!)
                             .resizable()
@@ -121,6 +121,9 @@ struct MainListView: View {
                         Text("Please select an item")
                             .font(.title3)
                             .foregroundColor(.secondary)
+
+                        SyncQueueView()
+                            .frame(minHeight: 300)
                     }
                     .padding()
                 }
