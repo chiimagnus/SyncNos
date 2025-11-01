@@ -18,7 +18,7 @@ struct SyncQueueView: View {
             } header: {
                 HStack {
                     Text("Running")
-                    Spacer()
+                    // Spacer()
                     if !runningTasks.isEmpty {
                         Text("\(runningTasks.count)")
                             .font(.caption)
@@ -40,7 +40,7 @@ struct SyncQueueView: View {
             } header: {
                 HStack {
                     Text("Waiting")
-                    Spacer()
+                    // Spacer()
                     if !queuedTasks.isEmpty {
                         Text("\(queuedTasks.count)")
                             .font(.caption)
@@ -51,7 +51,14 @@ struct SyncQueueView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .background(VisualEffectBackground(material: .windowBackground))
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
         .navigationTitle("Sync Queue")
         .toolbar {
             ToolbarItem { Text("") }
