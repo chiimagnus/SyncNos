@@ -187,6 +187,21 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         let syncService = self.appleBooksSyncService
         let dbPathLocal = annotationDBPath
 
+        // 在队列中入队（queued），以便 SyncQueueView 正确展示 AutoSync 任务
+        do {
+            var items: [[String: Any]] = []
+            items.reserveCapacity(eligibleIds.count)
+            for id in eligibleIds {
+                let meta = bookMeta[id]
+                let title = (meta?.title.isEmpty == false) ? meta!.title : id
+                let subtitle = meta?.author ?? ""
+                items.append(["id": id, "title": title, "subtitle": subtitle])
+            }
+            if !items.isEmpty {
+                NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
+            }
+        }
+
         // 有界并发：最多同时处理 maxConcurrentBooks 本书
         var nextIndex = 0
         await withTaskGroup(of: Void.self) { group in
