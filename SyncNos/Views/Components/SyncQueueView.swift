@@ -7,11 +7,11 @@ struct SyncQueueView: View {
         List {
             // Running Tasks Section
             Section {
-                if allRunningTasks.isEmpty {
+                if runningTasks.isEmpty {
                     Text("No active sync tasks")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(allRunningTasks) { task in
+                    ForEach(runningTasks) { task in
                         taskRow(task)
                     }
                 }
@@ -19,8 +19,8 @@ struct SyncQueueView: View {
                 HStack {
                     Text("Running")
                     Spacer()
-                    if !allRunningTasks.isEmpty {
-                        Text("\(allRunningTasks.count)")
+                    if !runningTasks.isEmpty {
+                        Text("\(runningTasks.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -29,11 +29,11 @@ struct SyncQueueView: View {
             
             // Queued Tasks Section
             Section {
-                if allQueuedTasks.isEmpty {
+                if queuedTasks.isEmpty {
                     Text("No queued tasks")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(allQueuedTasks) { task in
+                    ForEach(queuedTasks) { task in
                         taskRow(task)
                     }
                 }
@@ -41,8 +41,8 @@ struct SyncQueueView: View {
                 HStack {
                     Text("Waiting")
                     Spacer()
-                    if !allQueuedTasks.isEmpty {
-                        Text("\(allQueuedTasks.count)")
+                    if !queuedTasks.isEmpty {
+                        Text("\(queuedTasks.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -58,13 +58,8 @@ struct SyncQueueView: View {
         }
     }
     
-    private var allRunningTasks: [SyncQueueTask] {
-        viewModel.runningAppleBooks + viewModel.runningGoodLinks
-    }
-    
-    private var allQueuedTasks: [SyncQueueTask] {
-        viewModel.queuedAppleBooks + viewModel.queuedGoodLinks
-    }
+    private var runningTasks: [SyncQueueTask] { viewModel.runningTasks }
+    private var queuedTasks: [SyncQueueTask] { viewModel.queuedTasks }
     
     private func taskRow(_ task: SyncQueueTask) -> some View {
         HStack(spacing: 12) {
