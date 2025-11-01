@@ -400,21 +400,17 @@ extension AppleBooksViewModel {
 
         let ids = Array(bookIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
-        let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
+        let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncService = self.appleBooksSyncService
 
         Task {
-            // 在开始批量同步前，主线程标记这些 id 为正在同步，确保 UI 显示一致
-            await MainActor.run {
-                self.syncingBookIds.formUnion(bookIds)
-            }
-
             await withTaskGroup(of: Void.self) { group in
                 for id in ids {
                     guard let book = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
+                            // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
                             NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])                        
                             do {
                                 try await syncService.syncSmart(book: book, dbPath: dbPath) { progress in

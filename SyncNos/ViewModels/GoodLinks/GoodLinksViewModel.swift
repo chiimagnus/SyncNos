@@ -501,7 +501,7 @@ extension GoodLinksViewModel {
         guard !linkIds.isEmpty else { return }
         let dbPath = service.resolveDatabasePath()
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
-        let limiter = ConcurrencyLimiter(limit: max(1, concurrency))
+        let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncService = self.syncService
         let notionConfig = DIContainer.shared.notionConfigStore
         let notionService = DIContainer.shared.notionService
