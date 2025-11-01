@@ -15,13 +15,10 @@ struct MultipleSelectionPlaceholderView: View {
                 .font(.system(size: 56, weight: .bold, design: .rounded))
                 .fontWidth(.compressed)
                 .minimumScaleFactor(0.8)
-            Text("Multiple Selected (\(count))")
-                .font(.title3)
-                .foregroundColor(.primary)
             Button {
                 onSyncSelected()
             } label: {
-                Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath")
+                Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
             }
 
             SyncQueueView()
