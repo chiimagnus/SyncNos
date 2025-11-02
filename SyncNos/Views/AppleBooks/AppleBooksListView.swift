@@ -33,7 +33,11 @@ struct AppleBooksListView: View {
                     ForEach(viewModel.displayBooks, id: \.bookId) { book in
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(book.bookTitle).font(.headline)
+                                if book.hasTitle {
+                                    Text(book.bookTitle).font(.headline)
+                                } else {
+                                    Text("No Title").font(.headline).foregroundColor(.orange)
+                                }
                                 Text(book.authorName).font(.subheadline).foregroundColor(.secondary)
                                 Text("\(book.highlightCount) highlights").font(.caption)
                             }
