@@ -12,10 +12,10 @@ struct GoodLinksSettingsView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
-                Toggle("Auto Sync (placeholder)", isOn: $viewModel.autoSync)
+                Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
-                    .help("GoodLinks auto-sync not implemented; this is a UI-only toggle for now")
+                    .help("Enable automatic sync for GoodLinks (checked means AutoSyncService will run)")
 
                 // GoodLinks 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {

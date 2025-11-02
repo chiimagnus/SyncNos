@@ -51,11 +51,14 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     private let logger = DIContainer.shared.loggerService
     private let databaseService = DIContainer.shared.databaseService
     private let appleBooksSyncService = DIContainer.shared.appleBooksSyncService
+    private let goodLinksDatabaseService = DIContainer.shared.goodLinksService
+    private let goodLinksSyncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService()
     private let notionConfig = DIContainer.shared.notionConfigStore
 
     private var timerCancellable: AnyCancellable?
     private var notificationCancellable: AnyCancellable?
-    private var isSyncing: Bool = false
+    private var isSyncingAppleBooks: Bool = false
+    private var isSyncingGoodLinks: Bool = false
 
     private let intervalSeconds: TimeInterval = 24 * 60 * 60 // 24小时，后续可做成设置项
 
@@ -75,8 +78,9 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     func start() {
         guard timerCancellable == nil else { return }
         logger.info("AutoSyncService starting…")
-        // 监听数据源选择完成或刷新事件，触发一次同步
+        // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books 与 GoodLinks）
         notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
+            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")))
             .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -98,22 +102,22 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     }
 
     func triggerSyncNow() {
-        guard !isSyncing else { return }
         guard notionConfig.isConfigured else {
             logger.warning("AutoSync skipped: Notion not configured")
             return
         }
-        // Respect per-source auto sync flag for Apple Books. GoodLinks is placeholder.
+        triggerAppleBooksSyncNow()
+        triggerGoodLinksSyncNow()
+    }
+
+    private func triggerAppleBooksSyncNow() {
+        guard !isSyncingAppleBooks else { return }
         let appleAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
-        guard appleAutoSyncEnabled else {
-            logger.info("AutoSync skipped: Apple Books auto-sync disabled")
-            return
-        }
+        guard appleAutoSyncEnabled else { return }
         guard let root = booksRootPath else {
             logger.warning("AutoSync skipped: Apple Books root not selected")
             return
         }
-
         let annotationDir = (root as NSString).appendingPathComponent("AEAnnotation")
         let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
         guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
@@ -122,17 +126,44 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         }
         let booksDB = latestSQLiteFile(in: booksDir)
 
-        isSyncing = true
-        logger.info("AutoSync: start syncSmart for all books")
+        isSyncingAppleBooks = true
+        logger.info("AutoSync[AppleBooks]: start syncSmart for all books")
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
+            defer { self.isSyncingAppleBooks = false; self.logger.info("AutoSync[AppleBooks]: finished") }
             do {
                 try await self.syncAllBooksSmart(annotationDBPath: annotationDB, booksDBPath: booksDB)
             } catch {
-                self.logger.error("AutoSync error: \(error.localizedDescription)")
+                self.logger.error("AutoSync[AppleBooks] error: \(error.localizedDescription)")
             }
-            self.isSyncing = false
-            self.logger.info("AutoSync: finished")
+        }
+    }
+
+    private func triggerGoodLinksSyncNow() {
+        guard !isSyncingGoodLinks else { return }
+        let goodLinksAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        guard goodLinksAutoSyncEnabled else { return }
+        // 解析 GoodLinks DB 路径（会自动处理安全范围访问）
+        let dbPath = goodLinksDatabaseService.resolveDatabasePath()
+        guard FileManager.default.fileExists(atPath: dbPath) else {
+            logger.warning("AutoSync skipped: GoodLinks DB not found at \(dbPath)")
+            return
+        }
+
+        isSyncingGoodLinks = true
+        logger.info("AutoSync[GoodLinks]: start sync for eligible links")
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isSyncingGoodLinks = false
+                GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
+                self.logger.info("AutoSync[GoodLinks]: finished")
+            }
+            do {
+                try await self.syncAllGoodLinksSmart(dbPath: dbPath)
+            } catch {
+                self.logger.error("AutoSync[GoodLinks] error: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -238,6 +269,101 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             // 初始填充任务
             for _ in 0..<min(maxConcurrentBooks, eligibleIds.count) { addTaskIfPossible() }
             // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
+            while await group.next() != nil { addTaskIfPossible() }
+        }
+    }
+
+    private func syncAllGoodLinksSmart(dbPath: String) async throws {
+        // 打开只读会话
+        let session = try goodLinksDatabaseService.makeReadOnlySession(dbPath: dbPath)
+        defer { session.close() }
+
+        // 读取每个链接的高亮计数（仅有高亮的链接才同步）
+        let counts = try session.fetchHighlightCountsByLink()
+        let linkIds = counts.map { $0.linkId }.sorted()
+        if linkIds.isEmpty { return }
+
+        // 获取链接元数据（标题/作者/URL）
+        let allLinks = try session.fetchRecentLinks(limit: 0)
+        var linkMeta: [String: GoodLinksLinkRow] = [:]
+        for link in allLinks { linkMeta[link.id] = link }
+
+        // 并发上限（链接级并行数）
+        let maxConcurrentLinks = NotionSyncConfig.batchConcurrency
+
+        // 24 小时内已同步过则跳过
+        let now = Date()
+        var eligibleIds: [String] = []
+        for id in linkIds {
+            if let last = SyncTimestampStore.shared.getLastSyncTime(for: id), now.timeIntervalSince(last) < intervalSeconds {
+                self.logger.info("AutoSync skipped for GoodLinks[\(id)]: recent sync")
+                NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "skipped"]) 
+                continue
+            }
+            eligibleIds.append(id)
+        }
+        if eligibleIds.isEmpty { return }
+
+        // 入队队列，便于 UI 展示
+        do {
+            var items: [[String: Any]] = []
+            items.reserveCapacity(eligibleIds.count)
+            for id in eligibleIds {
+                let meta = linkMeta[id]
+                let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
+                let subtitle = meta?.author ?? ""
+                items.append(["id": id, "title": title, "subtitle": subtitle])
+            }
+            if !items.isEmpty {
+                NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
+            }
+        }
+
+        // 控制并发同步
+        var nextIndex = 0
+        await withTaskGroup(of: Void.self) { group in
+            func addTaskIfPossible() {
+                guard nextIndex < eligibleIds.count else { return }
+                let id = eligibleIds[nextIndex]; nextIndex += 1
+                let meta = linkMeta[id]
+                let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
+                let author = meta?.author ?? ""
+                // 构造行数据以传入同步服务
+                let row = GoodLinksLinkRow(
+                    id: id,
+                    url: meta?.url ?? id,
+                    originalURL: meta?.originalURL,
+                    title: title,
+                    summary: meta?.summary,
+                    author: author,
+                    tags: meta?.tags,
+                    starred: meta?.starred ?? false,
+                    readAt: meta?.readAt ?? 0,
+                    addedAt: meta?.addedAt ?? 0,
+                    modifiedAt: meta?.modifiedAt ?? 0,
+                    highlightTotal: meta?.highlightTotal
+                )
+
+                group.addTask {
+                    let limiter = DIContainer.shared.syncConcurrencyLimiter
+                    await limiter.withPermit {
+                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "started"]) 
+                        do {
+                            try await self.goodLinksSyncService.syncHighlights(for: row, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { progress in
+                                NotificationCenter.default.post(name: Notification.Name("SyncProgressUpdated"), object: nil, userInfo: ["bookId": id, "progress": progress])
+                            }
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "succeeded"]) 
+                        } catch {
+                            self.logger.error("AutoSync[GoodLinks] failed for \(id): \(error.localizedDescription)")
+                            NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
+                        }
+                        // 微等待，避免日志乱序
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                    }
+                }
+            }
+
+            for _ in 0..<min(maxConcurrentLinks, eligibleIds.count) { addTaskIfPossible() }
             while await group.next() != nil { addTaskIfPossible() }
         }
     }
