@@ -208,7 +208,7 @@ struct GoodLinksDetailView: View {
                                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                                     ForEach(filteredHighlights, id: \.id) { item in
                                         HighlightCardView(
-                                            colorMark: item.color.map { highlightColor(for: $0) } ?? Color.gray.opacity(0.5),
+                                            colorMark: item.color.map { HighlightColorUI.color(for: $0, source: .goodLinks) } ?? Color.gray.opacity(0.5),
                                             content: item.content,
                                             note: item.note,
                                             createdDate: formatDate(item.time),
@@ -420,18 +420,5 @@ struct GoodLinksDetailView: View {
         formatter.timeStyle = .short
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter.string(from: date)
-    }
-    
-    /// 根据GoodLinks的颜色值返回对应的SwiftUI Color
-    /// GoodLinks使用整数表示颜色，具体映射可能需要根据实际情况调整
-    private func highlightColor(for colorCode: Int) -> Color {
-        switch colorCode {
-        case 0: return .yellow
-        case 1: return .green
-        case 2: return .blue
-        case 3: return .red
-        case 4: return .purple
-        default: return .mint
-        }
     }
 }

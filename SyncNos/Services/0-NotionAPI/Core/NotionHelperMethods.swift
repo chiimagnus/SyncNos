@@ -293,29 +293,8 @@ class NotionHelperMethods {
 
     // Convert numeric style to human-friendly color name. Mapping differs per source.
     func styleName(for style: Int, source: String = "appleBooks") -> String {
-        switch source {
-        case "goodLinks":
-            // GoodLinks 有自己的一套颜色编码，映射到与 UI 使用一致的颜色名
-            // 对应 View 中 highlightColor(for:) 的映射：0: yellow, 1: green, 2: blue, 3: red, 4: purple
-            switch style {
-            case 0: return "yellow"
-            case 1: return "green"
-            case 2: return "blue"
-            case 3: return "red"
-            case 4: return "purple"
-            default: return "mint"
-            }
-        default:
-            // Apple Books mapping (existing)
-            switch style {
-            case 0: return "orange"
-            case 1: return "green"
-            case 2: return "blue"
-            case 3: return "yellow"
-            case 4: return "pink"
-            case 5: return "purple"
-            default: return "gray"
-            }
-        }
+        let src: HighlightSource = (source == "goodLinks") ? .goodLinks : .appleBooks
+        let def = HighlightColorScheme.definition(for: style, source: src)
+        return def.notionName
     }
 }
