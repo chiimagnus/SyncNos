@@ -48,8 +48,10 @@ class NotionRequestHelper {
 
         // Global RPS limiter + Retry-on-rate-limit (429) with exponential backoff
         let maxAttempts = NotionSyncConfig.retryMaxAttempts
+        let conflictMax = NotionSyncConfig.retryConflictMaxAttempts
         var attempt = 0
         var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
+        var conflictBackoff: UInt64 = NotionSyncConfig.retryConflictBaseBackoffMs
         while true {
             attempt += 1
             if isReadOperation(method: method, path: url.path) {
@@ -68,6 +70,12 @@ class NotionRequestHelper {
                     try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
                     backoffMillis = min(backoffMillis * 2, 32_000)
                 }
+                continue
+            } else if let http = response as? HTTPURLResponse, http.statusCode == 409, attempt < conflictMax {
+                // Conflict error: transient save conflict on Notion side → retry with backoff
+                let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryConflictJitterMs * 1_000_000))
+                try await Task.sleep(nanoseconds: conflictBackoff * 1_000_000 + jitterNs)
+                conflictBackoff = min(conflictBackoff * 2, 8_000)
                 continue
             }
             try Self.ensureSuccess(response: response, data: data)
@@ -88,8 +96,10 @@ class NotionRequestHelper {
         }
         // Global RPS limiter + Retry-on-rate-limit (429) with exponential backoff
         let maxAttempts = NotionSyncConfig.retryMaxAttempts
+        let conflictMax = NotionSyncConfig.retryConflictMaxAttempts
         var attempt = 0
         var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
+        var conflictBackoff: UInt64 = NotionSyncConfig.retryConflictBaseBackoffMs
         while true {
             attempt += 1
             if isReadOperation(method: method, path: url.path) {
@@ -107,6 +117,11 @@ class NotionRequestHelper {
                     try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
                     backoffMillis = min(backoffMillis * 2, 32_000)
                 }
+                continue
+            } else if let http = response as? HTTPURLResponse, http.statusCode == 409, attempt < conflictMax {
+                let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryConflictJitterMs * 1_000_000))
+                try await Task.sleep(nanoseconds: conflictBackoff * 1_000_000 + jitterNs)
+                conflictBackoff = min(conflictBackoff * 2, 8_000)
                 continue
             }
             try Self.ensureSuccess(response: response, data: data)
