@@ -24,9 +24,10 @@ struct MainListView: View {
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
             .toolbar {
-                // 仅保留数据源切换菜单，具体过滤/排序由各自的 ListView 管理
+                // 数据源切换菜单 + Articles 排序筛选（集成在同一菜单中）
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
+                        // 数据源切换部分
                         Button {
                             contentSourceRawValue = ContentSource.appleBooks.rawValue
                         } label: {
@@ -42,6 +43,119 @@ struct MainListView: View {
                             HStack {
                                 Text("GoodLinks-\(goodLinksVM.links.count)")
                                 if contentSource == .goodLinks { Image(systemName: "checkmark") }
+                            }
+                        }
+
+                        // 排序和筛选部分（根据数据源显示对应选项）
+                        if contentSource == .appleBooks {
+                            Divider()
+
+                            Section("Books Sort") {
+                                ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                    Button {
+                                        viewModel.sortKey = key
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("AppleBooksFilterChanged"),
+                                            object: nil,
+                                            userInfo: ["sortKey": key.rawValue]
+                                        )
+                                    } label: {
+                                        if viewModel.sortKey == key {
+                                            Label(key.displayName, systemImage: "checkmark")
+                                        } else {
+                                            Text(key.displayName)
+                                        }
+                                    }
+                                }
+
+                                Divider()
+
+                                Button {
+                                    viewModel.sortAscending.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("AppleBooksFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["sortAscending": viewModel.sortAscending]
+                                    )
+                                } label: {
+                                    if viewModel.sortAscending {
+                                        Label("Ascending", systemImage: "checkmark")
+                                    } else {
+                                        Label("Ascending", systemImage: "xmark")
+                                    }
+                                }
+                            }
+
+                            Section("Books Filter") {
+                                Button {
+                                    viewModel.showWithTitleOnly.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("AppleBooksFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["showWithTitleOnly": viewModel.showWithTitleOnly]
+                                    )
+                                } label: {
+                                    if viewModel.showWithTitleOnly {
+                                        Label("Only show books with titles", systemImage: "checkmark")
+                                    } else {
+                                        Text("Only show books with titles")
+                                    }
+                                }
+                            }
+                        } else if contentSource == .goodLinks {
+                            Divider()
+
+                            Section("Articles Sort") {
+                                ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
+                                    Button {
+                                        goodLinksVM.sortKey = key
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("GoodLinksFilterChanged"),
+                                            object: nil,
+                                            userInfo: ["sortKey": key.rawValue]
+                                        )
+                                    } label: {
+                                        if goodLinksVM.sortKey == key {
+                                            Label(key.displayName, systemImage: "checkmark")
+                                        } else {
+                                            Text(key.displayName)
+                                        }
+                                    }
+                                }
+
+                                Divider()
+
+                                Button {
+                                    goodLinksVM.sortAscending.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("GoodLinksFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["sortAscending": goodLinksVM.sortAscending]
+                                    )
+                                } label: {
+                                    if goodLinksVM.sortAscending {
+                                        Label("Ascending", systemImage: "checkmark")
+                                    } else {
+                                        Label("Ascending", systemImage: "xmark")
+                                    }
+                                }
+                            }
+
+                            Section("Articles Filter") {
+                                Button {
+                                    goodLinksVM.showStarredOnly.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("GoodLinksFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["showStarredOnly": goodLinksVM.showStarredOnly]
+                                    )
+                                } label: {
+                                    if goodLinksVM.showStarredOnly {
+                                        Label("Starred only", systemImage: "checkmark")
+                                    } else {
+                                        Text("Starred only")
+                                    }
+                                }
                             }
                         }
                     } label: {
