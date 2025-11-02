@@ -45,7 +45,7 @@ struct AppleBooksDetailView: View {
                             // Book header using unified card
                             InfoHeaderCardView(
                                 title: book.bookTitle,
-                                subtitle: "by \(book.authorName)",
+                                subtitle: book.authorName,
                                 overrideWidth: frozenLayoutWidth
                             ) {
                                 if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
