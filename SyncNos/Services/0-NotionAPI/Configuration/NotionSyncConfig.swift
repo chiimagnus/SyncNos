@@ -30,8 +30,10 @@ enum NotionSyncConfig {
     // MARK: - Concurrency & Rate limiting
     /// 批量同步并发上限（统一用于手动批量与自动同步）
     static let batchConcurrency: Int = 3
-    /// Notion 全局请求速率（RPS）上限，用于请求级限流
-    static let notionRequestsPerSecond: Int = 3
+    /// Notion 读取类请求速率（RPS）上限：GET、databases/*/query
+    static let notionReadRequestsPerSecond: Int = 8
+    /// Notion 写入类请求速率（RPS）上限：POST/PUT/PATCH/DELETE（非查询）
+    static let notionWriteRequestsPerSecond: Int = 3
 
     // MARK: - Retry on 429
     /// 429 最大重试次数
