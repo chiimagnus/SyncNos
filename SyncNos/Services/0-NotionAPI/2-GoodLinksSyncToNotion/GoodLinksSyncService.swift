@@ -98,8 +98,9 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         // 4.3) 首次创建页面：初始化结构（Article + 内容 + Highlights header），随后一次性追加全部高亮
         if created {
-            var pageChildren: [[String: Any]] = []
-            pageChildren.append([
+            // 合并初始结构与高亮一次性追加，减少紧邻的多次 children PATCH 造成的 409 冲突
+            var allChildren: [[String: Any]] = []
+            allChildren.append([
                 "object": "block",
                 "heading_2": [
                     "rich_text": [["text": ["content": "Article"]]]
@@ -108,21 +109,17 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             if let contentText = contentRow?.content, !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let helper = NotionHelperMethods()
                 let articleBlocks = helper.buildParagraphBlocks(from: contentText)
-                pageChildren.append(contentsOf: articleBlocks)
+                allChildren.append(contentsOf: articleBlocks)
             }
-            pageChildren.append([
+            allChildren.append([
                 "object": "block",
                 "heading_2": [
                     "rich_text": [["text": ["content": "Highlights"]]]
                 ]
             ])
-            try await notionService.appendChildren(pageId: pageId, children: pageChildren, batchSize: NotionSyncConfig.defaultAppendBatchSize)
-
-            // 追加所有高亮（批量）
             if !collected.isEmpty {
                 progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), collected.count))
                 let helper = NotionHelperMethods()
-                var children: [[String: Any]] = []
                 for h in collected {
                     let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
                     let fakeHighlight = HighlightRow(
@@ -136,10 +133,10 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                         location: nil
                     )
                     let block = helper.buildBulletedListItemBlock(for: fakeHighlight, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
-                    children.append(block)
+                    allChildren.append(block)
                 }
-                try await notionService.appendChildren(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize)
             }
+            try await notionService.appendChildren(pageId: pageId, children: allChildren, batchSize: NotionSyncConfig.defaultAppendBatchSize)
 
             // 更新计数与时间戳后返回
             try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)

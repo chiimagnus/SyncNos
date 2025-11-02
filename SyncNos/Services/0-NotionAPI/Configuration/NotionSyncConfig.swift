@@ -42,4 +42,12 @@ enum NotionSyncConfig {
     static let retryBaseBackoffMs: UInt64 = 500
     /// 退避抖动（毫秒）
     static let retryJitterMs: UInt64 = 250
+
+    // MARK: - Retry on 409 (conflict)
+    /// 409 最大重试次数（Notion 返回 conflict_error 时的重试）
+    static let retryConflictMaxAttempts: Int = 6
+    /// 409 指数退避起始毫秒
+    static let retryConflictBaseBackoffMs: UInt64 = 300
+    /// 409 退避抖动（毫秒）
+    static let retryConflictJitterMs: UInt64 = 200
 }
