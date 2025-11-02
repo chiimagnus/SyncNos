@@ -11,37 +11,21 @@ enum HighlightColorTheme: String, CaseIterable {
         }
     }
 
-    func colorInfo(for index: Int) -> (color: Color, name: String) {
+    private var source: HighlightSource {
         switch self {
-        case .appleBooks:
-            let infos: [(Color, String)] = [
-                (.orange, "Orange"),
-                (.green, "Green"),
-                (.blue, "Blue"),
-                (.yellow, "Yellow"),
-                (.pink, "Pink"),
-                (.purple, "Purple")
-            ]
-            return index < infos.count ? infos[index] : (Color.gray, "Unknown")
-
-        case .goodLinks:
-            let infos: [(Color, String)] = [
-                (.yellow, "Yellow"),
-                (.green, "Green"),
-                (.blue, "Blue"),
-                (.red, "Red"),
-                (.purple, "Purple"),
-                (.mint, "Mint")
-            ]
-            return index < infos.count ? infos[index] : (Color.gray, "Unknown")
+        case .appleBooks: return .appleBooks
+        case .goodLinks: return .goodLinks
         }
     }
 
+    func colorInfo(for index: Int) -> (color: Color, name: String) {
+        let def = HighlightColorScheme.definition(for: index, source: source)
+        let color = HighlightColorUI.color(fromNotionName: def.notionName)
+        return (color, def.displayName)
+    }
+
     var colorCount: Int {
-        switch self {
-        case .appleBooks: return 6
-        case .goodLinks: return 6
-        }
+        HighlightColorScheme.allDefinitions(for: source).count
     }
 }
 

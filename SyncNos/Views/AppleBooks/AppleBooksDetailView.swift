@@ -25,22 +25,7 @@ struct AppleBooksDetailView: View {
     
     
     static func highlightStyleColor(for style: Int) -> Color {
-        switch style {
-        case 0:
-            return Color.orange // Underline style
-        case 1:
-            return Color.green
-        case 2:
-            return Color.blue
-        case 3:
-            return Color.yellow
-        case 4:
-            return Color.pink
-        case 5:
-            return Color.purple
-        default:
-            return Color.gray
-        }
+        HighlightColorUI.color(for: style, source: .appleBooks)
     }
         
     private var selectedBook: BookListItem? {
