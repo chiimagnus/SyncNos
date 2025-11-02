@@ -1,5 +1,33 @@
 import SwiftUI
 
+/// 空状态占位视图，用于没有选择任何项目时的显示
+struct EmptyStateView: View {
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 24) {
+            // App Logo
+            Image(nsImage: NSImage(named: "AppIcon")!)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+
+            Text(title)
+                .font(.system(size: 56, weight: .bold, design: .rounded))
+                .fontWidth(.compressed)
+                .minimumScaleFactor(0.8)
+
+            Text("Please select an item")
+                .font(.title3)
+                .foregroundColor(.secondary)
+
+            SyncQueueView()
+                .frame(minHeight: 300)
+        }
+        .padding()
+    }
+}
+
 struct MultipleSelectionPlaceholderView: View {
     let title: String
     let count: Int
