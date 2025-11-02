@@ -96,9 +96,9 @@ struct MainListView: View {
                                     )
                                 } label: {
                                     if viewModel.showWithTitleOnly {
-                                        Label("Only show books with titles", systemImage: "checkmark")
+                                        Label("Titles only", systemImage: "checkmark")
                                     } else {
-                                        Text("Only show books with titles")
+                                        Text("Titles only")
                                     }
                                 }
                             }
