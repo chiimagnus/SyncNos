@@ -101,7 +101,7 @@ class NotionHelperMethods {
         let uuidPrefix = "[uuid:\(highlight.uuid)]\n"
         rt.append([
             "text": ["content": uuidPrefix],
-            "annotations": ["color": "gray"]
+            "annotations": ["color": "gray_background"]
         ])
         rt.append(["text": ["content": textContent]])
 
