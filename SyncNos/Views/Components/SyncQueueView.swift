@@ -59,10 +59,10 @@ struct SyncQueueView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
-        .navigationTitle("Sync Queue")
-        .toolbar {
-            ToolbarItem { Text("") }
-        }
+        // .navigationTitle("Sync Queue")
+        // .toolbar {
+        //     ToolbarItem { Text("") }
+        // }
     }
     
     private var runningTasks: [SyncQueueTask] { viewModel.runningTasks }
