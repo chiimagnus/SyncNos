@@ -6,7 +6,8 @@ class NotionRequestHelper {
     private let apiBase: URL
     private let notionVersion: String
     private let logger: LoggerServiceProtocol
-    private static let globalLimiter = NotionRateLimiter(rps: NotionSyncConfig.notionRequestsPerSecond)
+    private static let readLimiter = NotionRateLimiter(rps: NotionSyncConfig.notionReadRequestsPerSecond)
+    private static let writeLimiter = NotionRateLimiter(rps: NotionSyncConfig.notionWriteRequestsPerSecond)
 
     init(configStore: NotionConfigStoreProtocol, apiBase: URL, notionVersion: String, logger: LoggerServiceProtocol) {
         self.configStore = configStore
@@ -16,6 +17,15 @@ class NotionRequestHelper {
     }
 
     // MARK: - Request Helpers
+    private func isReadOperation(method: String, path: String) -> Bool {
+        let upper = method.uppercased()
+        if upper == "GET" { return true }
+        // Notion 的查询接口是 POST /v1/databases/{database_id}/query
+        if upper == "POST" && path.contains("/databases/") && path.hasSuffix("/query") {
+            return true
+        }
+        return false
+    }
     private func addCommonHeaders(to request: inout URLRequest, key: String) {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -42,7 +52,11 @@ class NotionRequestHelper {
         var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
         while true {
             attempt += 1
-            await Self.globalLimiter.acquire()
+            if isReadOperation(method: method, path: url.path) {
+                await Self.readLimiter.acquire()
+            } else {
+                await Self.writeLimiter.acquire()
+            }
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
                 // Try Retry-After header first
@@ -78,7 +92,11 @@ class NotionRequestHelper {
         var backoffMillis: UInt64 = NotionSyncConfig.retryBaseBackoffMs
         while true {
             attempt += 1
-            await Self.globalLimiter.acquire()
+            if isReadOperation(method: method, path: url.path) {
+                await Self.readLimiter.acquire()
+            } else {
+                await Self.writeLimiter.acquire()
+            }
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
                 if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"), let seconds = Double(retryAfter) {
