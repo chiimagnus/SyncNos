@@ -104,17 +104,17 @@ struct AssetHighlightStats {
 enum BookListSortKey: String, CaseIterable {
     case title = "title"
     case highlightCount = "highlightCount"
-    case lastSync = "lastSync"
-    case lastEdited = "lastEdited"
     case created = "created"
+    case lastEdited = "lastEdited"
+    case lastSync = "lastSync"
 
     var displayName: LocalizedStringResource {
         switch self {
         case .title: return "Title"
-        case .highlightCount: return "Note Count"
-        case .lastSync: return "Sync Time"
-        case .lastEdited: return "Edit Time"
-        case .created: return "Creation Time"
+        case .highlightCount: return "Highlight Count"
+        case .lastSync: return "Last Sync Time"
+        case .lastEdited: return "Modified Time"
+        case .created: return "Added Time"
         }
     }
 }
