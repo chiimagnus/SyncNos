@@ -50,7 +50,7 @@ struct MainListView: View {
                         if contentSource == .appleBooks {
                             Divider()
 
-                            Section("Books Sort") {
+                            Section("Sort") {
                                 ForEach(BookListSortKey.allCases, id: \.self) { key in
                                     Button {
                                         viewModel.sortKey = key
@@ -86,7 +86,7 @@ struct MainListView: View {
                                 }
                             }
 
-                            Section("Books Filter") {
+                            Section("Filter") {
                                 Button {
                                     viewModel.showWithTitleOnly.toggle()
                                     NotificationCenter.default.post(
@@ -105,7 +105,7 @@ struct MainListView: View {
                         } else if contentSource == .goodLinks {
                             Divider()
 
-                            Section("Articles Sort") {
+                            Section("Sort") {
                                 ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
                                     Button {
                                         goodLinksVM.sortKey = key
@@ -141,7 +141,7 @@ struct MainListView: View {
                                 }
                             }
 
-                            Section("Articles Filter") {
+                            Section("Filter") {
                                 Button {
                                     goodLinksVM.showStarredOnly.toggle()
                                     NotificationCenter.default.post(
