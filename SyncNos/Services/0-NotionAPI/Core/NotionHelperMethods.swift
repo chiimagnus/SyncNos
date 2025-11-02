@@ -149,13 +149,13 @@ class NotionHelperMethods {
         blocks.append(contentsOf: buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
         // 2) note 切分为多个兄弟 bulleted_list_item
         blocks.append(contentsOf: buildNoteChildren(for: highlight, chunkSize: chunkSize))
-        // 3) metadata + uuid 作为 bulleted_list_item，确保总在末尾
+        // 3) metadata 作为 bulleted_list_item，确保总在末尾
         blocks.append(buildMetaAndLinkBulletChild(for: highlight, bookId: bookId, source: source))
         return (parent, blocks)
     }
 
     // buildBulletedListItemBlock(for:bookId:maxTextLength:)：构建并返回一个完整的 Notion 列表项 block（现在使用数字列表），
-    // 父级 rich_text 包含高亮文本，children 包含 note 与 metadata+uuid 子块。
+    // 父级 rich_text 包含高亮文本，children 包含 note 与 metadata 子块。
     func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [String: Any] {
         let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength, source: source)
         let numbered: [String: Any] = [
@@ -250,7 +250,7 @@ class NotionHelperMethods {
         }
     }
 
-    /// metadata + uuid 作为 bulleted_list_item 子块（列表场景）
+    /// metadata 作为 bulleted_list_item 子块（列表场景）
     func buildMetaAndLinkBulletChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
         var rich: [[String: Any]] = []
         let metaString = buildMetadataString(for: highlight, source: source)
