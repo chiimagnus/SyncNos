@@ -5,26 +5,37 @@ struct EmptyStateView: View {
     let title: String
 
     var body: some View {
-        VStack(spacing: 24) {
-            // App Logo
-            Image(nsImage: NSImage(named: "AppIcon")!)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 120, height: 120)
+        ScrollView {
+            VStack(spacing: 24) {
+                // App Logo
+                Image(nsImage: NSImage(named: "AppIcon")!)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
 
-            Text(title)
-                .font(.system(size: 56, weight: .bold, design: .rounded))
-                .fontWidth(.compressed)
-                .minimumScaleFactor(0.8)
+                Text(title)
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .fontWidth(.compressed)
+                    .minimumScaleFactor(0.8)
 
-            Text("Please select an item")
-                .font(.title3)
-                .foregroundColor(.secondary)
+                Text("Please select an item")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.bottom, 32)
 
-            SyncQueueView()
-                .frame(minHeight: 300)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Sync Queue")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                SyncQueueView()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding()
         }
-        .padding()
     }
 }
 
@@ -34,25 +45,37 @@ struct MultipleSelectionPlaceholderView: View {
     let onSyncSelected: () -> Void
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(nsImage: NSImage(named: "AppIcon")!)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 120, height: 120)
-            Text(title)
-                .font(.system(size: 56, weight: .bold, design: .rounded))
-                .fontWidth(.compressed)
-                .minimumScaleFactor(0.8)
-            Button {
-                onSyncSelected()
-            } label: {
-                Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
-            }
+        ScrollView {
+            VStack(spacing: 24) {
+                Image(nsImage: NSImage(named: "AppIcon")!)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
+                
+                Text(title)
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .fontWidth(.compressed)
+                    .minimumScaleFactor(0.8)
+                
+                Button {
+                    onSyncSelected()
+                } label: {
+                    Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .padding(.bottom, 16)
 
-            SyncQueueView()
-                .frame(minHeight: 200)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Sync Queue")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    SyncQueueView()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding()
         }
-        .padding()
     }
 }
 

@@ -4,53 +4,72 @@ struct SyncQueueView: View {
     @StateObject private var viewModel = SyncQueueViewModel()
     
     var body: some View {
-        List {
+        VStack(alignment: .leading, spacing: 16) {
             // Running Tasks Section
-            Section {
-                if runningTasks.isEmpty {
-                    Text("No active sync tasks")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(runningTasks) { task in
-                        taskRow(task)
-                    }
-                }
-            } header: {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Running")
-                    // Spacer()
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                     if !runningTasks.isEmpty {
                         Text("\(runningTasks.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            
-            // Queued Tasks Section
-            Section {
-                if queuedTasks.isEmpty {
-                    Text("No queued tasks")
+                .padding(.horizontal, 12)
+                
+                if runningTasks.isEmpty {
+                    Text("No active sync tasks")
+                        .font(.body)
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                 } else {
-                    ForEach(queuedTasks) { task in
-                        taskRow(task)
+                    VStack(spacing: 8) {
+                        ForEach(runningTasks) { task in
+                            taskRow(task)
+                                .padding(.horizontal, 12)
+                        }
                     }
                 }
-            } header: {
+            }
+            
+            Divider()
+                .padding(.horizontal, 12)
+            
+            // Queued Tasks Section
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Waiting")
-                    // Spacer()
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                     if !queuedTasks.isEmpty {
                         Text("\(queuedTasks.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.horizontal, 12)
+                
+                if queuedTasks.isEmpty {
+                    Text("No queued tasks")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(queuedTasks) { task in
+                            taskRow(task)
+                                .padding(.horizontal, 12)
+                        }
+                    }
+                }
             }
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.06))
@@ -59,10 +78,6 @@ struct SyncQueueView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
-        // .navigationTitle("Sync Queue")
-        // .toolbar {
-        //     ToolbarItem { Text("") }
-        // }
     }
     
     private var runningTasks: [SyncQueueTask] { viewModel.runningTasks }
