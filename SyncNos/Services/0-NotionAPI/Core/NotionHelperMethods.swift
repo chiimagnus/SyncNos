@@ -97,6 +97,12 @@ class NotionHelperMethods {
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
         let chunks = chunkText(highlight.text, chunkSize: chunkSize)
         let textContent = chunks.first ?? ""
+        // 在父块最开头插入灰色小尾巴形式的 UUID，并在其后换行
+        let uuidPrefix = "[uuid:\(highlight.uuid)]\n"
+        rt.append([
+            "text": ["content": uuidPrefix],
+            "annotations": ["color": "gray"]
+        ])
         rt.append(["text": ["content": textContent]])
 
         return rt
@@ -126,7 +132,6 @@ class NotionHelperMethods {
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
-        rich.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["italic": true]])
         return [
             "object": "block",
             "paragraph": [
@@ -254,7 +259,6 @@ class NotionHelperMethods {
         if !metaString.isEmpty {
             rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
         }
-        rich.append(["text": ["content": "\n[uuid:\(highlight.uuid)]"], "annotations": ["italic": true]])
         return [
             "object": "block",
             "bulleted_list_item": [

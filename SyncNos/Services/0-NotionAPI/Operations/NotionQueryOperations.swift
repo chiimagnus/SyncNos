@@ -99,29 +99,7 @@ class NotionQueryOperations {
                     }
                 }
 
-                // If the block has children, fetch them and scan for metadata child blocks containing UUID
-                if block.has_children == true {
-                    do {
-                        let childComponents = requestHelper.makeURLComponents(path: "blocks/\(block.id)/children")
-                        let childData = try await requestHelper.performRequest(url: childComponents.url!, method: "GET", body: nil)
-                        let childDecoded = try JSONDecoder().decode(BlockChildrenResponse.self, from: childData)
-                        for child in childDecoded.results {
-                            let childTexts = child.paragraph?.rich_text ?? child.bulleted_list_item?.rich_text ?? child.numbered_list_item?.rich_text ?? []
-                            for ct in childTexts {
-                                if let s = ct.plain_text, let startRange = s.range(of: "[uuid:") {
-                                    let startIdx = startRange.upperBound
-                                    if let endRange = s.range(of: "]", range: startIdx..<s.endIndex) {
-                                        let idPart = String(s[startIdx..<endRange.lowerBound])
-                                        collected[idPart] = block.id
-                                        logger.debug("DEBUG: 从子块找到UUID映射 - UUID: \(idPart), Parent Block ID: \(block.id)")
-                                    }
-                                }
-                            }
-                        }
-                    } catch {
-                        logger.debug("DEBUG: 无法读取子块 children for block \(block.id): \(error.localizedDescription)")
-                    }
-                }
+                // 子块已不再存放 UUID，这里不再读取/扫描 children
             }
             startCursor = decoded.has_more ? decoded.next_cursor : nil
         } while startCursor != nil
