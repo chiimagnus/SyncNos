@@ -32,5 +32,3 @@ final class AppleBooksSyncService: AppleBooksSyncServiceProtocol {
         try await makeStrategy().sync(book: book, dbPath: dbPath, incremental: incremental, progress: progress)
     }
 }
-
-

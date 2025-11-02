@@ -17,5 +17,3 @@ protocol AppleBooksSyncStrategyProtocol {
     ///   - progress: 进度回调
     func syncSmart(book: BookListItem, dbPath: String?, progress: @escaping (String) -> Void) async throws
 }
-
-

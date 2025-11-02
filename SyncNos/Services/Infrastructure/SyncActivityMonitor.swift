@@ -53,5 +53,3 @@ final class SyncActivityMonitor: SyncActivityMonitorProtocol {
         stateQueue.sync { _ = activeIds.remove(id) }
     }
 }
-
-

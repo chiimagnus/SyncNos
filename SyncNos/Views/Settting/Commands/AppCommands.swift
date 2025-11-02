@@ -88,8 +88,6 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
             }
             .keyboardShortcut("r", modifiers: .command)
-
-
             Divider()
 
             // 数据源切换

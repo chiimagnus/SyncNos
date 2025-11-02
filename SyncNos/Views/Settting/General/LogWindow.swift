@@ -78,5 +78,3 @@ struct LogWindow_Previews: PreviewProvider {
         LogWindow()
     }
 }
-
-
