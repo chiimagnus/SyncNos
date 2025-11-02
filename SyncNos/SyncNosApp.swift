@@ -16,11 +16,9 @@ struct SyncNosApp: App {
         // Start observing IAP transactions
         DIContainer.shared.iapService.startObservingTransactions()
 
-        // Start Auto Sync if enabled
-        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSyncEnabled")
-        if autoSyncEnabled {
-            DIContainer.shared.autoSyncService.start()
-        }
+        // Start Auto Sync if any source enabled
+        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 
         // 初始化同步状态监控，确保尽早开始监听通知
         _ = DIContainer.shared.syncActivityMonitor
