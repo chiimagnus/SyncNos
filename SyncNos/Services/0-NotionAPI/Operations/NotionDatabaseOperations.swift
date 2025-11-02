@@ -138,6 +138,23 @@ class NotionDatabaseOperations {
     }
 
     func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws {
-        _ = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "PATCH", body: ["properties": definitions])
+        // 读取当前数据库属性，仅为“缺失的属性”做新增，避免对既有 multi_select（如 Tags）造成覆盖性重置
+        let data = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "GET", body: nil)
+        let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+        let existingProps = (json?["properties"] as? [String: Any]) ?? [:]
+
+        var toAdd: [String: Any] = [:]
+        for (name, def) in definitions {
+            if existingProps[name] == nil {
+                // 属性不存在 → 仅新增
+                toAdd[name] = def
+            } else {
+                // 已存在：跳过，避免将 multi_select 等重置为空选项
+                // 如需未来进行类型校验/迁移，可在此加判断，但默认不做破坏性变更
+                continue
+            }
+        }
+        if toAdd.isEmpty { return }
+        _ = try await requestHelper.performRequest(path: "databases/\(databaseId)", method: "PATCH", body: ["properties": toAdd])
     }
 }

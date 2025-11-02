@@ -34,6 +34,26 @@ final class NotionService: NotionServiceProtocol {
     // 串行化 ensure（按来源）
     private static let sourceEnsureLock = NotionSourceEnsureLock()
 
+    // Serialize property ensure per database to avoid racing PATCH on schema
+    private actor NotionDBPropsEnsureLock {
+        private var waitersByDb: [String: [CheckedContinuation<Void, Never>]] = [:]
+        func begin(dbId: String) async {
+            if waitersByDb[dbId] != nil {
+                await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                    waitersByDb[dbId]!.append(c)
+                }
+            } else {
+                waitersByDb[dbId] = []
+            }
+        }
+        func end(dbId: String) {
+            let waiters = waitersByDb.removeValue(forKey: dbId) ?? []
+            for w in waiters { w.resume() }
+        }
+    }
+
+    private static let dbPropsEnsureLock = NotionDBPropsEnsureLock()
+
     init(configStore: NotionConfigStoreProtocol) {
         // Initialize core components
         self.core = NotionServiceCore(configStore: configStore)
@@ -112,6 +132,9 @@ final class NotionService: NotionServiceProtocol {
 
     // MARK: - Generic property/schema helpers
     func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws {
+        // 串行化相同数据库的属性 ensure，避免并发 PATCH 造成意外覆盖
+        await Self.dbPropsEnsureLock.begin(dbId: databaseId)
+        defer { Task { await Self.dbPropsEnsureLock.end(dbId: databaseId) } }
         try await databaseOps.ensureDatabaseProperties(databaseId: databaseId, definitions: definitions)
     }
 
