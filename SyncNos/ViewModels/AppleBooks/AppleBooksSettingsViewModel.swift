@@ -28,6 +28,14 @@ final class AppleBooksSettingsViewModel: ObservableObject {
         notionConfig.setDatabaseId(appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "appleBooks")
         notionConfig.syncMode = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
         UserDefaults.standard.set(autoSync, forKey: "autoSync.appleBooks")
+        // 根据 per-source 开关控制 AutoSyncService 生命周期
+        let anyEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        UserDefaults.standard.set(anyEnabled, forKey: "autoSyncEnabled")
+        if anyEnabled {
+            DIContainer.shared.autoSyncService.start()
+        } else {
+            DIContainer.shared.autoSyncService.stop()
+        }
         message = "Settings saved"
         Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
