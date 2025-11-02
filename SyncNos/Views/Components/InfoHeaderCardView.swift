@@ -1,8 +1,18 @@
 import SwiftUI
 
-/// 空状态占位视图，用于没有选择任何项目时的显示
-struct EmptyStateView: View {
+/// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
+struct SelectionPlaceholderView: View {
     let title: String
+    let count: Int?
+    let onSyncSelected: (() -> Void)?
+
+    init(title: String, count: Int? = nil, onSyncSelected: (() -> Void)? = nil) {
+        self.title = title
+        self.count = count
+        self.onSyncSelected = onSyncSelected
+    }
+
+    private var isMultipleSelection: Bool { count ?? 0 > 0 && onSyncSelected != nil }
 
     var body: some View {
         ScrollView {
@@ -18,51 +28,19 @@ struct EmptyStateView: View {
                     .fontWidth(.compressed)
                     .minimumScaleFactor(0.8)
 
-                Text("Please select an item")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.bottom, 32)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Sync Queue")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                SyncQueueView()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding()
-        }
-    }
-}
-
-struct MultipleSelectionPlaceholderView: View {
-    let title: String
-    let count: Int
-    let onSyncSelected: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(nsImage: NSImage(named: "AppIcon")!)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                
-                Text(title)
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                    .fontWidth(.compressed)
-                    .minimumScaleFactor(0.8)
-                
-                Button {
-                    onSyncSelected()
-                } label: {
-                    Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
+                if isMultipleSelection, let count {
+                    Button {
+                        onSyncSelected?()
+                    } label: {
+                        Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .padding(.bottom, 16)
+                } else {
+                    Text("Please select an item")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .padding(.bottom, 16)
                 }
-                .padding(.bottom, 16)
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Sync Queue")
@@ -70,6 +48,7 @@ struct MultipleSelectionPlaceholderView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
+                    // 关键：无论空态或多选，均保留同一位置的 SyncQueueView，避免重新订阅
                     SyncQueueView()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
