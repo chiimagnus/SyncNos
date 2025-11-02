@@ -1428,64 +1428,6 @@
         }
       }
     },
-    "Auto Sync (placeholder)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Automatische Synchronisierung (Platzhalter)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auto Sync (placeholder)"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización automática (marcador de posición)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation automatique (espace réservé)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自動同期 (プレースホルダー)"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "자동 동기화 (플레이스홀더)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização automática (espaço reservado)"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Автосинхронизация (заполнитель)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动同步（占位符）"
-          }
-        }
-      }
-    },
     "Basic information" : {
       "localizations" : {
         "de" : {
@@ -2821,6 +2763,64 @@
         }
       }
     },
+    "Enable automatic sync for GoodLinks (checked means AutoSyncService will run)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable automatic sync for GoodLinks (checked means AutoSyncService will run)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 GoodLinks 自动同步（选中意味着 AutoSyncService 将运行）"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer la synchronisation automatique pour GoodLinks (coché signifie que AutoSyncService fonctionnera)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Synchronisation für GoodLinks aktivieren (aktiviert bedeutet, dass AutoSyncService ausgeführt wird)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GoodLinks の自動同期を有効にする（チェックすると AutoSyncService が実行されます）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GoodLinks 자동 동기화 활성화 (체크하면 AutoSyncService 실행)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativar sincronização automática para GoodLinks (marcado significa que o AutoSyncService será executado)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить автоматическую синхронизацию для GoodLinks (отмечено означает, что AutoSyncService будет работать)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habilitar sincronización automática para GoodLinks (marcado significa que se ejecutará AutoSyncService)"
+          }
+        }
+      }
+    },
     "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded." : {
       "localizations" : {
         "de" : {
@@ -3301,64 +3301,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "GoodLinks auto-sync not implemented; this is a UI-only toggle for now" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GoodLinks Auto-Sync nicht implementiert; dies ist vorerst nur ein UI-only Toggle"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GoodLinks auto-sync not implemented; this is a UI-only toggle for now"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronización automática de GoodLinks no implementada; esto es solo un toggle de UI por ahora"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Synchronisation automatique GoodLinks non implémentée; ceci est un toggle UI uniquement pour le moment"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GoodLinks自動同期は実装されていません。現在はUIのみのトグルです"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GoodLinks 자동 동기화가 구현되지 않았습니다. 현재는 UI 전용 토글입니다"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sincronização automática do GoodLinks não implementada; este é apenas um toggle de UI por enquanto"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Автосинхронизация GoodLinks не реализована; это пока только UI-переключатель"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GoodLinks 自动同步未实现；这目前只是一个纯 UI 开关"
-          }
-        }
-      }
     },
     "GoodLinks DB ID (optional)" : {
       "localizations" : {
@@ -9175,6 +9117,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple Books 同步模式"
+          }
+        }
+      }
+    },
+    "Sync Queue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Queue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步队列"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File de synchronisation"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync-Warteschlange"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期キュー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화 큐"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fila de sincronização"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очередь синхронизации"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cola de sincronización"
           }
         }
       }
