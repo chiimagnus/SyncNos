@@ -32,7 +32,7 @@ struct MainListView: View {
                             contentSourceRawValue = ContentSource.appleBooks.rawValue
                         } label: {
                             HStack {
-                                Text("AppleBooks-\(viewModel.books.count)")
+                                Text("AppleBooks (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
                                 if contentSource == .appleBooks { Image(systemName: "checkmark") }
                             }
                         }
@@ -41,7 +41,7 @@ struct MainListView: View {
                             contentSourceRawValue = ContentSource.goodLinks.rawValue
                         } label: {
                             HStack {
-                                Text("GoodLinks-\(goodLinksVM.links.count)")
+                                Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
                                 if contentSource == .goodLinks { Image(systemName: "checkmark") }
                             }
                         }
