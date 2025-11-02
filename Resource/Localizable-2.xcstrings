@@ -1,60 +1,60 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "quit.confirm.title" : {
+    "Book file not found on device or iCloud" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Synchronisation mit Notion läuft. Trotzdem beenden?"
+            "value" : "Buchdatei nicht auf Gerät oder iCloud gefunden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sync to Notion is in progress. Quit anyway?"
+            "value" : "Book file not found on device or iCloud"
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La sincronización con Notion está en curso. ¿Salir de todos modos?"
+            "value" : "Archivo de libro no encontrado en el dispositivo o iCloud"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La synchronisation vers Notion est en cours. Quitter quand même ?"
+            "value" : "Fichier livre non trouvé sur l'appareil ou iCloud"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notionへの同期が進行中です。終了しますか？"
+            "value" : "デバイスまたは iCloud に書籍ファイルが見つかりません"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notion으로 동기화 중입니다. 그래도 종료하시겠습니까?"
+            "value" : "장치 또는 iCloud에서 책 파일을 찾을 수 없습니다"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A sincronização com o Notion está em andamento. Sair mesmo assim?"
+            "value" : "Arquivo do livro não encontrado no dispositivo ou iCloud"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Синхронизация с Notion выполняется. Все равно выйти?"
+            "value" : "Файл книги не найден на устройстве или iCloud"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在同步笔记到 Notion，确定要退出吗？"
+            "value" : "在设备或 iCloud 上未找到图书文件"
           }
         }
       }
@@ -171,6 +171,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出"
+          }
+        }
+      }
+    },
+    "quit.confirm.title" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Synchronisation mit Notion läuft. Trotzdem beenden?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync to Notion is in progress. Quit anyway?"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La sincronización con Notion está en curso. ¿Salir de todos modos?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La synchronisation vers Notion est en cours. Quitter quand même ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notionへの同期が進行中です。終了しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notion으로 동기화 중입니다. 그래도 종료하시겠습니까?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sincronização com o Notion está em andamento. Sair mesmo assim?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация с Notion выполняется. Все равно выйти?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在同步笔记到 Notion，确定要退出吗？"
           }
         }
       }
