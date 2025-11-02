@@ -43,5 +43,3 @@ final class KeychainHelper {
         return status == errSecSuccess || status == errSecItemNotFound
     }
 }
-
-

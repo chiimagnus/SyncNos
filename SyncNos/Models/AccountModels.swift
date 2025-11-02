@@ -53,5 +53,3 @@ struct AccountProfile: Codable, Equatable {
         case loginMethods = "login_methods"
     }
 }
-
-

@@ -83,5 +83,3 @@ final class AppleSignInViewModel: ObservableObject {
         return hashed.map { String(format: "%02x", $0) }.joined()
     }
 }
-
-

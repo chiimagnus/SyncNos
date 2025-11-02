@@ -41,5 +41,3 @@ enum NotionSyncConfig {
     /// 退避抖动（毫秒）
     static let retryJitterMs: UInt64 = 250
 }
-
-

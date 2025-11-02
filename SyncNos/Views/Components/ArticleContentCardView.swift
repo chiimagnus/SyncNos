@@ -135,5 +135,3 @@ private extension ArticleContentCardView {
         return true
     }
 }
-
-

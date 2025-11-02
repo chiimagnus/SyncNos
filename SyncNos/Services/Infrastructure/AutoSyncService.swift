@@ -242,5 +242,3 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         }
     }
 }
-
-

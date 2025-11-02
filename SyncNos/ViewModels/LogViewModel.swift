@@ -59,5 +59,3 @@ final class LogViewModel: ObservableObject {
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
 }
-
-

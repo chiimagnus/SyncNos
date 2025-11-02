@@ -223,8 +223,6 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
     }
 
     // MARK: - Helpers
-
-
     private func getLatestHighlightCount(dbPath: String?, assetId: String) async throws -> Int {
         guard let path = dbPath else { return 0 }
         let handle = try databaseService.openReadOnlyDatabase(dbPath: path)
@@ -233,5 +231,3 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         return counts.first { $0.assetId == assetId }?.count ?? 0
     }
 }
-
-

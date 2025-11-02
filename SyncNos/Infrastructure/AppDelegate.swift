@@ -52,5 +52,3 @@ import SwiftUI
         }
     }
 }
-
-

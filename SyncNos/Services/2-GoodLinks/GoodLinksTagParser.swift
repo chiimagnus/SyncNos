@@ -45,5 +45,3 @@ enum GoodLinksTagParser {
         return parts.map { "\($0)；" }.joined()
     }
 }
-
-

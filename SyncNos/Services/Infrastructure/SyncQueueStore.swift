@@ -121,5 +121,3 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         subject.send(stateQueue.sync { orderedTasks() })
     }
 }
-
-

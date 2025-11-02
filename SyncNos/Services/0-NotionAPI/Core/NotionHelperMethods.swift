@@ -88,8 +88,6 @@ class NotionHelperMethods {
         return properties
     }
 
-
-
     // Build parent rich_text for nested-block approach (only highlight text)
     func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
         var rt: [[String: Any]] = []
@@ -97,7 +95,7 @@ class NotionHelperMethods {
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
         let chunks = chunkText(highlight.text, chunkSize: chunkSize)
         let textContent = chunks.first ?? ""
-        // 在父块最开头插入灰色小尾巴形式的 UUID，并在其后换行
+        // 在父块最开头插入灰色小尾巴形式的 UUID，并在其后块内换行
         let uuidPrefix = "[uuid:\(highlight.uuid)]\n"
         rt.append([
             "text": ["content": uuidPrefix],

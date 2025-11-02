@@ -79,8 +79,6 @@ struct AppleBooksDetailView: View {
                                     }
                                 }
                             }
-
-
                             // Highlights section (Waterfall / Masonry)
                             WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
                                 ForEach(viewModel.highlights, id: \.uuid) { highlight in

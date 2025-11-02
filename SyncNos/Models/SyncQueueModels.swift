@@ -31,5 +31,3 @@ struct SyncQueueTask: Identifiable, Equatable, Sendable {
         self.id = "\(source.rawValue):\(rawId)"
     }
 }
-
-
