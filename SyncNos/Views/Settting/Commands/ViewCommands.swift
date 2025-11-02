@@ -82,9 +82,9 @@ struct ViewCommands: Commands {
                             NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly])
                         } label: {
                             if bookListShowWithTitleOnly {
-                                Label("Books with titles only", systemImage: "checkmark")
+                                Label("Titles only", systemImage: "checkmark")
                             } else {
-                                Text("Books with titles only")
+                                Text("Titles only")
                             }
                         }
                     }
