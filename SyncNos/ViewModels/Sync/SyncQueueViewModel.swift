@@ -28,5 +28,3 @@ final class SyncQueueViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 }
-
-

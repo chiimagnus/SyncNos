@@ -44,5 +44,3 @@ final class SyncTimestampStore: SyncTimestampStoreProtocol {
     //     }
     // }
 }
-
-

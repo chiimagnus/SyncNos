@@ -18,5 +18,3 @@ extension FocusedValues {
         set { self[SelectionCommandsFocusedKey.self] = newValue }
     }
 }
-
-

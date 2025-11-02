@@ -164,5 +164,3 @@ final class AccountViewModel: ObservableObject {
         await setLoading(false)
     }
 }
-
-
