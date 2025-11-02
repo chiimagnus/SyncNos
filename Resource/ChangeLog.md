@@ -1,3 +1,62 @@
+## v0.5.10
+
+*Added*
+
+- 新增功能：为 Apple Books 和 GoodLinks 实现高亮颜色管理功能。
+
+*Changed*
+
+- 架构重构：将命令结构模块化，拆分为独立的命令文件以提高可维护性。
+
+## v0.5.9.3
+
+*Added*
+
+- 同步队列管理：实现同步队列管理和 UI 界面，为任务添加源标识徽章。
+- 全局并发控制：实现全局并发限制器以优化同步操作性能。
+
+*Changed*
+
+- API 优化：改进 Notion API 的读写限流机制，提升同步稳定性。
+- 同步队列重构：优化 SyncQueueView 的布局和功能，集成到 InfoHeaderCardView 和 MainListView 中。
+- 并发控制增强：在 AppleBooksDetailViewModel 和 GoodLinksViewModel 中集成并发限制器。
+- 界面改进：移除同步队列窗口，更新同步队列布局和背景样式。
+- 日志机制：改进 LoggerService 中的日志记录机制。
+- 状态管理：优化 GoodLinksViewModel 中的同步状态管理。
+
+## v0.5.9.2
+
+*Added*
+
+- 同步队列：实现同步队列管理和 UI 界面。
+
+*Changed*
+
+- 界面优化：统一 AppleBooksDetailView 和 GoodLinksDetailView 中的工具栏结构。
+- 布局改进：重新组织 LogWindow 布局和工具栏集成，更新 SyncQueueView 布局和导航。
+
+## v0.5.9.1
+
+*Changed*
+
+- 滚动体验优化：改进 AppleBooksDetailView 和 GoodLinksDetailView 中的滚动行为。
+- 界面微调：增强 ArticleContentCardView 的可选展开状态绑定，禁用文本选择以提升用户体验。
+
+## v0.5.8
+
+*Added*
+
+- 国际化支持：为应用添加多语言国际化支持。
+- 同步监控：实现同步活动监控和应用终止处理。
+- 内容增强：增强 ArticleContentCardView 以支持自定义内容插槽，添加多选占位符视图的标题和同步进度消息。
+- Fallback 机制：为 GoodLinksDetailView 添加 fallback 内容处理。
+
+*Changed*
+
+- 界面改进：增强 MainListView 布局和样式，更新 AppleBooksDetailView 和 GoodLinksDetailView 中的图标以保持一致性。
+- 链接显示：更新 GoodLinksDetailView 中的链接颜色以提高可见性，修正 fallback 消息的清晰度。
+- 许可证更新：更新 README 文件中的许可证从 GPL-3.0 到 AGPL-3.0。
+
 ## v0.5.7.2
 
 *Changed*
@@ -92,6 +151,12 @@
 *Fixed*
 
 - 修复批量同步中错误日志写入线程问题，确保在主线程安全记录日志。
+
+## v0.5.3.1
+
+*Changed*
+
+- 功能实验：为文章和高亮视图添加 Markdown 支持（后续版本中回滚）。
 
 ## v0.5.3
 
