@@ -154,7 +154,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             return
         }
 
-        // 5) 既有页面：仅追加缺失的高亮，避免对已存在的条目执行覆盖性“删除后重建”
+        // 5) 既有页面：增量同步（不重置、不删除）：仅追加缺失的高亮
         let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
 
         var toAppendHighlights: [HighlightRow] = []
@@ -177,10 +177,8 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         if !toAppendHighlights.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppendHighlights.count))
             let helper = NotionHelperMethods()
-            var children: [[String: Any]] = []
-            for h in toAppendHighlights {
-                let block = helper.buildBulletedListItemBlock(for: h, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
-                children.append(block)
+            let children: [[String: Any]] = toAppendHighlights.map { h in
+                helper.buildBulletedListItemBlock(for: h, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
             }
             try await notionService.appendChildren(pageId: pageId, children: children, batchSize: NotionSyncConfig.defaultAppendBatchSize)
         }
