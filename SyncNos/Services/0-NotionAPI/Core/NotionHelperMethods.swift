@@ -14,6 +14,20 @@ class NotionHelperMethods {
         }
     }
 
+    /// 使用 URLComponents 对 fragment 做编码，避免非法字符导致的 URL 无效
+    private func buildIBooksLinkEncoded(bookId: String, location: String?) -> String {
+        var comps = URLComponents()
+        comps.scheme = "ibooks"
+        comps.host = "assetid"
+        comps.path = "/" + bookId
+        if let loc = location, !loc.isEmpty {
+            comps.fragment = loc
+        }
+        if let url = comps.url { return url.absoluteString }
+        // 兜底：回退到原始拼接
+        return buildIBooksLink(bookId: bookId, location: location)
+    }
+
     // Build legacy metadata string (kept for compatibility where needed)
     func buildMetadataString(for highlight: HighlightRow, source: String = "appleBooks") -> String {
         var metaParts: [String] = []
@@ -136,7 +150,7 @@ class NotionHelperMethods {
             properties["Location"] = ["rich_text": []]
         }
 
-        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
+        let linkUrl = buildIBooksLinkEncoded(bookId: bookId, location: highlight.location)
         properties["Link"] = ["url": linkUrl]
 
         return properties
@@ -173,11 +187,10 @@ class NotionHelperMethods {
     }
 
     func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
-        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
+        let linkUrl = buildIBooksLinkEncoded(bookId: bookId, location: highlight.location)
         let rich: [[String: Any]] = [[
             "text": [
-                "content": "Open in iBooks",
-                "link": ["url": linkUrl]
+                "content": "Open in iBooks: \(linkUrl)"
             ]
         ]]
         return [
