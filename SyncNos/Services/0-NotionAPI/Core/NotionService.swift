@@ -114,10 +114,6 @@ final class NotionService: NotionServiceProtocol {
         return try await queryOps.collectExistingUUIDs(fromPageId: pageId)
     }
 
-    func collectExistingUUIDToBlockIdMapping(fromPageId pageId: String) async throws -> [String: String] {
-        return try await queryOps.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
-    }
-
     func collectExistingUUIDMapWithToken(fromPageId pageId: String) async throws -> [String: (blockId: String, token: String?)] {
         return try await queryOps.collectExistingUUIDMapWithToken(fromPageId: pageId)
     }

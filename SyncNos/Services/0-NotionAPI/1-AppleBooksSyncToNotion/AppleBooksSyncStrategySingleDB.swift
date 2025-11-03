@@ -64,19 +64,25 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         var newRows: [HighlightRow] = []
 
         if incremental {
-            let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
-            logger.debug(String(format: NSLocalizedString("DEBUG: Incremental sync - mapping: %lld", comment: ""), existingMap.count))
+            let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId)
+            logger.debug(String(format: NSLocalizedString("DEBUG: Incremental sync - mapping: %lld", comment: ""), existingMapWithToken.count))
             var toUpdate: [(String, HighlightRow)] = []
             var toAppend: [HighlightRow] = []
+            let helper = NotionHelperMethods()
 
             while true {
                 let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset, since: since)
                 logger.debug(String(format: NSLocalizedString("DEBUG: Incremental sync batch %d - fetched %lld highlights (offset: %lld)", comment: ""), batchCount + 1, page.count, offset))
                 if page.isEmpty { break }
                 for h in page {
-                    if let blockId = existingMap[h.uuid] {
+                    if let existing = existingMapWithToken[h.uuid] {
                         if let last = since, let modified = h.modified, modified < last { continue }
-                        toUpdate.append((blockId, h))
+                        let localToken = helper.computeModifiedToken(for: h, source: "appleBooks")
+                        if let remote = existing.token, remote == localToken {
+                            // equal -> skip
+                        } else {
+                            toUpdate.append((existing.blockId, h))
+                        }
                     } else {
                         toAppend.append(h)
                     }
@@ -181,21 +187,27 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             return
         }
 
-        // existing page → scan & update/append
-        let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+        // existing page → scan & update/append (use token map)
+        let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId)
         let last = SyncTimestampStore.shared.getLastSyncTime(for: book.bookId)
         progress(NSLocalizedString("Scanning local highlights...", comment: ""))
         var toAppend: [HighlightRow] = []
         var toUpdate: [(String, HighlightRow)] = []
         var offset = 0
         var batch = 0
+        let helper = NotionHelperMethods()
         while true {
             let page = try databaseService.fetchHighlightPage(db: handle, assetId: book.bookId, limit: pageSize, offset: offset)
             if page.isEmpty { break }
             for h in page {
-                if let blockId = existingMap[h.uuid] {
+                if let existing = existingMapWithToken[h.uuid] {
                     if let last, let modified = h.modified, modified < last { continue }
-                    toUpdate.append((blockId, h))
+                    let localToken = helper.computeModifiedToken(for: h, source: "appleBooks")
+                    if let remote = existing.token, remote == localToken {
+                        // equal -> skip
+                    } else {
+                        toUpdate.append((existing.blockId, h))
+                    }
                 } else {
                     toAppend.append(h)
                 }
