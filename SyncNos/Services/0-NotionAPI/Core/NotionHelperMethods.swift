@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Notion 服务辅助方法
 class NotionHelperMethods {
@@ -13,7 +14,7 @@ class NotionHelperMethods {
         }
     }
 
-    // Build metadata string from highlight. `source` selects style->color mapping.
+    // Build legacy metadata string (kept for compatibility where needed)
     func buildMetadataString(for highlight: HighlightRow, source: String = "appleBooks") -> String {
         var metaParts: [String] = []
         if let s = highlight.style {
@@ -23,6 +24,56 @@ class NotionHelperMethods {
         if let d = highlight.dateAdded { metaParts.append("added:\(NotionServiceCore.isoDateFormatter.string(from: d))") }
         if let m = highlight.modified { metaParts.append("modified:\(NotionServiceCore.isoDateFormatter.string(from: m))") }
         return metaParts.joined(separator: " | ")
+    }
+
+    // MARK: - Unified header helpers
+
+    /// Compute modified token for header second line.
+    /// - Apple Books: use modified time if present; otherwise fall back to hash.
+    /// - GoodLinks: always use hash (since source has no modified time).
+    func computeModifiedToken(for highlight: HighlightRow, source: String) -> String {
+        if source == "appleBooks", let m = highlight.modified {
+            return NotionServiceCore.isoDateFormatter.string(from: m)
+        }
+        // Hash-based token
+        let styleNameValue: String = {
+            if let s = highlight.style { return styleName(for: s, source: source) }
+            return ""
+        }()
+        let added = highlight.dateAdded.map { NotionServiceCore.isoDateFormatter.string(from: $0) } ?? ""
+        let location = highlight.location ?? ""
+        let normalizedText = highlight.text.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNote = (highlight.note ?? "").replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        let payload = [normalizedText, normalizedNote, styleNameValue, added, location].joined(separator: "\n")
+        let digest = SHA256.hash(data: payload.data(using: .utf8) ?? Data())
+        let fullHex = digest.compactMap { String(format: "%02x", $0) }.joined()
+        let short = String(fullHex.prefix(16))
+        return short
+    }
+
+    /// Build two header lines as rich_text fragments: [uuid:...] and metadata (style|added|modified)
+    func makeHeaderLines(for highlight: HighlightRow, source: String) -> [[String: Any]] {
+        var rt: [[String: Any]] = []
+        // Line 1: UUID (gray background), with trailing newline
+        let uuidPrefix = "[uuid:\(highlight.uuid)]\n"
+        rt.append([
+            "text": ["content": uuidPrefix],
+            "annotations": ["color": "gray_background"]
+        ])
+
+        // Line 2: metadata (style | added | modified TOKEN), with trailing newline
+        var parts: [String] = []
+        if let s = highlight.style {
+            parts.append("style:\(styleName(for: s, source: source))")
+        }
+        if let d = highlight.dateAdded {
+            parts.append("added:\(NotionServiceCore.isoDateFormatter.string(from: d))")
+        }
+        let token = computeModifiedToken(for: highlight, source: source)
+        parts.append("modified:\(token)")
+        let metaLine = parts.joined(separator: " | ") + "\n"
+        rt.append(["text": ["content": metaLine]])
+        return rt
     }
 
     // Build highlight properties for per-book database
@@ -88,21 +139,17 @@ class NotionHelperMethods {
         return properties
     }
 
-    // Build parent rich_text for nested-block approach (only highlight text)
-    func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil) -> [[String: Any]] {
+    // Build parent rich_text for nested-block approach (two header lines + first text chunk)
+    func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [[String: Any]] {
         var rt: [[String: Any]] = []
+        // Header lines
+        rt.append(contentsOf: makeHeaderLines(for: highlight, source: source))
 
+        // First chunk of highlight text
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
         let chunks = chunkText(highlight.text, chunkSize: chunkSize)
         let textContent = chunks.first ?? ""
-        // 在父块最开头插入灰色小尾巴形式的 UUID，并在其后块内换行
-        let uuidPrefix = "[uuid:\(highlight.uuid)]\n"
-        rt.append([
-            "text": ["content": uuidPrefix],
-            "annotations": ["color": "gray_background"]
-        ])
         rt.append(["text": ["content": textContent]])
-
         return rt
     }
 
@@ -141,7 +188,7 @@ class NotionHelperMethods {
     // Build parent rich_text and ordered child blocks for nested-block approach
     // Returns (parentRichText, childBlocks)
     func buildParentAndChildren(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> ([[String: Any]], [[String: Any]]) {
-        let parent = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+        let parent = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: maxTextLength, source: source)
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
 
         var blocks: [[String: Any]] = []
@@ -149,8 +196,6 @@ class NotionHelperMethods {
         blocks.append(contentsOf: buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
         // 2) note 切分为多个兄弟 bulleted_list_item
         blocks.append(contentsOf: buildNoteChildren(for: highlight, chunkSize: chunkSize))
-        // 3) metadata 作为 bulleted_list_item，确保总在末尾
-        blocks.append(buildMetaAndLinkBulletChild(for: highlight, bookId: bookId, source: source))
         return (parent, blocks)
     }
 
@@ -169,8 +214,15 @@ class NotionHelperMethods {
     }
 
     // buildPerBookPageChildren(for:bookId:)：为“每书库（per-book DB）”构建页面子块列表（用于 pages 的 children），包括：1) 引用（quote）块显示高亮文本；2) 可选的 note 段落；3) metadata + Open 链接段落。
-    func buildPerBookPageChildren(for highlight: HighlightRow, bookId: String) -> [[String: Any]] {
+    func buildPerBookPageChildren(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [[String: Any]] {
         var children: [[String: Any]] = []
+        // 0) Header paragraph block at top (two lines)
+        children.append([
+            "object": "block",
+            "paragraph": [
+                "rich_text": makeHeaderLines(for: highlight, source: source)
+            ]
+        ])
         // 1) Quote block for highlight text
         children.append([
             "object": "block",
@@ -182,8 +234,6 @@ class NotionHelperMethods {
         if let noteChild = buildNoteChild(for: highlight) {
             children.append(noteChild)
         }
-        // 3) Metadata + Open link
-        children.append(buildMetaAndLinkChild(for: highlight, bookId: bookId))
         return children
     }
 
