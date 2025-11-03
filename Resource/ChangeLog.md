@@ -1,3 +1,6 @@
+# 更新日志
+[ChangeLog-English Version](ChangeLog.En.md)
+
 ## v0.5.10 2025年11月2日
 
 *Added*
