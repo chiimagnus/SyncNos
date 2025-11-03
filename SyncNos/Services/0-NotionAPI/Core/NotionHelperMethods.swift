@@ -303,23 +303,6 @@ class NotionHelperMethods {
         }
     }
 
-    /// metadata 作为 bulleted_list_item 子块（列表场景）
-    func buildMetaAndLinkBulletChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
-        var rich: [[String: Any]] = []
-        let metaString = buildMetadataString(for: highlight, source: source)
-        if !metaString.isEmpty {
-            rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
-        }
-        return [
-            "object": "block",
-            "bulleted_list_item": [
-                "rich_text": rich
-            ]
-        ]
-    }
-
-    // buildTrimmedBlock 已移除：分块与批次策略替代了裁剪逻辑
-
     // Build paragraph blocks from a long text (used by GoodLinks sync)
     func buildParagraphBlocks(from text: String, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
         let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n")
