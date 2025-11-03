@@ -41,7 +41,7 @@ class NotionHighlightOperations {
         let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: source)
         _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
 
-        // 构建并替换子块（高亮续块 + note 多块 + metadata bullet），metadata 依据 source 选择颜色映射
+        // 构建并替换子块（高亮续块 + note 多块），metadata 已上移至父块第二行
         var childBlocks: [[String: Any]] = []
         let chunkSize = NotionSyncConfig.maxTextLengthPrimary
         childBlocks.append(contentsOf: helperMethods.buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
