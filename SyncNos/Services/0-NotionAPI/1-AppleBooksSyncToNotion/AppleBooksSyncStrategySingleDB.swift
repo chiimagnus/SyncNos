@@ -88,7 +88,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             // Apply
             if !toUpdate.isEmpty {
                 progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
-                for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId) }
+                for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId, source: "appleBooks") }
             }
             if !toAppend.isEmpty {
                 progress(String(format: NSLocalizedString("Adding %lld new highlights...", comment: ""), toAppend.count))
@@ -205,7 +205,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         }
         if !toUpdate.isEmpty {
             progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
-            for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId) }
+            for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId, source: "appleBooks") }
         }
         if !toAppend.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))

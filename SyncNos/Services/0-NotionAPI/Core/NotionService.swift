@@ -142,8 +142,8 @@ final class NotionService: NotionServiceProtocol {
         try await pageOps.updatePageProperties(pageId: pageId, properties: properties)
     }
 
-    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String) async throws {
-        try await highlightOps.updateBlockContent(blockId: blockId, highlight: highlight, bookId: bookId)
+    func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String, source: String) async throws {
+        try await highlightOps.updateBlockContent(blockId: blockId, highlight: highlight, bookId: bookId, source: source)
     }
 
     // MARK: - Per-book database (方案2)
