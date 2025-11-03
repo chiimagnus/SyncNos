@@ -1,6 +1,82 @@
 # 更新日志
 [ChangeLog-English Version](ChangeLog.En.md)
 
+## v0.5.11 2025年11月4日
+
+*Changed*
+
+- Notion 集成优化：改进 NotionHelperMethods 中的 iBooks 链接编码，提升链接处理准确性。
+- 高亮处理增强：优化高亮链接和元数据处理逻辑。
+- 同步策略更新：更新 AppleBooksSyncStrategy 以使用基于令牌的高亮映射。
+- 代码清理：移除 NotionHelperMethods 中过时的无效方法。
+
+## v0.5.10.6 2025年11月4日
+
+*Changed*
+
+- Notion 高亮操作优化：精简 NotionHighlightOperations 中的子块元数据处理流程。
+- 元数据处理增强：为 NotionHelperMethods 添加高亮元数据注释功能。
+- GoodLinks 同步改进：通过基于令牌的更新增强 GoodLinks 同步机制。
+- 队列管理优化：实现同步队列管理的延迟清理机制。
+- 同步触发机制：同步成功后在 AppleBooks 和 GoodLinks 中触发重新计算。
+
+## v0.5.10.5 2025年11月3日
+
+*Added*
+
+- 同步报告文档：新增 Apple Books 和 GoodLinks 同步到 Notion 的详细报告文档。
+
+*Changed*
+
+- 增量同步优化：改进 GoodLinksSyncService 中的增量同步机制。
+- 页面创建改进：优化 GoodLinks 页面创建和高亮同步流程。
+- 冲突处理增强：优化 GoodLinks 同步并增强冲突处理能力。
+- 用户界面统一：统一选择占位符视图以改善用户体验。
+- Notion 同步增强：通过添加源参数改进 Notion 同步功能。
+
+## v0.5.10.4 2025年11月3日
+
+*Changed*
+
+- Notion 数据库管理：增强 Notion 数据库属性管理功能。
+- 项目文档更新：更新 CLAUDE.md 中的项目概览和结构说明。
+
+## v0.5.10.3 2025年11月3日
+
+*Added*
+
+- 国际化功能：继续完善应用的多语言支持。
+
+*Changed*
+
+- 界面布局优化：增强 InfoHeaderCardView 和 SyncQueueView 的布局设计。
+
+## v0.5.10.2 2025年11月3日
+
+*Changed*
+
+- 自动同步增强：优化 AutoSyncService 以支持按源独立同步控制。
+
+## v0.5.10.1 2025年11月3日
+
+*Added*
+
+- 国际化支持：增强应用的国际化功能。
+- 空状态视图：实现 EmptyStateView 以改善用户体验。
+- 主列表功能：为主列表视图添加排序和筛选选项，支持 Apple Books 和 GoodLinks。
+
+*Changed*
+
+- 书籍显示改进：优化 AppleBooks 视图中的书籍标题和作者显示。
+- 界面文本优化：更新和简化各个视图组件的标签文本。
+- 排序键显示：更新 BookListSortKey 的显示名称以提升清晰度。
+- 同步队列界面：注释 SyncQueueView 中的导航标题和工具栏。
+- 版本管理：更新项目版本号至 0.5.10。
+
+*Fixed*
+
+- 显示问题修复：修复 AppleBooksDetailView 中的作者名显示和 MainListView 中的数量统计。
+
 ## v0.5.10 2025年11月2日
 
 *Added*
