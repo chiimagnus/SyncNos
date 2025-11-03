@@ -72,7 +72,10 @@ class NotionHelperMethods {
         let token = computeModifiedToken(for: highlight, source: source)
         parts.append("modified:\(token)")
         let metaLine = parts.joined(separator: " | ") + "\n"
-        rt.append(["text": ["content": metaLine]])
+        rt.append([
+            "text": ["content": metaLine],
+            "annotations": ["color": "gray_background"]
+        ])
         return rt
     }
 
