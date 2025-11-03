@@ -172,14 +172,14 @@ class NotionHelperMethods {
         ]
     }
 
-    // Build a paragraph child block containing metadata (italic) and UUID marker (code)
-    // Metadata (style/added/modified) and uuid are placed together for easy parsing and updates.
     func buildMetaAndLinkChild(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [String: Any] {
-        var rich: [[String: Any]] = []
-        let metaString = buildMetadataString(for: highlight, source: source)
-        if !metaString.isEmpty {
-            rich.append(["text": ["content": metaString], "annotations": ["italic": true]])
-        }
+        let linkUrl = buildIBooksLink(bookId: bookId, location: highlight.location)
+        let rich: [[String: Any]] = [[
+            "text": [
+                "content": "Open in iBooks",
+                "link": ["url": linkUrl]
+            ]
+        ]]
         return [
             "object": "block",
             "paragraph": [
@@ -219,14 +219,6 @@ class NotionHelperMethods {
     // buildPerBookPageChildren(for:bookId:)：为“每书库（per-book DB）”构建页面子块列表（用于 pages 的 children），包括：1) 引用（quote）块显示高亮文本；2) 可选的 note 段落；3) metadata + Open 链接段落。
     func buildPerBookPageChildren(for highlight: HighlightRow, bookId: String, source: String = "appleBooks") -> [[String: Any]] {
         var children: [[String: Any]] = []
-        // 0) Header paragraph block at top (two lines)
-        children.append([
-            "object": "block",
-            "paragraph": [
-                "rich_text": makeHeaderLines(for: highlight, source: source)
-            ]
-        ])
-        // 1) Quote block for highlight text
         children.append([
             "object": "block",
             "quote": [
