@@ -38,7 +38,7 @@ class NotionHighlightOperations {
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String, source: String) async throws {
         // 构建 parent rich_text（高亮首段）并更新；父块类型与创建时一致：numbered_list_item
-        let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary)
+        let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: source)
         _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
 
         // 构建并替换子块（高亮续块 + note 多块 + metadata bullet），metadata 依据 source 选择颜色映射
@@ -46,7 +46,6 @@ class NotionHighlightOperations {
         let chunkSize = NotionSyncConfig.maxTextLengthPrimary
         childBlocks.append(contentsOf: helperMethods.buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
         childBlocks.append(contentsOf: helperMethods.buildNoteChildren(for: highlight, chunkSize: chunkSize))
-        childBlocks.append(helperMethods.buildMetaAndLinkBulletChild(for: highlight, bookId: bookId, source: source))
 
         // 使用 pageOperations.replacePageChildren 来替换指定 block 的 children（适用于 block 的 children endpoint）
         try await pageOperations.replacePageChildren(pageId: blockId, with: childBlocks)
@@ -61,7 +60,7 @@ class NotionHighlightOperations {
 
         do {
             let properties = helperMethods.buildHighlightProperties(bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
-            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId, source: "appleBooks")
 
             let body: [String: Any] = [
                 "parent": [
@@ -95,7 +94,7 @@ class NotionHighlightOperations {
             _ = try await requestHelper.performRequest(path: "pages/\(pageId)", method: "PATCH", body: ["properties": properties])
 
             // Replace page children with up-to-date content
-            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId)
+            let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId, source: "appleBooks")
             try await pageOperations.replacePageChildren(pageId: pageId, with: children)
         } catch {
             if NotionRequestHelper.isContentTooLargeError(error) {

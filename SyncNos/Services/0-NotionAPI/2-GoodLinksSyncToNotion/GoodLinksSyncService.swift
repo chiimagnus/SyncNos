@@ -154,11 +154,12 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             return
         }
 
-        // 5) 既有页面：更新已存在的高亮（确保笔记、文本变更能同步），并追加缺失的高亮
-        let existingMap = try await notionService.collectExistingUUIDToBlockIdMapping(fromPageId: pageId)
+        // 5) 既有页面：根据远端 token 判等更新，并追加缺失的高亮
+        let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId)
 
         var toUpdate: [(String, HighlightRow)] = []
         var toAppendHighlights: [HighlightRow] = []
+        let helper = NotionHelperMethods()
         for h in collected {
             let addedDate = h.time > 0 ? Date(timeIntervalSince1970: h.time) : nil
             let fakeHighlight = HighlightRow(
@@ -171,8 +172,13 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
                 modified: nil,
                 location: nil
             )
-            if let blockId = existingMap[h.id] {
-                toUpdate.append((blockId, fakeHighlight))
+            if let existing = existingMapWithToken[h.id] {
+                let localToken = helper.computeModifiedToken(for: fakeHighlight, source: "goodLinks")
+                if let remoteToken = existing.token, remoteToken == localToken {
+                    // Equal → skip
+                } else {
+                    toUpdate.append((existing.blockId, fakeHighlight))
+                }
             } else {
                 toAppendHighlights.append(fakeHighlight)
             }
@@ -187,7 +193,6 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
 
         if !toAppendHighlights.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppendHighlights.count))
-            let helper = NotionHelperMethods()
             var children: [[String: Any]] = []
             for h in toAppendHighlights {
                 let block = helper.buildBulletedListItemBlock(for: h, bookId: link.id, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: "goodLinks")
