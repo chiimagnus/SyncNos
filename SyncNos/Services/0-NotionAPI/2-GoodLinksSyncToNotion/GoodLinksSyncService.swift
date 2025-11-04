@@ -85,11 +85,11 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         }
         properties["Starred"] = ["checkbox": link.starred]
         if link.addedAt > 0 {
-            let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.addedAt))
+            let start = NotionServiceCore.systemTimeZoneDateFormatter.string(from: Date(timeIntervalSince1970: link.addedAt))
             properties["Added At"] = ["date": ["start": start]]
         }
         if link.modifiedAt > 0 {
-            let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.modifiedAt))
+            let start = NotionServiceCore.systemTimeZoneDateFormatter.string(from: Date(timeIntervalSince1970: link.modifiedAt))
             properties["Modified At"] = ["date": ["start": start]]
         }
         if !properties.isEmpty {
@@ -146,7 +146,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             // 更新计数与时间戳后返回
             try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
             // 写入 Notion 页级 "Last Sync Time"
-            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            let nowString = NotionServiceCore.systemTimeZoneIsoDateFormatter.string(from: Date())
             try await notionService.updatePageProperties(pageId: pageId, properties: [
                 "Last Sync Time": ["date": ["start": nowString]]
             ])
@@ -204,7 +204,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         // 6) 更新计数并记录同步时间
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
         // 写入 Notion 页级 "Last Sync Time"
-        let nowString2 = NotionServiceCore.isoDateFormatter.string(from: Date())
+        let nowString2 = NotionServiceCore.systemTimeZoneIsoDateFormatter.string(from: Date())
         try await notionService.updatePageProperties(pageId: pageId, properties: [
             "Last Sync Time": ["date": ["start": nowString2]]
         ])
