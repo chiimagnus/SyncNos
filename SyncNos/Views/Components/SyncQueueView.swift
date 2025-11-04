@@ -84,7 +84,10 @@ struct SyncQueueView: View {
     private var queuedTasks: [SyncQueueTask] { viewModel.queuedTasks }
     
     private func taskRow(_ task: SyncQueueTask) -> some View {
-        HStack(spacing: 12) {
+        Button {
+            selectTask(task)
+        } label: {
+            HStack(spacing: 12) {
             // Status indicator
             statusIndicator(for: task)
                 .frame(width: 8, height: 8)
@@ -118,7 +121,13 @@ struct SyncQueueView: View {
                 ProgressView()
                     .controlSize(.small)
             }
+            }
         }
+        .buttonStyle(.plain)
+    }
+
+    private func selectTask(_ task: SyncQueueTask) {
+        NotificationCenter.default.post(name: Notification.Name("SyncQueueTaskSelected"), object: nil, userInfo: ["source": task.source.rawValue, "id": task.rawId])
     }
     
     @ViewBuilder
