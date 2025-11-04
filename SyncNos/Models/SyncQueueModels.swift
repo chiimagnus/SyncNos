@@ -30,18 +30,4 @@ struct SyncQueueTask: Identifiable, Equatable, Sendable {
         self.progressText = progressText
         self.id = "\(source.rawValue):\(rawId)"
     }
-
-    /// 导航到详情页
-    func navigateToDetail() {
-        let userInfo: [String: Any] = [
-            "source": source.rawValue,
-            "resourceId": rawId,
-            "title": title
-        ]
-        NotificationCenter.default.post(
-            name: Notification.Name("NavigateToSyncTaskDetail"),
-            object: nil,
-            userInfo: userInfo
-        )
-    }
 }

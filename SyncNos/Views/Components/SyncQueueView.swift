@@ -89,46 +89,36 @@ struct SyncQueueView: View {
             statusIndicator(for: task)
                 .frame(width: 8, height: 8)
                 .clipShape(Circle())
-
+            
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(task.title)
                         .font(.body)
-
+                    
                     sourceBadge(for: task.source)
                 }
-
+                
                 if let subtitle = task.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
+                
                 if let progressText = task.progressText, !progressText.isEmpty {
                     Text(progressText)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
             }
-
+            
             Spacer()
-
+            
             // Progress indicator for running tasks
             if task.state == .running {
                 ProgressView()
                     .controlSize(.small)
             }
         }
-        .contentShape(Rectangle()) // 确保整个区域可点击
-        .onTapGesture {
-            task.navigateToDetail()
-        }
-        .buttonStyle(.plain) // 鼠标悬停时显示手势图标
-        .padding(.vertical) // 增加点击区域高度
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.secondary.opacity(0.05))
-        )
     }
     
     @ViewBuilder
