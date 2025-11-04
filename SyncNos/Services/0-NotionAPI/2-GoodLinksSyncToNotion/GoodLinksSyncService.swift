@@ -85,12 +85,10 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         }
         properties["Starred"] = ["checkbox": link.starred]
         if link.addedAt > 0 {
-            let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.addedAt))
-            properties["Added At"] = ["date": ["start": start]]
+            properties["Added At"] = ["date": NotionServiceCore.makeNotionDateOffset(Date(timeIntervalSince1970: link.addedAt))]
         }
         if link.modifiedAt > 0 {
-            let start = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: link.modifiedAt))
-            properties["Modified At"] = ["date": ["start": start]]
+            properties["Modified At"] = ["date": NotionServiceCore.makeNotionDateOffset(Date(timeIntervalSince1970: link.modifiedAt))]
         }
         if !properties.isEmpty {
             try await notionService.updatePageProperties(pageId: pageId, properties: properties)
@@ -146,9 +144,8 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
             // 更新计数与时间戳后返回
             try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
             // 写入 Notion 页级 "Last Sync Time"
-            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
             try await notionService.updatePageProperties(pageId: pageId, properties: [
-                "Last Sync Time": ["date": ["start": nowString]]
+                "Last Sync Time": ["date": NotionServiceCore.makeNotionDateOffset(Date())]
             ])
             let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
             return
@@ -204,9 +201,8 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         // 6) 更新计数并记录同步时间
         try await notionService.updatePageHighlightCount(pageId: pageId, count: collected.count)
         // 写入 Notion 页级 "Last Sync Time"
-        let nowString2 = NotionServiceCore.isoDateFormatter.string(from: Date())
         try await notionService.updatePageProperties(pageId: pageId, properties: [
-            "Last Sync Time": ["date": ["start": nowString2]]
+            "Last Sync Time": ["date": NotionServiceCore.makeNotionDateOffset(Date())]
         ])
         let t = Date(); SyncTimestampStore.shared.setLastSyncTime(for: link.id, to: t)
     }
