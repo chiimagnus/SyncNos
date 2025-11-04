@@ -106,7 +106,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
             // 写入 Notion 页级 "Last Sync Time"
-            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            let nowString = NotionServiceCore.systemTimeZoneIsoDateFormatter.string(from: Date())
             try await notionService.updatePageProperties(pageId: pageId, properties: [
                 "Last Sync Time": ["date": ["start": nowString]]
             ])
@@ -179,7 +179,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
             progress(NSLocalizedString("Updating count...", comment: ""))
             try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
             // 写入 Notion 页级 "Last Sync Time"
-            let nowString = NotionServiceCore.isoDateFormatter.string(from: Date())
+            let nowString = NotionServiceCore.systemTimeZoneIsoDateFormatter.string(from: Date())
             try await notionService.updatePageProperties(pageId: pageId, properties: [
                 "Last Sync Time": ["date": ["start": nowString]]
             ])
@@ -227,7 +227,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
         progress(NSLocalizedString("Updating count...", comment: ""))
         try await notionService.updatePageHighlightCount(pageId: pageId, count: latest)
         // 写入 Notion 页级 "Last Sync Time"
-        let nowString2 = NotionServiceCore.isoDateFormatter.string(from: Date())
+        let nowString2 = NotionServiceCore.systemTimeZoneIsoDateFormatter.string(from: Date())
         try await notionService.updatePageProperties(pageId: pageId, properties: [
             "Last Sync Time": ["date": ["start": nowString2]]
         ])
