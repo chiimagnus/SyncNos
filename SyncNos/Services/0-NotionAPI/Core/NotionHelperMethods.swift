@@ -35,8 +35,8 @@ class NotionHelperMethods {
             let name = styleName(for: s, source: source)
             metaParts.append("style:\(name)")
         }
-        if let d = highlight.dateAdded { metaParts.append("added:\(NotionServiceCore.localISODateString(d))") }
-        if let m = highlight.modified { metaParts.append("modified:\(NotionServiceCore.localISODateString(m))") }
+        if let d = highlight.dateAdded { metaParts.append("added:\(NotionServiceCore.isoDateFormatter.string(from: d))") }
+        if let m = highlight.modified { metaParts.append("modified:\(NotionServiceCore.isoDateFormatter.string(from: m))") }
         return metaParts.joined(separator: " | ")
     }
 
@@ -47,14 +47,14 @@ class NotionHelperMethods {
     /// - GoodLinks: always use hash (since source has no modified time).
     func computeModifiedToken(for highlight: HighlightRow, source: String) -> String {
         if source == "appleBooks", let m = highlight.modified {
-            return NotionServiceCore.localISODateString(m)
+            return NotionServiceCore.isoDateFormatter.string(from: m)
         }
         // Hash-based token
         let styleNameValue: String = {
             if let s = highlight.style { return styleName(for: s, source: source) }
             return ""
         }()
-        let added = highlight.dateAdded.map { NotionServiceCore.localISODateString($0) } ?? ""
+        let added = highlight.dateAdded.map { NotionServiceCore.isoDateFormatter.string(from: $0) } ?? ""
         let location = highlight.location ?? ""
         let normalizedText = highlight.text.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedNote = (highlight.note ?? "").replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -81,7 +81,7 @@ class NotionHelperMethods {
             parts.append("style:\(styleName(for: s, source: source))")
         }
         if let d = highlight.dateAdded {
-            parts.append("added:\(NotionServiceCore.localISODateString(d))")
+            parts.append("added:\(NotionServiceCore.isoDateFormatter.string(from: d))")
         }
         let token = computeModifiedToken(for: highlight, source: source)
         parts.append("modified:\(token)")
@@ -130,13 +130,17 @@ class NotionHelperMethods {
 
         if let added = highlight.dateAdded {
             properties["Added At"] = [
-                "date": NotionServiceCore.makeNotionDateOffset(added)
+                "date": [
+                    "start": NotionServiceCore.isoDateFormatter.string(from: added)
+                ]
             ]
         }
 
         if let modified = highlight.modified {
             properties["Modified At"] = [
-                "date": NotionServiceCore.makeNotionDateOffset(modified)
+                "date": [
+                    "start": NotionServiceCore.isoDateFormatter.string(from: modified)
+                ]
             ]
         }
 
