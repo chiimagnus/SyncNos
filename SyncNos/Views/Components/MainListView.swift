@@ -209,6 +209,25 @@ struct MainListView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToSyncTaskDetail")).receive(on: DispatchQueue.main)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let sourceRawValue = userInfo["source"] as? String,
+                  let resourceId = userInfo["resourceId"] as? String,
+                  let source = SyncSource(rawValue: sourceRawValue) else {
+                return
+            }
+
+            // 切换到对应的数据源
+            if source == .goodLinks {
+                contentSourceRawValue = ContentSource.goodLinks.rawValue
+                // 选中对应的文章
+                selectedLinkIds = [resourceId]
+            } else {
+                contentSourceRawValue = ContentSource.appleBooks.rawValue
+                // 选中对应的书籍
+                selectedBookIds = [resourceId]
+            }
+        }
         .onChange(of: contentSourceRawValue) { _ in
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
