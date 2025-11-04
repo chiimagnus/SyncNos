@@ -218,6 +218,18 @@ struct MainListView: View {
                 goodLinksVM.prepareForDisplaySwitch()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
+            if source == ContentSource.appleBooks.rawValue {
+                contentSourceRawValue = ContentSource.appleBooks.rawValue
+                selectedLinkIds.removeAll()
+                selectedBookIds = Set([id])
+            } else if source == ContentSource.goodLinks.rawValue {
+                contentSourceRawValue = ContentSource.goodLinks.rawValue
+                selectedBookIds.removeAll()
+                selectedLinkIds = Set([id])
+            }
+        }
         .background {
             LinearGradient(
                 gradient: Gradient(colors: [
