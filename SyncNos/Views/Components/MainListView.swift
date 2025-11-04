@@ -12,9 +12,12 @@ struct MainListView: View {
     }
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
+    // local keyboard monitor (Option + Command + Left/Right)
+    @State private var localKeyMonitor: Any?
 
     var body: some View {
         NavigationSplitView {
+            // Sidebar content (list). Toolbar buttons moved to window toolbar center.
             Group {
                 if contentSource == .goodLinks {
                     GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
@@ -22,8 +25,36 @@ struct MainListView: View {
                     AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
             .toolbar {
+                // Center toolbar items: make two simple icon buttons in the window toolbar center
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 0) {
+                        // Emoji button for Apple Books
+                        Button(action: { contentSourceRawValue = ContentSource.appleBooks.rawValue }) {
+                            Text("📚")
+                                .font(.system(size: 10))
+                                .frame(width: 16, height: 16)
+                                .grayscale(contentSource == .appleBooks ? 0 : 1)
+                                .opacity(contentSource == .appleBooks ? 1.0 : 0.45)
+                        }
+                        // .buttonStyle(.plain)
+                        .help("Apple Books")
+
+                        // Emoji button for GoodLinks
+                        Button(action: { contentSourceRawValue = ContentSource.goodLinks.rawValue }) {
+                            Text("🔖")
+                                .font(.system(size: 10))
+                                .frame(width: 16, height: 16)
+                                .grayscale(contentSource == .goodLinks ? 0 : 1)
+                                .opacity(contentSource == .goodLinks ? 1.0 : 0.45)
+                        }
+                        // .buttonStyle(.plain)
+                        .help("GoodLinks")
+                    }
+                }
+
                 // 数据源切换菜单 + Articles 排序筛选（集成在同一菜单中）
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -207,6 +238,31 @@ struct MainListView: View {
                         }
                     )
                 }
+            }
+        }
+        .onAppear {
+            // install local key monitor for Option+Cmd+Left/Right to switch sources
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if flags.contains([.command, .option]) {
+                    switch event.keyCode {
+                    case 123: // left arrow
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                        return nil
+                    case 124: // right arrow
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                        return nil
+                    default:
+                        break
+                    }
+                }
+                return event
+            }
+        }
+        .onDisappear {
+            if let monitor = localKeyMonitor {
+                NSEvent.removeMonitor(monitor)
+                localKeyMonitor = nil
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
