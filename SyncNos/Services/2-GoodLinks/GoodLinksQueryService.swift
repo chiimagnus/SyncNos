@@ -13,7 +13,9 @@ final class GoodLinksQueryService: Sendable {
         let sql = limit > 0 ? baseSQL + " LIMIT ?;" : baseSQL + ";"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw NSError(domain: "SyncNos.GoodLinks", code: 1101, userInfo: [NSLocalizedDescriptionKey: "prepare recent links failed"])
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1101, userInfo: [NSLocalizedDescriptionKey: "prepare recent links failed: \(errMsg)"])
         }
         defer { sqlite3_finalize(stmt) }
         if limit > 0 { sqlite3_bind_int64(stmt, 1, Int64(limit)) }
@@ -41,7 +43,9 @@ final class GoodLinksQueryService: Sendable {
         let sql = "SELECT id, linkID, content, color, note, time FROM highlight ORDER BY time DESC LIMIT ? OFFSET ?;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw NSError(domain: "SyncNos.GoodLinks", code: 1102, userInfo: [NSLocalizedDescriptionKey: "prepare highlights failed"])
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1102, userInfo: [NSLocalizedDescriptionKey: "prepare highlights failed: \(errMsg)"])
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, Int64(limit))
@@ -64,7 +68,9 @@ final class GoodLinksQueryService: Sendable {
         let sql = "SELECT id, linkID, content, color, note, time FROM highlight WHERE linkID=? ORDER BY time DESC LIMIT ? OFFSET ?;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw NSError(domain: "SyncNos.GoodLinks", code: 1103, userInfo: [NSLocalizedDescriptionKey: "prepare highlights for link failed"])
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1103, userInfo: [NSLocalizedDescriptionKey: "prepare highlights for link failed: \(errMsg)"])
         }
         defer { sqlite3_finalize(stmt) }
         let ns = linkId as NSString
@@ -89,7 +95,9 @@ final class GoodLinksQueryService: Sendable {
         let sql = "SELECT linkID, COUNT(*) FROM highlight GROUP BY linkID;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw NSError(domain: "SyncNos.GoodLinks", code: 1104, userInfo: [NSLocalizedDescriptionKey: "prepare counts failed"])
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1104, userInfo: [NSLocalizedDescriptionKey: "prepare counts failed: \(errMsg)"])
         }
         defer { sqlite3_finalize(stmt) }
         var rows: [GoodLinksLinkHighlightCount] = []
@@ -106,7 +114,9 @@ final class GoodLinksQueryService: Sendable {
         let sql = "SELECT id, content, wordCount, videoDuration FROM content WHERE id=?;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw NSError(domain: "SyncNos.GoodLinks", code: 1105, userInfo: [NSLocalizedDescriptionKey: "prepare content failed"])
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1105, userInfo: [NSLocalizedDescriptionKey: "prepare content failed: \(errMsg)"])
         }
         defer { sqlite3_finalize(stmt) }
         let ns = linkId as NSString
