@@ -4,3 +4,5 @@ buildServer.json
 Backend/.env
 /.iflow
 /.specify
+plans/
+
