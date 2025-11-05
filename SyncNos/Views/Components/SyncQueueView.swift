@@ -37,7 +37,7 @@ struct SyncQueueView: View {
             
             Divider()
                 .padding(.horizontal, 12)
-            
+
             // Queued Tasks Section
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -67,6 +67,39 @@ struct SyncQueueView: View {
                     }
                 }
             }
+            
+            Divider()
+                .padding(.horizontal, 12)
+
+            // Failed Tasks Section
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Failed")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    if !failedTasks.isEmpty {
+                        Text("\(failedTasks.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+
+                if failedTasks.isEmpty {
+                    Text("No failed tasks")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(failedTasks) { task in
+                            taskRow(task)
+                                .padding(.horizontal, 12)
+                        }
+                    }
+                }
+            }
         }
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -82,6 +115,7 @@ struct SyncQueueView: View {
     
     private var runningTasks: [SyncQueueTask] { viewModel.runningTasks }
     private var queuedTasks: [SyncQueueTask] { viewModel.queuedTasks }
+    private var failedTasks: [SyncQueueTask] { viewModel.failedTasks }
     
     private func taskRow(_ task: SyncQueueTask) -> some View {
         Button {
@@ -129,6 +163,8 @@ struct SyncQueueView: View {
     private func selectTask(_ task: SyncQueueTask) {
         NotificationCenter.default.post(name: Notification.Name("SyncQueueTaskSelected"), object: nil, userInfo: ["source": task.source.rawValue, "id": task.rawId])
     }
+
+    
     
     @ViewBuilder
     private func sourceBadge(for source: SyncSource) -> some View {
