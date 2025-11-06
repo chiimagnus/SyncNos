@@ -210,6 +210,9 @@ protocol AutoSyncServiceProtocol: AnyObject {
     func start()
     func stop()
     func triggerSyncNow()
+    // New per-source immediate triggers (public API)
+    func triggerAppleBooksNow()
+    func triggerGoodLinksNow()
 }
 
 // MARK: - Sync Timestamp Store Protocol
