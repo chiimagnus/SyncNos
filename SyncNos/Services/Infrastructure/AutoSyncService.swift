@@ -110,6 +110,15 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         triggerGoodLinksSyncNow()
     }
 
+    // New public per-source triggers
+    func triggerAppleBooksNow() {
+        triggerAppleBooksSyncNow()
+    }
+
+    func triggerGoodLinksNow() {
+        triggerGoodLinksSyncNow()
+    }
+
     private func triggerAppleBooksSyncNow() {
         guard !isSyncingAppleBooks else { return }
         let appleAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
