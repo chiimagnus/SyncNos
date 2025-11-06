@@ -10,12 +10,18 @@ struct GoodLinksSettingsView: View {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: viewModel.goodLinksDbId) { _ in
+                            viewModel.save()
+                        }
                 }
 
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for GoodLinks (checked means AutoSyncService will run)")
+                    .onChange(of: viewModel.autoSync) { _ in
+                        viewModel.save()
+                    }
 
                 // GoodLinks 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {
@@ -36,11 +42,6 @@ struct GoodLinksSettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose GoodLinks group container and load data")
-
-                Button("Save") {
-                    viewModel.save()
-                }
-                .buttonStyle(.borderedProminent)
             }
 
             if let message = viewModel.message {
