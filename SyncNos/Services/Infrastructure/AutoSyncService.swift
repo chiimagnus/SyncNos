@@ -287,13 +287,12 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         let session = try goodLinksDatabaseService.makeReadOnlySession(dbPath: dbPath)
         defer { session.close() }
 
-        // 读取每个链接的高亮计数（仅有高亮的链接才同步）
-        let counts = try session.fetchHighlightCountsByLink()
-        let linkIds = counts.map { $0.linkId }.sorted()
+        // 读取所有链接（包含高亮数为 0 的链接），确保不对链接进行预过滤
+        let allLinks = try session.fetchRecentLinks(limit: 0)
+        let linkIds = allLinks.map { $0.id }.sorted()
         if linkIds.isEmpty { return }
 
-        // 获取链接元数据（标题/作者/URL）
-        let allLinks = try session.fetchRecentLinks(limit: 0)
+        // 构造 id -> 元数据映射
         var linkMeta: [String: GoodLinksLinkRow] = [:]
         for link in allLinks { linkMeta[link.id] = link }
 
