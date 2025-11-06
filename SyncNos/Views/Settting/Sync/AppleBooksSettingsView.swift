@@ -18,12 +18,18 @@ struct AppleBooksSettingsView: View {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for Apple Books", text: $viewModel.appleBooksDbId)
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: viewModel.appleBooksDbId) { _ in
+                            viewModel.save()
+                        }
                 }
 
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for Apple Books (checked means AutoSyncService will run)")
+                    .onChange(of: viewModel.autoSync) { _ in
+                        viewModel.save()
+                    }
 
                 // Apple Books 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {
@@ -45,11 +51,6 @@ struct AppleBooksSettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose Apple Books container directory and load notes")
-
-                Button("Save") {
-                    viewModel.save()
-                }
-                .buttonStyle(.borderedProminent)
             }
 
             if let message = viewModel.message {
