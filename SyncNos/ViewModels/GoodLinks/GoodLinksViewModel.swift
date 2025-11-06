@@ -474,6 +474,8 @@ final class GoodLinksViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
+                // Ignore notifications emitted by AutoSyncService (object == nil)
+                if notification.object == nil { return }
                 if let sender = notification.object as? GoodLinksViewModel, sender === self {
                     // Ignore self-emitted to prevent duplicate UI state
                     return

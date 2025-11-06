@@ -220,6 +220,8 @@ class AppleBooksViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
+                // Ignore notifications emitted by AutoSyncService (object == nil)
+                if notification.object == nil { return }
                 if let sender = notification.object as? AppleBooksViewModel, sender === self {
                     // Ignore self-emitted events to prevent duplicate state updates
                     return
@@ -425,7 +427,7 @@ extension AppleBooksViewModel {
                                     self.syncedBookIds.insert(id)
                                 }
                             } catch {
-                                await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
+                                _ = await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
                                 NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])                        
                                 await MainActor.run {
                                     self.syncingBookIds.remove(id)
