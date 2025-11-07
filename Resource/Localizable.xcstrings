@@ -2765,28 +2765,28 @@
     },
     "Enable automatic sync for GoodLinks (checked means AutoSyncService will run)" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Synchronisation für GoodLinks aktivieren (aktiviert bedeutet, dass AutoSyncService ausgeführt wird)"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enable automatic sync for GoodLinks (checked means AutoSyncService will run)"
           }
         },
-        "zh-Hans" : {
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启用 GoodLinks 自动同步（选中意味着 AutoSyncService 将运行）"
+            "value" : "Habilitar sincronización automática para GoodLinks (marcado significa que se ejecutará AutoSyncService)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer la synchronisation automatique pour GoodLinks (coché signifie que AutoSyncService fonctionnera)"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Automatische Synchronisation für GoodLinks aktivieren (aktiviert bedeutet, dass AutoSyncService ausgeführt wird)"
           }
         },
         "ja" : {
@@ -2813,10 +2813,10 @@
             "value" : "Включить автоматическую синхронизацию для GoodLinks (отмечено означает, что AutoSyncService будет работать)"
           }
         },
-        "es-ES" : {
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Habilitar sincronización automática para GoodLinks (marcado significa que se ejecutará AutoSyncService)"
+            "value" : "启用 GoodLinks 自动同步（选中意味着 AutoSyncService 将运行）"
           }
         }
       }
@@ -2936,6 +2936,9 @@
           }
         }
       }
+    },
+    "Failed" : {
+
     },
     "Favorited" : {
       "localizations" : {
@@ -4819,6 +4822,9 @@
           }
         }
       }
+    },
+    "No failed tasks" : {
+
     },
     "No highlights for this link yet" : {
       "localizations" : {
@@ -9123,28 +9129,28 @@
     },
     "Sync Queue" : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync-Warteschlange"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sync Queue"
           }
         },
-        "zh-Hans" : {
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步队列"
+            "value" : "Cola de sincronización"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "File de synchronisation"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync-Warteschlange"
           }
         },
         "ja" : {
@@ -9171,10 +9177,10 @@
             "value" : "Очередь синхронизации"
           }
         },
-        "es-ES" : {
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cola de sincronización"
+            "value" : "同步队列"
           }
         }
       }
