@@ -65,4 +65,27 @@ import UserNotifications
         completionHandler([.banner, .sound, .list])
     }
 
+    @available(macOS 10.14, *)
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        // Handle notification tap: bring existing main window to front instead of creating a new one
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+
+            // If there's any visible window, bring it to front
+            if let w = NSApp.windows.first(where: { $0.isVisible }) {
+                w.makeKeyAndOrderFront(nil)
+            } else if let w = NSApp.windows.first {
+                // If no visible window, just bring first window to front
+                w.makeKeyAndOrderFront(nil)
+            }
+        }
+
+        completionHandler()
+    }
+
+    // Prevent AppKit from creating an untitled new window when app is activated
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        return false
+    }
+
 }
