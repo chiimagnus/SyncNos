@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books 和 GoodLinks 中的读书高亮和笔记同步到 Notion 数据库。当前版本：**v0.5.10**，已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6752426176)。
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books 和 GoodLinks 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6752426176)。
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
@@ -18,6 +18,10 @@
 - ✅ **自动后台同步**：可配置时间间隔，支持按来源独立启用/禁用
 - ✅ **Apple Sign In 认证**：通过 FastAPI 后端安全认证
 - ✅ **国际化支持**：9 种语言（中、英、法、德、日、韩、巴西葡、俄、西）
+- ✅ **空状态视图**：优雅的占位页面提示（新增）
+- ✅ **模块化设置**：分类明确的设置界面和语言切换（重构）
+- ✅ **模块化菜单命令**：菜单命令系统完全模块化（新增）
+- ✅ **增量同步**：基于时间戳的增量同步机制（优化）
 
 ## 架构
 
@@ -28,10 +32,12 @@
 ```
 SyncNos/
 ├── SyncNosApp.swift              # 应用入口
+├── Infrastructure/
+│   └── AppDelegate.swift         # 应用生命周期管理
 ├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── AppTheme.swift        # 应用主题和样式
-│   │   ├── EmptyStateView.swift  # 空状态占位视图
+│   │   ├── EmptyStateView.swift  # 空状态占位视图（新增）
 │   │   ├── FiltetSortBar.swift   # 统一筛选排序栏
 │   │   ├── HighlightCardView.swift
 │   │   ├── InfoHeaderCardView.swift # 信息头部卡片（显示选中数量）
@@ -46,58 +52,115 @@ SyncNos/
 │   ├── GoodLinks/
 │   │   ├── GoodLinksListView.swift
 │   │   └── GoodLinksDetailView.swift
-│   └── Settting/
+│   └── Settting/                 # 设置视图（重构）
 │       ├── General/
-│       └── Sync/
+│       │   ├── AboutView.swift           # 关于页面
+│       │   ├── AppleAccountView.swift    # Apple 账户
+│       │   ├── IAPView.swift             # 应用内购买
+│       │   ├── LanguageView.swift        # 语言设置（新增）
+│       │   ├── LogWindow.swift           # 日志窗口
+│       │   ├── SettingsView.swift        # 主设置页面
+│       │   ├── UserGuideView.swift       # 用户指南
+│       │   └── VisualEffectBackground.swift # 视觉效果背景
+│       ├── Sync/
+│       │   ├── AppleBooksSettingsView.swift     # Apple Books 设置
+│       │   ├── GoodLinksSettingsView.swift      # GoodLinks 设置
+│       │   └── NotionIntegrationView.swift      # Notion 集成设置
+│       └── Commands/                  # 菜单命令（模块化）
+│           ├── AppCommands.swift      # 应用命令
+│           ├── EditCommands.swift     # 编辑命令
+│           ├── FileCommands.swift     # 文件命令
+│           ├── HelpCommands.swift     # 帮助命令
+│           ├── SelectionCommands.swift # 选择命令
+│           └── ViewCommands.swift     # 视图命令
 ├── ViewModels/                   # ObservableObject 视图模型
 │   ├── AppleBooks/
-│   │   ├── AppleBooksViewModel.swift        # 列表管理
-│   │   ├── AppleBooksDetailViewModel.swift  # 详情页分页
-│   │   └── AppleBooksSettingsViewModel.swift
+│   │   ├── AppleBooksViewModel.swift         # 列表管理
+│   │   ├── AppleBooksDetailViewModel.swift   # 详情页分页
+│   │   └── AppleBooksSettingsViewModel.swift # 设置管理
 │   ├── GoodLinks/
-│   │   ├── GoodLinksViewModel.swift         # 统一视图模型
-│   │   └── GoodLinksSettingsViewModel.swift
+│   │   ├── GoodLinksViewModel.swift          # 统一视图模型
+│   │   └── GoodLinksSettingsViewModel.swift  # 设置管理
 │   ├── Account/
-│   │   ├── AccountViewModel.swift           # 账户管理
-│   │   ├── AppleSignInViewModel.swift       # Apple 登录
-│   │   └── IAPViewModel.swift               # 应用内购买
+│   │   ├── AccountViewModel.swift            # 账户管理
+│   │   ├── AppleSignInViewModel.swift        # Apple 登录
+│   │   └── IAPViewModel.swift                # 应用内购买
 │   ├── Notion/
-│   │   └── NotionIntegrationViewModel.swift # Notion 配置
+│   │   └── NotionIntegrationViewModel.swift  # Notion 配置
 │   ├── Sync/
-│   │   └── SyncQueueViewModel.swift         # 同步队列管理
+│   │   └── SyncQueueViewModel.swift          # 同步队列管理
 │   └── LogViewModel.swift
 ├── Models/                       # 数据模型
 │   ├── Models.swift              # BookRow, Highlight 等核心模型
 │   ├── AccountModels.swift       # 账户相关模型
 │   ├── HighlightColorScheme.swift # 高亮颜色管理
 │   └── SyncQueueModels.swift     # 同步队列模型
-└── Services/                     # 业务逻辑和数据访问
-    ├── 0-NotionAPI/              # Notion 集成
-    │   ├── Core/                 # NotionService, HTTP 客户端
-    │   ├── Operations/           # CRUD 操作
-    │   └── 1-AppleBooksSyncToNotion/  # 同步策略
-    ├── 1-AppleBooks/             # Apple Books SQLite 访问
-    │   ├── DatabaseService.swift
-    │   ├── DatabaseReadOnlySession.swift
-    │   └── BookmarkStore.swift
-    ├── 2-GoodLinks/              # GoodLinks 数据库访问
-    │   ├── GoodLinksService.swift
-    │   └── GoodLinksQueryService.swift
-    ├── Infrastructure/           # 依赖注入、日志、认证等
-    │   ├── DIContainer.swift     # 中心服务容器
-    │   ├── LoggerService.swift
-    │   ├── AutoSyncService.swift # 支持按来源的独立同步
-    │   ├── SyncActivityMonitor.swift    # 同步活动监控
-    │   ├── SyncQueueStore.swift         # 同步队列存储
+└── Services/                     # 业务逻辑和数据访问（重构）
+    ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
-    │   ├── KeychainHelper.swift  # 安全凭证存储
-    │   └── Protocols.swift       # 服务协议定义
-    └── IAP/                      # 应用内购买
+    │   ├── IAPService.swift      # 应用内购买
+    │   └── KeychainHelper.swift  # 安全凭证存储
+    ├── Core/                     # 核心服务
+    │   ├── ConcurrencyLimiter.swift      # 并发控制
+    │    ├── DIContainer.swift            # 中心服务容器
+    │   ├── LoggerService.swift           # 统一日志记录
+    │   └── Protocols.swift               # 服务协议定义
+    ├── DataSources-From/         # 数据源（从...获取）
+    │   ├── AppleBooks/           # Apple Books SQLite 访问
+    │   │   ├── AppleBooksPicker.swift         # 数据库选择器
+    │   │   ├── BookFilterService.swift        # 书籍过滤
+    │   │   ├── BookmarkStore.swift            # 书签持久化
+    │   │   ├── DatabaseConnectionService.swift # 数据库连接
+    │   │   ├── DatabaseQueryService.swift     # 查询服务
+    │   │   ├── DatabaseReadOnlySession.swift  # 只读会话
+    │   │   └── DatabaseService.swift          # 数据库服务
+    │   ├── GoodLinks/            # GoodLinks 数据库访问
+    │   │   ├── GoodLinksConnectionService.swift # 连接服务
+    │   │   ├── GoodLinksModels.swift           # 数据模型
+    │   │   ├── GoodLinksProtocols.swift        # 协议定义
+    │   │   ├── GoodLinksQueryService.swift     # 查询服务
+    │   │   ├── GoodLinksService.swift          # 核心服务
+    │   │   └── GoodLinksTagParser.swift        # 标签解析
+    │   └── WeRead/               # 微信读书（文档目录）
+    │       ├── 1.md              # WeRead 插件技术文档
+    │       └── 微信读书API实现.md
+    ├── DataSources-To/           # 同步目标（同步到...）
+    │   ├── Lark/                 # 飞书（目录预留）
+    │   ├── Notion/               # Notion 集成
+    │   │   ├── Configuration/    # 配置管理
+    │   │   │   ├── NotionConfigStore.swift     # 配置存储
+    │   │   │   └── NotionSyncConfig.swift      # 同步配置
+    │   │   ├── Core/             # 核心服务
+    │   │   │   ├── NotionHelperMethods.swift   # 辅助方法
+    │   │   │   ├── NotionRateLimiter.swift     # 速率限制
+    │   │   │   ├── NotionRequestHelper.swift   # 请求辅助
+    │   │   │   ├── NotionService.swift         # 主服务
+    │   │   │   └── NotionServiceCore.swift     # 核心实现
+    │   │   ├── FromAppleBooks/   # Apple Books 同步策略
+    │   │   │   ├── AppleBooksSyncService.swift      # 同步服务
+    │   │   │   ├── AppleBooksSyncServiceProtocol.swift # 服务协议
+    │   │   │   ├── AppleBooksSyncStrategyPerBook.swift # 每书独立数据库
+    │   │   │   ├── AppleBooksSyncStrategyProtocol.swift # 策略协议
+    │   │   │   ├── AppleBooksSyncStrategySingleDB.swift # 单一数据库
+    │   │   │   └── SyncTimestampStore.swift          # 同步时间戳存储
+    │   │   ├── FromGoodLinks/    # GoodLinks 同步策略
+    │   │   │   └── GoodLinksSyncService.swift        # 同步服务
+    │   │   └── Operations/       # CRUD 操作
+    │   │       ├── NotionDatabaseOperations.swift    # 数据库操作
+    │   │       ├── NotionHighlightOperations.swift   # 高亮操作
+    │   │       ├── NotionPageOperations.swift        # 页面操作
+    │   │       └── NotionQueryOperations.swift       # 查询操作
+    │   └── Obsidian/             # Obsidian（目录预留）
+    ├── Infrastructure/           # 基础服务（遗留）
+    └── Sync/                     # 同步相关服务
+        ├── AutoSyncService.swift       # 自动同步（按来源独立控制）
+        ├── SyncActivityMonitor.swift   # 活动监控（退出拦截）
+        └── SyncQueueStore.swift        # 队列存储
 ```
 
 ### 依赖注入
 
-服务通过 `DIContainer.shared` 管理（Services/Infrastructure/DIContainer.swift:4）：
+服务通过 `DIContainer.shared` 管理（Services/Core/DIContainer.swift:5）：
 
 ```swift
 // 访问服务
@@ -109,15 +172,25 @@ DIContainer.shared.autoSyncService
 
 ### 关键服务层
 
-**1. Apple Books 数据访问** (Services/1-AppleBooks/)
+**1. Apple Books 数据访问** (Services/DataSources-From/AppleBooks/)
 - `DatabaseService`: SQLite 连接和查询管理
 - `DatabaseReadOnlySession`: 只读数据库会话，支持分页
 - `BookFilterService`: 书籍过滤逻辑
 - `BookmarkStore`: macOS 书签持久化
+- `AppleBooksPicker`: 数据库选择和访问管理
+- `DatabaseConnectionService`: 数据库连接管理
+- `DatabaseQueryService`: 查询服务封装
 
-**2. Notion API 集成** (Services/0-NotionAPI/)
-- `NotionService`: 主要协调器（Services/0-NotionAPI/Core/NotionService.swift:23）
+**2. Notion API 集成** (Services/DataSources-To/Notion/)
+- `NotionService`: 主要协调器（Services/DataSources-To/Notion/Core/NotionService.swift:1）
 - `NotionServiceCore`: 配置和 HTTP 客户端
+- 配置管理：
+  - `NotionConfigStore`: Notion 配置存储
+  - `NotionSyncConfig`: 同步配置管理
+- 核心服务：
+  - `NotionRequestHelper`: HTTP 请求辅助
+  - `NotionRateLimiter`: API 速率限制
+  - `NotionHelperMethods`: 辅助方法和工具
 - 操作模块：
   - `NotionDatabaseOperations`: 数据库创建和属性管理
   - `NotionPageOperations`: 页面 CRUD 操作
@@ -126,42 +199,57 @@ DIContainer.shared.autoSyncService
 - 同步策略：
   - `AppleBooksSyncStrategySingleDB`: 单一数据库模式
   - `AppleBooksSyncStrategyPerBook`: 每本书独立数据库模式
+  - `GoodLinksSyncService`: GoodLinks 同步服务
 
-**3. GoodLinks 集成** (Services/2-GoodLinks/)
+**3. GoodLinks 集成** (Services/DataSources-From/GoodLinks/)
 - `GoodLinksService`: 数据库查询和同步协调器
 - `GoodLinksQueryService`: 文章和高亮查询
 - `GoodLinksTagParser`: 标签提取和解析
+- `GoodLinksConnectionService`: 数据库连接管理
+- `GoodLinksModels`: 数据模型定义
+- `GoodLinksProtocols`: 服务协议
 
-**4. 基础设施** (Services/Infrastructure/)
+**4. 核心服务** (Services/Core/)
+- `DIContainer`: 中心服务容器和依赖注入
+- `LoggerService`: 统一日志记录，支持多级别日志
+- `ConcurrencyLimiter`: 全局并发控制和速率限制
+- `Protocols`: 所有服务协议定义
+
+**5. 认证与购买** (Services/Auth/)
+- `AuthService`: Apple Sign In 集成
+- `IAPService`: 应用内购买服务
+- `KeychainHelper`: 安全凭证存储
+
+**6. 同步管理** (Services/Sync/)
 - `AutoSyncService`: 后台同步调度（支持按来源独立同步）
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
-- `LoggerService`: 统一日志记录
-- `AuthService`: Apple Sign In 集成
-- `ConcurrencyLimiter`: API 调用速率限制
-- `KeychainHelper`: 安全凭证存储
-- `DIContainer`: 中心服务容器和依赖注入
-- `Protocols`: 所有服务协议定义
+
+**7. 扩展数据源** (预留)
+- **WeRead**: 微信读书集成（Services/DataSources-From/WeRead/，目前仅有技术文档）
+- **Lark**: 飞书集成（Services/DataSources-To/Lark/，目录预留）
+- **Obsidian**: Obsidian 集成（Services/DataSources-To/Obsidian/，目录预留）
 
 ### 主应用入口
 
 **SyncNosApp.swift:1** 使用 `@main` 和 `@NSApplicationDelegateAdaptor(AppDelegate.self)` 模式：
-1. Apple Books 数据库访问的书签恢复
-2. IAP 交易监控
+1. Apple Books 数据库访问的书签恢复（BookmarkStore）
+2. IAP 交易监控（IAPService）
 3. 自动同步服务启动（如果启用，按来源独立控制）
-4. 同步活动监控初始化（用于退出拦截）
-5. 同步队列存储初始化（用于状态管理）
+4. 同步活动监控初始化（Infrastructure/SyncActivityMonitor，用于退出拦截）
+5. 同步队列存储初始化（SyncQueueStore，用于状态管理）
 
-**AppDelegate.swift:4** 应用生命周期管理：
+**Infrastructure/AppDelegate.swift:1** 应用生命周期管理：
 - 使用 `@NSApplicationDelegateAdaptor` 适配器模式
 - 同步活动监控：在应用退出时检查是否有同步任务进行
 - 退出确认对话框：防止同步中断
 
 应用窗口：
-- MainListView: 书籍/文章选择和同步（支持排序筛选）
-- Settings: Notion 配置、同步选项
-- UserGuide: 帮助文档
-- Logs: 同步操作日志
+- **MainListView**: 书籍/文章选择和同步（支持排序筛选）
+- **SettingsView**: Notion 配置、同步选项、语言设置
+- **UserGuideView**: 帮助文档
+- **LogWindow**: 同步操作日志
+- **CommandMenu**: 模块化菜单命令系统（新增）
 
 ## 开发模式
 
@@ -169,7 +257,7 @@ DIContainer.shared.autoSyncService
 
 视图模型使用响应式模式，配备 `@Published` 属性和 Combine 操作符：
 
-**ViewModels/AppleBooks/AppleBookViewModel.swift:5**
+**ViewModels/AppleBooks/AppleBooksViewModel.swift:5**
 ```swift
 class AppleBookViewModel: ObservableObject {
     @Published var books: [BookListItem] = []
@@ -190,7 +278,7 @@ class AppleBookViewModel: ObservableObject {
 
 所有服务都实现协议以支持测试：
 
-**Services/Infrastructure/Protocols.swift:1**
+**Services/Core/Protocols.swift:1**
 ```swift
 protocol DatabaseServiceProtocol {
     func canOpenReadOnly(dbPath: String) -> Bool
@@ -305,6 +393,9 @@ protocol DatabaseServiceProtocol {
 - **字符串目录管理**：
   - 主目录：`Localizable.xcstrings`（262KB，已包含9种语言完整翻译）
   - 辅助目录：`Localizable-2.xcstrings`（6KB，包含退出确认等特定功能字符串）
+- **新增功能**：
+  - **语言设置页面**：`Views/Settting/General/LanguageView.swift` - 用户可直接在应用内切换语言
+  - **动态语言切换**：无需重启应用，实时更新界面语言
 - **使用规范**：
   - SwiftUI：`Text("Articles")` 或 `Text(String(localized: "Sync", table: "Localizable-2"))`
   - 传统 API：`NSLocalizedString("Articles", comment: "")`
@@ -315,29 +406,33 @@ protocol DatabaseServiceProtocol {
 - **字符串分类**：
   - 基础 UI 组件（保留在主目录）
   - 同步相关进度消息
-  - 设置相关配置选项
+  - 设置相关配置选项（已模块化，分类到 General/Sync/Commands）
   - 错误消息和帮助文本
   - 退出确认对话框（Localizable-2）
+  - 语言设置相关文本
+  - 模块化菜单命令文本
 
 **导出/导入**：Product → Export/Import Localizations
 
 ## 配置文件
 
 ### Xcode 项目
-- **SyncNos.xcodeproj/project.pbxproj**: Xcode 项目设置（版本 v0.5.10）
-- **SyncNos/SyncNos.entitlements**: 应用沙盒和功能权限
-- **SyncNos/Infrastructure/AppDelegate.swift**: 应用生命周期管理
+- **SyncNos.xcodeproj/project.pbxproj**: Xcode 项目设置
+- **SyncNos/SyncNos.entitlements**: 应用沙盒和功能权限（Apple Sign In）
+- **Infrastructure/AppDelegate.swift**: 应用生命周期管理
 
 ### 资源文件
 - **Resource/Localizable.xcstrings**: 主翻译文件（262KB，9种语言）
-- **Resource/Localizable-2.xcstrings**: 辅助翻译文件（6KB）
+- **Resource/Localizable-2.xcstrings**: 辅助翻译文件（6KB，包含退出确认等）
 - **Resource/SyncNos.storekit**: 应用内购买配置
 - **Resource/ChangeLog.md**: 版本更新日志
 - **Resource/PRIVACY_POLICY.md**: 隐私政策
 
 ### 后端服务
-- **Backend/requirements.txt**: Python 依赖
+- **Backend/requirements.txt**: Python 依赖（FastAPI Apple Sign In 后端）
 - **Backend/.env**: Apple 凭证（不在 git 中，已加入.ignore）
 
 ### 构建配置
 - **buildServer.json**: 构建服务器配置
+- **README.md**: 中文项目说明
+- **README_EN.md**: 英文项目说明
