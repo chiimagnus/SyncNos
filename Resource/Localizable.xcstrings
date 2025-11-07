@@ -5704,6 +5704,9 @@
         }
       }
     },
+    "Open at Login" : {
+
+    },
     "Open GoodLinks data" : {
       "localizations" : {
         "de" : {

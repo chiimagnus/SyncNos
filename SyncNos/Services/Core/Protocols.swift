@@ -192,15 +192,11 @@ protocol IAPServiceProtocol: AnyObject {
 
 // MARK: - Login Item Service Protocol
 protocol LoginItemServiceProtocol: AnyObject {
-    /// Returns true when the helper is currently registered as a login item
+    /// Returns true when the main app is set to open at login (macOS 13+)
     func isRegistered() -> Bool
 
-    /// Register or unregister the helper as a login item. Throws on failure.
+    /// Enable or disable "Open at Login" for the main app. Throws on failure.
     func setEnabled(_ enabled: Bool) throws
-
-    /// On macOS 13+, migrate legacy helper-based login item to main app "Open at Login".
-    /// Safe to call multiple times; no-op if migration is not needed.
-    func migrateToMainAppIfLegacyHelperEnabled()
 }
 
 // MARK: - GoodLinks Protocol Bridge (exposed to app layer)
