@@ -13,18 +13,6 @@ struct SyncNosApp: App {
             DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
 
-        // 迁移 UserDefaults 到 App Group（仅一次）
-        SharedDefaults.shared.migrateIfNeeded()
-
-        // 若用户曾启用后台活动，则确保存活登录项已注册（忽略错误）
-        if SharedDefaults.shared.bool(forKey: "backgroundActivity.enabled") {
-            do {
-                try BackgroundLoginItemService.register()
-            } catch {
-                DIContainer.shared.loggerService.warning("Background login item register failed: \(error)")
-            }
-        }
-
         // Start observing IAP transactions
         DIContainer.shared.iapService.startObservingTransactions()
 
