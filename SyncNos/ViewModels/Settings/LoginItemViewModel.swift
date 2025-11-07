@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UserNotifications
 
 import SwiftUI
 
@@ -34,6 +35,10 @@ final class LoginItemViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.isEnabled = enabled
                     self.isLoading = false
+                    // Deliver a local system notification to inform the user
+                    let title = enabled ? "Open at Login enabled" : "Open at Login disabled"
+                    let body = enabled ? "SyncNos will open automatically when you sign in." : "SyncNos will no longer open automatically at sign in."
+                    self.deliverSystemNotification(title: title, body: body)
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -43,6 +48,22 @@ final class LoginItemViewModel: ObservableObject {
                     self.isLoading = false
                 }
             }
+        }
+    }
+
+    // MARK: - Notifications
+    private func deliverSystemNotification(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        // Request authorization if needed, then schedule
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.5, repeats: false)
+            let request = UNNotificationRequest(identifier: "syncnos.openAtLogin.", content: content, trigger: trigger)
+            center.add(request, withCompletionHandler: nil)
         }
     }
 }
