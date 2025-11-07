@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
-@objc final class AppDelegate: NSObject, NSApplicationDelegate {
+@objc final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private static var bypassNextTerminationOnce: Bool = false
     private var bypassObserver: NSObjectProtocol?
 
@@ -9,6 +10,11 @@ import SwiftUI
         super.init()
         bypassObserver = NotificationCenter.default.addObserver(forName: Notification.Name("BypassQuitConfirmationOnce"), object: nil, queue: .main) { _ in
             Self.bypassNextTerminationOnce = true
+        }
+        // Setup UNUserNotificationCenter delegate to present notifications while app is foreground
+        if #available(macOS 10.14, *) {
+            let center = UNUserNotificationCenter.current()
+            center.delegate = self
         }
     }
 
@@ -51,4 +57,12 @@ import SwiftUI
             NSApp.reply(toApplicationShouldTerminate: shouldQuit)
         }
     }
+
+    // MARK: - UNUserNotificationCenterDelegate
+    @available(macOS 10.14, *)
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Present banner + sound even when app is foreground
+        completionHandler([.banner, .sound, .list])
+    }
+
 }
