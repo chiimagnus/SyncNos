@@ -7,27 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
-		D89D7DCB2EBDE19C004D8E11 /* LoginHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D89D7DBF2EBDDF7A004D8E11 /* LoginHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
+        D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
+        D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		D89D7DCA2EBDE109004D8E11 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LoginItems;
-			dstSubfolderSpec = 1;
-			files = (
-				D89D7DCB2EBDE19C004D8E11 /* LoginHelper.app in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		D89D7DBF2EBDDF7A004D8E11 /* LoginHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LoginHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -38,11 +27,7 @@
 			path = Resource;
 			sourceTree = "<group>";
 		};
-		D89D7DC02EBDDF7A004D8E11 /* LoginHelper */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LoginHelper;
-			sourceTree = "<group>";
-		};
+        
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SyncNos;
@@ -51,13 +36,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D89D7DBC2EBDDF7A004D8E11 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D72E713DB50025AD6E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -75,7 +53,7 @@
 				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* SyncNos */,
-				D89D7DC02EBDDF7A004D8E11 /* LoginHelper */,
+                
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -84,7 +62,7 @@
 			isa = PBXGroup;
 			children = (
 				D8CE88DA2E713DB50025AD6E /* SyncNos.app */,
-				D89D7DBF2EBDDF7A004D8E11 /* LoginHelper.app */,
+                
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,28 +70,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D89D7DBE2EBDDF7A004D8E11 /* LoginHelper */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = D89D7DC92EBDDF7B004D8E11 /* Build configuration list for PBXNativeTarget "LoginHelper" */;
-			buildPhases = (
-				D89D7DBB2EBDDF7A004D8E11 /* Sources */,
-				D89D7DBC2EBDDF7A004D8E11 /* Frameworks */,
-				D89D7DBD2EBDDF7A004D8E11 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				D89D7DC02EBDDF7A004D8E11 /* LoginHelper */,
-			);
-			name = LoginHelper;
-			packageProductDependencies = (
-			);
-			productName = LoginHelper;
-			productReference = D89D7DBF2EBDDF7A004D8E11 /* LoginHelper.app */;
-			productType = "com.apple.product-type.application";
-		};
 		D8CE88D92E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D8CE88E32E713DB60025AD6E /* Build configuration list for PBXNativeTarget "SyncNos" */;
@@ -121,7 +77,6 @@
 				D8CE88D62E713DB50025AD6E /* Sources */,
 				D8CE88D72E713DB50025AD6E /* Frameworks */,
 				D8CE88D82E713DB50025AD6E /* Resources */,
-				D89D7DCA2EBDE109004D8E11 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -147,14 +102,11 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
-				TargetAttributes = {
-					D89D7DBE2EBDDF7A004D8E11 = {
-						CreatedOnToolsVersion = 26.0;
-					};
-					D8CE88D92E713DB50025AD6E = {
-						CreatedOnToolsVersion = 16.3;
-					};
-				};
+                TargetAttributes = {
+                    D8CE88D92E713DB50025AD6E = {
+                        CreatedOnToolsVersion = 16.3;
+                    };
+                };
 			};
 			buildConfigurationList = D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncNos" */;
 			developmentRegion = en;
@@ -178,20 +130,12 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D8CE88D92E713DB50025AD6E /* SyncNos */,
-				D89D7DBE2EBDDF7A004D8E11 /* LoginHelper */,
+                D8CE88D92E713DB50025AD6E /* SyncNos */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		D89D7DBD2EBDDF7A004D8E11 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D82E713DB50025AD6E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -204,13 +148,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D89D7DBB2EBDDF7A004D8E11 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D62E713DB50025AD6E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -349,74 +286,6 @@
 			};
 			name = Release;
 		};
-		D89D7DC72EBDDF7B004D8E11 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 13;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.LoginHelper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		D89D7DC82EBDDF7B004D8E11 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 13;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.LoginHelper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		D8CE88E42E713DB60025AD6E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -497,15 +366,6 @@
 			buildConfigurations = (
 				D81167C12E70A140000D0173 /* Debug */,
 				D81167C22E70A140000D0173 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		D89D7DC92EBDDF7B004D8E11 /* Build configuration list for PBXNativeTarget "LoginHelper" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D89D7DC72EBDDF7B004D8E11 /* Debug */,
-				D89D7DC82EBDDF7B004D8E11 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
