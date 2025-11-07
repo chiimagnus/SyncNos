@@ -2,11 +2,20 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
+    @StateObject private var loginItemVM = LoginItemViewModel()
     var body: some View {
         NavigationStack {
             List {
                 Section(header: Text("General")) {
                     LanguageView()
+
+                    Toggle(isOn: $loginItemVM.isEnabled) {
+                        Label("Open at Login", systemImage: "arrow.up.right.square")
+                    }
+                    .toggleStyle(SwitchToggleStyle())
+                    .onChange(of: loginItemVM.isEnabled) { newValue in
+                        loginItemVM.setEnabled(newValue)
+                    }
 
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
