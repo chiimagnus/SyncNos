@@ -7,16 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-        D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
-        D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
+		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
+		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-        
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -27,7 +23,6 @@
 			path = Resource;
 			sourceTree = "<group>";
 		};
-        
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SyncNos;
@@ -53,7 +48,6 @@
 				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* SyncNos */,
-                
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,7 +56,6 @@
 			isa = PBXGroup;
 			children = (
 				D8CE88DA2E713DB50025AD6E /* SyncNos.app */,
-                
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -102,11 +95,11 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
-                TargetAttributes = {
-                    D8CE88D92E713DB50025AD6E = {
-                        CreatedOnToolsVersion = 16.3;
-                    };
-                };
+				TargetAttributes = {
+					D8CE88D92E713DB50025AD6E = {
+						CreatedOnToolsVersion = 16.3;
+					};
+				};
 			};
 			buildConfigurationList = D81167B72E70A13F000D0173 /* Build configuration list for PBXProject "SyncNos" */;
 			developmentRegion = en;
@@ -130,7 +123,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-                D8CE88D92E713DB50025AD6E /* SyncNos */,
+				D8CE88D92E713DB50025AD6E /* SyncNos */,
 			);
 		};
 /* End PBXProject section */
