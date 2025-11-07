@@ -5,9 +5,6 @@ import StoreKit
 struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     init() {
-        // Migrate any legacy login helper registration to "Open at Login" for main app
-        DIContainer.shared.loginItemService.migrateToMainAppIfLegacyHelperEnabled()
-
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
             let started = BookmarkStore.shared.startAccessing(url: url)
