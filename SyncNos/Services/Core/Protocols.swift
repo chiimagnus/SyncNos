@@ -190,6 +190,15 @@ protocol IAPServiceProtocol: AnyObject {
     func startObservingTransactions()
 }
 
+// MARK: - Login Item Service Protocol
+protocol LoginItemServiceProtocol: AnyObject {
+    /// Returns true when the helper is currently registered as a login item
+    func isRegistered() -> Bool
+
+    /// Register or unregister the helper as a login item. Throws on failure.
+    func setEnabled(_ enabled: Bool) throws
+}
+
 // MARK: - GoodLinks Protocol Bridge (exposed to app layer)
 protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func defaultDatabasePath() -> String
