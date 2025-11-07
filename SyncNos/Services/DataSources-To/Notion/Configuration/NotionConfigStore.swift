@@ -3,7 +3,7 @@ import Foundation
 final class NotionConfigStore: NotionConfigStoreProtocol {
     static let shared = NotionConfigStore()
     
-    private let userDefaults = SharedDefaults.shared.defaults
+    private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
     // 说明：以下 UserDefaults 键用于持久化 Notion 配置与缓存的数据库映射
