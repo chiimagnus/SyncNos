@@ -8,6 +8,18 @@ struct SettingsView: View {
                 Section(header: Text("General")) {
                     LanguageView()
 
+                    NavigationLink(destination: BackgroundActivityView()) {
+                        HStack {
+                            Label("Background Activity", systemImage: "desktopcomputer")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Enable background login item and status")
+
+
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
                         HStack {
