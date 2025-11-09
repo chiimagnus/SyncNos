@@ -28,24 +28,25 @@ struct MainListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         // 数据源切换部分
-                        Button {
-                            contentSourceRawValue = ContentSource.appleBooks.rawValue
-                        } label: {
-                            HStack {
-                                Text("AppleBooks (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
-                                if contentSource == .appleBooks { Image(systemName: "checkmark") }
+                        Section("Data Source") {
+                            Button {
+                                contentSourceRawValue = ContentSource.appleBooks.rawValue
+                            } label: {
+                                HStack {
+                                    Text("AppleBooks (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
+                                    if contentSource == .appleBooks { Image(systemName: "checkmark") }
+                                }
+                            }
+
+                            Button {
+                                contentSourceRawValue = ContentSource.goodLinks.rawValue
+                            } label: {
+                                HStack {
+                                    Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
+                                    if contentSource == .goodLinks { Image(systemName: "checkmark") }
+                                }
                             }
                         }
-
-                        Button {
-                            contentSourceRawValue = ContentSource.goodLinks.rawValue
-                        } label: {
-                            HStack {
-                                Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
-                                if contentSource == .goodLinks { Image(systemName: "checkmark") }
-                            }
-                        }
-
                         // 排序和筛选部分（根据数据源显示对应选项）
                         if contentSource == .appleBooks {
                             Divider()
