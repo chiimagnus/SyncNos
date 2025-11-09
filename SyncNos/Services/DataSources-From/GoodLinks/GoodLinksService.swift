@@ -121,14 +121,14 @@ final class GoodLinksBookmarkStore {
             let data = try folderURL.bookmarkData(options: [.withSecurityScope],
                                                   includingResourceValuesForKeys: nil,
                                                   relativeTo: nil)
-            UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
+            SharedDefaults.userDefaults.set(data, forKey: bookmarkDefaultsKey)
         } catch {
             logger.error("[GoodLinks] Failed to create bookmark: \(error)")
         }
     }
 
     func restore() -> URL? {
-        guard let data = UserDefaults.standard.data(forKey: bookmarkDefaultsKey) else { return nil }
+        guard let data = SharedDefaults.userDefaults.data(forKey: bookmarkDefaultsKey) else { return nil }
         var isStale = false
         do {
             let url = try URL(resolvingBookmarkData: data,

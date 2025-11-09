@@ -15,14 +15,14 @@ final class BookmarkStore: BookmarkStoreProtocol {
             let data = try folderURL.bookmarkData(options: [.withSecurityScope],
                                                   includingResourceValuesForKeys: nil,
                                                   relativeTo: nil)
-            UserDefaults.standard.set(data, forKey: bookmarkDefaultsKey)
+            SharedDefaults.userDefaults.set(data, forKey: bookmarkDefaultsKey)
         } catch {
             logger.error("Failed to create bookmark for URL: \(folderURL.path), error: \(error)")
         }
     }
     
     func restore() -> URL? {
-        guard let data = UserDefaults.standard.data(forKey: bookmarkDefaultsKey) else {
+        guard let data = SharedDefaults.userDefaults.data(forKey: bookmarkDefaultsKey) else {
             return nil
         }
         var isStale = false
