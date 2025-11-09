@@ -7,9 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D84699442EC0C30300512670 /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
 		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D84699432EC0C2E700512670 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LoginItems;
+			dstSubfolderSpec = 1;
+			files = (
+				D84699442EC0C30300512670 /* SyncNosHelper.app in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		D846980B2EC0BFDC00512670 /* SyncNosHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNosHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -168,6 +182,7 @@
 				D8CE88D62E713DB50025AD6E /* Sources */,
 				D8CE88D72E713DB50025AD6E /* Frameworks */,
 				D8CE88D82E713DB50025AD6E /* Resources */,
+				D84699432EC0C2E700512670 /* CopyFiles */,
 			);
 			buildRules = (
 			);
