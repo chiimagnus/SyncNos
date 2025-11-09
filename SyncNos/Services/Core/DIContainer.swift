@@ -22,6 +22,7 @@ class DIContainer {
     private var _syncQueueStore: SyncQueueStoreProtocol?
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
+    private var _backgroundActivityService: BackgroundActivityServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -131,6 +132,13 @@ class DIContainer {
         }
         return _loginItemService!
     }
+    
+    var backgroundActivityService: BackgroundActivityServiceProtocol {
+        if _backgroundActivityService == nil {
+            _backgroundActivityService = BackgroundActivityService()
+        }
+        return _backgroundActivityService!
+    }
 
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
@@ -193,6 +201,10 @@ class DIContainer {
 
     func register(loginItemService: LoginItemServiceProtocol) {
         self._loginItemService = loginItemService
+    }
+    
+    func register(backgroundActivityService: BackgroundActivityServiceProtocol) {
+        self._backgroundActivityService = backgroundActivityService
     }
 
 }
