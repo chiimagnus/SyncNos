@@ -20,7 +20,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     
     func setEnabled(_ enabled: Bool) {
         // 记录用户偏好（供下次启动时做幂等校正）
-        UserDefaults.standard.set(enabled, forKey: defaultsKey)
+        SharedDefaults.userDefaults.set(enabled, forKey: defaultsKey)
         
         do {
             if enabled {
@@ -40,7 +40,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     
     /// 应用启动时调用：根据用户偏好与当前系统状态进行幂等校正
     func startIfEnabled() {
-        let preferEnabled = UserDefaults.standard.bool(forKey: defaultsKey)
+        let preferEnabled = SharedDefaults.userDefaults.bool(forKey: defaultsKey)
         let status = helperService.status
         if preferEnabled && status == .notRegistered {
             // 尝试注册一次（可能仍需用户在系统设置授权）

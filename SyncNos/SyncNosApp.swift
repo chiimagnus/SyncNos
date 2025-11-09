@@ -17,7 +17,7 @@ struct SyncNosApp: App {
         DIContainer.shared.iapService.startObservingTransactions()
 
         // Start Auto Sync if any source enabled
-        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        let autoSyncEnabled = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks") || SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
         if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 
         // Register background activity scheduler if user enabled it

@@ -17,8 +17,8 @@ final class AppleBooksSettingsViewModel: ObservableObject {
         if let id = notionConfig.databaseIdForSource("appleBooks") {
             self.appleBooksDbId = id
         }
-        // read autoSync flag from AppStorage via UserDefaults bridge
-        self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
+        // read autoSync flag from SharedDefaults (shared with Helper)
+        self.autoSync = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks")
 
         // keep syncMode in sync if external changes happen
         // no external publisher available; omit
@@ -27,11 +27,11 @@ final class AppleBooksSettingsViewModel: ObservableObject {
     func save() {
         notionConfig.setDatabaseId(appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "appleBooks")
         notionConfig.syncMode = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
-        let previous = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
-        UserDefaults.standard.set(autoSync, forKey: "autoSync.appleBooks")
+        let previous = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks")
+        SharedDefaults.userDefaults.set(autoSync, forKey: "autoSync.appleBooks")
         // 根据 per-source 开关控制 AutoSyncService 生命周期
-        let anyEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
-        UserDefaults.standard.set(anyEnabled, forKey: "autoSyncEnabled")
+        let anyEnabled = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks") || SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
+        SharedDefaults.userDefaults.set(anyEnabled, forKey: "autoSyncEnabled")
         if anyEnabled {
             DIContainer.shared.autoSyncService.start()
             if !previous && autoSync {

@@ -121,7 +121,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
     private func triggerAppleBooksSyncNow() {
         guard !isSyncingAppleBooks else { return }
-        let appleAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
+        let appleAutoSyncEnabled = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks")
         guard appleAutoSyncEnabled else { return }
         guard let root = booksRootPath else {
             logger.warning("AutoSync skipped: Apple Books root not selected")
@@ -150,7 +150,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
     private func triggerGoodLinksSyncNow() {
         guard !isSyncingGoodLinks else { return }
-        let goodLinksAutoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        let goodLinksAutoSyncEnabled = SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
         guard goodLinksAutoSyncEnabled else { return }
         // 解析 GoodLinks DB 路径（会自动处理安全范围访问）
         let dbPath = goodLinksDatabaseService.resolveDatabasePath()
