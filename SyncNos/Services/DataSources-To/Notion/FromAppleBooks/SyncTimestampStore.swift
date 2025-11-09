@@ -4,7 +4,7 @@ final class SyncTimestampStore: SyncTimestampStoreProtocol {
     static let shared = SyncTimestampStore()
     private let logger = DIContainer.shared.loggerService
 
-    private let userDefaults = UserDefaults.standard
+    private let userDefaults = SharedDefaults.userDefaults
     private let lastSyncKeyPrefix = "LAST_SYNC_TIMESTAMP_"
 
     private init() {}

@@ -14,16 +14,16 @@ final class GoodLinksSettingsViewModel: ObservableObject {
         if let id = notionConfig.databaseIdForSource("goodLinks") {
             self.goodLinksDbId = id
         }
-        self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        self.autoSync = SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
     }
 
     func save() {
         notionConfig.setDatabaseId(goodLinksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "goodLinks")
-        let previous = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
-        UserDefaults.standard.set(autoSync, forKey: "autoSync.goodLinks")
+        let previous = SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
+        SharedDefaults.userDefaults.set(autoSync, forKey: "autoSync.goodLinks")
         // 根据 per-source 开关控制 AutoSyncService 生命周期
-        let anyEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
-        UserDefaults.standard.set(anyEnabled, forKey: "autoSyncEnabled")
+        let anyEnabled = SharedDefaults.userDefaults.bool(forKey: "autoSync.appleBooks") || SharedDefaults.userDefaults.bool(forKey: "autoSync.goodLinks")
+        SharedDefaults.userDefaults.set(anyEnabled, forKey: "autoSyncEnabled")
         if anyEnabled {
             DIContainer.shared.autoSyncService.start()
             if !previous && autoSync {
