@@ -16,6 +16,9 @@ struct AppleBooksListView: View {
                     Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
                         .multilineTextAlignment(.center)
                         .padding()
+                    Button("Open Apple Books notes", systemImage: "book") {
+                        AppleBooksPicker.pickAppleBooksContainer()
+                    }
                 }
             } else if viewModel.books.isEmpty {
                 VStack {
