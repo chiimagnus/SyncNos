@@ -15,7 +15,7 @@ final class IAPService: IAPServiceProtocol {
     static let statusChangedNotification = Notification.Name("IAPServiceStatusChanged")
 
     var isProUnlocked: Bool {
-        UserDefaults.standard.bool(forKey: unlockedKey)
+        SharedDefaults.userDefaults.bool(forKey: unlockedKey)
     }
 
     // MARK: - Public API
@@ -98,7 +98,7 @@ final class IAPService: IAPServiceProtocol {
     private func setUnlocked(_ newValue: Bool) {
         let current = isProUnlocked
         guard current != newValue else { return }
-        UserDefaults.standard.set(newValue, forKey: unlockedKey)
+        SharedDefaults.userDefaults.set(newValue, forKey: unlockedKey)
         NotificationCenter.default.post(name: Self.statusChangedNotification, object: nil)
         logger.info("Pro unlocked state changed to: \(newValue)")
     }
