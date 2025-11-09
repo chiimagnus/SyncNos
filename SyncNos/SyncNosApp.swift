@@ -20,6 +20,9 @@ struct SyncNosApp: App {
         let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
         if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 
+        // Register background activity scheduler if user enabled it
+        DIContainer.shared.backgroundActivityService.startIfEnabled()
+
         // 初始化同步状态监控，确保尽早开始监听通知
         _ = DIContainer.shared.syncActivityMonitor
         // 初始化同步队列存储，确保尽早开始监听入队/状态事件

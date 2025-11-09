@@ -254,3 +254,15 @@ protocol SyncQueueStoreProtocol: AnyObject {
     /// 任务流（主线程交付）
     var tasksPublisher: AnyPublisher<[SyncQueueTask], Never> { get }
 }
+
+// MARK: - Background Activity Service Protocol
+/// 使用 NSBackgroundActivityScheduler 为应用注册系统级“后台活动”，
+/// 仅在 macOS 13+ 上提供，实际执行由系统能耗策略与用户“后台允许”开关共同决定。
+protocol BackgroundActivityServiceProtocol: AnyObject {
+    /// 用户是否在应用内启用后台活动（本地偏好）
+    var isEnabled: Bool { get }
+    /// 启用/停用后台活动，并持久化偏好
+    func setEnabled(_ enabled: Bool)
+    /// 应用启动时调用：若开启则确保已注册调度
+    func startIfEnabled()
+}
