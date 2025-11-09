@@ -43,11 +43,18 @@ import SwiftUI
         if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first {
             alert.beginSheetModal(for: w) { response in
                 let shouldQuit = (response == .alertSecondButtonReturn)
+                // 若用户确认退出且当前有同步任务在进行，唤起 Helper 以继续后台同步
+                if shouldQuit && DIContainer.shared.syncActivityMonitor.isSyncing {
+                    HelperLauncher.launchHelperForHandoff()
+                }
                 NSApp.reply(toApplicationShouldTerminate: shouldQuit)
             }
         } else {
             let response = alert.runModal()
             let shouldQuit = (response == .alertSecondButtonReturn)
+            if shouldQuit && DIContainer.shared.syncActivityMonitor.isSyncing {
+                HelperLauncher.launchHelperForHandoff()
+            }
             NSApp.reply(toApplicationShouldTerminate: shouldQuit)
         }
     }

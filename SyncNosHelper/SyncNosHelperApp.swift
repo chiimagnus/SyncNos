@@ -44,26 +44,30 @@ final class SyncNosHelperApp {
             return
         }
         
-        // 触发自动同步（异步执行，完成后退出）
+        // 启动同步并等待真正完成（或整体超时）
         Task {
-            do {
-                // 触发同步
-                DIContainer.shared.autoSyncService.triggerSyncNow()
-                
-                // 等待一段时间让同步任务启动（不阻塞主线程）
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2秒
-                
-                logger.info("Helper: Background sync triggered, exiting")
-                exit(0)
-            } catch {
-                logger.error("Helper: Error during sync: \(error.localizedDescription)")
-                exit(1)
+            // 触发同步
+            DIContainer.shared.autoSyncService.triggerSyncNow()
+            
+            // 轮询 SyncActivityMonitor 直到安静期结束或整体超时
+            let monitor = DIContainer.shared.syncActivityMonitor
+            var lastActive = Date()
+            let overallDeadline = Date().addingTimeInterval(20 * 60) // 最长等待20分钟
+            let quietSeconds: TimeInterval = 10
+            
+            if monitor.isSyncing { lastActive = Date() }
+            
+            while Date() < overallDeadline {
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s
+                if monitor.isSyncing {
+                    lastActive = Date()
+                } else if Date().timeIntervalSince(lastActive) > quietSeconds {
+                    logger.info("Helper: Sync finished (quiet), exiting")
+                    exit(0)
+                }
             }
+            logger.info("Helper: Overall timeout reached, exiting")
+            exit(0)
         }
-        
-        // 保持运行直到任务完成（最多等待30秒）
-        RunLoop.main.run(until: Date(timeIntervalSinceNow: 30))
-        logger.info("Helper: Timeout reached, exiting")
-        exit(0)
     }
 }
