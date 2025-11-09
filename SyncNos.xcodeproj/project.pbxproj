@@ -18,6 +18,64 @@
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/AccountModels.swift,
+				Models/HighlightColorScheme.swift,
+				Models/Models.swift,
+				Models/SyncQueueModels.swift,
+				Services/Auth/AuthService.swift,
+				Services/Auth/IAPService.swift,
+				Services/Auth/KeychainHelper.swift,
+				Services/Core/BackgroundActivityService.swift,
+				Services/Core/ConcurrencyLimiter.swift,
+				Services/Core/DIContainer.swift,
+				Services/Core/LoggerService.swift,
+				Services/Core/LoginItemService.swift,
+				Services/Core/Protocols.swift,
+				"Services/DataSources-From/AppleBooks/AppleBooksPicker.swift",
+				"Services/DataSources-From/AppleBooks/BookFilterService.swift",
+				"Services/DataSources-From/AppleBooks/BookmarkStore.swift",
+				"Services/DataSources-From/AppleBooks/DatabaseConnectionService.swift",
+				"Services/DataSources-From/AppleBooks/DatabaseQueryService.swift",
+				"Services/DataSources-From/AppleBooks/DatabaseReadOnlySession.swift",
+				"Services/DataSources-From/AppleBooks/DatabaseService.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksConnectionService.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksModels.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksProtocols.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksQueryService.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksService.swift",
+				"Services/DataSources-From/GoodLinks/GoodLinksTagParser.swift",
+				"Services/DataSources-From/WeRead/1.md",
+				"Services/DataSources-From/WeRead/微信读书API实现.md",
+				"Services/DataSources-To/Notion/Configuration/NotionConfigStore.swift",
+				"Services/DataSources-To/Notion/Configuration/NotionSyncConfig.swift",
+				"Services/DataSources-To/Notion/Core/NotionHelperMethods.swift",
+				"Services/DataSources-To/Notion/Core/NotionRateLimiter.swift",
+				"Services/DataSources-To/Notion/Core/NotionRequestHelper.swift",
+				"Services/DataSources-To/Notion/Core/NotionService.swift",
+				"Services/DataSources-To/Notion/Core/NotionServiceCore.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncService.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncServiceProtocol.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategyPerBook.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategyProtocol.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategySingleDB.swift",
+				"Services/DataSources-To/Notion/FromAppleBooks/SyncTimestampStore.swift",
+				"Services/DataSources-To/Notion/FromGoodLinks/GoodLinksSyncService.swift",
+				"Services/DataSources-To/Notion/Operations/NotionDatabaseOperations.swift",
+				"Services/DataSources-To/Notion/Operations/NotionHighlightOperations.swift",
+				"Services/DataSources-To/Notion/Operations/NotionPageOperations.swift",
+				"Services/DataSources-To/Notion/Operations/NotionQueryOperations.swift",
+				Services/Sync/AutoSyncService.swift,
+				Services/Sync/SyncActivityMonitor.swift,
+				Services/Sync/SyncQueueStore.swift,
+			);
+			target = D846980A2EC0BFDC00512670 /* SyncNosHelper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D846980C2EC0BFDC00512670 /* SyncNosHelper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -31,6 +89,9 @@
 		};
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */,
+			);
 			path = SyncNos;
 			sourceTree = "<group>";
 		};
