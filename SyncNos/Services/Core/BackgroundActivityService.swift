@@ -29,7 +29,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
         do {
             try helperService.register()
         } catch {
-            DIContainer.shared.loggerService.error("SMAppService.register failed: \(error.localizedDescription)")
+            DIContainer.shared.loggerService.info("SMAppService.register failed (user approval required): \(error.localizedDescription)")
             throw error
         }
         
@@ -60,7 +60,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
         do {
             try helperService.unregister()
         } catch {
-            DIContainer.shared.loggerService.error("SMAppService.unregister failed: \(error.localizedDescription)")
+            DIContainer.shared.loggerService.warning("SMAppService.unregister failed: \(error.localizedDescription)")
             throw error
         }
     }
@@ -72,7 +72,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
             do {
                 try helperService.register()
             } catch {
-                DIContainer.shared.loggerService.error("register on launch failed: \(error.localizedDescription)")
+                DIContainer.shared.loggerService.info("register on launch failed (user approval required): \(error.localizedDescription)")
             }
         }
         // 若已启用但 Helper 未在运行，则后台拉起一次
