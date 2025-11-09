@@ -46,8 +46,8 @@ struct LanguageView: View {
 
     private func changeAppLanguage(to languageCode: String) {
         // 保存用户选择的语言偏好
-        UserDefaults.standard.set([languageCode], forKey: "AppleLanguages")
-        UserDefaults.standard.synchronize()
+        SharedDefaults.userDefaults.set([languageCode], forKey: "AppleLanguages")
+        SharedDefaults.userDefaults.synchronize()
 
         // 显示重启提示
         showRestartAlert = true

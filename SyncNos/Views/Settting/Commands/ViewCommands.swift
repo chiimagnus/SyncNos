@@ -211,7 +211,7 @@ struct ViewCommands: Commands {
                                 }
                             }
                             let arr = Array(newSet).sorted()
-                            UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
+                            SharedDefaults.userDefaults.set(arr, forKey: "highlight_selected_styles")
                             // 同步写位掩码以驱动 @AppStorage 重绘
                             if newSet.isEmpty {
                                 highlightSelectedMask = 0

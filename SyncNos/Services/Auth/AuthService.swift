@@ -4,7 +4,7 @@ final class AuthService: AuthServiceProtocol {
     private struct BackendConfig {
         static var baseURL: URL {
             // 允许通过 UserDefaults 覆盖（方便调试）
-            if let override = UserDefaults.standard.string(forKey: "BackendBaseURL"), let url = URL(string: override) {
+            if let override = SharedDefaults.userDefaults.string(forKey: "BackendBaseURL"), let url = URL(string: override) {
                 return url
             }
             return URL(string: "http://127.0.0.1:8000/api/v1")!

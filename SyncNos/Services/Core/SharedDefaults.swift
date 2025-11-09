@@ -7,7 +7,7 @@ enum SharedDefaults {
         if let ud = UserDefaults(suiteName: suiteName) {
             return ud
         }
-        return UserDefaults.standard
+        return SharedDefaults.userDefaults
     }
 }
 
