@@ -12,12 +12,18 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D846980B2EC0BFDC00512670 /* SyncNosHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNosHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D846980C2EC0BFDC00512670 /* SyncNosHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SyncNosHelper;
+			sourceTree = "<group>";
+		};
 		D855CBA82E7D52B10019C4A0 /* Resource */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Resource;
@@ -31,6 +37,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		D84698082EC0BFDC00512670 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D8CE88D72E713DB50025AD6E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -48,6 +61,7 @@
 				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* SyncNos */,
+				D846980C2EC0BFDC00512670 /* SyncNosHelper */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -56,6 +70,7 @@
 			isa = PBXGroup;
 			children = (
 				D8CE88DA2E713DB50025AD6E /* SyncNos.app */,
+				D846980B2EC0BFDC00512670 /* SyncNosHelper.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -63,6 +78,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D846980A2EC0BFDC00512670 /* SyncNosHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D84698152EC0BFDD00512670 /* Build configuration list for PBXNativeTarget "SyncNosHelper" */;
+			buildPhases = (
+				D84698072EC0BFDC00512670 /* Sources */,
+				D84698082EC0BFDC00512670 /* Frameworks */,
+				D84698092EC0BFDC00512670 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D846980C2EC0BFDC00512670 /* SyncNosHelper */,
+			);
+			name = SyncNosHelper;
+			packageProductDependencies = (
+			);
+			productName = SyncNosHelper;
+			productReference = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */;
+			productType = "com.apple.product-type.application";
+		};
 		D8CE88D92E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D8CE88E32E713DB60025AD6E /* Build configuration list for PBXNativeTarget "SyncNos" */;
@@ -96,6 +133,9 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					D846980A2EC0BFDC00512670 = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					D8CE88D92E713DB50025AD6E = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -124,11 +164,19 @@
 			projectRoot = "";
 			targets = (
 				D8CE88D92E713DB50025AD6E /* SyncNos */,
+				D846980A2EC0BFDC00512670 /* SyncNosHelper */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		D84698092EC0BFDC00512670 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D8CE88D82E713DB50025AD6E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -141,6 +189,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D84698072EC0BFDC00512670 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D8CE88D62E713DB50025AD6E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -279,6 +334,72 @@
 			};
 			name = Release;
 		};
+		D84698132EC0BFDD00512670 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = RDQHYSDFFG;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D84698142EC0BFDD00512670 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = RDQHYSDFFG;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		D8CE88E42E713DB60025AD6E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -359,6 +480,15 @@
 			buildConfigurations = (
 				D81167C12E70A140000D0173 /* Debug */,
 				D81167C22E70A140000D0173 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D84698152EC0BFDD00512670 /* Build configuration list for PBXNativeTarget "SyncNosHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D84698132EC0BFDD00512670 /* Debug */,
+				D84698142EC0BFDD00512670 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
