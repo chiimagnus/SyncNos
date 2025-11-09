@@ -7,18 +7,22 @@ alwaysApply: true
 ## 项目架构要求
 
 ### 核心技术栈
+
 - **架构模式**: MVVM (Model-View-ViewModel)
 - **UI框架**: SwiftUI (macOS13+)
 - **响应式编程**: Combine
+- **并发编程**: Swift Concurrency (async/await, Task, actor)
 - **数据持久化**: SwiftData
-- **语言版本**: Swift 6.1+、Swift5+
+- **语言版本**: Swift 5.9+（@Observable 宏最低要求）或 Swift 6.1+（推荐，支持完整的并发检查）
 
 ### 平台支持
+
 - macOS 13.0+
 
 ## MVVM架构规范
 
 ### 1. Models (数据模型)
+
 - 纯数据结构，不包含业务逻辑
 - 使用 `@Model` 宏用于 SwiftData
 - 只包含属性和简单的数据处理方法
@@ -26,6 +30,7 @@ alwaysApply: true
 - 数据结构应该清晰、简洁
 
 ### 2. ViewModels (视图模型)
+
 - 处理业务逻辑，管理状态
 - 二选一：使用 `ObservableObject` + `@Published`，或使用 `@Observable`；不要混用
 - 使用 `ObservableObject` 时使用 `@Published`；使用 `@Observable` 时不要使用 `@Published`
@@ -47,14 +52,18 @@ alwaysApply: true
 - 使用 `Set<AnyCancellable>` 管理订阅生命周期
 
 ### 3. Views (视图)
+
 - 纯UI展示，不包含业务逻辑
-- 绑定策略：`ObservableObject` 用 `@StateObject/@ObservedObject`；`@Observable` 用 `@State`/`@Environment` + `@Bindable`（不要混用）
+- 绑定策略：
+    - `ObservableObject`：使用 `@StateObject`（长期持有）或 `@ObservedObject`（从外部注入）
+    - `@Observable`：使用 `@State`（长期持有）或 `@Environment`（从环境注入）；需要双向绑定时使用 `@Bindable` 包装
 - 组件化、可复用、条件渲染（加载/错误/空数据）
 - 响应式布局，支持不同屏幕尺寸
 
 ## 代码组织与职责分离
 
 ### 文件结构
+
 ```
 Feature/
 ├── Views/
@@ -66,9 +75,11 @@ Feature/
 │   └── FeatureModel.swift
 └── Services/
     └── FeatureService.swift
+
 ```
 
 ### 职责分离原则
+
 - **Views**: 只负责UI展示和用户交互响应
 - **ViewModels**: 处理业务逻辑、数据转换、状态管理
 - **Models**: 数据结构定义和简单数据处理
@@ -77,18 +88,25 @@ Feature/
 ## ViewModel 实例化策略
 
 ### 推荐方式
+
 1. **按需创建**：每个视图创建独立的ViewModel实例
 2. **依赖注入**：通过 `.environmentObject()`（ObservableObject）或 `.environment(...)`（@Observable）传递 ViewModel
 3. **生命周期管理**：
-   - 短期：使用 `@State` 管理
-   - 长期：使用 `@Environment` 或 `@StateObject`
+    - **ObservableObject**：
+        - 长期持有：使用 `@StateObject`（视图创建时初始化，随视图生命周期）
+        - 外部注入：使用 `@ObservedObject`（从父视图传递）
+    - **@Observable**：
+        - 长期持有：使用 `@State`（视图创建时初始化，随视图生命周期）
+        - 环境注入：使用 `@Environment`（从环境值中获取）
 
 ### 禁止方式
+
 - ❌ 使用 `static let shared` 单例模式
 - ❌ 在ViewModel中创建全局状态
 - ❌ 多个视图共享同一个ViewModel实例
 
 ### 正确示例
+
 ```swift
 // ✅ 正确：按需创建（ObservableObject）
 @StateObject private var viewModel = ItemViewModel()
@@ -112,17 +130,20 @@ class ItemViewModel: ObservableObject {
             .assign(to: &$filteredItems)
     }
 }
+
 ```
 
 ## SwiftUI最佳实践
 
 ### 响应式布局
+
 - 优先使用 SwiftUI 内置的响应式布局系统
 - 合理使用 Size Classes 进行设备适配
 - 避免过度使用 GeometryReader
 - 使用 ScrollView 优化长内容展示
 
 ### 状态管理
+
 ```swift
 // ✅ 正确：按需创建ViewModel（ObservableObject）
 struct FeatureView: View {
@@ -152,9 +173,11 @@ class FeatureViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 }
+
 ```
 
 ### 组件化开发
+
 - 每个组件职责单一
 - 组件可复用、可测试
 - 合理使用 ViewModifier 和 ViewBuilder
@@ -163,6 +186,7 @@ class FeatureViewModel: ObservableObject {
 ## Combine响应式编程
 
 ### 数据流处理
+
 ```swift
 // ViewModel中的响应式数据处理
 class MyViewModel: ObservableObject {
@@ -170,9 +194,9 @@ class MyViewModel: ObservableObject {
     @Published var processedData: [DisplayModel] = []
     @Published var searchText = ""
     @Published var searchResults: [Item] = []
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
     init() {
         // 响应式数据转换
         $sourceData
@@ -181,35 +205,346 @@ class MyViewModel: ObservableObject {
                 return data.map { DisplayModel(from: $0) }
             }
             .assign(to: &$processedData)
-            
-        // 搜索功能
+
+        // 搜索功能（Combine scheduler 可以使用 DispatchQueue.main）
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .flatMap { text in
-                text.isEmpty ? Just([]).eraseToAnyPublisher() : 
+                text.isEmpty ? Just([]).eraseToAnyPublisher() :
                 self.searchService.search(text).catch { _ in Just([]) }.eraseToAnyPublisher()
             }
             .assign(to: &$searchResults)
+
+        // ✅ 或者使用 async/await 方式（推荐）
+        // Task {
+        //     for await text in $searchText.values {
+        //         try? await Task.sleep(nanoseconds: 300_000_000)
+        //         searchResults = try? await searchService.search(text) ?? []
+        //     }
+        // }
     }
 }
 
+```
+
 ### 响应式编程最佳实践
+
 1. **数据源响应**: 使用`@Published`属性作为数据源
 2. **自动转换**: 通过`.map`、`.filter`等操作符处理数据
 3. **链式操作**: 使用`.assign(to:)`或`.sink`订阅结果
 4. **内存管理**: 使用`Set<AnyCancellable>`管理订阅生命周期
 5. **错误处理**: 使用`.catch`、`.replaceError`处理错误情况
-```
 
 ### 错误处理
+
 - 使用 `catch` 操作符处理错误
 - 统一错误处理机制
 - 避免在 View 层处理复杂错误逻辑
 
+## Swift Concurrency 并发编程规范
+
+### 核心原则
+
+- **优先使用 Swift Concurrency**：使用 `async/await` 和 `Task` 进行异步操作
+- **使用 `actor` 进行线程安全**：需要线程安全的状态管理时，优先使用 `actor` 而非 `DispatchQueue`
+- **避免使用 `DispatchQueue`**：除非与 Combine 的 scheduler 配合使用，否则应避免直接使用 `DispatchQueue` 进行并发控制
+
+### async/await 异步操作
+
+#### ViewModel 中的异步操作
+```swift
+// ✅ 正确：使用 async/await 调用 Service（使用 @MainActor 确保 UI 更新在主线程）
+@MainActor
+class MyViewModel: ObservableObject {
+    @Published var items: [Item] = []
+    @Published var isLoading = false
+
+    func loadData() {
+        // 重要：因为类标记了 @MainActor，loadData() 方法已经在 MainActor 上下文中
+        // 在此方法内创建的 Task 会继承 MainActor 上下文（除非显式使用 Task.detached）
+        // 因此 Task 闭包内的所有代码（包括 defer）都在 MainActor 上执行
+        Task {
+            isLoading = true
+            defer { isLoading = false }  // defer 块也在 MainActor 上下文中
+            do {
+                let fetchedItems = try await dataService.fetchItems()
+                // 直接更新 @Published 属性，因为已在 MainActor 上下文中
+                items = fetchedItems
+            } catch {
+                // 错误处理
+            }
+        }
+    }
+}
+
+// ✅ 正确：ViewModel 方法标记为 async（推荐方式）
+@MainActor
+class MyViewModel2: ObservableObject {
+    @Published var items: [Item] = []
+    @Published var isLoading = false
+
+    func loadData() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            items = try await dataService.fetchItems()
+        } catch {
+            // 错误处理
+        }
+    }
+}
+
+// ✅ 正确：在 View 中使用 .task 触发异步操作
+struct MyView: View {
+    @StateObject private var viewModel = MyViewModel2()
+
+    var body: some View {
+        List(viewModel.items) { item in
+            Text([item.name](http://item.name))
+        }
+        .task {
+            await viewModel.loadData()
+        }
+    }
+}
+
+// ✅ 正确：如果 ViewModel 没有 @MainActor，使用 Task { @MainActor in } 包装整个闭包
+class MyViewModel3: ObservableObject {
+    @Published var items: [Item] = []
+    @Published var isLoading = false
+
+    func loadData() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.isLoading = true
+            defer {
+                // 在 @MainActor Task 中，defer 块也在 MainActor 上下文中
+                self.isLoading = false
+            }
+            do {
+                // dataService.fetchItems() 是 async 方法，会自动在后台执行
+                let fetchedItems = try await self.dataService.fetchItems()
+                // 回到 MainActor 上下文更新 UI（因为整个 Task 都在 @MainActor 中）
+                self.items = fetchedItems
+            } catch {
+                // 错误处理（已在 MainActor 上下文中）
+                print("Error: \(error)")
+            }
+        }
+    }
+}
+
+// ✅ 或者：不使用 defer，在所有路径手动设置（更明确，适合复杂错误处理）
+class MyViewModel4: ObservableObject {
+    @Published var items: [Item] = []
+    @Published var isLoading = false
+
+    func loadData() {
+        Task {
+            await [MainActor.run](http://MainActor.run) { [weak self] in
+                self?.isLoading = true
+            }
+            do {
+                let fetchedItems = try await dataService.fetchItems()
+                await [MainActor.run](http://MainActor.run) { [weak self] in
+                    self?.items = fetchedItems
+                    self?.isLoading = false
+                }
+            } catch {
+                await [MainActor.run](http://MainActor.run) { [weak self] in
+                    self?.isLoading = false
+                    // 错误处理
+                }
+            }
+        }
+    }
+}
+
+```
+
+#### Service 层中的异步操作
+
+```swift
+// ✅ 正确：Service 使用 async/await
+protocol DataServiceProtocol {
+    func fetchItems() async throws -> [Item]
+}
+
+final class DataService: DataServiceProtocol {
+    func fetchItems() async throws -> [Item] {
+        let url = URL(string: "<https://api.example.com/items>")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode([Item].self, from: data)
+    }
+}
+
+```
+
+### Actor 线程安全
+
+#### 使用 actor 保护共享状态
+```swift
+// ✅ 正确：使用 actor 进行线程安全的状态管理
+actor StateManager {
+    private var count: Int = 0
+
+    func increment() {
+        count += 1
+    }
+
+    func getCount() -> Int {
+        return count
+    }
+}
+
+// ✅ 正确：在 Service 中使用 actor
+actor ConcurrencyLimiter {
+    private let limit: Int
+    private var permitsAvailable: Int
+
+    init(limit: Int) {
+        self.limit = limit
+        self.permitsAvailable = limit
+    }
+
+    func withPermit<T>(_ operation: () async throws -> T) async rethrows -> T {
+        await acquire()
+        defer { release() }
+        return try await operation()
+    }
+
+    private func acquire() async {
+        // 实现获取许可的逻辑
+    }
+
+    private func release() {
+        // 实现释放许可的逻辑
+    }
+}
+
+```
+
+#### 避免使用 DispatchQueue 进行状态管理
+```swift
+// ❌ 错误：使用 DispatchQueue 进行状态管理
+class OldStateManager {
+    private let queue = DispatchQueue(label: "state.queue")
+    private var count: Int = 0
+
+    func increment() {
+        queue.sync { count += 1 }
+    }
+}
+
+// ✅ 正确：使用 actor 替代
+actor StateManager {
+    private var count: Int = 0
+
+    func increment() {
+        count += 1
+    }
+}
+
+```
+
+### Combine 与 Swift Concurrency 的配合
+
+#### Combine Scheduler 的使用
+```swift
+// ✅ 正确：Combine 中使用 DispatchQueue.main 作为 scheduler（这是允许的）
+$searchText
+    .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+    .removeDuplicates()
+    .sink { text in
+        // 处理搜索文本
+    }
+
+// ✅ 正确：Combine 中使用 RunLoop.main 作为 scheduler
+$searchText
+    .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+    .removeDuplicates()
+    .sink { text in
+        // 处理搜索文本
+    }
+
+```
+
+#### 将 Combine Publisher 转换为 async/await
+```swift
+// ✅ 正确：使用 async/await 处理 Combine Publisher（使用 values 属性）
+func fetchData() async throws -> [Item] {
+    for try await value in dataPublisher.values {
+        return value
+    }
+    throw NSError(domain: "NoData", code: 0)
+}
+
+// ✅ 正确：使用 first() 获取第一个值
+func fetchFirstData() async throws -> [Item] {
+    return try await dataPublisher.values.first { _ in true } ?? []
+}
+
+// ✅ 正确：在 Task 中更新 @Published 属性（ViewModel 标记了 @MainActor）
+@MainActor
+class MyViewModel: ObservableObject {
+    @Published var items: [Item] = []
+
+    func loadData() {
+        Task {
+            let items = try await dataService.fetchItems()
+            // @MainActor 确保在主线程更新
+            self.items = items
+        }
+    }
+}
+
+// ✅ 正确：如果 ViewModel 没有 @MainActor，使用 MainActor.run
+class MyViewModel2: ObservableObject {
+    @Published var items: [Item] = []
+
+    func loadData() {
+        Task {
+            let items = try await dataService.fetchItems()
+            await MainActor.run {
+                self.items = items
+            }
+        }
+    }
+}
+
+```
+
+### 并发控制最佳实践
+
+1. **优先使用 actor**：需要线程安全的状态管理时，使用 `actor` 而非 `DispatchQueue`
+2. **使用 Task 进行异步操作**：在 ViewModel 和 Service 中使用 `Task` 包装异步操作
+3. **避免阻塞主线程**：使用 `async/await` 避免阻塞主线程
+4. **合理使用 MainActor**：
+    - **推荐**：在 ViewModel 类上标记 `@MainActor`，确保所有 `@Published` 属性更新在主线程
+    - **备选**：在后台任务完成后使用 `await MainActor.run { }` 更新 UI 状态
+    - **禁止**：在非主线程直接更新 `@Published` 属性（Swift 6.1+ 会报错）
+5. **defer 中的异步操作**：
+    - **禁止**：在 `defer` 中使用 `Task { }` 创建新的异步任务（不会等待完成）
+    - **正确**：
+        - **如果 ViewModel 标记了 `@MainActor`**：类内方法已在 MainActor 上下文中，`Task` 会继承该上下文（除非使用 `Task.detached`），`defer` 块也在 MainActor 上下文中，可以直接更新 `@Published` 属性
+        - **如果 ViewModel 没有 `@MainActor` 标记**：使用 `Task { @MainActor in }` 包装整个闭包，这样 `defer` 块也在 MainActor 上下文中
+    - **正确**：或者不使用 `defer`，在所有退出路径（成功/失败）手动设置状态
+6. **错误处理**：使用 `do-catch` 处理异步操作的错误
+7. **Task 生命周期**：注意 Task 的取消和内存管理，避免强引用循环
+
+### 并发编程禁止事项
+
+- ❌ 使用 `DispatchQueue` 进行状态管理（应使用 `actor`）
+- ❌ 在异步上下文中使用同步阻塞操作
+- ❌ 忽略异步操作的错误处理
+- ❌ 在非主线程更新 UI（应使用 `@MainActor` 或 `await MainActor.run`）
+- ❌ 在 `defer` 中使用 `Task { }` 创建新的异步任务（不会等待完成，可能导致状态更新延迟）
+
 ## 禁止事项
 
 ### 架构层面
+
 - ❌ 在 View 中直接处理业务逻辑
 - ❌ 在 Model 中包含业务逻辑
 - ❌ 使用单例模式创建 ViewModel
@@ -218,19 +553,25 @@ class MyViewModel: ObservableObject {
 - ❌ 在View中直接访问数据库
 
 ### 代码实现
+
 - ❌ 手动计算屏幕尺寸和比例
 - ❌ 使用固定像素值布局
 - ❌ 复杂的 GeometryReader 嵌套
 - ❌ 忽略内存管理 (忘记调用 store(in:))
+- ❌ 使用 `DispatchQueue` 进行状态管理（应使用 `actor`）
+- ❌ 在异步上下文中使用同步阻塞操作
+- ❌ 忽略异步操作的错误处理
 
 ## 性能优化
 
 ### 响应式数据流
+
 - 合理使用 `@Published` 避免不必要的更新
 - 使用 `removeDuplicates()` 减少重复计算
 - 使用 `debounce()` 优化用户输入响应
 
 ### 视图渲染
+
 - 避免在 `body` 中进行复杂计算
 - 使用 `@State` 和 `@Binding` 优化状态传递
 - 合理使用 `@ViewBuilder` 优化视图构建
