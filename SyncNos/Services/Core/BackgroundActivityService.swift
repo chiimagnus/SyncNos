@@ -18,7 +18,8 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     }
     
     var isHelperRunning: Bool {
-        HelperLauncher.isHelperRunning()
+        // 避免跨目标依赖：直接通过 bundle id 检测进程是否存在
+        !NSRunningApplication.runningApplications(withBundleIdentifier: helperBundleId).isEmpty
     }
     
     // MARK: - Actions
@@ -34,7 +35,7 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
         
         switch helperService.status {
         case .enabled:
-            HelperLauncher.launchHelperIfNeeded(activates: false)
+            launchHelperLocalIfNeeded(activates: false)
             return .launched
         case .requiresApproval:
             // 按要求：打开系统设置登录项页，并交由上层弹窗提示
@@ -69,13 +70,31 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
         }
         // 若已启用但 Helper 未在运行，则后台拉起一次
         if helperService.status == .enabled && !isHelperRunning {
-            HelperLauncher.launchHelperIfNeeded(activates: false)
+            launchHelperLocalIfNeeded(activates: false)
         }
     }
     
     // MARK: - Helpers
     private func setPreferred(_ newValue: Bool) {
         SharedDefaults.userDefaults.set(newValue, forKey: defaultsKey)
+    }
+    
+    private func launchHelperLocalIfNeeded(activates: Bool) {
+        guard !isHelperRunning else { return }
+        let logger = DIContainer.shared.loggerService
+        let helperURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LoginItems")
+            .appendingPathComponent("SyncNosHelper.app")
+        guard FileManager.default.fileExists(atPath: helperURL.path) else {
+            logger.warning("BackgroundActivityService: helper not found at \(helperURL.path)")
+            return
+        }
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = activates
+        NSWorkspace.shared.openApplication(at: helperURL, configuration: config, completionHandler: nil)
+        logger.info("BackgroundActivityService: launched helper, activates=\(activates)")
     }
 }
 
