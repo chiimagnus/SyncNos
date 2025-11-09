@@ -50,6 +50,13 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     
     func disable() throws {
         setPreferred(false)
+
+        // 强制终止正在运行的 Helper 进程
+        if isHelperRunning {
+            DIContainer.shared.loggerService.info("BackgroundActivityService: terminating running helper before disable")
+            terminateHelper()
+        }
+
         do {
             try helperService.unregister()
         } catch {
@@ -72,6 +79,51 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
         if helperService.status == .enabled && !isHelperRunning {
             launchHelperLocalIfNeeded(activates: false)
         }
+    }
+
+    func terminateHelper() {
+        guard isHelperRunning else { return }
+
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: helperBundleId).first {
+            let logger = DIContainer.shared.loggerService
+
+            // 尝试优雅退出
+            if app.terminate() {
+                logger.info("BackgroundActivityService: sent terminate signal to helper")
+            }
+
+            // 5秒后检查是否仍在运行，若在则强制终止
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                if !app.isTerminated, let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: self.helperBundleId).first {
+                    if runningApp.forceTerminate() {
+                        logger.warning("BackgroundActivityService: force terminated helper after 5s timeout")
+                    } else {
+                        logger.error("BackgroundActivityService: failed to force terminate helper")
+                    }
+                }
+            }
+        }
+    }
+
+    func launchHelperForHandoff() {
+        guard !isHelperRunning else { return }
+
+        let logger = DIContainer.shared.loggerService
+        let helperURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LoginItems")
+            .appendingPathComponent("SyncNosHelper.app")
+
+        guard FileManager.default.fileExists(atPath: helperURL.path) else {
+            logger.warning("BackgroundActivityService: helper not found at \(helperURL.path)")
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        NSWorkspace.shared.openApplication(at: helperURL, configuration: config, completionHandler: nil)
+        logger.info("BackgroundActivityService: launched helper for handoff")
     }
     
     // MARK: - Helpers
