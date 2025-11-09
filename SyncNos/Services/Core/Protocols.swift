@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SQLite3
 import StoreKit
+import ServiceManagement
 
 // MARK: - Logger Level
 enum LogLevel: Int, CaseIterable, Comparable {
@@ -256,13 +257,26 @@ protocol SyncQueueStoreProtocol: AnyObject {
 }
 
 // MARK: - Background Activity Service Protocol
-/// 使用 NSBackgroundActivityScheduler 为应用注册系统级“后台活动”，
-/// 仅在 macOS 13+ 上提供，实际执行由系统能耗策略与用户“后台允许”开关共同决定。
+/// 管理 Helper Login Item 的注册与运行状态（macOS 13+）。
+/// - 用户偏好与系统状态分离：preferredEnabled（本地偏好）与 effectiveStatus（系统实际状态）
+/// - 采用 1b 策略：开启时立即后台拉起 Helper，并保持注册
+enum EnableOutcome {
+    case launched
+    case requiresApprovalOpenedSettings
+}
+
 protocol BackgroundActivityServiceProtocol: AnyObject {
-    /// 用户是否在应用内启用后台活动（本地偏好）
-    var isEnabled: Bool { get }
-    /// 启用/停用后台活动，并持久化偏好
-    func setEnabled(_ enabled: Bool)
-    /// 应用启动时调用：若开启则确保已注册调度
-    func startIfEnabled()
+    /// 用户偏好：是否允许后台活动
+    var preferredEnabled: Bool { get }
+    /// 系统实际状态（SMAppService）
+    var effectiveStatus: SMAppService.Status { get }
+    /// Helper 是否正在运行
+    var isHelperRunning: Bool { get }
+    /// 启用并尝试后台拉起 Helper；必要时打开系统设置（返回需要授权）
+    @discardableResult
+    func enableAndLaunch() throws -> EnableOutcome
+    /// 停用并撤销注册（不强杀 Helper）
+    func disable() throws
+    /// 应用启动时调用：按偏好确保注册，必要时后台拉起 Helper
+    func ensurePreferredStateOnLaunch()
 }
