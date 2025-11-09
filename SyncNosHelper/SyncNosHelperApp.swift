@@ -14,6 +14,11 @@ import AppKit
 final class SyncNosHelperApp {
     private let logger = DIContainer.shared.loggerService
     
+    static func main() {
+        _ = SyncNosHelperApp()
+        RunLoop.main.run()
+    }
+    
     init() {
         // Helper启动时执行同步任务
         logger.info("SyncNosHelper started")
