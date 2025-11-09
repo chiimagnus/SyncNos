@@ -9,7 +9,6 @@ final class BackgroundActivityViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var statusText: String = ""
     @Published var showRequiresApprovalAlert: Bool = false
-    @Published var showCloseConfirmationAlert: Bool = false
 
     private let service: BackgroundActivityServiceProtocol
     private var cancellables = Set<AnyCancellable>()
@@ -53,26 +52,29 @@ final class BackgroundActivityViewModel: ObservableObject {
     
     func setEnabled(_ enabled: Bool) {
         guard !isLoading else { return }
-
-        if !enabled {
-            // 关闭前显示确认对话框
-            showCloseConfirmationAlert = true
-            return
-        }
-
-        // 开启流程
         isLoading = true
         errorMessage = nil
 
         Task {
             do {
-                let outcome = try service.enableAndLaunch()
-                DispatchQueue.main.async {
-                    self.preferredEnabled = true
-                    self.isLoading = false
-                    self.refreshStatusText()
-                    if case .requiresApprovalOpenedSettings = outcome {
-                        self.showRequiresApprovalAlert = true
+                if enabled {
+                    // 开启流程
+                    let outcome = try service.enableAndLaunch()
+                    DispatchQueue.main.async {
+                        self.preferredEnabled = true
+                        self.isLoading = false
+                        self.refreshStatusText()
+                        if case .requiresApprovalOpenedSettings = outcome {
+                            self.showRequiresApprovalAlert = true
+                        }
+                    }
+                } else {
+                    // 关闭流程
+                    try service.disable()
+                    DispatchQueue.main.async {
+                        self.preferredEnabled = false
+                        self.isLoading = false
+                        self.refreshStatusText()
                     }
                 }
             } catch {
@@ -85,28 +87,6 @@ final class BackgroundActivityViewModel: ObservableObject {
         }
     }
 
-    func confirmDisable() {
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
-
-        Task {
-            do {
-                try service.disable()
-                DispatchQueue.main.async {
-                    self.preferredEnabled = false
-                    self.isLoading = false
-                    self.refreshStatusText()
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                    self.refreshStatusText()
-                }
-            }
-        }
-    }
     
     private func refreshStatusText() {
         let status = service.effectiveStatus
