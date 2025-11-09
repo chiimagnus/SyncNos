@@ -275,8 +275,12 @@ protocol BackgroundActivityServiceProtocol: AnyObject {
     /// 启用并尝试后台拉起 Helper；必要时打开系统设置（返回需要授权）
     @discardableResult
     func enableAndLaunch() throws -> EnableOutcome
-    /// 停用并撤销注册（不强杀 Helper）
+    /// 停用并撤销注册（同时强制终止 Helper 进程）
     func disable() throws
+    /// 强制终止正在运行的 Helper 进程
+    func terminateHelper()
+    /// 启动 Helper 用于 handoff 场景（仅在未运行时启动）
+    func launchHelperForHandoff()
     /// 应用启动时调用：按偏好确保注册，必要时后台拉起 Helper
     func ensurePreferredStateOnLaunch()
 }
