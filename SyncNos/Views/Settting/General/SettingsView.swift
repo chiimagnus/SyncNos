@@ -3,6 +3,7 @@ import AppKit
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
+    @StateObject private var backgroundActivityVM = BackgroundActivityViewModel()
     var body: some View {
         NavigationStack {
             List {
@@ -15,6 +16,14 @@ struct SettingsView: View {
                     .toggleStyle(SwitchToggleStyle())
                     .onChange(of: loginItemVM.isEnabled) { newValue in
                         loginItemVM.setEnabled(newValue)
+                    }
+
+                    Toggle(isOn: $backgroundActivityVM.isEnabled) {
+                        Label(String(localized: "Allow Background Activity", table: "Localizable-2"), systemImage: "bolt.badge.clock")
+                    }
+                    .toggleStyle(SwitchToggleStyle())
+                    .onChange(of: backgroundActivityVM.isEnabled) { newValue in
+                        backgroundActivityVM.setEnabled(newValue)
                     }
 
                     // 添加 AboutView 的 NavigationLink
