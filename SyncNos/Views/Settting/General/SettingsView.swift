@@ -26,10 +26,6 @@ struct SettingsView: View {
                     .onChange(of: backgroundActivityVM.preferredEnabled) { newValue in
                         backgroundActivityVM.setEnabled(newValue)
                     }
-                    
-                    Text(backgroundActivityVM.statusText)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
 
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
