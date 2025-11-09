@@ -324,6 +324,69 @@ protocol DatabaseServiceProtocol {
 - 使用 macOS 安全范围书签进行持久访问
 - **只读** 连接以避免损坏源数据库
 
+### 登录项与后台运行
+
+应用实现了完整的**启动登录项**和**后台活动管理**系统：
+
+#### 1. 登录项管理（LoginItemService）
+- **位置**：`Services/Core/LoginItemService.swift:1`
+- **技术**：使用 `SMAppService` API（macOS 13+）
+- **功能**：
+  - `isRegistered()`: 检测是否已注册启动登录项
+  - `setEnabled(_:)`: 启用/禁用登录项注册
+  - 与系统登录项设置自动同步
+
+#### 2. 后台活动服务（BackgroundActivityService）
+- **位置**：`Services/Core/BackgroundActivityService.swift:1`
+- **技术**：`SMAppService` + Helper App 架构
+- **核心组件**：
+  - **Helper App**: `SyncNosHelper.app`（内置在 LoginItems 目录）
+  - **Bundle ID**: `com.chiimagnus.macOS.SyncNosHelper`
+  - **线程安全队列**: 防止竞态条件的 `_isLaunchingHelper` 标记
+- **核心方法**：
+  - `enableAndLaunch()`: 启用登录项并启动 Helper（返回 `.launched` 或 `.requiresApprovalOpenedSettings`）
+  - `disable()`: 禁用登录项并终止运行中的 Helper 进程
+  - `ensurePreferredStateOnLaunch()`: 应用启动时自动恢复状态
+  - `launchHelperForHandoff()`: 退出时移交后台同步任务给 Helper
+  - `terminateHelper()`: 优雅终止 Helper 进程（5秒超时强制终止）
+- **用户审批流程**：
+  - 当状态为 `.requiresApproval` 时，自动打开系统设置页面
+  - 引导用户完成登录项授权流程
+
+#### 3. 同步活动监控（SyncActivityMonitor）
+- **位置**：`Services/Sync/SyncActivityMonitor.swift:1`
+- **功能**：统一监控所有同步任务的运行状态
+- **工作原理**：
+  - 监听 `SyncBookStarted` 和 `SyncBookFinished` 通知
+  - 维护 `activeIds` 集合记录正在同步的任务
+  - 提供 `isSyncing` 只读属性供退出检查
+- **用途**：应用退出时检查是否有同步任务正在进行
+
+#### 4. 应用生命周期管理（AppDelegate）
+- **位置**：`Infrastructure/AppDelegate.swift:1`
+- **退出拦截流程**：
+  1. **检查同步状态**（`applicationShouldTerminate`）
+     - 如果没有同步任务：直接退出（`.terminateNow`）
+     - 如果有同步任务：显示退出确认对话框
+  2. **退出确认对话框**（`presentQuitAlert`）
+     - 消息文本：`"quit.confirm.title"`（从 `Localizable-2` 加载）
+     - 两个选项：**取消**（保持运行）或 **退出**（继续）
+  3. **后台移交**（如果用户确认退出）
+     - 检查 `syncActivityMonitor.isSyncing`
+     - 唤起 Helper 应用：`backgroundActivityService.launchHelperForHandoff()`
+     - 继续在后台完成同步任务
+  4. **绕过机制**：
+     - 支持 `BypassQuitConfirmationOnce` 通知绕过确认对话框
+     - 用于强制退出场景
+
+#### 5. 视图模型（BackgroundActivityViewModel）
+- **位置**：`ViewModels/Settings/BackgroundActivityViewModel.swift:1`
+- **功能**：管理设置页面中的后台活动开关
+- **特性**：
+  - 使用 `Timer` 定时检查状态变化（1秒间隔）
+  - 自动检测并显示用户审批提示
+  - 线程安全的状态更新（`lastKnownStatus`）
+
 ### 同步策略
 
 **单一数据库**（默认）：
