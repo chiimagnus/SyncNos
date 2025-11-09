@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-本文档为 Claude Code (claude.ai/code) 在此代码库中工作提供指导。
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目概述
 
@@ -436,3 +436,113 @@ protocol DatabaseServiceProtocol {
 - **buildServer.json**: 构建服务器配置
 - **README.md**: 中文项目说明
 - **README_EN.md**: 英文项目说明
+
+## 常用开发命令
+
+### 构建和运行
+
+```bash
+# 使用 Xcode 打开项目
+open SyncNos.xcodeproj
+
+# 使用命令行构建（Debug）
+xcodebuild -scheme SyncNos -configuration Debug build
+
+# 使用命令行构建（Release）
+xcodebuild -scheme SyncNos -configuration Release build
+
+# 清理构建目录
+xcodebuild -scheme SyncNos clean
+
+# 构建并运行（需要在 Xcode 中设置默认方案）
+xcodebuild -scheme SyncNos -configuration Debug run
+
+# 归档导出（Distribution）
+xcodebuild -scheme SyncNos -configuration Release archive \
+  -archivePath ./build/SyncNos.xcarchive
+
+# 导出 IPA/App（需要配置 ExportOptions.plist）
+xcodebuild -exportArchive \
+  -archivePath ./build/SyncNos.xcarchive \
+  -exportPath ./build \
+  -exportOptionsPlist ExportOptions.plist
+```
+
+### 代码检查
+
+```bash
+# Swift 编译检查
+swiftc -typecheck SyncNos/SyncNosApp.swift
+
+# Swift 格式检查（需要 swiftformat）
+swiftformat --dryrun SyncNos/
+
+# 依赖更新
+swift package resolve
+swift package update
+```
+
+### 本地化
+
+```bash
+# 导出本地化文件
+# 在 Xcode 中：Product → Export Localizations
+
+# 导入本地化文件
+# 在 Xcode 中：Product → Import Localizations
+```
+
+### 后端服务（FastAPI Apple Sign In）
+
+```bash
+cd Backend
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行开发服务器
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# 运行测试
+pytest
+```
+
+## 开发工作流
+
+### 1. 环境准备
+- **macOS 13.0+**
+- **Xcode 15.0+**
+- **Swift 5.0+**
+- **Python 3.9+** (用于后端 FastAPI 服务)
+
+### 2. 日常开发
+```bash
+# 1. 拉取最新代码
+git pull origin main
+
+# 2. 打开 Xcode 项目
+open SyncNos.xcodeproj
+
+# 3. 在 Xcode 中选择目标设备并运行 (Cmd+R)
+
+# 4. 提交代码
+git add .
+git commit -m "feat: add new feature"
+git push origin main
+```
+
+### 3. 添加新功能流程
+1. 在 `Models/` 中定义数据模型
+2. 在 `Services/` 中实现业务逻辑
+3. 在 `ViewModels/` 中创建视图模型
+4. 在 `Views/` 中实现 UI
+5. 添加本地化字符串
+6. 测试功能
+7. 更新文档
+
+### 4. 关键开发注意事项
+- **严格遵循 MVVM 架构**：Views 纯 UI，ViewModels 处理业务逻辑，Models 仅数据结构
+- **使用依赖注入**：通过 `DIContainer.shared` 访问服务
+- **遵循服务协议**：所有服务实现协议以支持测试
+- **避免业务逻辑在视图中**：保持 SwiftUI 视图的纯函数性
+- **本地化优先**：新功能开发时同时考虑多语言支持
