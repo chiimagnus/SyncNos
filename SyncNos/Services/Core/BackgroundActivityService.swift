@@ -7,19 +7,34 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     private let defaultsKey = "backgroundActivity.preferredEnabled"
     private let helperBundleId = "com.chiimagnus.macOS.SyncNosHelper"
     private var helperService: SMAppService { SMAppService.loginItem(identifier: helperBundleId) }
-    
+
     // MARK: - State
+    /// 线程安全的管理队列，用于保护启动状态
+    private let stateQueue = DispatchQueue(label: "com.syncnos.backgroundActivity.state", qos: .userInitiated)
+    /// 防止重复启动的状态标记（在线程安全队列中保护）
+    private var _isLaunchingHelper: Bool = false
+
     var preferredEnabled: Bool {
         SharedDefaults.userDefaults.bool(forKey: defaultsKey)
     }
-    
+
     var effectiveStatus: SMAppService.Status {
         helperService.status
     }
-    
+
     var isHelperRunning: Bool {
         // 避免跨目标依赖：直接通过 bundle id 检测进程是否存在
         !NSRunningApplication.runningApplications(withBundleIdentifier: helperBundleId).isEmpty
+    }
+
+    /// 线程安全地获取和设置启动状态
+    private var isLaunchingHelper: Bool {
+        get {
+            stateQueue.sync { _isLaunchingHelper }
+        }
+        set {
+            stateQueue.sync { _isLaunchingHelper = newValue }
+        }
     }
     
     // MARK: - Actions
@@ -32,10 +47,18 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
             DIContainer.shared.loggerService.info("SMAppService.register failed (user approval required): \(error.localizedDescription)")
             throw error
         }
-        
+
         switch helperService.status {
         case .enabled:
-            launchHelperLocalIfNeeded(activates: false)
+            // 方案2：使用启动状态标记防止竞态条件
+            if !isLaunchingHelper && !isHelperRunning {
+                isLaunchingHelper = true
+                launchHelperLocalIfNeeded(activates: false)
+                // 启动操作是异步的，延迟重置状态标记
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.isLaunchingHelper = false
+                }
+            }
             return .launched
         case .requiresApproval:
             // 按要求：打开系统设置登录项页，并交由上层弹窗提示
@@ -76,8 +99,14 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
             }
         }
         // 若已启用但 Helper 未在运行，则后台拉起一次
-        if helperService.status == .enabled && !isHelperRunning {
+        // 方案2：使用启动状态标记防止竞态条件
+        if helperService.status == .enabled && !isHelperRunning && !isLaunchingHelper {
+            isLaunchingHelper = true
             launchHelperLocalIfNeeded(activates: false)
+            // 启动操作是异步的，延迟重置状态标记
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.isLaunchingHelper = false
+            }
         }
     }
 
@@ -106,7 +135,8 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     }
 
     func launchHelperForHandoff() {
-        guard !isHelperRunning else { return }
+        // 方案2：使用启动状态标记防止竞态条件
+        guard !isHelperRunning, !isLaunchingHelper else { return }
 
         let logger = DIContainer.shared.loggerService
         let helperURL = Bundle.main.bundleURL
@@ -120,10 +150,17 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
             return
         }
 
+        // 标记开始启动
+        isLaunchingHelper = true
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
         NSWorkspace.shared.openApplication(at: helperURL, configuration: config, completionHandler: nil)
         logger.info("BackgroundActivityService: launched helper for handoff")
+
+        // 启动操作是异步的，延迟重置状态标记
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.isLaunchingHelper = false
+        }
     }
     
     // MARK: - Helpers
@@ -132,7 +169,9 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
     }
     
     private func launchHelperLocalIfNeeded(activates: Bool) {
-        guard !isHelperRunning else { return }
+        // 方案2：使用启动状态标记防止竞态条件
+        guard !isHelperRunning, !isLaunchingHelper else { return }
+
         let logger = DIContainer.shared.loggerService
         let helperURL = Bundle.main.bundleURL
             .appendingPathComponent("Contents")
@@ -143,10 +182,18 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
             logger.warning("BackgroundActivityService: helper not found at \(helperURL.path)")
             return
         }
+
+        // 标记开始启动
+        isLaunchingHelper = true
         let config = NSWorkspace.OpenConfiguration()
         config.activates = activates
         NSWorkspace.shared.openApplication(at: helperURL, configuration: config, completionHandler: nil)
         logger.info("BackgroundActivityService: launched helper, activates=\(activates)")
+
+        // 启动操作是异步的，延迟重置状态标记
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.isLaunchingHelper = false
+        }
     }
 }
 
