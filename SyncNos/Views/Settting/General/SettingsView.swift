@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
@@ -18,13 +19,17 @@ struct SettingsView: View {
                         loginItemVM.setEnabled(newValue)
                     }
 
-                    Toggle(isOn: $backgroundActivityVM.isEnabled) {
+                    Toggle(isOn: $backgroundActivityVM.preferredEnabled) {
                         Label(String(localized: "Allow Background Activity", table: "Localizable-2"), systemImage: "bolt.badge.clock")
                     }
                     .toggleStyle(SwitchToggleStyle())
-                    .onChange(of: backgroundActivityVM.isEnabled) { newValue in
+                    .onChange(of: backgroundActivityVM.preferredEnabled) { newValue in
                         backgroundActivityVM.setEnabled(newValue)
                     }
+                    
+                    Text(backgroundActivityVM.statusText)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
 
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
@@ -156,6 +161,14 @@ struct SettingsView: View {
             ToolbarItem {
                 Text("")
             }
+        }
+        .alert(String(localized: "bg.requiresApproval.title", table: "Localizable-2"), isPresented: $backgroundActivityVM.showRequiresApprovalAlert) {
+            Button(String(localized: "bg.requiresApproval.openSettings", table: "Localizable-2")) {
+                SMAppService.openSystemSettingsLoginItems()
+            }
+            Button(String(localized: "bg.requiresApproval.later", table: "Localizable-2")) {}
+        } message: {
+            Text(String(localized: "bg.requiresApproval.message", table: "Localizable-2"))
         }
         .frame(width: 425)
     }
