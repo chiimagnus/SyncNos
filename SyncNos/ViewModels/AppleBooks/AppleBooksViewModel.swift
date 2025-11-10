@@ -63,12 +63,12 @@ class AppleBooksViewModel: ObservableObject {
         self.appleBooksSyncService = appleBooksSyncService
 
         // Load initial values from UserDefaults
-        if let savedSortKey = SharedDefaults.userDefaults.string(forKey: Keys.sortKey),
+        if let savedSortKey = UserDefaults.standard.string(forKey: Keys.sortKey),
            let sortKey = BookListSortKey(rawValue: savedSortKey) {
             self.sortKey = sortKey
         }
-        self.sortAscending = SharedDefaults.userDefaults.bool(forKey: Keys.sortAscending)
-        self.showWithTitleOnly = SharedDefaults.userDefaults.bool(forKey: Keys.showWithTitleOnly)
+        self.sortAscending = UserDefaults.standard.bool(forKey: Keys.sortAscending)
+        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: Keys.showWithTitleOnly)
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: ABVMNotifications.appleBooksFilterChanged)
@@ -119,7 +119,7 @@ class AppleBooksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: Keys.sortKey)
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
             }
             .store(in: &cancellables)
 
@@ -127,7 +127,7 @@ class AppleBooksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.sortAscending)
+                UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
             }
             .store(in: &cancellables)
 
@@ -135,7 +135,7 @@ class AppleBooksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.showWithTitleOnly)
+                UserDefaults.standard.set(newValue, forKey: Keys.showWithTitleOnly)
             }
             .store(in: &cancellables)
     }

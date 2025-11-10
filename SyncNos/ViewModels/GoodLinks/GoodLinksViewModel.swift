@@ -76,41 +76,41 @@ final class GoodLinksViewModel: ObservableObject {
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         subscribeSyncStatusNotifications()
-        if let raw = SharedDefaults.userDefaults.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
-        self.sortAscending = SharedDefaults.userDefaults.object(forKey: Keys.sortAscending) as? Bool ?? false
-        self.showStarredOnly = SharedDefaults.userDefaults.object(forKey: Keys.showStarredOnly) as? Bool ?? false
-        self.searchText = SharedDefaults.userDefaults.string(forKey: Keys.searchText) ?? ""
+        if let raw = UserDefaults.standard.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
+        self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? false
+        self.showStarredOnly = UserDefaults.standard.object(forKey: Keys.showStarredOnly) as? Bool ?? false
+        self.searchText = UserDefaults.standard.string(forKey: Keys.searchText) ?? ""
 
         // Load highlight detail filter/sort settings (GoodLinks-specific defaults)
-        self.highlightNoteFilter = SharedDefaults.userDefaults.bool(forKey: Keys.hlNoteFilter)
-        if let savedStyles = SharedDefaults.userDefaults.array(forKey: Keys.hlSelectedStyles) as? [Int] {
+        self.highlightNoteFilter = UserDefaults.standard.bool(forKey: Keys.hlNoteFilter)
+        if let savedStyles = UserDefaults.standard.array(forKey: Keys.hlSelectedStyles) as? [Int] {
             self.highlightSelectedStyles = Set(savedStyles)
         }
-        if let savedSortFieldRaw = SharedDefaults.userDefaults.string(forKey: Keys.hlSortField),
+        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: Keys.hlSortField),
            let sortField = HighlightSortField(rawValue: savedSortFieldRaw) {
             self.highlightSortField = sortField
         }
-        self.highlightIsAscending = SharedDefaults.userDefaults.object(forKey: Keys.hlSortAscending) as? Bool ?? false
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.hlSortAscending) as? Bool ?? false
 
         // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
-        if let globalSortRaw = SharedDefaults.userDefaults.string(forKey: Keys.globalSortField),
+        if let globalSortRaw = UserDefaults.standard.string(forKey: Keys.globalSortField),
            let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
             self.highlightSortField = globalSortField
         }
-        self.highlightIsAscending = SharedDefaults.userDefaults.object(forKey: Keys.globalSortAscending) as? Bool ?? self.highlightIsAscending
-        self.highlightNoteFilter = SharedDefaults.userDefaults.object(forKey: Keys.globalHasNotes) as? Bool ?? self.highlightNoteFilter
-        if let globalStyles = SharedDefaults.userDefaults.array(forKey: Keys.globalSelectedStyles) as? [Int] {
+        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.globalSortAscending) as? Bool ?? self.highlightIsAscending
+        self.highlightNoteFilter = UserDefaults.standard.object(forKey: Keys.globalHasNotes) as? Bool ?? self.highlightNoteFilter
+        if let globalStyles = UserDefaults.standard.array(forKey: Keys.globalSelectedStyles) as? [Int] {
             self.highlightSelectedStyles = Set(globalStyles)
         }
         // Initialize mask to reflect current selection for App menu checkmarks
         do {
             let arr = Array(self.highlightSelectedStyles).sorted()
             if arr.isEmpty {
-                SharedDefaults.userDefaults.set(0, forKey: Keys.globalSelectedMask)
+                UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
             } else {
                 var mask = 0
                 for i in arr { mask |= (1 << i) }
-                SharedDefaults.userDefaults.set(mask, forKey: Keys.globalSelectedMask)
+                UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
             }
         }
 
@@ -196,7 +196,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: Keys.sortKey)
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
             }
             .store(in: &cancellables)
 
@@ -204,7 +204,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.sortAscending)
+                UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
             }
             .store(in: &cancellables)
 
@@ -212,7 +212,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.showStarredOnly)
+                UserDefaults.standard.set(newValue, forKey: Keys.showStarredOnly)
             }
             .store(in: &cancellables)
 
@@ -220,7 +220,7 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.searchText)
+                UserDefaults.standard.set(newValue, forKey: Keys.searchText)
             }
             .store(in: &cancellables)
 
@@ -228,8 +228,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.hlNoteFilter)
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.globalHasNotes)
+                UserDefaults.standard.set(newValue, forKey: Keys.hlNoteFilter)
+                UserDefaults.standard.set(newValue, forKey: Keys.globalHasNotes)
             }
             .store(in: &cancellables)
 
@@ -238,15 +238,15 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { arr in
-                SharedDefaults.userDefaults.set(arr, forKey: Keys.hlSelectedStyles)
-                SharedDefaults.userDefaults.set(arr, forKey: Keys.globalSelectedStyles)
+                UserDefaults.standard.set(arr, forKey: Keys.hlSelectedStyles)
+                UserDefaults.standard.set(arr, forKey: Keys.globalSelectedStyles)
                 // Maintain a compact mask for App menu binding
                 if arr.isEmpty {
-                    SharedDefaults.userDefaults.set(0, forKey: Keys.globalSelectedMask)
+                    UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
                 } else {
                     var mask = 0
                     for i in arr { mask |= (1 << i) }
-                    SharedDefaults.userDefaults.set(mask, forKey: Keys.globalSelectedMask)
+                    UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
                 }
             }
             .store(in: &cancellables)
@@ -255,8 +255,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: Keys.hlSortField)
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: Keys.globalSortField)
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.hlSortField)
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.globalSortField)
             }
             .store(in: &cancellables)
 
@@ -264,8 +264,8 @@ final class GoodLinksViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.hlSortAscending)
-                SharedDefaults.userDefaults.set(newValue, forKey: Keys.globalSortAscending)
+                UserDefaults.standard.set(newValue, forKey: Keys.hlSortAscending)
+                UserDefaults.standard.set(newValue, forKey: Keys.globalSortAscending)
             }
             .store(in: &cancellables)
     }
