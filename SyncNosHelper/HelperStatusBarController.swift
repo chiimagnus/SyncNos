@@ -4,7 +4,8 @@ import Combine
 final class HelperStatusBarController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var cancellables = Set<AnyCancellable>()
-    
+    private let logger = DIContainer.shared.loggerService
+
     // Dynamic items
     private let runningItem = NSMenuItem(title: "Running: 0", action: nil, keyEquivalent: "")
     private let appleSyncNowItem = NSMenuItem(title: "Sync Apple Books Now", action: #selector(syncAppleBooksNow), keyEquivalent: "")
@@ -13,30 +14,63 @@ final class HelperStatusBarController {
     private let quitItem = NSMenuItem(title: "Quit Helper", action: #selector(quitHelper), keyEquivalent: "q")
     private let toggleAppleItem = NSMenuItem(title: "Auto Sync Apple Books", action: #selector(toggleAppleAutoSync), keyEquivalent: "")
     private let toggleGoodLinksItem = NSMenuItem(title: "Auto Sync GoodLinks", action: #selector(toggleGoodLinksAutoSync), keyEquivalent: "")
-    
+
     init() {
-        if let button = statusItem.button {
-            // 仅使用 Helper target 中的 AppIcon 资源（不提供回退方案）
-            if let img = NSImage(named: "AppIcon") {
-                // 使用状态栏高度作为目标尺寸（线稿图已自带内边距）
-                let thickness = NSStatusBar.system.thickness
-                let targetSize = NSSize(width: thickness, height: thickness)
-                let resized = NSImage(size: targetSize)
-                resized.lockFocus()
-                NSGraphicsContext.current?.imageInterpolation = .high
-                img.draw(in: NSRect(origin: .zero, size: targetSize),
-                         from: NSRect(origin: .zero, size: img.size),
-                         operation: .sourceOver,
-                         fraction: 1.0)
-                resized.unlockFocus()
-                // 保持彩色显示；如需系统模板渲染，可改为 true
-                resized.isTemplate = true
-                button.image = resized
+        logger.info("HelperStatusBarController init started")
+
+        // 检查状态栏按钮是否可用
+        guard let button = statusItem.button else {
+            logger.error("Failed to get status bar button - statusItem.button is nil")
+            rebuildMenu()
+            subscribeQueue()
+            refreshToggleStates()
+            return
+        }
+
+        logger.info("Status bar button created successfully")
+
+        // 尝试加载 AppIcon
+        if let img = NSImage(named: "AppIcon") {
+            logger.info("AppIcon loaded successfully, size: \(img.size.width)x\(img.size.height)")
+
+            // 使用状态栏高度作为目标尺寸（线稿图已自带内边距）
+            let thickness = NSStatusBar.system.thickness
+            let targetSize = NSSize(width: thickness, height: thickness)
+            logger.info("Resizing icon to status bar thickness: \(thickness)px")
+
+            let resized = NSImage(size: targetSize)
+            resized.lockFocus()
+            NSGraphicsContext.current?.imageInterpolation = .high
+            img.draw(in: NSRect(origin: .zero, size: targetSize),
+                     from: NSRect(origin: .zero, size: img.size),
+                     operation: .sourceOver,
+                     fraction: 1.0)
+            resized.unlockFocus()
+
+            // 保持彩色显示；如需系统模板渲染，可改为 true
+            resized.isTemplate = true
+            button.image = resized
+            logger.info("Status bar icon set successfully (template mode: true)")
+        } else {
+            logger.warning("AppIcon not found, falling back to SF Symbol")
+            // 降级方案：使用 SF Symbols
+            if let symbolImage = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: "SyncNos Helper") {
+                symbolImage.isTemplate = true
+                button.image = symbolImage
+                logger.info("Fallback SF Symbol icon set successfully")
+            } else {
+                logger.error("Failed to load both AppIcon and fallback SF Symbol")
             }
         }
+
+        // 验证状态栏可见性
+        logger.info("Status bar item visible: \(statusItem.isVisible)")
+
         rebuildMenu()
         subscribeQueue()
         refreshToggleStates()
+
+        logger.info("HelperStatusBarController init completed")
     }
     
     private func subscribeQueue() {
