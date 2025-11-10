@@ -3,6 +3,7 @@ import AppKit
 
 struct MenuBarView: View {
     @StateObject private var viewModel = MenuBarViewModel()
+    @Environment(\.openWindow) private var openWindow
     
     var body: some View {
         // MARK: - Sync Actions
@@ -68,17 +69,13 @@ struct MenuBarView: View {
             .padding(.vertical, 4)
         }
         
-        // MARK: - Auto Sync Status
-        if viewModel.isAutoSyncRunning {
-            Divider()
-            
-            HStack {
-                Label("Auto Sync Enabled", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+        Divider()
+        
+        // MARK: - Settings
+        Button {
+            openWindow(id: "setting")
+        } label: {
+            Label("Settings", systemImage: "gear")
         }
         
         Divider()
