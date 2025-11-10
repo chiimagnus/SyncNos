@@ -42,35 +42,35 @@ class AppleBooksDetailViewModel: ObservableObject {
         self.syncService = syncService
 
         // Load initial values from UserDefaults
-        if let savedFieldRaw = SharedDefaults.userDefaults.string(forKey: "detail_sort_field"),
+        if let savedFieldRaw = UserDefaults.standard.string(forKey: "detail_sort_field"),
            let field = HighlightSortField(rawValue: savedFieldRaw) {
             self.sortField = field
         }
-        self.isAscending = SharedDefaults.userDefaults.object(forKey: "detail_sort_ascending") as? Bool ?? false
-        self.noteFilter = SharedDefaults.userDefaults.bool(forKey: "detail_note_filter")
-        if let savedStyles = SharedDefaults.userDefaults.array(forKey: "detail_selected_styles") as? [Int] {
+        self.isAscending = UserDefaults.standard.object(forKey: "detail_sort_ascending") as? Bool ?? false
+        self.noteFilter = UserDefaults.standard.bool(forKey: "detail_note_filter")
+        if let savedStyles = UserDefaults.standard.array(forKey: "detail_selected_styles") as? [Int] {
             self.selectedStyles = Set(savedStyles)
         }
 
         // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
-        if let globalSortRaw = SharedDefaults.userDefaults.string(forKey: "highlight_sort_field"),
+        if let globalSortRaw = UserDefaults.standard.string(forKey: "highlight_sort_field"),
            let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
             self.sortField = globalSortField
         }
-        self.isAscending = SharedDefaults.userDefaults.object(forKey: "highlight_sort_ascending") as? Bool ?? self.isAscending
-        self.noteFilter = SharedDefaults.userDefaults.object(forKey: "highlight_has_notes") as? Bool ?? self.noteFilter
-        if let globalStyles = SharedDefaults.userDefaults.array(forKey: "highlight_selected_styles") as? [Int] {
+        self.isAscending = UserDefaults.standard.object(forKey: "highlight_sort_ascending") as? Bool ?? self.isAscending
+        self.noteFilter = UserDefaults.standard.object(forKey: "highlight_has_notes") as? Bool ?? self.noteFilter
+        if let globalStyles = UserDefaults.standard.array(forKey: "highlight_selected_styles") as? [Int] {
             self.selectedStyles = Set(globalStyles)
         }
         // Initialize mask for App menu checkmarks (0 means all/empty selection)
         do {
             let arr = Array(self.selectedStyles).sorted()
             if arr.isEmpty {
-                SharedDefaults.userDefaults.set(0, forKey: "highlight_selected_mask")
+                UserDefaults.standard.set(0, forKey: "highlight_selected_mask")
             } else {
                 var mask = 0
                 for i in arr { mask |= (1 << i) }
-                SharedDefaults.userDefaults.set(mask, forKey: "highlight_selected_mask")
+                UserDefaults.standard.set(mask, forKey: "highlight_selected_mask")
             }
         }
 
@@ -124,8 +124,8 @@ class AppleBooksDetailViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: "detail_sort_field")
-                SharedDefaults.userDefaults.set(newValue.rawValue, forKey: "highlight_sort_field")
+                UserDefaults.standard.set(newValue.rawValue, forKey: "detail_sort_field")
+                UserDefaults.standard.set(newValue.rawValue, forKey: "highlight_sort_field")
             }
             .store(in: &cancellables)
 
@@ -133,8 +133,8 @@ class AppleBooksDetailViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: "detail_sort_ascending")
-                SharedDefaults.userDefaults.set(newValue, forKey: "highlight_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: "detail_sort_ascending")
+                UserDefaults.standard.set(newValue, forKey: "highlight_sort_ascending")
             }
             .store(in: &cancellables)
 
@@ -142,8 +142,8 @@ class AppleBooksDetailViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { newValue in
-                SharedDefaults.userDefaults.set(newValue, forKey: "detail_note_filter")
-                SharedDefaults.userDefaults.set(newValue, forKey: "highlight_has_notes")
+                UserDefaults.standard.set(newValue, forKey: "detail_note_filter")
+                UserDefaults.standard.set(newValue, forKey: "highlight_has_notes")
             }
             .store(in: &cancellables)
 
@@ -152,15 +152,15 @@ class AppleBooksDetailViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { arr in
-                SharedDefaults.userDefaults.set(arr, forKey: "detail_selected_styles")
-                SharedDefaults.userDefaults.set(arr, forKey: "highlight_selected_styles")
+                UserDefaults.standard.set(arr, forKey: "detail_selected_styles")
+                UserDefaults.standard.set(arr, forKey: "highlight_selected_styles")
                 // Maintain a compact mask for App menu binding
                 if arr.isEmpty {
-                    SharedDefaults.userDefaults.set(0, forKey: "highlight_selected_mask")
+                    UserDefaults.standard.set(0, forKey: "highlight_selected_mask")
                 } else {
                     var mask = 0
                     for i in arr { mask |= (1 << i) }
-                    SharedDefaults.userDefaults.set(mask, forKey: "highlight_selected_mask")
+                    UserDefaults.standard.set(mask, forKey: "highlight_selected_mask")
                 }
             }
             .store(in: &cancellables)
