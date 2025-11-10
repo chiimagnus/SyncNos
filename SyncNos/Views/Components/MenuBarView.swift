@@ -2,16 +2,88 @@ import SwiftUI
 import AppKit
 
 struct MenuBarView: View {
+    @StateObject private var viewModel = MenuBarViewModel()
+    
     var body: some View {
-        // 这里写入同步功能
-        // 1、同步Apple Books笔记
-        // 2、同步goodlinks笔记
-        // 3、自动同步功能
-        // 4、下次自动同步的时间
+        // MARK: - Sync Actions
+        Button {
+            viewModel.syncAppleBooksNow()
+        } label: {
+            Label("Sync Apple Books", systemImage: "book")
+        }
+        
+        Button {
+            viewModel.syncGoodLinksNow()
+        } label: {
+            Label("Sync GoodLinks", systemImage: "link")
+        }
         
         Divider()
         
-        // Quit application
+        // MARK: - Auto Sync Toggle
+        Toggle(isOn: Binding(
+            get: { viewModel.autoSyncAppleBooks },
+            set: { viewModel.setAutoSyncAppleBooks($0) }
+        )) {
+            Label("Auto Sync Apple Books", systemImage: "book.fill")
+        }
+        
+        Toggle(isOn: Binding(
+            get: { viewModel.autoSyncGoodLinks },
+            set: { viewModel.setAutoSyncGoodLinks($0) }
+        )) {
+            Label("Auto Sync GoodLinks", systemImage: "link.circle.fill")
+        }
+        
+        // MARK: - Sync Queue Status
+        if viewModel.runningCount > 0 || viewModel.queuedCount > 0 || viewModel.failedCount > 0 {
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 4) {
+                if viewModel.runningCount > 0 {
+                    HStack {
+                        Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if viewModel.queuedCount > 0 {
+                    HStack {
+                        Label("\(viewModel.queuedCount) Queued", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if viewModel.failedCount > 0 {
+                    HStack {
+                        Label("\(viewModel.failedCount) Failed", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        
+        // MARK: - Auto Sync Status
+        if viewModel.isAutoSyncRunning {
+            Divider()
+            
+            HStack {
+                Label("Auto Sync Enabled", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        
+        Divider()
+        
+        // MARK: - Quit Application
         Button {
             quitApplication()
         } label: {
