@@ -18,7 +18,7 @@ struct SelectionPlaceholderView: View {
         ScrollView {
             VStack(spacing: 24) {
                 // App Logo
-                Image(nsImage: NSImage(named: "AppIcon")!)
+                Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 120, height: 120)
