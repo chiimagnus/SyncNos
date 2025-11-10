@@ -235,6 +235,9 @@ struct AppleBooksDetailView: View {
         .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
             Button("Go to Settings") {
                 openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
