@@ -4,6 +4,7 @@ import AppKit
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
+    @Environment(\.openWindow) private var openWindow
 
     // Freeze layout width during live resize to avoid heavy recomputation.
     @State private var isLiveResizing: Bool = false
@@ -364,6 +365,17 @@ struct GoodLinksDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
+        }
+        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
         }
         .onChange(of: viewModel.syncMessage) { newMessage in
             if let message = newMessage {
