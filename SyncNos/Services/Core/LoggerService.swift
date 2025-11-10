@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import Combine
+import Combine
 import AppKit
 import os.log
 
