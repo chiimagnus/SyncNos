@@ -8,6 +8,7 @@ import Combine
 final class SyncNosHelperApp {
     private let logger = DIContainer.shared.loggerService
     private var cancellables = Set<AnyCancellable>()
+    private var statusBarController: StatusBarController?
     
     static func main() {
         let app = NSApplication.shared
@@ -17,6 +18,8 @@ final class SyncNosHelperApp {
     
     init() {
         logger.info("SyncNosHelper launched (persistent)")
+        // 初始化状态栏菜单控制器（Helper 常驻时提供快速触发入口）
+        statusBarController = StatusBarController()
         
         // 恢复书签（Apple Books / GoodLinks）
         if let url = BookmarkStore.shared.restore() { _ = BookmarkStore.shared.startAccessing(url: url) }
