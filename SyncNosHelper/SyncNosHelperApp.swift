@@ -18,8 +18,11 @@ final class SyncNosHelperApp {
     private var statusController: HelperStatusBarController?
     
     static func main() {
+        let app = NSApplication.shared
+        // 作为辅助应用运行（无 Dock），但仍能接收状态栏事件
+        app.setActivationPolicy(.accessory)
         _ = SyncNosHelperApp()
-        RunLoop.main.run()
+        app.run()
     }
     
     init() {
