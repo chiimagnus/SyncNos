@@ -16,7 +16,25 @@ final class HelperStatusBarController {
     
     init() {
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bolt.horizontal.circle", accessibilityDescription: "SyncNos")
+            // 仅使用 Helper target 中的 AppIcon 资源（不提供回退方案）
+            if let img = NSImage(named: "AppIcon") {
+                // 使用状态栏高度自动计算目标尺寸，保留一定内边距
+                let thickness = NSStatusBar.system.thickness
+                let inset: CGFloat = 4.0
+                let size = max(12.0, thickness - inset)
+                let targetSize = NSSize(width: size, height: size)
+                let resized = NSImage(size: targetSize)
+                resized.lockFocus()
+                NSGraphicsContext.current?.imageInterpolation = .high
+                img.draw(in: NSRect(origin: .zero, size: targetSize),
+                         from: NSRect(origin: .zero, size: img.size),
+                         operation: .sourceOver,
+                         fraction: 1.0)
+                resized.unlockFocus()
+                // 保持彩色显示；如需系统模板渲染，可改为 true
+                resized.isTemplate = false
+                button.image = resized
+            }
         }
         rebuildMenu()
         subscribeQueue()
