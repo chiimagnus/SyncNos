@@ -1,10 +1,3 @@
-//
-//  SyncNosHelperApp.swift
-//  SyncNosHelper
-//
-//  Created by chii_magnus on 2025/11/9.
-//
-
 import Foundation
 import AppKit
 import Combine
