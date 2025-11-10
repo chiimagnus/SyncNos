@@ -6,25 +6,48 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
-		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D834FF732EC23384008EE9FB /* Exceptions for "SyncNos" folder in "SyncNos" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Services/DataSources-From/WeRead/1.md",
+				"Services/DataSources-From/WeRead/微信读书API实现.md",
+			);
+			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
+		};
+		D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ChangeLog.en.md,
+				ChangeLog.md,
+				image.png,
+				PRIVACY_POLICY.md,
+				SyncNos.storekit,
+			);
+			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D855CBA82E7D52B10019C4A0 /* Resource */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */,
+			);
 			path = Resource;
 			sourceTree = "<group>";
 		};
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D834FF732EC23384008EE9FB /* Exceptions for "SyncNos" folder in "SyncNos" target */,
+			);
 			path = SyncNos;
 			sourceTree = "<group>";
 		};
@@ -133,8 +156,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */,
-				D8529F712E7354B200FE0D95 /* LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
