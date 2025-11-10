@@ -1,7 +1,7 @@
 import AppKit
 import Combine
 
-final class HelperStatusBarController {
+final class HelperStatusBarController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var cancellables = Set<AnyCancellable>()
     
@@ -14,7 +14,8 @@ final class HelperStatusBarController {
     private let toggleAppleItem = NSMenuItem(title: "Auto Sync Apple Books", action: #selector(toggleAppleAutoSync), keyEquivalent: "")
     private let toggleGoodLinksItem = NSMenuItem(title: "Auto Sync GoodLinks", action: #selector(toggleGoodLinksAutoSync), keyEquivalent: "")
     
-    init() {
+    override init() {
+        super.init()
         if let button = statusItem.button {
             // 仅使用 Helper target 中的 AppIcon 资源（不提供回退方案）
             if let img = NSImage(named: "AppIcon") {
