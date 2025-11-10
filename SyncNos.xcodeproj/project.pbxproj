@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D84699442EC0C30300512670 /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
 		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
+		D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -19,7 +19,7 @@
 			dstPath = Contents/Library/LoginItems;
 			dstSubfolderSpec = 1;
 			files = (
-				D84699442EC0C30300512670 /* SyncNosHelper.app in CopyFiles */,
+				D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
