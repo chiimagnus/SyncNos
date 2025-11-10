@@ -10,19 +10,23 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var queuedCount: Int = 0
     @Published private(set) var failedCount: Int = 0
     @Published private(set) var isAutoSyncRunning: Bool = false
+    @Published var showNotionConfigAlert: Bool = false
 
     // MARK: - Dependencies
     private let autoSyncService: AutoSyncServiceProtocol
     private let queueStore: SyncQueueStoreProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
     init(
         autoSyncService: AutoSyncServiceProtocol = DIContainer.shared.autoSyncService,
-        queueStore: SyncQueueStoreProtocol = DIContainer.shared.syncQueueStore
+        queueStore: SyncQueueStoreProtocol = DIContainer.shared.syncQueueStore,
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.autoSyncService = autoSyncService
         self.queueStore = queueStore
+        self.notionConfig = notionConfig
         self.autoSyncAppleBooks = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
         self.autoSyncGoodLinks = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
         self.isAutoSyncRunning = autoSyncService.isRunning
@@ -45,13 +49,26 @@ final class MenuBarViewModel: ObservableObject {
 
     // MARK: - Actions
     func syncAppleBooksNow() {
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         autoSyncService.triggerAppleBooksNow()
         refreshAutoSyncRunning()
     }
 
     func syncGoodLinksNow() {
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         autoSyncService.triggerGoodLinksNow()
         refreshAutoSyncRunning()
+    }
+    
+    // MARK: - Configuration Validation
+    private func checkNotionConfig() -> Bool {
+        return notionConfig.isConfigured
     }
 
     func setAutoSyncAppleBooks(_ enabled: Bool) {
