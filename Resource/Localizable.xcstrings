@@ -21,6 +21,9 @@
     "%lld" : {
       "shouldTranslate" : false
     },
+    "%lld Failed" : {
+
+    },
     "%lld highlights" : {
       "localizations" : {
         "de" : {
@@ -136,6 +139,12 @@
           }
         }
       }
+    },
+    "%lld Queued" : {
+
+    },
+    "%lld Running" : {
+
     },
     "%lld words" : {
       "localizations" : {
@@ -1428,6 +1437,12 @@
         }
       }
     },
+    "Auto Sync Apple Books" : {
+
+    },
+    "Auto Sync GoodLinks" : {
+
+    },
     "Basic information" : {
       "localizations" : {
         "de" : {
@@ -1543,6 +1558,9 @@
           }
         }
       }
+    },
+    "Cancel" : {
+
     },
     "Change application language" : {
       "localizations" : {
@@ -3348,6 +3366,9 @@
           }
         }
       }
+    },
+    "Go to Settings" : {
+
     },
     "GoodLinks" : {
       "shouldTranslate" : false
@@ -5294,6 +5315,9 @@
     "Notion API" : {
       "shouldTranslate" : false
     },
+    "Notion Configuration Required" : {
+
+    },
     "Notion Database ID for Apple Books" : {
       "localizations" : {
         "de" : {
@@ -6345,6 +6369,9 @@
         }
       }
     },
+    "Please configure Notion API Key and Page ID before syncing." : {
+
+    },
     "Please give five stars" : {
       "localizations" : {
         "de" : {
@@ -6867,6 +6894,9 @@
           }
         }
       }
+    },
+    "Quit SyncNos" : {
+
     },
     "Rate & Review" : {
       "localizations" : {
@@ -8840,6 +8870,9 @@
         }
       }
     },
+    "Sync Apple Books" : {
+
+    },
     "Sync Data To" : {
       "localizations" : {
         "de" : {
@@ -8955,6 +8988,9 @@
           }
         }
       }
+    },
+    "Sync GoodLinks" : {
+
     },
     "Sync highlights to Notion" : {
       "localizations" : {
@@ -9535,6 +9571,9 @@
           }
         }
       }
+    },
+    "SyncNos" : {
+
     },
     "SyncNos User Guide" : {
       "localizations" : {
