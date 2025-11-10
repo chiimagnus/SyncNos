@@ -10,6 +10,16 @@
 		D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		D825ED772EC1F0C00079DA85 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D81167B42E70A13F000D0173 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D846980A2EC0BFDC00512670;
+			remoteInfo = SyncNosHelper;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		D84699432EC0C2E700512670 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -209,6 +219,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				D825ED782EC1F0C00079DA85 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D855CBA82E7D52B10019C4A0 /* Resource */,
@@ -300,6 +311,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D825ED782EC1F0C00079DA85 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D846980A2EC0BFDC00512670 /* SyncNosHelper */;
+			targetProxy = D825ED772EC1F0C00079DA85 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D81167C12E70A140000D0173 /* Debug */ = {
@@ -466,6 +485,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -511,6 +531,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
