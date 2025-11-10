@@ -24,11 +24,13 @@ class AppleBooksDetailViewModel: ObservableObject {
     @Published var noteFilter: NoteFilter = false
 
     @Published var selectedStyles: Set<Int> = []
+    @Published var showNotionConfigAlert: Bool = false
 
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
     private let syncService: AppleBooksSyncServiceProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
     private var currentOffset = 0
@@ -37,9 +39,11 @@ class AppleBooksDetailViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-         syncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService) {
+         syncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService,
+         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.databaseService = databaseService
         self.syncService = syncService
+        self.notionConfig = notionConfig
 
         // Load initial values from UserDefaults
         if let savedFieldRaw = UserDefaults.standard.string(forKey: "detail_sort_field"),
@@ -286,6 +290,10 @@ class AppleBooksDetailViewModel: ObservableObject {
     // MARK: - Notion Sync
     // 统一入口：智能同步（创建/补齐/更新）
     func syncSmart(book: BookListItem, dbPath: String?) {
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         syncMessage = nil
         syncProgressText = nil
         isSyncing = true
@@ -313,5 +321,10 @@ class AppleBooksDetailViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    // MARK: - Configuration Validation
+    private func checkNotionConfig() -> Bool {
+        return notionConfig.isConfigured
     }
 }

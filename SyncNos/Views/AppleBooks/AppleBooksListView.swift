@@ -3,6 +3,7 @@ import SwiftUI
 struct AppleBooksListView: View {
     @ObservedObject var viewModel: AppleBooksViewModel
     @Binding var selectionIds: Set<String>
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -144,6 +145,14 @@ struct AppleBooksListView: View {
             }
             NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
             viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
+        }
+        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
         }
     }
 }

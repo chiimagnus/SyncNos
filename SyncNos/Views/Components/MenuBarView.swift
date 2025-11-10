@@ -86,6 +86,14 @@ struct MenuBarView: View {
         } label: {
             Label("Quit SyncNos", systemImage: "power")
         }
+        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
+        }
     }
     
     private func quitApplication() {
