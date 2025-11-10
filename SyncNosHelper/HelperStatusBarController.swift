@@ -18,11 +18,9 @@ final class HelperStatusBarController {
         if let button = statusItem.button {
             // 仅使用 Helper target 中的 AppIcon 资源（不提供回退方案）
             if let img = NSImage(named: "AppIcon") {
-                // 使用状态栏高度自动计算目标尺寸，保留一定内边距
+                // 使用状态栏高度作为目标尺寸（线稿图已自带内边距）
                 let thickness = NSStatusBar.system.thickness
-                let inset: CGFloat = 4.0
-                let size = max(12.0, thickness - inset)
-                let targetSize = NSSize(width: size, height: size)
+                let targetSize = NSSize(width: thickness, height: thickness)
                 let resized = NSImage(size: targetSize)
                 resized.lockFocus()
                 NSGraphicsContext.current?.imageInterpolation = .high
@@ -32,7 +30,7 @@ final class HelperStatusBarController {
                          fraction: 1.0)
                 resized.unlockFocus()
                 // 保持彩色显示；如需系统模板渲染，可改为 true
-                resized.isTemplate = false
+                resized.isTemplate = true
                 button.image = resized
             }
         }
