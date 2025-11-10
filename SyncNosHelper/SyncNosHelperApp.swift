@@ -8,12 +8,9 @@ import Combine
 final class SyncNosHelperApp {
     private let logger = DIContainer.shared.loggerService
     private var cancellables = Set<AnyCancellable>()
-    private var statusController: HelperStatusBarController?
     
     static func main() {
         let app = NSApplication.shared
-        // 作为辅助应用运行（无 Dock），但仍能接收状态栏事件
-        app.setActivationPolicy(.accessory)
         _ = SyncNosHelperApp()
         app.run()
     }
@@ -37,8 +34,5 @@ final class SyncNosHelperApp {
         // 初始化监控&队列（供状态栏展示）
         _ = DIContainer.shared.syncActivityMonitor
         _ = DIContainer.shared.syncQueueStore
-        
-        // 状态栏控制器
-        statusController = HelperStatusBarController()
     }
 }
