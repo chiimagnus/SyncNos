@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import Combine
 import AppKit
+import os.log
 
 // MARK: - Logger Service Implementation
 final class LoggerService: LoggerServiceProtocol {
@@ -10,6 +11,9 @@ final class LoggerService: LoggerServiceProtocol {
     var logPublisher: AnyPublisher<LogEntry, Never> { subject.eraseToAnyPublisher() }
 
     private var storedLogs: [LogEntry] = []
+
+    // 系统日志记录器
+    private let osLog = OSLog(subsystem: "com.chiimagnus.macOS.SyncNos", category: "general")
 
     private init() {
         // 在开发环境中默认为debug级别，生产环境中默认为info级别
@@ -39,6 +43,18 @@ final class LoggerService: LoggerServiceProtocol {
 
         // 通过 publisher 发布
         subject.send(entry)
+
+        // 输出到系统日志（os_log）
+        let logMessage = "[\(fileName):\(line)] \(message)"
+        let osLogType: OSLogType = {
+            switch level {
+            case .debug: return .debug
+            case .info: return .info
+            case .warning: return .default
+            case .error: return .error
+            }
+        }()
+        os_log("%{public}@", log: osLog, type: osLogType, logMessage)
     }
 
     func clearLogs() {
