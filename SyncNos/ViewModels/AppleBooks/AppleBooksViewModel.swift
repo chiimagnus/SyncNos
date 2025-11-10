@@ -429,7 +429,7 @@ extension AppleBooksViewModel {
                             } catch {
                                 _ = await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
                                 NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])                        
-                                await MainActor.run {
+                                _ = await MainActor.run {
                                     self.syncingBookIds.remove(id)
                                 }
                             }
