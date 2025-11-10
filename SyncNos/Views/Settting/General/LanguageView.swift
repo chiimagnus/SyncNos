@@ -45,8 +45,17 @@ struct LanguageView: View {
     ]
 
     private func changeAppLanguage(to languageCode: String) {
-        // 保存用户选择的语言偏好
+        // 保存用户选择的语言偏好到标准 UserDefaults（系统在启动时读取）
+        UserDefaults.standard.set([languageCode], forKey: "AppleLanguages")
+        // 也同时保存到 app group 的 SharedDefaults，便于 Helper/Extension 读取
         SharedDefaults.userDefaults.set([languageCode], forKey: "AppleLanguages")
+
+        // 保存 AppleLocale 以增强语言/区域设置的一致性（可选）
+        UserDefaults.standard.set(languageCode, forKey: "AppleLocale")
+        SharedDefaults.userDefaults.set(languageCode, forKey: "AppleLocale")
+
+        // 强制同步写入（尽管 modern API 不推荐，但保证在退出前写入到磁盘）
+        UserDefaults.standard.synchronize()
         SharedDefaults.userDefaults.synchronize()
 
         // 显示重启提示
