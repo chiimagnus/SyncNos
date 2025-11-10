@@ -6,11 +6,10 @@ import ServiceManagement
 
 // MARK: - Logger Level
 enum LogLevel: Int, CaseIterable, Comparable {
-    case verbose = 0
-    case debug = 1
-    case info = 2
-    case warning = 3
-    case error = 4
+    case debug = 0
+    case info = 1
+    case warning = 2
+    case error = 3
 
     static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
         return lhs.rawValue < rhs.rawValue
@@ -18,7 +17,6 @@ enum LogLevel: Int, CaseIterable, Comparable {
 
     var description: String {
         switch self {
-        case .verbose: return "VERBOSE"
         case .debug: return "DEBUG"
         case .info: return "INFO"
         case .warning: return "WARNING"
@@ -50,7 +48,6 @@ protocol LoggerServiceProtocol: Sendable {
 
     func log(_ level: LogLevel, message: String, file: String, function: String, line: Int)
 
-    func verbose(_ message: String, file: String, function: String, line: Int)
     func debug(_ message: String, file: String, function: String, line: Int)
     func info(_ message: String, file: String, function: String, line: Int)
     func warning(_ message: String, file: String, function: String, line: Int)
@@ -65,10 +62,6 @@ protocol LoggerServiceProtocol: Sendable {
 
 // MARK: - Logger Extension with Default Parameters
 extension LoggerServiceProtocol {
-    func verbose(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(.verbose, message: message, file: file, function: function, line: line)
-    }
-
     func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         log(.debug, message: message, file: file, function: function, line: line)
     }
