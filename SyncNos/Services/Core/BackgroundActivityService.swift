@@ -121,11 +121,11 @@ final class BackgroundActivityService: BackgroundActivityServiceProtocol {
                 logger.info("BackgroundActivityService: sent terminate signal to helper")
             }
 
-            // 5秒后检查是否仍在运行，若在则强制终止
-            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+            // 1秒后检查是否仍在运行，若在则强制终止
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
                 if !app.isTerminated, let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: self.helperBundleId).first {
                     if runningApp.forceTerminate() {
-                        logger.warning("BackgroundActivityService: force terminated helper after 5s timeout")
+                        logger.warning("BackgroundActivityService: force terminated helper after 1s timeout")
                     } else {
                         logger.error("BackgroundActivityService: failed to force terminate helper")
                     }
