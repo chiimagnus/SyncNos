@@ -35,12 +35,14 @@ class AppleBooksViewModel: ObservableObject {
     @Published var sortAscending: Bool = true
 
     @Published var showWithTitleOnly: Bool = false
+    @Published var showNotionConfigAlert: Bool = false
 
     private let databaseService: DatabaseServiceProtocol
     private let appleBooksSyncService: AppleBooksSyncServiceProtocol
     private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
     private let syncTimestampStore: SyncTimestampStoreProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     private var dbRootOverride: String?
     private var annotationDBPath: String?
     private var booksDBPath: String?
@@ -56,11 +58,13 @@ class AppleBooksViewModel: ObservableObject {
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore,
          syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
-         appleBooksSyncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService) {
+         appleBooksSyncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService,
+         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
         self.syncTimestampStore = syncTimestampStore
         self.appleBooksSyncService = appleBooksSyncService
+        self.notionConfig = notionConfig
 
         // Load initial values from UserDefaults
         if let savedSortKey = UserDefaults.standard.string(forKey: Keys.sortKey),
@@ -397,6 +401,10 @@ extension AppleBooksViewModel {
     /// 批量同步所选书籍到 Notion，使用并发限流（默认 10 并发）
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         guard let dbPath = self.annotationDatabasePath else {
             logger.warning("[AppleBooks] annotationDatabasePath is nil; skip batchSync")
             return
@@ -439,5 +447,10 @@ extension AppleBooksViewModel {
                 await group.waitForAll()
             }
         }
+    }
+    
+    // MARK: - Configuration Validation
+    private func checkNotionConfig() -> Bool {
+        return notionConfig.isConfigured
     }
 }
