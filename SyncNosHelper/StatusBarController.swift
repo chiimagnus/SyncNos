@@ -13,8 +13,8 @@ final class StatusBarController: NSObject {
                 img.isTemplate = true
                 button.image = img
             }
-            button.action = #selector(menuClicked(_:))
-            button.target = self
+            // button.action = #selector(menuClicked(_:))
+            // button.target = self
         }
         statusItem.menu = buildMenu()
     }
@@ -52,9 +52,9 @@ final class StatusBarController: NSObject {
     }
 
     // MARK: - Actions
-    @objc private func menuClicked(_ sender: Any?) {
-        // 展示菜单由系统负责，保留空实现以满足 Selector 绑定
-    }
+    // @objc private func menuClicked(_ sender: Any?) {
+    //     // 展示菜单由系统负责，保留空实现以满足 Selector 绑定
+    // }
 
     @objc private func syncAll() {
         Task.detached(priority: .utility) {
