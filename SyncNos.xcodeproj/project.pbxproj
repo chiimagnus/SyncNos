@@ -44,6 +44,7 @@
 		D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Assets.xcassets,
 				Models/AccountModels.swift,
 				Models/HighlightColorScheme.swift,
 				Models/Models.swift,
