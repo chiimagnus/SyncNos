@@ -317,8 +317,8 @@ final class DatabaseQueryService: Sendable {
 
         let whereClause = whereConditions.joined(separator: " AND ")
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE \(whereClause) ORDER BY \(orderBy) LIMIT ? OFFSET ?;"
-        logger.verbose("DEBUG: 执行查询: \(sql)")
-        logger.verbose("DEBUG: 查询参数 - assetId: \(assetId), limit: \(limit), offset: \(offset)" + (since != nil ? ", since: \(since!)" : "") + ", sortField: \(field.rawValue), ascending: \(isAsc)")
+        logger.debug("DEBUG: 执行查询: \(sql)")
+        logger.debug("DEBUG: 查询参数 - assetId: \(assetId), limit: \(limit), offset: \(offset)" + (since != nil ? ", since: \(since!)" : "") + ", sortField: \(field.rawValue), ascending: \(isAsc)")
 
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: highlight page"
