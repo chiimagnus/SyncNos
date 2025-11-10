@@ -51,5 +51,10 @@ struct SyncNosApp: App {
             LogWindow()
         }
         .windowResizability(.contentSize)
+        
+        // 菜单栏项
+        MenuBarExtra("SyncNos", systemImage: "book") {
+            MenuBarView()
+        }
     }
 }
