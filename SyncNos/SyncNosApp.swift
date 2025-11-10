@@ -53,7 +53,7 @@ struct SyncNosApp: App {
         .windowResizability(.contentSize)
         
         // 菜单栏项
-        MenuBarExtra("SyncNos", systemImage: "book") {
+        MenuBarExtra("SyncNos", image: "MenuBarIcon") {
             MenuBarView()
         }
     }
