@@ -3,8 +3,10 @@ import AppKit
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
+    @State private var navigationPath = NavigationPath()
+    
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 Section(header: Text("General")) {
                     LanguageView()
@@ -58,16 +60,16 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Sync Data To")) {
-                    NavigationLink(destination: NotionIntegrationView()) {
-                            HStack {
-                                Label("Notion API", systemImage: "n.square")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
-                                    .font(.body.weight(.regular))
-                            }
+                    NavigationLink(value: "notion") {
+                        HStack {
+                            Label("Notion API", systemImage: "n.square")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
                         }
-                        .help("Configure Notion and run example API calls")
+                    }
+                    .help("Configure Notion and run example API calls")
                 }
                 .collapsible(false)
 
@@ -141,6 +143,11 @@ struct SettingsView: View {
             .listStyle(SidebarListStyle())
             .scrollContentBackground(.hidden)
             .background(VisualEffectBackground(material: .windowBackground))
+            .navigationDestination(for: String.self) { destination in
+                if destination == "notion" {
+                    NotionIntegrationView()
+                }
+            }
         }
         .navigationTitle("Settings")
         .toolbar {
@@ -149,6 +156,9 @@ struct SettingsView: View {
             }
         }
         .frame(width: 425)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNotionSettings"))) { _ in
+            navigationPath.append("notion")
+        }
     }
 }
 

@@ -89,6 +89,10 @@ struct MenuBarView: View {
         .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
             Button("Go to Settings") {
                 openWindow(id: "setting")
+                // 延迟一下确保窗口已经打开，然后导航到 Notion 配置页面
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
