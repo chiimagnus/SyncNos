@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D8529F712E7354B200FE0D95 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = D8529F702E7354B200FE0D95 /* LICENSE */; };
-		D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D8CCCCA52E72DB5E00ED8EFA /* README.md */; };
 		D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -89,6 +87,25 @@
 			);
 			target = D846980A2EC0BFDC00512670 /* SyncNosHelper */;
 		};
+		D8CE5C232EC1C839008CC29D /* Exceptions for "SyncNos" folder in "SyncNos" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Services/DataSources-From/WeRead/1.md",
+				"Services/DataSources-From/WeRead/微信读书API实现.md",
+			);
+			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
+		};
+		D8CE5C242EC1C840008CC29D /* Exceptions for "Resource" folder in "SyncNos" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ChangeLog.en.md,
+				ChangeLog.md,
+				image.png,
+				PRIVACY_POLICY.md,
+				SyncNos.storekit,
+			);
+			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -99,12 +116,16 @@
 		};
 		D855CBA82E7D52B10019C4A0 /* Resource */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D8CE5C242EC1C840008CC29D /* Exceptions for "Resource" folder in "SyncNos" target */,
+			);
 			path = Resource;
 			sourceTree = "<group>";
 		};
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				D8CE5C232EC1C839008CC29D /* Exceptions for "SyncNos" folder in "SyncNos" target */,
 				D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */,
 			);
 			path = SyncNos;
@@ -258,8 +279,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D8CCCCA62E72DB5E00ED8EFA /* README.md in Resources */,
-				D8529F712E7354B200FE0D95 /* LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
