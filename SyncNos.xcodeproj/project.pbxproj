@@ -6,99 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */ = {isa = PBXBuildFile; fileRef = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-/* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		D825ED772EC1F0C00079DA85 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = D81167B42E70A13F000D0173 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = D846980A2EC0BFDC00512670;
-			remoteInfo = SyncNosHelper;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		D84699432EC0C2E700512670 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LoginItems;
-			dstSubfolderSpec = 1;
-			files = (
-				D8CE5AF62EC1C555008CC29D /* SyncNosHelper.app in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		D846980B2EC0BFDC00512670 /* SyncNosHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNosHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8529F702E7354B200FE0D95 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		D8CCCCA52E72DB5E00ED8EFA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8CE88DA2E713DB50025AD6E /* SyncNos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncNos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Assets.xcassets,
-				Models/AccountModels.swift,
-				Models/HighlightColorScheme.swift,
-				Models/Models.swift,
-				Models/SyncQueueModels.swift,
-				Services/Auth/AuthService.swift,
-				Services/Auth/IAPService.swift,
-				Services/Auth/KeychainHelper.swift,
-				Services/Core/BackgroundActivityService.swift,
-				Services/Core/ConcurrencyLimiter.swift,
-				Services/Core/DIContainer.swift,
-				Services/Core/LoggerService.swift,
-				Services/Core/LoginItemService.swift,
-				Services/Core/Protocols.swift,
-				Services/Core/SharedDefaults.swift,
-				"Services/DataSources-From/AppleBooks/AppleBooksPicker.swift",
-				"Services/DataSources-From/AppleBooks/BookFilterService.swift",
-				"Services/DataSources-From/AppleBooks/BookmarkStore.swift",
-				"Services/DataSources-From/AppleBooks/DatabaseConnectionService.swift",
-				"Services/DataSources-From/AppleBooks/DatabaseQueryService.swift",
-				"Services/DataSources-From/AppleBooks/DatabaseReadOnlySession.swift",
-				"Services/DataSources-From/AppleBooks/DatabaseService.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksConnectionService.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksModels.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksProtocols.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksQueryService.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksService.swift",
-				"Services/DataSources-From/GoodLinks/GoodLinksTagParser.swift",
-				"Services/DataSources-From/WeRead/1.md",
-				"Services/DataSources-From/WeRead/微信读书API实现.md",
-				"Services/DataSources-To/Notion/Configuration/NotionConfigStore.swift",
-				"Services/DataSources-To/Notion/Configuration/NotionSyncConfig.swift",
-				"Services/DataSources-To/Notion/Core/NotionHelperMethods.swift",
-				"Services/DataSources-To/Notion/Core/NotionRateLimiter.swift",
-				"Services/DataSources-To/Notion/Core/NotionRequestHelper.swift",
-				"Services/DataSources-To/Notion/Core/NotionService.swift",
-				"Services/DataSources-To/Notion/Core/NotionServiceCore.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncService.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncServiceProtocol.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategyPerBook.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategyProtocol.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/AppleBooksSyncStrategySingleDB.swift",
-				"Services/DataSources-To/Notion/FromAppleBooks/SyncTimestampStore.swift",
-				"Services/DataSources-To/Notion/FromGoodLinks/GoodLinksSyncService.swift",
-				"Services/DataSources-To/Notion/Operations/NotionDatabaseOperations.swift",
-				"Services/DataSources-To/Notion/Operations/NotionHighlightOperations.swift",
-				"Services/DataSources-To/Notion/Operations/NotionPageOperations.swift",
-				"Services/DataSources-To/Notion/Operations/NotionQueryOperations.swift",
-				Services/Sync/AutoSyncService.swift,
-				Services/Sync/SyncActivityMonitor.swift,
-				Services/Sync/SyncQueueStore.swift,
-			);
-			target = D846980A2EC0BFDC00512670 /* SyncNosHelper */;
-		};
-		D8CE5C232EC1C839008CC29D /* Exceptions for "SyncNos" folder in "SyncNos" target */ = {
+		D834FF732EC23384008EE9FB /* Exceptions for "SyncNos" folder in "SyncNos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"Services/DataSources-From/WeRead/1.md",
@@ -106,7 +21,7 @@
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
-		D8CE5C242EC1C840008CC29D /* Exceptions for "Resource" folder in "SyncNos" target */ = {
+		D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				ChangeLog.en.md,
@@ -120,15 +35,10 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D846980C2EC0BFDC00512670 /* SyncNosHelper */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SyncNosHelper;
-			sourceTree = "<group>";
-		};
 		D855CBA82E7D52B10019C4A0 /* Resource */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				D8CE5C242EC1C840008CC29D /* Exceptions for "Resource" folder in "SyncNos" target */,
+				D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */,
 			);
 			path = Resource;
 			sourceTree = "<group>";
@@ -136,8 +46,7 @@
 		D8CE88DB2E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				D8CE5C232EC1C839008CC29D /* Exceptions for "SyncNos" folder in "SyncNos" target */,
-				D84699152EC0C1DE00512670 /* Exceptions for "SyncNos" folder in "SyncNosHelper" target */,
+				D834FF732EC23384008EE9FB /* Exceptions for "SyncNos" folder in "SyncNos" target */,
 			);
 			path = SyncNos;
 			sourceTree = "<group>";
@@ -145,13 +54,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D84698082EC0BFDC00512670 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D72E713DB50025AD6E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -169,7 +71,6 @@
 				D8529F702E7354B200FE0D95 /* LICENSE */,
 				D8CCCCA52E72DB5E00ED8EFA /* README.md */,
 				D8CE88DB2E713DB50025AD6E /* SyncNos */,
-				D846980C2EC0BFDC00512670 /* SyncNosHelper */,
 				D81167BD2E70A140000D0173 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -178,7 +79,6 @@
 			isa = PBXGroup;
 			children = (
 				D8CE88DA2E713DB50025AD6E /* SyncNos.app */,
-				D846980B2EC0BFDC00512670 /* SyncNosHelper.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -186,28 +86,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D846980A2EC0BFDC00512670 /* SyncNosHelper */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = D84698152EC0BFDD00512670 /* Build configuration list for PBXNativeTarget "SyncNosHelper" */;
-			buildPhases = (
-				D84698072EC0BFDC00512670 /* Sources */,
-				D84698082EC0BFDC00512670 /* Frameworks */,
-				D84698092EC0BFDC00512670 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				D846980C2EC0BFDC00512670 /* SyncNosHelper */,
-			);
-			name = SyncNosHelper;
-			packageProductDependencies = (
-			);
-			productName = SyncNosHelper;
-			productReference = D846980B2EC0BFDC00512670 /* SyncNosHelper.app */;
-			productType = "com.apple.product-type.application";
-		};
 		D8CE88D92E713DB50025AD6E /* SyncNos */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D8CE88E32E713DB60025AD6E /* Build configuration list for PBXNativeTarget "SyncNos" */;
@@ -215,12 +93,10 @@
 				D8CE88D62E713DB50025AD6E /* Sources */,
 				D8CE88D72E713DB50025AD6E /* Frameworks */,
 				D8CE88D82E713DB50025AD6E /* Resources */,
-				D84699432EC0C2E700512670 /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				D825ED782EC1F0C00079DA85 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D855CBA82E7D52B10019C4A0 /* Resource */,
@@ -243,9 +119,6 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
-					D846980A2EC0BFDC00512670 = {
-						CreatedOnToolsVersion = 26.0;
-					};
 					D8CE88D92E713DB50025AD6E = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -274,19 +147,11 @@
 			projectRoot = "";
 			targets = (
 				D8CE88D92E713DB50025AD6E /* SyncNos */,
-				D846980A2EC0BFDC00512670 /* SyncNosHelper */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		D84698092EC0BFDC00512670 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D82E713DB50025AD6E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -297,13 +162,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D84698072EC0BFDC00512670 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D8CE88D62E713DB50025AD6E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -312,14 +170,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		D825ED782EC1F0C00079DA85 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = D846980A2EC0BFDC00512670 /* SyncNosHelper */;
-			targetProxy = D825ED772EC1F0C00079DA85 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D81167C12E70A140000D0173 /* Debug */ = {
@@ -450,98 +300,6 @@
 			};
 			name = Release;
 		};
-		D84698132EC0BFDD00512670 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = SyncNosHelper/SyncNosHelper.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		D84698142EC0BFDD00512670 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = SyncNosHelper/SyncNosHelper.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = RDQHYSDFFG;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS.SyncNosHelper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		D8CE88E42E713DB60025AD6E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -552,7 +310,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = RDQHYSDFFG;
 				ENABLE_APP_SANDBOX = YES;
@@ -569,8 +327,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13;
-				MARKETING_VERSION = 0.5.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS;
+				MARKETING_VERSION = 0.6.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.SyncNos1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -588,7 +346,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = RDQHYSDFFG;
 				ENABLE_APP_SANDBOX = YES;
@@ -605,8 +363,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13;
-				MARKETING_VERSION = 0.5.10;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.macOS;
+				MARKETING_VERSION = 0.6.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chiimagnus.SyncNos1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -622,15 +380,6 @@
 			buildConfigurations = (
 				D81167C12E70A140000D0173 /* Debug */,
 				D81167C22E70A140000D0173 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		D84698152EC0BFDD00512670 /* Build configuration list for PBXNativeTarget "SyncNosHelper" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D84698132EC0BFDD00512670 /* Debug */,
-				D84698142EC0BFDD00512670 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

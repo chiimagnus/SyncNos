@@ -33,6 +33,9 @@ struct SyncNosApp: App {
         WindowGroup {
             MainListView()
         }
+        .commands {
+            AppCommands()
+        }
         
         // 设置窗口（单实例）
         Window("Settings", id: "setting") {
@@ -51,10 +54,10 @@ struct SyncNosApp: App {
             LogWindow()
         }
         .windowResizability(.contentSize)
-
-        // .commandsRemoved() //会移除所有系统自带的commands，不推荐使用。
-        .commands {
-            AppCommands()
+        
+        // 菜单栏项
+        MenuBarExtra("SyncNos", image: "MenuBarIcon") {
+            MenuBarView()
         }
     }
 }

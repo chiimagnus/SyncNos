@@ -6,6 +6,7 @@ struct MainListView: View {
     @State private var selectedBookIds: Set<String> = []
     @State private var selectedLinkIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @Environment(\.openWindow) private var openWindow
 
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
@@ -248,6 +249,28 @@ struct MainListView: View {
             .ignoresSafeArea()
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
+        }
+        .alert("Notion Configuration Required", isPresented: $goodLinksVM.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
+        }
         
     }
 }

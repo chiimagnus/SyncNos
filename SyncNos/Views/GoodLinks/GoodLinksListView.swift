@@ -3,6 +3,7 @@ import SwiftUI
 struct GoodLinksListView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectionIds: Set<String>
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -151,6 +152,17 @@ struct GoodLinksListView: View {
             }
             NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
             viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
+        }
+        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
         }
     }
 }

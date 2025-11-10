@@ -1,12 +1,12 @@
 import SwiftUI
 import AppKit
-import ServiceManagement
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
-    @StateObject private var backgroundActivityVM = BackgroundActivityViewModel()
+    @State private var navigationPath = NavigationPath()
+    
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 Section(header: Text("General")) {
                     LanguageView()
@@ -17,14 +17,6 @@ struct SettingsView: View {
                     .toggleStyle(SwitchToggleStyle())
                     .onChange(of: loginItemVM.isEnabled) { newValue in
                         loginItemVM.setEnabled(newValue)
-                    }
-
-                    Toggle(isOn: $backgroundActivityVM.preferredEnabled) {
-                        Label(String(localized: "Allow Background Activity", table: "Localizable-2"), systemImage: "bolt.badge.clock")
-                    }
-                    .toggleStyle(SwitchToggleStyle())
-                    .onChange(of: backgroundActivityVM.preferredEnabled) { newValue in
-                        backgroundActivityVM.setEnabled(newValue)
                     }
 
                     // 添加 AboutView 的 NavigationLink
@@ -68,16 +60,16 @@ struct SettingsView: View {
                 .collapsible(false)
 
                 Section(header: Text("Sync Data To")) {
-                    NavigationLink(destination: NotionIntegrationView()) {
-                            HStack {
-                                Label("Notion API", systemImage: "n.square")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
-                                    .font(.body.weight(.regular))
-                            }
+                    NavigationLink(value: "notion") {
+                        HStack {
+                            Label("Notion API", systemImage: "n.square")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
                         }
-                        .help("Configure Notion and run example API calls")
+                    }
+                    .help("Configure Notion and run example API calls")
                 }
                 .collapsible(false)
 
@@ -151,6 +143,11 @@ struct SettingsView: View {
             .listStyle(SidebarListStyle())
             .scrollContentBackground(.hidden)
             .background(VisualEffectBackground(material: .windowBackground))
+            .navigationDestination(for: String.self) { destination in
+                if destination == "notion" {
+                    NotionIntegrationView()
+                }
+            }
         }
         .navigationTitle("Settings")
         .toolbar {
@@ -158,15 +155,10 @@ struct SettingsView: View {
                 Text("")
             }
         }
-        .alert(String(localized: "bg.requiresApproval.title", table: "Localizable-2"), isPresented: $backgroundActivityVM.showRequiresApprovalAlert) {
-            Button(String(localized: "bg.requiresApproval.openSettings", table: "Localizable-2")) {
-                SMAppService.openSystemSettingsLoginItems()
-            }
-            Button(String(localized: "bg.requiresApproval.later", table: "Localizable-2")) {}
-        } message: {
-            Text(String(localized: "bg.requiresApproval.message", table: "Localizable-2"))
-        }
         .frame(width: 425)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNotionSettings"))) { _ in
+            navigationPath.append("notion")
+        }
     }
 }
 

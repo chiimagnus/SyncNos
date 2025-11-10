@@ -58,11 +58,13 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var highlightSelectedStyles: Set<Int> = []
     @Published var highlightSortField: HighlightSortField = .created
     @Published var highlightIsAscending: Bool = false
+    @Published var showNotionConfigAlert: Bool = false
 
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
@@ -70,11 +72,13 @@ final class GoodLinksViewModel: ObservableObject {
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
          logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore) {
+         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
+         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.service = service
         self.syncService = syncService
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
+        self.notionConfig = notionConfig
         subscribeSyncStatusNotifications()
         if let raw = UserDefaults.standard.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
         self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? false
@@ -427,6 +431,10 @@ final class GoodLinksViewModel: ObservableObject {
     /// 智能同步当前 GoodLinks 链接的高亮到 Notion（仅追加新条目，实际同步逻辑委托给 `GoodLinksSyncService`）
     func syncSmart(link: GoodLinksLinkRow, pageSize: Int = NotionSyncConfig.goodLinksPageSize) {
         if isSyncing { return }
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         syncMessage = nil
         syncProgressText = nil
         isSyncing = true
@@ -506,6 +514,10 @@ extension GoodLinksViewModel {
     /// 批量同步所选 GoodLinks 到 Notion，使用并发限流（默认 10 并发）
     func batchSync(linkIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !linkIds.isEmpty else { return }
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
         let dbPath = service.resolveDatabasePath()
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
@@ -558,6 +570,11 @@ extension GoodLinksViewModel {
                 await group.waitForAll()
             }
         }
+    }
+    
+    // MARK: - Configuration Validation
+    private func checkNotionConfig() -> Bool {
+        return notionConfig.isConfigured
     }
 }
 
