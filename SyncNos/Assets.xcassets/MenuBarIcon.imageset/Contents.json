@@ -1,17 +1,15 @@
 {
   "images" : [
     {
-      "filename" : "line18*18.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "line_logo2.png",
+      "filename" : "line2.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "line_logo3.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
