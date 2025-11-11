@@ -121,43 +121,43 @@ struct NotionIntegrationView: View {
                     .padding(.vertical, 4)
                 }
                 
-                Divider()
+            //     Divider()
                 
-                Text("Or manually enter credentials:")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            //     Text("Or manually enter credentials:")
+            //         .font(.subheadline)
+            //         .foregroundColor(.secondary)
                 
-                LabeledContent("NOTION_KEY") {
-                    SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(viewModel.isOAuthAuthorized)
-                }
+            //     LabeledContent("NOTION_KEY") {
+            //         SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+            //             .textFieldStyle(.roundedBorder)
+            //             .disabled(viewModel.isOAuthAuthorized)
+            //     }
 
-                LabeledContent("NOTION_PAGE_ID") {
-                    TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
-                        .textFieldStyle(.roundedBorder)
-                }
+            //     LabeledContent("NOTION_PAGE_ID") {
+            //         TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
+            //             .textFieldStyle(.roundedBorder)
+            //     }
 
-                Button("Save") {
-                    viewModel.saveCredentials()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isOAuthAuthorized)
-            }
+            //     Button("Save") {
+            //         viewModel.saveCredentials()
+            //     }
+            //     .buttonStyle(.borderedProminent)
+            //     .disabled(viewModel.isOAuthAuthorized)
+            // }
             
-            Section(header: Text("Database IDs")) {
-                // Optional per-source DB IDs
-                LabeledContent("AppleBooks DB ID (optional)") {
-                    // Now read-only; moved to AppleBooksSettingsView
-                    Text(viewModel.appleBooksDbId.isEmpty ? "(moved to AppleBooks settings)" : viewModel.appleBooksDbId)
-                        .foregroundColor(.secondary)
-                }
+            // Section(header: Text("Database IDs")) {
+            //     // Optional per-source DB IDs
+            //     LabeledContent("AppleBooks DB ID (optional)") {
+            //         // Now read-only; moved to AppleBooksSettingsView
+            //         Text(viewModel.appleBooksDbId.isEmpty ? "(moved to AppleBooks settings)" : viewModel.appleBooksDbId)
+            //             .foregroundColor(.secondary)
+            //     }
 
-                LabeledContent("GoodLinks DB ID (optional)") {
-                    // Now read-only; moved to GoodLinksSettingsView
-                    Text(viewModel.goodLinksDbId.isEmpty ? "(moved to GoodLinks settings)" : viewModel.goodLinksDbId)
-                        .foregroundColor(.secondary)
-                }
+            //     LabeledContent("GoodLinks DB ID (optional)") {
+            //         // Now read-only; moved to GoodLinksSettingsView
+            //         Text(viewModel.goodLinksDbId.isEmpty ? "(moved to GoodLinks settings)" : viewModel.goodLinksDbId)
+            //             .foregroundColor(.secondary)
+            //     }
             }
 
             if let message = viewModel.message {
