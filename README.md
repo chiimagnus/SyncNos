@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3-%E4%B8%AD%E6%96%87%E7%89%88-ff0000?style=flat)](README.md)
 [![](https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-000aff?style=flat)](README_EN.md)
 
-[<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
+[<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
 > **SyncNos** - 专业的阅读笔记同步工具，将 Apple Books 和 GoodLinks 中的高亮与注释无缝同步到 Notion，支持多种同步策略和强大的自定义功能。
 
@@ -38,7 +38,7 @@
 ### 方式一：Mac App Store 安装（推荐）
 
 1. **下载应用**
-   - 访问 [Mac App Store](https://apps.apple.com/app/syncnos/id6752426176)
+   - 访问 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
    - 点击"获取"安装应用
 
 2. **配置 Notion**
