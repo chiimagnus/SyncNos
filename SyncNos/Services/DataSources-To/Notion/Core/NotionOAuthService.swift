@@ -4,14 +4,22 @@ import AuthenticationServices
 /// Notion OAuth 服务，处理 OAuth 2.0 授权流程
 final class NotionOAuthService {
     // Notion OAuth 配置
-    // 从 Notion 开发者中心获取的值：
-    // 1. OAuth 客户端 ID (Client ID)
-    // 2. OAuth 客户端密钥 (Client Secret)
-    // 3. 重定向 URI (Redirect URI) ✅ 已配置为 http://localhost:8080/oauth/callback
+    // 配置值从 NotionOAuthConfig 加载，支持以下方式：
+    // 1. 环境变量：NOTION_OAUTH_CLIENT_ID 和 NOTION_OAUTH_CLIENT_SECRET
+    // 2. 配置文件：notion_auth.env（在 Bundle 或 ~/.syncnos/ 目录下）
+    // 3. 重定向 URI：固定为 http://localhost:8080/oauth/callback
     //    注意：此值必须与 Notion Integration 设置中的 Redirect URI 完全一致
-    static let clientId = "YOUR_CLIENT_ID"
-    static let clientSecret = "YOUR_CLIENT_SECRET"
-    static let redirectURI = "http://localhost:8080/oauth/callback"
+    var clientId: String {
+        NotionOAuthConfig.clientId
+    }
+    
+    var clientSecret: String {
+        NotionOAuthConfig.clientSecret
+    }
+    
+    var redirectURI: String {
+        NotionOAuthConfig.redirectURI
+    }
     
     // Notion OAuth 端点
     private static let authorizationURL = "https://api.notion.com/v1/oauth/authorize"
@@ -28,11 +36,11 @@ final class NotionOAuthService {
     /// 注意：此方法必须在主线程调用（ASWebAuthenticationSession 要求）
     @MainActor
     func startAuthorization() async throws -> String? {
-        guard Self.clientId != "YOUR_CLIENT_ID" else {
+        guard clientId != "YOUR_CLIENT_ID" else {
             throw NSError(
                 domain: "NotionOAuthService",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Notion OAuth Client ID not configured"]
+                userInfo: [NSLocalizedDescriptionKey: "Notion OAuth Client ID not configured. Please set NOTION_OAUTH_CLIENT_ID environment variable or create notion_auth.env file."]
             )
         }
         
@@ -42,10 +50,10 @@ final class NotionOAuthService {
         // 构建授权 URL
         var components = URLComponents(string: Self.authorizationURL)!
         components.queryItems = [
-            URLQueryItem(name: "client_id", value: Self.clientId),
+            URLQueryItem(name: "client_id", value: clientId),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "owner", value: "user"),
-            URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "state", value: state)
         ]
         
@@ -64,7 +72,7 @@ final class NotionOAuthService {
         // 注意：即使 Notion 要求 HTTPS，ASWebAuthenticationSession 也可以处理 localhost 的 HTTP 回调
         return try await withCheckedThrowingContinuation { continuation in
             // 从 redirectURI 中提取 scheme（http 或 https）
-            let scheme = URL(string: Self.redirectURI)?.scheme ?? "http"
+            let scheme = URL(string: redirectURI)?.scheme ?? "http"
             
             let session = ASWebAuthenticationSession(
                 url: authURL,
@@ -157,9 +165,9 @@ final class NotionOAuthService {
         let requestBody: [String: Any] = [
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": Self.redirectURI,
-            "client_id": Self.clientId,
-            "client_secret": Self.clientSecret
+            "redirect_uri": redirectURI,
+            "client_id": clientId,
+            "client_secret": clientSecret
         ]
         
         var request = URLRequest(url: tokenURL)
