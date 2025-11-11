@@ -18,8 +18,9 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
    - ✅ Insert content
 6. 在 **"OAuth"** 部分，设置重定向 URI：
    ```
-   https://localhost:8080/oauth/callback
+   https://chiimagnus.github.io/syncnos-oauth/callback
    ```
+   **注意**：此 URL 会重定向到 SyncNos 应用的自定义 URL scheme (`syncnos://`)，无需本地服务器
 7. 保存后，记录下 **Client ID** 和 **Client Secret**
 
 ### 2. 配置 SyncNos
@@ -49,10 +50,17 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
 
 1. 在 SyncNos 设置中，打开 **"Notion API"** 页面
 2. 点击 **"Authorize with Notion"** 按钮
-3. 浏览器将打开 Notion 授权页面
+3. Safari 浏览器将自动打开 Notion 授权页面（macOS 使用 Safari 以确保安全性）
 4. 选择要授权的工作区和页面
 5. 点击 **"Allow access"**
-6. 授权成功后，应用将自动保存访问令牌
+6. Notion 会重定向到 GitHub Pages 回调页面
+7. GitHub Pages 页面会自动重定向到 SyncNos 应用（通过自定义 URL scheme）
+8. 授权成功后，应用将自动保存访问令牌
+
+**OAuth 流程说明**：
+- Notion → GitHub Pages (`https://chiimagnus.github.io/syncnos-oauth/callback`)
+- GitHub Pages → SyncNos 应用 (`syncnos://oauth/callback`)
+- 应用接收回调并完成授权
 
 ## 注意事项
 
@@ -61,7 +69,9 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
   - ✅ 模板文件 `notion_auth.env.example` 可以安全地提交到 Git
   - ❌ **永远不要**将包含真实凭证的 `notion_auth.env` 文件提交到版本控制
   - ❌ **永远不要**在代码中硬编码 Client Secret
-- **重定向 URI**：必须与 Notion Integration 设置中的重定向 URI 完全匹配（`https://localhost:8080/oauth/callback`）
+- **重定向 URI**：必须与 Notion Integration 设置中的重定向 URI 完全匹配（`https://chiimagnus.github.io/syncnos-oauth/callback`）
+- **URL Scheme**：应用已注册 `syncnos://` URL scheme，用于接收 OAuth 回调
+- **浏览器**：macOS 会使用 Safari 浏览器打开授权页面（这是 Apple 的安全要求）
 - **配置文件位置**：`Resource/notion_auth.env`（需要添加到 Xcode Target 的 "Copy Bundle Resources"）
 - **页面 ID**：OAuth 授权后，您仍需要手动输入或选择要使用的 Notion 页面 ID
 - **撤销授权**：可以在设置页面中点击 **"Revoke Authorization"** 来撤销 OAuth 授权
@@ -74,7 +84,9 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
   - 确认配置文件路径正确（`Resource/notion_auth.env`）
   - 确认配置文件格式正确（`KEY=VALUE`，每行一个）
   - 确认已添加到 Xcode Target 的 "Copy Bundle Resources"
-- 确认重定向 URI 与 Notion Integration 设置中的完全匹配（`https://localhost:8080/oauth/callback`）
+- 确认重定向 URI 与 Notion Integration 设置中的完全匹配（`https://chiimagnus.github.io/syncnos-oauth/callback`）
+- 确认应用已正确注册 URL scheme（`syncnos://`）
+- 如果应用没有自动打开，检查 URL scheme 配置是否正确
 - 检查网络连接是否正常
 
 ### 配置文件找不到

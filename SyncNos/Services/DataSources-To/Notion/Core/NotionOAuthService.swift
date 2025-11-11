@@ -67,9 +67,10 @@ final class NotionOAuthService {
         logger.info("Starting Notion OAuth authorization: \(authURL.absoluteString)")
         
         // 使用 ASWebAuthenticationSession 处理 OAuth 流程
+        // GitHub Pages 会重定向到自定义 URL scheme (syncnos://)
         return try await withCheckedThrowingContinuation { continuation in
-            // 从 redirectURI 中提取 scheme
-            let scheme = URL(string: redirectURI)?.scheme ?? "https"
+            // 使用自定义 URL scheme 来接收回调
+            let scheme = "syncnos"
             
             let session = ASWebAuthenticationSession(
                 url: authURL,

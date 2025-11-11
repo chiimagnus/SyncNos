@@ -8,7 +8,9 @@ final class NotionOAuthConfig {
     private static let clientIdKey = "NOTION_OAUTH_CLIENT_ID"
     private static let clientSecretKey = "NOTION_OAUTH_CLIENT_SECRET"
     
-    static let redirectURI = "https://localhost:8080/oauth/callback"
+    // 使用 GitHub Pages 作为 OAuth 回调中转
+    // GitHub Pages 页面会重定向到自定义 URL scheme (syncnos://)
+    static let redirectURI = "https://chiimagnus.github.io/syncnos-oauth/callback"
     
     // 缓存配置值（避免重复读取）
     private static var cachedClientId: String?
