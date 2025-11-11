@@ -34,6 +34,26 @@ struct NotionIntegrationView: View {
                                 .lineLimit(nil)
                         }
                         
+                        // 当前父页面（用于在此页面下创建数据库）
+                        if !viewModel.notionPageIdInput.isEmpty {
+                            LabeledContent("Parent Page ID") {
+                                Text(viewModel.notionPageIdInput)
+                                    .font(.callout)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        Button {
+                            viewModel.openPagePicker()
+                        } label: {
+                            HStack(spacing: 6) {
+                                if viewModel.isBusy {
+                                    ProgressView().scaleEffect(0.8)
+                                }
+                                Text(viewModel.notionPageIdInput.isEmpty ? "Select Parent Page" : "Change Parent Page")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        
                         Button("Revoke Authorization") {
                             viewModel.revokeOAuth()
                         }
@@ -124,6 +144,48 @@ struct NotionIntegrationView: View {
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("Notion API")
+        .sheet(isPresented: $viewModel.isPagePickerPresented) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Select a Notion Page")
+                    .font(.headline)
+                TextField("Search", text: $viewModel.pageSearchText)
+                    .textFieldStyle(.roundedBorder)
+                List {
+                    let items = viewModel.availablePages.filter { p in
+                        let q = viewModel.pageSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if q.isEmpty { return true }
+                        return p.title.localizedCaseInsensitiveContains(q) || p.id.localizedCaseInsensitiveContains(q)
+                    }
+                    ForEach(items) { page in
+                        Button {
+                            viewModel.selectPage(page)
+                        } label: {
+                            HStack {
+                                if let e = page.iconEmoji, !e.isEmpty {
+                                    Text(e)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(page.title.isEmpty ? "Untitled" : page.title)
+                                    Text(page.id)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Close") {
+                        viewModel.isPagePickerPresented = false
+                    }
+                }
+            }
+            .padding()
+            .frame(minWidth: 520, minHeight: 420)
+        }
     }
 }
 

@@ -210,4 +210,69 @@ final class NotionService: NotionServiceProtocol {
         core.configStore.setDatabaseId(db.id, forBook: assetId)
         return (db.id, true)
     }
+
+    // MARK: - Discovery helpers
+    /// 使用 /search 枚举当前 token 可访问的页面，过滤掉 parent 为 database_id 的条目（数据库条目页）
+    /// 返回可作为数据库父级的页面摘要（workspace 顶级页与普通子页面）
+    func listAccessibleParentPages(searchQuery: String?) async throws -> [NotionPageSummary] {
+        struct SearchResponse: Decodable {
+            struct Icon: Decodable { let type: String?; let emoji: String? }
+            struct TitleFragment: Decodable { let plain_text: String? }
+            struct Property: Decodable {
+                let type: String?
+                let title: [TitleFragment]?
+            }
+            struct Parent: Decodable { let type: String?; let page_id: String?; let database_id: String?; let workspace: Bool? }
+            struct Result: Decodable {
+                let object: String
+                let id: String
+                let icon: Icon?
+                let parent: Parent?
+                let properties: [String: Property]?
+            }
+            let results: [Result]
+            let has_more: Bool?
+            let next_cursor: String?
+        }
+
+        var collected: [NotionPageSummary] = []
+        var cursor: String? = nil
+        let pageSize = 100
+
+        repeat {
+            var body: [String: Any] = [
+                "filter": ["property": "object", "value": "page"],
+                "page_size": pageSize
+            ]
+            if let q = searchQuery, !q.isEmpty {
+                body["query"] = q
+            }
+            if let c = cursor {
+                body["start_cursor"] = c
+            }
+            let data = try await requestHelper.performRequest(path: "search", method: "POST", body: body)
+            let decoded = try JSONDecoder().decode(SearchResponse.self, from: data)
+
+            for r in decoded.results where r.object == "page" {
+                // 过滤掉数据库条目（不能作为父级去创建数据库）
+                if r.parent?.database_id != nil { continue }
+                // 提取标题：寻找 properties 中第一个 type == "title" 的属性聚合 plain_text
+                var title: String = ""
+                if let props = r.properties {
+                    if let titleProp = props.values.first(where: { $0.type == "title" }) {
+                        title = (titleProp.title ?? []).compactMap { $0.plain_text }.joined()
+                    }
+                }
+                if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    title = "Untitled"
+                }
+                let emoji = (r.icon?.type == "emoji") ? r.icon?.emoji : nil
+                collected.append(NotionPageSummary(id: r.id, title: title, iconEmoji: emoji))
+            }
+
+            cursor = decoded.has_more == true ? decoded.next_cursor : nil
+        } while cursor != nil
+
+        return collected
+    }
 }
