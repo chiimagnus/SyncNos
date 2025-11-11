@@ -46,7 +46,7 @@ struct AppleBooksDetailView: View {
                             // Book header using unified card
                             InfoHeaderCardView(
                                 title: book.hasTitle ? book.bookTitle : "No Title",
-                                subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud", table: "Localizable-2"))",
+                                subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud"))",
                                 overrideWidth: frozenLayoutWidth
                             ) {
                                 if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {

@@ -344,17 +344,6 @@ protocol DatabaseServiceProtocol {
 - **同步队列**: 基于 `SyncQueueStore` 的任务队列管理
 - **活动监控**: `SyncActivityMonitor` 统一监控所有同步活动
 
-### 国际化 (i18n)
-- ✅ **多语言支持**: 9 种语言（英、中、法、德、日、韩、巴西葡、俄、西）
-- ✅ **字符串管理**:
-  - 主文件: `Localizable.xcstrings` (262KB)
-  - 辅助文件: `Localizable-2.xcstrings` (6KB)
-- ✅ **用户切换**: 用户可以在设置中切换语言
-- ✅ **使用方式**:
-  - SwiftUI: `Text("Articles")` 或 `Text(String(localized: "Sync", table: "Localizable-2"))`
-  - 传统 API: `NSLocalizedString("Articles", comment: "")`
-- ✅ **最佳实践**: 英文键名、驼峰命名、正确处理格式化字符串和复数
-
 ## Cursor 规则
 
 ### .cursor/rules/SwiftUI响应式布局+MVVM架构+Combine响应式编程.mdc
@@ -392,25 +381,12 @@ protocol DatabaseServiceProtocol {
 - ✅ **多语言支持**：9种语言（英、中、法、德、日、韩、巴西葡、俄、西）
 - **字符串目录管理**：
   - 主目录：`Localizable.xcstrings`（262KB，已包含9种语言完整翻译）
-  - 辅助目录：`Localizable-2.xcstrings`（6KB，包含退出确认等特定功能字符串）
 - **新增功能**：
   - **语言设置页面**：`Views/Settting/General/LanguageView.swift` - 用户可直接在应用内切换语言
   - **动态语言切换**：无需重启应用，实时更新界面语言
 - **使用规范**：
-  - SwiftUI：`Text("Articles")` 或 `Text(String(localized: "Sync", table: "Localizable-2"))`
+  - SwiftUI：`Text("Articles")`
   - 传统 API：`NSLocalizedString("Articles", comment: "")`
-- **最佳实践**：
-  - 英文键名、驼峰命名
-  - 添加注释说明
-  - 正确处理格式化字符串和复数
-- **字符串分类**：
-  - 基础 UI 组件（保留在主目录）
-  - 同步相关进度消息
-  - 设置相关配置选项（已模块化，分类到 General/Sync/Commands）
-  - 错误消息和帮助文本
-  - 退出确认对话框（Localizable-2）
-  - 语言设置相关文本
-  - 模块化菜单命令文本
 
 **导出/导入**：Product → Export/Import Localizations
 
@@ -423,7 +399,6 @@ protocol DatabaseServiceProtocol {
 
 ### 资源文件
 - **Resource/Localizable.xcstrings**: 主翻译文件（262KB，9种语言）
-- **Resource/Localizable-2.xcstrings**: 辅助翻译文件（6KB，包含退出确认等）
 - **Resource/SyncNos.storekit**: 应用内购买配置
 - **Resource/ChangeLog.md**: 版本更新日志
 - **Resource/PRIVACY_POLICY.md**: 隐私政策
@@ -480,16 +455,6 @@ swiftformat --dryrun SyncNos/
 # 依赖更新
 swift package resolve
 swift package update
-```
-
-### 本地化
-
-```bash
-# 导出本地化文件
-# 在 Xcode 中：Product → Export Localizations
-
-# 导入本地化文件
-# 在 Xcode 中：Product → Import Localizations
 ```
 
 ### 后端服务（FastAPI Apple Sign In）
