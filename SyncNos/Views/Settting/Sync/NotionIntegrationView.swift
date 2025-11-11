@@ -27,56 +27,57 @@ struct NotionIntegrationView: View {
                         // 当前父页面（用于在此页面下创建数据库）
                         LabeledContent("Parent Page") {
                             HStack(spacing: 8) {
-                                // 选中项展示
-                                if let selected = viewModel.availablePages.first(where: { $0.id == viewModel.notionPageIdInput }) {
-                                    HStack(spacing: 6) {
-                                        if let e = selected.iconEmoji, !e.isEmpty {
-                                            Text(e)
+                                Picker(selection: Binding(
+                                    get: {
+                                        // 确保当前值在可用页面列表中，否则返回空字符串以避免 Picker 警告
+                                        let currentId = viewModel.notionPageIdInput
+                                        guard !currentId.isEmpty,
+                                              viewModel.availablePages.contains(where: { $0.id == currentId }) else {
+                                            return ""
                                         }
-                                        Text(selected.title.isEmpty ? "Untitled" : selected.title)
-                                            .font(.callout)
-                                            .foregroundColor(.secondary)
+                                        return currentId
+                                    },
+                                    set: { newId in
+                                        guard !newId.isEmpty,
+                                              let page = viewModel.availablePages.first(where: { $0.id == newId }) else {
+                                            return
+                                        }
+                                        viewModel.selectPage(page)
                                     }
-                                } else {
-                                    Text(viewModel.notionPageIdInput.isEmpty ? "(Not set)" : viewModel.notionPageIdInput)
-                                        .font(.callout)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                // 下拉菜单选择
-                                Menu {
+                                )) {
                                     if viewModel.isBusy {
-                                        Text("Loading pages...")
+                                        Text("Loading pages...").tag("")
+                                    } else if viewModel.availablePages.isEmpty {
+                                        Text("(No pages available)").tag("")
                                     } else {
                                         ForEach(viewModel.availablePages) { page in
-                                            Button {
-                                                viewModel.selectPage(page)
-                                            } label: {
-                                                HStack {
-                                                    if let e = page.iconEmoji, !e.isEmpty {
-                                                        Text(e)
-                                                    }
-                                                    Text(page.title.isEmpty ? "Untitled" : page.title)
+                                            HStack(spacing: 6) {
+                                                if let e = page.iconEmoji, !e.isEmpty {
+                                                    Text(e)
                                                 }
+                                                Text(page.title.isEmpty ? "Untitled" : page.title)
                                             }
+                                            .tag(page.id)
                                         }
-                                    }
-                                    Divider()
-                                    Button("Refresh") {
-                                        viewModel.loadAccessiblePagesIfNeeded(force: true)
                                     }
                                 } label: {
-                                    HStack(spacing: 6) {
-                                        if viewModel.isBusy {
-                                            ProgressView().scaleEffect(0.8)
-                                        }
-                                        Text(viewModel.notionPageIdInput.isEmpty ? "Select" : "Change")
-                                        Image(systemName: "chevron.up.chevron.down")
+                                    EmptyView()
+                                }
+                                .disabled(viewModel.isBusy || viewModel.availablePages.isEmpty)
+                                
+                                Button {
+                                    viewModel.loadAccessiblePagesIfNeeded(force: true)
+                                } label: {
+                                    if viewModel.isBusy {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
                                             .font(.caption)
-                                            .foregroundColor(.secondary)
                                     }
                                 }
-                                .menuStyle(.borderlessButton)
+                                .buttonStyle(.borderless)
+                                .disabled(viewModel.isBusy)
                             }
                         }
                         
