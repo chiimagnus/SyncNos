@@ -34,10 +34,6 @@ struct NotionIntegrationView: View {
                                 .lineLimit(nil)
                         }
                         
-                        Text("Using OAuth token for authentication")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
                         Button("Revoke Authorization") {
                             viewModel.revokeOAuth()
                         }
@@ -76,16 +72,9 @@ struct NotionIntegrationView: View {
                     .foregroundColor(.secondary)
                 
                 LabeledContent("NOTION_KEY") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-                            .textFieldStyle(.roundedBorder)
-                            .disabled(viewModel.isOAuthAuthorized)
-                        if viewModel.isOAuthAuthorized {
-                            Text("OAuth token is being used instead")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                    SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(viewModel.isOAuthAuthorized)
                 }
 
                 LabeledContent("NOTION_PAGE_ID") {

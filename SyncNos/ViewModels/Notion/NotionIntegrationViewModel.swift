@@ -80,16 +80,9 @@ final class NotionIntegrationViewModel: ObservableObject {
         errorMessage = nil
         message = nil
         
-        // 获取 logger 用于记录日志
-        let logger = DIContainer.shared.loggerService
-        logger.info("🚀 Starting Notion OAuth authorization flow...")
-        
         Task {
             do {
-                logger.info("Step 1: Starting authorization...")
                 let tokenResponse = try await oauthService.performFullAuthorization()
-                
-                logger.info("Step 2: Authorization successful, saving token and workspace info...")
                 
                 // 保存 OAuth token 和 workspace 信息
                 await MainActor.run {
@@ -99,40 +92,31 @@ final class NotionIntegrationViewModel: ObservableObject {
                     
                     self.isOAuthAuthorized = true
                     self.workspaceName = tokenResponse.workspaceName
+                    self.message = tokenResponse.workspaceName.map { "Authorized workspace: \($0)" } ?? "Authorization successful"
                     
-                    let workspaceInfo = tokenResponse.workspaceName.map { "\($0)" } ?? "Unknown workspace"
-                    self.message = "✅ Authorization successful!\nWorkspace: \(workspaceInfo)"
-                    
-                    logger.info("✅ OAuth token saved successfully for workspace: \(workspaceInfo)")
-                    
-                    // 如果用户还没有设置 pageId，提示用户手动设置
+                    // 如果用户还没有设置 pageId，尝试获取用户可访问的页面列表
+                    // 注意：这需要额外的 API 调用，暂时先提示用户手动设置
                     if self.notionConfig.notionPageId == nil {
-                        self.message = (self.message ?? "") + "\n\n⚠️ Please enter a Page ID below to complete setup."
-                        logger.warning("Page ID not set yet, user needs to enter it manually")
-                    } else {
-                        logger.info("✅ Page ID already configured: \(self.notionConfig.notionPageId ?? "unknown")")
+                        self.message = (self.message ?? "") + "\nPlease select a page ID from your Notion workspace"
                     }
                 }
                 
-                // 清除消息（延迟更长时间以便用户看到）
-                try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+                // 清除消息
+                try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
                 await MainActor.run {
-                    if self.message?.contains("Authorization successful") == true {
+                    if self.message?.contains("Authorized") == true {
                         self.message = nil
                     }
                 }
             } catch {
-                let errorMsg = error.localizedDescription
-                logger.error("❌ OAuth authorization failed: \(errorMsg)")
                 await MainActor.run {
-                    self.errorMessage = "Authorization failed: \(errorMsg)"
+                    self.errorMessage = error.localizedDescription
                     self.isOAuthAuthorized = false
                 }
             }
             
             await MainActor.run {
                 self.isAuthorizing = false
-                logger.info("OAuth authorization flow completed")
             }
         }
     }
