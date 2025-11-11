@@ -80,17 +80,14 @@ final class NotionOAuthService {
                     let nsError = error as NSError
                     // 用户取消授权（code == -1000）
                     if nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                        self.logger.info("User canceled Notion OAuth authorization")
                         continuation.resume(returning: nil)
                         return
                     }
-                    self.logger.error("Notion OAuth authorization failed: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                     return
                 }
                 
                 guard let callbackURL = callbackURL else {
-                    self.logger.error("No callback URL received from OAuth flow")
                     continuation.resume(throwing: NSError(
                         domain: "NotionOAuthService",
                         code: 3,
@@ -99,12 +96,9 @@ final class NotionOAuthService {
                     return
                 }
                 
-                self.logger.info("Received OAuth callback URL: \(callbackURL.absoluteString)")
-                
                 // 解析回调 URL，提取 code 和 state
                 guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
                       let queryItems = components.queryItems else {
-                    self.logger.error("Invalid callback URL format: \(callbackURL.absoluteString)")
                     continuation.resume(throwing: NSError(
                         domain: "NotionOAuthService",
                         code: 4,
@@ -116,7 +110,6 @@ final class NotionOAuthService {
                 // 验证 state
                 let receivedState = queryItems.first(where: { $0.name == "state" })?.value
                 guard receivedState == state else {
-                    self.logger.error("State mismatch - expected: \(state), received: \(receivedState ?? "nil")")
                     continuation.resume(throwing: NSError(
                         domain: "NotionOAuthService",
                         code: 5,
@@ -129,15 +122,12 @@ final class NotionOAuthService {
                 guard let code = queryItems.first(where: { $0.name == "code" })?.value else {
                     // 检查是否有错误
                     if let error = queryItems.first(where: { $0.name == "error" })?.value {
-                        let errorDesc = queryItems.first(where: { $0.name == "error_description" })?.value ?? "Unknown error"
-                        self.logger.error("OAuth error received: \(error) - \(errorDesc)")
                         continuation.resume(throwing: NSError(
                             domain: "NotionOAuthService",
                             code: 6,
-                            userInfo: [NSLocalizedDescriptionKey: "OAuth error: \(error) - \(errorDesc)"]
+                            userInfo: [NSLocalizedDescriptionKey: "OAuth error: \(error)"]
                         ))
                     } else {
-                        self.logger.error("No authorization code in callback URL")
                         continuation.resume(throwing: NSError(
                             domain: "NotionOAuthService",
                             code: 7,
@@ -147,7 +137,6 @@ final class NotionOAuthService {
                     return
                 }
                 
-                self.logger.info("Successfully received authorization code from Notion OAuth")
                 continuation.resume(returning: code)
             }
             
@@ -189,7 +178,6 @@ final class NotionOAuthService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            logger.error("Invalid HTTP response when exchanging token")
             throw NSError(
                 domain: "NotionOAuthService",
                 code: 9,
@@ -199,7 +187,6 @@ final class NotionOAuthService {
         
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            logger.error("Token exchange failed: HTTP \(httpResponse.statusCode) - \(errorBody)")
             throw NSError(
                 domain: "NotionOAuthService",
                 code: httpResponse.statusCode,
@@ -210,7 +197,6 @@ final class NotionOAuthService {
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         
         guard let accessToken = json["access_token"] as? String else {
-            logger.error("No access_token in token exchange response")
             throw NSError(
                 domain: "NotionOAuthService",
                 code: 10,
@@ -223,7 +209,7 @@ final class NotionOAuthService {
         let workspaceId = workspace?["id"] as? String
         let workspaceName = workspace?["name"] as? String
         
-        logger.info("✅ Successfully obtained OAuth access token for workspace: \(workspaceName ?? "unknown") (ID: \(workspaceId ?? "unknown"))")
+        logger.info("Successfully obtained access token for workspace: \(workspaceName ?? "unknown")")
         
         return NotionOAuthTokenResponse(
             accessToken: accessToken,
