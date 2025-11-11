@@ -35,6 +35,10 @@ struct NotionIntegrationView: View {
                             HStack(spacing: 8) {
                                 Picker(selection: Binding(
                                     get: {
+                                        // 加载中时返回空字符串以显示 "Loading..."
+                                        if viewModel.isBusy {
+                                            return ""
+                                        }
                                         // 确保当前值在可用页面列表中，否则返回空字符串以避免 Picker 警告
                                         let currentId = viewModel.notionPageIdInput
                                         guard !currentId.isEmpty,
@@ -52,7 +56,7 @@ struct NotionIntegrationView: View {
                                     }
                                 )) {
                                     if viewModel.isBusy {
-                                        Text("Loading pages...").tag("")
+                                        Text("Loading...").tag("")
                                     } else if viewModel.availablePages.isEmpty {
                                         Text("(No pages available)").tag("")
                                     } else {
@@ -64,7 +68,7 @@ struct NotionIntegrationView: View {
                                 } label: {
                                     EmptyView()
                                 }
-                                .disabled(viewModel.isBusy || viewModel.availablePages.isEmpty)
+                                .disabled(viewModel.isBusy)
                                 
                                 Button {
                                     viewModel.loadAccessiblePagesIfNeeded(force: true)
