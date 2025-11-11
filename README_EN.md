@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3-%E4%B8%AD%E6%96%87%E7%89%88-ff0000?style=flat)](README.md)
 [![](https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-000aff?style=flat)](README_EN.md)
 
-[<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6752426176)
+[<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
 > **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books and GoodLinks to Notion, supporting multiple sync strategies and powerful customization features.
 
@@ -38,7 +38,7 @@
 ### Method 1: Mac App Store Installation (Recommended)
 
 1. **Download the App**
-   - Visit [Mac App Store](https://apps.apple.com/app/syncnos/id6752426176)
+   - Visit [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
    - Click "Get" to install the application
 
 2. **Configure Notion**
