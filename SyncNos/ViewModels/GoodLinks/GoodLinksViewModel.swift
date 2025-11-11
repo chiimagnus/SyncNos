@@ -519,6 +519,17 @@ extension GoodLinksViewModel {
             return
         }
         let dbPath = service.resolveDatabasePath()
+
+        // 配置检查通过后，才发送入队通知（从 View 层移除到此）
+        let items: [[String: Any]] = linkIds.compactMap { id in
+            guard let link = displayLinks.first(where: { $0.id == id }) else { return nil }
+            let title = (link.title?.isEmpty == false ? link.title! : link.url)
+            return ["id": id, "title": title, "subtitle": link.author ?? ""]
+        }
+        if !items.isEmpty {
+            NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
+        }
+
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncService = self.syncService

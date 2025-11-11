@@ -410,6 +410,15 @@ extension AppleBooksViewModel {
             return
         }
 
+        // 配置检查通过后，才发送入队通知（从 View 层移除到此）
+        let items: [[String: Any]] = bookIds.compactMap { id in
+            guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
+            return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
+        }
+        if !items.isEmpty {
+            NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
+        }
+
         let ids = Array(bookIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
