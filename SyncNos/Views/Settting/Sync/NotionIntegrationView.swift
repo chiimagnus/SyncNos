@@ -31,6 +31,7 @@ struct NotionIntegrationView: View {
                             Text("Workspace: \(workspaceName)")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
+                                .lineLimit(nil)
                         }
                         
                         Button("Revoke Authorization") {
@@ -45,6 +46,7 @@ struct NotionIntegrationView: View {
                         Text("Use OAuth to authorize SyncNos to access your Notion workspace. This is the recommended method.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .lineLimit(nil)
                         
                         Button(action: {
                             viewModel.authorizeWithOAuth()
@@ -106,6 +108,7 @@ struct NotionIntegrationView: View {
                 Section {
                     Text(message)
                         .foregroundColor(.secondary)
+                        .lineLimit(nil)
                 }
             }
             
@@ -113,6 +116,7 @@ struct NotionIntegrationView: View {
                 Section {
                     Text(errorMessage)
                         .foregroundColor(.red)
+                        .lineLimit(nil)
                 }
             }
         }
