@@ -8,8 +8,7 @@ final class NotionOAuthConfig {
     private static let clientIdKey = "NOTION_OAUTH_CLIENT_ID"
     private static let clientSecretKey = "NOTION_OAUTH_CLIENT_SECRET"
     
-    // 默认重定向 URI（不需要保密）
-    static let redirectURI = "http://localhost:8080/oauth/callback"
+    static let redirectURI = "https://localhost:8080/oauth/callback"
     
     // 缓存配置值（避免重复读取）
     private static var cachedClientId: String?

@@ -18,7 +18,7 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
    - ✅ Insert content
 6. 在 **"OAuth"** 部分，设置重定向 URI：
    ```
-   http://localhost:8080/oauth/callback
+   https://localhost:8080/oauth/callback
    ```
 7. 保存后，记录下 **Client ID** 和 **Client Secret**
 
@@ -61,7 +61,7 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
   - ✅ 模板文件 `notion_auth.env.example` 可以安全地提交到 Git
   - ❌ **永远不要**将包含真实凭证的 `notion_auth.env` 文件提交到版本控制
   - ❌ **永远不要**在代码中硬编码 Client Secret
-- **重定向 URI**：必须与 Notion Integration 设置中的重定向 URI 完全匹配（`http://localhost:8080/oauth/callback`）
+- **重定向 URI**：必须与 Notion Integration 设置中的重定向 URI 完全匹配（`https://localhost:8080/oauth/callback`）
 - **配置文件位置**：`Resource/notion_auth.env`（需要添加到 Xcode Target 的 "Copy Bundle Resources"）
 - **页面 ID**：OAuth 授权后，您仍需要手动输入或选择要使用的 Notion 页面 ID
 - **撤销授权**：可以在设置页面中点击 **"Revoke Authorization"** 来撤销 OAuth 授权
@@ -74,7 +74,7 @@ SyncNos 支持通过 Notion OAuth 2.0 授权流程来访问用户的 Notion 工�
   - 确认配置文件路径正确（`Resource/notion_auth.env`）
   - 确认配置文件格式正确（`KEY=VALUE`，每行一个）
   - 确认已添加到 Xcode Target 的 "Copy Bundle Resources"
-- 确认重定向 URI 与 Notion Integration 设置中的完全匹配（`http://localhost:8080/oauth/callback`）
+- 确认重定向 URI 与 Notion Integration 设置中的完全匹配（`https://localhost:8080/oauth/callback`）
 - 检查网络连接是否正常
 
 ### 配置文件找不到

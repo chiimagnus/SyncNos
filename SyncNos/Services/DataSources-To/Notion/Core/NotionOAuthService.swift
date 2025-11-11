@@ -6,7 +6,7 @@ final class NotionOAuthService {
     // Notion OAuth 配置
     // 配置值从 NotionOAuthConfig 加载，从 Bundle 中的 notion_auth.env 文件读取
     // 配置文件位置：Resource/notion_auth.env（需要添加到 Xcode Target 的 "Copy Bundle Resources"）
-    // 重定向 URI：固定为 http://localhost:8080/oauth/callback
+    // 重定向 URI：固定为 https://localhost:8080/oauth/callback
     // 注意：此值必须与 Notion Integration 设置中的 Redirect URI 完全一致
     var clientId: String {
         NotionOAuthConfig.clientId
@@ -67,11 +67,9 @@ final class NotionOAuthService {
         logger.info("Starting Notion OAuth authorization: \(authURL.absoluteString)")
         
         // 使用 ASWebAuthenticationSession 处理 OAuth 流程
-        // 对于 localhost，我们需要明确指定 scheme 为 "http"
-        // 注意：即使 Notion 要求 HTTPS，ASWebAuthenticationSession 也可以处理 localhost 的 HTTP 回调
         return try await withCheckedThrowingContinuation { continuation in
-            // 从 redirectURI 中提取 scheme（http 或 https）
-            let scheme = URL(string: redirectURI)?.scheme ?? "http"
+            // 从 redirectURI 中提取 scheme
+            let scheme = URL(string: redirectURI)?.scheme ?? "https"
             
             let session = ASWebAuthenticationSession(
                 url: authURL,
