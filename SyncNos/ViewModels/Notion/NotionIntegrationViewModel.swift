@@ -19,10 +19,8 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var isOAuthAuthorized: Bool = false
     @Published var workspaceName: String?
     @Published var isAuthorizing: Bool = false
-    // Page picking
-    @Published var isPagePickerPresented: Bool = false
+    // Parent page listing
     @Published var availablePages: [NotionPageSummary] = []
-    @Published var pageSearchText: String = ""
     
     private let notionConfig: NotionConfigStoreProtocol
     private let notionService: NotionServiceProtocol
@@ -144,12 +142,13 @@ final class NotionIntegrationViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Page selection
-    func openPagePicker() {
+    // MARK: - Parent page listing
+    func loadAccessiblePagesIfNeeded(force: Bool = false) {
         guard isOAuthAuthorized || !(notionConfig.effectiveToken ?? "").isEmpty else {
             errorMessage = "Please authorize with Notion first"
             return
         }
+        if !force && !availablePages.isEmpty { return }
         isBusy = true
         errorMessage = nil
         message = nil
@@ -158,7 +157,6 @@ final class NotionIntegrationViewModel: ObservableObject {
                 let pages = try await notionService.listAccessibleParentPages(searchQuery: nil)
                 await MainActor.run {
                     self.availablePages = pages
-                    self.isPagePickerPresented = true
                 }
             } catch {
                 await MainActor.run {
@@ -172,7 +170,6 @@ final class NotionIntegrationViewModel: ObservableObject {
     func selectPage(_ page: NotionPageSummary) {
         notionConfig.notionPageId = page.id
         notionPageIdInput = page.id
-        isPagePickerPresented = false
         message = "Selected page: \(page.iconEmoji ?? "") \(page.title)"
         // Auto-clear tip
         Task {
