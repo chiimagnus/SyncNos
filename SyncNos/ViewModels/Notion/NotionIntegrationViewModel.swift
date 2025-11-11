@@ -19,6 +19,10 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var isOAuthAuthorized: Bool = false
     @Published var workspaceName: String?
     @Published var isAuthorizing: Bool = false
+    // Page picking
+    @Published var isPagePickerPresented: Bool = false
+    @Published var availablePages: [NotionPageSummary] = []
+    @Published var pageSearchText: String = ""
     
     private let notionConfig: NotionConfigStoreProtocol
     private let notionService: NotionServiceProtocol
@@ -137,6 +141,43 @@ final class NotionIntegrationViewModel: ObservableObject {
                     message = nil
                 }
             }
+        }
+    }
+
+    // MARK: - Page selection
+    func openPagePicker() {
+        guard isOAuthAuthorized || !(notionConfig.effectiveToken ?? "").isEmpty else {
+            errorMessage = "Please authorize with Notion first"
+            return
+        }
+        isBusy = true
+        errorMessage = nil
+        message = nil
+        Task {
+            do {
+                let pages = try await notionService.listAccessibleParentPages(searchQuery: nil)
+                await MainActor.run {
+                    self.availablePages = pages
+                    self.isPagePickerPresented = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+            await MainActor.run { self.isBusy = false }
+        }
+    }
+
+    func selectPage(_ page: NotionPageSummary) {
+        notionConfig.notionPageId = page.id
+        notionPageIdInput = page.id
+        isPagePickerPresented = false
+        message = "Selected page: \(page.iconEmoji ?? "") \(page.title)"
+        // Auto-clear tip
+        Task {
+            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+            await MainActor.run { if self.message?.hasPrefix("Selected page:") == true { self.message = nil } }
         }
     }
 }
