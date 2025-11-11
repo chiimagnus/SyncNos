@@ -36,9 +36,9 @@ import SwiftUI
     private func presentQuitAlert() {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = String(localized: "quit.confirm.title", table: "Localizable-2")
-        alert.addButton(withTitle: String(localized: "quit.button.cancel", table: "Localizable-2")) // 默认按钮：不退出
-        alert.addButton(withTitle: String(localized: "quit.button.quit", table: "Localizable-2"))
+        alert.messageText = NSLocalizedString("Sync to Notion is in progress. Quit anyway?", comment: "")
+        alert.addButton(withTitle: NSLocalizedString("Don't Quit", comment: "")) // 默认按钮：不退出
+        alert.addButton(withTitle: NSLocalizedString("Quit", comment: ""))
 
         if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first {
             alert.beginSheetModal(for: w) { response in

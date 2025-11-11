@@ -58,9 +58,9 @@ struct LanguageView: View {
         if DIContainer.shared.syncActivityMonitor.isSyncing {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = String(localized: "quit.confirm.title", table: "Localizable-2")
-            alert.addButton(withTitle: String(localized: "quit.button.cancel", table: "Localizable-2")) // 默认：不退出
-            alert.addButton(withTitle: String(localized: "quit.button.quit", table: "Localizable-2"))
+            alert.messageText = NSLocalizedString("Sync to Notion is in progress. Quit anyway?", comment: "")
+            alert.addButton(withTitle: NSLocalizedString("Don't Quit", comment: "")) // 默认：不退出
+            alert.addButton(withTitle: NSLocalizedString("Quit", comment: ""))
             let response = alert.runModal()
             guard response == .alertSecondButtonReturn else { return }
             // 避免接下来 NSApp.terminate(nil) 再次弹窗
