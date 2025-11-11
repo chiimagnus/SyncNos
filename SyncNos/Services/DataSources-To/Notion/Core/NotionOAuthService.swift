@@ -2,7 +2,6 @@ import Foundation
 import AuthenticationServices
 
 /// Notion OAuth 服务，处理 OAuth 2.0 授权流程
-@MainActor
 final class NotionOAuthService {
     // Notion OAuth 配置
     // 从 Notion 开发者中心获取的值：
@@ -26,6 +25,8 @@ final class NotionOAuthService {
     
     /// 启动 OAuth 授权流程
     /// - Returns: 授权码（code）或 nil（如果用户取消）
+    /// 注意：此方法必须在主线程调用（ASWebAuthenticationSession 要求）
+    @MainActor
     func startAuthorization() async throws -> String? {
         guard Self.clientId != "YOUR_CLIENT_ID" else {
             throw NSError(
@@ -213,6 +214,8 @@ final class NotionOAuthService {
     
     /// 完整的 OAuth 授权流程（启动授权 + 交换令牌）
     /// - Returns: 访问令牌和相关信息
+    /// 注意：此方法必须在主线程调用（ASWebAuthenticationSession 要求）
+    @MainActor
     func performFullAuthorization() async throws -> NotionOAuthTokenResponse {
         guard let code = try await startAuthorization() else {
             throw NSError(
