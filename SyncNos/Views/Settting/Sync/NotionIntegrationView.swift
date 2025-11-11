@@ -5,6 +5,12 @@ struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()
     @Environment(\.dismiss) private var dismiss
     
+    private func pageDisplayText(_ page: NotionPageSummary) -> String {
+        let emoji = page.iconEmoji ?? ""
+        let title = page.title.isEmpty ? "Untitled" : page.title
+        return emoji.isEmpty ? title : "\(emoji) \(title)"
+    }
+    
     var body: some View {
         List {
             Section(header: Text("Authorization")) {
@@ -51,13 +57,8 @@ struct NotionIntegrationView: View {
                                         Text("(No pages available)").tag("")
                                     } else {
                                         ForEach(viewModel.availablePages) { page in
-                                            HStack(spacing: 6) {
-                                                if let e = page.iconEmoji, !e.isEmpty {
-                                                    Text(e)
-                                                }
-                                                Text(page.title.isEmpty ? "Untitled" : page.title)
-                                            }
-                                            .tag(page.id)
+                                            Text(pageDisplayText(page))
+                                                .tag(page.id)
                                         }
                                     }
                                 } label: {
