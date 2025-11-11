@@ -160,18 +160,30 @@ final class NotionOAuthService {
             )
         }
         
-        let requestBody: [String: Any] = [
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirectURI,
-            "client_id": clientId,
-            "client_secret": clientSecret
+        // Use application/x-www-form-urlencoded per OAuth2 token endpoint expectations.
+        // Some providers (including variations of OAuth implementations) may expect
+        // form-encoded body or HTTP Basic auth. Send form-encoded body and also
+        // include Basic Authorization header to maximize compatibility.
+        var formComponents = URLComponents()
+        formComponents.queryItems = [
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "client_secret", value: clientSecret)
         ]
-        
+
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = formComponents.percentEncodedQuery?.data(using: .utf8)
+
+        // Add HTTP Basic auth header as an additional client authentication method.
+        if let credentialsData = "\(clientId):\(clientSecret)".data(using: .utf8) {
+            let base64Credentials = credentialsData.base64EncodedString()
+            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        }
         
         logger.info("Exchanging authorization code for access token")
         
