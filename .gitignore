@@ -6,3 +6,9 @@ Backend/.env
 /.specify
 plans/
 
+# Notion OAuth 配置文件（包含敏感信息）
+notion_auth.env
+**/notion_auth.env
+*.env
+!*.env.example
+
