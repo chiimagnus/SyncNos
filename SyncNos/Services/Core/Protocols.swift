@@ -167,6 +167,9 @@ protocol NotionServiceProtocol: AnyObject {
     // Helpers added for consolidated DB management
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
+    // Discovery helpers
+    /// 列出当前 token 可访问、且可作为数据库父级的 Notion 页面（过滤掉 database item）
+    func listAccessibleParentPages(searchQuery: String?) async throws -> [NotionPageSummary]
 }
 
 // MARK: - Notion Models (lightweight decodables for responses)
@@ -178,6 +181,13 @@ struct NotionDatabase: Decodable {
 struct NotionPage: Decodable {
     let id: String
     let url: String?
+}
+
+/// 用于页面选择器的轻量信息
+struct NotionPageSummary: Identifiable, Decodable {
+    let id: String
+    let title: String
+    let iconEmoji: String?
 }
 
 // MARK: - In-App Purchase Service Protocol
