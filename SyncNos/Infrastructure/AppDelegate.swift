@@ -58,5 +58,19 @@ import SwiftUI
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
         return false
     }
+    
+    // MARK: - URL Scheme Handling
+    /// 处理自定义 URL scheme 回调（备用机制）
+    /// 主要处理由 ASWebAuthenticationSession 负责，此方法作为备用
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            // 处理 syncnos://oauth/callback 回调
+            if url.scheme == "syncnos" && url.host == "oauth" && url.path == "/callback" {
+                DIContainer.shared.loggerService.info("Received OAuth callback via URL scheme: \(url.absoluteString)")
+                // ASWebAuthenticationSession 会自动处理，这里只是记录日志
+                // 如果需要手动处理，可以在这里添加逻辑
+            }
+        }
+    }
 
 }
