@@ -5,11 +5,14 @@ import AuthenticationServices
 @MainActor
 final class NotionOAuthService {
     // Notion OAuth 配置
-    // 注意：这些值需要在 Notion 开发者中心创建 Public Integration 后配置
-    // 暂时使用占位符，实际使用时需要替换为真实的 Client ID 和 Client Secret
-    static let clientId = "YOUR_CLIENT_ID" // TODO: 替换为实际的 Client ID
-    static let clientSecret = "YOUR_CLIENT_SECRET" // TODO: 替换为实际的 Client Secret
-    static let redirectURI = "syncnos://oauth/callback"
+    // 从 Notion 开发者中心获取的值：
+    // 1. OAuth 客户端 ID (Client ID)
+    // 2. OAuth 客户端密钥 (Client Secret)
+    // 3. 重定向 URI (Redirect URI) ✅ 已配置为 http://localhost:8080/oauth/callback
+    //    注意：此值必须与 Notion Integration 设置中的 Redirect URI 完全一致
+    static let clientId = "YOUR_CLIENT_ID"
+    static let clientSecret = "YOUR_CLIENT_SECRET"
+    static let redirectURI = "http://localhost:8080/oauth/callback"
     
     // Notion OAuth 端点
     private static let authorizationURL = "https://api.notion.com/v1/oauth/authorize"
@@ -56,10 +59,15 @@ final class NotionOAuthService {
         logger.info("Starting Notion OAuth authorization: \(authURL.absoluteString)")
         
         // 使用 ASWebAuthenticationSession 处理 OAuth 流程
+        // 对于 localhost，我们需要明确指定 scheme 为 "http"
+        // 注意：即使 Notion 要求 HTTPS，ASWebAuthenticationSession 也可以处理 localhost 的 HTTP 回调
         return try await withCheckedThrowingContinuation { continuation in
+            // 从 redirectURI 中提取 scheme（http 或 https）
+            let scheme = URL(string: Self.redirectURI)?.scheme ?? "http"
+            
             let session = ASWebAuthenticationSession(
                 url: authURL,
-                callbackURLScheme: "syncnos"
+                callbackURLScheme: scheme  // 匹配 redirect_uri 的 scheme
             ) { callbackURL, error in
                 if let error = error {
                     let nsError = error as NSError
