@@ -35,7 +35,7 @@ class NotionRequestHelper {
 
     // Centralized request sender to remove duplicated URLSession/request boilerplate
     func performRequest(path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
-        guard let key = configStore.notionKey else {
+        guard let key = configStore.effectiveToken else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         let url = apiBase.appendingPathComponent(path)
@@ -85,7 +85,7 @@ class NotionRequestHelper {
 
     // Overload that accepts a full URL (used for URLComponents-built URLs)
     func performRequest(url: URL, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
-        guard let key = configStore.notionKey else {
+        guard let key = configStore.effectiveToken else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         var request = URLRequest(url: url)

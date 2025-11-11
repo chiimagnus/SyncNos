@@ -6,6 +6,10 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     private let userDefaults = UserDefaults.standard
     private let keyKey = "NOTION_KEY"
     private let pageIdKey = "NOTION_PAGE_ID"
+    // OAuth 相关键
+    private let oauthTokenKey = "NOTION_OAUTH_TOKEN"
+    private let workspaceIdKey = "NOTION_WORKSPACE_ID"
+    private let workspaceNameKey = "NOTION_WORKSPACE_NAME"
     // 说明：以下 UserDefaults 键用于持久化 Notion 配置与缓存的数据库映射
     // - NOTION_SYNC_MODE：同步模式（"single" | "perBook"），默认 "single"
     // - PER_BOOK_DB_ID_{assetId}：每本书独立数据库的 id 映射
@@ -41,8 +45,47 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         }
     }
     
+    var notionOAuthToken: String? {
+        get { userDefaults.string(forKey: oauthTokenKey) }
+        set {
+            if let value = newValue, !value.isEmpty {
+                userDefaults.set(value, forKey: oauthTokenKey)
+            } else {
+                userDefaults.removeObject(forKey: oauthTokenKey)
+            }
+        }
+    }
+    
+    var notionWorkspaceId: String? {
+        get { userDefaults.string(forKey: workspaceIdKey) }
+        set {
+            if let value = newValue, !value.isEmpty {
+                userDefaults.set(value, forKey: workspaceIdKey)
+            } else {
+                userDefaults.removeObject(forKey: workspaceIdKey)
+            }
+        }
+    }
+    
+    var notionWorkspaceName: String? {
+        get { userDefaults.string(forKey: workspaceNameKey) }
+        set {
+            if let value = newValue, !value.isEmpty {
+                userDefaults.set(value, forKey: workspaceNameKey)
+            } else {
+                userDefaults.removeObject(forKey: workspaceNameKey)
+            }
+        }
+    }
+    
+    var effectiveToken: String? {
+        // 优先使用 OAuth token，如果没有则使用 API key
+        return notionOAuthToken ?? notionKey
+    }
+    
     var isConfigured: Bool {
-        return (notionKey?.isEmpty == false) && (notionPageId?.isEmpty == false)
+        // 只要有有效的 token（OAuth 或 API key）和 pageId 就认为已配置
+        return (effectiveToken?.isEmpty == false) && (notionPageId?.isEmpty == false)
     }
     
 

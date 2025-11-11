@@ -121,6 +121,12 @@ protocol NotionConfigStoreProtocol: AnyObject {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
+    // OAuth token (优先使用，如果存在则替代 notionKey)
+    var notionOAuthToken: String? { get set }
+    var notionWorkspaceId: String? { get set }
+    var notionWorkspaceName: String? { get set }
+    // 获取有效的认证 token（优先 OAuth token，否则使用 API key）
+    var effectiveToken: String? { get }
     // Generic mapping for future sources (e.g., WeRead/DeDao/GetBiji)
     func databaseIdForSource(_ sourceKey: String) -> String?
     func setDatabaseId(_ id: String?, forSource sourceKey: String)
