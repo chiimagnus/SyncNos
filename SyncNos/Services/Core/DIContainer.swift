@@ -22,6 +22,7 @@ class DIContainer {
     private var _syncQueueStore: SyncQueueStoreProtocol?
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
+    private var _notionOAuthService: NotionOAuthService?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -132,6 +133,13 @@ class DIContainer {
         return _loginItemService!
     }
 
+    var notionOAuthService: NotionOAuthService {
+        if _notionOAuthService == nil {
+            _notionOAuthService = NotionOAuthService()
+        }
+        return _notionOAuthService!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -193,6 +201,10 @@ class DIContainer {
 
     func register(loginItemService: LoginItemServiceProtocol) {
         self._loginItemService = loginItemService
+    }
+
+    func register(notionOAuthService: NotionOAuthService) {
+        self._notionOAuthService = notionOAuthService
     }
 
 }

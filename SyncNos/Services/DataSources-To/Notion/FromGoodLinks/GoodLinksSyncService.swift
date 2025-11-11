@@ -21,9 +21,12 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
     }
 
     func syncHighlights(for link: GoodLinksLinkRow, dbPath: String, pageSize: Int = NotionSyncConfig.goodLinksPageSize, progress: @escaping (String) -> Void) async throws {
-        // 1) 校验 Notion 配置
-        guard let parentPageId = notionConfig.notionPageId, notionConfig.notionKey?.isEmpty == false else {
+        // 1) 校验 Notion 配置（支持 OAuth token 或 API key）
+        guard let parentPageId = notionConfig.notionPageId else {
             throw NSError(domain: "NotionSync", code: 1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")])
+        }
+        guard let token = notionConfig.effectiveToken, !token.isEmpty else {
+            throw NSError(domain: "NotionSync", code: 2, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please authorize Notion first.", comment: "")])
         }
 
         // 2) 解析 GoodLinks 单库：优先使用已持久化的 ID；仅当明确不存在时才清理并创建
