@@ -7,16 +7,6 @@ struct NotionIntegrationView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Sync Mode for Apple Books")) {
-                Picker("Mode", selection: $viewModel.syncMode) {
-                    Text("Single Database (One page per book)").tag("single")
-                    Text("One database per book (Each highlight as an entry)").tag("perBook")
-                }
-                .onChange(of: viewModel.syncMode) { _ in
-                    viewModel.saveSyncMode()
-                }
-            }
-
             Section(header: Text("Authorization")) {
                 if viewModel.isOAuthAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
