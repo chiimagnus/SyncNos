@@ -1,324 +1,247 @@
-# 更新日志
-[ChangeLog-English Version](ChangeLog.En.md)
+[ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
-## v0.5.11 2025年11月4日
-
-*Changed*
-
-- Notion 集成优化：改进 NotionHelperMethods 中的 iBooks 链接编码，提升链接处理准确性。
-- 高亮处理增强：优化高亮链接和元数据处理逻辑。
-- 同步策略更新：更新 AppleBooksSyncStrategy 以使用基于令牌的高亮映射。
-- 代码清理：移除 NotionHelperMethods 中过时的无效方法。
-
-## v0.5.10.6 2025年11月4日
-
-*Changed*
-
-- Notion 高亮操作优化：精简 NotionHighlightOperations 中的子块元数据处理流程。
-- 元数据处理增强：为 NotionHelperMethods 添加高亮元数据注释功能。
-- GoodLinks 同步改进：通过基于令牌的更新增强 GoodLinks 同步机制。
-- 队列管理优化：实现同步队列管理的延迟清理机制。
-- 同步触发机制：同步成功后在 AppleBooks 和 GoodLinks 中触发重新计算。
-
-## v0.5.10.5 2025年11月3日
+## v0.5.10 November 2, 2025
 
 *Added*
 
-- 同步报告文档：新增 Apple Books 和 GoodLinks 同步到 Notion 的详细报告文档。
+- New Feature: Implemented highlight color management functionality for Apple Books and GoodLinks.
 
 *Changed*
 
-- 增量同步优化：改进 GoodLinksSyncService 中的增量同步机制。
-- 页面创建改进：优化 GoodLinks 页面创建和高亮同步流程。
-- 冲突处理增强：优化 GoodLinks 同步并增强冲突处理能力。
-- 用户界面统一：统一选择占位符视图以改善用户体验。
-- Notion 同步增强：通过添加源参数改进 Notion 同步功能。
+- Architecture Refactor: Modularized command structure, split into independent command files for improved maintainability.
 
-## v0.5.10.4 2025年11月3日
-
-*Changed*
-
-- Notion 数据库管理：增强 Notion 数据库属性管理功能。
-- 项目文档更新：更新 CLAUDE.md 中的项目概览和结构说明。
-
-## v0.5.10.3 2025年11月3日
+## v0.5.9.3 November 2, 2025
 
 *Added*
 
-- 国际化功能：继续完善应用的多语言支持。
+- Sync Queue Management: Implemented sync queue management and UI interface, added source identification badges for tasks.
+- Global Concurrency Control: Implemented global concurrency limiter to optimize sync operation performance.
 
 *Changed*
 
-- 界面布局优化：增强 InfoHeaderCardView 和 SyncQueueView 的布局设计。
+- API Optimization: Improved Notion API read/write rate limiting mechanism, enhanced sync stability.
+- Sync Queue Refactor: Optimized SyncQueueView layout and functionality, integrated into InfoHeaderCardView and MainListView.
+- Concurrency Control Enhancement: Integrated concurrency limiter in AppleBooksDetailViewModel and GoodLinksViewModel.
+- UI Improvements: Removed sync queue window, updated sync queue layout and background styles.
+- Logging Mechanism: Improved logging mechanism in LoggerService.
+- State Management: Optimized sync state management in GoodLinksViewModel.
 
-## v0.5.10.2 2025年11月3日
-
-*Changed*
-
-- 自动同步增强：优化 AutoSyncService 以支持按源独立同步控制。
-
-## v0.5.10.1 2025年11月3日
+## v0.5.9.2 October 30, 2025
 
 *Added*
 
-- 国际化支持：增强应用的国际化功能。
-- 空状态视图：实现 EmptyStateView 以改善用户体验。
-- 主列表功能：为主列表视图添加排序和筛选选项，支持 Apple Books 和 GoodLinks。
+- Sync Queue: Implemented sync queue management and UI interface.
 
 *Changed*
 
-- 书籍显示改进：优化 AppleBooks 视图中的书籍标题和作者显示。
-- 界面文本优化：更新和简化各个视图组件的标签文本。
-- 排序键显示：更新 BookListSortKey 的显示名称以提升清晰度。
-- 同步队列界面：注释 SyncQueueView 中的导航标题和工具栏。
-- 版本管理：更新项目版本号至 0.5.10。
+- UI Optimization: Unified toolbar structure in AppleBooksDetailView and GoodLinksDetailView.
+- Layout Improvements: Reorganized LogWindow layout and toolbar integration, updated SyncQueueView layout and navigation.
+
+## v0.5.9.1 October 30, 2025
+
+*Changed*
+
+- Scroll Experience Optimization: Improved scroll behavior in AppleBooksDetailView and GoodLinksDetailView.
+- UI Fine-tuning: Enhanced optional expand state binding in ArticleContentCardView, disabled text selection to improve user experience.
+
+## v0.5.8 October 30, 2025
+
+*Added*
+
+- Internationalization Support: Added multi-language internationalization support for the application.
+- Sync Monitoring: Implemented sync activity monitoring and application termination handling.
+- Content Enhancement: Enhanced ArticleContentCardView to support custom content slots, added titles and sync progress messages for multi-selection placeholder views.
+- Fallback Mechanism: Added fallback content handling for GoodLinksDetailView.
+
+*Changed*
+
+- UI Improvements: Enhanced MainListView layout and style, updated icons in AppleBooksDetailView and GoodLinksDetailView for consistency.
+- Link Display: Updated link colors in GoodLinksDetailView for better visibility, clarified fallback message clarity.
+- License Update: Updated license in README file from GPL-3.0 to AGPL-3.0.
+
+## v0.5.7.2 October 28, 2025
+
+*Changed*
+
+- UI Optimization: Updated AppCommands menu icons for better clarity, replaced Toggle with Button in FiltetSortBar and AppCommands for note filtering, maintained compact mask for highlight selection in ViewModels.
+- Feature Enhancement: Implemented color filter selection in ViewModels, unified filtering and sorting experience.
+
+## v0.5.7.1 October 28, 2025
+
+*Added*
+
+- Global Settings: Synchronized global highlight settings in AppleBooks and GoodLinks view models, added global highlight sorting and filtering options in AppCommands.
+
+*Changed*
+
+- State Management Optimization: Optimized UserDefaults usage and enhanced debounce mechanism in ViewModels, enhanced sync notifications in GoodLinksViewModel, improved application restart process.
+- Documentation Update: Removed ViewModels improvement plan document, streamlined project documentation structure.
+
+## v0.5.7 October 28, 2025
+
+*Changed*
+
+- Architecture Refactor: Simplified AppCommands structure, removed unused reset filter functionality in detail views, updated toolbar item positions in detail views.
+- Component Update: Replaced FilterBar with FiltetSortBar in AppleBooks and GoodLinks detail views, enhanced concurrency and service-level Sendable compliance.
+
+## v0.5.6.7 October 28, 2025
+
+*Changed*
+
+- Code Optimization: Removed syncToNotion method from AppleBookDetailViewModel, merged highlight filtering and sorting into GoodLinksViewModel to improve consistency.
+- Feature Enhancement: Enhanced sorting functionality in GoodLinksDetailViewModel and UI components, added GoodLinksDetailViewModel and FilterBar to enhance filtering options.
+
+## v0.5.6.6 October 27, 2025
+
+*Changed*
+
+- Parsing Optimization: Enhanced EPUB CFI parsing capability in AppleBooksLocationParser, optimized highlight sorting mechanism in AppleBookDetailView.
+- UI Improvements: Refined sorting field display, corrected syntax errors in AppleBookDetailView, simplified sorting options and hidden menu indicators.
+
+## v0.5.6.5 October 26, 2025
+
+*Changed*
+
+- Interaction Improvements: Implemented selection commands for AppleBooksListView and GoodLinksListView, updated deselect button icon in AppCommands.
+
+## v0.5.6.3 October 25, 2025
+
+*Added*
+
+- Deep Integration: Added context menu options for Apple Books and GoodLinks to directly open applications, added deep linking functionality for GoodLinks.
+
+*Changed*
+
+- UI Improvements: Optimized last sync time display logic in AppleBooksListView and GoodLinksListView, enhanced user experience feedback.
+
+## v0.5.6.2 October 24, 2025
+
+*Added*
+
+- Notion Integration Enhancement: Added "Last Sync Time" property to Notion database and updated page properties, providing more detailed sync status information.
+
+## v0.5.6.1 October 24, 2025
+
+*Changed*
+
+- Database Management: Implemented serialized database creation mechanism in NotionService, ensuring consistency and stability of database operations.
+
+## v0.5.5.1 October 24, 2025
+
+*Changed*
+
+- Documentation Adjustment: Rolled back planning documents, maintained project documentation conciseness and practicality.
+
+## v0.5.5 October 17, 2025
+
+*Added*
+
+- Sync Experience Improvement: Enhanced sync feedback and added progress tracking for batch sync, displayed last sync time for selected items.
+
+*Changed*
+
+- UI Cleanup and Optimization: Removed redundant sync buttons and related context menus, simplified `MainListView` layout and improved item selection feedback.
+- Concurrency Control Unification: Unified and strengthened batch sync concurrency control logic, improved sync stability and consistency.
+
+## v0.5.4 October 17, 2025
+
+*Added*
+
+- Batch Sync: Added batch sync functionality for selected items in Apple Books and GoodLinks, improved operation efficiency.
+- Filtering and Sorting: Implemented filtering and sorting options for Apple Books and GoodLinks, flattened filter menu structure to simplify operations.
 
 *Fixed*
 
-- 显示问题修复：修复 AppleBooksDetailView 中的作者名显示和 MainListView 中的数量统计。
+- Fixed error log writing thread issue in batch sync, ensured safe log recording on main thread.
 
-## v0.5.10 2025年11月2日
+## v0.5.3.1 October 17, 2025
+
+*Changed*
+
+- Feature Experiment: Added Markdown support for article and highlight views (rolled back in later versions).
+
+## v0.5.3 October 15, 2025
 
 *Added*
 
-- 新增功能：为 Apple Books 和 GoodLinks 实现高亮颜色管理功能。
+- Sign in with Apple Backend Enhancement: Implemented Apple ID token verification, nonce support, and more secure JTI storage, improved Apple login flow.
 
 *Changed*
 
-- 架构重构：将命令结构模块化，拆分为独立的命令文件以提高可维护性。
-
-## v0.5.9.3 2025年11月2日
-
-*Added*
-
-- 同步队列管理：实现同步队列管理和 UI 界面，为任务添加源标识徽章。
-- 全局并发控制：实现全局并发限制器以优化同步操作性能。
-
-*Changed*
-
-- API 优化：改进 Notion API 的读写限流机制，提升同步稳定性。
-- 同步队列重构：优化 SyncQueueView 的布局和功能，集成到 InfoHeaderCardView 和 MainListView 中。
-- 并发控制增强：在 AppleBooksDetailViewModel 和 GoodLinksViewModel 中集成并发限制器。
-- 界面改进：移除同步队列窗口，更新同步队列布局和背景样式。
-- 日志机制：改进 LoggerService 中的日志记录机制。
-- 状态管理：优化 GoodLinksViewModel 中的同步状态管理。
-
-## v0.5.9.2 2025年10月30日
-
-*Added*
-
-- 同步队列：实现同步队列管理和 UI 界面。
-
-*Changed*
-
-- 界面优化：统一 AppleBooksDetailView 和 GoodLinksDetailView 中的工具栏结构。
-- 布局改进：重新组织 LogWindow 布局和工具栏集成，更新 SyncQueueView 布局和导航。
-
-## v0.5.9.1 2025年10月30日
-
-*Changed*
-
-- 滚动体验优化：改进 AppleBooksDetailView 和 GoodLinksDetailView 中的滚动行为。
-- 界面微调：增强 ArticleContentCardView 的可选展开状态绑定，禁用文本选择以提升用户体验。
-
-## v0.5.8 2025年10月30日
-
-*Added*
-
-- 国际化支持：为应用添加多语言国际化支持。
-- 同步监控：实现同步活动监控和应用终止处理。
-- 内容增强：增强 ArticleContentCardView 以支持自定义内容插槽，添加多选占位符视图的标题和同步进度消息。
-- Fallback 机制：为 GoodLinksDetailView 添加 fallback 内容处理。
-
-*Changed*
-
-- 界面改进：增强 MainListView 布局和样式，更新 AppleBooksDetailView 和 GoodLinksDetailView 中的图标以保持一致性。
-- 链接显示：更新 GoodLinksDetailView 中的链接颜色以提高可见性，修正 fallback 消息的清晰度。
-- 许可证更新：更新 README 文件中的许可证从 GPL-3.0 到 AGPL-3.0。
-
-## v0.5.7.2 2025年10月28日
-
-*Changed*
-
-- 界面优化：更新 AppCommands 菜单图标以提高清晰度，在 FiltetSortBar 和 AppCommands 中用 Button 替换 Toggle 以进行笔记筛选，保持 ViewModels 中高亮选择的紧凑遮罩。
-- 功能增强：在 ViewModels 中实现颜色筛选选择，统一筛选与排序体验。
-
-## v0.5.7.1 2025年10月28日
-
-*Added*
-
-- 全局设置：在 AppleBooks 和 GoodLinks 视图模型中同步全局高亮设置，在 AppCommands 中添加全局高亮排序和筛选选项。
-
-*Changed*
-
-- 状态管理优化：优化 UserDefaults 使用并在 ViewModels 中增强防抖机制，增强 GoodLinksViewModel 中的同步通知，改进应用重启流程。
-- 文档更新：移除 ViewModels 改进计划文档，精简项目文档结构。
-
-## v0.5.7 2025年10月28日
-
-*Changed*
-
-- 架构重构：简化 AppCommands 结构，移除详情视图中未使用的重置筛选功能，更新详情视图中的工具栏项目位置。
-- 组件更新：用 FiltetSortBar 替换 FilterBar 在 AppleBooks 和 GoodLinks 详情视图中，增强并发性和服务级别的 Sendable 合规性。
-
-## v0.5.6.7 2025年10月28日
-
-*Changed*
-
-- 代码优化：从 AppleBookDetailViewModel 中移除 syncToNotion 方法，将高亮筛选和排序合并到 GoodLinksViewModel 中以提升一致性。
-- 功能增强：在 GoodLinksDetailViewModel 和 UI 组件中增强排序功能，添加 GoodLinksDetailViewModel 和 FilterBar 以增强筛选选项。
-
-## v0.5.6.6 2025年10月27日
-
-*Changed*
-
-- 解析优化：增强 AppleBooksLocationParser 中的 EPUB CFI 解析能力，优化 AppleBookDetailView 中的高亮排序机制。
-- 界面改进：细化排序字段显示，修正 AppleBookDetailView 中的语法错误，简化排序选项并隐藏菜单指示器。
-
-## v0.5.6.5 2025年10月26日
-
-*Changed*
-
-- 交互改进：为 AppleBooksListView 和 GoodLinksListView 实现选择命令，更新 AppCommands 中的取消选择按钮图标。
-
-## v0.5.6.3 2025年10月25日
-
-*Added*
-
-- 深度集成：为 Apple Books 和 GoodLinks 添加上下文菜单选项以直接打开应用，为 GoodLinks 添加深度链接功能。
-
-*Changed*
-
-- UI 改进：在 AppleBooksListView 和 GoodLinksListView 中优化最后同步时间显示逻辑，提升用户体验反馈。
-
-## v0.5.6.2 2025年10月24日
-
-*Added*
-
-- Notion 集成增强：为 Notion 数据库添加"最后同步时间"属性并更新页面属性，提供更详细的同步状态信息。
-
-## v0.5.6.1 2025年10月24日
-
-*Changed*
-
-- 数据库管理：在 NotionService 中实现数据库创建的序列化机制，确保数据库操作的一致性和稳定性。
-
-## v0.5.5.1 2025年10月24日
-
-*Changed*
-
-- 文档调整：回滚计划文档，保持项目文档的简洁性和实用性。
-
-## v0.5.5 2025年10月17日
-
-*Added*
-
-- 同步体验改进：增强同步反馈并为批量同步添加进度跟踪，显示选中项目的上次同步时间。
-
-*Changed*
-
-- UI 清理与优化：移除冗余的同步按钮与相关上下文菜单，简化 `MainListView` 布局并改进项选择反馈。
-- 并发控制统一：统一并强化批量同步的并发控制逻辑，提升同步稳定性与一致性。
-
-## v0.5.4 2025年10月17日
-
-*Added*
-
-- 批量同步：为 Apple Books 与 GoodLinks 添加对选中项的批量同步功能，提升操作效率。
-- 筛选与排序：实现 Apple Books 与 GoodLinks 的过滤与排序选项，并扁平化过滤菜单结构以简化操作。
-
-*Fixed*
-
-- 修复批量同步中错误日志写入线程问题，确保在主线程安全记录日志。
-
-## v0.5.3.1 2025年10月17日
-
-*Changed*
-
-- 功能实验：为文章和高亮视图添加 Markdown 支持（后续版本中回滚）。
-
-## v0.5.3 2025年10月15日
-
-*Added*
-
-- Sign in with Apple 后端增强：实现 Apple ID token 验证、nonce 支持以及更安全的 JTI 存储，改进 Apple 登录流程。
-
-*Changed*
-
-- 后端重构与类型改进：更新用户模型与安全依赖以改善类型处理与安全性。
+- Backend Refactor and Type Improvements: Updated user models and security dependencies to improve type handling and security.
 
 *Docs*
 
-- 新增 Sign in with Apple 开发指南并更新 README 与相关文档。
+- Added Sign in with Apple development guide and updated README and related documentation.
 
-## v0.5.2 2025年10月15日
-
-*Added*
-
-- 日志与调试：新增日志窗口及导出/分享功能，改进日志筛选与级别选项，增强调试体验。
-
-*Changed*
-
-- 界面微调：若干设置视图标签与图标优化，提升可读性与一致性。
-
-## v0.5.1 2025年10月15日
+## v0.5.2 October 15, 2025
 
 *Added*
 
-- 后端与认证：初始化 FastAPI 后端骨架，添加用户认证與 Apple OAuth 支持（后端初始实现）。
+- Logging and Debugging: Added log window with export/share functionality, improved log filtering and level options, enhanced debugging experience.
 
 *Changed*
 
-- 账户与权限：改善 `AccountViewModel` 的 token 获取逻辑并为项目添加 Apple Sign In 权限配置（entitlements）。
+- UI Fine-tuning: Optimized labels and icons in several settings views, improved readability and consistency.
+
+## v0.5.1 October 15, 2025
+
+*Added*
+
+- Backend and Authentication: Initialized FastAPI backend skeleton, added user authentication and Apple OAuth support (backend initial implementation).
+
+*Changed*
+
+- Account and Permissions: Improved token retrieval logic in `AccountViewModel` and added Apple Sign In permission configuration (entitlements) to the project.
 
 *Docs*
 
-- 更新 AppleBooks/GoodLinks 的本地化字符串与相关文档、Changelog 条目。
+- Updated AppleBooks/GoodLinks localization strings and related documentation, Changelog entries.
 
-## v0.4.15 2025年10月12日
+## v0.4.15 October 12, 2025
 
 *Changed*
 
-- 设置重构：将设置拆分为按源（AppleBooks/GoodLinks）管理，移动数据授权按钮到对应源设置，移除全局 autoSync，采用每源开关与更清晰的导航与图标。
+- Settings Refactor: Split settings into per-source (AppleBooks/GoodLinks) management, moved data authorization buttons to corresponding source settings, removed global autoSync, adopted per-source switches with clearer navigation and icons.
 
 *Fixed*
 
-- Notion 集成修复：修复 Notion 相关 ViewModel 使用通用 `databaseIdForSource` 的问题，改进 per-source 配置使用流程。
+- Notion Integration Fix: Fixed issue with Notion-related ViewModels using generic `databaseIdForSource`, improved per-source configuration usage flow.
 
-## v0.4.14 2025年10月12日
+## v0.4.14 October 12, 2025
 
 *Changed*
 
-- Notion 配置增强：为 AppleBooks 与 GoodLinks 提供可选的数据库 ID 配置，重构 `NotionConfigStore` 与 `NotionService` 以改善配置管理。
-- GoodLinks 改进：重构 GoodLinks 列表的排序与筛选逻辑，并将工具栏移至主列表以统一体验；若干视图与枚举重命名与清理。
+- Notion Configuration Enhancement: Provided optional database ID configuration for AppleBooks and GoodLinks, refactored `NotionConfigStore` and `NotionService` to improve configuration management.
+- GoodLinks Improvements: Refactored sorting and filtering logic for GoodLinks list, moved toolbar to main list for unified experience; renamed and cleaned up several views and enums.
 
-## v0.4.13 2025年10月11日
+## v0.4.13 October 11, 2025
 
 *Added*
 
-- Notion 功能扩展（实验性）：引入页面级数据库映射与子数据库查找功能、feature flag 以控制子块/子库查找行为；增加 Notion API 版本升级与限流重试支持。
-- 并发同步：`AutoSyncService` 支持并发同步（最高 10 本书），提高同步吞吐量与稳定性。
+- Notion Feature Extension (Experimental): Introduced page-level database mapping and sub-database lookup functionality, feature flag to control sub-block/sub-database lookup behavior; added Notion API version upgrade and rate limit retry support.
+- Concurrent Sync: `AutoSyncService` supports concurrent sync (up to 10 books), improved sync throughput and stability.
 
-## v0.4.12.1 2025年10月11日
+## v0.4.12.1 October 11, 2025
 
 *Fixed*
 
-- 修复 MainList 背景处理与默认背景设置，完善 GoodLinks 的排序与筛选实现。
+- Fixed MainList background handling and default background settings, completed GoodLinks sorting and filtering implementation.
 
 *Changed*
 
-- ViewModel 与性能优化：抽象并注入时间戳存储（`SyncTimestampStore`）、移除未使用导入、清理多个 ViewModel；使用 Combine 优化 IAP 状态监听与移除冗余的对象变更通知。
+- ViewModel and Performance Optimization: Abstracted and injected timestamp storage (`SyncTimestampStore`), removed unused imports, cleaned up multiple ViewModels; used Combine to optimize IAP state monitoring and remove redundant object change notifications.
 
-## v0.4.12 2025年10月11日
+## v0.4.12 October 11, 2025
 
 *Added*
 
-- AppleBooks 功能：为高亮和书籍实现排序与筛选功能，并将相关菜单结构简化以提升可用性。
+- AppleBooks Features: Implemented sorting and filtering functionality for highlights and books, simplified related menu structure to improve usability.
 
 *Changed*
 
-- 状态管理重构：将排序/筛选状态从 `@AppStorage` 替换为通过 `UserDefaults` 注入以简化状态依赖与测试。
-- 复用性改进：提取共享 UI 组件以减少重复并对若干视图做重构和项目文件更新。
+- State Management Refactor: Replaced sorting/filtering state from `@AppStorage` with injection through `UserDefaults` to simplify state dependencies and testing.
+- Reusability Improvements: Extracted shared UI components to reduce duplication and refactored several views and project file updates.
 
 ## v0.4.11.2 2025年10月8日
 
