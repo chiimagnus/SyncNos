@@ -25,7 +25,7 @@
 		D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				ChangeLog.en.md,
+				ChangeLog.cn.md,
 				ChangeLog.md,
 				image.png,
 				notion_auth.env.example,
