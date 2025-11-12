@@ -4,6 +4,9 @@
     "" : {
       "shouldTranslate" : false
     },
+    "(No pages available)" : {
+
+    },
     "%@" : {
       "shouldTranslate" : false
     },
@@ -1138,6 +1141,7 @@
       "shouldTranslate" : false
     },
     "AppleBooks DB ID (optional)" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1369,6 +1373,9 @@
         }
       }
     },
+    "Authorization" : {
+
+    },
     "Authorization failed" : {
       "localizations" : {
         "de" : {
@@ -1542,6 +1549,12 @@
           }
         }
       }
+    },
+    "Authorize with Notion" : {
+
+    },
+    "Authorizing..." : {
+
     },
     "Auto Sync (24 hours)" : {
       "localizations" : {
@@ -2530,6 +2543,7 @@
       }
     },
     "Credentials" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4056,6 +4070,7 @@
       "shouldTranslate" : false
     },
     "GoodLinks DB ID (optional)" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4751,6 +4766,9 @@
         }
       }
     },
+    "Launch at Login" : {
+
+    },
     "Level" : {
       "localizations" : {
         "de" : {
@@ -4983,6 +5001,9 @@
         }
       }
     },
+    "Loading..." : {
+
+    },
     "Login methods" : {
       "localizations" : {
         "de" : {
@@ -5164,6 +5185,7 @@
       }
     },
     "Mode" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6269,6 +6291,7 @@
       }
     },
     "NOTION_KEY" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6327,6 +6350,7 @@
       }
     },
     "NOTION_PAGE_ID" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6383,6 +6407,9 @@
           }
         }
       }
+    },
+    "OAuth Authorized" : {
+
     },
     "Obsidian" : {
       "shouldTranslate" : false
@@ -6557,64 +6584,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开 Apple Books 笔记"
-          }
-        }
-      }
-    },
-    "Open at Login" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beim Anmelden öffnen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open at Login"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir al Iniciar Sesión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir à la Connexion"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログイン時に開く"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그인 시 열기"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir no Login"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открывать при Входе"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登录时打开"
           }
         }
       }
@@ -6850,6 +6819,9 @@
           }
         }
       }
+    },
+    "Parent Page" : {
+
     },
     "Paste" : {
       "localizations" : {
@@ -7256,6 +7228,9 @@
           }
         }
       }
+    },
+    "Please authorize Notion first." : {
+
     },
     "Please configure Notion API Key and Page ID before syncing." : {
       "localizations" : {
@@ -8708,6 +8683,9 @@
         }
       }
     },
+    "Revoke Authorization" : {
+
+    },
     "Running" : {
       "localizations" : {
         "de" : {
@@ -8767,6 +8745,7 @@
       }
     },
     "Save" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10333,6 +10312,7 @@
       }
     },
     "Sync Mode for Apple Books" : {
+      "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -11151,6 +11131,9 @@
     "URL" : {
       "shouldTranslate" : false
     },
+    "Use OAuth to authorize SyncNos to access your Notion workspace. This is the recommended method." : {
+
+    },
     "User Guide" : {
       "localizations" : {
         "de" : {
@@ -11559,6 +11542,9 @@
     },
     "WeRead" : {
       "shouldTranslate" : false
+    },
+    "Workspace: %@" : {
+
     },
     "You Bet!" : {
       "localizations" : {
