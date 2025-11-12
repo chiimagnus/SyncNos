@@ -40,12 +40,6 @@ struct SyncNosApp: App {
         }
         .windowResizability(.contentSize)
         
-        // 用户指南窗口（单实例）
-        Window("SyncNos User Guide", id: "userguide") {
-            UserGuideView()
-        }
-        .windowResizability(.contentSize)
-
         // 日志窗口（单实例）
         Window("Logs", id: "log") {
             LogWindow()
