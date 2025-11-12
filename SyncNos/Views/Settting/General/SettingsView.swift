@@ -11,13 +11,16 @@ struct SettingsView: View {
                 Section(header: Text("General")) {
                     LanguageView()
 
-                    Toggle(isOn: $loginItemVM.isEnabled) {
-                        Label("Open at Login", systemImage: "arrow.up.right.square")
+                    Toggle(isOn: Binding(
+                        get: { loginItemVM.isEnabled },
+                        set: { newValue in
+                            // 只在用户手动操作toggle时才调用setEnabled
+                            loginItemVM.setEnabled(newValue)
+                        }
+                    )) {
+                        Label("Launch at Login", systemImage: "arrow.up.right.square")
                     }
                     .toggleStyle(SwitchToggleStyle())
-                    .onChange(of: loginItemVM.isEnabled) { newValue in
-                        loginItemVM.setEnabled(newValue)
-                    }
 
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
@@ -156,6 +159,10 @@ struct SettingsView: View {
             }
         }
         .frame(width: 425)
+        .onAppear {
+            // 视图出现时刷新状态，监听系统设置中的变化
+            loginItemVM.refreshStatus()
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNotionSettings"))) { _ in
             navigationPath.append("notion")
         }
