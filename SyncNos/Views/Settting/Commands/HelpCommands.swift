@@ -7,12 +7,6 @@ struct HelpCommands: Commands {
     var body: some Commands {
         // Help 菜单 - 帮助相关
         CommandGroup(replacing: .help) {
-            Button("SyncNos User Guide", systemImage: "questionmark.circle") {
-                openWindow(id: "userguide")
-            }
-
-            Divider()
-
             Button("Please give five stars", systemImage: "heart") {
                 openAppStoreReview()
             }
