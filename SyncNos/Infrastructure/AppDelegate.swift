@@ -59,6 +59,23 @@ import SwiftUI
         return false
     }
     
+    // Ensure clicking the Dock icon re-opens the main window even if other windows are visible.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Try to find the main window created by the SwiftUI `Window(id: "main")`
+        if let mainWindow = sender.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+            mainWindow.makeKeyAndOrderFront(nil)
+            sender.activate(ignoringOtherApps: true)
+            return true
+        }
+
+        // Fallback: if no window has identifier "main", bring the first window to front.
+        if let anyWindow = sender.windows.first {
+            anyWindow.makeKeyAndOrderFront(nil)
+            sender.activate(ignoringOtherApps: true)
+        }
+        return true
+    }
+    
     // MARK: - URL Scheme Handling
     /// 处理自定义 URL scheme 回调（备用机制）
     /// 主要处理由 ASWebAuthenticationSession 负责，此方法作为备用
