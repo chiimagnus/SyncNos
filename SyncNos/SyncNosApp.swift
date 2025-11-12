@@ -27,7 +27,8 @@ struct SyncNosApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        // Use a named single main window so we can explicitly re-open it when dock icon is clicked.
+        Window("SyncNos", id: "main") {
             MainListView()
         }
         .commands {
