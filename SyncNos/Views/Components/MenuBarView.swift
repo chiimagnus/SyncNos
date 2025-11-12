@@ -10,7 +10,7 @@ struct MenuBarView: View {
         Button {
             openWindow(id: "main")
         } label: {
-            Label("Open Window", systemImage: "checkmark.square")
+            Label("Open SyncNos", systemImage: "checkmark.square")
         }
         
         Divider()
