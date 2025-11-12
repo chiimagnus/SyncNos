@@ -51,7 +51,7 @@ struct AppCommands: Commands {
         ViewCommands()
 
         // Window 菜单 - 窗口管理相关
-        CommandGroup(replacing: .singleWindowList) {}
+        // CommandGroup(replacing: .singleWindowList) {}
 
         // Help 菜单 - 帮助相关
         HelpCommands()
