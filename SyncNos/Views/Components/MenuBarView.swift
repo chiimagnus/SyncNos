@@ -6,6 +6,15 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     
     var body: some View {
+        // MARK: - Window Management
+        Button {
+            openWindow(id: "main")
+        } label: {
+            Label("Open Window", systemImage: "checkmark.square")
+        }
+        
+        Divider()
+
         // MARK: - Sync Actions
         Button {
             viewModel.syncAppleBooksNow()
@@ -70,7 +79,7 @@ struct MenuBarView: View {
         }
         
         Divider()
-        
+                
         // MARK: - Settings
         Button {
             openWindow(id: "setting")
