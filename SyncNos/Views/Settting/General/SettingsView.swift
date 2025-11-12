@@ -12,7 +12,7 @@ struct SettingsView: View {
                     LanguageView()
 
                     Toggle(isOn: $loginItemVM.isEnabled) {
-                        Label("Open at Login", systemImage: "arrow.up.right.square")
+                        Label("Launch at Login", systemImage: "arrow.up.right.square")
                     }
                     .toggleStyle(SwitchToggleStyle())
                     .onChange(of: loginItemVM.isEnabled) { newValue in
