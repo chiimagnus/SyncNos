@@ -117,29 +117,29 @@ struct NotionIntegrationView: View {
                     .padding(.vertical, 4)
                 }
                 
-            //     Divider()
+                Divider()
                 
-            //     Text("Or manually enter credentials:")
-            //         .font(.subheadline)
-            //         .foregroundColor(.secondary)
+                Text("If you have any problems with OAuth, you can manually enter credentials:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                 
-            //     LabeledContent("NOTION_KEY") {
-            //         SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-            //             .textFieldStyle(.roundedBorder)
-            //             .disabled(viewModel.isOAuthAuthorized)
-            //     }
+                LabeledContent("NOTION_KEY") {
+                    SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(viewModel.isOAuthAuthorized)
+                }
 
-            //     LabeledContent("NOTION_PAGE_ID") {
-            //         TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
-            //             .textFieldStyle(.roundedBorder)
-            //     }
+                LabeledContent("NOTION_PAGE_ID") {
+                    TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
+                        .textFieldStyle(.roundedBorder)
+                }
 
-            //     Button("Save") {
-            //         viewModel.saveCredentials()
-            //     }
-            //     .buttonStyle(.borderedProminent)
-            //     .disabled(viewModel.isOAuthAuthorized)
-            // }
+                Button("Save") {
+                    viewModel.saveCredentials()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isOAuthAuthorized)
+            }
             
             // Section(header: Text("Database IDs")) {
             //     // Optional per-source DB IDs
@@ -154,7 +154,7 @@ struct NotionIntegrationView: View {
             //         Text(viewModel.goodLinksDbId.isEmpty ? "(moved to GoodLinks settings)" : viewModel.goodLinksDbId)
             //             .foregroundColor(.secondary)
             //     }
-            }
+            // }
 
             if let message = viewModel.message {
                 Section {
