@@ -140,6 +140,13 @@
 				"pt-BR",
 				ru,
 				"es-ES",
+				da,
+				fi,
+				nl,
+				sv,
+				th,
+				id,
+				vi,
 			);
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
