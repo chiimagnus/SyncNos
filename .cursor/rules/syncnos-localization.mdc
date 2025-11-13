@@ -9,13 +9,20 @@ alwaysApply: false
 此app 支持多语言本地化，当前支持以下语言：
 - **English (en)** - 主要开发语言
 - **Chinese, Simplified (zh-Hans)** - 简体中文
+- **Danish (da)** - 丹麦语
+- **Dutch (nl)** - 荷兰语
+- **Finnish (fi)** - 芬兰语
 - **French (fr)** - 法语
 - **German (de)** - 德语
+- **Indonesian (id)** - 印尼语
 - **Japanese (ja)** - 日语
 - **Korean (ko)** - 韩语
 - **Portuguese (Brazil) (pt-BR)** - 巴西葡萄牙语
 - **Russian (ru)** - 俄语
 - **Spanish (Spain) (es-ES)** - 西班牙语
+- **Swedish (sv)** - 瑞典语
+- **Thai (th)** - 泰语
+- **Vietnamese (vi)** - 越南语
 
 ## 📁 字符串目录结构
 
