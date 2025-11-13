@@ -1,5 +1,240 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.6.5.4 November 12, 2025
+
+*Added*
+
+- Main Window Behavior: Optimized main window display and behavior logic
+- Open at Login Technical Documentation: Added technical documentation for the login item feature
+
+*Changed*
+
+- Removed User Guide: Removed user guide functionality from the app to simplify the interface
+- Refactored FileCommands: Updated menu structure, replacing previous implementation with CommandGroup
+- Merged NotionAuth PR: Integrated Notion authentication-related feature improvements
+
+## v0.6.5.3 November 12, 2025
+
+*Changed*
+
+- Menu Bar Improvements: Fixed unused menu items in menu settings
+- Enhanced Logging: Improved logging functionality in LoggerService and HelperStatusBarController
+- Configuration Cleanup: Replaced SharedDefaults with UserDefaults for consistency
+- Language Preference Handling: Enhanced language preference setting management logic
+
+## v0.6.5.2 November 12, 2025
+
+*Changed*
+
+- Login Item Optimization: Enhanced interaction logic between LoginItemViewModel and SettingsView
+- Registration Logic Fix: Updated login item registration logic to improve stability
+- Internationalization Updates: Improved localization support for background activity management
+- Label Text Optimization: Updated label text in SettingsView for better clarity
+
+## v0.6.5.1 November 12, 2025
+
+*Changed*
+
+- Notion Sync Configuration Validation: Enhanced configuration validation logic
+- Page Selection Feature: Added page selection functionality for Notion integration
+- UI Handling Improvements: Optimized Notion page selection and interface handling logic
+
+## v0.6.5 November 11, 2025
+
+*Changed*
+
+- Loading State Handling: Improved loading state management logic
+- UI Simplification: Simplified page display logic in NotionIntegrationView
+- Page Selection Enhancement: Optimized Notion page selection UI
+- Sync Mode Cleanup: Removed unused sync mode UI elements
+
+## v0.6.4 November 11, 2025
+
+*Added*
+
+- Custom Clipboard Operations: Implemented custom clipboard and selection commands in EditCommands
+- StatusBarController: Added status bar controller for the Helper app
+
+*Fixed*
+
+- Logic Sequence Fix: Corrected configuration check → pass → send notification → execute task flow
+- Mac App Store Links: Updated Mac App Store links in documentation
+*Changed*
+
+- Scheme Management: Cleaned up scheme management plist file, removed unused entries
+- Project Configuration: Updated SyncNosHelper project configuration
+
+## v0.6.3 November 11, 2025
+
+*Added*
+
+- Menu Bar Functionality: Implemented MenuBarViewModel and MenuBarView to enhance sync functionality
+- Custom Menu Bar Icon: Added custom menu bar icon for the SyncNos application
+- Modular Processing: Modularized command handling to improve code maintainability
+
+*Changed*
+
+- Project Configuration: Updated project file to include file system synchronization exception configuration
+- Bundle Identifier Fix: Updated PRODUCT_BUNDLE_IDENTIFIER
+- Helper App Updates: Adjusted app icon handling, optimized helper app behavior
+
+## v0.6.2.3 November 10, 2025
+
+*Added*
+
+- Background Activity Service Enhancement: Enhanced background activity service to improve background task management
+- Helper App Refactor: Refactored SyncNosHelper app structure and removed ContentView
+- File System Synchronization: Added file system synchronization exception configuration for SyncNosHelper target
+- Background Mode: Enabled background mode for the application
+
+*Changed*
+
+- Background Activity Integration: Implemented background activity service for automatic syncing
+- Data Source Selection: Refactored data source selection logic in MainListView
+- Apple Books Integration: Added button to open Apple Books notes in AppleBooksListView
+- Logging Protocol Update: Updated logging protocol and fixed debug logging in DatabaseQueryService
+
+## v0.6.2.2 November 10, 2025
+
+*Added*
+
+- Status Bar Controller: Added HelperStatusBarController for the Helper app
+- SharedDefaults Migration: Continued migration to SharedDefaults for managing user preferences
+- Helper App Integration: Implemented helper app integration for background syncing
+
+*Changed*
+
+- Background Activity Management: Enhanced background activity management with thread-safe state handling
+- Settings View Cleanup: Removed unused status text
+- Background Activity Service: Improved logging in BackgroundActivityService
+- Background Activity Management: Streamlined background activity management in ViewModel
+
+## v0.6.2.1 November 9, 2025
+
+*Added*
+
+- Internationalization Support: Added i18n support for background activity management
+- Status Bar Interaction: Added HelperStatusBarController for managing status bar interactions
+- SharedDefaults Migration: Migrated user defaults to SharedDefaults for improved data management
+
+*Changed*
+
+- Background Mode: Updated plist key for background-only mode
+- Background Activity Service: Removed HelperLauncher, enhanced background activity service
+- Background Activity Management: Improved helper management in background activity service
+
+## v0.6.2 November 9, 2025
+
+*Added*
+
+- Background Activity Service Enhancement: Enhanced BackgroundActivityService to improve background task management
+- Helper App Refactor: Refactored SyncNosHelper app structure and removed ContentView
+- File System Synchronization: Added file system synchronization exception configuration for SyncNosHelper target
+- Background Mode: Enabled background mode for the application
+- MainListView Refactor: Refactored data source selection logic in MainListView
+
+*Changed*
+
+- Background Activity Integration: Implemented background activity service for automatic syncing
+- Apple Books Integration: Added button to open Apple Books notes in AppleBooksListView
+- User Notifications Integration: Removed user notifications integration from AppDelegate and LoginItemViewModel
+- Logging Enhancement: Improved logging mechanism in LoggerService
+- CLAUDE.md Update: Updated documentation for clarity and added development commands
+
+## v0.6.1 November 7, 2025
+
+*Added*
+
+- Notification Handling Enhancement: Enhanced notification handling in AppDelegate
+- User Notifications Integration: Integrated User Notifications for app status updates
+- Open at Login Technical Documentation: Added technical documentation for the login item feature
+
+*Changed*
+
+- Login Item Service Enhancement: Enhanced LoginItemService with migration for legacy helper registration
+- SyncNosHelper App Update: Removed ContentView and updated initialization
+- Project Configuration: Updated project configuration to support login item functionality
+
+## v0.6.0 November 7, 2025
+
+*Added*
+
+- Login Item Service Implementation: Implemented LoginItemService and integrated it into settings
+- SyncNosHelper App: Added initial implementation of SyncNosHelper app
+- Background Login Item Status Retrieval: Improved background login item status retrieval
+
+*Changed*
+
+- Removed LoginHelper App: Removed LoginHelper app and associated assets
+- Login Item Status: Improved background login item status retrieval
+- Project Configuration: Updated project configuration to support new login item implementation
+
+## v0.5.11.6 November 7, 2025
+
+*Added*
+
+- Auto-save Functionality: Implemented auto-save functionality in AppleBooks and GoodLinks settings views
+
+*Changed*
+
+- Documentation Update: Updated CLAUDE.md documentation
+- Project Maintenance: Project configuration and build optimization
+
+## v0.5.11.5 November 6, 2025
+
+*Changed*
+
+- Notification Handling: Improved notification handling in AppleBooks and GoodLinks view models
+- Auto-sync Optimization: Updated AutoSyncService to include all links in the sync process
+- Sync Triggers: Added per-source immediate triggers for AutoSyncService
+
+## v0.5.11.4 November 6, 2025
+
+*Added*
+
+- Failed Task Management: Added failed tasks section in SyncQueueView to improve task management
+- Sync Queue Enhancement: Enhanced sync queue management to track failed tasks
+
+*Changed*
+
+- Error Handling: Enhanced error handling in GoodLinksQueryService
+- UI Update: Updated MainListView toolbar with emoji buttons to differentiate content sources
+
+## v0.5.11.3 November 5, 2025
+
+*Changed*
+
+- Notification Handling: Improved notification handling in AppleBooks and GoodLinks view models
+- Auto-sync Optimization: Updated AutoSyncService to include all links in the sync process
+- Sync Triggers: Added per-source immediate triggers for AutoSyncService
+
+## v0.5.11.2 November 5, 2025
+
+*Changed*
+
+- UI Improvement: Updated MainListView toolbar with emoji buttons to differentiate content sources
+
+## v0.5.11.1 November 4, 2025
+
+*Added*
+
+- Sync Task Navigation: Enhanced sync task selection and navigation functionality
+- Sync Queue Navigation: Implemented navigation to sync task detail from sync queue
+
+*Changed*
+
+- Date Handling: Updated date handling in Notion synchronization services to use system timezone
+- Documentation Update: Updated ChangeLog
+
+## v0.5.11 November 4, 2025
+
+*Changed*
+
+- Notion Integration Optimization: Improved iBooks link encoding in NotionHelperMethods to enhance link processing accuracy.
+- Highlight Processing Enhancement: Optimized highlight link and metadata processing logic.
+- Sync Strategy Update: Updated AppleBooksSyncStrategy to use token-based highlight mapping.
+- Code Cleanup: Removed obsolete and invalid methods in NotionHelperMethods.
+
 ## v0.5.10 November 2, 2025
 
 *Added*

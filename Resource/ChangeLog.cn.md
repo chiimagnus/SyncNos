@@ -1,5 +1,231 @@
 # 更新日志
 
+## v0.6.5.4 2025年11月12日
+
+*Added*
+
+- 主窗口行为改进：优化主窗口的显示和行为逻辑
+- Open at Login 技术文档：新增开机自启功能的技术文档
+
+*Changed*
+
+- 移除用户指南功能：从应用中移除用户指南功能，简化界面
+- 重构 FileCommands 命令组：更新菜单结构，使用 CommandGroup 替代原有实现
+- 合并 NotionAuth 功能的 PR：整合 Notion 授权相关的功能改进
+
+## v0.6.5.3 2025年11月12日
+
+*Changed*
+
+- 菜单栏改进：修复菜单设置中的未使用菜单项
+- 日志增强：改进 LoggerService 和 HelperStatusBarController 的日志功能
+- 配置清理：将 SharedDefaults 替换为 UserDefaults 以保持一致性
+- 语言偏好处理：增强语言偏好设置的管理逻辑
+
+## v0.6.5.2 2025年11月12日
+
+*Changed*
+
+- 登录项优化：增强 LoginItemViewModel 与 SettingsView 的交互逻辑
+- 注册逻辑修复：更新登录项注册逻辑，提升稳定性
+- 国际化更新：完善后台活动管理的本地化支持
+- 标签文本优化：更新设置视图的标签文本以提高清晰度
+
+## v0.6.5.1 2025年11月12日
+
+*Changed*
+
+- Notion 同步配置验证：增强配置验证逻辑
+- 页面选择功能：为 Notion 集成添加页面选择功能
+- UI 处理改进：优化 Notion 页面选择和界面处理逻辑
+
+## v0.6.5 2025年11月11日
+
+*Changed*
+
+- 加载状态处理：改进加载状态的管理逻辑
+- UI 界面简化：简化 NotionIntegrationView 的页面显示逻辑
+- 页面选择增强：优化 Notion 页面选择 UI
+- 同步模式清理：移除未使用的同步模式 UI 元素
+
+## v0.6.4 2025年11月11日
+
+*Added*
+
+- 自定义剪贴板操作：在 EditCommands 中实现自定义剪贴板和选择命令
+- StatusBarController：为 Helper 应用添加状态栏控制器
+
+*Fixed*
+
+- 逻辑顺序修复：修正配置检查 → 通过 → 发送通知 → 执行任务的流程
+- Mac App Store 链接：更新文档中的 Mac App Store 链接
+*Changed*
+
+- 方案管理：清理方案管理 plist 文件，移除未使用的条目
+- 项目配置：更新 SyncNosHelper 的项目配置
+
+## v0.6.3 2025年11月11日
+
+*Added*
+
+- 菜单栏功能：实现 MenuBarViewModel 和 MenuBarView，增强同步功能
+- 自定义菜单栏图标：为 SyncNos 应用添加自定义菜单栏图标
+- 模块化处理：模块化命令处理，提升代码可维护性
+
+*Changed*
+
+- 项目配置：更新项目文件，包含文件系统同步异常配置
+- Bundle Identifier 修复：更新 PRODUCT_BUNDLE_IDENTIFIER
+- Helper 应用更新：调整应用图标处理，优化助手应用行为
+
+## v0.6.2.3 2025年11月10日
+
+*Added*
+
+- 后台活动服务增强：增强后台活动服务以改进后台任务管理
+- Helper 应用重构：重构 SyncNosHelper 应用结构并移除 ContentView
+- 文件系统同步：为 SyncNosHelper 目标添加文件系统同步异常配置
+- 后台模式：启用应用程序的后台模式
+
+*Changed*
+
+- 后台活动集成：实现用于自动同步的后台活动服务
+- 数据源选择：重构 MainListView 中的数据源选择逻辑
+- Apple Books 集成：添加按钮以在 AppleBooksListView 中打开 Apple Books 笔记
+- 日志协议更新：更新日志协议并修复 DatabaseQueryService 中的调试日志
+
+## v0.6.2.2 2025年11月10日
+
+*Added*
+
+- 状态栏控制器：为 Helper 应用添加 HelperStatusBarController
+- SharedDefaults 迁移：继续迁移到 SharedDefaults 以管理用户偏好
+- 助手应用集成：实现用于后台同步的助手应用集成
+
+*Changed*
+
+- 后台活动管理：使用线程安全的状态处理增强后台活动管理
+- 设置视图清理：移除未使用的状态文本
+- 后台活动服务：改进后台活动服务的日志记录
+- 后台活动管理：在 ViewModel 中简化后台活动管理
+
+## v0.6.2.1 2025年11月09日
+
+*Added*
+
+- 国际化支持：为后台活动管理添加 i18n 支持
+- 状态栏交互：添加 HelperStatusBarController 用于管理状态栏交互
+- SharedDefaults 迁移：将用户默认设置迁移到 SharedDefaults 以改进数据管理
+
+*Changed*
+
+- 后台模式：更新仅后台模式的 plist 键
+- 后台活动服务：移除 HelperLauncher，增强后台活动服务
+- 后台活动管理：改进后台活动服务助手管理
+
+## v0.6.2 2025年11月09日
+
+*Added*
+
+- 后台活动服务增强：增强 BackgroundActivityService 以改进后台任务管理
+- Helper 应用重构：重构 SyncNosHelper 应用结构并移除 ContentView
+- 文件系统同步：为 SyncNosHelper 目标添加文件系统同步异常配置
+- 后台模式：启用应用程序的后台模式
+- MainListView 重构：重构 MainListView 中的数据源选择逻辑
+
+*Changed*
+
+- 后台活动集成：实现用于自动同步的后台活动服务
+- Apple Books 集成：添加按钮以在 AppleBooksListView 中打开 Apple Books 笔记
+- 用户通知集成：从 AppDelegate 和 LoginItemViewModel 中移除用户通知集成
+- 日志记录增强：改进 LoggerService 中的日志记录机制
+- CLAUDE.md 更新：更新文档以提高清晰度并添加开发命令
+
+## v0.6.1 2025年11月07日
+
+*Added*
+
+- 通知处理增强：增强 AppDelegate 中的通知处理
+- 用户通知集成：为应用状态更新集成用户通知
+- Open at Login 技术文档：添加开机自启功能的技术文档
+
+*Changed*
+
+- 登录项服务增强：增强 LoginItemService 并迁移旧版助手注册
+- SyncNosHelper 应用更新：移除 ContentView 并更新初始化
+- 项目配置：更新项目配置以支持登录项功能
+
+## v0.6.0 2025年11月07日
+
+*Added*
+
+- 登录项服务实现：实现 LoginItemService 并集成到设置
+- SyncNosHelper 应用：添加 SyncNosHelper 应用的初始实现
+- 后台登录项状态检索：改进后台登录项状态检索
+
+*Changed*
+
+- 移除 LoginHelper 应用：移除 LoginHelper 应用和相关资源
+- 登录项状态：改进后台登录项状态检索
+- 项目配置：更新项目配置以支持新的登录项实现
+
+## v0.5.11.6 2025年11月07日
+
+*Added*
+
+- 自动保存功能：在 AppleBooks 和 GoodLinks 设置视图中实现自动保存功能
+
+*Changed*
+
+- 文档更新：更新 CLAUDE.md 文档
+- 项目维护：项目配置和构建优化
+
+## v0.5.11.5 2025年11月06日
+
+*Changed*
+
+- 通知处理：改进 AppleBooks 和 GoodLinks 视图模型中的通知处理
+- 自动同步优化：更新 AutoSyncService 以包含所有链接在同步过程中
+- 同步触发器：为 AutoSyncService 添加按源的即时触发器
+
+## v0.5.11.4 2025年11月06日
+
+*Added*
+
+- 失败任务管理：在 SyncQueueView 中添加失败任务部分以改进任务管理
+- 同步队列增强：增强同步队列管理以跟踪失败任务
+
+*Changed*
+
+- 错误处理：增强 GoodLinksQueryService 中的错误处理
+- UI 更新：用表情符号按钮更新 MainListView 工具栏以区分内容源
+
+## v0.5.11.3 2025年11月05日
+
+*Changed*
+
+- 通知处理：改进 AppleBooks 和 GoodLinks 视图模型中的通知处理
+- 自动同步优化：更新 AutoSyncService 以包含所有链接在同步过程中
+- 同步触发器：为 AutoSyncService 添加按源的即时触发器
+
+## v0.5.11.2 2025年11月05日
+
+*Changed*
+
+- UI 改进：用表情符号按钮更新 MainListView 工具栏以区分内容源
+
+## v0.5.11.1 2025年11月04日
+
+*Added*
+
+- 同步任务导航：增强同步任务选择和导航功能
+- 同步队列导航：实现从同步队列导航到同步任务详情的功能
+
+*Changed*
+
+- 日期处理：更新 Notion 同步服务中的日期处理以使用系统时区
+- 文档更新：更新 ChangeLog
+
 ## v0.5.11 2025年11月4日
 
 *Changed*
