@@ -59,6 +59,12 @@
             "state": "translated",
             "value": "(无可用页面)"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Ingen sider tilgængelige)"
+          }
         }
       }
     },
@@ -134,6 +140,12 @@
             "state": "translated",
             "value": "%lld 失败"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Mislykkedes"
+          }
         }
       }
     },
@@ -191,6 +203,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个高亮"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld markeringer"
           }
         }
       }
@@ -250,6 +268,12 @@
             "state": "translated",
             "value": "%1$lld 项%2$@"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld element%2$@"
+          }
         }
       }
     },
@@ -307,6 +331,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 已排队"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld I kø"
           }
         }
       }
@@ -366,6 +396,12 @@
             "state": "translated",
             "value": "%lld 运行中"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Kører"
+          }
         }
       }
     },
@@ -423,6 +459,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 字"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ord"
           }
         }
       }
@@ -482,6 +524,12 @@
             "state": "translated",
             "value": "关于"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Om"
+          }
         }
       }
     },
@@ -539,6 +587,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "账户信息"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontoinformation"
           }
         }
       }
@@ -598,6 +652,12 @@
             "state": "translated",
             "value": "操作"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handlinger"
+          }
         }
       }
     },
@@ -655,6 +715,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "已添加"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilføjet"
           }
         }
       }
@@ -714,6 +780,12 @@
             "state": "translated",
             "value": "添加时间"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilføjelsestidspunkt"
+          }
         }
       }
     },
@@ -771,6 +843,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在添加 %lld 条高亮..."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilføjer %lld markeringer..."
           }
         }
       }
@@ -830,6 +908,12 @@
             "state": "translated",
             "value": "正在添加 %lld 条新高亮..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilføjer %lld nye markeringer..."
+          }
         }
       }
     },
@@ -887,6 +971,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "并重新下载这篇文章。"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "og gen-download denne artikel."
           }
         }
       }
@@ -946,6 +1036,12 @@
             "state": "translated",
             "value": "正在追加 %lld 条新高亮..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilføjer %lld nye markeringer..."
+          }
         }
       }
     },
@@ -1004,6 +1100,12 @@
             "state": "translated",
             "value": "Apple 账户"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple-konto"
+          }
         }
       }
     },
@@ -1061,6 +1163,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple 账户和登录"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple-konto & Log Ind"
           }
         }
       }
@@ -1135,6 +1243,12 @@
             "state": "translated",
             "value": "AppleBooks 数据库 ID（可选）"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AppleBooks DB ID (valgfrit)"
+          }
         }
       }
     },
@@ -1192,6 +1306,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "文章"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artikel"
           }
         }
       }
@@ -1251,6 +1371,12 @@
             "state": "translated",
             "value": "文章"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artikler"
+          }
         }
       }
     },
@@ -1308,6 +1434,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "升序"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stigende"
           }
         }
       }
@@ -1367,6 +1499,12 @@
             "state": "translated",
             "value": "授权"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godkendelse"
+          }
         }
       }
     },
@@ -1425,6 +1563,12 @@
             "state": "translated",
             "value": "授权失败"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godkendelse mislykkedes"
+          }
         }
       }
     },
@@ -1482,6 +1626,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "授权成功"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godkendelse lykkedes"
           }
         }
       }
@@ -1599,6 +1749,12 @@
             "state": "translated",
             "value": "使用 Notion 授权"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godkend med Notion"
+          }
         }
       }
     },
@@ -1656,6 +1812,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "授权中..."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godkender..."
           }
         }
       }
@@ -1715,6 +1877,12 @@
             "state": "translated",
             "value": "自动同步（24小时）"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk synkronisering (24 timer)"
+          }
         }
       }
     },
@@ -1772,6 +1940,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "自动同步 Apple Books"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk synkronisering af Apple Books"
           }
         }
       }
@@ -1831,6 +2005,12 @@
             "state": "translated",
             "value": "自动同步 GoodLinks"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk synkronisering af GoodLinks"
+          }
         }
       }
     },
@@ -1888,6 +2068,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "基本信息"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grundlæggende information"
           }
         }
       }
@@ -1947,6 +2133,12 @@
             "state": "translated",
             "value": "在设备或 iCloud 上未找到图书文件"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bogfil ikke fundet på enhed eller iCloud"
+          }
         }
       }
     },
@@ -2004,6 +2196,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "书籍"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bøger"
           }
         }
       }
@@ -2063,6 +2261,12 @@
             "state": "translated",
             "value": "取消"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuller"
+          }
         }
       }
     },
@@ -2120,6 +2324,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "更改应用语言"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skift programsprog"
           }
         }
       }
@@ -2179,6 +2389,12 @@
             "state": "translated",
             "value": "选择 Apple Books 容器目录并加载笔记"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vælg Apple Books container-mappe og indlæs noter"
+          }
         }
       }
     },
@@ -2236,6 +2452,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "选择 GoodLinks 组容器并加载数据"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vælg GoodLinks gruppe-container og indlæs data"
           }
         }
       }
@@ -2295,6 +2517,12 @@
             "state": "translated",
             "value": "清除日志"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ryd logfiler"
+          }
         }
       }
     },
@@ -2352,6 +2580,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "点击上方按钮开始授权"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klik på knappen ovenfor for at starte godkendelse"
           }
         }
       }
@@ -2411,6 +2645,12 @@
             "state": "translated",
             "value": "折叠"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sammenfold"
+          }
         }
       }
     },
@@ -2468,6 +2708,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "配置 Notion 并执行示例 API 调用"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Notion og kør eksempel API-kald"
           }
         }
       }
@@ -2527,6 +2773,12 @@
             "state": "translated",
             "value": "复制"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopiér"
+          }
         }
       }
     },
@@ -2585,6 +2837,12 @@
             "state": "translated",
             "value": "创建时间"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oprettelsestidspunkt"
+          }
         }
       }
     },
@@ -2642,6 +2900,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "创建时间: %@"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oprettelsestidspunkt: %@"
           }
         }
       }
@@ -2702,6 +2966,12 @@
             "state": "translated",
             "value": "凭据"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legitimationsoplysninger"
+          }
         }
       }
     },
@@ -2759,6 +3029,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "剪切"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klip"
           }
         }
       }
@@ -2818,6 +3094,12 @@
             "state": "translated",
             "value": "数据源"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datakilde"
+          }
         }
       }
     },
@@ -2875,6 +3157,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "数据库 ID（可选）"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database-id (valgfri)"
           }
         }
       }
@@ -2934,6 +3222,12 @@
             "state": "translated",
             "value": "DEBUG: 全量同步 - 收集到 %lld 个已存在的UUID"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Fuld synkronisering - indsamlede %lld eksisterende UUID'er"
+          }
         }
       }
     },
@@ -2991,6 +3285,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "DEBUG: 增量同步 - 映射: %lld"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Inkrementel synkronisering - kortlægning: %lld"
           }
         }
       }
@@ -3050,6 +3350,12 @@
             "state": "translated",
             "value": "DEBUG: 增量同步批次 %d - 获取到 %lld 条高亮 (offset: %lld)"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Inkrementel synkroniseringsbatch %d - hentede %lld markeringer (offset: %lld)"
+          }
         }
       }
     },
@@ -3107,6 +3413,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "得到"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dedao"
           }
         }
       }
@@ -3166,6 +3478,12 @@
             "state": "translated",
             "value": "删除账户"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet konto"
+          }
         }
       }
     },
@@ -3223,6 +3541,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消选择"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fravælg"
           }
         }
       }
@@ -3282,6 +3606,12 @@
             "state": "translated",
             "value": "检测到数据库被重建，执行全量同步..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrerede databasegendannelse, udfører fuld synkronisering..."
+          }
         }
       }
     },
@@ -3339,6 +3669,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示名称: %@"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vist navn: %@"
           }
         }
       }
@@ -3399,6 +3735,12 @@
             "state": "translated",
             "value": "不要退出"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afslut ikke"
+          }
         }
       }
     },
@@ -3456,6 +3798,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "邮箱: %@"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-mail: %@"
           }
         }
       }
@@ -3515,6 +3863,12 @@
             "state": "translated",
             "value": "启用 Apple Books 自动同步（选中意味着 AutoSyncService 将运行）"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivér automatisk synkronisering for Apple Books (afkrydset betyder at AutoSyncService kører)"
+          }
         }
       }
     },
@@ -3572,6 +3926,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "启用 GoodLinks 自动同步（选中意味着 AutoSyncService 将运行）"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivér automatisk synkronisering for GoodLinks (afkrydset betyder at AutoSyncService kører)"
           }
         }
       }
@@ -3631,6 +3991,12 @@
             "state": "translated",
             "value": "错误：您需要允许SyncNos访问Apple Books中的笔记，否则无法加载"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fejl: Venligst tillad SyncNos at få adgang til Apple Books-noter; ellers kan de ikke indlæses."
+          }
         }
       }
     },
@@ -3688,6 +4054,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "展开"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold ud"
           }
         }
       }
@@ -3747,6 +4119,12 @@
             "state": "translated",
             "value": "失败"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mislykkedes"
+          }
         }
       }
     },
@@ -3804,6 +4182,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "已收藏"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorit"
           }
         }
       }
@@ -3863,6 +4247,12 @@
             "state": "translated",
             "value": "已获取 %lld 条高亮..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hentede %lld markeringer..."
+          }
         }
       }
     },
@@ -3920,6 +4310,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "筛选"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
           }
         }
       }
@@ -3979,6 +4375,12 @@
             "state": "translated",
             "value": "筛选器"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtre"
+          }
         }
       }
     },
@@ -4036,6 +4438,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "通用"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generelt"
           }
         }
       }
@@ -4098,6 +4506,12 @@
             "state": "translated",
             "value": "获取数据来源"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hent data fra"
+          }
         }
       }
     },
@@ -4155,6 +4569,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "前往设置"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gå til Indstillinger"
           }
         }
       }
@@ -4229,6 +4649,12 @@
             "state": "translated",
             "value": "GoodLinks 数据库 ID（可选）"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoodLinks DB-id (valgfrit)"
+          }
         }
       }
     },
@@ -4286,6 +4712,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "有笔记"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Har noter"
           }
         }
       }
@@ -4345,6 +4777,12 @@
             "state": "translated",
             "value": "高亮"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markering"
+          }
         }
       }
     },
@@ -4403,6 +4841,12 @@
             "state": "translated",
             "value": "高亮数量"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antal markeringer"
+          }
         }
       }
     },
@@ -4460,6 +4904,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "高亮"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markeringer"
           }
         }
       }
@@ -4577,6 +5027,12 @@
             "state": "translated",
             "value": "密钥: %@"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nøgle: %@"
+          }
         }
       }
     },
@@ -4634,6 +5090,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "语言"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprog"
           }
         }
       }
@@ -4693,6 +5155,12 @@
             "state": "translated",
             "value": "语言已更改"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprog Ændret"
+          }
         }
       }
     },
@@ -4750,6 +5218,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "最后同步时间"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidste Synkroniseringstidspunkt"
           }
         }
       }
@@ -4809,6 +5283,12 @@
             "state": "translated",
             "value": "最后同步: %@"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidste Synkronisering: %@"
+          }
         }
       }
     },
@@ -4866,6 +5346,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "最后同步: 从未"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidste Synkronisering: Aldrig"
           }
         }
       }
@@ -4925,6 +5411,12 @@
             "state": "translated",
             "value": "登录时启动"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start ved Login"
+          }
         }
       }
     },
@@ -4982,6 +5474,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "等级"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau"
           }
         }
       }
@@ -5041,6 +5539,12 @@
             "state": "translated",
             "value": "加载更多"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indlæs mere"
+          }
         }
       }
     },
@@ -5098,6 +5602,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在加载书籍..."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indlæser bøger..."
           }
         }
       }
@@ -5157,6 +5667,12 @@
             "state": "translated",
             "value": "正在加载链接..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indlæser links..."
+          }
         }
       }
     },
@@ -5214,6 +5730,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "加载中..."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indlæser..."
           }
         }
       }
@@ -5273,6 +5795,12 @@
             "state": "translated",
             "value": "登录方式"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Login-metoder"
+          }
         }
       }
     },
@@ -5330,6 +5858,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "日志"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logfiler"
           }
         }
       }
@@ -10180,6 +10714,12 @@
             "state": "translated",
             "value": "专业版已解锁"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro Låst Op"
+          }
         }
       }
     },
@@ -10237,6 +10777,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "产品"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Produkter"
           }
         }
       }
@@ -10296,6 +10842,12 @@
             "state": "translated",
             "value": "购买已取消或正在处理中。"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Køb annulleret eller afventende."
+          }
         }
       }
     },
@@ -10353,6 +10905,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "购买成功。"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Køb gennemført."
           }
         }
       }
@@ -10413,6 +10971,12 @@
             "state": "translated",
             "value": "退出"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afslut"
+          }
         }
       }
     },
@@ -10470,6 +11034,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "退出 SyncNos"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afslut SyncNos"
           }
         }
       }
@@ -10529,6 +11099,12 @@
             "state": "translated",
             "value": "评分和评价"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vurder & Anmeld"
+          }
         }
       }
     },
@@ -10586,6 +11162,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "已读"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Læs"
           }
         }
       }
@@ -10645,6 +11227,12 @@
             "state": "translated",
             "value": "刷新书籍"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opdater Bøger"
+          }
         }
       }
     },
@@ -10702,6 +11290,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "刷新信息"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opdater information"
           }
         }
       }
@@ -10761,6 +11355,12 @@
             "state": "translated",
             "value": "报告问题"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rapportér Problemer"
+          }
         }
       }
     },
@@ -10818,6 +11418,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "报告问题和建议"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rapportér Problemer & Forslag"
           }
         }
       }
@@ -10877,6 +11483,12 @@
             "state": "translated",
             "value": "正在请求授权..."
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anmoder om godkendelse..."
+          }
         }
       }
     },
@@ -10935,6 +11547,12 @@
             "state": "translated",
             "value": "重置状态"
           }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nulstil status"
+          }
         }
       }
     },
@@ -10992,6 +11610,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "重启"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genstart"
           }
         }
       }
