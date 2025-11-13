@@ -65,6 +65,12 @@
             "state": "translated",
             "value": "(Ingen sider tilgængelige)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Geen pagina's beschikbaar)"
+          }
         }
       }
     },
@@ -146,6 +152,12 @@
             "state": "translated",
             "value": "%lld Mislykkedes"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Mislukt"
+          }
         }
       }
     },
@@ -209,6 +221,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld markeringer"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld highlights"
           }
         }
       }
@@ -274,6 +292,12 @@
             "state": "translated",
             "value": "%1$lld element%2$@"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld item%2$@"
+          }
         }
       }
     },
@@ -337,6 +361,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld I kø"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld In wachtrij"
           }
         }
       }
@@ -402,6 +432,12 @@
             "state": "translated",
             "value": "%lld Kører"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Actief"
+          }
         }
       }
     },
@@ -465,6 +501,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld ord"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld woorden"
           }
         }
       }
@@ -530,6 +572,12 @@
             "state": "translated",
             "value": "Om"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Over"
+          }
         }
       }
     },
@@ -593,6 +641,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kontoinformation"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accountinformatie"
           }
         }
       }
@@ -658,6 +712,12 @@
             "state": "translated",
             "value": "Handlinger"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acties"
+          }
         }
       }
     },
@@ -721,6 +781,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tilføjet"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toegevoegd"
           }
         }
       }
@@ -786,6 +852,12 @@
             "state": "translated",
             "value": "Tilføjelsestidspunkt"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toegevoegd op"
+          }
         }
       }
     },
@@ -849,6 +921,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tilføjer %lld markeringer..."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toevoegen van %lld highlights..."
           }
         }
       }
@@ -914,6 +992,12 @@
             "state": "translated",
             "value": "Tilføjer %lld nye markeringer..."
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toevoegen van %lld nieuwe highlights..."
+          }
         }
       }
     },
@@ -977,6 +1061,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "og gen-download denne artikel."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en download dit artikel opnieuw."
           }
         }
       }
@@ -1042,6 +1132,12 @@
             "state": "translated",
             "value": "Tilføjer %lld nye markeringer..."
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toevoegen van %lld nieuwe highlights..."
+          }
         }
       }
     },
@@ -1106,6 +1202,12 @@
             "state": "translated",
             "value": "Apple-konto"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Account"
+          }
         }
       }
     },
@@ -1169,6 +1271,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple-konto & Log Ind"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Account & Sign In"
           }
         }
       }
@@ -1249,6 +1357,12 @@
             "state": "translated",
             "value": "AppleBooks DB ID (valgfrit)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AppleBooks DB ID (optioneel)"
+          }
         }
       }
     },
@@ -1309,6 +1423,12 @@
           }
         },
         "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artikel"
+          }
+        },
+        "nl": {
           "stringUnit": {
             "state": "translated",
             "value": "Artikel"
@@ -1377,6 +1497,12 @@
             "state": "translated",
             "value": "Artikler"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artikelen"
+          }
         }
       }
     },
@@ -1440,6 +1566,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stigende"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oplopend"
           }
         }
       }
@@ -1505,6 +1637,12 @@
             "state": "translated",
             "value": "Godkendelse"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisatie"
+          }
         }
       }
     },
@@ -1569,6 +1707,12 @@
             "state": "translated",
             "value": "Godkendelse mislykkedes"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisatie mislukt"
+          }
         }
       }
     },
@@ -1632,6 +1776,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Godkendelse lykkedes"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisatie geslaagd"
           }
         }
       }
@@ -1755,6 +1905,12 @@
             "state": "translated",
             "value": "Godkend med Notion"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriseer met Notion"
+          }
         }
       }
     },
@@ -1818,6 +1974,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Godkender..."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriseren..."
           }
         }
       }
@@ -1883,6 +2045,12 @@
             "state": "translated",
             "value": "Automatisk synkronisering (24 timer)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatische synchronisatie (24 uur)"
+          }
         }
       }
     },
@@ -1946,6 +2114,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Automatisk synkronisering af Apple Books"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatische synchronisatie Apple Books"
           }
         }
       }
@@ -2011,6 +2185,12 @@
             "state": "translated",
             "value": "Automatisk synkronisering af GoodLinks"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatische synchronisatie GoodLinks"
+          }
         }
       }
     },
@@ -2074,6 +2254,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Grundlæggende information"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basisinformatie"
           }
         }
       }
@@ -2139,6 +2325,12 @@
             "state": "translated",
             "value": "Bogfil ikke fundet på enhed eller iCloud"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boekbestand niet gevonden op apparaat of iCloud"
+          }
         }
       }
     },
@@ -2202,6 +2394,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bøger"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boeken"
           }
         }
       }
@@ -2267,6 +2465,12 @@
             "state": "translated",
             "value": "Annuller"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuleren"
+          }
         }
       }
     },
@@ -2330,6 +2534,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Skift programsprog"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taal van toepassing wijzigen"
           }
         }
       }
@@ -2395,6 +2605,12 @@
             "state": "translated",
             "value": "Vælg Apple Books container-mappe og indlæs noter"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kies Apple Books container map en laad notities"
+          }
         }
       }
     },
@@ -2458,6 +2674,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vælg GoodLinks gruppe-container og indlæs data"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kies GoodLinks groepcontainer en laad gegevens"
           }
         }
       }
@@ -2523,6 +2745,12 @@
             "state": "translated",
             "value": "Ryd logfiler"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wis logs"
+          }
         }
       }
     },
@@ -2586,6 +2814,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Klik på knappen ovenfor for at starte godkendelse"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klik op de knop hierboven om autorisatie te starten"
           }
         }
       }
@@ -2651,6 +2885,12 @@
             "state": "translated",
             "value": "Sammenfold"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samenklappen"
+          }
         }
       }
     },
@@ -2714,6 +2954,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Konfigurer Notion og kør eksempel API-kald"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configureer Notion en voer voorbeeld API-aanroepen uit"
           }
         }
       }
@@ -2779,6 +3025,12 @@
             "state": "translated",
             "value": "Kopiér"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopieren"
+          }
         }
       }
     },
@@ -2843,6 +3095,12 @@
             "state": "translated",
             "value": "Oprettelsestidspunkt"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aanmaaktijd"
+          }
         }
       }
     },
@@ -2906,6 +3164,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oprettelsestidspunkt: %@"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aanmaaktijd: %@"
           }
         }
       }
@@ -2972,6 +3236,12 @@
             "state": "translated",
             "value": "Legitimationsoplysninger"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenties"
+          }
         }
       }
     },
@@ -3035,6 +3305,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Klip"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Knippen"
           }
         }
       }
@@ -3100,6 +3376,12 @@
             "state": "translated",
             "value": "Datakilde"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gegevensbron"
+          }
         }
       }
     },
@@ -3163,6 +3445,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Database-id (valgfri)"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database ID (optioneel)"
           }
         }
       }
@@ -3228,6 +3516,12 @@
             "state": "translated",
             "value": "DEBUG: Fuld synkronisering - indsamlede %lld eksisterende UUID'er"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Volledige synchronisatie - %lld bestaande UUID's verzameld"
+          }
         }
       }
     },
@@ -3291,6 +3585,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "DEBUG: Inkrementel synkronisering - kortlægning: %lld"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Incrementele synchronisatie - mapping: %lld"
           }
         }
       }
@@ -3356,6 +3656,12 @@
             "state": "translated",
             "value": "DEBUG: Inkrementel synkroniseringsbatch %d - hentede %lld markeringer (offset: %lld)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEBUG: Incrementele synchronisatie batch %d - opgehaalde %lld highlights (offset: %lld)"
+          }
         }
       }
     },
@@ -3416,6 +3722,12 @@
           }
         },
         "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dedao"
+          }
+        },
+        "nl": {
           "stringUnit": {
             "state": "translated",
             "value": "Dedao"
@@ -3484,6 +3796,12 @@
             "state": "translated",
             "value": "Slet konto"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account verwijderen"
+          }
         }
       }
     },
@@ -3547,6 +3865,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fravælg"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deselecteren"
           }
         }
       }
@@ -3612,6 +3936,12 @@
             "state": "translated",
             "value": "Registrerede databasegendannelse, udfører fuld synkronisering..."
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Database hercreatie gedetecteerd, volledige synchronisatie wordt uitgevoerd..."
+          }
         }
       }
     },
@@ -3675,6 +4005,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vist navn: %@"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weergavenaam: %@"
           }
         }
       }
@@ -3741,6 +4077,12 @@
             "state": "translated",
             "value": "Afslut ikke"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niet afsluiten"
+          }
         }
       }
     },
@@ -3801,6 +4143,12 @@
           }
         },
         "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-mail: %@"
+          }
+        },
+        "nl": {
           "stringUnit": {
             "state": "translated",
             "value": "E-mail: %@"
@@ -3869,6 +4217,12 @@
             "state": "translated",
             "value": "Aktivér automatisk synkronisering for Apple Books (afkrydset betyder at AutoSyncService kører)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatische synchronisatie voor Apple Books inschakelen (aangevinkt betekent dat AutoSyncService wordt uitgevoerd)"
+          }
         }
       }
     },
@@ -3932,6 +4286,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aktivér automatisk synkronisering for GoodLinks (afkrydset betyder at AutoSyncService kører)"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatische synchronisatie voor GoodLinks inschakelen (aangevinkt betekent dat AutoSyncService wordt uitgevoerd)"
           }
         }
       }
@@ -3997,6 +4357,12 @@
             "state": "translated",
             "value": "Fejl: Venligst tillad SyncNos at få adgang til Apple Books-noter; ellers kan de ikke indlæses."
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fout: Geef SyncNos toegang tot Apple Books notities; anders kunnen deze niet worden geladen."
+          }
         }
       }
     },
@@ -4060,6 +4426,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fold ud"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uitklappen"
           }
         }
       }
@@ -4125,6 +4497,12 @@
             "state": "translated",
             "value": "Mislykkedes"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mislukt"
+          }
         }
       }
     },
@@ -4188,6 +4566,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Favorit"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoriet"
           }
         }
       }
@@ -4253,6 +4637,12 @@
             "state": "translated",
             "value": "Hentede %lld markeringer..."
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld highlights opgehaald..."
+          }
         }
       }
     },
@@ -4313,6 +4703,12 @@
           }
         },
         "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        },
+        "nl": {
           "stringUnit": {
             "state": "translated",
             "value": "Filter"
@@ -4381,6 +4777,12 @@
             "state": "translated",
             "value": "Filtre"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filters"
+          }
         }
       }
     },
@@ -4444,6 +4846,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Generelt"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algemeen"
           }
         }
       }
@@ -4512,6 +4920,12 @@
             "state": "translated",
             "value": "Hent data fra"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gegevens ophalen van"
+          }
         }
       }
     },
@@ -4575,6 +4989,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gå til Indstillinger"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ga naar Instellingen"
           }
         }
       }
@@ -4655,6 +5075,12 @@
             "state": "translated",
             "value": "GoodLinks DB-id (valgfrit)"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoodLinks DB ID (optioneel)"
+          }
         }
       }
     },
@@ -4718,6 +5144,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Har noter"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heeft notities"
           }
         }
       }
@@ -4783,6 +5215,12 @@
             "state": "translated",
             "value": "Markering"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlight"
+          }
         }
       }
     },
@@ -4847,6 +5285,12 @@
             "state": "translated",
             "value": "Antal markeringer"
           }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aantal highlights"
+          }
         }
       }
     },
@@ -4910,6 +5354,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Markeringer"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
           }
         }
       }
