@@ -196,7 +196,7 @@ struct GoodLinksDetailView: View {
                                     .foregroundColor(.primary)
 
                                 if !filteredHighlights.isEmpty {
-                                    Text("\(filteredHighlights.count) item\(filteredHighlights.count == 1 ? "" : "s")")
+                                    Text("\(filteredHighlights.count) highlights")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }

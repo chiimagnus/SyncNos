@@ -60,7 +60,7 @@ struct GoodLinksListView: View {
                             if viewModel.syncingLinkIds.contains(link.id) {
                                 Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                                     .foregroundColor(.yellow)
-                                    .help("Syncing")
+                                    .help("Syncing...")
                             } else if viewModel.syncedLinkIds.contains(link.id) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
