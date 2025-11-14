@@ -50,7 +50,7 @@ struct AppleBooksListView: View {
                             if viewModel.syncingBookIds.contains(book.bookId) {
                                 Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                                     .foregroundColor(.yellow)
-                                    .help("Syncing")
+                                    .help("Syncing...")
                             } else if viewModel.syncedBookIds.contains(book.bookId) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
