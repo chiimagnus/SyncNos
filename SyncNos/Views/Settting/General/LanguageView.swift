@@ -26,22 +26,29 @@ struct LanguageView: View {
         }
 
         // 检查是否支持当前语言，否则默认使用英语
-        let supportedCodes = ["en", "zh-Hans", "ja", "ko", "es-ES", "fr", "de", "pt-BR", "ru"]
+        let supportedCodes = ["en", "zh-Hans", "da", "nl", "fi", "fr", "de", "id", "ja", "ko", "es-ES", "pt-BR", "ru", "sv", "th", "vi"]
         return supportedCodes.contains(languageCode ?? "") ? languageCode! : "en"
     }()
 
     @State private var showRestartAlert = false
 
     let supportedLanguages = [
+        ("da", "Dansk"),
+        ("de", "Deutsch"),
         ("en", "English"),
-        ("zh-Hans", "中文(简体)"),
+        ("es-ES", "Español"),
+        ("fi", "Suomi"),
+        ("fr", "Français"),
+        ("id", "Bahasa Indonesia"),
         ("ja", "日本語"),
         ("ko", "한국어"),
-        ("es-ES", "Español"),
-        ("fr", "Français"),
-        ("de", "Deutsch"),
+        ("nl", "Nederlands"),
         ("pt-BR", "Português (Brasil)"),
-        ("ru", "Русский")
+        ("ru", "Русский"),
+        ("sv", "Svenska"),
+        ("th", "ไทย"),
+        ("vi", "Tiếng Việt"),
+        ("zh-Hans", "中文(简体)")
     ]
 
     private func changeAppLanguage(to languageCode: String) {
