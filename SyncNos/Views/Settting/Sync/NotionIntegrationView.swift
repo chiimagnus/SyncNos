@@ -141,21 +141,6 @@ struct NotionIntegrationView: View {
                 .disabled(viewModel.isOAuthAuthorized)
             }
             
-            // Section(header: Text("Database IDs")) {
-            //     // Optional per-source DB IDs
-            //     LabeledContent("AppleBooks DB ID (optional)") {
-            //         // Now read-only; moved to AppleBooksSettingsView
-            //         Text(viewModel.appleBooksDbId.isEmpty ? "(moved to AppleBooks settings)" : viewModel.appleBooksDbId)
-            //             .foregroundColor(.secondary)
-            //     }
-
-            //     LabeledContent("GoodLinks DB ID (optional)") {
-            //         // Now read-only; moved to GoodLinksSettingsView
-            //         Text(viewModel.goodLinksDbId.isEmpty ? "(moved to GoodLinks settings)" : viewModel.goodLinksDbId)
-            //             .foregroundColor(.secondary)
-            //     }
-            // }
-
             if let message = viewModel.message {
                 Section {
                     Text(message)

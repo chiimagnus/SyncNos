@@ -97,7 +97,7 @@ final class AppleBooksSyncStrategySingleDB: AppleBooksSyncStrategyProtocol {
                 for (blockId, h) in toUpdate { try await notionService.updateBlockContent(blockId: blockId, highlight: h, bookId: book.bookId, source: "appleBooks") }
             }
             if !toAppend.isEmpty {
-                progress(String(format: NSLocalizedString("Adding %lld new highlights...", comment: ""), toAppend.count))
+                progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), toAppend.count))
                 try await notionService.appendHighlightBullets(pageId: pageId, bookId: book.bookId, highlights: toAppend)
             }
 
