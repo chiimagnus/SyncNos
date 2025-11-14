@@ -183,7 +183,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 실패"
+            "value" : "%lld개 실패"
           }
         },
         "nl" : {
@@ -207,7 +207,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Misslyckades"
+            "value" : "%lld misslyckades"
           }
         },
         "th" : {
@@ -238,13 +238,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld markeringer"
+                  "value" : "%lld fremhævning"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld markeringer"
+                  "value" : "%lld fremhævninger"
                 }
               }
             }
@@ -256,7 +256,7 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld Hervorhebungen"
+                  "value" : "%lld Hervorhebung"
                 }
               },
               "other" : {
@@ -310,7 +310,7 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld korostusta"
+                  "value" : "%lld korostus"
                 }
               },
               "other" : {
@@ -382,13 +382,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld highlights"
+                  "value" : "%lld markering"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld highlights"
+                  "value" : "%lld markeringen"
                 }
               }
             }
@@ -430,7 +430,7 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld выделений"
+                  "value" : "%lld выделение"
                 }
               },
               "other" : {
@@ -511,7 +511,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld In Warteschlange"
+            "value" : "%lld in Warteschlange"
           }
         },
         "en" : {
@@ -535,7 +535,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld En file d'attente"
+            "value" : "%lld en attente"
           }
         },
         "id" : {
@@ -577,7 +577,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Köade"
+            "value" : "%lld köade"
           }
         },
         "th" : {
@@ -661,7 +661,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Actief"
+            "value" : "%lld Bezig"
           }
         },
         "pt-BR" : {
@@ -679,7 +679,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Körs"
+            "value" : "%lld körs"
           }
         },
         "th" : {
@@ -787,7 +787,7 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "คำ %lld คำ"
+            "value" : "คำ %lld"
           }
         },
         "vi" : {
@@ -1319,7 +1319,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tilføjer %lld markeringer..."
+            "value" : "Tilføjer %lld fremhævninger..."
           }
         },
         "de" : {
@@ -1367,13 +1367,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld개의 하이라이트 추가 중..."
+            "value" : "%lld개 하이라이트 추가 중..."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toevoegen van %lld highlights..."
+            "value" : "%lld markeringen toevoegen..."
           }
         },
         "pt-BR" : {
@@ -1462,7 +1462,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "そしてこの記事を再ダウンロードしてください。"
+            "value" : "そして記事を再ダウンロードしてください。"
           }
         },
         "ko" : {
@@ -1486,7 +1486,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "и перезагрузите эту статью."
+            "value" : "и повторно загрузите эту статью."
           }
         },
         "sv" : {
@@ -1522,7 +1522,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tilføjer %lld nye markeringer..."
+            "value" : "Tilføjer %lld nye fremhævninger..."
           }
         },
         "de" : {
@@ -1546,7 +1546,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Liitetään %lld uutta korostusta..."
+            "value" : "Haetaan %lld uutta korostusta..."
           }
         },
         "fr" : {
@@ -1570,13 +1570,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld개의 새 하이라이트 추가 중..."
+            "value" : "%lld개 새 하이라이트 추가 중..."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toevoegen van %lld nieuwe highlights..."
+            "value" : "%lld nieuwe markeringen toevoegen..."
           }
         },
         "pt-BR" : {
@@ -1792,7 +1792,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунт Apple и вход"
+            "value" : "Аккаунт Apple и вход в систему"
           }
         },
         "sv" : {
@@ -2099,7 +2099,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oplopend"
+            "value" : "Oplopend (A-Z)"
           }
         },
         "pt-BR" : {
@@ -2266,7 +2266,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Autorización fallida"
+            "value" : "Autorización falló"
           }
         },
         "fi" : {
@@ -2494,13 +2494,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "認証コード：%@"
+            "value" : "認証コード: %@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "인증 코드: %@"
+            "value" : " authorization_code: %@"
           }
         },
         "nl" : {
@@ -2512,7 +2512,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "código de autorização: %@"
+            "value" : "Código de autorização: %@"
           }
         },
         "ru" : {
@@ -2536,7 +2536,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "mã ủy quyền：%@"
+            "value" : "mã ủy quyền: %@"
           }
         },
         "zh-Hans" : {
@@ -2809,7 +2809,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatische synchronisatie (24 uur)"
+            "value" : "Automatisch synchroniseren (24 uur)"
           }
         },
         "pt-BR" : {
@@ -2911,7 +2911,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatische synchronisatie Apple Books"
+            "value" : "Apple Books automatisch synchroniseren"
           }
         },
         "pt-BR" : {
@@ -3013,7 +3013,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatische synchronisatie GoodLinks"
+            "value" : "GoodLinks automatisch synchroniseren"
           }
         },
         "pt-BR" : {
@@ -3251,7 +3251,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在设备或 iCloud 上未找到图书文件"
+            "value" : "未在设备或 iCloud 上找到图书文件"
           }
         }
       }
@@ -3505,13 +3505,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリケーション言語を変更"
+            "value" : "アプリケーションの言語を変更"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "애플리케이션 언어 변경"
+            "value" : "앱 언어 변경"
           }
         },
         "nl" : {
@@ -3607,7 +3607,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Books コンテナディレクトリを選択してノートを読み込む"
+            "value" : "Apple Booksコンテナのディレクトリを選択してノートを読み込む"
           }
         },
         "ko" : {
@@ -3631,7 +3631,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите каталог контейнера Apple Books и загрузите заметки"
+            "value" : "Выберите папку Apple Books и загрузите заметки"
           }
         },
         "sv" : {
@@ -3691,7 +3691,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Valitse GoodLinks-ryhmän kontti ja lataa tiedot"
+            "value" : "Valitse GoodLinks-ryhmä ja lataa tiedot"
           }
         },
         "fr" : {
@@ -3709,7 +3709,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GoodLinks グループコンテナを選択してデータを読み込む"
+            "value" : "GoodLinksグループコンテナを選択してデータを読み込む"
           }
         },
         "ko" : {
@@ -3733,7 +3733,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите контейнер группы GoodLinks и загрузите данные"
+            "value" : "Выберите папку GoodLinks и загрузите данные"
           }
         },
         "sv" : {
@@ -4099,7 +4099,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Konfiguroi Notion ja suorita esimerkki API-kutsut"
+            "value" : "Konfiguroi Notion ja suorita API-esimerkkikutsut"
           }
         },
         "fr" : {
@@ -4471,7 +4471,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建时间: %@"
+            "value" : "创建时间：%@"
           }
         }
       }
@@ -4601,7 +4601,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fuente de Datos"
+            "value" : "Fuente de datos"
           }
         },
         "fi" : {
@@ -4613,7 +4613,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source de Données"
+            "value" : "Source de données"
           }
         },
         "id" : {
@@ -4909,7 +4909,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DEBUG: Lisäys synkronointi - kartoitus: %lld"
+            "value" : "DEBUG: Inkrementaalinen synkronointi - kartoitus: %lld"
           }
         },
         "fr" : {
@@ -4921,7 +4921,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DEBUG: Sinkronisasi incremental - pemetaan: %lld"
+            "value" : "DEBUG: Sinkronisasi bertahap - pemetaan: %lld"
           }
         },
         "ja" : {
@@ -4985,7 +4985,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DEBUG: Inkrementel synkroniseringsbatch %d - hentede %lld markeringer (offset: %lld)"
+            "value" : "DEBUG: Inkrementel synkroniseringsbatch %d - hentede %lld fremhævninger (offset: %lld)"
           }
         },
         "de" : {
@@ -5009,7 +5009,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DEBUG: Lisäys synkronointi erä %d - haettiin %lld korostusta (offset: %lld)"
+            "value" : "DEBUG: Inkrementaalinen synkronointi erä %d - haettiin %lld korostusta (offset: %lld)"
           }
         },
         "fr" : {
@@ -5021,7 +5021,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DEBUG: Sinkronisasi incremental batch %d - mengambil %lld highlight (offset: %lld)"
+            "value" : "DEBUG: Sinkronisasi bertahap batch %d - mengambil %lld sorotan (offset: %lld)"
           }
         },
         "ja" : {
@@ -5393,7 +5393,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registrerede databasegendannelse, udfører fuld synkronisering..."
+            "value" : "Database genkendt, udfører fuld synkronisering..."
           }
         },
         "de" : {
@@ -5585,7 +5585,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示名称: %@"
+            "value" : "显示名称：%@"
           }
         }
       }
@@ -5789,7 +5789,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "邮箱: %@"
+            "value" : "邮箱：%@"
           }
         }
       }
@@ -5843,7 +5843,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Booksの自動同期を有効にする（チェックするとAutoSyncServiceが実行されます）"
+            "value" : "Apple Booksの自動同期を有効化（チェックするとAutoSyncServiceが実行されます）"
           }
         },
         "ko" : {
@@ -5945,7 +5945,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GoodLinks の自動同期を有効にする（チェックすると AutoSyncService が実行されます）"
+            "value" : "GoodLinksの自動同期を有効化（チェックするとAutoSyncServiceが実行されます）"
           }
         },
         "ko" : {
@@ -6021,7 +6021,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
+            "value" : "Error: Permita que SyncNos acceda a las notas de Apple Books; de lo contrario, no se podrán cargar."
           }
         },
         "fi" : {
@@ -6033,7 +6033,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
+            "value" : "Erreur : Veuillez autoriser SyncNos à accéder aux notes Apple Books ; sinon elles ne peuvent pas être chargées."
           }
         },
         "id" : {
@@ -6051,7 +6051,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "오류: SyncNos가 Apple Books 노트에 액세스할 수 있도록 허용해 주세요. 그렇지 않으면 로드할 수 없습니다."
+            "value" : "오류: SyncNos가 Apple Books 노트에 접근할 수 있도록 허용해 주세요. 그렇지 않으면 로드할 수 없습니다."
           }
         },
         "nl" : {
@@ -6063,7 +6063,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded."
+            "value" : "Erro: Por favor, permita que o SyncNos acesse as notas do Apple Books; caso contrário, elas não poderão ser carregadas."
           }
         },
         "ru" : {
@@ -6093,7 +6093,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "错误：您需要允许SyncNos访问Apple Books中的笔记，否则无法加载"
+            "value" : "错误：您需要允许 SyncNos 访问 Apple Books 中的笔记，否则无法加载"
           }
         }
       }
@@ -6141,7 +6141,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bentang"
+            "value" : "Luaskan"
           }
         },
         "ja" : {
@@ -6331,7 +6331,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suosikki"
+            "value" : "Merkitty suosikiksi"
           }
         },
         "fr" : {
@@ -6407,7 +6407,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hentede %lld markeringer..."
+            "value" : "Hentede %lld fremhævninger..."
           }
         },
         "de" : {
@@ -6443,7 +6443,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mengambil %lld highlight..."
+            "value" : "Mengambil %lld sorotan..."
           }
         },
         "ja" : {
@@ -6455,13 +6455,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld개의 하이라이트 가져옴..."
+            "value" : "%lld개 하이라이트 가져옴..."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld highlights opgehaald..."
+            "value" : "%lld markeringen opgehaald..."
           }
         },
         "pt-BR" : {
@@ -6545,7 +6545,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Filter"
+            "value" : "Saring"
           }
         },
         "ja" : {
@@ -6563,7 +6563,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Filter"
+            "value" : "Filteren"
           }
         },
         "pt-BR" : {
@@ -6647,7 +6647,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Filter"
+            "value" : "Saring"
           }
         },
         "ja" : {
@@ -6719,7 +6719,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "General"
+            "value" : "Allgemein"
           }
         },
         "en" : {
@@ -6737,13 +6737,13 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yleinen"
+            "value" : "Yleiset"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "General"
+            "value" : "Général"
           }
         },
         "id" : {
@@ -6773,7 +6773,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "General"
+            "value" : "Geral"
           }
         },
         "ru" : {
@@ -6960,7 +6960,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "データを取得元"
+            "value" : "データ取得元"
           }
         },
         "ko" : {
@@ -7024,7 +7024,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zu den Einstellungen gehen"
+            "value" : "Zu den Einstellungen"
           }
         },
         "en" : {
@@ -7084,7 +7084,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перейти к Настройкам"
+            "value" : "Перейти к настройкам"
           }
         },
         "sv" : {
@@ -7164,13 +7164,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A des Notes"
+            "value" : "Avec des notes"
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memiliki Catatan"
+            "value" : "Ada Catatan"
           }
         },
         "ja" : {
@@ -7194,7 +7194,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tem Notas"
+            "value" : "Tem anotações"
           }
         },
         "ru" : {
@@ -7234,13 +7234,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Markering"
+            "value" : "Fremhævning"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hervorheben"
+            "value" : "Hervorhebung"
           }
         },
         "en" : {
@@ -7288,19 +7288,19 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Highlight"
+            "value" : "Markering"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Destacar"
+            "value" : "Destaque"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выделить"
+            "value" : "Выделение"
           }
         },
         "sv" : {
@@ -7336,7 +7336,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Antal markeringer"
+            "value" : "Antal fremhævninger"
           }
         },
         "de" : {
@@ -7372,7 +7372,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jumlah Highlight"
+            "value" : "Jumlah Sorotan"
           }
         },
         "ja" : {
@@ -7390,7 +7390,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aantal highlights"
+            "value" : "Aantal markeringen"
           }
         },
         "pt-BR" : {
@@ -7436,7 +7436,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Markeringer"
+            "value" : "Fremhævninger"
           }
         },
         "de" : {
@@ -7490,7 +7490,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Highlights"
+            "value" : "Markeringen"
           }
         },
         "pt-BR" : {
@@ -7580,13 +7580,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "IDトークン：%@"
+            "value" : "IDトークン: %@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ID 토큰: %@"
+            "value" : " identity_token: %@"
           }
         },
         "nl" : {
@@ -7598,13 +7598,13 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "token de identidade: %@"
+            "value" : "Token de identidade: %@"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "токен идентификации: %@"
+            "value" : "токен личности: %@"
           }
         },
         "sv" : {
@@ -7622,7 +7622,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "identity_token：%@"
+            "value" : "identity_token: %@"
           }
         },
         "zh-Hans" : {
@@ -7800,7 +7800,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "chave: %@"
+            "value" : "Chave: %@"
           }
         },
         "ru" : {
@@ -7830,7 +7830,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "密钥: %@"
+            "value" : "密钥：%@"
           }
         }
       }
@@ -7848,7 +7848,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language"
+            "value" : "Sprache"
           }
         },
         "en" : {
@@ -7860,7 +7860,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language"
+            "value" : "Idioma"
           }
         },
         "fi" : {
@@ -7872,7 +7872,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language"
+            "value" : "Langue"
           }
         },
         "id" : {
@@ -7902,7 +7902,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language"
+            "value" : "Idioma"
           }
         },
         "ru" : {
@@ -7986,7 +7986,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "言語が変更されました"
+            "value" : "言語変更"
           }
         },
         "ko" : {
@@ -8046,7 +8046,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sidste Synkroniseringstidspunkt"
+            "value" : "Sidste synkroniseringstidspunkt"
           }
         },
         "de" : {
@@ -8148,7 +8148,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sidste Synkronisering: %@"
+            "value" : "Sidste synkronisering: %@"
           }
         },
         "de" : {
@@ -8238,7 +8238,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最后同步: %@"
+            "value" : "最后同步：%@"
           }
         }
       }
@@ -8248,7 +8248,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sidste Synkronisering: Aldrig"
+            "value" : "Sidste synkronisering: Aldrig"
           }
         },
         "de" : {
@@ -8338,7 +8338,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最后同步: 从未"
+            "value" : "最后同步：从未"
           }
         }
       }
@@ -8440,7 +8440,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "登录时启动"
+            "value" : "随系统登录启动"
           }
         }
       }
@@ -8558,7 +8558,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Load more"
+            "value" : "Mehr laden"
           }
         },
         "en" : {
@@ -8570,7 +8570,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Load more"
+            "value" : "Cargar más"
           }
         },
         "fi" : {
@@ -8582,7 +8582,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Load more"
+            "value" : "Charger plus"
           }
         },
         "id" : {
@@ -8600,7 +8600,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "더 불러오기"
+            "value" : "더 보기"
           }
         },
         "nl" : {
@@ -8612,7 +8612,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Load more"
+            "value" : "Carregar mais"
           }
         },
         "ru" : {
@@ -8658,7 +8658,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading books..."
+            "value" : "Bücher werden geladen..."
           }
         },
         "en" : {
@@ -8670,7 +8670,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading books..."
+            "value" : "Cargando libros..."
           }
         },
         "fi" : {
@@ -8682,7 +8682,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading books..."
+            "value" : "Chargement des livres..."
           }
         },
         "id" : {
@@ -8712,7 +8712,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading books..."
+            "value" : "Carregando livros..."
           }
         },
         "ru" : {
@@ -9381,7 +9381,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tila"
+            "value" : "Tila/Moodi"
           }
         },
         "fr" : {
@@ -9631,7 +9631,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ändringstid"
+            "value" : "Senast ändrad"
           }
         },
         "th" : {
@@ -9643,7 +9643,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thờigian sửa đổi"
+            "value" : "Thời gian sửa đổi"
           }
         },
         "zh-Hans" : {
@@ -9751,7 +9751,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "名称: %@"
+            "value" : "名称：%@"
           }
         }
       }
@@ -9799,7 +9799,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tidak ada tugas sinkronisasi aktif"
+            "value" : "Tidak ada tugas sinkronisasi yang aktif"
           }
         },
         "ja" : {
@@ -9835,7 +9835,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inga aktiva synkroniseringsuppgifter"
+            "value" : "Inga aktiva synkroniseringsaktiviteter"
           }
         },
         "th" : {
@@ -9853,7 +9853,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有正在运行的同步任务"
+            "value" : "无正在运行的同步任务"
           }
         }
       }
@@ -9905,19 +9905,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "記事コンテンツが検出されませんでした。どうぞ"
+            "value" : "記事コンテンツが検出されませんでした。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "기사 콘텐츠가 감지되지 않았습니다. 부탁드립니다"
+            "value" : "기사 콘텐츠가 감지되지 않았습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen artikelinhoud gedetecteerd. Gelieve"
+            "value" : "Geen artikelinhoud gedetecteerd. Probeer het artikel opnieuw te downloaden."
           }
         },
         "pt-BR" : {
@@ -9953,7 +9953,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未检测到文章内容。请"
+            "value" : "未检测到文章内容。请您"
           }
         }
       }
@@ -9969,7 +9969,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No books found"
+            "value" : "Keine Bücher gefunden"
           }
         },
         "en" : {
@@ -10137,7 +10137,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inga misslyckade uppgifter"
+            "value" : "Inga misslyckade aktiviteter"
           }
         },
         "th" : {
@@ -10155,7 +10155,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有失败的任务"
+            "value" : "无失败任务"
           }
         }
       }
@@ -10243,13 +10243,13 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ยังไม่มีไฮไลท์สำหรับลิงก์นี้"
+            "value" : "ยังไม่มีการไฮไลต์สำหรับลิงก์นี้"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chưa có điểm nổi bật nào cho liên kết này"
+            "value" : "Chưa có đánh dấu nào cho liên kết này"
           }
         },
         "zh-Hans" : {
@@ -10541,7 +10541,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inga köade uppgifter"
+            "value" : "Inga köade aktiviteter"
           }
         },
         "th" : {
@@ -10559,7 +10559,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有排队的任务"
+            "value" : "无排队任务"
           }
         }
       }
@@ -10940,7 +10940,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configuración de Notion Requerida"
+            "value" : "Configuración de Notion requerida"
           }
         },
         "fi" : {
@@ -10988,7 +10988,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Требуется Конфигурация Notion"
+            "value" : "Требуется настройка Notion"
           }
         },
         "sv" : {
@@ -11817,7 +11817,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Satu database per buku (Setiap sorotan sebagai entri)"
+            "value" : "Satu database per buku (Setiap highlight sebagai entri)"
           }
         },
         "ja" : {
@@ -11859,19 +11859,19 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ฐานข้อมูลหนึ่งชุดต่อหนังสือหนึ่งเล่ม (ไฮไลท์แต่ละรายการเป็นหนึ่งรายการ)"
+            "value" : "ฐานข้อมูลหนึ่งชุดต่อหนึ่งเล่ม (การไฮไลต์แต่ละรายการเป็นหนึ่งรายการ)"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Một cơ sở dữ liệu cho mỗi sách (Mỗi điểm nổi bật là một mục)"
+            "value" : "Một cơ sở dữ liệu cho mỗi sách (Mỗi đánh dấu là một mục)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每本书一个库（每条高亮为条目）"
+            "value" : "每本书一个数据库（每条高亮为条目）"
           }
         }
       }
@@ -11889,7 +11889,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Apple Books notes"
+            "value" : "Apple Books Notizen öffnen"
           }
         },
         "en" : {
@@ -11901,7 +11901,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Apple Books notes"
+            "value" : "Abrir notas de Apple Books"
           }
         },
         "fi" : {
@@ -11913,7 +11913,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Apple Books notes"
+            "value" : "Ouvrir les notes Apple Books"
           }
         },
         "id" : {
@@ -11943,7 +11943,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Apple Books notes"
+            "value" : "Abrir notas do Apple Books"
           }
         },
         "ru" : {
@@ -12007,7 +12007,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avaa GoodLinks-tiedot"
+            "value" : "GoodLinks-tiedot"
           }
         },
         "fr" : {
@@ -12089,7 +12089,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open in Apple Books"
+            "value" : "In Apple Books öffnen"
           }
         },
         "en" : {
@@ -12101,7 +12101,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open in Apple Books"
+            "value" : "Abrir en Apple Books"
           }
         },
         "fi" : {
@@ -12113,7 +12113,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open in Apple Books"
+            "value" : "Ouvrir dans Apple Books"
           }
         },
         "id" : {
@@ -12143,7 +12143,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open in Apple Books"
+            "value" : "Abrir no Apple Books"
           }
         },
         "ru" : {
@@ -12475,7 +12475,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "原始URL"
+            "value" : "原始 URL"
           }
         }
       }
@@ -12687,7 +12687,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Udfører inkrementel synkronisering, sidste synkroniseringstidspunkt: %@"
+            "value" : "Udfører inkrementel synkronisering, sidste synkronisering: %@"
           }
         },
         "de" : {
@@ -12711,7 +12711,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suoritetaan inkrementaalista synkronointia, viimeinen synkronointiaika: %@"
+            "value" : "Suoritetaan inkrementaalista synkronointia, viimeisin synkronointiaika: %@"
           }
         },
         "fr" : {
@@ -12723,7 +12723,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Melakukan sinkronisasi bertahap, waktu sinkronisasi terakhir: %@"
+            "value" : "Melakukan sinkronisasi tambahan, waktu sinkronisasi terakhir: %@"
           }
         },
         "ja" : {
@@ -12771,7 +12771,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đang thực hiện đồng bộ hóa gia tăng, thờigian đồng bộ cuối: %@"
+            "value" : "Đang thực hiện đồng bộ hóa gia tăng, thời gian đồng bộ cuối: %@"
           }
         },
         "zh-Hans" : {
@@ -12825,13 +12825,13 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rencana 1: Menambahkan batch %d, jumlah: %lld"
+            "value" : "Rencana 1: Menambahkan kelompok %d, jumlah: %lld"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プラン1: バッチ %d を追加、件数: %lld"
+            "value" : "プラン1: バッチ%dを追加、件数:%lld"
           }
         },
         "ko" : {
@@ -12843,7 +12843,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plan 1: Batch %d toevoegen, aantal: %lld"
+            "value" : "Plan 1: Batch %d toevoegen, aantal: %lld markeringen"
           }
         },
         "pt-BR" : {
@@ -12867,7 +12867,7 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "แผน 1: เพิ่มชุด %d จำนวน: %lld"
+            "value" : "แผน 1: เพิ่มชุดที่ %d จำนวน %lld"
           }
         },
         "vi" : {
@@ -12879,7 +12879,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "方案1，正在添加第 %d 批，条数：%lld"
+            "value" : "方案1：正在添加第 %d 批，条数：%lld"
           }
         }
       }
@@ -12925,13 +12925,13 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rencana 2: Batch penuh %d, jumlah: %lld"
+            "value" : "Rencana 2: Kelompok penuh %d, jumlah: %lld"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プラン2: 完全バッチ %d、件数: %lld"
+            "value" : "プラン2: 完全バッチ%d、件数:%lld"
           }
         },
         "ko" : {
@@ -12943,7 +12943,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plan 2: Volledige batch %d, aantal: %lld"
+            "value" : "Plan 2: Volledige batch %d, aantal: %lld markeringen"
           }
         },
         "pt-BR" : {
@@ -12967,7 +12967,7 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "แผน 2: ชุดเต็ม %d จำนวน: %lld"
+            "value" : "แผน 2: ชุดที่ %d เต็ม จำนวน %lld"
           }
         },
         "vi" : {
@@ -13027,7 +13027,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rencana 2: Sinkronisasi bertahap"
+            "value" : "Rencana 2: Sinkronisasi tambahan"
           }
         },
         "ja" : {
@@ -13117,7 +13117,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suunnitelma 2: Alkuperäinen synkronointi (täysi)"
+            "value" : "Suunnitelma 2: Alkusynkronointi (täysi)"
           }
         },
         "fr" : {
@@ -13165,13 +13165,13 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plan 2: Inledande synkronisering (fullständig)"
+            "value" : "Plan 2: Första synkronisering (fullständig)"
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "แผน 2: การซิงค์เริ่มต้น (เต็ม)"
+            "value" : "แผน 2: การซิงค์เริ่มต้นแบบเต็ม"
           }
         },
         "vi" : {
@@ -13231,13 +13231,13 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rencana 2: Memproses batch %d..."
+            "value" : "Rencana 2: Memproses kelompok %d..."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プラン2: バッチ %d を処理中..."
+            "value" : "プラン2: バッチ%dを処理中..."
           }
         },
         "ko" : {
@@ -13273,7 +13273,7 @@
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "แผน 2: กำลังประมวลผลชุด %d..."
+            "value" : "แผน 2: กำลังประมวลผลชุดที่ %d..."
           }
         },
         "vi" : {
@@ -13337,7 +13337,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "まず Notion を認証してください。"
+            "value" : "まずNotionを認証してください。"
           }
         },
         "ko" : {
@@ -13437,7 +13437,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同期前に Notion API キーおよびページ ID を設定してください。"
+            "value" : "同期前にNotion APIキーおよびページIDを設定してください。"
           }
         },
         "ko" : {
@@ -13485,7 +13485,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在同步前配置 Notion API 密钥和页面 ID。"
+            "value" : "同步前请先配置 Notion API 密钥和页面 ID。"
           }
         }
       }
@@ -13641,19 +13641,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "言語の変更を有効にするには、アプリケーションを再起動してください。"
+            "value" : "言語変更を有効にするには、アプリケーションを再起動してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "언어 변경을 적용하려면 애플리케이션을 다시 시작하세요."
+            "value" : "언어 변경을 적용하려면 앱을 다시 시작하세요."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start de applicatie opnieuw op zodat de taalwijziging van kracht wordt."
+            "value" : "Herstart de applicatie om de taalwijziging door te voeren."
           }
         },
         "pt-BR" : {
@@ -13671,7 +13671,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Starta om programmet för att språkändringen ska träda i kraft."
+            "value" : "Starta om appen för att språkändringen ska träda i kraft."
           }
         },
         "th" : {
@@ -13755,7 +13755,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecteer een item"
+            "value" : "Selecteer een item om te synchroniseren"
           }
         },
         "pt-BR" : {
@@ -13843,7 +13843,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "まず Notion Integration ビューで NOTION_PAGE_ID を設定してください。"
+            "value" : "まずNotion IntegrationビューでNOTION_PAGE_IDを設定してください。"
           }
         },
         "ko" : {
@@ -13867,13 +13867,13 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сначала установите NOTION_PAGE_ID в представлении интеграции Notion."
+            "value" : "Сначала установите NOTION_PAGE_ID в настройках интеграции Notion."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ställ in NOTION_PAGE_ID i Notion Integration-vyn först."
+            "value" : "Ställ först in NOTION_PAGE_ID i Notion-integration-vyn."
           }
         },
         "th" : {
@@ -13969,7 +13969,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Политика Конфиденциальности"
+            "value" : "Политика конфиденциальности"
           }
         },
         "sv" : {
@@ -14005,7 +14005,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pro Låst Op"
+            "value" : "Pro låst op"
           }
         },
         "de" : {
@@ -14029,7 +14029,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pro avattu"
+            "value" : "Pro käytössä"
           }
         },
         "fr" : {
@@ -14279,7 +14279,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Köp avbrutet eller väntar."
+            "value" : "Köp avbrutet eller väntande."
           }
         },
         "th" : {
@@ -14633,7 +14633,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Calificar y Reseñar"
+            "value" : "Puntuar y reseñar"
           }
         },
         "fi" : {
@@ -14645,7 +14645,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Évaluer et Aviser"
+            "value" : "Évaluer et donner mon avis"
           }
         },
         "id" : {
@@ -14681,7 +14681,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оценить и Отзыв"
+            "value" : "Оценить и оставить отзыв"
           }
         },
         "sv" : {
@@ -14815,7 +14815,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opdater Bøger"
+            "value" : "Opdater bøger"
           }
         },
         "de" : {
@@ -15017,7 +15017,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rapportér Problemer"
+            "value" : "Rapportér problemer"
           }
         },
         "de" : {
@@ -15083,7 +15083,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сообщить о Проблемах"
+            "value" : "Сообщить о проблемах"
           }
         },
         "sv" : {
@@ -15119,7 +15119,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rapportér Problemer & Forslag"
+            "value" : "Rapportér problemer & forslag"
           }
         },
         "de" : {
@@ -15185,7 +15185,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сообщить о проблемах и предложениях"
+            "value" : "Сообщить о проблемах и предложить идеи"
           }
         },
         "sv" : {
@@ -15731,7 +15731,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gendannet succesfuldt."
+            "value" : "Gendannet."
           }
         },
         "de" : {
@@ -15803,7 +15803,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Återställning lyckades."
+            "value" : "Återställningen lyckades."
           }
         },
         "th" : {
@@ -16267,7 +16267,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memindai highlight lokal..."
+            "value" : "Memindai sorotan lokal..."
           }
         },
         "ja" : {
@@ -16337,7 +16337,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Select a book to view details"
+            "value" : "Wählen Sie ein Buch aus, um Details anzuzeigen"
           }
         },
         "en" : {
@@ -16397,7 +16397,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите книгу для просмотра деталей"
+            "value" : "Выберите книгу для просмотра подробностей"
           }
         },
         "sv" : {
@@ -16433,7 +16433,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vælg Alle"
+            "value" : "Vælg alle"
           }
         },
         "de" : {
@@ -16781,13 +16781,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリケーションの情報表示"
+            "value" : "アプリについて情報を表示"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "애플리케이션 정보 표시"
+            "value" : "앱 정보 표시"
           }
         },
         "nl" : {
@@ -17135,7 +17135,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "单库（每本书一个页面）"
+            "value" : "单数据库（每本书一个页面）"
           }
         }
       }
@@ -17201,7 +17201,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sorteren"
+            "value" : "Sorteeropties"
           }
         },
         "pt-BR" : {
@@ -17267,7 +17267,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Código Fuente"
+            "value" : "Código fuente"
           }
         },
         "fi" : {
@@ -17683,7 +17683,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Support"
+            "value" : "Assistance"
           }
         },
         "id" : {
@@ -17755,7 +17755,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Support & Pro Lås Op"
+            "value" : "Support & Pro-lås op"
           }
         },
         "de" : {
@@ -17779,13 +17779,13 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tuki ja Pro-avain"
+            "value" : "Tuki ja Pro-ominaisuudet"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Support et déblocage Pro"
+            "value" : "Assistance et déblocage Pro"
           }
         },
         "id" : {
@@ -17959,7 +17959,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Støt Projektet"
+            "value" : "Støt projektet"
           }
         },
         "de" : {
@@ -18305,7 +18305,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "データを同期先"
+            "value" : "データ同期先"
           }
         },
         "ko" : {
@@ -18601,7 +18601,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sinkronisasi highlight ke Notion"
+            "value" : "Sinkronisasi sorotan ke Notion"
           }
         },
         "ja" : {
@@ -18976,7 +18976,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sync-Warteschlange"
+            "value" : "Synchronisations-Warteschlange"
           }
         },
         "en" : {
@@ -19072,7 +19072,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synkroniser Valgte (%lld) til Notion"
+            "value" : "Synkroniser valgte (%lld) til Notion"
           }
         },
         "de" : {
@@ -19138,7 +19138,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Синхронизировать %lld выбранных с Notion"
+            "value" : "Синхронизировать выбранные (%lld) с Notion"
           }
         },
         "sv" : {
@@ -19172,7 +19172,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synkroniser Valgte til Notion"
+            "value" : "Synkroniser valgte til Notion"
           }
         },
         "de" : {
@@ -19310,13 +19310,13 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sinkronisasi ke Notion sedang berlangsung. Keluar anyway?"
+            "value" : "Sinkronisasi ke Notion sedang berlangsung. Tetap keluar?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notion への同期が進行中です。 それでも終了しますか？"
+            "value" : "Notionへの同期が進行中です。終了しますか？"
           }
         },
         "ko" : {
@@ -19358,7 +19358,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đồng bộ vào Notion đang diễn ra. Thoát mọi trường hợp?"
+            "value" : "Đồng bộ vào Notion đang diễn ra. Thoát dù vậy?"
           }
         },
         "zh-Hans" : {
@@ -19831,7 +19831,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사이드바 전환"
+            "value" : "사이드바 표시/숨기기"
           }
         },
         "nl" : {
@@ -19919,7 +19919,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memperbarui %lld highlight yang ada..."
+            "value" : "Memperbarui %lld sorotan yang ada..."
           }
         },
         "ja" : {
@@ -19931,7 +19931,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld개의 기존 하이라이트 업데이트 중..."
+            "value" : "%lld개 기존 하이라이트 업데이트 중..."
           }
         },
         "nl" : {
@@ -20128,13 +20128,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OAuth を使用して SyncNos が Notion ワークスペースにアクセスすることを許可します。これは推奨される方法です。"
+            "value" : "OAuthを使用してSyncNosがNotionワークスペースにアクセスすることを許可します。これは推奨される方法です。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OAuth를 사용하여 SyncNos가 Notion 워크스페이스에 액세스하도록 승인하세요. 이것이 권장되는 방법입니다."
+            "value" : "OAuth를 사용하여 SyncNos가 Notion 워크스페이스에 접근하도록 승인하세요. 이것이 권장되는 방법입니다."
           }
         },
         "nl" : {
@@ -20176,7 +20176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用 OAuth 授权 SyncNos 访问您的 Notion 工作区。这是推荐方法。"
+            "value" : "使用 OAuth 授权 SyncNos 访问您的 Notion 工作空间。这是推荐的方法。"
           }
         }
       }
@@ -20278,7 +20278,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用户ID: %lld"
+            "value" : "用户 ID: %lld"
           }
         }
       }
@@ -20332,7 +20332,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ユーザー識別子：%@"
+            "value" : "ユーザー識別子: %@"
           }
         },
         "ko" : {
@@ -20362,7 +20362,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Användaridentifierare：%@"
+            "value" : "Användar-ID: %@"
           }
         },
         "th" : {
@@ -20374,7 +20374,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Định danh người dùng：%@"
+            "value" : "Định danh người dùng: %@"
           }
         },
         "zh-Hans" : {
@@ -20512,7 +20512,7 @@
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "Versión %1$@ (%2$@)"
           }
         },
         "fi" : {
@@ -20536,13 +20536,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "バージョン %1$@ (%2$@)"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "버전 %1$@ (%2$@)"
           }
         },
         "nl" : {
@@ -20554,13 +20554,13 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "Versão %1$@ (%2$@)"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "Версия %1$@ (%2$@)"
           }
         },
         "sv" : {
@@ -20584,7 +20584,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version %1$@ (%2$@)"
+            "value" : "版本 %1$@ (%2$@)"
           }
         }
       }
@@ -20596,7 +20596,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vis Kildekode"
+            "value" : "Vis kildekode"
           }
         },
         "de" : {
@@ -20668,7 +20668,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Visa Källkod"
+            "value" : "Visa källkod"
           }
         },
         "th" : {
@@ -20932,7 +20932,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Espace de travail: %@"
+            "value" : "Espace de travail : %@"
           }
         },
         "id" : {
@@ -20992,7 +20992,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "工作区：%@"
+            "value" : "工作空间：%@"
           }
         }
       }
