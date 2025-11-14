@@ -1,5 +1,22 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.6.6 November 14, 2025
+
+*Added*
+
+- Debug Support Section: Added conditional compilation for a debug support section in SettingsView to enhance development experience
+- MenuBar Window Management: Enhanced MenuBarView with window management functionality, including button to open main window
+- Language Support Updates: Updated supported languages in LanguageView for improved localization
+
+*Fixed*
+
+- Notion Integration UI: Restored Notion integration UI elements and improved manual credential entry instructions
+
+*Changed*
+
+- MenuBar Layout: Added divider in MenuBarView for better visual separation of sync actions and settings
+- Internationalization: Enhanced i18n support across multiple features
+
 ## v0.6.5.4 November 12, 2025
 
 *Added*
