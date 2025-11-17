@@ -33,28 +33,6 @@
 - **Error Retry**: Intelligent error retry mechanism
 - **Apple Sign In**: Secure Apple ID authentication integration
 
-## 🚀 Quick Start
-
-### Method 1: Mac App Store Installation (Recommended)
-
-1. **Download the App**
-   - Visit [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
-   - Click "Get" to install the application
-
-### Method 2: Source Code Compilation Installation
-
-#### System Requirements
-- macOS 13.0+
-- Xcode 15.0+
-- Swift 5.0+
-
-#### In Scheme > Run > Arguments, fill in Environment Variables:
-
-- NOTION_OAUTH_CLIENT_ID: Notion OAuth Client ID
-- NOTION_OAUTH_CLIENT_SECRET: Notion OAuth Client Secret
-
-```
-
 ## 📄 License
 
 This project is licensed under the [AGPL-3.0 License](LICENSE).

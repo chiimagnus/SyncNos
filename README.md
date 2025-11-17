@@ -33,26 +33,6 @@
 - **错误重试**：智能的错误重试机制
 - **Apple 登录**：安全的 Apple ID 认证集成
 
-## 🚀 快速开始
-
-### 方式一：Mac App Store 安装（推荐）
-
-1. **下载应用**
-   - 访问 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
-   - 点击"获取"安装应用
-
-### 方式二：源码编译安装
-
-#### 环境要求
-- macOS 13.0+
-- Xcode 15.0+
-- Swift 5.0+
-
-#### 在Scheme > Run > Arguments 中填写 Environment Variables:
-
-- NOTION_OAUTH_CLIENT_ID: Notion OAuth Client ID
-- NOTION_OAUTH_CLIENT_SECRET: Notion OAuth Client Secret
-
 ## 📄 许可证
 
 本项目采用 [AGPL-3.0 License](LICENSE)。
