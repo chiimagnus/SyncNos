@@ -41,16 +41,6 @@
    - Visit [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
    - Click "Get" to install the application
 
-2. **Configure Notion**
-   - Open [Notion Integrations Page](https://www.notion.so/profile/integrations)
-   - Create a new integration to get the API Token
-   - Create a database in Notion and get the database ID
-
-3. **Setup SyncNos**
-   - Open the SyncNos application
-   - Enter the Notion API Token and database ID in settings
-   - Click "Save" to complete the configuration
-
 ### Method 2: Source Code Compilation Installation
 
 #### System Requirements
@@ -58,18 +48,11 @@
 - Xcode 15.0+
 - Swift 5.0+
 
-#### Compilation Steps
+#### In Scheme > Run > Arguments, fill in Environment Variables:
 
-```bash
-# Clone repository
-git clone https://github.com/chiimagnus/SyncNos.git
-cd SyncNos
+- NOTION_OAUTH_CLIENT_ID: Notion OAuth Client ID
+- NOTION_OAUTH_CLIENT_SECRET: Notion OAuth Client Secret
 
-# Open Xcode project
-open SyncNos.xcodeproj
-
-# Or compile using command line
-xcodebuild -scheme SyncNos -configuration Debug build
 ```
 
 ## 📄 License
