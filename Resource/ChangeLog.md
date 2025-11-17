@@ -1,5 +1,28 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.6.7 November 18, 2025
+
+*Added*
+
+- Notion Rate Limiting: Enhanced NotionRequestHelper to include search endpoint in read limiter
+- Debug Support: Added conditional Apple account navigation link in SettingsView for debug mode
+
+*Changed*
+
+- Notion Integration UI: Updated NotionIntegrationView to conditionally display manual credential input based on OAuth authorization status
+- Notion Pagination: Improved pagination logic in NotionService for dynamic page retrieval with better logging
+- Notion Configuration: Simplified NotionOAuthConfig by removing Keychain integration and using local Swift configuration
+- Notion OAuth Configuration: Migrated Notion OAuth configuration to use environment variables instead of config file
+- Project Configuration: Updated .gitignore to include additional build artifacts and user settings
+
+*Fixed*
+
+- App Store Link: Updated App Store ID in HelpCommands to correct value for app review link
+
+*Removed*
+
+- Unused Scheme: Removed unused scheme file and updated scheme management plist
+
 ## v0.6.6 November 14, 2025
 
 *Added*
