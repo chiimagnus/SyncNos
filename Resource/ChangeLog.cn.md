@@ -1,5 +1,28 @@
 # 更新日志
 
+## v0.6.7 2025年11月18日
+
+*Added*
+
+- Notion 速率限制：增强 NotionRequestHelper，在读取限制器中包含搜索端点
+- 调试支持：在 SettingsView 中添加条件性的 Apple 账户导航链接以用于调试模式
+
+*Changed*
+
+- Notion 集成界面：更新 NotionIntegrationView，根据 OAuth 授权状态有条件地显示手动凭证输入
+- Notion 分页：改进 NotionService 中的分页逻辑，支持动态页面检索并改进日志记录
+- Notion 配置：简化 NotionOAuthConfig，移除 Keychain 集成，使用本地 Swift 配置
+- Notion OAuth 配置：迁移 Notion OAuth 配置使用环境变量而非配置文件
+- 项目配置：更新 .gitignore 以包含额外的构建产物和用户设置
+
+*Fixed*
+
+- App Store 链接：在 HelpCommands 中更新 App Store ID 为正确的应用审核链接值
+
+*Removed*
+
+- 未使用的方案：移除未使用的方案文件并更新方案管理 plist
+
 ## v0.6.6 2025年11月14日
 
 *Added*
