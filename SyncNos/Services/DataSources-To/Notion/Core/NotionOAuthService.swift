@@ -4,10 +4,10 @@ import AuthenticationServices
 /// Notion OAuth 服务，处理 OAuth 2.0 授权流程
 final class NotionOAuthService {
     // Notion OAuth 配置
-    // 配置值从 NotionOAuthConfig 加载，从 Bundle 中的 notion_auth.env 文件读取
-    // 配置文件位置：Resource/notion_auth.env（需要添加到 Xcode Target 的 "Copy Bundle Resources"）
-    // 重定向 URI：固定为 https://localhost:8080/oauth/callback
-    // 注意：此值必须与 Notion Integration 设置中的 Redirect URI 完全一致
+    // 配置值从 NotionOAuthConfig 加载：
+    // - 优先从 Keychain 读取；
+    // - 若 Keychain 为空，则从本地 `NotionConfig.swift` 中读取并自动写入 Keychain。
+    // 不再依赖 Bundle 中的 `.env` 文件。
     var clientId: String {
         NotionOAuthConfig.clientId
     }
@@ -39,7 +39,7 @@ final class NotionOAuthService {
             throw NSError(
                 domain: "NotionOAuthService",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Notion OAuth Client ID not configured. Please set NOTION_OAUTH_CLIENT_ID environment variable or create notion_auth.env file."]
+                userInfo: [NSLocalizedDescriptionKey: "Notion OAuth Client ID not configured. 请在本地 NotionConfig.swift 中配置 clientId / clientSecret。"]
             )
         }
         

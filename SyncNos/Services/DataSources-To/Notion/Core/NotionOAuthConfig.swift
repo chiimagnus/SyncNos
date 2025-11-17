@@ -1,8 +1,8 @@
 import Foundation
 
 /// Notion OAuth 配置加载器
-/// 从配置文件中读取敏感信息，避免硬编码在代码中
-/// 配置文件位置：应用 Bundle 中的 notion_auth.env（需要添加到 Xcode Target 的 "Copy Bundle Resources"）
+/// 使用 Keychain + 本地 Swift 配置文件（`NotionConfig.swift`）管理敏感信息，
+/// 避免 `.env` 明文文件进入应用包。
 final class NotionOAuthConfig {
     // 配置键名
     private static let clientIdKey = "NOTION_OAUTH_CLIENT_ID"
@@ -15,6 +15,11 @@ final class NotionOAuthConfig {
     // 缓存配置值（避免重复读取）
     private static var cachedClientId: String?
     private static var cachedClientSecret: String?
+
+    // Keychain 配置
+    private static let keychainService = "com.chiimagnus.SyncNos.NotionOAuth"
+    private static let keychainClientIdAccount = "notion_client_id"
+    private static let keychainClientSecretAccount = "notion_client_secret"
     
     /// 从配置文件中加载 Client ID
     static var clientId: String {
@@ -22,8 +27,16 @@ final class NotionOAuthConfig {
             return cached
         }
         
-        // 从 Bundle 中的配置文件读取
-        if let configValue = loadFromConfigFile(key: clientIdKey), !configValue.isEmpty {
+        // 1. 优先从 Keychain 读取
+        if let keychainValue = loadFromKeychain(account: keychainClientIdAccount), !keychainValue.isEmpty {
+            cachedClientId = keychainValue
+            return keychainValue
+        }
+
+        // 2. 其次从本地 Swift 配置文件读取，并在首次读取时写入 Keychain
+        let configValue = NotionConfig.clientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !configValue.isEmpty, configValue != "YOUR_CLIENT_ID" {
+            saveToKeychain(value: configValue, account: keychainClientIdAccount)
             cachedClientId = configValue
             return configValue
         }
@@ -38,8 +51,16 @@ final class NotionOAuthConfig {
             return cached
         }
         
-        // 从 Bundle 中的配置文件读取
-        if let configValue = loadFromConfigFile(key: clientSecretKey), !configValue.isEmpty {
+        // 1. 优先从 Keychain 读取
+        if let keychainValue = loadFromKeychain(account: keychainClientSecretAccount), !keychainValue.isEmpty {
+            cachedClientSecret = keychainValue
+            return keychainValue
+        }
+
+        // 2. 其次从本地 Swift 配置文件读取，并在首次读取时写入 Keychain
+        let configValue = NotionConfig.clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !configValue.isEmpty, configValue != "YOUR_CLIENT_SECRET" {
+            saveToKeychain(value: configValue, account: keychainClientSecretAccount)
             cachedClientSecret = configValue
             return configValue
         }
@@ -48,45 +69,26 @@ final class NotionOAuthConfig {
         return "YOUR_CLIENT_SECRET"
     }
     
-    /// 从 Bundle 中的配置文件加载值
-    /// 配置文件路径：应用 Bundle 中的 notion_auth.env
-    private static func loadFromConfigFile(key: String) -> String? {
-        // 从 Bundle 中读取配置文件
-        guard let configPath = Bundle.main.path(forResource: "notion_auth", ofType: "env"),
-              FileManager.default.fileExists(atPath: configPath) else {
+    // MARK: - Keychain helpers
+
+    /// 从 Keychain 读取字符串
+    private static func loadFromKeychain(account: String) -> String? {
+        guard let data = KeychainHelper.shared.read(service: keychainService, account: account),
+              !data.isEmpty,
+              let value = String(data: data, encoding: .utf8),
+              !value.isEmpty else {
             return nil
         }
-        
-        do {
-            let content = try String(contentsOfFile: configPath, encoding: .utf8)
-            let lines = content.components(separatedBy: .newlines)
-            
-            for line in lines {
-                // 跳过注释和空行
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty || trimmed.hasPrefix("#") {
-                    continue
-                }
-                
-                // 解析 KEY=VALUE 格式
-                let parts = trimmed.components(separatedBy: "=")
-                if parts.count >= 2 {
-                    let configKey = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                    let configValue = parts.dropFirst().joined(separator: "=")
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) // 移除引号
-                    
-                    if configKey == key {
-                        return configValue
-                    }
-                }
-            }
-        } catch {
-            // 忽略读取错误
-            return nil
+        return value
+    }
+
+    /// 将字符串写入 Keychain
+    @discardableResult
+    private static func saveToKeychain(value: String, account: String) -> Bool {
+        guard let data = value.data(using: .utf8) else {
+            return false
         }
-        
-        return nil
+        return KeychainHelper.shared.save(service: keychainService, account: account, data: data)
     }
     
     /// 检查配置是否已设置
