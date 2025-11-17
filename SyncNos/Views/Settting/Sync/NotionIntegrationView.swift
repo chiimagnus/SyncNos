@@ -116,29 +116,32 @@ struct NotionIntegrationView: View {
                     }
                     .padding(.vertical, 4)
                 }
-                
-                Divider()
-                
-                Text("If you have any problems with OAuth, you can manually enter credentials:")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                LabeledContent("NOTION_KEY") {
-                    SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(viewModel.isOAuthAuthorized)
-                }
 
-                LabeledContent("NOTION_PAGE_ID") {
-                    TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
-                        .textFieldStyle(.roundedBorder)
-                }
+                if !viewModel.isOAuthAuthorized {
 
-                Button("Save") {
-                    viewModel.saveCredentials()
+                    Divider()
+
+                    Text("If you have any problems with OAuth, you can manually enter credentials:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    LabeledContent("NOTION_KEY") {
+                        SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(viewModel.isOAuthAuthorized)
+                    }
+
+                    LabeledContent("NOTION_PAGE_ID") {
+                        TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    Button("Save") {
+                        viewModel.saveCredentials()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isOAuthAuthorized)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isOAuthAuthorized)
             }
             
             if let message = viewModel.message {
