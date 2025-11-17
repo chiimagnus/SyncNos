@@ -28,7 +28,6 @@
 				ChangeLog.cn.md,
 				ChangeLog.md,
 				image.png,
-				notion_auth.env.example,
 				PRIVACY_POLICY.md,
 				SyncNos.storekit,
 			);
