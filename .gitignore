@@ -12,6 +12,9 @@ notion_auth.env
 *.env
 !*.env.example
 
+# 本地 Notion OAuth Swift 配置文件（只在开发者本机存在）
+SyncNos/Services/DataSources-To/Notion/Core/NotionConfig.swift
+
 
 ## User settings
 xcuserdata/
