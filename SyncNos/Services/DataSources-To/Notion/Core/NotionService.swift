@@ -240,7 +240,9 @@ final class NotionService: NotionServiceProtocol {
 
         // 分页拉取：逐页请求，一旦在某一页找到可用的页面就立即返回；若一页没有则继续下一页，直至遍历完成。
         var cursor: String? = nil
+        var attempt = 1
         repeat {
+            core.logger.info("Notion search attempt \(attempt) starting, cursor=\(cursor ?? "nil"), query=\(searchQuery ?? "")")
             var body: [String: Any] = [
                 "filter": ["property": "object", "value": "page"],
                 "page_size": pageSize
@@ -254,6 +256,7 @@ final class NotionService: NotionServiceProtocol {
             let data = try await requestHelper.performRequest(path: "search", method: "POST", body: body)
             let decoded = try JSONDecoder().decode(SearchResponse.self, from: data)
 
+            var addedThisPage = 0
             for r in decoded.results where r.object == "page" {
                 // 过滤掉数据库条目（不能作为父级去创建数据库）
                 if r.parent?.database_id != nil { continue }
@@ -269,14 +272,21 @@ final class NotionService: NotionServiceProtocol {
                 }
                 let emoji = (r.icon?.type == "emoji") ? r.icon?.emoji : nil
                 collected.append(NotionPageSummary(id: r.id, title: title, iconEmoji: emoji))
+                addedThisPage += 1
             }
 
+            core.logger.info("Notion search attempt \(attempt) completed, rawResults=\(decoded.results.count), pagesAdded=\(addedThisPage), has_more=\(decoded.has_more == true)")
+
             // 如果本页找到了任何可用页面，则立即返回，不继续翻页（动态一批一批查找）
-            if !collected.isEmpty {
+            if addedThisPage > 0 {
+                core.logger.info("Notion search found pages on attempt \(attempt), returning \(addedThisPage) pages")
                 break
+            } else {
+                core.logger.info("Notion search attempt \(attempt) found no usable pages, continuing to next page if any")
             }
 
             cursor = decoded.has_more == true ? decoded.next_cursor : nil
+            attempt += 1
         } while cursor != nil
 
         return collected
