@@ -236,9 +236,10 @@ final class NotionService: NotionServiceProtocol {
         }
 
         var collected: [NotionPageSummary] = []
-        var cursor: String? = nil
         let pageSize = 100
 
+        // 分页拉取：逐页请求，一旦在某一页找到可用的页面就立即返回；若一页没有则继续下一页，直至遍历完成。
+        var cursor: String? = nil
         repeat {
             var body: [String: Any] = [
                 "filter": ["property": "object", "value": "page"],
@@ -268,6 +269,11 @@ final class NotionService: NotionServiceProtocol {
                 }
                 let emoji = (r.icon?.type == "emoji") ? r.icon?.emoji : nil
                 collected.append(NotionPageSummary(id: r.id, title: title, iconEmoji: emoji))
+            }
+
+            // 如果本页找到了任何可用页面，则立即返回，不继续翻页（动态一批一批查找）
+            if !collected.isEmpty {
+                break
             }
 
             cursor = decoded.has_more == true ? decoded.next_cursor : nil
