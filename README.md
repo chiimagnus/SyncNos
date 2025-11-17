@@ -41,16 +41,6 @@
    - 访问 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)
    - 点击"获取"安装应用
 
-2. **配置 Notion**
-   - 打开 [Notion 集成页面](https://www.notion.so/profile/integrations)
-   - 创建新的集成，获取 API Token
-   - 在 Notion 中创建数据库，获取数据库 ID
-
-3. **设置 SyncNos**
-   - 打开 SyncNos 应用
-   - 在设置中输入 Notion API Token 和数据库 ID
-   - 点击"保存"完成配置
-
 ### 方式二：源码编译安装
 
 #### 环境要求
@@ -58,19 +48,10 @@
 - Xcode 15.0+
 - Swift 5.0+
 
-#### 编译步骤
+#### 在Scheme > Run > Arguments 中填写 Environment Variables:
 
-```bash
-# 克隆仓库
-git clone https://github.com/chiimagnus/SyncNos.git
-cd SyncNos
-
-# 打开 Xcode 项目
-open SyncNos.xcodeproj
-
-# 或使用命令行编译
-xcodebuild -scheme SyncNos -configuration Debug build
-```
+- NOTION_OAUTH_CLIENT_ID: Notion OAuth Client ID
+- NOTION_OAUTH_CLIENT_SECRET: Notion OAuth Client Secret
 
 ## 📄 许可证
 
