@@ -24,6 +24,10 @@ class NotionRequestHelper {
         if upper == "POST" && path.contains("/databases/") && path.hasSuffix("/query") {
             return true
         }
+        // /v1/search 语义上属于读取，将其归入 read limiter（提高到 notionReadRequestsPerSecond）
+        if upper == "POST" && path.hasSuffix("/search") {
+            return true
+        }
         return false
     }
     private func addCommonHeaders(to request: inout URLRequest, key: String) {
