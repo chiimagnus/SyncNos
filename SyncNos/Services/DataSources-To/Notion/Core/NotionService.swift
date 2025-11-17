@@ -236,7 +236,7 @@ final class NotionService: NotionServiceProtocol {
         }
 
         var collected: [NotionPageSummary] = []
-        let pageSize = 100
+        let pageSize = 50
 
         // 分页拉取：逐页请求，一旦在某一页找到可用的页面就立即返回；若一页没有则继续下一页，直至遍历完成。
         var cursor: String? = nil
