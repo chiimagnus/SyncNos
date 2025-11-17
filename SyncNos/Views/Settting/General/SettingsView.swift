@@ -33,7 +33,7 @@ struct SettingsView: View {
                         }
                     }
                     .help("Show application about information")
-
+#if DEBUG
                     // 添加 Apple 账号与登录 的 NavigationLink
                     NavigationLink(destination: AppleAccountView()) {
                         HStack {
@@ -45,6 +45,7 @@ struct SettingsView: View {
                         }
                     }
                     .help("Manage Apple sign-in and account info")
+#endif
                 }
                 .collapsible(false)
 #if DEBUG
