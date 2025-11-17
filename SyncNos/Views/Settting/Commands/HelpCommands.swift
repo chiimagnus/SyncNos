@@ -29,7 +29,7 @@ struct HelpCommands: Commands {
     }
 
     private func openAppStoreReview() {
-        let appStoreID = "6752426176"
+        let appStoreID = "6755133888"
         let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id\(appStoreID)")!
         let webURL = URL(string: "https://apps.apple.com/app/id\(appStoreID)")!
 
