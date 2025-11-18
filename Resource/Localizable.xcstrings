@@ -14810,102 +14810,102 @@
         }
       }
     },
-    "Refresh Books" : {
+    "Refresh" : {
       "localizations" : {
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opdater bøger"
+            "value" : "Opdater"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bücher aktualisieren"
+            "value" : "Aktualisieren"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Refresh Books"
+            "value" : "Refresh"
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Actualizar libros"
+            "value" : "Actualizar"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Päivitä kirjat"
+            "value" : "Päivitä"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Actualiser les livres"
+            "value" : "Actualiser"
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Segarkan Buku"
+            "value" : "Segarkan"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "書籍を更新"
+            "value" : "更新"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "책 새로고침"
+            "value" : "새로고침"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Boeken vernieuwen"
+            "value" : "Vernieuwen"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Atualizar livros"
+            "value" : "Atualizar"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Обновить книги"
+            "value" : "Обновить"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uppdatera böcker"
+            "value" : "Uppdatera"
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "รีเฟรชหนังสือ"
+            "value" : "รีเฟรช"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Làm mới sách"
+            "value" : "Làm mới"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新书籍"
+            "value" : "刷新"
           }
         }
       }

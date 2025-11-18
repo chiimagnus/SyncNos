@@ -23,7 +23,7 @@ struct ViewCommands: Commands {
             }
             .keyboardShortcut("\\", modifiers: .command)
 
-            Button("Refresh Books", systemImage: "arrow.clockwise") {
+            Button("Refresh", systemImage: "arrow.clockwise") {
                 NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
             }
             .keyboardShortcut("r", modifiers: .command)
