@@ -60,6 +60,9 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var highlightIsAscending: Bool = false
     @Published var showNotionConfigAlert: Bool = false
 
+    /// 当前用于列表渲染的子集（支持分页/增量加载）
+    @Published var visibleLinks: [GoodLinksLinkRow] = []
+
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
@@ -68,6 +71,11 @@ final class GoodLinksViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
+
+    /// GoodLinks 列表分页大小：初次加载与后续每次增量追加的数量
+    private let pageSize: Int = 80
+    /// 当前已向 UI 暴露的列表长度
+    private var currentPageSize: Int = 0
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
          syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
@@ -189,10 +197,13 @@ final class GoodLinksViewModel: ObservableObject {
             }
             // 发布结果前，在主线程上驱动 UI 更新
             .receive(on: DispatchQueue.main)
-            .handleEvents(receiveOutput: { [weak self] _ in
-                self?.isComputingList = false
-            })
-            .assign(to: &$displayLinks)
+            .sink { [weak self] newDisplay in
+                guard let self else { return }
+                self.isComputingList = false
+                self.displayLinks = newDisplay
+                self.resetVisibleLinks()
+            }
+            .store(in: &cancellables)
 
         // Debounced persistence for GoodLinks preferences
         $sortKey
@@ -363,7 +374,33 @@ final class GoodLinksViewModel: ObservableObject {
 
     // 主动触发一次派生重算（供视图 onAppear/切换场景调用）
     func triggerRecompute() {
+        // 切换或条件变化时，先进入计算态，避免长列表直接闪现
+        isComputingList = true
         recomputeTrigger.send(())
+    }
+
+    /// 重置当前可见列表为第一页
+    private func resetVisibleLinks() {
+        currentPageSize = min(pageSize, displayLinks.count)
+        if currentPageSize == 0 {
+            visibleLinks = []
+        } else {
+            visibleLinks = Array(displayLinks.prefix(currentPageSize))
+        }
+    }
+
+    /// 在行即将出现在视图中时调用，判断是否需要向后追加一页数据
+    func loadMoreIfNeeded(currentItem: GoodLinksLinkRow) {
+        guard let index = visibleLinks.firstIndex(where: { $0.id == currentItem.id }) else { return }
+        // 当靠近当前已加载列表尾部 10 个元素时触发下一页加载
+        let threshold = max(visibleLinks.count - 10, 0)
+        guard index >= threshold else { return }
+
+        let newSize = min(currentPageSize + pageSize, displayLinks.count)
+        guard newSize > currentPageSize else { return }
+
+        currentPageSize = newSize
+        visibleLinks = Array(displayLinks.prefix(currentPageSize))
     }
 
     /// 在切换到 GoodLinks 列表之前调用，确保首帧显示“加载中”并后台重算
