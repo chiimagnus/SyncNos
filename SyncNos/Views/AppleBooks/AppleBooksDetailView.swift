@@ -166,7 +166,7 @@ struct AppleBooksDetailView: View {
                 externalSyncProgress = nil
             }
         }
-        // .navigationTitle("Apple Books")
+        .navigationTitle("Apple Books")
         .background(LiveResizeObserver(isResizing: $isLiveResizing))
         .onChange(of: isLiveResizing) { resizing in
             if resizing {
@@ -177,7 +177,7 @@ struct AppleBooksDetailView: View {
         }
         .toolbar {
             // 中间区域：Filter 控件
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .automatic) {
                 FiltetSortBar(
                     noteFilter: $viewModel.noteFilter,
                     selectedStyles: $viewModel.selectedStyles,
@@ -189,8 +189,12 @@ struct AppleBooksDetailView: View {
                 )
             }
             
+            ToolbarItem(placement: .automatic) {
+                    Spacer()
+                }
+            
             // 后缘：Sync 按钮 / 进度
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .automatic) {
                 if externalIsSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
