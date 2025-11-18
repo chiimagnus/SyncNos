@@ -17,7 +17,7 @@ struct AppleBooksListView: View {
                     Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
                         .multilineTextAlignment(.center)
                         .padding()
-                    Button("Open Apple Books notes", systemImage: "book") {
+                    Button("Open Apple Books notes", systemImage: "folder") {
                         AppleBooksPicker.pickAppleBooksContainer()
                     }
                 }
@@ -28,7 +28,7 @@ struct AppleBooksListView: View {
                         .font(.largeTitle)
                     Text("No books found")
                         .padding()
-                    Button("Open Apple Books notes", systemImage: "book") {
+                    Button("Open Apple Books notes", systemImage: "folder") {
                         AppleBooksPicker.pickAppleBooksContainer()
                     }
                 }
