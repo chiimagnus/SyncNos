@@ -27,8 +27,8 @@ struct SyncNosApp: App {
     }
 
     var body: some Scene {
-        // Use a named single main window so we can explicitly re-open it when dock icon is clicked.
-        Window("SyncNos", id: "main") {
+        // 隐藏可见窗口标题（保留重新打开时的 id），以避免在工具栏中显示应用程序名称。
+        Window("", id: "main") {
             MainListView()
         }
         .commands {

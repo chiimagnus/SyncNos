@@ -297,7 +297,7 @@ struct GoodLinksDetailView: View {
                         frozenLayoutWidth = nil
                     }
                 }
-                .navigationTitle("GoodLinks")
+                // .navigationTitle("GoodLinks")
                 .toolbar {
                     // 中间区域：Filter 控件
                     ToolbarItem(placement: .principal) {
