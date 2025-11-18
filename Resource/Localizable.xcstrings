@@ -1824,12 +1824,12 @@
     "Apple Books" : {
       "shouldTranslate" : false
     },
-    "AppleBooks (%lld/%lld)" : {
+    "Apple Books (%lld/%lld)" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "AppleBooks (%1$lld/%2$lld)"
+            "value" : "Apple Books (%1$lld/%2$lld)"
           }
         }
       },

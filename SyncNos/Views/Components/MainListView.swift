@@ -34,7 +34,7 @@ struct MainListView: View {
                                 contentSourceRawValue = ContentSource.appleBooks.rawValue
                             } label: {
                                 HStack {
-                                    Text("AppleBooks (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
+                                    Text("Apple Books (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
                                     if contentSource == .appleBooks { Image(systemName: "checkmark") }
                                 }
                             }
@@ -161,7 +161,8 @@ struct MainListView: View {
                             }
                         }
                     } label: {
-                        Label(contentSource.title, systemImage: contentSource == .appleBooks ? "book" : "bookmark")
+                        // 显示数据源名称而不是图标
+                        Text(contentSource.title)
                     }
                 }
             }
