@@ -299,8 +299,8 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        // Filter bar in toolbar
+                    // 中间区域：Filter 控件
+                    ToolbarItem(placement: .principal) {
                         FiltetSortBar(
                             noteFilter: $viewModel.highlightNoteFilter,
                             selectedStyles: $viewModel.highlightSelectedStyles,
@@ -314,8 +314,10 @@ struct GoodLinksDetailView: View {
                                 viewModel.highlightIsAscending = ascending
                             }
                         )
-
-                        // Sync button / progress
+                    }
+                    
+                    // 后缘：Sync 按钮 / 进度
+                    ToolbarItem(placement: .primaryAction) {
                         if externalIsSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
