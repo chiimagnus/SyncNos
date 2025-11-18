@@ -7,6 +7,11 @@ final class SyncQueueViewModel: ObservableObject {
     @Published var queuedTasks: [SyncQueueTask] = []
     @Published var failedTasks: [SyncQueueTask] = []
 
+    /// 等待队列任务总数（包含未在 UI 中展示的部分）
+    @Published var queuedTotalCount: Int = 0
+    /// 失败任务总数（包含未在 UI 中展示的部分）
+    @Published var failedTotalCount: Int = 0
+
     /// 等待队列在 UI 中最多展示的任务数量（完整数据仍保存在 `SyncQueueStore` 中）
     private let maxQueuedDisplayCount: Int = 5
     /// 失败队列在 UI 中最多展示的任务数量
@@ -22,6 +27,8 @@ final class SyncQueueViewModel: ObservableObject {
         var running: [SyncQueueTask]
         var queued: [SyncQueueTask]
         var failed: [SyncQueueTask]
+        var queuedTotal: Int
+        var failedTotal: Int
     }
 
     private func groupTasks(_ tasks: [SyncQueueTask]) -> TaskGroups {
@@ -31,8 +38,15 @@ final class SyncQueueViewModel: ObservableObject {
         let queuedAll = tasks.filter { $0.state == .queued }
         let failedAll = tasks.filter { $0.state == .failed }
         let queued = Array(queuedAll.prefix(maxQueuedDisplayCount))
-        let failed = Array(failedAll.prefix(maxFailedDisplayCount))
-        return TaskGroups(running: running, queued: queued, failed: failed)
+        // 失败任务保持完整列表，默认在 UI 中折叠，只有在用户展开时才渲染
+        let failed = failedAll
+        return TaskGroups(
+            running: running,
+            queued: queued,
+            failed: failed,
+            queuedTotal: queuedAll.count,
+            failedTotal: failedAll.count
+        )
     }
 
     init(store: SyncQueueStoreProtocol = DIContainer.shared.syncQueueStore) {
@@ -44,7 +58,7 @@ final class SyncQueueViewModel: ObservableObject {
             .throttle(for: .milliseconds(120), scheduler: DispatchQueue.main, latest: true)
             .map { [weak self] tasks -> TaskGroups in
                 guard let self else {
-                    return TaskGroups(running: [], queued: [], failed: [])
+                    return TaskGroups(running: [], queued: [], failed: [], queuedTotal: 0, failedTotal: 0)
                 }
                 return self.groupTasks(tasks)
             }
@@ -54,6 +68,8 @@ final class SyncQueueViewModel: ObservableObject {
                 self?.runningTasks = groups.running
                 self?.queuedTasks = groups.queued
                 self?.failedTasks = groups.failed
+                self?.queuedTotalCount = groups.queuedTotal
+                self?.failedTotalCount = groups.failedTotal
             }
             .store(in: &cancellables)
     }
