@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
-- ✅ **智能分页**：大量数据的分页处理，确保性能优化
+- ✅ **智能分页**：大量数据的分页处理，确保性能优化，支持增量加载
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
@@ -16,12 +16,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **同步队列管理**：实时同步进度显示，任务排队和状态跟踪
 - ✅ **高亮颜色管理**：支持 Apple Books 和 GoodLinks 的颜色标签同步
 - ✅ **自动后台同步**：可配置时间间隔，支持按来源独立启用/禁用
-- ✅ **Apple Sign In 认证**：通过 FastAPI 后端安全认证
+- ✅ **Apple Sign In 认证**：通过 FastAPI 后端安全认证，支持 OAuth 授权
 - ✅ **国际化支持**：16 种语言（英、中、丹麦、荷兰、芬兰、法、德、印尼、日、韩、巴西葡、俄、西、瑞典、泰、越南）
-- ✅ **空状态视图**：优雅的占位页面提示（新增）
-- ✅ **模块化设置**：分类明确的设置界面和语言切换（重构）
-- ✅ **模块化菜单命令**：菜单命令系统完全模块化（新增）
-- ✅ **增量同步**：基于时间戳的增量同步机制（优化）
+- ✅ **空状态视图**：优雅的占位页面提示
+- ✅ **模块化设置**：分类明确的设置界面和语言切换
+- ✅ **模块化菜单命令**：菜单命令系统完全模块化
+- ✅ **增量同步**：基于时间戳的增量同步机制
+- ✅ **菜单栏视图**：新增 MenuBarView 和 MenuBarViewModel，提供快捷访问功能
+- ✅ **窗口标题优化**：隐藏主窗口标题，优化界面显示
 
 ## 架构
 
@@ -37,15 +39,15 @@ SyncNos/
 ├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── AppTheme.swift        # 应用主题和样式
-│   │   ├── EmptyStateView.swift  # 空状态占位视图（新增）
-│   │   ├── FiltetSortBar.swift   # 统一筛选排序栏
+│   │   ├── ArticleContentCardView.swift
+│   │   ├── FiltetSortBar.swift   # 统一筛选排序栏（布局优化）
 │   │   ├── HighlightCardView.swift
 │   │   ├── InfoHeaderCardView.swift # 信息头部卡片（显示选中数量）
 │   │   ├── LiveResizeObserver.swift # 实时大小观察器
-│   │   ├── ArticleContentCardView.swift
+│   │   ├── MainListView.swift    # 主列表视图（支持排序筛选）
+│   │   ├── MenuBarView.swift     # 菜单栏视图（新增）
 │   │   ├── SyncQueueView.swift   # 同步队列管理视图
-│   │   ├── WaterfallLayout.swift # 瀑布流布局
-│   │   └── MainListView.swift    # 主列表视图（支持排序筛选）
+│   │   └── WaterfallLayout.swift # 瀑布流布局
 │   ├── AppleBooks/
 │   │   ├── AppleBooksListView.swift
 │   │   └── AppleBooksDetailView.swift
@@ -75,20 +77,24 @@ SyncNos/
 │           └── ViewCommands.swift     # 视图命令
 ├── ViewModels/                   # ObservableObject 视图模型
 │   ├── AppleBooks/
-│   │   ├── AppleBooksViewModel.swift         # 列表管理
+│   │   ├── AppleBooksViewModel.swift         # 列表管理，支持分页和增量加载
 │   │   ├── AppleBooksDetailViewModel.swift   # 详情页分页
 │   │   └── AppleBooksSettingsViewModel.swift # 设置管理
 │   ├── GoodLinks/
-│   │   ├── GoodLinksViewModel.swift          # 统一视图模型
+│   │   ├── GoodLinksViewModel.swift          # 统一视图模型，支持分页和增量加载
 │   │   └── GoodLinksSettingsViewModel.swift  # 设置管理
 │   ├── Account/
 │   │   ├── AccountViewModel.swift            # 账户管理
 │   │   ├── AppleSignInViewModel.swift        # Apple 登录
 │   │   └── IAPViewModel.swift                # 应用内购买
+│   ├── MenuBar/
+│   │   └── MenuBarViewModel.swift            # 菜单栏视图模型（新增）
 │   ├── Notion/
-│   │   └── NotionIntegrationViewModel.swift  # Notion 配置
+│   │   └── NotionIntegrationViewModel.swift  # Notion 配置，支持 OAuth 授权
+│   ├── Settings/
+│   │   └── LoginItemViewModel.swift           # 登录项视图模型（新增）
 │   ├── Sync/
-│   │   └── SyncQueueViewModel.swift          # 同步队列管理
+│   │   └── SyncQueueViewModel.swift          # 同步队列管理，显示任务总数
 │   └── LogViewModel.swift
 ├── Models/                       # 数据模型
 │   ├── Models.swift              # BookRow, Highlight 等核心模型
@@ -131,10 +137,13 @@ SyncNos/
     │   │   │   ├── NotionConfigStore.swift     # 配置存储
     │   │   │   └── NotionSyncConfig.swift      # 同步配置
     │   │   ├── Core/             # 核心服务
+    │   │   │   ├── NotionConfig.swift.example # 配置文件示例（新增）
     │   │   │   ├── NotionHelperMethods.swift   # 辅助方法
+    │   │   │   ├── NotionOAuthConfig.swift     # OAuth 配置（新增）
+    │   │   │   ├── NotionOAuthService.swift    # OAuth 服务（新增）
     │   │   │   ├── NotionRateLimiter.swift     # 速率限制
-    │   │   │   ├── NotionRequestHelper.swift   # 请求辅助
-    │   │   │   ├── NotionService.swift         # 主服务
+    │   │   │   ├── NotionRequestHelper.swift   # 请求辅助，支持搜索端点
+    │   │   │   ├── NotionService.swift         # 主服务，分页逻辑优化
     │   │   │   └── NotionServiceCore.swift     # 核心实现
     │   │   ├── FromAppleBooks/   # Apple Books 同步策略
     │   │   │   ├── AppleBooksSyncService.swift      # 同步服务
@@ -182,15 +191,17 @@ DIContainer.shared.autoSyncService
 - `DatabaseQueryService`: 查询服务封装
 
 **2. Notion API 集成** (Services/DataSources-To/Notion/)
-- `NotionService`: 主要协调器（Services/DataSources-To/Notion/Core/NotionService.swift:1）
+- `NotionService`: 主要协调器（Services/DataSources-To/Notion/Core/NotionService.swift:1），分页逻辑优化
 - `NotionServiceCore`: 配置和 HTTP 客户端
 - 配置管理：
   - `NotionConfigStore`: Notion 配置存储
   - `NotionSyncConfig`: 同步配置管理
+  - `NotionOAuthConfig`: OAuth 配置管理（新增）
 - 核心服务：
-  - `NotionRequestHelper`: HTTP 请求辅助
+  - `NotionRequestHelper`: HTTP 请求辅助，支持搜索端点
   - `NotionRateLimiter`: API 速率限制
   - `NotionHelperMethods`: 辅助方法和工具
+  - `NotionOAuthService`: OAuth 认证服务（新增）
 - 操作模块：
   - `NotionDatabaseOperations`: 数据库创建和属性管理
   - `NotionPageOperations`: 页面 CRUD 操作
@@ -213,6 +224,7 @@ DIContainer.shared.autoSyncService
 - `DIContainer`: 中心服务容器和依赖注入
 - `LoggerService`: 统一日志记录，支持多级别日志
 - `ConcurrencyLimiter`: 全局并发控制和速率限制
+- `LoginItemService`: 登录项管理服务（新增）
 - `Protocols`: 所有服务协议定义
 
 **5. 认证与购买** (Services/Auth/)
@@ -398,9 +410,10 @@ protocol DatabaseServiceProtocol {
 - **Infrastructure/AppDelegate.swift**: 应用生命周期管理
 
 ### 资源文件
-- **Resource/Localizable.xcstrings**: 主翻译文件（262KB，9种语言）
+- **Resource/Localizable.xcstrings**: 主翻译文件（16种语言完整支持）
 - **Resource/SyncNos.storekit**: 应用内购买配置
-- **Resource/ChangeLog.md**: 版本更新日志
+- **Resource/ChangeLog.md**: 版本更新日志（中英双语）
+- **Resource/ChangeLog.cn.md**: 中文更新日志
 - **Resource/PRIVACY_POLICY.md**: 隐私政策
 
 ### 后端服务
