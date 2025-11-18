@@ -7,10 +7,8 @@ struct MenuBarView: View {
     
     var body: some View {
         // MARK: - Window Management
-        Button {
+        Button("Open SyncNos") {
             openWindow(id: "main")
-        } label: {
-            Label("Open SyncNos", systemImage: "checkmark.square")
         }
         
         Divider()
@@ -25,25 +23,21 @@ struct MenuBarView: View {
         Button {
             viewModel.syncGoodLinksNow()
         } label: {
-            Label("Sync GoodLinks", systemImage: "link")
+            Label("Sync GoodLinks", systemImage: "tag")
         }
         
         Divider()
         
         // MARK: - Auto Sync Toggle
-        Toggle(isOn: Binding(
+        Toggle("Auto Sync Apple Books", isOn: Binding(
             get: { viewModel.autoSyncAppleBooks },
             set: { viewModel.setAutoSyncAppleBooks($0) }
-        )) {
-            Label("Auto Sync Apple Books", systemImage: "book.fill")
-        }
+        ))
         
-        Toggle(isOn: Binding(
+        Toggle("Auto Sync GoodLinks", isOn: Binding(
             get: { viewModel.autoSyncGoodLinks },
             set: { viewModel.setAutoSyncGoodLinks($0) }
-        )) {
-            Label("Auto Sync GoodLinks", systemImage: "link.circle.fill")
-        }
+        ))
         
         // MARK: - Sync Queue Status
         if viewModel.runningCount > 0 || viewModel.queuedCount > 0 || viewModel.failedCount > 0 {
