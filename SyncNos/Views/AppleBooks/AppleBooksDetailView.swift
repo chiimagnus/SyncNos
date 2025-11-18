@@ -166,7 +166,7 @@ struct AppleBooksDetailView: View {
                 externalSyncProgress = nil
             }
         }
-        .navigationTitle("Apple Books")
+        // .navigationTitle("Apple Books")
         .background(LiveResizeObserver(isResizing: $isLiveResizing))
         .onChange(of: isLiveResizing) { resizing in
             if resizing {
