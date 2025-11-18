@@ -173,10 +173,7 @@ final class GoodLinksViewModel: ObservableObject {
 
         Publishers.CombineLatest4($links, $sortKey, $sortAscending, $showStarredOnly)
             .combineLatest(debouncedSearch, recomputeTrigger)
-            // 主线程置计算标记为 true，确保第一帧显示“加载中”
-            .receive(on: DispatchQueue.main)
-            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = true })
-            // 在后台队列进行 filter/sort/tags 解析等重计算
+            // 在后台队列进行 filter/sort/tags 解析等重计算，避免在主线程上做大量排序和字符串匹配
             .receive(on: computeQueue)
             .map { tuple -> [GoodLinksLinkRow] in
                 let (combined, searchText, _) = tuple
@@ -190,9 +187,11 @@ final class GoodLinksViewModel: ObservableObject {
                     syncTimestampStore: syncTimestampStore
                 )
             }
-            // 回到主线程发布结果，驱动 UI
+            // 发布结果前，在主线程上驱动 UI 更新
             .receive(on: DispatchQueue.main)
-            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
+            .handleEvents(receiveOutput: { [weak self] _ in
+                self?.isComputingList = false
+            })
             .assign(to: &$displayLinks)
 
         // Debounced persistence for GoodLinks preferences

@@ -269,8 +269,6 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                             NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
                         }
                         NotificationCenter.default.post(name: Notification.Name("SyncBookFinished"), object: id)
-                        // 微等待，避免连续压测导致 RunLoop 乱序日志或 IMK 警告
-                        try? await Task.sleep(nanoseconds: 50_000_000)
                     }
                 }
             }
@@ -365,8 +363,6 @@ final class AutoSyncService: AutoSyncServiceProtocol {
                             self.logger.error("AutoSync[GoodLinks] failed for \(id): \(error.localizedDescription)")
                             NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": id, "status": "failed"]) 
                         }
-                        // 微等待，避免日志乱序
-                        try? await Task.sleep(nanoseconds: 50_000_000)
                     }
                 }
             }
