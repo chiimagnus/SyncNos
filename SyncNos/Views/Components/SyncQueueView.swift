@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SyncQueueView: View {
     @StateObject private var viewModel = SyncQueueViewModel()
+    @State private var isFailedExpanded: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -44,8 +45,8 @@ struct SyncQueueView: View {
                     Text("Waiting")
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    if !queuedTasks.isEmpty {
-                        Text("\(queuedTasks.count)")
+                    if queuedTotalCount > 0 {
+                        Text("\(queuedTotalCount)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -73,16 +74,27 @@ struct SyncQueueView: View {
 
             // Failed Tasks Section
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Failed")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
+                Button {
                     if !failedTasks.isEmpty {
-                        Text("\(failedTasks.count)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        isFailedExpanded.toggle()
                     }
+                } label: {
+                    HStack {
+                        Image(systemName: isFailedExpanded ? "chevron.down" : "chevron.right")
+                            .foregroundStyle(.secondary)
+                        Text("Failed")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        if failedTotalCount > 0 {
+                            Text("\(failedTotalCount)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 12)
 
                 if failedTasks.isEmpty {
@@ -91,7 +103,7 @@ struct SyncQueueView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                } else {
+                } else if isFailedExpanded {
                     VStack(spacing: 8) {
                         ForEach(failedTasks) { task in
                             taskRow(task)
@@ -116,6 +128,8 @@ struct SyncQueueView: View {
     private var runningTasks: [SyncQueueTask] { viewModel.runningTasks }
     private var queuedTasks: [SyncQueueTask] { viewModel.queuedTasks }
     private var failedTasks: [SyncQueueTask] { viewModel.failedTasks }
+    private var queuedTotalCount: Int { viewModel.queuedTotalCount }
+    private var failedTotalCount: Int { viewModel.failedTotalCount }
     
     private func taskRow(_ task: SyncQueueTask) -> some View {
         Button {
