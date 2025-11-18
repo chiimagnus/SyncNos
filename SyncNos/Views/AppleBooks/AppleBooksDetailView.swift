@@ -176,23 +176,21 @@ struct AppleBooksDetailView: View {
             }
         }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                // Filter bar in toolbar
+            // 中间区域：Filter 控件
+            ToolbarItem(placement: .principal) {
                 FiltetSortBar(
                     noteFilter: $viewModel.noteFilter,
                     selectedStyles: $viewModel.selectedStyles,
                     colorTheme: .appleBooks,
                     sortField: viewModel.sortField,
                     isAscending: viewModel.isAscending,
-                    onSortFieldChanged: { field in
-                        viewModel.sortField = field
-                    },
-                    onAscendingChanged: { ascending in
-                        viewModel.isAscending = ascending
-                    }
+                    onSortFieldChanged: { field in viewModel.sortField = field },
+                    onAscendingChanged: { asc in viewModel.isAscending = asc }
                 )
-
-                // Sync button / progress (shows per-item batch progress when available)
+            }
+            
+            // 后缘：Sync 按钮 / 进度
+            ToolbarItem(placement: .primaryAction) {
                 if externalIsSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
