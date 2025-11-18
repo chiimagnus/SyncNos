@@ -77,7 +77,7 @@ struct FiltetSortBar: View {
                     }
                 }
             } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+                Image(systemName: "line.3.horizontal.decrease")
             }
             .menuIndicator(.hidden)
             .help("Filters")
@@ -116,8 +116,9 @@ struct FiltetSortBar: View {
                     .help("\(name)\(isSelected ? " (Selected)" : "")")
                 }
             }
+            .padding(.trailing, 8)
         }
-        .padding(.horizontal, 8)
+        // .padding(.horizontal, 8)
     }
 }
 
