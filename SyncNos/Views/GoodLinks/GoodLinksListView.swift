@@ -31,7 +31,7 @@ struct GoodLinksListView: View {
                 }
             } else {
                 List(selection: $selectionIds) {
-                    ForEach(viewModel.displayLinks, id: \.id) { link in
+                    ForEach(viewModel.visibleLinks, id: \.id) { link in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
@@ -69,6 +69,10 @@ struct GoodLinksListView: View {
                         }
                         .padding(.vertical, 4)
                         .tag(link.id)
+                        .onAppear {
+                            // 当行即将出现在屏幕底部附近时，尝试加载更多数据
+                            viewModel.loadMoreIfNeeded(currentItem: link)
+                        }
                         .contextMenu {
                             // Open in GoodLinks
                             if let openURL = URL(string: link.openInGoodLinksURLString) {
