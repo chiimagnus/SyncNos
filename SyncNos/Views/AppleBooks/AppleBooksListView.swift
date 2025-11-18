@@ -34,7 +34,7 @@ struct AppleBooksListView: View {
                 }
             } else {
                 List(selection: $selectionIds) {
-                    ForEach(viewModel.displayBooks, id: \.bookId) { book in
+                    ForEach(viewModel.visibleBooks, id: \.bookId) { book in
                         HStack {
                             VStack(alignment: .leading) {
                                 if book.hasTitle {
@@ -59,6 +59,9 @@ struct AppleBooksListView: View {
                         }
                         .padding(.vertical, 4)
                         .tag(book.bookId)
+                        .onAppear {
+                            viewModel.loadMoreIfNeeded(currentItem: book)
+                        }
                         .contextMenu {
                             // Open in Apple Books (if available)
                             if let ibooksURLString = book.ibooksURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let ibooksURL = URL(string: ibooksURLString) {

@@ -29,6 +29,12 @@ class AppleBooksViewModel: ObservableObject {
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
 
+    /// 当前用于列表渲染的子集（支持分页/增量加载）
+    @Published var visibleBooks: [BookListItem] = []
+    /// 分页参数与当前已暴露长度
+    private let pageSize: Int = 80
+    private var currentPageSize: Int = 0
+
     // Sorting and filtering state - Reactive properties with UserDefaults persistence
     @Published var sortKey: BookListSortKey = .title
 
@@ -115,8 +121,19 @@ class AppleBooksViewModel: ObservableObject {
             }
             // 回到主线程发布结果，驱动 UI
             .receive(on: DispatchQueue.main)
-            .handleEvents(receiveOutput: { [weak self] _ in self?.isComputingList = false })
-            .assign(to: &$displayBooks)
+            .sink { [weak self] newDisplay in
+                guard let self else { return }
+                self.isComputingList = false
+                self.displayBooks = newDisplay
+                // 重置可见列表为第一页
+                self.currentPageSize = min(self.pageSize, self.displayBooks.count)
+                if self.currentPageSize == 0 {
+                    self.visibleBooks = []
+                } else {
+                    self.visibleBooks = Array(self.displayBooks.prefix(self.currentPageSize))
+                }
+            }
+            .store(in: &cancellables)
 
         // Debounced persistence of list preferences to reduce UserDefaults I/O
         $sortKey
@@ -248,6 +265,17 @@ class AppleBooksViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// 在行即将出现在视图中时调用，判断是否需要向后追加一页数据
+    func loadMoreIfNeeded(currentItem: BookListItem) {
+        guard let index = visibleBooks.firstIndex(where: { $0.bookId == currentItem.bookId }) else { return }
+        let threshold = max(visibleBooks.count - 10, 0)
+        guard index >= threshold else { return }
+        let newSize = min(currentPageSize + pageSize, displayBooks.count)
+        guard newSize > currentPageSize else { return }
+        currentPageSize = newSize
+        visibleBooks = Array(displayBooks.prefix(currentPageSize))
     }
 }
 
