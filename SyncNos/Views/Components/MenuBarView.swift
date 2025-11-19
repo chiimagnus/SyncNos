@@ -12,21 +12,6 @@ struct MenuBarView: View {
         }
         
         Divider()
-
-        // MARK: - Sync Actions
-        Button {
-            viewModel.syncAppleBooksNow()
-        } label: {
-            Label("Sync Apple Books", systemImage: "book")
-        }
-        
-        Button {
-            viewModel.syncGoodLinksNow()
-        } label: {
-            Label("Sync GoodLinks", systemImage: "bookmark")
-        }
-        
-        Divider()
         
         // MARK: - Sync Queue Status
         Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
@@ -46,18 +31,6 @@ struct MenuBarView: View {
             quitApplication()
         } label: {
             Label("Quit SyncNos", systemImage: "power")
-        }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                // 延迟一下确保窗口已经打开，然后导航到 Notion 配置页面
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
         }
     }
     
