@@ -14,8 +14,7 @@ struct MainListView: View {
     }
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
-    // WeRead ViewModel 将在后续阶段实现并接入
-    // @StateObject private var weReadVM = WeReadViewModel()
+    @StateObject private var weReadVM = WeReadViewModel()
 
     var body: some View {
         NavigationSplitView {
@@ -26,9 +25,7 @@ struct MainListView: View {
                 case .appleBooks:
                     AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
                 case .weRead:
-                    // 占位：后续会替换为 WeReadListView
-                    Text("WeRead is coming soon…")
-                        .foregroundStyle(.secondary)
+                    WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -60,8 +57,7 @@ struct MainListView: View {
                                 contentSourceRawValue = ContentSource.weRead.rawValue
                             } label: {
                                 HStack {
-                                    // WeReadVM 接入后替换为实际计数
-                                    Text("WeRead")
+                                    Text("WeRead (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
                                     if contentSource == .weRead { Image(systemName: "checkmark") }
                                 }
                             }
@@ -229,12 +225,39 @@ struct MainListView: View {
                     )
                 }
             } else {
-                // WeRead 详情视图占位，后续会接入 WeReadDetailView
-                SelectionPlaceholderView(
-                    title: contentSource.title,
-                    count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
-                    onSyncSelected: nil
-                )
+                if contentSource == .weRead {
+                    if selectedWeReadBookIds.count == 1 {
+                        let singleWeReadBinding = Binding<String?>(
+                            get: { selectedWeReadBookIds.first },
+                            set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
+                        )
+                        WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
+                    } else {
+                        SelectionPlaceholderView(
+                            title: contentSource.title,
+                            count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
+                            onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : {
+                                let items = selectedWeReadBookIds.compactMap { id -> [String: Any]? in
+                                    guard let b = weReadVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                                    return ["id": id, "title": b.title, "subtitle": b.author]
+                                }
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncTasksEnqueued"),
+                                    object: nil,
+                                    userInfo: ["source": "weRead", "items": items]
+                                )
+                                weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+                            }
+                        )
+                    }
+                } else {
+                    // 理论上不会走到这里，因为 contentSource 只有三种情况
+                    SelectionPlaceholderView(
+                        title: contentSource.title,
+                        count: nil,
+                        onSyncSelected: nil
+                    )
+                }
             }
         }
         .onChange(of: contentSourceRawValue) { _ in
