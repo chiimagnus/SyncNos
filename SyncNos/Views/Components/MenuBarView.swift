@@ -8,7 +8,8 @@ struct MenuBarView: View {
     var body: some View {
         // MARK: - Window Management
         Button("Open SyncNos") {
-            openWindow(id: "main")
+            NSApp.activate(ignoringOtherApps: true) // 强制将应用带到前台
+            openWindow(id: "main") // 打开或聚焦主窗口
         }
         
         Divider()
