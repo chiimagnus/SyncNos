@@ -24,9 +24,6 @@ struct SyncNosApp: App {
         _ = DIContainer.shared.syncActivityMonitor
         // 初始化同步队列存储，确保尽早开始监听入队/状态事件
         _ = DIContainer.shared.syncQueueStore
-        
-        // Register WeRead Provider
-        DIContainer.shared.registerWeReadSyncProvider()
     }
 
     var body: some Scene {
