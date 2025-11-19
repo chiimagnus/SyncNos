@@ -240,6 +240,61 @@ protocol SyncTimestampStoreProtocol: AnyObject {
     func setLastSyncTime(for bookId: String, to date: Date)
 }
 
+// MARK: - WeRead Auth & Data Protocols
+
+/// 管理 WeRead 认证 Cookie 的服务协议
+protocol WeReadAuthServiceProtocol: AnyObject {
+    /// 当前是否已登录（依据是否存在可用 Cookie）
+    var isLoggedIn: Bool { get }
+    /// 已持久化的 Cookie Header（`Cookie: ...` 的值部分）
+    var cookieHeader: String? { get }
+
+    /// 更新并持久化新的 Cookie Header
+    func updateCookieHeader(_ header: String)
+    /// 清除本地存储的 Cookie 与登录状态
+    func clearCookies()
+}
+
+/// WeRead API 服务协议
+protocol WeReadAPIServiceProtocol: AnyObject {
+    /// 获取当前用户的 Notebook 列表（每个元素代表一本书/文章）
+    func fetchNotebooks() async throws -> [WeReadNotebook]
+    /// 获取单本书的详细信息
+    func fetchBookInfo(bookId: String) async throws -> WeReadBookInfo
+    /// 获取单本书的所有高亮
+    func fetchBookmarks(bookId: String) async throws -> [WeReadBookmark]
+    /// 获取单本书的个人想法/书评
+    func fetchReviews(bookId: String) async throws -> [WeReadReview]
+}
+
+/// WeRead 数据持久化服务协议（SwiftData 封装）
+protocol WeReadDataServiceProtocol: AnyObject {
+    /// 将 Notebook 列表写入/更新到 SwiftData，返回映射后的列表模型
+    func upsertBooks(from notebooks: [WeReadNotebook]) throws -> [WeReadBookListItem]
+    /// 将指定书籍的高亮与想法写入/更新到 SwiftData
+    func upsertHighlights(
+        for bookId: String,
+        bookmarks: [WeReadBookmark],
+        reviews: [WeReadReview]
+    ) throws
+    /// 读取本地缓存的所有书籍列表
+    func fetchBooks() throws -> [WeReadBookListItem]
+    /// 按过滤和排序规则读取某本书的高亮
+    func fetchHighlights(
+        for bookId: String,
+        sortField: HighlightSortField,
+        ascending: Bool,
+        noteFilter: Bool,
+        selectedStyles: [Int]?
+    ) throws -> [WeReadHighlight]
+}
+
+/// WeRead -> Notion 同步服务协议
+protocol WeReadSyncServiceProtocol: AnyObject {
+    /// 同步单本 WeRead 书籍的高亮到 Notion
+    func syncHighlights(for book: WeReadBookListItem, progress: @escaping (String) -> Void) async throws
+}
+
 // MARK: - Auth Service Protocol
 protocol AuthServiceProtocol: AnyObject {
     func loginWithApple(authorizationCode: String, nonce: String?) async throws -> AuthTokens
