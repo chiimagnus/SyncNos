@@ -2,7 +2,6 @@ import Foundation
 import SwiftData
 
 /// WeRead SwiftData 数据访问服务实现
-@MainActor
 final class WeReadDataService: WeReadDataServiceProtocol {
     private let container: ModelContainer
     private var context: ModelContext {
@@ -165,35 +164,12 @@ final class WeReadDataService: WeReadDataServiceProtocol {
         selectedStyles: [Int]?
     ) throws -> [WeReadHighlight] {
         let ctx = context
+        let stylesSet: Set<Int>? = (selectedStyles?.isEmpty == false) ? Set(selectedStyles!) : nil
 
-        let bookPredicate = #Predicate<WeReadHighlight> { $0.book?.bookId == bookId }
-        var predicates: [Predicate<WeReadHighlight>] = [bookPredicate]
-
-        if noteFilter {
-            let hasNote = #Predicate<WeReadHighlight> { h in
-                if let note = h.note {
-                    return !note.isEmpty
-                }
-                return false
-            }
-            predicates.append(hasNote)
-        }
-
-        if let styles = selectedStyles, !styles.isEmpty {
-            let set = Set(styles)
-            let stylePredicate = #Predicate<WeReadHighlight> { h in
-                if let color = h.colorIndex {
-                    return set.contains(color)
-                }
-                return false
-            }
-            predicates.append(stylePredicate)
-        }
-
-        let compound = predicates.reduce(#Predicate<WeReadHighlight> { _ in true }) { partial, next in
-            #Predicate<WeReadHighlight> { h in
-                partial.evaluate(h) && next.evaluate(h)
-            }
+        let compound = #Predicate<WeReadHighlight> { h in
+            (h.book?.bookId == bookId)
+            && (!noteFilter || ((h.note ?? "").isEmpty == false))
+            && (stylesSet == nil || ((h.colorIndex != nil) && stylesSet!.contains(h.colorIndex!)))
         }
 
         let sortDescriptor: SortDescriptor<WeReadHighlight>
@@ -216,7 +192,8 @@ final class WeReadDataService: WeReadDataServiceProtocol {
 
     private func fetchBookById(_ bookId: String, in context: ModelContext) -> WeReadBook? {
         let predicate = #Predicate<WeReadBook> { $0.bookId == bookId }
-        let descriptor = FetchDescriptor<WeReadBook>(predicate: predicate, fetchLimit: 1)
+        var descriptor = FetchDescriptor<WeReadBook>(predicate: predicate)
+        descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
     }
 }
