@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // MARK: - Dependency Injection Container
 class DIContainer {
@@ -23,6 +24,11 @@ class DIContainer {
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
+    // WeRead
+    private var _weReadAuthService: WeReadAuthServiceProtocol?
+    private var _weReadAPIService: WeReadAPIServiceProtocol?
+    private var _weReadDataService: WeReadDataServiceProtocol?
+    private var _weReadModelContainer: ModelContainer?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -140,6 +146,43 @@ class DIContainer {
         return _notionOAuthService!
     }
 
+    // MARK: - WeRead Services
+
+    /// 全局共享的 WeRead SwiftData 容器
+    var weReadModelContainer: ModelContainer {
+        if _weReadModelContainer == nil {
+            let schema = Schema([WeReadBook.self, WeReadHighlight.self])
+            let configuration = ModelConfiguration("WeReadStore")
+            do {
+                _weReadModelContainer = try ModelContainer(for: schema, configurations: configuration)
+            } catch {
+                fatalError("Failed to create WeRead ModelContainer: \(error)")
+            }
+        }
+        return _weReadModelContainer!
+    }
+
+    var weReadAuthService: WeReadAuthServiceProtocol {
+        if _weReadAuthService == nil {
+            _weReadAuthService = WeReadAuthService()
+        }
+        return _weReadAuthService!
+    }
+
+    var weReadAPIService: WeReadAPIServiceProtocol {
+        if _weReadAPIService == nil {
+            _weReadAPIService = WeReadAPIService(authService: weReadAuthService)
+        }
+        return _weReadAPIService!
+    }
+
+    var weReadDataService: WeReadDataServiceProtocol {
+        if _weReadDataService == nil {
+            _weReadDataService = WeReadDataService(container: weReadModelContainer)
+        }
+        return _weReadDataService!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -205,6 +248,18 @@ class DIContainer {
 
     func register(notionOAuthService: NotionOAuthService) {
         self._notionOAuthService = notionOAuthService
+    }
+
+    func register(weReadAuthService: WeReadAuthServiceProtocol) {
+        self._weReadAuthService = weReadAuthService
+    }
+
+    func register(weReadAPIService: WeReadAPIServiceProtocol) {
+        self._weReadAPIService = weReadAPIService
+    }
+
+    func register(weReadDataService: WeReadDataServiceProtocol) {
+        self._weReadDataService = weReadDataService
     }
 
 }
