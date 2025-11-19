@@ -197,6 +197,13 @@ struct SyncQueueView: View {
                 .padding(.vertical, 2)
                 .foregroundStyle(.red)
                 .background(.red.opacity(0.12), in: Capsule())
+        case .weRead:
+            Label("WeRead", systemImage: "text.book.closed")
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .foregroundStyle(.blue)
+                .background(.blue.opacity(0.14), in: Capsule())
         }
     }
     
