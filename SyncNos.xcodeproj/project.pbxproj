@@ -17,8 +17,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				"Services/DataSources-From/WeRead/1.md",
-				"Services/DataSources-From/WeRead/微信读书API实现.md",
 				"Services/DataSources-To/Notion/Core/NotionConfig.swift.example",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
