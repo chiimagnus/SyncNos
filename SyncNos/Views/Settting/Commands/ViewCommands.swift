@@ -41,6 +41,14 @@ struct ViewCommands: Commands {
             }
             .keyboardShortcut("2", modifiers: .command)
             .disabled(contentSourceRawValue == ContentSource.goodLinks.rawValue)
+            
+            if #available(macOS 14.0, *) {
+                Button("Weread", systemImage: "book.closed") {
+                    contentSourceRawValue = ContentSource.weRead.rawValue
+                }
+                .keyboardShortcut("3", modifiers: .command)
+                .disabled(contentSourceRawValue == ContentSource.weRead.rawValue)
+            }
 
             Divider()
 
@@ -89,7 +97,7 @@ struct ViewCommands: Commands {
                         }
                     }
                 }
-            } else {
+            } else if ContentSource(rawValue: contentSourceRawValue) == .goodLinks {
                 // GoodLinks 的排序和筛选菜单
                 Menu("Articles", systemImage: "doc.text") {
                     Section("Sort") {
@@ -133,6 +141,11 @@ struct ViewCommands: Commands {
                         }
                     }
                 }
+            } else if ContentSource(rawValue: contentSourceRawValue) == .weRead {
+                 // WeRead menu (Placeholder for now, or basic sort)
+                 Menu("Books", systemImage: "book.closed") {
+                     Text("Sort/Filter coming soon")
+                 }
             }
 
             // Highlight 菜单 - 全局高亮排序和筛选
