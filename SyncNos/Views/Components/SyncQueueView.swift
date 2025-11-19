@@ -191,7 +191,7 @@ struct SyncQueueView: View {
                 .foregroundStyle(.yellow)
                 .background(.yellow.opacity(0.18), in: Capsule())
         case .goodLinks:
-            Label("GoodLinks", systemImage: "link")
+            Label("GoodLinks", systemImage: "bookmark")
                 .font(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

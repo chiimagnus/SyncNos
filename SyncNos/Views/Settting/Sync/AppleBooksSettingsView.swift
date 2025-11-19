@@ -6,7 +6,7 @@ struct AppleBooksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "book")) {
+            Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
                 Picker("Sync Mode", selection: $viewModel.syncMode) {
                     Text("Single Database (One page per book)").tag("single")
                     Text("One database per book (Each highlight as an entry)").tag("perBook")
@@ -42,7 +42,7 @@ struct AppleBooksSettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label("Open Apple Books notes", systemImage: "book")
+                        Label("Open Apple Books notes", systemImage: "folder")
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)

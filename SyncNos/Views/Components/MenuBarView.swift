@@ -23,63 +23,21 @@ struct MenuBarView: View {
         Button {
             viewModel.syncGoodLinksNow()
         } label: {
-            Label("Sync GoodLinks", systemImage: "tag")
+            Label("Sync GoodLinks", systemImage: "bookmark")
         }
         
         Divider()
-        
-        // MARK: - Auto Sync Toggle
-        Toggle("Auto Sync Apple Books", isOn: Binding(
-            get: { viewModel.autoSyncAppleBooks },
-            set: { viewModel.setAutoSyncAppleBooks($0) }
-        ))
-        
-        Toggle("Auto Sync GoodLinks", isOn: Binding(
-            get: { viewModel.autoSyncGoodLinks },
-            set: { viewModel.setAutoSyncGoodLinks($0) }
-        ))
         
         // MARK: - Sync Queue Status
-        if viewModel.runningCount > 0 || viewModel.queuedCount > 0 || viewModel.failedCount > 0 {
-            Divider()
-            
-            VStack(alignment: .leading, spacing: 4) {
-                if viewModel.runningCount > 0 {
-                    HStack {
-                        Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                if viewModel.queuedCount > 0 {
-                    HStack {
-                        Label("\(viewModel.queuedCount) Queued", systemImage: "clock")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                if viewModel.failedCount > 0 {
-                    HStack {
-                        Label("\(viewModel.failedCount) Failed", systemImage: "exclamationmark.triangle")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-        }
-        
-        Divider()
-                
-        // MARK: - Settings
-        Button {
-            openWindow(id: "setting")
-        } label: {
-            Label("Settings", systemImage: "gear")
-        }
+        Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Label("\(viewModel.queuedCount) Waiting", systemImage: "clock")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Label("\(viewModel.failedCount) Failed", systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.red)
         
         Divider()
         
