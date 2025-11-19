@@ -98,16 +98,16 @@ struct SettingsView: View {
                         }
                     }
 
-#if DEBUG
-                    NavigationLink(destination: EmptyView()) {
+                    NavigationLink(destination: WeReadSettingsView()) {
                         HStack {
-                            Label("WeRead", systemImage: "")
+                            Label("WeRead", systemImage: "text.book.closed")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                         }
                     }
 
+#if DEBUG
                     NavigationLink(destination: EmptyView()) {
                         HStack {
                             Label("Get", systemImage: "")
