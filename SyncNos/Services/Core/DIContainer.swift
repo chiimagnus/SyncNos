@@ -23,7 +23,6 @@ class DIContainer {
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
-    private var _syncProviders: [SyncSourceProvider]?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -141,16 +140,6 @@ class DIContainer {
         return _notionOAuthService!
     }
 
-    var syncProviders: [SyncSourceProvider] {
-        if _syncProviders == nil {
-            _syncProviders = [
-                AppleBooksSyncProvider(),
-                GoodLinksSyncProvider()
-            ]
-        }
-        return _syncProviders!
-    }
-
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -216,22 +205,6 @@ class DIContainer {
 
     func register(notionOAuthService: NotionOAuthService) {
         self._notionOAuthService = notionOAuthService
-    }
-    
-    func register(syncProvider: SyncSourceProvider) {
-        if _syncProviders == nil {
-            _syncProviders = [
-                AppleBooksSyncProvider(),
-                GoodLinksSyncProvider()
-            ]
-        }
-        _syncProviders?.append(syncProvider)
-    }
-    
-    func registerWeReadSyncProvider() {
-        if #available(macOS 14.0, *) {
-            register(syncProvider: WeReadSyncProvider())
-        }
     }
 
 }
