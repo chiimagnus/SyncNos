@@ -13,30 +13,12 @@ struct MainListView: View {
     }
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
-    
-    // Only create if available
-    @StateObject private var weReadVM: WeReadViewModel = {
-        if #available(macOS 14.0, *) {
-            return WeReadViewModel()
-        } else {
-            // Fallback/Dummy for older OS if needed, or handled via view checks
-            return WeReadViewModel() // Force instantiate, assuming app min version check elsewhere or guard
-        }
-    }()
-    
-    @State private var selectedWeReadBookIds: Set<String> = []
 
     var body: some View {
         NavigationSplitView {
             Group {
                 if contentSource == .goodLinks {
                     GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
-                } else if contentSource == .weRead {
-                    if #available(macOS 14.0, *) {
-                        WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
-                    } else {
-                        Text("WeRead requires macOS 14.0+")
-                    }
                 } else {
                     AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
                 }
@@ -63,17 +45,6 @@ struct MainListView: View {
                                 HStack {
                                     Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
                                     if contentSource == .goodLinks { Image(systemName: "checkmark") }
-                                }
-                            }
-                            
-                            if #available(macOS 14.0, *) {
-                                Button {
-                                    contentSourceRawValue = ContentSource.weRead.rawValue
-                                } label: {
-                                    HStack {
-                                        Text("Weread (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
-                                        if contentSource == .weRead { Image(systemName: "checkmark") }
-                                    }
                                 }
                             }
                         }
@@ -218,27 +189,6 @@ struct MainListView: View {
                         }
                     )
                 }
-            } else if contentSource == .weRead {
-                if #available(macOS 14.0, *) {
-                    if selectedWeReadBookIds.count == 1 {
-                         let singleBookBinding = Binding<String?>(
-                            get: { selectedWeReadBookIds.first },
-                            set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
-                        )
-                        WeReadDetailView(viewModel: weReadVM, selectedBookId: singleBookBinding)
-                    } else {
-                        SelectionPlaceholderView(
-                            title: contentSource.title,
-                            count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
-                            onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : {
-                                // Implement manual batch sync trigger if needed, for now just global refresh
-                                weReadVM.triggerRefresh()
-                            }
-                        )
-                    }
-                } else {
-                    Text("WeRead requires macOS 14.0+")
-                }
             } else {
                 if selectedBookIds.count == 1 {
                     let singleBookBinding = Binding<String?>(
@@ -266,7 +216,6 @@ struct MainListView: View {
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()
-            selectedWeReadBookIds.removeAll()
             // 在切换到 GoodLinks 前预置计算标记，确保首帧进入“加载中”占位
             if contentSource == .goodLinks {
                 goodLinksVM.prepareForDisplaySwitch()
@@ -277,18 +226,11 @@ struct MainListView: View {
             if source == ContentSource.appleBooks.rawValue {
                 contentSourceRawValue = ContentSource.appleBooks.rawValue
                 selectedLinkIds.removeAll()
-                selectedWeReadBookIds.removeAll()
                 selectedBookIds = Set([id])
             } else if source == ContentSource.goodLinks.rawValue {
                 contentSourceRawValue = ContentSource.goodLinks.rawValue
                 selectedBookIds.removeAll()
-                selectedWeReadBookIds.removeAll()
                 selectedLinkIds = Set([id])
-            } else if source == ContentSource.weRead.rawValue {
-                contentSourceRawValue = ContentSource.weRead.rawValue
-                selectedBookIds.removeAll()
-                selectedLinkIds.removeAll()
-                selectedWeReadBookIds = Set([id])
             }
         }
         .background {
@@ -321,17 +263,6 @@ struct MainListView: View {
         }
         .alert("Notion Configuration Required", isPresented: $goodLinksVM.showNotionConfigAlert) {
             Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
-        .alert("Notion Configuration Required", isPresented: $weReadVM.showNotionConfigAlert) {
-             Button("Go to Settings") {
                 openWindow(id: "setting")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
