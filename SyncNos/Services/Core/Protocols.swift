@@ -117,7 +117,7 @@ protocol BookmarkStoreProtocol {
 }
 
 // MARK: - Notion Config Store Protocol
-protocol NotionConfigStoreProtocol: AnyObject {
+protocol NotionConfigStoreProtocol: AnyObject, Sendable {
     var notionKey: String? { get set }
     var notionPageId: String? { get set }
     var isConfigured: Bool { get }
@@ -138,7 +138,7 @@ protocol NotionConfigStoreProtocol: AnyObject {
 }
 
 // MARK: - Notion Service Protocol
-protocol NotionServiceProtocol: AnyObject {
+protocol NotionServiceProtocol: AnyObject, Sendable {
     func createDatabase(title: String) async throws -> NotionDatabase
     // Extended sync helpers
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?

@@ -97,17 +97,17 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-
-#if DEBUG
-                    NavigationLink(destination: EmptyView()) {
+                    
+                    NavigationLink(destination: WeReadSettingsView()) {
                         HStack {
-                            Label("WeRead", systemImage: "")
+                            Label("Weread", systemImage: "book.closed")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                         }
                     }
 
+#if DEBUG
                     NavigationLink(destination: EmptyView()) {
                         HStack {
                             Label("Get", systemImage: "")

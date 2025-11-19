@@ -6,11 +6,13 @@ import Foundation
 enum ContentSource: String, Codable, CaseIterable {
     case appleBooks = "appleBooks"
     case goodLinks = "goodLinks"
+    case weRead = "weRead"
 
     var title: String {
         switch self {
         case .appleBooks: return "Apple Books"
         case .goodLinks: return "GoodLinks"
+        case .weRead: return "Weread"
         }
     }
 }
