@@ -9,6 +9,12 @@
 
 ## ✨ Main Features
 
+### Support multi-platform synchronization
+- Apple Books
+- GoodLinks
+- WeRead
+- Notion
+
 ### 📚 Apple Books Sync
 - **Complete Data Extraction**: Book title, author, highlights, notes, color labels
 - **Timestamp Support**: Precise sync of creation and modification times
@@ -32,6 +38,11 @@
 - **Real-time Status**: Real-time display of sync progress
 - **Error Retry**: Intelligent error retry mechanism
 - **Apple Sign In**: Secure Apple ID authentication integration
+
+## Download SyncNos from Mac App Store
+
+[前往Mac App Store下载 ->](https://apps.apple.com/app/syncnos/id6755133888)
+
 
 ## 📄 License
 
