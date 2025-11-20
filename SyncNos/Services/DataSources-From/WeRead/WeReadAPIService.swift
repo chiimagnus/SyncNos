@@ -23,6 +23,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         let data = try await performRequest(url: url)
         // WeRead 返回的 JSON 结构可能为 { "books": [ ... ] } 或 { "notebooks": [ ... ] }
         let decoded = try decodeNotebookList(from: data)
+        logger.info("[WeReadAPI] fetched notebooks: \(decoded.count)")
         return decoded
     }
 
@@ -39,7 +40,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         var components = URLComponents(url: baseURL.appendingPathComponent("/web/book/bookmarklist"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "bookId", value: bookId)]
         let data = try await performRequest(url: components.url!)
-        return try decodeBookmarks(from: data, bookId: bookId)
+        let bookmarks = try decodeBookmarks(from: data, bookId: bookId)
+        logger.info("[WeReadAPI] fetched bookmarks for bookId=\(bookId): \(bookmarks.count)")
+        return bookmarks
     }
 
     func fetchReviews(bookId: String) async throws -> [WeReadReview] {
@@ -51,7 +54,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             URLQueryItem(name: "synckey", value: "0")
         ]
         let data = try await performRequest(url: components.url!)
-        return try decodeReviews(from: data, bookId: bookId)
+        let reviews = try decodeReviews(from: data, bookId: bookId)
+        logger.info("[WeReadAPI] fetched reviews for bookId=\(bookId): \(reviews.count)")
+        return reviews
     }
 
     // MARK: - Low level request

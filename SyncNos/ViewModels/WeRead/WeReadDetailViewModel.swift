@@ -17,6 +17,7 @@ final class WeReadDetailViewModel: ObservableObject {
     @Published var syncMessage: String?
     @Published var showNotionConfigAlert: Bool = false
 
+    private let apiService: WeReadAPIServiceProtocol
     private let dataService: WeReadDataServiceProtocol
     private let syncService: WeReadSyncServiceProtocol
     private let logger: LoggerServiceProtocol
@@ -25,11 +26,13 @@ final class WeReadDetailViewModel: ObservableObject {
     private var currentBookId: String?
 
     init(
+        apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         dataService: WeReadDataServiceProtocol = DIContainer.shared.weReadDataService,
         syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
+        self.apiService = apiService
         self.dataService = dataService
         self.syncService = syncService
         self.logger = logger
@@ -39,6 +42,17 @@ final class WeReadDetailViewModel: ObservableObject {
     func loadHighlights(for bookId: String) async {
         currentBookId = bookId
         isLoading = true
+        do {
+            // 1) 先从远端拉取最新高亮与想法并写入本地
+            let bookmarks = try await apiService.fetchBookmarks(bookId: bookId)
+            let reviews = try await apiService.fetchReviews(bookId: bookId)
+            try dataService.upsertHighlights(for: bookId, bookmarks: bookmarks, reviews: reviews)
+        } catch {
+            let desc = error.localizedDescription
+            logger.warning("[WeReadDetail] remote fetch failed for bookId=\(bookId): \(desc)")
+            // 继续尝试使用本地已有缓存
+        }
+
         do {
             let rows = try dataService.fetchHighlights(
                 for: bookId,
@@ -58,7 +72,22 @@ final class WeReadDetailViewModel: ObservableObject {
 
     func reloadCurrent() async {
         guard let id = currentBookId else { return }
-        await loadHighlights(for: id)
+        isLoading = true
+        do {
+            let rows = try dataService.fetchHighlights(
+                for: id,
+                sortField: sortField,
+                ascending: isAscending,
+                noteFilter: noteFilter,
+                selectedStyles: Array(selectedStyles)
+            )
+            highlights = rows
+            isLoading = false
+        } catch {
+            let desc = error.localizedDescription
+            logger.error("[WeReadDetail] reloadCurrent error: \(desc)")
+            isLoading = false
+        }
     }
 
     func syncSmart(book: WeReadBookListItem) {

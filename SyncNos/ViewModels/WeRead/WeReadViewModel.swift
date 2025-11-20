@@ -29,6 +29,7 @@ final class WeReadViewModel: ObservableObject {
     private var currentPageSize: Int = 0
 
     // 依赖
+    private let apiService: WeReadAPIServiceProtocol
     private let dataService: WeReadDataServiceProtocol
     private let syncService: WeReadSyncServiceProtocol
     private let logger: LoggerServiceProtocol
@@ -40,12 +41,14 @@ final class WeReadViewModel: ObservableObject {
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     init(
+        apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         dataService: WeReadDataServiceProtocol = DIContainer.shared.weReadDataService,
         syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
+        self.apiService = apiService
         self.dataService = dataService
         self.syncService = syncService
         self.logger = logger
@@ -101,9 +104,12 @@ final class WeReadViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            let items = try dataService.fetchBooks()
+            // 1) 从 WeRead 远端拉取 Notebook 列表
+            let notebooks = try await apiService.fetchNotebooks()
+            // 2) 写入本地 SwiftData，并获得规范化列表
+            let items = try dataService.upsertBooks(from: notebooks)
             books = items
-            logger.info("[WeRead] loaded books: \(items.count)")
+            logger.info("[WeRead] fetched notebooks: \(notebooks.count), cached books: \(items.count)")
             isLoading = false
         } catch {
             let desc = error.localizedDescription
