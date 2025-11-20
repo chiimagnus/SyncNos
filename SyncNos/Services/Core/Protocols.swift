@@ -267,11 +267,11 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     func fetchReviews(bookId: String) async throws -> [WeReadReview]
 }
 
-/// WeRead 数据持久化服务协议（本地存储封装）
+/// WeRead 数据持久化服务协议（SwiftData 封装）
 protocol WeReadDataServiceProtocol: AnyObject {
-    /// 将 Notebook 列表写入/更新到本地存储，返回映射后的列表模型
+    /// 将 Notebook 列表写入/更新到 SwiftData，返回映射后的列表模型
     func upsertBooks(from notebooks: [WeReadNotebook]) throws -> [WeReadBookListItem]
-    /// 将指定书籍的高亮与想法写入/更新到本地存储
+    /// 将指定书籍的高亮与想法写入/更新到 SwiftData
     func upsertHighlights(
         for bookId: String,
         bookmarks: [WeReadBookmark],
