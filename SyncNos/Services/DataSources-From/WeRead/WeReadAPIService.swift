@@ -132,21 +132,85 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .useDefaultKeys
 
-        // 先尝试直接解码为数组
-        if let direct = try? decoder.decode([WeReadBookmark].self, from: data) {
-            return direct
+        // 优先按 HighlightResponse（obsidian-weread-plugin 的 HighlightResponse）解码
+        if let resp = try? decoder.decode(WeReadHighlightResponse.self, from: data) {
+            // 构建 chapterUid -> title 映射，便于展示章节标题
+            var chapterTitleByUid: [Int: String] = [:]
+            if let chapters = resp.chapters {
+                for ch in chapters {
+                    if let uid = ch.chapterUid {
+                        chapterTitleByUid[uid] = ch.title
+                    }
+                }
+            }
+
+            return resp.updated.map { item in
+                let rawId = item.bookmarkId
+                // 与插件一致：将 bookmarkId 中的 "_"、"~" 替换为 "-"，避免在下游（如块引用）中出问题
+                let normalizedId = rawId.replacingOccurrences(
+                    of: #"[_~]"#,
+                    with: "-",
+                    options: .regularExpression
+                )
+                let chapterTitle: String?
+                if let uid = item.chapterUid, let title = chapterTitleByUid[uid] {
+                    chapterTitle = title
+                } else {
+                    chapterTitle = item.chapterName
+                }
+
+                return WeReadBookmark(
+                    highlightId: normalizedId,
+                    bookId: item.bookId,
+                    chapterTitle: chapterTitle,
+                    colorIndex: item.colorStyle ?? item.style,
+                    text: item.markText,
+                    note: nil,
+                    timestamp: item.createTime
+                )
+            }
         }
 
+        // 兼容性兜底：历史或未预期结构（尽量不走到这里）
         let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
         guard let root = json else { return [] }
 
-        // WeRead 实际返回中，高亮通常在 "updated" 字段里
-        let candidatesKeys = ["bookmarks", "items", "list", "updated"]
+        let candidatesKeys = ["updated", "bookmarks", "items", "list"]
         for key in candidatesKeys {
-            if let arr = root[key] {
-                let subData = try JSONSerialization.data(withJSONObject: arr, options: [])
-                if let decoded = try? decoder.decode([WeReadBookmark].self, from: subData) {
-                    return decoded
+            if let arr = root[key] as? [[String: Any]] {
+                // 尝试从每个元素中手动抽取最低限度字段
+                var result: [WeReadBookmark] = []
+                result.reserveCapacity(arr.count)
+                for obj in arr {
+                    guard let markText = obj["markText"] as? String ?? obj["content"] as? String else {
+                        continue
+                    }
+                    let rawId = (obj["bookmarkId"] as? String) ?? UUID().uuidString
+                    let normalizedId = rawId.replacingOccurrences(
+                        of: #"[_~]"#,
+                        with: "-",
+                        options: .regularExpression
+                    )
+                    let chapterTitle = (obj["chapterTitle"] as? String)
+                        ?? (obj["chapterName"] as? String)
+                    let color = (obj["colorStyle"] as? Int) ?? (obj["color"] as? Int) ?? (obj["style"] as? Int)
+                    let ts = (obj["createTime"] as? TimeInterval)
+                    let bId = (obj["bookId"] as? String) ?? bookId
+
+                    result.append(
+                        WeReadBookmark(
+                            highlightId: normalizedId,
+                            bookId: bId,
+                            chapterTitle: chapterTitle,
+                            colorIndex: color,
+                            text: markText,
+                            note: nil,
+                            timestamp: ts
+                        )
+                    )
+                }
+                if !result.isEmpty {
+                    return result
                 }
             }
         }

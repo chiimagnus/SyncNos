@@ -233,8 +233,11 @@ struct WeReadBookInfo: Decodable {
     }
 }
 
-/// 单条高亮
-struct WeReadBookmark: Decodable {
+/// 单条高亮（Swift 内部使用的归一化结构）
+///
+/// 注意：WeRead 后端返回的是 HighlightResponse（见 `WeReadHighlightResponse`），
+/// 其中真正的高亮在 `updated` 数组中，本结构由 `WeReadAPIService.decodeBookmarks` 手动组装。
+struct WeReadBookmark {
     let highlightId: String
     let bookId: String
     let chapterTitle: String?
@@ -242,16 +245,6 @@ struct WeReadBookmark: Decodable {
     let text: String
     let note: String?
     let timestamp: TimeInterval?
-
-    enum CodingKeys: String, CodingKey {
-        case highlightId = "bookmarkId"
-        case bookId
-        case chapterTitle = "chapterTitle"
-        case colorIndex = "color"
-        case text = "content"
-        case note
-        case timestamp = "createTime"
-    }
 }
 
 /// 单条想法 / 书评
@@ -310,6 +303,37 @@ struct WeReadReview: Decodable {
             timestamp = try? container.decode(TimeInterval.self, forKey: .createTime)
         }
     }
+}
+
+/// WeRead `/web/book/bookmarklist` 高亮响应（对应 Obsidian 插件中的 HighlightResponse）
+struct WeReadHighlightResponse: Decodable {
+    struct HighlightItem: Decodable {
+        let bookId: String
+        let bookVersion: Int?
+        let chapterName: String?
+        let chapterUid: Int?
+        let colorStyle: Int?
+        let contextAbstract: String?
+        let markText: String
+        let range: String
+        let style: Int?
+        let type: Int?
+        let createTime: TimeInterval
+        let bookmarkId: String
+        let refMpReviewId: String?
+    }
+
+    struct ChapterItem: Decodable {
+        let bookId: String
+        let chapterUid: Int?
+        let chapterIdx: Int?
+        let title: String
+    }
+
+    let synckey: Int?
+    let updated: [HighlightItem]
+    let removed: [String]?
+    let chapters: [ChapterItem]?
 }
 
 
