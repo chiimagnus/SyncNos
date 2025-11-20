@@ -187,5 +187,3 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         ]
     }
 }
-
-

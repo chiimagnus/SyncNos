@@ -246,5 +246,3 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         return []
     }
 }
-
-

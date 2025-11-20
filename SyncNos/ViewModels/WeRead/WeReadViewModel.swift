@@ -297,5 +297,3 @@ final class WeReadViewModel: ObservableObject {
         return result
     }
 }
-
-

@@ -18,5 +18,3 @@ protocol AutoSyncSourceProvider: AnyObject {
     /// - 为保持与既有行为一致，同样尊重 autoSync 开关与最近同步时间
     func triggerManualSyncNow()
 }
-
-
