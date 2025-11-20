@@ -255,17 +255,60 @@ struct WeReadBookmark: Decodable {
 }
 
 /// 单条想法 / 书评
+///
+/// 实际 JSON 结构示例（来自 `/web/review/list`）：
+/// {
+///   "reviewId": "422219929_84NvtpVKU",
+///   "review": {
+///     "type": 1,
+///     "bookId": "34389621",
+///     "chapterUid": 303,
+///     "content": "这是一个测试啊啊啊啊",
+///     "createTime": 1763619349,
+///     ...
+///   }
+/// }
 struct WeReadReview: Decodable {
     let reviewId: String
     let bookId: String
     let content: String
     let timestamp: TimeInterval?
 
-    enum CodingKeys: String, CodingKey {
-        case reviewId = "reviewId"
+    private enum CodingKeys: String, CodingKey {
+        case reviewId
+        case review
+        // 兼容可能扁平化在顶层的字段
         case bookId
         case content
-        case timestamp = "createTime"
+        case createTime
+    }
+
+    private enum ReviewDetailKeys: String, CodingKey {
+        case bookId
+        case content
+        case createTime
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        reviewId = (try? container.decode(String.self, forKey: .reviewId)) ?? ""
+
+        // 优先从嵌套的 review 对象中取字段
+        if let reviewContainer = try? container.nestedContainer(keyedBy: ReviewDetailKeys.self, forKey: .review) {
+            bookId = (try? reviewContainer.decode(String.self, forKey: .bookId))
+                ?? (try? container.decode(String.self, forKey: .bookId))
+                ?? ""
+            content = (try? reviewContainer.decode(String.self, forKey: .content))
+                ?? (try? container.decode(String.self, forKey: .content))
+                ?? ""
+            timestamp = (try? reviewContainer.decode(TimeInterval.self, forKey: .createTime))
+                ?? (try? container.decode(TimeInterval.self, forKey: .createTime))
+        } else {
+            // 退化为所有字段都在顶层的情况
+            bookId = (try? container.decode(String.self, forKey: .bookId)) ?? ""
+            content = (try? container.decode(String.self, forKey: .content)) ?? ""
+            timestamp = try? container.decode(TimeInterval.self, forKey: .createTime)
+        }
     }
 }
 

@@ -140,7 +140,8 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
         guard let root = json else { return [] }
 
-        let candidatesKeys = ["bookmarks", "items", "list"]
+        // WeRead 实际返回中，高亮通常在 "updated" 字段里
+        let candidatesKeys = ["bookmarks", "items", "list", "updated"]
         for key in candidatesKeys {
             if let arr = root[key] {
                 let subData = try JSONSerialization.data(withJSONObject: arr, options: [])
