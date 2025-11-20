@@ -43,7 +43,7 @@ struct WeReadSettingsView: View {
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
-                    .help("Enable automatic sync for WeRead (checked means AutoSyncService will run)")
+                    .help("Enable automatic sync for WeRead")
                     .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
