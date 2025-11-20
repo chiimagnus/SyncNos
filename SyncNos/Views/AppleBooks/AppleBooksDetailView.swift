@@ -100,7 +100,7 @@ struct AppleBooksDetailView: View {
                                     let w = proxy.size.width
                                     Color.clear
                                         .onAppear { measuredLayoutWidth = w }
-                                        .onChange(of: w) { newValue in
+                                        .onChange(of: w) { _, newValue in
                                             measuredLayoutWidth = newValue
                                         }
                                 }
@@ -129,7 +129,7 @@ struct AppleBooksDetailView: View {
                         .padding()
                     }
                     // Scroll to top when selected book changes
-                    .onChange(of: selectedBookId) { _ in
+                    .onChange(of: selectedBookId) { _, _ in
                         withAnimation {
                             proxy.scrollTo("appleBooksDetailTop", anchor: .top)
                         }
@@ -151,7 +151,7 @@ struct AppleBooksDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _ in
+        .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
@@ -168,7 +168,7 @@ struct AppleBooksDetailView: View {
         }
         .navigationTitle("Apple Books")
         .background(LiveResizeObserver(isResizing: $isLiveResizing))
-        .onChange(of: isLiveResizing) { resizing in
+        .onChange(of: isLiveResizing) { _, resizing in
             if resizing {
                 frozenLayoutWidth = measuredLayoutWidth
             } else {
@@ -245,7 +245,7 @@ struct AppleBooksDetailView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
-        .onChange(of: viewModel.syncMessage) { newMessage in
+        .onChange(of: viewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
                 // 仅在消息明显是错误时弹窗；“同步完成”等成功文案不提示
                 let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
@@ -256,7 +256,7 @@ struct AppleBooksDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _ in
+        .onChange(of: selectedBookId) { _, _ in
             // 切换选中项时清理外部同步显示，避免遗留状态影响新选中项
             externalIsSyncing = false
             externalSyncProgress = nil
