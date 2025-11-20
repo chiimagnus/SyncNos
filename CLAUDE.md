@@ -503,11 +503,7 @@ open SyncNos.xcodeproj
 
 # 3. 在 Xcode 中选择目标设备并运行 (Cmd+R)
 
-# 4. 提交代码
-git add .
-git commit -m "feat: add new feature"
-git push origin main
-```
+# 4. 完成之后记得扫尾：验证代码无问题，能够成功build。
 
 ### 3. 添加新功能流程
 1. 在 `Models/` 中定义数据模型
