@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// WeRead -> Notion 同步服务实现
 final class WeReadSyncService: WeReadSyncServiceProtocol {
@@ -78,7 +79,7 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         let bookmarks = try await apiService.fetchBookmarks(bookId: book.bookId)
         let reviews = try await apiService.fetchReviews(bookId: book.bookId)
 
-        try await MainActor.run {
+        await MainActor.run {
             do {
                 try dataService.upsertHighlights(for: book.bookId, bookmarks: bookmarks, reviews: reviews)
             } catch {
@@ -87,14 +88,17 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         }
 
         // 5) 从 SwiftData 中读取已规范化的高亮，映射为 HighlightRow
-        let highlights: [WeReadHighlight] = try await MainActor.run {
-            try dataService.fetchHighlights(
+        let highlights: [(PersistentIdentifier, String, String, String?, Int?, Date?, Date?, String?)] = try await MainActor.run {
+            let weReadHighlights = try dataService.fetchHighlights(
                 for: book.bookId,
                 sortField: .created,
                 ascending: true,
                 noteFilter: false,
                 selectedStyles: nil
             )
+            return weReadHighlights.map { highlight in
+                (highlight.persistentModelID, highlight.highlightId, highlight.text, highlight.note, highlight.colorIndex, highlight.createdAt, highlight.modifiedAt, highlight.location)
+            }
         }
 
         guard !highlights.isEmpty else {
@@ -105,16 +109,16 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         let helper = NotionHelperMethods()
         var rows: [HighlightRow] = []
         rows.reserveCapacity(highlights.count)
-        for h in highlights {
+        for (_, highlightId, text, note, colorIndex, createdAt, modifiedAt, location) in highlights {
             let row = HighlightRow(
                 assetId: book.bookId,
-                uuid: h.highlightId,
-                text: h.text,
-                note: h.note,
-                style: h.colorIndex,
-                dateAdded: h.createdAt,
-                modified: h.modifiedAt,
-                location: h.location
+                uuid: highlightId,
+                text: text,
+                note: note,
+                style: colorIndex,
+                dateAdded: createdAt,
+                modified: modifiedAt,
+                location: location
             )
             rows.append(row)
         }
