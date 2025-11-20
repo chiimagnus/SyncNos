@@ -1,10 +1,12 @@
 import Foundation
+import SwiftData
 
-// MARK: - Models
+// MARK: - SwiftData Models
 
-struct WeReadBook: Codable, Identifiable {
+@Model
+final class WeReadBook {
     /// 微信读书书籍 ID（唯一）
-    var bookId: String
+    @Attribute(.unique) var bookId: String
     var title: String
     var author: String
     var coverUrl: String?
@@ -14,13 +16,12 @@ struct WeReadBook: Codable, Identifiable {
     var createdAt: Date?
     var updatedAt: Date?
 
-    /// 最近一次同步到 Notion 的时间
+    /// 最近一次同步到 Notion 的时间（冗余字段，便于 SwiftData 查询）
     var lastSyncAt: Date?
 
     /// 与该书关联的所有高亮
+    @Relationship(deleteRule: .cascade, inverse: \WeReadHighlight.book)
     var highlights: [WeReadHighlight] = []
-    
-    var id: String { bookId }
 
     init(
         bookId: String,
@@ -43,14 +44,13 @@ struct WeReadBook: Codable, Identifiable {
     }
 }
 
-struct WeReadHighlight: Codable, Identifiable {
+@Model
+final class WeReadHighlight {
     /// WeRead 高亮 ID（唯一）
-    var highlightId: String
-    
-    var id: String { highlightId }
+    @Attribute(.unique) var highlightId: String
 
-    /// 所属书籍 ID (替代对象引用)
-    var bookId: String?
+    /// 所属书籍
+    var book: WeReadBook?
 
     var text: String
     var note: String?
@@ -67,7 +67,7 @@ struct WeReadHighlight: Codable, Identifiable {
 
     init(
         highlightId: String,
-        bookId: String?,
+        book: WeReadBook?,
         text: String,
         note: String? = nil,
         colorIndex: Int? = nil,
@@ -78,7 +78,7 @@ struct WeReadHighlight: Codable, Identifiable {
         remoteHash: String? = nil
     ) {
         self.highlightId = highlightId
-        self.bookId = bookId
+        self.book = book
         self.text = text
         self.note = note
         self.colorIndex = colorIndex
@@ -92,7 +92,7 @@ struct WeReadHighlight: Codable, Identifiable {
 
 // MARK: - UI 列表模型
 
-/// WeRead 书籍在列表中的轻量视图模型，避免在 UI 层直接依赖数据对象
+/// WeRead 书籍在列表中的轻量视图模型，避免在 UI 层直接依赖 SwiftData 对象
 struct WeReadBookListItem: Identifiable, Equatable {
     var id: String { bookId }
 
@@ -335,3 +335,5 @@ struct WeReadHighlightResponse: Decodable {
     let removed: [String]?
     let chapters: [ChapterItem]?
 }
+
+

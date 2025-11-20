@@ -73,7 +73,7 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         )
         let pageId = ensured.id
 
-        // 4) 从 WeRead API 拉取最新高亮与想法，并写入本地存储
+        // 4) 从 WeRead API 拉取最新高亮与想法，并写入 SwiftData
         progress(NSLocalizedString("Fetching WeRead highlights...", comment: ""))
         let bookmarks = try await apiService.fetchBookmarks(bookId: book.bookId)
         let reviews = try await apiService.fetchReviews(bookId: book.bookId)
@@ -86,7 +86,7 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
             }
         }
 
-        // 5) 从本地存储中读取已规范化的高亮，映射为 HighlightRow
+        // 5) 从 SwiftData 中读取已规范化的高亮，映射为 HighlightRow
         let highlights: [WeReadHighlight] = try await MainActor.run {
             try dataService.fetchHighlights(
                 for: book.bookId,
