@@ -191,5 +191,3 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         }
     }
 }
-
-

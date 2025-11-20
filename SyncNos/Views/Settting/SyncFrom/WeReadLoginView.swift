@@ -129,5 +129,3 @@ struct WeReadLoginView_Previews: PreviewProvider {
         WeReadLoginView(onLoginChanged: {})
     }
 }
-
-

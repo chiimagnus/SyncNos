@@ -104,5 +104,3 @@ final class MenuBarViewModel: ObservableObject {
         isAutoSyncRunning = autoSyncService.isRunning
     }
 }
-
-

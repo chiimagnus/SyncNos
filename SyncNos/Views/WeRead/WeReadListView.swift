@@ -126,5 +126,3 @@ struct WeReadListView: View {
         }
     }
 }
-
-

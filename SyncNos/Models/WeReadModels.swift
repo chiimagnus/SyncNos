@@ -335,5 +335,3 @@ struct WeReadHighlightResponse: Decodable {
     let removed: [String]?
     let chapters: [ChapterItem]?
 }
-
-
