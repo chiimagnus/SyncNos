@@ -1,12 +1,10 @@
 import Foundation
-import SwiftData
 
-// MARK: - SwiftData Models
+// MARK: - Models
 
-@Model
-final class WeReadBook {
+struct WeReadBook: Codable, Identifiable {
     /// 微信读书书籍 ID（唯一）
-    @Attribute(.unique) var bookId: String
+    var bookId: String
     var title: String
     var author: String
     var coverUrl: String?
@@ -16,12 +14,13 @@ final class WeReadBook {
     var createdAt: Date?
     var updatedAt: Date?
 
-    /// 最近一次同步到 Notion 的时间（冗余字段，便于 SwiftData 查询）
+    /// 最近一次同步到 Notion 的时间
     var lastSyncAt: Date?
 
     /// 与该书关联的所有高亮
-    @Relationship(deleteRule: .cascade, inverse: \WeReadHighlight.book)
     var highlights: [WeReadHighlight] = []
+    
+    var id: String { bookId }
 
     init(
         bookId: String,
@@ -44,13 +43,14 @@ final class WeReadBook {
     }
 }
 
-@Model
-final class WeReadHighlight {
+struct WeReadHighlight: Codable, Identifiable {
     /// WeRead 高亮 ID（唯一）
-    @Attribute(.unique) var highlightId: String
+    var highlightId: String
+    
+    var id: String { highlightId }
 
-    /// 所属书籍
-    var book: WeReadBook?
+    /// 所属书籍 ID (替代对象引用)
+    var bookId: String?
 
     var text: String
     var note: String?
@@ -67,7 +67,7 @@ final class WeReadHighlight {
 
     init(
         highlightId: String,
-        book: WeReadBook?,
+        bookId: String?,
         text: String,
         note: String? = nil,
         colorIndex: Int? = nil,
@@ -78,7 +78,7 @@ final class WeReadHighlight {
         remoteHash: String? = nil
     ) {
         self.highlightId = highlightId
-        self.book = book
+        self.bookId = bookId
         self.text = text
         self.note = note
         self.colorIndex = colorIndex
@@ -92,7 +92,7 @@ final class WeReadHighlight {
 
 // MARK: - UI 列表模型
 
-/// WeRead 书籍在列表中的轻量视图模型，避免在 UI 层直接依赖 SwiftData 对象
+/// WeRead 书籍在列表中的轻量视图模型，避免在 UI 层直接依赖数据对象
 struct WeReadBookListItem: Identifiable, Equatable {
     var id: String { bookId }
 
@@ -335,5 +335,3 @@ struct WeReadHighlightResponse: Decodable {
     let removed: [String]?
     let chapters: [ChapterItem]?
 }
-
-

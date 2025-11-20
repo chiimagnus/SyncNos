@@ -106,7 +106,7 @@ final class WeReadViewModel: ObservableObject {
         do {
             // 1) 从 WeRead 远端拉取 Notebook 列表
             let notebooks = try await apiService.fetchNotebooks()
-            // 2) 写入本地 SwiftData，并获得规范化列表
+            // 2) 写入本地存储，并获得规范化列表
             let items = try dataService.upsertBooks(from: notebooks)
             books = items
             logger.info("[WeRead] fetched notebooks: \(notebooks.count), cached books: \(items.count)")
