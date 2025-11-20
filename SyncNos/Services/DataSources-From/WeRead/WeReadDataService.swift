@@ -197,5 +197,3 @@ final class WeReadDataService: WeReadDataServiceProtocol {
         return try? context.fetch(descriptor).first
     }
 }
-
-

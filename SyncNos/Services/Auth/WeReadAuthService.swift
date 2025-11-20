@@ -55,5 +55,3 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
         _ = KeychainHelper.shared.delete(service: "SyncNos.WeRead", account: keychainKey)
     }
 }
-
-

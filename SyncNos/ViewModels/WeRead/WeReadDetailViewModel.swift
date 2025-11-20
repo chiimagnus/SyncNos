@@ -150,5 +150,3 @@ final class WeReadDetailViewModel: ObservableObject {
         notionConfig.isConfigured
     }
 }
-
-

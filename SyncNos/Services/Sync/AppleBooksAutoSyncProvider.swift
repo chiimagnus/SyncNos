@@ -226,5 +226,3 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         }
     }
 }
-
-

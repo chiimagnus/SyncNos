@@ -134,5 +134,3 @@ struct WeReadDetailView: View {
         }
     }
 }
-
-

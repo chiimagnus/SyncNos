@@ -83,5 +83,3 @@ final class WeReadSettingsViewModel: ObservableObject {
         }
     }
 }
-
-

@@ -37,5 +37,3 @@ final class WeReadLoginViewModel: ObservableObject {
         saveCookieHeader(trimmed)
     }
 }
-
-

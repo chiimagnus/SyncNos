@@ -73,5 +73,3 @@ struct WeReadSettingsView_Previews: PreviewProvider {
         WeReadSettingsView()
     }
 }
-
-
