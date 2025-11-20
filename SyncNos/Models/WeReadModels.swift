@@ -135,7 +135,22 @@ struct WeReadBookListItem: Identifiable, Equatable {
 
 // MARK: - WeRead API DTO 模型
 
-/// 用户 Notebook 条目（每本书/文章的基本信息）
+/// 用户 Notebook 条目（每本书/文章的基本信息）对应 `/api/user/notebook` 中的 `books` 列表元素
+///
+/// 实际返回结构示例：
+/// {
+///   "bookId": "34389621",
+///   "book": {
+///     "bookId": "34389621",
+///     "title": "...",
+///     "author": "...",
+///     "cover": "https://...",
+///     "category": "..."
+///   },
+///   "created": 1680000000,
+///   "updated": 1690000000,
+///   ...
+/// }
 struct WeReadNotebook: Decodable {
     let bookId: String
     let title: String
@@ -147,14 +162,57 @@ struct WeReadNotebook: Decodable {
     let createdTimestamp: TimeInterval?
     let updatedTimestamp: TimeInterval?
 
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
+        case bookId
+        case book
+        case title
+        case author
+        case cover
+        case category
+        case created = "created"
+        case updated = "updated"
+    }
+
+    private enum BookKeys: String, CodingKey {
         case bookId
         case title
         case author
         case cover
         case category
-        case createdTimestamp = "created"
-        case updatedTimestamp = "updated"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // 优先从嵌套的 book 对象中取书籍信息，兼容旧结构直接在顶层返回 title/author 等字段
+        if let bookContainer = try? container.nestedContainer(keyedBy: BookKeys.self, forKey: .book) {
+            let nestedBookId = try? bookContainer.decode(String.self, forKey: .bookId)
+            let topLevelBookId = try? container.decode(String.self, forKey: .bookId)
+            self.bookId = nestedBookId ?? topLevelBookId ?? ""
+
+            if let nestedTitle = try? bookContainer.decode(String.self, forKey: .title) {
+                self.title = nestedTitle
+            } else {
+                self.title = (try? container.decode(String.self, forKey: .title)) ?? ""
+            }
+
+            self.author = (try? bookContainer.decode(String.self, forKey: .author))
+                ?? (try? container.decode(String.self, forKey: .author))
+            self.cover = (try? bookContainer.decode(String.self, forKey: .cover))
+                ?? (try? container.decode(String.self, forKey: .cover))
+            self.category = (try? bookContainer.decode(String.self, forKey: .category))
+                ?? (try? container.decode(String.self, forKey: .category))
+        } else {
+            // 兼容没有嵌套 book 的情况
+            self.bookId = (try? container.decode(String.self, forKey: .bookId)) ?? ""
+            self.title = try container.decode(String.self, forKey: .title)
+            self.author = try? container.decode(String.self, forKey: .author)
+            self.cover = try? container.decode(String.self, forKey: .cover)
+            self.category = try? container.decode(String.self, forKey: .category)
+        }
+
+        self.createdTimestamp = try? container.decode(TimeInterval.self, forKey: .created)
+        self.updatedTimestamp = try? container.decode(TimeInterval.self, forKey: .updated)
     }
 }
 
