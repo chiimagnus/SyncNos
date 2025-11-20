@@ -125,7 +125,7 @@ struct WeReadDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _ in
+        .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)
