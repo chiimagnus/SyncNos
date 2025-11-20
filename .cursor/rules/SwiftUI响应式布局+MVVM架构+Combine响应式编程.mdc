@@ -8,7 +8,7 @@ alwaysApply: true
 
 ### 核心技术栈
 - **架构模式**: MVVM (Model-View-ViewModel)
-- **UI框架**: SwiftUI (iOS17+, iPadOS17+, macOS13+)
+- **UI框架**: SwiftUI (iOS 17+, iPadOS 17+, macOS 14+)
 - **响应式编程**: Combine
 - **数据持久化**: SwiftData
 - **语言版本**: Swift 6.1+、Swift5+
@@ -16,7 +16,7 @@ alwaysApply: true
 ### 平台支持
 - iOS 17.0+
 - iPadOS 17.0+
-- macOS 13.0+
+- macOS 14.0+
 
 ## MVVM架构规范
 

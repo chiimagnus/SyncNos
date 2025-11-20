@@ -117,7 +117,7 @@ struct LanguageView: View {
         } label: {
             Label("Language", systemImage: "globe")
         }
-        .onChange(of: selectedLanguage) { newLanguage in
+        .onChange(of: selectedLanguage) { _, newLanguage in
             changeAppLanguage(to: newLanguage)
         }
         .help("Change application language")

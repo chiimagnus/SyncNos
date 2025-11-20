@@ -235,7 +235,7 @@ struct GoodLinksDetailView: View {
                                         let w = proxy.size.width
                                         Color.clear
                                             .onAppear { measuredLayoutWidth = w }
-                                            .onChange(of: w) { newValue in
+                                            .onChange(of: w) { _, newValue in
                                                 measuredLayoutWidth = newValue
                                             }
                                     }
@@ -253,7 +253,7 @@ struct GoodLinksDetailView: View {
                         .padding()
                     }
                     // when the article collapses, ensure we scroll to top to avoid empty space
-                    .onChange(of: articleIsExpanded) { expanded in
+                    .onChange(of: articleIsExpanded) { _, expanded in
                         if !expanded {
                             withAnimation {
                                 proxy.scrollTo("goodlinksDetailTop", anchor: .top)
@@ -261,7 +261,7 @@ struct GoodLinksDetailView: View {
                         }
                     }
                     // Scroll to top when selected link changes
-                    .onChange(of: linkId) { _ in
+                    .onChange(of: linkId) { _, _ in
                         withAnimation {
                             proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                         }
@@ -276,7 +276,7 @@ struct GoodLinksDetailView: View {
                         externalIsSyncing = true
                     }
                 }
-                .onChange(of: linkId) { newLinkId in
+                .onChange(of: linkId) { _, newLinkId in
                     Task {
                         await viewModel.loadHighlights(for: newLinkId)
                         await viewModel.loadContent(for: newLinkId)
@@ -290,7 +290,7 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 .background(LiveResizeObserver(isResizing: $isLiveResizing))
-                .onChange(of: isLiveResizing) { resizing in
+                .onChange(of: isLiveResizing) { _, resizing in
                     if resizing {
                         frozenLayoutWidth = measuredLayoutWidth
                     } else {
@@ -383,7 +383,7 @@ struct GoodLinksDetailView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
-        .onChange(of: viewModel.syncMessage) { newMessage in
+        .onChange(of: viewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
                 let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
                 let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
@@ -393,12 +393,12 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedLinkId) { _ in
+        .onChange(of: selectedLinkId) { _, _ in
             articleIsExpanded = false
             externalIsSyncing = false
             externalSyncProgress = nil
         }
-        .onChange(of: viewModel.highlightsByLinkId) { _ in
+        .onChange(of: viewModel.highlightsByLinkId) { _, _ in
             // Trigger UI update when highlights are loaded
             // The filteredHighlights computed property will automatically refresh
         }
@@ -419,7 +419,7 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .onChange(of: viewModel.errorMessage) { newError in
+        .onChange(of: viewModel.errorMessage) { _, newError in
             if let err = newError, !err.isEmpty {
                 syncErrorMessage = err
                 showingSyncError = true

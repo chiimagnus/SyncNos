@@ -260,7 +260,7 @@ struct MainListView: View {
                 }
             }
         }
-        .onChange(of: contentSourceRawValue) { _ in
+        .onChange(of: contentSourceRawValue) { _, _ in
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()

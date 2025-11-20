@@ -19,7 +19,7 @@ struct LogWindow: View {
                     }
                     .padding(8)
                 }
-                .onChange(of: viewModel.entries.count) { _ in
+                .onChange(of: viewModel.entries.count) { _, _ in
                     guard isAutoScrollEnabled, let last = viewModel.entries.last else { return }
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)

@@ -35,7 +35,7 @@ struct WeReadSettingsView: View {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for WeRead", text: $viewModel.weReadDbId)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: viewModel.weReadDbId) { _ in
+                        .onChange(of: viewModel.weReadDbId) { _, _ in
                             viewModel.save()
                         }
                 }
@@ -44,7 +44,7 @@ struct WeReadSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for WeRead (checked means AutoSyncService will run)")
-                    .onChange(of: viewModel.autoSync) { _ in
+                    .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
             }
