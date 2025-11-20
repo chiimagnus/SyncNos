@@ -1,17 +1,12 @@
 import Foundation
-import SwiftData
 
-/// WeRead SwiftData 数据访问服务实现
+/// WeRead 数据访问服务实现
 final class WeReadDataService: WeReadDataServiceProtocol {
-    private let container: ModelContainer
-    private var context: ModelContext {
-        ModelContext(container)
-    }
-
+    private let store: WeReadStore
     private let logger: LoggerServiceProtocol
 
-    init(container: ModelContainer, logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
-        self.container = container
+    init(store: WeReadStore, logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
+        self.store = store
         self.logger = logger
     }
 
@@ -19,26 +14,26 @@ final class WeReadDataService: WeReadDataServiceProtocol {
 
     func upsertBooks(from notebooks: [WeReadNotebook]) throws -> [WeReadBookListItem] {
         guard !notebooks.isEmpty else { return [] }
-        let ctx = context
 
-        var result: [WeReadBookListItem] = []
-        result.reserveCapacity(notebooks.count)
-
+        var booksToUpsert: [WeReadBook] = []
+        booksToUpsert.reserveCapacity(notebooks.count)
+        
         for nb in notebooks {
-            let existing = fetchBookById(nb.bookId, in: ctx)
+            let existing = store.getBook(id: nb.bookId)
             let createdDate = nb.createdTimestamp.flatMap { Date(timeIntervalSince1970: $0) }
             let updatedDate = nb.updatedTimestamp.flatMap { Date(timeIntervalSince1970: $0) }
-
-            if let book = existing {
-                book.title = nb.title
-                book.author = nb.author ?? ""
-                book.coverUrl = nb.cover
-                book.category = nb.category
-                book.createdAt = book.createdAt ?? createdDate
-                book.updatedAt = updatedDate ?? book.updatedAt
-                result.append(WeReadBookListItem(from: book))
+            
+            var book: WeReadBook
+            if var existingBook = existing {
+                existingBook.title = nb.title
+                existingBook.author = nb.author ?? ""
+                existingBook.coverUrl = nb.cover
+                existingBook.category = nb.category
+                existingBook.createdAt = existingBook.createdAt ?? createdDate
+                existingBook.updatedAt = updatedDate ?? existingBook.updatedAt
+                book = existingBook
             } else {
-                let book = WeReadBook(
+                book = WeReadBook(
                     bookId: nb.bookId,
                     title: nb.title,
                     author: nb.author ?? "",
@@ -47,19 +42,13 @@ final class WeReadDataService: WeReadDataServiceProtocol {
                     createdAt: createdDate,
                     updatedAt: updatedDate
                 )
-                ctx.insert(book)
-                result.append(WeReadBookListItem(from: book))
             }
+            booksToUpsert.append(book)
         }
-
-        do {
-            try ctx.save()
-        } catch {
-            logger.error("[WeReadData] Failed to save books: \(error.localizedDescription)")
-            throw error
-        }
-
-        return result
+        
+        store.upsertBooks(booksToUpsert)
+        
+        return booksToUpsert.map { WeReadBookListItem(from: $0) }
     }
 
     func upsertHighlights(
@@ -67,36 +56,34 @@ final class WeReadDataService: WeReadDataServiceProtocol {
         bookmarks: [WeReadBookmark],
         reviews: [WeReadReview]
     ) throws {
-        let ctx = context
-
-        guard let book = fetchBookById(bookId, in: ctx) else {
+        guard var book = store.getBook(id: bookId) else {
             logger.warning("[WeReadData] upsertHighlights: book not found for id=\(bookId)")
             return
         }
-
-        // 先构建当前已有高亮的索引表
+        
+        // Index existing highlights
         var existingById: [String: WeReadHighlight] = [:]
         for h in book.highlights {
             existingById[h.highlightId] = h
         }
-
-        // 合并 bookmarks
+        
+        // Merge bookmarks
         for bm in bookmarks {
             let createdDate = bm.timestamp.flatMap { Date(timeIntervalSince1970: $0) }
             let highlightId = bm.highlightId
-
-            let existing = existingById[highlightId]
-            if let h = existing {
+            
+            if var h = existingById[highlightId] {
                 h.text = bm.text
                 h.note = bm.note
                 h.colorIndex = bm.colorIndex
                 h.createdAt = h.createdAt ?? createdDate
                 h.chapterTitle = bm.chapterTitle
-                h.book = book
+                h.bookId = bookId
+                existingById[highlightId] = h
             } else {
                 let h = WeReadHighlight(
                     highlightId: highlightId,
-                    book: book,
+                    bookId: bookId,
                     text: bm.text,
                     note: bm.note,
                     colorIndex: bm.colorIndex,
@@ -106,25 +93,25 @@ final class WeReadDataService: WeReadDataServiceProtocol {
                     location: nil,
                     remoteHash: nil
                 )
-                ctx.insert(h)
-                book.highlights.append(h)
                 existingById[highlightId] = h
             }
         }
-
-        // 将 review 作为带 note 的“虚拟高亮”附加到列表末尾（以 reviewId 作为 highlightId）
+        
+        // Merge reviews
         for rv in reviews {
             let createdDate = rv.timestamp.flatMap { Date(timeIntervalSince1970: $0) }
             let highlightId = "review-\(rv.reviewId)"
-            if let existing = existingById[highlightId] {
-                existing.text = rv.content
-                existing.note = rv.content
-                existing.createdAt = existing.createdAt ?? createdDate
-                existing.book = book
+            
+            if var h = existingById[highlightId] {
+                h.text = rv.content
+                h.note = rv.content
+                h.createdAt = h.createdAt ?? createdDate
+                h.bookId = bookId
+                existingById[highlightId] = h
             } else {
                 let h = WeReadHighlight(
                     highlightId: highlightId,
-                    book: book,
+                    bookId: bookId,
                     text: rv.content,
                     note: rv.content,
                     colorIndex: nil,
@@ -134,26 +121,16 @@ final class WeReadDataService: WeReadDataServiceProtocol {
                     location: nil,
                     remoteHash: nil
                 )
-                ctx.insert(h)
-                book.highlights.append(h)
                 existingById[highlightId] = h
             }
         }
-
-        do {
-            try ctx.save()
-        } catch {
-            logger.error("[WeReadData] Failed to save highlights for bookId=\(bookId): \(error.localizedDescription)")
-            throw error
-        }
+        
+        book.highlights = Array(existingById.values)
+        store.upsertBook(book)
     }
 
     func fetchBooks() throws -> [WeReadBookListItem] {
-        let ctx = context
-        let descriptor = FetchDescriptor<WeReadBook>()
-
-        let books = try ctx.fetch(descriptor)
-        return books.map { WeReadBookListItem(from: $0) }
+        return store.getAllBooks().map { WeReadBookListItem(from: $0) }
     }
 
     func fetchHighlights(
@@ -163,39 +140,46 @@ final class WeReadDataService: WeReadDataServiceProtocol {
         noteFilter: Bool,
         selectedStyles: [Int]?
     ) throws -> [WeReadHighlight] {
-        let ctx = context
+        guard let book = store.getBook(id: bookId) else { return [] }
+        
         let stylesSet: Set<Int>? = (selectedStyles?.isEmpty == false) ? Set(selectedStyles!) : nil
-
-        let compound = #Predicate<WeReadHighlight> { h in
-            (h.book?.bookId == bookId)
-            && (!noteFilter || ((h.note ?? "").isEmpty == false))
+        
+        var highlights = book.highlights.filter { h in
+            (!noteFilter || ((h.note ?? "").isEmpty == false))
             && (stylesSet == nil || ((h.colorIndex != nil) && stylesSet!.contains(h.colorIndex!)))
         }
-
-        let sortDescriptor: SortDescriptor<WeReadHighlight>
-        switch sortField {
-        case .created:
-            sortDescriptor = SortDescriptor(\.createdAt, order: ascending ? .forward : .reverse)
-        case .modified:
-            sortDescriptor = SortDescriptor(\.modifiedAt, order: ascending ? .forward : .reverse)
+        
+        highlights.sort { h1, h2 in
+            let d1: Date?
+            let d2: Date?
+            switch sortField {
+            case .created:
+                d1 = h1.createdAt
+                d2 = h2.createdAt
+            case .modified:
+                d1 = h1.modifiedAt
+                d2 = h2.modifiedAt
+            }
+            
+            // Handle optional dates
+            if let date1 = d1, let date2 = d2 {
+                return ascending ? date1 < date2 : date1 > date2
+            }
+            if d1 != nil { return ascending ? false : true } // d1 exists, d2 nil -> d1 is "larger"? 
+            // Usually: nil is "oldest" or "undefined". 
+            // If ascending, nil < date. 
+            // If descending, date > nil.
+            if d1 == nil && d2 == nil { return false }
+            
+            if ascending {
+                // nil comes first
+                return d1 == nil
+            } else {
+                // nil comes last
+                return d2 == nil
+            }
         }
-
-        let descriptor = FetchDescriptor<WeReadHighlight>(
-            predicate: compound,
-            sortBy: [sortDescriptor]
-        )
-
-        return try ctx.fetch(descriptor)
-    }
-
-    // MARK: - Private helpers
-
-    private func fetchBookById(_ bookId: String, in context: ModelContext) -> WeReadBook? {
-        let predicate = #Predicate<WeReadBook> { $0.bookId == bookId }
-        var descriptor = FetchDescriptor<WeReadBook>(predicate: predicate)
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
+        
+        return highlights
     }
 }
-
-

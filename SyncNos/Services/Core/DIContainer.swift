@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 // MARK: - Dependency Injection Container
 class DIContainer {
@@ -28,7 +27,7 @@ class DIContainer {
     private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadDataService: WeReadDataServiceProtocol?
-    private var _weReadModelContainer: ModelContainer?
+    private var _weReadStore: WeReadStore?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -148,18 +147,11 @@ class DIContainer {
 
     // MARK: - WeRead Services
 
-    /// 全局共享的 WeRead SwiftData 容器
-    var weReadModelContainer: ModelContainer {
-        if _weReadModelContainer == nil {
-            let schema = Schema([WeReadBook.self, WeReadHighlight.self])
-            let configuration = ModelConfiguration("WeReadStore")
-            do {
-                _weReadModelContainer = try ModelContainer(for: schema, configurations: configuration)
-            } catch {
-                fatalError("Failed to create WeRead ModelContainer: \(error)")
-            }
+    var weReadStore: WeReadStore {
+        if _weReadStore == nil {
+            _weReadStore = WeReadStore(logger: loggerService)
         }
-        return _weReadModelContainer!
+        return _weReadStore!
     }
 
     var weReadAuthService: WeReadAuthServiceProtocol {
@@ -178,7 +170,7 @@ class DIContainer {
 
     var weReadDataService: WeReadDataServiceProtocol {
         if _weReadDataService == nil {
-            _weReadDataService = WeReadDataService(container: weReadModelContainer)
+            _weReadDataService = WeReadDataService(store: weReadStore)
         }
         return _weReadDataService!
     }
