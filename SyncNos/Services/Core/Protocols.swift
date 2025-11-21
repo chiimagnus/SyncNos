@@ -22,6 +22,15 @@ enum LogLevel: Int, CaseIterable, Comparable {
         case .error: return "ERROR"
         }
     }
+
+    var color: NSColor {
+        switch self {
+        case .debug: return .gray
+        case .info: return .gray
+        case .warning: return .systemYellow
+        case .error: return .systemRed
+        }
+    }
 }
 
 // MARK: - Log Entry
