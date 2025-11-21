@@ -103,6 +103,10 @@ struct WeReadDetailView: View {
             }
 
             ToolbarItem(placement: .automatic) {
+                Spacer()
+            }
+
+            ToolbarItem(placement: .automatic) {
                 if detailViewModel.isSyncing {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
