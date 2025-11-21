@@ -30,22 +30,25 @@ struct WeReadDetailView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         InfoHeaderCardView(
                             title: book.title,
-                            subtitle: book.author.isEmpty ? nil : book.author
+                            subtitle: book.author.isEmpty ? nil : book.author,
+                            timestamps: TimestampInfo(
+                                addedAt: book.createdAt,
+                                modifiedAt: book.updatedAt,
+                                lastSyncAt: listViewModel.lastSync(for: book.bookId)
+                            )
                         ) {
                             if let url = URL(string: "https://weread.qq.com/web/reader/\(book.bookId)") {
                                 Link("Open in WeRead Web", destination: url)
                                     .font(.subheadline)
                             }
                         } content: {
-                            HStack(spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "highlighter")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                            HStack(spacing: 6) {
+                                Image(systemName: "highlighter")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(book.highlightCount) highlights")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
 
