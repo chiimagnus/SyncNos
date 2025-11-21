@@ -93,9 +93,9 @@ struct GoodLinksListView: View {
                             Divider()
                             let last = viewModel.lastSync(for: link.id)
                             if let lastDate = last {
-                                Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
+                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
                             } else {
-                                Text("Last Sync: Never")
+                                Text("Last Sync Time") + Text(": ") + Text("-")
                             }
                         }
                     }
