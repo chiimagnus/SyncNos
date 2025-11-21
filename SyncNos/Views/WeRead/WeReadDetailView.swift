@@ -37,7 +37,7 @@ struct WeReadDetailView: View {
                                 lastSyncAt: listViewModel.lastSync(for: book.bookId)
                             )
                         ) {
-                            if let url = URL(string: "https://weread.qq.com/web/reader/\(book.bookId)") {
+                            if let url = URL(string: "https://weread.qq.com/") {
                                 Link("Open in WeRead Web", destination: url)
                                     .font(.subheadline)
                             }
