@@ -11,14 +11,14 @@ struct AppleBooksSettingsView: View {
                     Text("Single Database (One page per book)").tag("single")
                     Text("One database per book (Each highlight as an entry)").tag("perBook")
                 }
-                .onChange(of: viewModel.syncMode) { _ in
+                .onChange(of: viewModel.syncMode) { _, _ in
                     viewModel.saveSyncMode()
                 }
 
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for Apple Books", text: $viewModel.appleBooksDbId)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: viewModel.appleBooksDbId) { _ in
+                        .onChange(of: viewModel.appleBooksDbId) { _, _ in
                             viewModel.save()
                         }
                 }
@@ -27,7 +27,7 @@ struct AppleBooksSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for Apple Books (checked means AutoSyncService will run)")
-                    .onChange(of: viewModel.autoSync) { _ in
+                    .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
 

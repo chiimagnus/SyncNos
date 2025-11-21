@@ -117,7 +117,7 @@ struct ArticleContentCardView: View {
                 let w = proxy.size.width
                 Color.clear
                     .onAppear { measuredWidth = w }
-                    .onChange(of: w) { newValue in
+                    .onChange(of: w) { _, newValue in
                         measuredWidth = newValue
                     }
             }

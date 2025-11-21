@@ -22,6 +22,15 @@ enum LogLevel: Int, CaseIterable, Comparable {
         case .error: return "ERROR"
         }
     }
+
+    var color: NSColor {
+        switch self {
+        case .debug: return .gray
+        case .info: return .gray
+        case .warning: return .systemYellow
+        case .error: return .systemRed
+        }
+    }
 }
 
 // MARK: - Log Entry
@@ -238,6 +247,41 @@ protocol AutoSyncServiceProtocol: AnyObject {
 protocol SyncTimestampStoreProtocol: AnyObject {
     func getLastSyncTime(for bookId: String) -> Date?
     func setLastSyncTime(for bookId: String, to date: Date)
+}
+
+// MARK: - WeRead Auth & Data Protocols
+
+/// 管理 WeRead 认证 Cookie 的服务协议
+protocol WeReadAuthServiceProtocol: AnyObject {
+    /// 当前是否已登录（依据是否存在可用 Cookie）
+    var isLoggedIn: Bool { get }
+    /// 已持久化的 Cookie Header（`Cookie: ...` 的值部分）
+    var cookieHeader: String? { get }
+
+    /// 更新并持久化新的 Cookie Header
+    func updateCookieHeader(_ header: String)
+    /// 清除本地存储的 Cookie 与登录状态
+    func clearCookies()
+}
+
+/// WeRead API 服务协议
+protocol WeReadAPIServiceProtocol: AnyObject {
+    /// 获取当前用户的 Notebook 列表（每个元素代表一本书/文章）
+    func fetchNotebooks() async throws -> [WeReadNotebook]
+    /// 获取单本书的详细信息
+    func fetchBookInfo(bookId: String) async throws -> WeReadBookInfo
+    /// 获取单本书的所有高亮
+    func fetchBookmarks(bookId: String) async throws -> [WeReadBookmark]
+    /// 获取单本书的个人想法/书评
+    func fetchReviews(bookId: String) async throws -> [WeReadReview]
+    /// 获取书籍的高亮并与想法合并（基于 range 字段）
+    func fetchMergedHighlights(bookId: String) async throws -> [WeReadBookmark]
+}
+
+/// WeRead -> Notion 同步服务协议
+protocol WeReadSyncServiceProtocol: AnyObject {
+    /// 同步单本 WeRead 书籍的高亮到 Notion
+    func syncHighlights(for book: WeReadBookListItem, progress: @escaping (String) -> Void) async throws
 }
 
 // MARK: - Auth Service Protocol

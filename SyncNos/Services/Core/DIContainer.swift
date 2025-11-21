@@ -23,6 +23,9 @@ class DIContainer {
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
+    // WeRead
+    private var _weReadAuthService: WeReadAuthServiceProtocol?
+    private var _weReadAPIService: WeReadAPIServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -140,6 +143,22 @@ class DIContainer {
         return _notionOAuthService!
     }
 
+    // MARK: - WeRead Services
+
+    var weReadAuthService: WeReadAuthServiceProtocol {
+        if _weReadAuthService == nil {
+            _weReadAuthService = WeReadAuthService()
+        }
+        return _weReadAuthService!
+    }
+
+    var weReadAPIService: WeReadAPIServiceProtocol {
+        if _weReadAPIService == nil {
+            _weReadAPIService = WeReadAPIService(authService: weReadAuthService)
+        }
+        return _weReadAPIService!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -205,6 +224,14 @@ class DIContainer {
 
     func register(notionOAuthService: NotionOAuthService) {
         self._notionOAuthService = notionOAuthService
+    }
+
+    func register(weReadAuthService: WeReadAuthServiceProtocol) {
+        self._weReadAuthService = weReadAuthService
+    }
+
+    func register(weReadAPIService: WeReadAPIServiceProtocol) {
+        self._weReadAPIService = weReadAPIService
     }
 
 }
