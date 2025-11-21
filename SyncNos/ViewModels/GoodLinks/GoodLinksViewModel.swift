@@ -528,8 +528,6 @@ final class GoodLinksViewModel: ObservableObject {
                 case "succeeded":
                     self.syncingLinkIds.remove(bookId)
                     self.syncedLinkIds.insert(bookId)
-                    // 同步成功后触发一次派生重算，刷新基于 lastSync 的排序/显示
-                    self.triggerRecompute()
                 case "failed":
                     self.syncingLinkIds.remove(bookId)
                 default:

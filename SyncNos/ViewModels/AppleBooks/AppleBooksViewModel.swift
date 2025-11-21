@@ -256,8 +256,6 @@ class AppleBooksViewModel: ObservableObject {
                 case "succeeded":
                     self.syncingBookIds.remove(bookId)
                     self.syncedBookIds.insert(bookId)
-                    // 同步成功后触发一次派生重算，刷新基于 lastSync 的排序/显示
-                    self.triggerRecompute()
                 case "failed":
                     self.syncingBookIds.remove(bookId)
                 default:
