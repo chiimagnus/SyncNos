@@ -86,7 +86,7 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         // 转换合并后的 bookmarks（将多条想法合并为一个 note）
         for bm in mergedBookmarks {
             // 合并多条想法内容，用换行符分隔
-            let combinedReviews = bm.reviewContents.isEmpty ? nil : bm.reviewContents.joined(separator: "\n\n---\n\n")
+            let combinedReviews = bm.reviewContents.isEmpty ? nil : bm.reviewContents.joined(separator: "\n")
             let row = HighlightRow(
                 assetId: book.bookId,
                 uuid: bm.highlightId,
