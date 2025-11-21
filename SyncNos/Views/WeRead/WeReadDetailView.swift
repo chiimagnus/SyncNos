@@ -58,7 +58,7 @@ struct WeReadDetailView: View {
                                 .padding(.top)
                         } else {
                             WaterfallLayout(minColumnWidth: 280, spacing: 12) {
-                                ForEach(detailViewModel.highlights, id: \.highlightId) { h in
+                                ForEach(detailViewModel.highlights) { h in
                                     HighlightCardView(
                                         colorMark: color(for: h.colorIndex),
                                         content: h.text,
