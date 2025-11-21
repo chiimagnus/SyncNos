@@ -1,10 +1,11 @@
-buildServer.json
 /Backend/.venv
 *.db
 Backend/.env
 /.iflow
 /.specify
 plans/
+.kiro/
+.claude/
 
 # Notion OAuth 配置文件（包含敏感信息）
 notion_auth.env
