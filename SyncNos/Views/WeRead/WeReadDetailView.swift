@@ -62,7 +62,7 @@ struct WeReadDetailView: View {
                                     HighlightCardView(
                                         colorMark: color(for: h.colorIndex),
                                         content: h.text,
-                                        note: h.note,
+                                        note: h.reviewContent ?? h.note,  // 优先显示想法内容，其次是简短笔记
                                         createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
                                         modifiedDate: h.modifiedAt.map { Self.dateFormatter.string(from: $0) }
                                     )
