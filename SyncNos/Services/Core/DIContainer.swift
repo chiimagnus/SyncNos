@@ -27,8 +27,6 @@ class DIContainer {
     // WeRead
     private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
-    private var _weReadDataService: WeReadDataServiceProtocol?
-    private var _weReadModelContainer: ModelContainer?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -148,20 +146,6 @@ class DIContainer {
 
     // MARK: - WeRead Services
 
-    /// 全局共享的 WeRead SwiftData 容器
-    var weReadModelContainer: ModelContainer {
-        if _weReadModelContainer == nil {
-            let schema = Schema([WeReadBook.self, WeReadHighlight.self])
-            let configuration = ModelConfiguration("WeReadStore")
-            do {
-                _weReadModelContainer = try ModelContainer(for: schema, configurations: configuration)
-            } catch {
-                fatalError("Failed to create WeRead ModelContainer: \(error)")
-            }
-        }
-        return _weReadModelContainer!
-    }
-
     var weReadAuthService: WeReadAuthServiceProtocol {
         if _weReadAuthService == nil {
             _weReadAuthService = WeReadAuthService()
@@ -174,13 +158,6 @@ class DIContainer {
             _weReadAPIService = WeReadAPIService(authService: weReadAuthService)
         }
         return _weReadAPIService!
-    }
-
-    var weReadDataService: WeReadDataServiceProtocol {
-        if _weReadDataService == nil {
-            _weReadDataService = WeReadDataService(container: weReadModelContainer)
-        }
-        return _weReadDataService!
     }
 
     // MARK: - Registration Methods
@@ -256,10 +233,6 @@ class DIContainer {
 
     func register(weReadAPIService: WeReadAPIServiceProtocol) {
         self._weReadAPIService = weReadAPIService
-    }
-
-    func register(weReadDataService: WeReadDataServiceProtocol) {
-        self._weReadDataService = weReadDataService
     }
 
 }

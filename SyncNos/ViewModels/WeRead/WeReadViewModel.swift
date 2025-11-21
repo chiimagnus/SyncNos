@@ -30,7 +30,6 @@ final class WeReadViewModel: ObservableObject {
 
     // 依赖
     private let apiService: WeReadAPIServiceProtocol
-    private let dataService: WeReadDataServiceProtocol
     private let syncService: WeReadSyncServiceProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
@@ -42,14 +41,12 @@ final class WeReadViewModel: ObservableObject {
 
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        dataService: WeReadDataServiceProtocol = DIContainer.shared.weReadDataService,
         syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.apiService = apiService
-        self.dataService = dataService
         self.syncService = syncService
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
@@ -104,12 +101,10 @@ final class WeReadViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            // 1) 从 WeRead 远端拉取 Notebook 列表
+            // 从 WeRead 远端拉取 Notebook 列表并直接转换为 UI 模型
             let notebooks = try await apiService.fetchNotebooks()
-            // 2) 写入本地 SwiftData，并获得规范化列表
-            let items = try dataService.upsertBooks(from: notebooks)
-            books = items
-            logger.info("[WeRead] fetched notebooks: \(notebooks.count), cached books: \(items.count)")
+            books = notebooks.map { WeReadBookListItem(from: $0) }
+            logger.info("[WeRead] fetched notebooks: \(notebooks.count)")
             isLoading = false
         } catch let error as WeReadAPIError where error.isAuthenticationError {
             // 检测到认证错误，尝试自动刷新 Cookie
@@ -140,18 +135,7 @@ final class WeReadViewModel: ObservableObject {
             refreshService.notifyManualLoginRequired()
             
             // 显示友好的错误提示
-            errorMessage = NSLocalizedString("WeRead session expired. Showing cached data. Please login to refresh.", comment: "")
-            
-            // 尝试从本地加载缓存数据
-            do {
-                let cachedBooks = try dataService.fetchBooks()
-                if !cachedBooks.isEmpty {
-                    books = cachedBooks
-                    logger.info("[WeRead] Loaded \(cachedBooks.count) books from cache")
-                }
-            } catch {
-                logger.error("[WeRead] Failed to load cached books: \(error.localizedDescription)")
-            }
+            errorMessage = NSLocalizedString("WeRead session expired. Please login to refresh.", comment: "")
         }
     }
 

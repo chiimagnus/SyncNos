@@ -1,8 +1,39 @@
 import Foundation
 
+// 临时结构体用于存储高亮数据
+struct WeReadHighlightDisplay: Identifiable {
+    let id: String
+    let text: String
+    let note: String?
+    let colorIndex: Int?
+    let createdAt: Date?
+    let modifiedAt: Date?
+    let chapterTitle: String?
+    
+    init(from bookmark: WeReadBookmark) {
+        self.id = bookmark.highlightId
+        self.text = bookmark.text
+        self.note = bookmark.note
+        self.colorIndex = bookmark.colorIndex
+        self.createdAt = bookmark.timestamp.map { Date(timeIntervalSince1970: $0) }
+        self.modifiedAt = nil
+        self.chapterTitle = bookmark.chapterTitle
+    }
+    
+    init(from review: WeReadReview) {
+        self.id = "review-\(review.reviewId)"
+        self.text = review.content
+        self.note = review.content
+        self.colorIndex = nil
+        self.createdAt = review.timestamp.map { Date(timeIntervalSince1970: $0) }
+        self.modifiedAt = nil
+        self.chapterTitle = nil
+    }
+}
+
 @MainActor
 final class WeReadDetailViewModel: ObservableObject {
-    @Published var highlights: [WeReadHighlight] = []
+    @Published var highlights: [WeReadHighlightDisplay] = []
     @Published var isLoading: Bool = false
 
     // 高亮筛选与排序
@@ -18,22 +49,21 @@ final class WeReadDetailViewModel: ObservableObject {
     @Published var showNotionConfigAlert: Bool = false
 
     private let apiService: WeReadAPIServiceProtocol
-    private let dataService: WeReadDataServiceProtocol
     private let syncService: WeReadSyncServiceProtocol
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
 
     private var currentBookId: String?
+    private var allBookmarks: [WeReadBookmark] = []
+    private var allReviews: [WeReadReview] = []
 
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        dataService: WeReadDataServiceProtocol = DIContainer.shared.weReadDataService,
         syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.apiService = apiService
-        self.dataService = dataService
         self.syncService = syncService
         self.logger = logger
         self.notionConfig = notionConfig
@@ -43,25 +73,16 @@ final class WeReadDetailViewModel: ObservableObject {
         currentBookId = bookId
         isLoading = true
         do {
-            // 1) 先从远端拉取最新高亮与想法并写入本地
+            // 从远端拉取最新高亮与想法
             let bookmarks = try await apiService.fetchBookmarks(bookId: bookId)
             let reviews = try await apiService.fetchReviews(bookId: bookId)
-            try dataService.upsertHighlights(for: bookId, bookmarks: bookmarks, reviews: reviews)
-        } catch {
-            let desc = error.localizedDescription
-            logger.warning("[WeReadDetail] remote fetch failed for bookId=\(bookId): \(desc)")
-            // 继续尝试使用本地已有缓存
-        }
-
-        do {
-            let rows = try dataService.fetchHighlights(
-                for: bookId,
-                sortField: sortField,
-                ascending: isAscending,
-                noteFilter: noteFilter,
-                selectedStyles: Array(selectedStyles)
-            )
-            highlights = rows
+            
+            // 保存原始数据用于筛选和排序
+            allBookmarks = bookmarks
+            allReviews = reviews
+            
+            // 应用筛选和排序
+            applyFiltersAndSort()
             isLoading = false
         } catch {
             let desc = error.localizedDescription
@@ -71,23 +92,43 @@ final class WeReadDetailViewModel: ObservableObject {
     }
 
     func reloadCurrent() async {
-        guard let id = currentBookId else { return }
-        isLoading = true
-        do {
-            let rows = try dataService.fetchHighlights(
-                for: id,
-                sortField: sortField,
-                ascending: isAscending,
-                noteFilter: noteFilter,
-                selectedStyles: Array(selectedStyles)
-            )
-            highlights = rows
-            isLoading = false
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[WeReadDetail] reloadCurrent error: \(desc)")
-            isLoading = false
+        // 重新应用筛选和排序
+        applyFiltersAndSort()
+    }
+    
+    private func applyFiltersAndSort() {
+        var result: [WeReadHighlightDisplay] = []
+        
+        // 转换 bookmarks
+        for bm in allBookmarks {
+            // 应用筛选
+            if noteFilter && (bm.note?.isEmpty ?? true) {
+                continue
+            }
+            if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
+                continue
+            }
+            result.append(WeReadHighlightDisplay(from: bm))
         }
+        
+        // 转换 reviews
+        for rv in allReviews {
+            result.append(WeReadHighlightDisplay(from: rv))
+        }
+        
+        // 排序
+        result.sort { a, b in
+            let t1 = sortField == .created ? a.createdAt : a.modifiedAt
+            let t2 = sortField == .created ? b.createdAt : b.modifiedAt
+            
+            if t1 == nil && t2 == nil { return false }
+            if t1 == nil { return !isAscending }
+            if t2 == nil { return isAscending }
+            
+            return isAscending ? (t1! < t2!) : (t1! > t2!)
+        }
+        
+        highlights = result
     }
 
     func syncSmart(book: WeReadBookListItem) {
