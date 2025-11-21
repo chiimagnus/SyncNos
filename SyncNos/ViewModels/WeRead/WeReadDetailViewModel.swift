@@ -5,7 +5,7 @@ struct WeReadHighlightDisplay: Identifiable {
     let id: String
     let text: String
     let note: String?
-    let reviewContent: String?  // 关联的想法内容
+    let reviewContents: [String]  // 关联的多条想法内容
     let colorIndex: Int?
     let createdAt: Date?
     let modifiedAt: Date?
@@ -15,7 +15,7 @@ struct WeReadHighlightDisplay: Identifiable {
         self.id = bookmark.highlightId
         self.text = bookmark.text
         self.note = bookmark.note
-        self.reviewContent = bookmark.reviewContent
+        self.reviewContents = bookmark.reviewContents
         self.colorIndex = bookmark.colorIndex
         self.createdAt = bookmark.timestamp.map { Date(timeIntervalSince1970: $0) }
         self.modifiedAt = nil
@@ -26,7 +26,7 @@ struct WeReadHighlightDisplay: Identifiable {
         self.id = "review-\(review.reviewId)"
         self.text = review.content
         self.note = review.content
-        self.reviewContent = nil
+        self.reviewContents = []
         self.colorIndex = nil
         self.createdAt = review.timestamp.map { Date(timeIntervalSince1970: $0) }
         self.modifiedAt = nil
@@ -99,11 +99,11 @@ final class WeReadDetailViewModel: ObservableObject {
     private func applyFiltersAndSort() {
         var result: [WeReadHighlightDisplay] = []
         
-        // 转换合并后的 bookmarks（已包含 reviewContent）
+        // 转换合并后的 bookmarks（已包含 reviewContents）
         for bm in allBookmarks {
             // 应用筛选
-            // "仅笔记"过滤：检查是否有 reviewContent（关联的想法）
-            if noteFilter && (bm.reviewContent?.isEmpty ?? true) {
+            // "仅笔记"过滤：检查是否有 reviewContents（关联的想法）
+            if noteFilter && bm.reviewContents.isEmpty {
                 continue
             }
             if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
