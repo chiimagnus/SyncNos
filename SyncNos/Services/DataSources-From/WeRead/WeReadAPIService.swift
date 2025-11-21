@@ -256,11 +256,14 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                     chapterTitle = item.chapterName
                 }
 
+                // WeRead API 返回的颜色值是 1-5，需要转换为 0-4 的索引
+                let colorIndex = (item.colorStyle ?? item.style).map { $0 - 1 }
+                
                 return WeReadBookmark(
                     highlightId: normalizedId,
                     bookId: item.bookId,
                     chapterTitle: chapterTitle,
-                    colorIndex: item.colorStyle ?? item.style,
+                    colorIndex: colorIndex,
                     text: item.markText,
                     note: nil,
                     timestamp: item.createTime,
@@ -292,7 +295,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                     )
                     let chapterTitle = (obj["chapterTitle"] as? String)
                         ?? (obj["chapterName"] as? String)
-                    let color = (obj["colorStyle"] as? Int) ?? (obj["color"] as? Int) ?? (obj["style"] as? Int)
+                    let rawColor = (obj["colorStyle"] as? Int) ?? (obj["color"] as? Int) ?? (obj["style"] as? Int)
+                    // WeRead API 返回的颜色值是 1-5，需要转换为 0-4 的索引
+                    let color = rawColor.map { $0 - 1 }
                     let ts = (obj["createTime"] as? TimeInterval)
                     let bId = (obj["bookId"] as? String) ?? bookId
 

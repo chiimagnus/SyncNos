@@ -34,14 +34,12 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 5, notionName: "mint", displayName: "Mint")
             ]
         case .weRead:
-            // WeRead 颜色方案：参考常见高亮色，便于与 Apple Books / GoodLinks 对齐
             return [
-                HighlightColorDefinition(index: 0, notionName: "yellow", displayName: "Yellow"),
-                HighlightColorDefinition(index: 1, notionName: "green", displayName: "Green"),
+                HighlightColorDefinition(index: 0, notionName: "red", displayName: "Red"),
+                HighlightColorDefinition(index: 1, notionName: "purple", displayName: "Purple"),
                 HighlightColorDefinition(index: 2, notionName: "blue", displayName: "Blue"),
-                HighlightColorDefinition(index: 3, notionName: "red", displayName: "Red"),
-                HighlightColorDefinition(index: 4, notionName: "purple", displayName: "Purple"),
-                HighlightColorDefinition(index: 5, notionName: "orange", displayName: "Orange")
+                HighlightColorDefinition(index: 3, notionName: "green", displayName: "Green"),
+                HighlightColorDefinition(index: 4, notionName: "yellow", displayName: "Yellow")
             ]
         }
     }
