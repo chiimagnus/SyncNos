@@ -144,7 +144,7 @@ struct ViewCommands: Commands {
                 // WeRead 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
-                        ForEach(BookListSortKey.allCases, id: \.self) { k in
+                        ForEach(WeReadSortKey.allCases, id: \.self) { k in
                             Button {
                                 bookListSortKey = k.rawValue
                                 NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
