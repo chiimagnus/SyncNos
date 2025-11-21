@@ -1,94 +1,4 @@
 import Foundation
-import SwiftData
-
-// MARK: - SwiftData Models
-
-@Model
-final class WeReadBook {
-    /// 微信读书书籍 ID（唯一）
-    @Attribute(.unique) var bookId: String
-    var title: String
-    var author: String
-    var coverUrl: String?
-    var category: String?
-
-    /// 来自 WeRead 的时间信息（可选）
-    var createdAt: Date?
-    var updatedAt: Date?
-
-    /// 最近一次同步到 Notion 的时间（冗余字段，便于 SwiftData 查询）
-    var lastSyncAt: Date?
-
-    /// 与该书关联的所有高亮
-    @Relationship(deleteRule: .cascade, inverse: \WeReadHighlight.book)
-    var highlights: [WeReadHighlight] = []
-
-    init(
-        bookId: String,
-        title: String,
-        author: String,
-        coverUrl: String? = nil,
-        category: String? = nil,
-        createdAt: Date? = nil,
-        updatedAt: Date? = nil,
-        lastSyncAt: Date? = nil
-    ) {
-        self.bookId = bookId
-        self.title = title
-        self.author = author
-        self.coverUrl = coverUrl
-        self.category = category
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.lastSyncAt = lastSyncAt
-    }
-}
-
-@Model
-final class WeReadHighlight {
-    /// WeRead 高亮 ID（唯一）
-    @Attribute(.unique) var highlightId: String
-
-    /// 所属书籍
-    var book: WeReadBook?
-
-    var text: String
-    var note: String?
-    var colorIndex: Int?
-
-    var createdAt: Date?
-    var modifiedAt: Date?
-
-    var chapterTitle: String?
-    var location: String?
-
-    /// 远端内容指纹，用于和 Notion 现有内容比对是否需要更新
-    var remoteHash: String?
-
-    init(
-        highlightId: String,
-        book: WeReadBook?,
-        text: String,
-        note: String? = nil,
-        colorIndex: Int? = nil,
-        createdAt: Date? = nil,
-        modifiedAt: Date? = nil,
-        chapterTitle: String? = nil,
-        location: String? = nil,
-        remoteHash: String? = nil
-    ) {
-        self.highlightId = highlightId
-        self.book = book
-        self.text = text
-        self.note = note
-        self.colorIndex = colorIndex
-        self.createdAt = createdAt
-        self.modifiedAt = modifiedAt
-        self.chapterTitle = chapterTitle
-        self.location = location
-        self.remoteHash = remoteHash
-    }
-}
 
 // MARK: - UI 列表模型
 
@@ -122,14 +32,14 @@ struct WeReadBookListItem: Identifiable, Equatable {
         self.lastSyncAt = lastSyncAt
     }
 
-    init(from model: WeReadBook) {
-        self.bookId = model.bookId
-        self.title = model.title
-        self.author = model.author
-        self.highlightCount = model.highlights.count
-        self.createdAt = model.createdAt
-        self.updatedAt = model.updatedAt
-        self.lastSyncAt = model.lastSyncAt
+    init(from notebook: WeReadNotebook) {
+        self.bookId = notebook.bookId
+        self.title = notebook.title
+        self.author = notebook.author ?? ""
+        self.highlightCount = 0 // Will be fetched separately if needed
+        self.createdAt = notebook.createdTimestamp.map { Date(timeIntervalSince1970: $0) }
+        self.updatedAt = notebook.updatedTimestamp.map { Date(timeIntervalSince1970: $0) }
+        self.lastSyncAt = nil
     }
 }
 

@@ -4,20 +4,17 @@ import SwiftData
 /// WeRead -> Notion 同步服务实现
 final class WeReadSyncService: WeReadSyncServiceProtocol {
     private let apiService: WeReadAPIServiceProtocol
-    private let dataService: WeReadDataServiceProtocol
     private let notionService: NotionServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
     private let logger: LoggerServiceProtocol
 
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        dataService: WeReadDataServiceProtocol = DIContainer.shared.weReadDataService,
         notionService: NotionServiceProtocol = DIContainer.shared.notionService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
         self.apiService = apiService
-        self.dataService = dataService
         self.notionService = notionService
         self.notionConfig = notionConfig
         self.logger = logger
@@ -74,51 +71,46 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         )
         let pageId = ensured.id
 
-        // 4) 从 WeRead API 拉取最新高亮与想法，并写入 SwiftData
+        // 4) 从 WeRead API 拉取最新高亮与想法，直接转换为 HighlightRow
         progress(NSLocalizedString("Fetching WeRead highlights...", comment: ""))
         let bookmarks = try await apiService.fetchBookmarks(bookId: book.bookId)
         let reviews = try await apiService.fetchReviews(bookId: book.bookId)
 
-        await MainActor.run {
-            do {
-                try dataService.upsertHighlights(for: book.bookId, bookmarks: bookmarks, reviews: reviews)
-            } catch {
-                self.logger.error("[WeReadSync] Failed to upsert highlights for bookId=\(book.bookId): \(error.localizedDescription)")
-            }
-        }
-
-        // 5) 从 SwiftData 中读取已规范化的高亮，映射为 HighlightRow
-        let highlights: [(PersistentIdentifier, String, String, String?, Int?, Date?, Date?, String?)] = try await MainActor.run {
-            let weReadHighlights = try dataService.fetchHighlights(
-                for: book.bookId,
-                sortField: .created,
-                ascending: true,
-                noteFilter: false,
-                selectedStyles: nil
-            )
-            return weReadHighlights.map { highlight in
-                (highlight.persistentModelID, highlight.highlightId, highlight.text, highlight.note, highlight.colorIndex, highlight.createdAt, highlight.modifiedAt, highlight.location)
-            }
-        }
-
-        guard !highlights.isEmpty else {
+        guard !bookmarks.isEmpty || !reviews.isEmpty else {
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
             return
         }
 
         let helper = NotionHelperMethods()
         var rows: [HighlightRow] = []
-        rows.reserveCapacity(highlights.count)
-        for (_, highlightId, text, note, colorIndex, createdAt, modifiedAt, location) in highlights {
+        rows.reserveCapacity(bookmarks.count + reviews.count)
+        
+        // 转换 bookmarks
+        for bm in bookmarks {
             let row = HighlightRow(
                 assetId: book.bookId,
-                uuid: highlightId,
-                text: text,
-                note: note,
-                style: colorIndex,
-                dateAdded: createdAt,
-                modified: modifiedAt,
-                location: location
+                uuid: bm.highlightId,
+                text: bm.text,
+                note: bm.note,
+                style: bm.colorIndex,
+                dateAdded: bm.timestamp.map { Date(timeIntervalSince1970: $0) },
+                modified: nil,
+                location: bm.chapterTitle
+            )
+            rows.append(row)
+        }
+        
+        // 转换 reviews（作为带 note 的虚拟高亮）
+        for rv in reviews {
+            let row = HighlightRow(
+                assetId: book.bookId,
+                uuid: "review-\(rv.reviewId)",
+                text: rv.content,
+                note: rv.content,
+                style: nil,
+                dateAdded: rv.timestamp.map { Date(timeIntervalSince1970: $0) },
+                modified: nil,
+                location: nil
             )
             rows.append(row)
         }

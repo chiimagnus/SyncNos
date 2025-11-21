@@ -267,28 +267,6 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     func fetchReviews(bookId: String) async throws -> [WeReadReview]
 }
 
-/// WeRead 数据持久化服务协议（SwiftData 封装）
-protocol WeReadDataServiceProtocol: AnyObject {
-    /// 将 Notebook 列表写入/更新到 SwiftData，返回映射后的列表模型
-    func upsertBooks(from notebooks: [WeReadNotebook]) throws -> [WeReadBookListItem]
-    /// 将指定书籍的高亮与想法写入/更新到 SwiftData
-    func upsertHighlights(
-        for bookId: String,
-        bookmarks: [WeReadBookmark],
-        reviews: [WeReadReview]
-    ) throws
-    /// 读取本地缓存的所有书籍列表
-    func fetchBooks() throws -> [WeReadBookListItem]
-    /// 按过滤和排序规则读取某本书的高亮
-    func fetchHighlights(
-        for bookId: String,
-        sortField: HighlightSortField,
-        ascending: Bool,
-        noteFilter: Bool,
-        selectedStyles: [Int]?
-    ) throws -> [WeReadHighlight]
-}
-
 /// WeRead -> Notion 同步服务协议
 protocol WeReadSyncServiceProtocol: AnyObject {
     /// 同步单本 WeRead 书籍的高亮到 Notion
