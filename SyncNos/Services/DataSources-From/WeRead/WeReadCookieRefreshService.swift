@@ -95,28 +95,24 @@ extension WeReadCookieRefreshService: WKNavigationDelegate {
         Task { @MainActor in
             // 页面加载完成，尝试获取 Cookie
             let store = webView.configuration.websiteDataStore.httpCookieStore
-            store.getAllCookies { [weak self] cookies in
-                Task { @MainActor in
-                    guard let self else { return }
-                    
-                    let relevant = cookies.filter { cookie in
-                        cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
-                    }
-                    
-                    guard !relevant.isEmpty else {
-                        self.handleRefreshFailure(error: WeReadCookieRefreshError.noCookiesFound)
-                        return
-                    }
-                    
-                    let header = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
-                    
-                    // 验证 Cookie 是否有效（检查是否包含关键字段）
-                    if header.contains("wr_vid=") || header.contains("wr_skey=") {
-                        self.handleRefreshSuccess(cookieHeader: header)
-                    } else {
-                        self.handleRefreshFailure(error: WeReadCookieRefreshError.invalidCookies)
-                    }
-                }
+            let cookies = await store.allCookies()
+
+            let relevant = cookies.filter { cookie in
+                cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
+            }
+
+            guard !relevant.isEmpty else {
+                self.handleRefreshFailure(error: WeReadCookieRefreshError.noCookiesFound)
+                return
+            }
+
+            let header = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+
+            // 验证 Cookie 是否有效（检查是否包含关键字段）
+            if header.contains("wr_vid=") || header.contains("wr_skey=") {
+                self.handleRefreshSuccess(cookieHeader: header)
+            } else {
+                self.handleRefreshFailure(error: WeReadCookieRefreshError.invalidCookies)
             }
         }
     }
