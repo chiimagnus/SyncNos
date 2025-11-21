@@ -25,7 +25,7 @@ final class WeReadViewModel: ObservableObject {
     @Published var refreshFailureReason: String = ""
 
     // 排序
-    @Published var sortKey: WeReadSortKey = .title
+    @Published var sortKey: BookListSortKey = .title
     @Published var sortAscending: Bool = true
 
     /// 当前用于列表渲染的子集（支持分页/增量加载）
@@ -102,7 +102,7 @@ final class WeReadViewModel: ObservableObject {
                 guard let info = notification.userInfo else { return }
                 
                 if let sortKeyRaw = info["sortKey"] as? String,
-                   let newKey = WeReadSortKey(rawValue: sortKeyRaw) {
+                   let newKey = BookListSortKey(rawValue: sortKeyRaw) {
                     self.sortKey = newKey
                 }
                 
@@ -326,7 +326,7 @@ final class WeReadViewModel: ObservableObject {
     // 纯函数：构建排序后的展示列表
     private static func buildDisplayBooks(
         books: [WeReadBookListItem],
-        sortKey: WeReadSortKey,
+        sortKey: BookListSortKey,
         sortAscending: Bool,
         syncTimestampStore: SyncTimestampStoreProtocol
     ) -> [WeReadBookListItem] {
