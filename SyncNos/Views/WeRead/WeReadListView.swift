@@ -137,6 +137,11 @@ struct WeReadListView: View {
         } message: {
             Text(viewModel.refreshFailureReason)
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+            Task {
+                await viewModel.loadBooks()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadSettings")).receive(on: DispatchQueue.main)) { _ in
             // 导航到 WeRead 登录设置页面
             openWindow(id: "setting")
