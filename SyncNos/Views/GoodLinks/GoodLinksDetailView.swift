@@ -40,7 +40,12 @@ struct GoodLinksDetailView: View {
                             InfoHeaderCardView(
                                 title: link.title?.isEmpty == false ? link.title! : link.url,
                                 subtitle: link.author,
-                                overrideWidth: frozenLayoutWidth
+                                overrideWidth: frozenLayoutWidth,
+                                timestamps: TimestampInfo(
+                                    addedAt: link.addedAt > 0 ? Date(timeIntervalSince1970: link.addedAt) : nil,
+                                    modifiedAt: link.modifiedAt > 0 ? Date(timeIntervalSince1970: link.modifiedAt) : nil,
+                                    lastSyncAt: viewModel.lastSync(for: link.id)
+                                )
                             ) {
                                 if let url = URL(string: link.openInGoodLinksURLString) {
                                     Link("Open in GoodLinks", destination: url)
@@ -116,37 +121,6 @@ struct GoodLinksDetailView: View {
                                                 .fixedSize(horizontal: false, vertical: true)
                                         }
                                         .padding(.top, 4)
-                                    }
-
-                                    Divider()
-
-                                    // 时间与统计
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack(spacing: 16) {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Added")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                                Text(formatDate(link.addedAt))
-                                                    .font(.caption)
-                                            }
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Modified")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                                Text(formatDate(link.modifiedAt))
-                                                    .font(.caption)
-                                            }
-                                            if link.readAt > 0 {
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text("Read")
-                                                        .font(.caption2)
-                                                        .foregroundColor(.secondary)
-                                                    Text(formatDate(link.readAt))
-                                                        .font(.caption)
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }

@@ -47,22 +47,25 @@ struct AppleBooksDetailView: View {
                             InfoHeaderCardView(
                                 title: book.hasTitle ? book.bookTitle : "No Title",
                                 subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud"))",
-                                overrideWidth: frozenLayoutWidth
+                                overrideWidth: frozenLayoutWidth,
+                                timestamps: TimestampInfo(
+                                    addedAt: book.createdAt,
+                                    modifiedAt: book.modifiedAt,
+                                    lastSyncAt: viewModelList.lastSync(for: book.bookId)
+                                )
                             ) {
                                 if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
                                     Link("Open in Apple Books", destination: ibooksURL)
                                         .font(.subheadline)
                                 }
                             } content: {
-                                HStack(spacing: 12) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "highlighter")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text("\(book.highlightCount) highlights")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                HStack(spacing: 6) {
+                                    Image(systemName: "highlighter")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(book.highlightCount) highlights")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
                             }
                             // Highlights section (Waterfall / Masonry)

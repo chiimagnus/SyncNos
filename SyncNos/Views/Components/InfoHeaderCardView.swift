@@ -60,11 +60,31 @@ struct SelectionPlaceholderView: View {
 
 import SwiftUI
 
+/// 时间戳信息结构
+struct TimestampInfo {
+    let addedAt: Date?
+    let modifiedAt: Date?
+    let lastSyncAt: Date?
+    
+    var hasAnyTimestamp: Bool {
+        addedAt != nil || modifiedAt != nil || lastSyncAt != nil
+    }
+}
+
+/// 全局日期格式化器（避免泛型类型中的静态属性问题）
+private let infoHeaderDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateStyle = .short
+    f.timeStyle = .short
+    return f
+}()
+
 /// 通用的头部信息卡片，半透明背景，左右结构可扩展
 struct InfoHeaderCardView<Content: View, Trailing: View>: View {
     let title: String
     let subtitle: String?
     let overrideWidth: CGFloat?
+    let timestamps: TimestampInfo?
     let trailing: () -> Trailing
     let content: () -> Content
 
@@ -72,12 +92,14 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
         title: String,
         subtitle: String? = nil,
         overrideWidth: CGFloat? = nil,
+        timestamps: TimestampInfo? = nil,
         @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() },
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.subtitle = subtitle
         self.overrideWidth = overrideWidth
+        self.timestamps = timestamps
         self.trailing = trailing
         self.content = content
     }
@@ -101,6 +123,41 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
             }
 
             content()
+            
+            // 时间戳信息
+            if let timestamps = timestamps, timestamps.hasAnyTimestamp {
+                Divider()
+                
+                HStack(spacing: 16) {
+                    if let addedAt = timestamps.addedAt {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Added Time")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(infoHeaderDateFormatter.string(from: addedAt))
+                                .font(.caption)
+                        }
+                    }
+                    if let modifiedAt = timestamps.modifiedAt {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Modified Time")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(infoHeaderDateFormatter.string(from: modifiedAt))
+                                .font(.caption)
+                        }
+                    }
+                    if let lastSyncAt = timestamps.lastSyncAt {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Last Sync Time")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(infoHeaderDateFormatter.string(from: lastSyncAt))
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
         }
         .padding()
         .frame(maxWidth: overrideWidth, alignment: .leading)
