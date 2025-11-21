@@ -83,13 +83,15 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         var rows: [HighlightRow] = []
         rows.reserveCapacity(mergedBookmarks.count)
         
-        // 转换合并后的 bookmarks（reviewContent 作为 note）
+        // 转换合并后的 bookmarks（将多条想法合并为一个 note）
         for bm in mergedBookmarks {
+            // 合并多条想法内容，用换行符分隔
+            let combinedReviews = bm.reviewContents.isEmpty ? nil : bm.reviewContents.joined(separator: "\n\n---\n\n")
             let row = HighlightRow(
                 assetId: book.bookId,
                 uuid: bm.highlightId,
                 text: bm.text,
-                note: bm.reviewContent ?? bm.note,  // 优先使用想法内容，其次是简短笔记
+                note: combinedReviews ?? bm.note,  // 优先使用合并的想法内容，其次是简短笔记
                 style: bm.colorIndex,
                 dateAdded: bm.timestamp.map { Date(timeIntervalSince1970: $0) },
                 modified: nil,

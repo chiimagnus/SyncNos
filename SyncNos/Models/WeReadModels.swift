@@ -154,8 +154,8 @@ struct WeReadBookmark {
     let text: String
     let note: String?
     let timestamp: TimeInterval?
-    let reviewContent: String?  // 关联的想法内容
-    let range: String?          // 用于匹配想法的范围标识
+    let reviewContents: [String]  // 关联的多条想法内容（一条高亮可以有多条注释）
+    let range: String?            // 用于匹配想法的范围标识
 }
 
 /// 单条想法 / 书评
