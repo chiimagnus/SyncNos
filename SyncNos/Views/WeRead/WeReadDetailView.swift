@@ -68,7 +68,7 @@ struct WeReadDetailView: View {
                                         note: h.note,
                                         reviewContents: h.reviewContents,
                                         createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
-                                        modifiedDate: h.modifiedAt.map { Self.dateFormatter.string(from: $0) }
+                                        modifiedDate: nil  // WeRead 没有 modified time
                                     )
                                 }
                             }
@@ -91,6 +91,7 @@ struct WeReadDetailView: View {
                     colorTheme: .weRead,
                     sortField: detailViewModel.sortField,
                     isAscending: detailViewModel.isAscending,
+                    availableSortFields: [.created],  // WeRead 只支持按创建时间排序
                     onSortFieldChanged: { field in
                         detailViewModel.sortField = field
                         Task { await detailViewModel.reloadCurrent() }
