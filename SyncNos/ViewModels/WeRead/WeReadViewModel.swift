@@ -111,11 +111,47 @@ final class WeReadViewModel: ObservableObject {
             books = items
             logger.info("[WeRead] fetched notebooks: \(notebooks.count), cached books: \(items.count)")
             isLoading = false
+        } catch let error as WeReadAPIError where error.isAuthenticationError {
+            // 检测到认证错误，尝试自动刷新 Cookie
+            logger.warning("[WeRead] Authentication error detected, attempting cookie refresh...")
+            isLoading = false
+            await handleAuthenticationError()
         } catch {
             let desc = error.localizedDescription
             logger.error("[WeRead] loadBooks error: \(desc)")
             errorMessage = desc
             isLoading = false
+        }
+    }
+    
+    private func handleAuthenticationError() async {
+        let refreshService = WeReadCookieRefreshService()
+        
+        do {
+            // 尝试静默刷新 Cookie
+            _ = try await refreshService.attemptSilentRefresh()
+            logger.info("[WeRead] Cookie refreshed successfully, retrying...")
+            
+            // 刷新成功，重试加载
+            await loadBooks()
+        } catch {
+            // 静默刷新失败，通知用户需要手动登录
+            logger.error("[WeRead] Cookie refresh failed: \(error.localizedDescription)")
+            refreshService.notifyManualLoginRequired()
+            
+            // 显示友好的错误提示
+            errorMessage = NSLocalizedString("WeRead session expired. Showing cached data. Please login to refresh.", comment: "")
+            
+            // 尝试从本地加载缓存数据
+            do {
+                let cachedBooks = try dataService.fetchBooks()
+                if !cachedBooks.isEmpty {
+                    books = cachedBooks
+                    logger.info("[WeRead] Loaded \(cachedBooks.count) books from cache")
+                }
+            } catch {
+                logger.error("[WeRead] Failed to load cached books: \(error.localizedDescription)")
+            }
         }
     }
 

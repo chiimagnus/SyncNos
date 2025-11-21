@@ -1,5 +1,42 @@
 import Foundation
 
+// MARK: - WeRead API Errors
+
+enum WeReadAPIError: LocalizedError {
+    case notLoggedIn
+    case unauthorized
+    case sessionExpired
+    case invalidResponse
+    case httpError(statusCode: Int, body: String)
+    case apiError(code: Int, message: String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .notLoggedIn:
+            return NSLocalizedString("WeRead is not logged in. Please login first.", comment: "")
+        case .unauthorized:
+            return NSLocalizedString("WeRead cookie expired or invalid. Please login again.", comment: "")
+        case .sessionExpired:
+            return NSLocalizedString("WeRead session expired. Please login again.", comment: "")
+        case .invalidResponse:
+            return NSLocalizedString("Invalid HTTP response from WeRead.", comment: "")
+        case .httpError(let statusCode, _):
+            return NSLocalizedString("WeRead HTTP error \(statusCode)", comment: "")
+        case .apiError(let code, let message):
+            return "WeRead API error \(code): \(message)"
+        }
+    }
+    
+    var isAuthenticationError: Bool {
+        switch self {
+        case .notLoggedIn, .unauthorized, .sessionExpired:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// WeRead API 客户端实现，基于 Cookie 认证与 URLSession
 final class WeReadAPIService: WeReadAPIServiceProtocol {
     private let authService: WeReadAuthServiceProtocol
@@ -63,11 +100,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
 
     private func performRequest(url: URL) async throws -> Data {
         guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
-            throw NSError(
-                domain: "WeReadAPI",
-                code: 401,
-                userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("WeRead is not logged in. Please login first.", comment: "")]
-            )
+            throw WeReadAPIError.notLoggedIn
         }
 
         var request = URLRequest(url: url)
@@ -81,16 +114,30 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "WeReadAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])
+            throw WeReadAPIError.invalidResponse
         }
 
         guard 200..<300 ~= http.statusCode else {
             let bodyPreview = String(data: data.prefix(256), encoding: .utf8) ?? ""
             logger.error("[WeReadAPI] HTTP \(http.statusCode) for \(url.absoluteString), body=\(bodyPreview)")
+            
             if http.statusCode == 401 {
-                throw NSError(domain: "WeReadAPI", code: 401, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("WeRead cookie expired or invalid. Please login again.", comment: "")])
+                throw WeReadAPIError.unauthorized
             } else {
-                throw NSError(domain: "WeReadAPI", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "WeRead HTTP error \(http.statusCode)"])
+                throw WeReadAPIError.httpError(statusCode: http.statusCode, body: bodyPreview)
+            }
+        }
+
+        // 检查响应体中的错误码（微信读书特有的错误格式）
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let errCode = json["errCode"] as? Int {
+            if errCode == -2012 {
+                logger.warning("[WeReadAPI] Session expired (errCode: -2012)")
+                throw WeReadAPIError.sessionExpired
+            } else if errCode != 0 {
+                let errMsg = json["errMsg"] as? String ?? "Unknown error"
+                logger.warning("[WeReadAPI] API error: \(errCode) - \(errMsg)")
+                throw WeReadAPIError.apiError(code: errCode, message: errMsg)
             }
         }
 
