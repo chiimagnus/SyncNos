@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 /// WeRead -> Notion 同步服务实现
 final class WeReadSyncService: WeReadSyncServiceProtocol {

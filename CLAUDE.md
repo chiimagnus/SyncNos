@@ -138,7 +138,6 @@ SyncNos/
     │   │   └── GoodLinksTagParser.swift        # 标签解析
     │   └── WeRead/               # 微信读书集成
     │       ├── WeReadAPIService.swift           # API 客户端，基于 Cookie 认证
-    │       ├── WeReadDataService.swift          # SwiftData 数据管理
     │       └── WeReadSyncService.swift          # 同步服务协调器
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Lark/                 # 飞书（目录预留）
@@ -232,12 +231,11 @@ DIContainer.shared.autoSyncService
 
 **4. WeRead 集成** (Services/DataSources-From/WeRead/)
 - `WeReadAPIService`: 微信读书 API 客户端，基于 Cookie 认证与 URLSession
-- `WeReadDataService`: SwiftData 数据管理，支持书籍和高亮的持久化存储
 - `WeReadSyncService`: 同步服务协调器，处理与 Notion 的同步逻辑
 - 支持功能：
   - 基于Cookie的Web API认证
   - 书籍信息、高亮、笔记的完整提取
-  - SwiftData 本地缓存和增量同步
+  - 直接从 API 获取数据，无本地缓存
   - 与 Notion 数据库的无缝集成
 
 **6. 核心服务** (Services/Core/)
@@ -355,13 +353,13 @@ protocol DatabaseServiceProtocol {
 - IAP 交易模型
 
 **WeRead 模型**（Models/WeReadModels.swift:1）：
-- `WeReadBook`: SwiftData 模型，存储微信读书书籍信息
-- `WeReadHighlight`: SwiftData 模型，存储高亮和笔记
-- `WeReadNotebook`: 书籍列表响应模型
-- `WeReadBookInfo`: 书籍详细信息模型
-- `WeReadBookmark`: 书签/高亮数据模型
-- `WeReadReview`: 笔记/评论模型
-- 支持 Cookie 认证和增量同步
+- `WeReadBookListItem`: UI 列表展示模型
+- `WeReadNotebook`: 书籍列表响应模型（API DTO）
+- `WeReadBookInfo`: 书籍详细信息模型（API DTO）
+- `WeReadBookmark`: 书签/高亮数据模型（API DTO）
+- `WeReadReview`: 笔记/评论模型（API DTO）
+- `WeReadHighlightResponse`: 高亮响应模型（API DTO）
+- 数据流：API → DTO → UI 模型，无本地持久化
 
 ## 重要说明
 
