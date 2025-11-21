@@ -124,5 +124,12 @@ struct WeReadListView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WeReadSessionExpired")).receive(on: DispatchQueue.main)) { _ in
+            // 会话过期，打开登录窗口
+            openWindow(id: "setting")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NotificationCenter.default.post(name: Notification.Name("NavigateToWeReadLogin"), object: nil)
+            }
+        }
     }
 }

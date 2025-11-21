@@ -65,6 +65,10 @@ struct WeReadSettingsView: View {
                 viewModel.refreshLoginStatus()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadLogin")).receive(on: DispatchQueue.main)) { _ in
+            // 自动打开登录页面（当会话过期时）
+            viewModel.showLoginSheet = true
+        }
     }
 }
 
