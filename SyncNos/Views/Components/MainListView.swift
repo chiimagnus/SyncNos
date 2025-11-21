@@ -265,10 +265,6 @@ struct MainListView: View {
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()
             selectedWeReadBookIds.removeAll()
-            // 在切换到 GoodLinks 前预置计算标记，确保首帧进入“加载中”占位
-            if contentSource == .goodLinks {
-                goodLinksVM.prepareForDisplaySwitch()
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
