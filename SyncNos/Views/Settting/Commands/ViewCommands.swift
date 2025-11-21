@@ -142,7 +142,7 @@ struct ViewCommands: Commands {
                 }
             } else {
                 // WeRead 的排序和筛选菜单（复用 Books 语义）
-                Menu("WeRead", systemImage: "text.book.closed") {
+                Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
                         ForEach(BookListSortKey.allCases, id: \.self) { k in
                             Button {
