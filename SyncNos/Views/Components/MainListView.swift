@@ -177,7 +177,9 @@ struct MainListView: View {
                             Divider()
 
                             Section("Sort") {
-                                ForEach(WeReadSortKey.allCases, id: \.self) { key in
+                                // WeRead 只支持 title, highlightCount, lastSync
+                                let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+                                ForEach(availableKeys, id: \.self) { key in
                                     Button {
                                         weReadVM.sortKey = key
                                         NotificationCenter.default.post(

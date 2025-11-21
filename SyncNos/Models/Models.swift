@@ -121,21 +121,6 @@ enum BookListSortKey: String, CaseIterable {
     }
 }
 
-/// WeRead 专用排序枚举（只包含可用的排序选项）
-enum WeReadSortKey: String, CaseIterable {
-    case title = "title"
-    case highlightCount = "highlightCount"
-    case lastSync = "lastSync"
-
-    var displayName: LocalizedStringResource {
-        switch self {
-        case .title: return "Title"
-        case .highlightCount: return "Highlight Count"
-        case .lastSync: return "Last Sync Time"
-        }
-    }
-}
-
 // Note filter: true = show only highlights with notes, false = show all
 typealias NoteFilter = Bool
 
