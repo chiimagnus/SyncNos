@@ -1,5 +1,33 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.7.0 November 22, 2025
+
+*Added*
+
+- WeRead Integration: Full WeRead (微信读书) support including authentication, data sync, and UI components
+- Cookie Authentication: Implemented WeRead cookie-based authentication with automatic refresh mechanism
+- Highlight Sync: Added WeRead highlights and reviews synchronization with Notion
+- Sort Options: New sorting options for WeRead content including created and last edited timestamps
+- Notification System: Notification-driven sorting and filtering for WeRead highlights
+- Color Scheme Alignment: Unified WeRead highlight color mapping with API index
+- Internationalization: Enhanced i18n support for WeRead features
+- Auto Sync Providers: Added WeRead to auto sync service providers
+- Main List Integration: Integrated WeRead support in MainListView and ViewCommands
+
+*Changed*
+
+- Data Flow Simplification: Removed SwiftData persistence for WeRead to simplify data flow
+- Authentication UI: Simplified WeRead login view and removed manual cookie input
+- Sort Key Unification: Merged sorting key handling using BookListSortKey
+- Display Optimization: Improved WeRead book list item metadata display
+- Timestamp Display: Enhanced detail view headers with timestamp information
+- Thread Safety: Improved LoggerService with thread-safe concurrent access
+- Code Organization: Moved KeychainHelper to Core services for better structure
+- Error Handling: Enhanced error handling in WeRead services
+- Performance: Removed unnecessary recompute triggers after successful sync
+- Menu Consistency: Updated WeRead menu label and icon for UI consistency
+- Deployment Target: Updated macOS deployment target settings
+
 ## v0.6.8 November 20, 2025
 
 *Added*

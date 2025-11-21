@@ -403,11 +403,6 @@ final class GoodLinksViewModel: ObservableObject {
         visibleLinks = Array(displayLinks.prefix(currentPageSize))
     }
 
-    /// 在切换到 GoodLinks 列表之前调用，确保首帧显示“加载中”并后台重算
-    func prepareForDisplaySwitch() {
-        // 先标记计算中，让视图首帧立即走占位分支
-        isComputingList = true
-    }
 
     func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
         let serviceForTask = service
@@ -533,8 +528,6 @@ final class GoodLinksViewModel: ObservableObject {
                 case "succeeded":
                     self.syncingLinkIds.remove(bookId)
                     self.syncedLinkIds.insert(bookId)
-                    // 同步成功后触发一次派生重算，刷新基于 lastSync 的排序/显示
-                    self.triggerRecompute()
                 case "failed":
                     self.syncingLinkIds.remove(bookId)
                 default:

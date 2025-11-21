@@ -5,6 +5,7 @@ struct MainListView: View {
     @StateObject private var viewModel = AppleBooksViewModel()
     @State private var selectedBookIds: Set<String> = []
     @State private var selectedLinkIds: Set<String> = []
+    @State private var selectedWeReadBookIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @Environment(\.openWindow) private var openWindow
 
@@ -13,14 +14,18 @@ struct MainListView: View {
     }
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
+    @StateObject private var weReadVM = WeReadViewModel()
 
     var body: some View {
         NavigationSplitView {
             Group {
-                if contentSource == .goodLinks {
+                switch contentSource {
+                case .goodLinks:
                     GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
-                } else {
+                case .appleBooks:
                     AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
+                case .weRead:
+                    WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -45,6 +50,15 @@ struct MainListView: View {
                                 HStack {
                                     Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
                                     if contentSource == .goodLinks { Image(systemName: "checkmark") }
+                                }
+                            }
+
+                            Button {
+                                contentSourceRawValue = ContentSource.weRead.rawValue
+                            } label: {
+                                HStack {
+                                    Text("WeRead (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
+                                    if contentSource == .weRead { Image(systemName: "checkmark") }
                                 }
                             }
                         }
@@ -159,6 +173,46 @@ struct MainListView: View {
                                     }
                                 }
                             }
+                        } else if contentSource == .weRead {
+                            Divider()
+
+                            Section("Sort") {
+                                // WeRead 只支持 title, highlightCount, lastSync
+                                let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+                                ForEach(availableKeys, id: \.self) { key in
+                                    Button {
+                                        weReadVM.sortKey = key
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("WeReadFilterChanged"),
+                                            object: nil,
+                                            userInfo: ["sortKey": key.rawValue]
+                                        )
+                                    } label: {
+                                        if weReadVM.sortKey == key {
+                                            Label(key.displayName, systemImage: "checkmark")
+                                        } else {
+                                            Text(key.displayName)
+                                        }
+                                    }
+                                }
+
+                                Divider()
+
+                                Button {
+                                    weReadVM.sortAscending.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("WeReadFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["sortAscending": weReadVM.sortAscending]
+                                    )
+                                } label: {
+                                    if weReadVM.sortAscending {
+                                        Label("Ascending", systemImage: "checkmark")
+                                    } else {
+                                        Label("Ascending", systemImage: "xmark")
+                                    }
+                                }
+                            }
                         }
                     } label: {
                         // 显示数据源名称而不是图标
@@ -189,7 +243,7 @@ struct MainListView: View {
                         }
                     )
                 }
-            } else {
+            } else if contentSource == .appleBooks {
                 if selectedBookIds.count == 1 {
                     let singleBookBinding = Binding<String?>(
                         get: { selectedBookIds.first },
@@ -210,27 +264,65 @@ struct MainListView: View {
                         }
                     )
                 }
+            } else {
+                if contentSource == .weRead {
+                    if selectedWeReadBookIds.count == 1 {
+                        let singleWeReadBinding = Binding<String?>(
+                            get: { selectedWeReadBookIds.first },
+                            set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
+                        )
+                        WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
+                    } else {
+                        SelectionPlaceholderView(
+                            title: contentSource.title,
+                            count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
+                            onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : {
+                                let items = selectedWeReadBookIds.compactMap { id -> [String: Any]? in
+                                    guard let b = weReadVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                                    return ["id": id, "title": b.title, "subtitle": b.author]
+                                }
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncTasksEnqueued"),
+                                    object: nil,
+                                    userInfo: ["source": "weRead", "items": items]
+                                )
+                                weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+                            }
+                        )
+                    }
+                } else {
+                    // 理论上不会走到这里，因为 contentSource 只有三种情况
+                    SelectionPlaceholderView(
+                        title: contentSource.title,
+                        count: nil,
+                        onSyncSelected: nil
+                    )
+                }
             }
         }
-        .onChange(of: contentSourceRawValue) { _ in
+        .onChange(of: contentSourceRawValue) { _, _ in
             // 切换数据源时重置选择
             selectedBookIds.removeAll()
             selectedLinkIds.removeAll()
-            // 在切换到 GoodLinks 前预置计算标记，确保首帧进入“加载中”占位
-            if contentSource == .goodLinks {
-                goodLinksVM.prepareForDisplaySwitch()
-            }
+            selectedWeReadBookIds.removeAll()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
             if source == ContentSource.appleBooks.rawValue {
                 contentSourceRawValue = ContentSource.appleBooks.rawValue
                 selectedLinkIds.removeAll()
+                selectedWeReadBookIds.removeAll()
                 selectedBookIds = Set([id])
             } else if source == ContentSource.goodLinks.rawValue {
                 contentSourceRawValue = ContentSource.goodLinks.rawValue
                 selectedBookIds.removeAll()
+                selectedWeReadBookIds.removeAll()
                 selectedLinkIds = Set([id])
+            } else if source == ContentSource.weRead.rawValue {
+                contentSourceRawValue = ContentSource.weRead.rawValue
+                selectedBookIds.removeAll()
+                selectedLinkIds.removeAll()
+                selectedWeReadBookIds = Set([id])
             }
         }
         .background {
