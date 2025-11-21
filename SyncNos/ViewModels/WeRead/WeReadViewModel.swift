@@ -354,6 +354,16 @@ final class WeReadViewModel: ObservableObject {
                 if t2 == nil { return !sortAscending }
                 if t1! == t2! { return false }
                 return sortAscending ? (t1! < t2!) : (t1! > t2!)
+            case .created:
+                if a.createdAt == b.createdAt { return false }
+                let t1 = a.createdAt ?? Date.distantPast
+                let t2 = b.createdAt ?? Date.distantPast
+                return sortAscending ? (t1 < t2) : (t1 > t2)
+            case .lastEdited:
+                if a.updatedAt == b.updatedAt { return false }
+                let t1 = a.updatedAt ?? Date.distantPast
+                let t2 = b.updatedAt ?? Date.distantPast
+                return sortAscending ? (t1 < t2) : (t1 > t2)
             }
         }
 
