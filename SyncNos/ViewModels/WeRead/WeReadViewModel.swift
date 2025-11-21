@@ -25,7 +25,7 @@ final class WeReadViewModel: ObservableObject {
     @Published var refreshFailureReason: String = ""
 
     // 排序
-    @Published var sortKey: BookListSortKey = .title
+    @Published var sortKey: WeReadSortKey = .title
     @Published var sortAscending: Bool = true
 
     /// 当前用于列表渲染的子集（支持分页/增量加载）
@@ -102,7 +102,7 @@ final class WeReadViewModel: ObservableObject {
                 guard let info = notification.userInfo else { return }
                 
                 if let sortKeyRaw = info["sortKey"] as? String,
-                   let newKey = BookListSortKey(rawValue: sortKeyRaw) {
+                   let newKey = WeReadSortKey(rawValue: sortKeyRaw) {
                     self.sortKey = newKey
                 }
                 
@@ -326,7 +326,7 @@ final class WeReadViewModel: ObservableObject {
     // 纯函数：构建排序后的展示列表
     private static func buildDisplayBooks(
         books: [WeReadBookListItem],
-        sortKey: BookListSortKey,
+        sortKey: WeReadSortKey,
         sortAscending: Bool,
         syncTimestampStore: SyncTimestampStoreProtocol
     ) -> [WeReadBookListItem] {
@@ -346,16 +346,6 @@ final class WeReadViewModel: ObservableObject {
             case .highlightCount:
                 if a.highlightCount == b.highlightCount { return false }
                 return sortAscending ? (a.highlightCount < b.highlightCount) : (a.highlightCount > b.highlightCount)
-            case .created:
-                let t1 = a.createdAt ?? Date.distantPast
-                let t2 = b.createdAt ?? Date.distantPast
-                if t1 == t2 { return false }
-                return sortAscending ? (t1 < t2) : (t1 > t2)
-            case .lastEdited:
-                let t1 = a.updatedAt ?? Date.distantPast
-                let t2 = b.updatedAt ?? Date.distantPast
-                if t1 == t2 { return false }
-                return sortAscending ? (t1 < t2) : (t1 > t2)
             case .lastSync:
                 let t1 = lastSyncCache[a.bookId] ?? nil
                 let t2 = lastSyncCache[b.bookId] ?? nil
