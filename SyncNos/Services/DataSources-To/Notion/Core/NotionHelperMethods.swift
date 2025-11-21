@@ -334,7 +334,15 @@ class NotionHelperMethods {
 
     // Convert numeric style to human-friendly color name. Mapping differs per source.
     func styleName(for style: Int, source: String = "appleBooks") -> String {
-        let src: HighlightSource = (source == "goodLinks") ? .goodLinks : .appleBooks
+        let src: HighlightSource
+        switch source {
+        case "goodLinks":
+            src = .goodLinks
+        case "weRead":
+            src = .weRead
+        default:
+            src = .appleBooks
+        }
         let def = HighlightColorScheme.definition(for: style, source: src)
         return def.notionName
     }
