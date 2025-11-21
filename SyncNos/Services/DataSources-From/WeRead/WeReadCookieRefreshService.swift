@@ -58,22 +58,13 @@ final class WeReadCookieRefreshService: NSObject {
         }
     }
     
-    /// 发送通知，提示用户需要手动登录
-    func notifyManualLoginRequired() {
-        logger.warning("[WeReadCookieRefresh] Manual login required")
-        NotificationCenter.default.post(
-            name: Notification.Name("WeReadSessionExpired"),
-            object: nil,
-            userInfo: ["reason": "cookie_expired"]
-        )
-    }
-    
+
     private func handleRefreshSuccess(cookieHeader: String) {
         timeoutTask?.cancel()
         timeoutTask = nil
         
         logger.info("[WeReadCookieRefresh] Cookie refresh succeeded")
-        authService.updateCookieHeader(cookieHeader)
+        // 注意：Cookie 的更新由 CookieRefreshCoordinator 负责，这里只返回新的 Cookie
         
         refreshCompletion?(.success(cookieHeader))
         refreshCompletion = nil

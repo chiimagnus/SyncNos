@@ -137,7 +137,11 @@ SyncNos/
     │   │   ├── GoodLinksService.swift          # 核心服务
     │   │   └── GoodLinksTagParser.swift        # 标签解析
     │   └── WeRead/               # 微信读书集成
-    │       ├── WeReadAPIService.swift           # API 客户端，基于 Cookie 认证
+    │       ├── WeReadAPIService.swift           # API 客户端，基于 Cookie 认证，支持自动刷新
+    │       ├── WeReadAuthService.swift          # Cookie 认证服务
+    │       ├── WeReadCookieRefreshService.swift # Cookie 自动刷新服务
+    │       ├── CookieRefreshCoordinator.swift   # 刷新协调器（Actor）
+    │       ├── WeReadDataService.swift          # SwiftData 数据管理
     │       └── WeReadSyncService.swift          # 同步服务协调器
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Lark/                 # 飞书（目录预留）
@@ -231,11 +235,25 @@ DIContainer.shared.autoSyncService
 
 **4. WeRead 集成** (Services/DataSources-From/WeRead/)
 - `WeReadAPIService`: 微信读书 API 客户端，基于 Cookie 认证与 URLSession
+  - 自动检测会话过期（errCode -2012 或 HTTP 401）
+  - 透明的 Cookie 自动刷新机制
+  - 刷新成功后自动重试原始请求
+- `WeReadAuthService`: Cookie 认证服务，管理 Cookie 在 Keychain 中的存储
+- `WeReadCookieRefreshService`: Cookie 自动刷新服务
+  - 使用隐藏 WebView 静默刷新 Cookie
+  - 15 秒超时保护
+  - Cookie 验证（检查 wr_vid 和 wr_skey）
+- `CookieRefreshCoordinator`: 刷新协调器（Actor）
+  - 确保并发请求只触发一次刷新
+  - 多个等待请求共享刷新结果
+  - 线程安全的并发控制
+- `WeReadDataService`: SwiftData 数据管理，支持书籍和高亮的持久化存储
 - `WeReadSyncService`: 同步服务协调器，处理与 Notion 的同步逻辑
 - 支持功能：
   - 基于Cookie的Web API认证
   - 书籍信息、高亮、笔记的完整提取
-  - 直接从 API 获取数据，无本地缓存
+  - 自动 Cookie 刷新，减少手动登录频率
+  - SwiftData 本地缓存和增量同步
   - 与 Notion 数据库的无缝集成
 
 **6. 核心服务** (Services/Core/)
