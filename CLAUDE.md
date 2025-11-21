@@ -54,6 +54,9 @@ SyncNos/
 │   ├── GoodLinks/
 │   │   ├── GoodLinksListView.swift
 │   │   └── GoodLinksDetailView.swift
+│   ├── WeRead/                   # 微信读书视图
+│   │   ├── WeReadListView.swift
+│   │   └── WeReadDetailView.swift
 │   └── Settting/                 # 设置视图（重构）
 │       ├── General/
 │       │   ├── AboutView.swift           # 关于页面
@@ -83,6 +86,11 @@ SyncNos/
 │   ├── GoodLinks/
 │   │   ├── GoodLinksViewModel.swift          # 统一视图模型，支持分页和增量加载
 │   │   └── GoodLinksSettingsViewModel.swift  # 设置管理
+│   ├── WeRead/                              # 微信读书视图模型
+│   │   ├── WeReadViewModel.swift             # 主列表视图模型
+│   │   ├── WeReadDetailViewModel.swift       # 详情页视图模型
+│   │   ├── WeReadLoginViewModel.swift        # 登录认证视图模型
+│   │   └── WeReadSettingsViewModel.swift     # 设置管理视图模型
 │   ├── Account/
 │   │   ├── AccountViewModel.swift            # 账户管理
 │   │   ├── AppleSignInViewModel.swift        # Apple 登录
@@ -100,7 +108,8 @@ SyncNos/
 │   ├── Models.swift              # BookRow, Highlight 等核心模型
 │   ├── AccountModels.swift       # 账户相关模型
 │   ├── HighlightColorScheme.swift # 高亮颜色管理
-│   └── SyncQueueModels.swift     # 同步队列模型
+│   ├── SyncQueueModels.swift     # 同步队列模型
+│   └── WeReadModels.swift        # 微信读书数据模型
 └── Services/                     # 业务逻辑和数据访问（重构）
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -127,9 +136,13 @@ SyncNos/
     │   │   ├── GoodLinksQueryService.swift     # 查询服务
     │   │   ├── GoodLinksService.swift          # 核心服务
     │   │   └── GoodLinksTagParser.swift        # 标签解析
-    │   └── WeRead/               # 微信读书（文档目录）
-    │       ├── 1.md              # WeRead 插件技术文档
-    │       └── 微信读书API实现.md
+    │   └── WeRead/               # 微信读书集成
+    │       ├── WeReadAPIService.swift           # API 客户端，基于 Cookie 认证，支持自动刷新
+    │       ├── WeReadAuthService.swift          # Cookie 认证服务
+    │       ├── WeReadCookieRefreshService.swift # Cookie 自动刷新服务
+    │       ├── CookieRefreshCoordinator.swift   # 刷新协调器（Actor）
+    │       ├── WeReadDataService.swift          # SwiftData 数据管理
+    │       └── WeReadSyncService.swift          # 同步服务协调器
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Lark/                 # 飞书（目录预留）
     │   ├── Notion/               # Notion 集成
@@ -220,27 +233,53 @@ DIContainer.shared.autoSyncService
 - `GoodLinksModels`: 数据模型定义
 - `GoodLinksProtocols`: 服务协议
 
-**4. 核心服务** (Services/Core/)
+**4. WeRead 集成** (Services/DataSources-From/WeRead/)
+- `WeReadAPIService`: 微信读书 API 客户端，基于 Cookie 认证与 URLSession
+  - 自动检测会话过期（errCode -2012 或 HTTP 401）
+  - 透明的 Cookie 自动刷新机制
+  - 刷新成功后自动重试原始请求
+- `WeReadAuthService`: Cookie 认证服务，管理 Cookie 在 Keychain 中的存储
+- `WeReadCookieRefreshService`: Cookie 自动刷新服务
+  - 使用隐藏 WebView 静默刷新 Cookie
+  - 15 秒超时保护
+  - Cookie 验证（检查 wr_vid 和 wr_skey）
+- `CookieRefreshCoordinator`: 刷新协调器（Actor）
+  - 确保并发请求只触发一次刷新
+  - 多个等待请求共享刷新结果
+  - 线程安全的并发控制
+- `WeReadDataService`: SwiftData 数据管理，支持书籍和高亮的持久化存储
+- `WeReadSyncService`: 同步服务协调器，处理与 Notion 的同步逻辑
+- 支持功能：
+  - 基于Cookie的Web API认证
+  - 书籍信息、高亮、笔记的完整提取
+  - 自动 Cookie 刷新，减少手动登录频率
+  - SwiftData 本地缓存和增量同步
+  - 与 Notion 数据库的无缝集成
+
+**6. 核心服务** (Services/Core/)
 - `DIContainer`: 中心服务容器和依赖注入
 - `LoggerService`: 统一日志记录，支持多级别日志
 - `ConcurrencyLimiter`: 全局并发控制和速率限制
 - `LoginItemService`: 登录项管理服务（新增）
 - `Protocols`: 所有服务协议定义
 
-**5. 认证与购买** (Services/Auth/)
+**7. 认证与购买** (Services/Auth/)
 - `AuthService`: Apple Sign In 集成
 - `IAPService`: 应用内购买服务
 - `KeychainHelper`: 安全凭证存储
 
-**6. 同步管理** (Services/Sync/)
+**8. 同步管理** (Services/Sync/)
 - `AutoSyncService`: 后台同步调度（支持按来源独立同步）
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
-**7. 扩展数据源** (预留)
-- **WeRead**: 微信读书集成（Services/DataSources-From/WeRead/，目前仅有技术文档）
-- **Lark**: 飞书集成（Services/DataSources-To/Lark/，目录预留）
-- **Obsidian**: Obsidian 集成（Services/DataSources-To/Obsidian/，目录预留）
+**9. 扩展数据源（尚未实现）**
+- **Get**
+- **Dedao**
+- **Logseq**
+- **Lark**
+- **Obsidian**
+- etc...
 
 ### 主应用入口
 
@@ -258,6 +297,8 @@ DIContainer.shared.autoSyncService
 
 应用窗口：
 - **MainListView**: 书籍/文章选择和同步（支持排序筛选）
+- **WeReadListView**: 微信读书书籍列表和管理
+- **WeReadDetailView**: 微信读书详情和高亮管理
 - **SettingsView**: Notion 配置、同步选项、语言设置
 - **UserGuideView**: 帮助文档
 - **LogWindow**: 同步操作日志
@@ -329,6 +370,15 @@ protocol DatabaseServiceProtocol {
 - Apple Sign In 认证相关模型
 - IAP 交易模型
 
+**WeRead 模型**（Models/WeReadModels.swift:1）：
+- `WeReadBookListItem`: UI 列表展示模型
+- `WeReadNotebook`: 书籍列表响应模型（API DTO）
+- `WeReadBookInfo`: 书籍详细信息模型（API DTO）
+- `WeReadBookmark`: 书签/高亮数据模型（API DTO）
+- `WeReadReview`: 笔记/评论模型（API DTO）
+- `WeReadHighlightResponse`: 高亮响应模型（API DTO）
+- 数据流：API → DTO → UI 模型，无本地持久化
+
 ## 重要说明
 
 ### Apple Books 数据库访问
@@ -390,7 +440,25 @@ protocol DatabaseServiceProtocol {
 **本地化指南**：提供 i18n 本地化工作的详细指导
 
 **核心内容**：
-- ✅ **多语言支持**：16种语言（英、中、丹麦、荷兰、芬兰、法、德、印尼、日、韩、巴西葡、俄、西、瑞典、泰、越南）
+- ✅ **多语言支持**：
+```markdown
+- English (en) - 主要开发语言
+- Chinese, Simplified (zh-Hans) - 简体中文
+- Danish (da) - 丹麦语
+- Dutch (nl) - 荷兰语
+- Finnish (fi) - 芬兰语
+- French (fr) - 法语
+- German (de) - 德语
+- Indonesian (id) - 印尼语
+- Japanese (ja) - 日语
+- Korean (ko) - 韩语
+- Portuguese (Brazil) (pt-BR) - 巴西葡萄牙语
+- Russian (ru) - 俄语
+- Spanish (Spain) (es-ES) - 西班牙语
+- Swedish (sv) - 瑞典语
+- Thai (th) - 泰语
+- Vietnamese (vi) - 越南语
+```
 - **字符串目录管理**：
   - 主目录：`Localizable.xcstrings`（已包含16种语言完整翻译）
 - **新增功能**：
@@ -488,7 +556,7 @@ pytest
 ## 开发工作流
 
 ### 1. 环境准备
-- **macOS 13.0+**
+- **macOS 14.0+**
 - **Xcode 15.0+**
 - **Swift 5.0+**
 - **Python 3.9+** (用于后端 FastAPI 服务)
@@ -503,11 +571,7 @@ open SyncNos.xcodeproj
 
 # 3. 在 Xcode 中选择目标设备并运行 (Cmd+R)
 
-# 4. 提交代码
-git add .
-git commit -m "feat: add new feature"
-git push origin main
-```
+# 4. 完成之后记得扫尾：验证代码无问题，能够成功build。
 
 ### 3. 添加新功能流程
 1. 在 `Models/` 中定义数据模型

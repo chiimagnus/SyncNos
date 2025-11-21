@@ -17,5 +17,3 @@ final class LoginItemService: LoginItemServiceProtocol {
         }
     }
 }
-
-

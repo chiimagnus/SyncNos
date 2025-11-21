@@ -42,10 +42,17 @@ struct ViewCommands: Commands {
             .keyboardShortcut("2", modifiers: .command)
             .disabled(contentSourceRawValue == ContentSource.goodLinks.rawValue)
 
+            Button("WeRead", systemImage: "text.book.closed") {
+                contentSourceRawValue = ContentSource.weRead.rawValue
+            }
+            .keyboardShortcut("3", modifiers: .command)
+            .disabled(contentSourceRawValue == ContentSource.weRead.rawValue)
+
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
-            if ContentSource(rawValue: contentSourceRawValue) == .appleBooks {
+            let currentSource = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
+            if currentSource == .appleBooks {
                 // Apple Books 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
@@ -89,7 +96,7 @@ struct ViewCommands: Commands {
                         }
                     }
                 }
-            } else {
+            } else if currentSource == .goodLinks {
                 // GoodLinks 的排序和筛选菜单
                 Menu("Articles", systemImage: "doc.text") {
                     Section("Sort") {
@@ -129,6 +136,39 @@ struct ViewCommands: Commands {
                                 Label("Starred only", systemImage: "checkmark")
                             } else {
                                 Text("Starred only")
+                            }
+                        }
+                    }
+                }
+            } else {
+                // WeRead 的排序和筛选菜单
+                Menu("Books", systemImage: "book.closed") {
+                    Section("Sort") {
+                        // WeRead 只支持 title, highlightCount, lastSync
+                        let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+                        ForEach(availableKeys, id: \.self) { k in
+                            Button {
+                                bookListSortKey = k.rawValue
+                                NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            } label: {
+                                if bookListSortKey == k.rawValue {
+                                    Label(k.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(k.displayName)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            bookListSortAscending.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
+                        } label: {
+                            if bookListSortAscending {
+                                Label("Ascending", systemImage: "checkmark")
+                            } else {
+                                Label("Ascending", systemImage: "xmark")
                             }
                         }
                     }
@@ -178,7 +218,13 @@ struct ViewCommands: Commands {
                     }
 
                     // 颜色筛选（与 FiltetSortBar 的行为一致）
-                    let theme: HighlightColorTheme = (ContentSource(rawValue: contentSourceRawValue) == .appleBooks) ? .appleBooks : .goodLinks
+                    let theme: HighlightColorTheme = {
+                        switch currentSource {
+                        case .appleBooks: return .appleBooks
+                        case .goodLinks: return .goodLinks
+                        case .weRead: return .weRead
+                        }
+                    }()
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）
                     let currentSet: Set<Int> = {
                         if highlightSelectedMask == 0 { return [] }

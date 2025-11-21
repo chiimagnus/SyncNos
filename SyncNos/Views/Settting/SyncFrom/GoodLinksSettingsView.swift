@@ -10,7 +10,7 @@ struct GoodLinksSettingsView: View {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: viewModel.goodLinksDbId) { _ in
+                        .onChange(of: viewModel.goodLinksDbId) { _, _ in
                             viewModel.save()
                         }
                 }
@@ -19,7 +19,7 @@ struct GoodLinksSettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .help("Enable automatic sync for GoodLinks (checked means AutoSyncService will run)")
-                    .onChange(of: viewModel.autoSync) { _ in
+                    .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
 

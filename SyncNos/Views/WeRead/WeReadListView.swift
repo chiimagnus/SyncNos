@@ -1,52 +1,49 @@
 import SwiftUI
 
-struct AppleBooksListView: View {
-    @ObservedObject var viewModel: AppleBooksViewModel
+struct WeReadListView: View {
+    @ObservedObject var viewModel: WeReadViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
             if viewModel.isLoading || viewModel.isComputingList {
-                ProgressView("Loading books...")
-            } else if viewModel.errorMessage != nil {
-                VStack {
+                ProgressView("Loading WeRead books...")
+            } else if let error = viewModel.errorMessage {
+                VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
                         .font(.largeTitle)
-                    Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
+                    Text(error)
                         .multilineTextAlignment(.center)
-                        .padding()
-                    Button("Open Apple Books notes", systemImage: "folder") {
-                        AppleBooksPicker.pickAppleBooksContainer()
-                    }
+                        .padding(.horizontal)
                 }
             } else if viewModel.books.isEmpty {
-                VStack {
-                    Image(systemName: "books.vertical")
+                VStack(spacing: 12) {
+                    Image(systemName: "text.book.closed")
                         .foregroundColor(.secondary)
                         .font(.largeTitle)
-                    Text("No books found")
-                        .padding()
-                    Button("Open Apple Books notes", systemImage: "folder") {
-                        AppleBooksPicker.pickAppleBooksContainer()
-                    }
+                    Text("No WeRead books found")
+                        .foregroundColor(.secondary)
                 }
             } else {
                 List(selection: $selectionIds) {
                     ForEach(viewModel.visibleBooks, id: \.bookId) { book in
                         HStack {
-                            VStack(alignment: .leading) {
-                                if book.hasTitle {
-                                    Text(book.bookTitle).font(.headline)
-                                } else {
-                                    Text("No Title").font(.headline).foregroundColor(.orange)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(book.title)
+                                    .font(.headline)
+                                    .lineLimit(2)
+                                if !book.author.isEmpty {
+                                    Text(book.author)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
                                 }
-                                Text(book.authorName).font(.subheadline).foregroundColor(.secondary)
-                                Text("\(book.highlightCount) highlights").font(.caption)
+                                Text("\(book.highlightCount) highlights")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             Spacer()
-                            // Sync status icon
                             if viewModel.syncingBookIds.contains(book.bookId) {
                                 Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                                     .foregroundColor(.yellow)
@@ -63,22 +60,12 @@ struct AppleBooksListView: View {
                             viewModel.loadMoreIfNeeded(currentItem: book)
                         }
                         .contextMenu {
-                            // Open in Apple Books (if available)
-                            if let ibooksURLString = book.ibooksURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let ibooksURL = URL(string: ibooksURLString) {
-                                Button {
-                                    NSWorkspace.shared.open(ibooksURL)
-                                } label: {
-                                    Label("Open in Apple Books", systemImage: "book")
-                                }
-                            }
-
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                             }
 
-                            // 显示上次同步时间（针对当前右键的行）
                             Divider()
                             let last = viewModel.lastSync(for: book.bookId)
                             if let lastDate = last {
@@ -109,33 +96,13 @@ struct AppleBooksListView: View {
             }
         }
         .onAppear {
-            // 切换到 Apple Books 时，确保第一帧进入加载态，然后异步加载/重算
             viewModel.triggerRecompute()
-            _ = viewModel.restoreBookmarkAndConfigureRoot()
             if viewModel.books.isEmpty {
                 Task {
                     await viewModel.loadBooks()
                 }
             }
         }
-        .onDisappear {
-            viewModel.stopAccessingIfNeeded()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
-                .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
-                .receive(on: DispatchQueue.main)
-        ) { notification in
-            if notification.name == Notification.Name("AppleBooksContainerSelected") {
-                guard let selectedPath = notification.object as? String else { return }
-                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
-                viewModel.setDbRootOverride(rootCandidate)
-            }
-            Task {
-                await viewModel.loadBooks()
-            }
-        }
-        
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
             viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
@@ -149,6 +116,31 @@ struct AppleBooksListView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
+        }
+        .alert(
+            NSLocalizedString("Session Expired", comment: ""),
+            isPresented: $viewModel.showRefreshFailedAlert
+        ) {
+            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {
+                // 关闭弹窗
+            }
+            Button(NSLocalizedString("Go to Login", comment: "")) {
+                viewModel.navigateToWeReadLogin()
+            }
+        } message: {
+            Text(viewModel.refreshFailureReason)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+            Task {
+                await viewModel.loadBooks()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadSettings")).receive(on: DispatchQueue.main)) { _ in
+            // 导航到 WeRead 登录设置页面
+            openWindow(id: "setting")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NotificationCenter.default.post(name: Notification.Name("NavigateToWeReadLogin"), object: nil)
+            }
         }
     }
 }

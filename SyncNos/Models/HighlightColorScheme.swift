@@ -3,6 +3,7 @@ import Foundation
 enum HighlightSource: String {
     case appleBooks
     case goodLinks
+    case weRead
 }
 
 struct HighlightColorDefinition {
@@ -32,6 +33,14 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 4, notionName: "purple", displayName: "Purple"),
                 HighlightColorDefinition(index: 5, notionName: "mint", displayName: "Mint")
             ]
+        case .weRead:
+            return [
+                HighlightColorDefinition(index: 0, notionName: "red", displayName: "Red"),
+                HighlightColorDefinition(index: 1, notionName: "purple", displayName: "Purple"),
+                HighlightColorDefinition(index: 2, notionName: "blue", displayName: "Blue"),
+                HighlightColorDefinition(index: 3, notionName: "green", displayName: "Green"),
+                HighlightColorDefinition(index: 4, notionName: "yellow", displayName: "Yellow")
+            ]
         }
     }
 
@@ -45,6 +54,8 @@ enum HighlightColorScheme {
         case .goodLinks:
             return HighlightColorDefinition(index: index, notionName: "mint", displayName: "Mint")
         case .appleBooks:
+            return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
+        case .weRead:
             return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
         }
     }

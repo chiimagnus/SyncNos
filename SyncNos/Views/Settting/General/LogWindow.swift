@@ -11,15 +11,14 @@ struct LogWindow: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(viewModel.entries) { entry in
-                            Text(formatted(entry: entry))
-                                .font(.system(.caption, design: .monospaced))
+                            logEntryView(entry: entry)
                                 .id(entry.id)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(8)
                 }
-                .onChange(of: viewModel.entries.count) { _ in
+                .onChange(of: viewModel.entries.count) { _, _ in
                     guard isAutoScrollEnabled, let last = viewModel.entries.last else { return }
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)
@@ -50,6 +49,12 @@ struct LogWindow: View {
                 .help("Share logs")
             }
         }
+    }
+
+    private func logEntryView(entry: LogEntry) -> some View {
+        Text(formatted(entry: entry))
+            .font(.system(.caption, design: .monospaced))
+            .foregroundColor(Color(entry.level.color))
     }
 
     private func formatted(entry: LogEntry) -> String {

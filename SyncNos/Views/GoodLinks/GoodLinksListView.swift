@@ -93,9 +93,9 @@ struct GoodLinksListView: View {
                             Divider()
                             let last = viewModel.lastSync(for: link.id)
                             if let lastDate = last {
-                                Text("Last Sync: \(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))")
+                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
                             } else {
-                                Text("Last Sync: Never")
+                                Text("Last Sync Time") + Text(": ") + Text("-")
                             }
                         }
                     }
@@ -138,10 +138,9 @@ struct GoodLinksListView: View {
                 await viewModel.loadRecentLinks()
             }
         }
-        .onDisappear {
-            GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
-        }
-        
+        // 注意：不要在 onDisappear 中强制关闭 GoodLinks 的安全范围访问，
+        // 以免在自动同步或后台同步仍在访问数据库时导致权限被撤销（authorization denied）。
+        // 安全范围生命周期由 GoodLinksBookmarkStore 自身和自动同步 Provider 统一管理。
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
             viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
         }

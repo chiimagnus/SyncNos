@@ -65,5 +65,3 @@ final class LoginItemViewModel: ObservableObject {
         }
     }
 }
-
-

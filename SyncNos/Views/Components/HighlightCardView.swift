@@ -5,6 +5,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
     let colorMark: Color
     let content: String
     let note: String?
+    let reviewContents: [String]  // 多条想法内容
     let createdDate: String?
     let modifiedDate: String?
     let accessory: () -> AccessoryContent
@@ -13,6 +14,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
         colorMark: Color,
         content: String,
         note: String? = nil,
+        reviewContents: [String] = [],
         createdDate: String? = nil,
         modifiedDate: String? = nil,
         @ViewBuilder accessory: @escaping () -> AccessoryContent = { EmptyView() }
@@ -20,6 +22,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
         self.colorMark = colorMark
         self.content = content
         self.note = note
+        self.reviewContents = reviewContents
         self.createdDate = createdDate
         self.modifiedDate = modifiedDate
         self.accessory = accessory
@@ -40,26 +43,37 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         .font(.body)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                        // .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // 用户笔记（如果有）
                     if let note = note, !note.isEmpty {
-                        HStack(alignment: .top, spacing: 6) {
-                            // Image(systemName: "note.text")
-                            //     .font(.caption)
-                            //     .foregroundColor(.orange)
-                            Text(note)
+                        Text(note)
+                            .font(.callout)
+                            .foregroundColor(.primary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(10)
+                            
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.orange.opacity(0.08))
+                            )
+                    }
+                    
+                    // 多条想法（如果有，如 weread）
+                    if !reviewContents.isEmpty {
+                        ForEach(Array(reviewContents.enumerated()), id: \.offset) { index, reviewContent in
+                            Text(reviewContent)
                                 .font(.callout)
                                 .foregroundColor(.primary)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
+                            
+                                .padding(10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.orange.opacity(0.08))
+                                )
                         }
-                        // .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.orange.opacity(0.08))
-                        )
                     }
                     
                     // 时间信息

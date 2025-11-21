@@ -1,0 +1,85 @@
+import Foundation
+
+@MainActor
+final class WeReadSettingsViewModel: ObservableObject {
+    @Published var weReadDbId: String = ""
+    @Published var autoSync: Bool = false
+    @Published var message: String?
+    @Published var isLoggedIn: Bool = false
+    @Published var showLoginSheet: Bool = false
+
+    private let notionConfig: NotionConfigStoreProtocol
+    private let authService: WeReadAuthServiceProtocol
+    private let autoSyncService: AutoSyncServiceProtocol
+
+    init(
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
+        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        autoSyncService: AutoSyncServiceProtocol = DIContainer.shared.autoSyncService
+    ) {
+        self.notionConfig = notionConfig
+        self.authService = authService
+        self.autoSyncService = autoSyncService
+
+        if let id = notionConfig.databaseIdForSource("weRead") {
+            self.weReadDbId = id
+        }
+        self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.weRead")
+        refreshLoginStatus()
+    }
+
+    func refreshLoginStatus() {
+        isLoggedIn = authService.isLoggedIn
+    }
+
+    func save() {
+        notionConfig.setDatabaseId(
+            weReadDbId.trimmingCharacters(in: .whitespacesAndNewlines),
+            forSource: "weRead"
+        )
+
+        let previous = UserDefaults.standard.bool(forKey: "autoSync.weRead")
+        UserDefaults.standard.set(autoSync, forKey: "autoSync.weRead")
+
+        // 根据 per-source 开关控制 AutoSyncService 生命周期
+        let anyEnabled =
+            UserDefaults.standard.bool(forKey: "autoSync.appleBooks") ||
+            UserDefaults.standard.bool(forKey: "autoSync.goodLinks") ||
+            UserDefaults.standard.bool(forKey: "autoSync.weRead")
+
+        UserDefaults.standard.set(anyEnabled, forKey: "autoSyncEnabled")
+        if anyEnabled {
+            autoSyncService.start()
+            // WeRead 尚未接入 AutoSyncProvider 触发器，此处暂不立即触发一次同步
+            if !previous && autoSync {
+                // 预留：触发一次 WeRead 增量同步
+            }
+        } else {
+            autoSyncService.stop()
+        }
+
+        message = "Settings saved"
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                if self.message == "Settings saved" {
+                    self.message = nil
+                }
+            }
+        }
+    }
+
+    func clearLogin() {
+        authService.clearCookies()
+        refreshLoginStatus()
+        message = "Logged out"
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                if self.message == "Logged out" {
+                    self.message = nil
+                }
+            }
+        }
+    }
+}

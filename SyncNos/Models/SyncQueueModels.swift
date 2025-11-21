@@ -3,6 +3,7 @@ import Foundation
 enum SyncSource: String, Codable, CaseIterable, Sendable {
     case appleBooks
     case goodLinks
+    case weRead
 }
 
 enum SyncTaskState: String, Codable, Sendable {
