@@ -6,6 +6,7 @@ enum WeReadAPIError: LocalizedError {
     case notLoggedIn
     case unauthorized
     case sessionExpired
+    case sessionExpiredWithRefreshFailure(reason: String)
     case invalidResponse
     case httpError(statusCode: Int, body: String)
     case apiError(code: Int, message: String)
@@ -18,6 +19,8 @@ enum WeReadAPIError: LocalizedError {
             return NSLocalizedString("WeRead cookie expired or invalid. Please login again.", comment: "")
         case .sessionExpired:
             return NSLocalizedString("WeRead session expired. Please login again.", comment: "")
+        case .sessionExpiredWithRefreshFailure(let reason):
+            return String(format: NSLocalizedString("WeRead session expired and auto-refresh failed: %@. Please login manually.", comment: ""), reason)
         case .invalidResponse:
             return NSLocalizedString("Invalid HTTP response from WeRead.", comment: "")
         case .httpError(let statusCode, _):
@@ -41,6 +44,7 @@ enum WeReadAPIError: LocalizedError {
 final class WeReadAPIService: WeReadAPIServiceProtocol {
     private let authService: WeReadAuthServiceProtocol
     private let logger: LoggerServiceProtocol
+    private let refreshCoordinator = CookieRefreshCoordinator()
 
     /// WeRead Web 端基础 URL
     private let baseURL = URL(string: "https://weread.qq.com")!
@@ -99,6 +103,52 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     // MARK: - Low level request
 
     private func performRequest(url: URL) async throws -> Data {
+        do {
+            return try await executeRequest(url: url)
+        } catch let error as WeReadAPIError where error.isAuthenticationError {
+            // 检测到认证错误，尝试刷新 Cookie 并重试
+            return try await handleAuthenticationError(url: url, originalError: error)
+        }
+    }
+    
+    /// 处理认证错误：刷新 Cookie 并重试
+    private func handleAuthenticationError(url: URL, originalError: Error) async throws -> Data {
+        logger.info("[WeReadAPI] Authentication error detected, attempting cookie refresh...")
+        
+        do {
+            // 在 MainActor 上创建 WeReadCookieRefreshService
+            let refreshService = await MainActor.run {
+                WeReadCookieRefreshService(
+                    authService: authService,
+                    logger: logger
+                )
+            }
+            
+            // 通过 actor 协调刷新
+            _ = try await refreshCoordinator.attemptRefresh(
+                refreshService: refreshService,
+                authService: authService
+            )
+            
+            logger.info("[WeReadAPI] Cookie refreshed successfully, retrying request")
+            
+            // 重试原始请求
+            return try await executeRequest(url: url)
+        } catch {
+            logger.error("[WeReadAPI] Cookie refresh failed: \(error.localizedDescription)")
+            
+            // 清除过期的 Cookie
+            authService.clearCookies()
+            
+            // 抛出包含刷新失败信息的错误
+            throw WeReadAPIError.sessionExpiredWithRefreshFailure(
+                reason: error.localizedDescription
+            )
+        }
+    }
+    
+    /// 实际执行 HTTP 请求
+    private func executeRequest(url: URL) async throws -> Data {
         guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
             throw WeReadAPIError.notLoggedIn
         }

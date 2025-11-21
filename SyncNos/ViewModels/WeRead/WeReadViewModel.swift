@@ -19,6 +19,10 @@ final class WeReadViewModel: ObservableObject {
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
     @Published var showNotionConfigAlert: Bool = false
+    
+    // Cookie 刷新失败 Alert
+    @Published var showRefreshFailedAlert: Bool = false
+    @Published var refreshFailureReason: String = ""
 
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -131,11 +135,15 @@ final class WeReadViewModel: ObservableObject {
             
             logger.info("[WeRead] fetched notebooks: \(notebooks.count)")
             isLoading = false
-        } catch let error as WeReadAPIError where error.isAuthenticationError {
-            // 检测到认证错误，尝试自动刷新 Cookie
-            logger.warning("[WeRead] Authentication error detected, attempting cookie refresh...")
+        } catch let error as WeReadAPIError {
+            if case .sessionExpiredWithRefreshFailure(let reason) = error {
+                // Cookie 刷新失败，显示 Alert 提示用户需要手动登录
+                refreshFailureReason = reason
+                showRefreshFailedAlert = true
+            } else {
+                errorMessage = error.localizedDescription
+            }
             isLoading = false
-            await handleAuthenticationError()
         } catch {
             let desc = error.localizedDescription
             logger.error("[WeRead] loadBooks error: \(desc)")
@@ -157,24 +165,12 @@ final class WeReadViewModel: ObservableObject {
         }
     }
     
-    private func handleAuthenticationError() async {
-        let refreshService = WeReadCookieRefreshService()
-        
-        do {
-            // 尝试静默刷新 Cookie
-            _ = try await refreshService.attemptSilentRefresh()
-            logger.info("[WeRead] Cookie refreshed successfully, retrying...")
-            
-            // 刷新成功，重试加载
-            await loadBooks()
-        } catch {
-            // 静默刷新失败，通知用户需要手动登录
-            logger.error("[WeRead] Cookie refresh failed: \(error.localizedDescription)")
-            refreshService.notifyManualLoginRequired()
-            
-            // 显示友好的错误提示
-            errorMessage = NSLocalizedString("WeRead session expired. Please login to refresh.", comment: "")
-        }
+    /// 导航到 WeRead 登录页面
+    func navigateToWeReadLogin() {
+        NotificationCenter.default.post(
+            name: Notification.Name("NavigateToWeReadSettings"),
+            object: nil
+        )
     }
 
     func loadMoreIfNeeded(currentItem: WeReadBookListItem) {
