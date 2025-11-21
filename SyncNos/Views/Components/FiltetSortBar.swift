@@ -39,6 +39,7 @@ struct FiltetSortBar: View {
     var colorTheme: HighlightColorTheme
     var sortField: HighlightSortField
     var isAscending: Bool
+    var availableSortFields: [HighlightSortField] = HighlightSortField.allCases
     var onSortFieldChanged: ((HighlightSortField) -> Void)?
     var onAscendingChanged: ((Bool) -> Void)?
 
@@ -48,7 +49,7 @@ struct FiltetSortBar: View {
             Menu {
                 // 排序选项
                 Section("Sort") {
-                    ForEach(HighlightSortField.allCases, id: \.self) { field in
+                    ForEach(availableSortFields, id: \.self) { field in
                         Button {
                             onSortFieldChanged?(field)
                         } label: {
