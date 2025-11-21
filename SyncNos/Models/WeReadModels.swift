@@ -31,11 +31,11 @@ struct WeReadBookListItem: Identifiable, Equatable {
         self.lastSyncAt = lastSyncAt
     }
 
-    init(from notebook: WeReadNotebook) {
+    init(from notebook: WeReadNotebook, highlightCount: Int = 0) {
         self.bookId = notebook.bookId
         self.title = notebook.title
         self.author = notebook.author ?? ""
-        self.highlightCount = 0 // Will be fetched separately if needed
+        self.highlightCount = highlightCount
         self.createdAt = notebook.createdTimestamp.map { Date(timeIntervalSince1970: $0) }
         self.updatedAt = notebook.updatedTimestamp.map { Date(timeIntervalSince1970: $0) }
         self.lastSyncAt = nil
@@ -154,6 +154,8 @@ struct WeReadBookmark {
     let text: String
     let note: String?
     let timestamp: TimeInterval?
+    let reviewContent: String?  // 关联的想法内容
+    let range: String?          // 用于匹配想法的范围标识
 }
 
 /// 单条想法 / 书评
@@ -167,6 +169,7 @@ struct WeReadBookmark {
 ///     "chapterUid": 303,
 ///     "content": "这是一个测试啊啊啊啊",
 ///     "createTime": 1763619349,
+///     "range": "123-456",
 ///     ...
 ///   }
 /// }
@@ -175,6 +178,8 @@ struct WeReadReview: Decodable {
     let bookId: String
     let content: String
     let timestamp: TimeInterval?
+    let range: String?      // 用于匹配高亮的范围标识
+    let type: Int           // 1=章节想法, 4=书评
 
     private enum CodingKeys: String, CodingKey {
         case reviewId
@@ -183,12 +188,16 @@ struct WeReadReview: Decodable {
         case bookId
         case content
         case createTime
+        case range
+        case type
     }
 
     private enum ReviewDetailKeys: String, CodingKey {
         case bookId
         case content
         case createTime
+        case range
+        case type
     }
 
     init(from decoder: Decoder) throws {
@@ -205,11 +214,18 @@ struct WeReadReview: Decodable {
                 ?? ""
             timestamp = (try? reviewContainer.decode(TimeInterval.self, forKey: .createTime))
                 ?? (try? container.decode(TimeInterval.self, forKey: .createTime))
+            range = (try? reviewContainer.decode(String.self, forKey: .range))
+                ?? (try? container.decode(String.self, forKey: .range))
+            type = (try? reviewContainer.decode(Int.self, forKey: .type))
+                ?? (try? container.decode(Int.self, forKey: .type))
+                ?? 1
         } else {
             // 退化为所有字段都在顶层的情况
             bookId = (try? container.decode(String.self, forKey: .bookId)) ?? ""
             content = (try? container.decode(String.self, forKey: .content)) ?? ""
             timestamp = try? container.decode(TimeInterval.self, forKey: .createTime)
+            range = try? container.decode(String.self, forKey: .range)
+            type = (try? container.decode(Int.self, forKey: .type)) ?? 1
         }
     }
 }

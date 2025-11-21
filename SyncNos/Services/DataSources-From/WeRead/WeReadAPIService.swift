@@ -213,7 +213,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                     colorIndex: item.colorStyle ?? item.style,
                     text: item.markText,
                     note: nil,
-                    timestamp: item.createTime
+                    timestamp: item.createTime,
+                    reviewContent: nil,
+                    range: item.range
                 )
             }
         }
@@ -244,6 +246,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                     let ts = (obj["createTime"] as? TimeInterval)
                     let bId = (obj["bookId"] as? String) ?? bookId
 
+                    let range = obj["range"] as? String
                     result.append(
                         WeReadBookmark(
                             highlightId: normalizedId,
@@ -252,7 +255,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                             colorIndex: color,
                             text: markText,
                             note: nil,
-                            timestamp: ts
+                            timestamp: ts,
+                            reviewContent: nil,
+                            range: range
                         )
                     )
                 }
@@ -291,5 +296,73 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         let preview = String(data: data.prefix(256), encoding: .utf8) ?? ""
         logger.warning("[WeReadAPI] Unable to decode reviews for bookId=\(bookId). Raw preview: \(preview)")
         return []
+    }
+
+    // MARK: - Highlight Merging
+
+    /// 获取书籍的高亮并与想法合并
+    /// - Parameter bookId: 书籍 ID
+    /// - Returns: 合并后的高亮列表（包含关联的想法内容）
+    func fetchMergedHighlights(bookId: String) async throws -> [WeReadBookmark] {
+        // 并发获取 bookmarks 和 reviews
+        async let bookmarksTask = fetchBookmarks(bookId: bookId)
+        async let reviewsTask = fetchReviews(bookId: bookId)
+        
+        let (bookmarks, reviews) = try await (bookmarksTask, reviewsTask)
+        
+        // 合并逻辑
+        let merged = mergeHighlightsWithReviews(bookmarks: bookmarks, reviews: reviews)
+        logger.info("[WeReadAPI] merged highlights for bookId=\(bookId): \(merged.count) (from \(bookmarks.count) bookmarks + \(reviews.count) reviews)")
+        return merged
+    }
+    
+    /// 将高亮与想法基于 range 字段合并
+    /// - Parameters:
+    ///   - bookmarks: 高亮列表
+    ///   - reviews: 想法列表
+    /// - Returns: 合并后的高亮列表
+    private func mergeHighlightsWithReviews(
+        bookmarks: [WeReadBookmark],
+        reviews: [WeReadReview]
+    ) -> [WeReadBookmark] {
+        // 构建 range -> review 映射（只处理 type == 1 的章节级想法）
+        var reviewByRange: [String: WeReadReview] = [:]
+        for review in reviews {
+            // 只处理 type == 1 的章节级想法（type == 4 是书评，独立处理）
+            if review.type == 1, let range = review.range, !range.isEmpty {
+                // 标准化 range 字符串（去除空格）
+                let normalizedRange = range.trimmingCharacters(in: .whitespaces)
+                if !normalizedRange.isEmpty {
+                    // 如果有重复的 range，使用第一个匹配的想法
+                    if reviewByRange[normalizedRange] == nil {
+                        reviewByRange[normalizedRange] = review
+                    } else {
+                        logger.warning("[WeReadAPI] Duplicate range found: \(normalizedRange)")
+                    }
+                }
+            }
+        }
+        
+        // 合并
+        return bookmarks.map { bookmark in
+            var merged = bookmark
+            if let range = bookmark.range, !range.isEmpty {
+                let normalizedRange = range.trimmingCharacters(in: .whitespaces)
+                if let review = reviewByRange[normalizedRange] {
+                    merged = WeReadBookmark(
+                        highlightId: bookmark.highlightId,
+                        bookId: bookmark.bookId,
+                        chapterTitle: bookmark.chapterTitle,
+                        colorIndex: bookmark.colorIndex,
+                        text: bookmark.text,
+                        note: bookmark.note,
+                        timestamp: bookmark.timestamp,
+                        reviewContent: review.content,
+                        range: bookmark.range
+                    )
+                }
+            }
+            return merged
+        }
     }
 }
