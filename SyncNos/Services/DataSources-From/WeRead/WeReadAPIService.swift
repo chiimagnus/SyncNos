@@ -214,7 +214,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                     text: item.markText,
                     note: nil,
                     timestamp: item.createTime,
-                    reviewContent: nil,
+                    reviewContents: [],
                     range: item.range
                 )
             }
@@ -256,7 +256,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                             text: markText,
                             note: nil,
                             timestamp: ts,
-                            reviewContent: nil,
+                            reviewContents: [],
                             range: range
                         )
                     )
@@ -325,22 +325,23 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         bookmarks: [WeReadBookmark],
         reviews: [WeReadReview]
     ) -> [WeReadBookmark] {
-        // 构建 range -> review 映射（只处理 type == 1 的章节级想法）
-        var reviewByRange: [String: WeReadReview] = [:]
+        // 构建 range -> [review] 映射（支持一条高亮对应多条想法）
+        var reviewsByRange: [String: [WeReadReview]] = [:]
         for review in reviews {
             // 只处理 type == 1 的章节级想法（type == 4 是书评，独立处理）
             if review.type == 1, let range = review.range, !range.isEmpty {
                 // 标准化 range 字符串（去除空格）
                 let normalizedRange = range.trimmingCharacters(in: .whitespaces)
                 if !normalizedRange.isEmpty {
-                    // 如果有重复的 range，使用第一个匹配的想法
-                    if reviewByRange[normalizedRange] == nil {
-                        reviewByRange[normalizedRange] = review
-                    } else {
-                        logger.warning("[WeReadAPI] Duplicate range found: \(normalizedRange)")
-                    }
+                    reviewsByRange[normalizedRange, default: []].append(review)
                 }
             }
+        }
+        
+        // 记录有多条想法的高亮
+        let multiReviewRanges = reviewsByRange.filter { $0.value.count > 1 }
+        if !multiReviewRanges.isEmpty {
+            logger.info("[WeReadAPI] Found \(multiReviewRanges.count) highlights with multiple reviews")
         }
         
         // 合并
@@ -348,7 +349,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             var merged = bookmark
             if let range = bookmark.range, !range.isEmpty {
                 let normalizedRange = range.trimmingCharacters(in: .whitespaces)
-                if let review = reviewByRange[normalizedRange] {
+                if let matchedReviews = reviewsByRange[normalizedRange], !matchedReviews.isEmpty {
+                    // 提取所有想法的内容
+                    let reviewContents = matchedReviews.map { $0.content }
                     merged = WeReadBookmark(
                         highlightId: bookmark.highlightId,
                         bookId: bookmark.bookId,
@@ -357,7 +360,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
                         text: bookmark.text,
                         note: bookmark.note,
                         timestamp: bookmark.timestamp,
-                        reviewContent: review.content,
+                        reviewContents: reviewContents,
                         range: bookmark.range
                     )
                 }
