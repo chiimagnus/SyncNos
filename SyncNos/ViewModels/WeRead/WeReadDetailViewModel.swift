@@ -9,7 +9,6 @@ struct WeReadHighlightDisplay: Identifiable {
     let reviewContents: [String]  // 关联的多条想法内容
     let colorIndex: Int?
     let createdAt: Date?
-    let modifiedAt: Date?
     let chapterTitle: String?
     
     init(from bookmark: WeReadBookmark) {
@@ -19,7 +18,6 @@ struct WeReadHighlightDisplay: Identifiable {
         self.reviewContents = bookmark.reviewContents
         self.colorIndex = bookmark.colorIndex
         self.createdAt = bookmark.timestamp.map { Date(timeIntervalSince1970: $0) }
-        self.modifiedAt = nil
         self.chapterTitle = bookmark.chapterTitle
     }
     
@@ -30,7 +28,6 @@ struct WeReadHighlightDisplay: Identifiable {
         self.reviewContents = []
         self.colorIndex = nil
         self.createdAt = review.timestamp.map { Date(timeIntervalSince1970: $0) }
-        self.modifiedAt = nil
         self.chapterTitle = nil
     }
 }
@@ -181,10 +178,10 @@ final class WeReadDetailViewModel: ObservableObject {
             result.append(WeReadHighlightDisplay(from: bm))
         }
         
-        // 排序
+        // 排序（WeRead 只有 createdAt）
         result.sort { a, b in
-            let t1 = sortField == .created ? a.createdAt : a.modifiedAt
-            let t2 = sortField == .created ? b.createdAt : b.modifiedAt
+            let t1 = a.createdAt
+            let t2 = b.createdAt
             
             if t1 == nil && t2 == nil { return false }
             if t1 == nil { return !isAscending }
