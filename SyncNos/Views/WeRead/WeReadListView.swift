@@ -39,16 +39,9 @@ struct WeReadListView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
-                                HStack(spacing: 8) {
-                                    Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    if let last = viewModel.lastSync(for: book.bookId) {
-                                        Text(DateFormatter.localizedString(from: last, dateStyle: .short, timeStyle: .short))
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+                                Text("\(book.highlightCount) highlights")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             Spacer()
                             if viewModel.syncingBookIds.contains(book.bookId) {
