@@ -177,7 +177,7 @@ struct MainListView: View {
                             Divider()
 
                             Section("Sort") {
-                                ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                ForEach(WeReadSortKey.allCases, id: \.self) { key in
                                     Button {
                                         weReadVM.sortKey = key
                                         NotificationCenter.default.post(
