@@ -2,7 +2,6 @@ import Foundation
 
 // MARK: - UI 列表模型
 
-/// WeRead 书籍在列表中的轻量视图模型，避免在 UI 层直接依赖 SwiftData 对象
 struct WeReadBookListItem: Identifiable, Equatable {
     var id: String { bookId }
 
