@@ -5,6 +5,7 @@ struct WeReadHighlightDisplay: Identifiable {
     let id: String
     let text: String
     let note: String?
+    let reviewContent: String?  // 关联的想法内容
     let colorIndex: Int?
     let createdAt: Date?
     let modifiedAt: Date?
@@ -14,6 +15,7 @@ struct WeReadHighlightDisplay: Identifiable {
         self.id = bookmark.highlightId
         self.text = bookmark.text
         self.note = bookmark.note
+        self.reviewContent = bookmark.reviewContent
         self.colorIndex = bookmark.colorIndex
         self.createdAt = bookmark.timestamp.map { Date(timeIntervalSince1970: $0) }
         self.modifiedAt = nil
@@ -24,6 +26,7 @@ struct WeReadHighlightDisplay: Identifiable {
         self.id = "review-\(review.reviewId)"
         self.text = review.content
         self.note = review.content
+        self.reviewContent = nil
         self.colorIndex = nil
         self.createdAt = review.timestamp.map { Date(timeIntervalSince1970: $0) }
         self.modifiedAt = nil
@@ -55,7 +58,6 @@ final class WeReadDetailViewModel: ObservableObject {
 
     private var currentBookId: String?
     private var allBookmarks: [WeReadBookmark] = []
-    private var allReviews: [WeReadReview] = []
 
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
@@ -73,13 +75,11 @@ final class WeReadDetailViewModel: ObservableObject {
         currentBookId = bookId
         isLoading = true
         do {
-            // 从远端拉取最新高亮与想法
-            let bookmarks = try await apiService.fetchBookmarks(bookId: bookId)
-            let reviews = try await apiService.fetchReviews(bookId: bookId)
+            // 使用新的合并 API 获取高亮（已包含关联的想法）
+            let mergedBookmarks = try await apiService.fetchMergedHighlights(bookId: bookId)
             
-            // 保存原始数据用于筛选和排序
-            allBookmarks = bookmarks
-            allReviews = reviews
+            // 保存合并后的数据用于筛选和排序
+            allBookmarks = mergedBookmarks
             
             // 应用筛选和排序
             applyFiltersAndSort()
@@ -99,21 +99,17 @@ final class WeReadDetailViewModel: ObservableObject {
     private func applyFiltersAndSort() {
         var result: [WeReadHighlightDisplay] = []
         
-        // 转换 bookmarks
+        // 转换合并后的 bookmarks（已包含 reviewContent）
         for bm in allBookmarks {
             // 应用筛选
-            if noteFilter && (bm.note?.isEmpty ?? true) {
+            // "仅笔记"过滤：检查是否有 reviewContent（关联的想法）
+            if noteFilter && (bm.reviewContent?.isEmpty ?? true) {
                 continue
             }
             if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
                 continue
             }
             result.append(WeReadHighlightDisplay(from: bm))
-        }
-        
-        // 转换 reviews
-        for rv in allReviews {
-            result.append(WeReadHighlightDisplay(from: rv))
         }
         
         // 排序

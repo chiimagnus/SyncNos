@@ -265,6 +265,8 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     func fetchBookmarks(bookId: String) async throws -> [WeReadBookmark]
     /// 获取单本书的个人想法/书评
     func fetchReviews(bookId: String) async throws -> [WeReadReview]
+    /// 获取书籍的高亮并与想法合并（基于 range 字段）
+    func fetchMergedHighlights(bookId: String) async throws -> [WeReadBookmark]
 }
 
 /// WeRead -> Notion 同步服务协议

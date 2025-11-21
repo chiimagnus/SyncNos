@@ -70,46 +70,30 @@ final class WeReadSyncService: WeReadSyncServiceProtocol {
         )
         let pageId = ensured.id
 
-        // 4) 从 WeRead API 拉取最新高亮与想法，直接转换为 HighlightRow
+        // 4) 从 WeRead API 拉取合并后的高亮（已包含关联的想法），直接转换为 HighlightRow
         progress(NSLocalizedString("Fetching WeRead highlights...", comment: ""))
-        let bookmarks = try await apiService.fetchBookmarks(bookId: book.bookId)
-        let reviews = try await apiService.fetchReviews(bookId: book.bookId)
+        let mergedBookmarks = try await apiService.fetchMergedHighlights(bookId: book.bookId)
 
-        guard !bookmarks.isEmpty || !reviews.isEmpty else {
+        guard !mergedBookmarks.isEmpty else {
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
             return
         }
 
         let helper = NotionHelperMethods()
         var rows: [HighlightRow] = []
-        rows.reserveCapacity(bookmarks.count + reviews.count)
+        rows.reserveCapacity(mergedBookmarks.count)
         
-        // 转换 bookmarks
-        for bm in bookmarks {
+        // 转换合并后的 bookmarks（reviewContent 作为 note）
+        for bm in mergedBookmarks {
             let row = HighlightRow(
                 assetId: book.bookId,
                 uuid: bm.highlightId,
                 text: bm.text,
-                note: bm.note,
+                note: bm.reviewContent ?? bm.note,  // 优先使用想法内容，其次是简短笔记
                 style: bm.colorIndex,
                 dateAdded: bm.timestamp.map { Date(timeIntervalSince1970: $0) },
                 modified: nil,
                 location: bm.chapterTitle
-            )
-            rows.append(row)
-        }
-        
-        // 转换 reviews（作为带 note 的虚拟高亮）
-        for rv in reviews {
-            let row = HighlightRow(
-                assetId: book.bookId,
-                uuid: "review-\(rv.reviewId)",
-                text: rv.content,
-                note: rv.content,
-                style: nil,
-                dateAdded: rv.timestamp.map { Date(timeIntervalSince1970: $0) },
-                modified: nil,
-                location: nil
             )
             rows.append(row)
         }

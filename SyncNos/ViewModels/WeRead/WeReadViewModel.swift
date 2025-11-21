@@ -101,9 +101,34 @@ final class WeReadViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            // 从 WeRead 远端拉取 Notebook 列表并直接转换为 UI 模型
+            // 从 WeRead 远端拉取 Notebook 列表
             let notebooks = try await apiService.fetchNotebooks()
-            books = notebooks.map { WeReadBookListItem(from: $0) }
+            
+            // 并发获取每本书的高亮数量
+            let booksWithCounts = try await withThrowingTaskGroup(
+                of: (WeReadNotebook, Int).self,
+                returning: [(WeReadNotebook, Int)].self
+            ) { group in
+                for notebook in notebooks {
+                    group.addTask { [weak self] in
+                        guard let self else { return (notebook, 0) }
+                        let count = await self.fetchHighlightCount(bookId: notebook.bookId)
+                        return (notebook, count)
+                    }
+                }
+                
+                var results: [(WeReadNotebook, Int)] = []
+                for try await result in group {
+                    results.append(result)
+                }
+                return results
+            }
+            
+            // 转换为 UI 模型
+            books = booksWithCounts.map { notebook, count in
+                WeReadBookListItem(from: notebook, highlightCount: count)
+            }
+            
             logger.info("[WeRead] fetched notebooks: \(notebooks.count)")
             isLoading = false
         } catch let error as WeReadAPIError where error.isAuthenticationError {
@@ -116,6 +141,19 @@ final class WeReadViewModel: ObservableObject {
             logger.error("[WeRead] loadBooks error: \(desc)")
             errorMessage = desc
             isLoading = false
+        }
+    }
+    
+    /// 获取书籍的高亮数量
+    /// - Parameter bookId: 书籍 ID
+    /// - Returns: 高亮数量
+    private func fetchHighlightCount(bookId: String) async -> Int {
+        do {
+            let bookmarks = try await apiService.fetchBookmarks(bookId: bookId)
+            return bookmarks.count
+        } catch {
+            logger.warning("[WeRead] Failed to fetch highlight count for bookId=\(bookId): \(error.localizedDescription)")
+            return 0
         }
     }
     
