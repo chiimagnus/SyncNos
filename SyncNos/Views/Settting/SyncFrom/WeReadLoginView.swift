@@ -26,12 +26,7 @@ struct WeReadLoginView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Login to WeRead")
-                .font(.title2)
-                .fontWeight(.semibold)
-
             WeReadWebView(webView: webView)
-                .frame(minWidth: 600, minHeight: 400)
                 .onAppear {
                     if webView.url == nil {
                         if let url = URL(string: "https://weread.qq.com/") {
@@ -56,49 +51,7 @@ struct WeReadLoginView: View {
                     Text("Done")
                 }
             }
-            .padding(.horizontal)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                if let status = viewModel.statusMessage {
-                    Text(status)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-
-                Text("Or paste WeRead Cookie header manually:")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-
-                TextEditor(text: $viewModel.manualCookie)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(height: 80)
-                    .border(Color.secondary.opacity(0.3))
-
-                HStack {
-                    Button {
-                        viewModel.applyManualCookie()
-                        onLoginChanged()
-                    } label: {
-                        Label("Save Manual Cookie", systemImage: "square.and.arrow.down")
-                    }
-
-                    Spacer()
-
-                    if viewModel.isLoggedIn {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.green)
-                            .help("WeRead login detected")
-                    } else {
-                        Image(systemName: "xmark.seal")
-                            .foregroundColor(.secondary)
-                            .help("WeRead not logged in")
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding()
         }
         .frame(minWidth: 640, minHeight: 600)
     }
