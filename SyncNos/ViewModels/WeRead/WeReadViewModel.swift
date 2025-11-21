@@ -286,7 +286,6 @@ final class WeReadViewModel: ObservableObject {
                 case "succeeded":
                     self.syncingBookIds.remove(bookId)
                     self.syncedBookIds.insert(bookId)
-                    self.triggerRecompute()
                 case "failed":
                     self.syncingBookIds.remove(bookId)
                 case "skipped":
