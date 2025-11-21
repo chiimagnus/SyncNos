@@ -173,6 +173,44 @@ struct MainListView: View {
                                     }
                                 }
                             }
+                        } else if contentSource == .weRead {
+                            Divider()
+
+                            Section("Sort") {
+                                ForEach(BookListSortKey.allCases, id: \.self) { key in
+                                    Button {
+                                        weReadVM.sortKey = key
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("WeReadFilterChanged"),
+                                            object: nil,
+                                            userInfo: ["sortKey": key.rawValue]
+                                        )
+                                    } label: {
+                                        if weReadVM.sortKey == key {
+                                            Label(key.displayName, systemImage: "checkmark")
+                                        } else {
+                                            Text(key.displayName)
+                                        }
+                                    }
+                                }
+
+                                Divider()
+
+                                Button {
+                                    weReadVM.sortAscending.toggle()
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("WeReadFilterChanged"),
+                                        object: nil,
+                                        userInfo: ["sortAscending": weReadVM.sortAscending]
+                                    )
+                                } label: {
+                                    if weReadVM.sortAscending {
+                                        Label("Ascending", systemImage: "checkmark")
+                                    } else {
+                                        Label("Ascending", systemImage: "xmark")
+                                    }
+                                }
+                            }
                         }
                     } label: {
                         // 显示数据源名称而不是图标
