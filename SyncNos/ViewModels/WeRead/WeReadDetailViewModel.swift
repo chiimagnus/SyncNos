@@ -74,6 +74,7 @@ final class WeReadDetailViewModel: ObservableObject {
         self.notionConfig = notionConfig
         
         setupNotificationSubscriptions()
+        setupFilterSortSubscriptions()
     }
     
     private func setupNotificationSubscriptions() {
@@ -114,6 +115,22 @@ final class WeReadDetailViewModel: ObservableObject {
                 Task { await self.reloadCurrent() }
             }
             .store(in: &cancellables)
+    }
+    
+    private func setupFilterSortSubscriptions() {
+        // 监听筛选和排序属性的变化，自动重新应用
+        Publishers.CombineLatest4(
+            $noteFilter,
+            $selectedStyles,
+            $sortField,
+            $isAscending
+        )
+        .dropFirst() // 跳过初始值
+        .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+        .sink { [weak self] _, _, _, _ in
+            self?.applyFiltersAndSort()
+        }
+        .store(in: &cancellables)
     }
 
     func loadHighlights(for bookId: String) async {
