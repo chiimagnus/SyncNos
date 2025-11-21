@@ -141,13 +141,13 @@ struct ViewCommands: Commands {
                     }
                 }
             } else {
-                // WeRead 的排序和筛选菜单（复用 Books 语义）
+                // WeRead 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
                         ForEach(BookListSortKey.allCases, id: \.self) { k in
                             Button {
                                 bookListSortKey = k.rawValue
-                                NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                                NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
                             } label: {
                                 if bookListSortKey == k.rawValue {
                                     Label(k.displayName, systemImage: "checkmark")
@@ -161,7 +161,7 @@ struct ViewCommands: Commands {
 
                         Button {
                             bookListSortAscending.toggle()
-                            NotificationCenter.default.post(name: Notification.Name("AppleBooksFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
+                            NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
                         } label: {
                             if bookListSortAscending {
                                 Label("Ascending", systemImage: "checkmark")

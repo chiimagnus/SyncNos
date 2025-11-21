@@ -93,6 +93,26 @@ final class WeReadViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        // 订阅来自 ViewCommands 的 WeRead 排序/筛选通知
+        NotificationCenter.default.publisher(for: Notification.Name("WeReadFilterChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                guard let info = notification.userInfo else { return }
+                
+                if let sortKeyRaw = info["sortKey"] as? String,
+                   let newKey = BookListSortKey(rawValue: sortKeyRaw) {
+                    self.sortKey = newKey
+                }
+                
+                if let ascending = info["sortAscending"] as? Bool {
+                    self.sortAscending = ascending
+                }
+                
+                self.triggerRecompute()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Public API

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // 临时结构体用于存储高亮数据
 struct WeReadHighlightDisplay: Identifiable {
@@ -59,6 +60,8 @@ final class WeReadDetailViewModel: ObservableObject {
     private var currentBookId: String?
     private var allBookmarks: [WeReadBookmark] = []
 
+    private var cancellables = Set<AnyCancellable>()
+
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
@@ -69,6 +72,48 @@ final class WeReadDetailViewModel: ObservableObject {
         self.syncService = syncService
         self.logger = logger
         self.notionConfig = notionConfig
+        
+        setupNotificationSubscriptions()
+    }
+    
+    private func setupNotificationSubscriptions() {
+        // 订阅来自 ViewCommands 的高亮排序/筛选通知
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                guard let info = notification.userInfo else { return }
+                
+                if let sortKeyRaw = info["sortKey"] as? String,
+                   let newField = HighlightSortField(rawValue: sortKeyRaw) {
+                    self.sortField = newField
+                }
+                
+                if let ascending = info["sortAscending"] as? Bool {
+                    self.isAscending = ascending
+                }
+                
+                Task { await self.reloadCurrent() }
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                guard let info = notification.userInfo else { return }
+                
+                if let hasNotes = info["hasNotes"] as? Bool {
+                    self.noteFilter = hasNotes
+                }
+                
+                if let selectedArray = info["selectedStyles"] as? [Int] {
+                    self.selectedStyles = Set(selectedArray)
+                }
+                
+                Task { await self.reloadCurrent() }
+            }
+            .store(in: &cancellables)
     }
 
     func loadHighlights(for bookId: String) async {
@@ -102,13 +147,20 @@ final class WeReadDetailViewModel: ObservableObject {
         // 转换合并后的 bookmarks（已包含 reviewContents）
         for bm in allBookmarks {
             // 应用筛选
-            // "仅笔记"过滤：检查是否有 reviewContents（关联的想法）
-            if noteFilter && bm.reviewContents.isEmpty {
-                continue
+            // "仅笔记"过滤：检查是否有 note 或 reviewContents（关联的想法）
+            if noteFilter {
+                let hasNote = (bm.note != nil && !bm.note!.isEmpty)
+                let hasReviews = !bm.reviewContents.isEmpty
+                if !hasNote && !hasReviews {
+                    continue
+                }
             }
+            
+            // 颜色筛选
             if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
                 continue
             }
+            
             result.append(WeReadHighlightDisplay(from: bm))
         }
         
