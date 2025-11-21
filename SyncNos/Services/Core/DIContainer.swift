@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 // MARK: - Dependency Injection Container
 class DIContainer {
