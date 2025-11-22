@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 /// WeRead 认证服务：管理 Cookie 字符串的安全存储与读取
 final class WeReadAuthService: WeReadAuthServiceProtocol {
@@ -31,7 +32,8 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
     func clearCookies() {
         cachedHeader = nil
         removeCookieHeaderFromKeychain()
-        logger.info("[WeRead] Cookie header cleared from Keychain.")
+        clearWebKitCookies()
+        logger.info("[WeRead] Cookie header cleared from Keychain and WebKit.")
     }
 
     // MARK: - Keychain helpers
@@ -53,5 +55,19 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
 
     private func removeCookieHeaderFromKeychain() {
         _ = KeychainHelper.shared.delete(service: "SyncNos.WeRead", account: keychainKey)
+    }
+
+    // MARK: - WebKit Cookie helpers
+
+    private func clearWebKitCookies() {
+        let store = WKWebsiteDataStore.default()
+        store.httpCookieStore.getAllCookies { cookies in
+            let wereadCookies = cookies.filter { cookie in
+                cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
+            }
+            for cookie in wereadCookies {
+                store.httpCookieStore.delete(cookie)
+            }
+        }
     }
 }
