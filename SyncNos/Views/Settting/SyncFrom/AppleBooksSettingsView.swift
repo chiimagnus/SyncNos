@@ -8,8 +8,8 @@ struct AppleBooksSettingsView: View {
         List {
             Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
                 Picker("Sync Mode", selection: $viewModel.syncMode) {
-                    Text("Single Database (One page per book)").tag("single")
-                    Text("One database per book (Each highlight as an entry)").tag("perBook")
+                    Text("One page per book").tag("single")
+                    Text("One database per book").tag("perBook")
                 }
                 .onChange(of: viewModel.syncMode) { _, _ in
                     viewModel.saveSyncMode()
