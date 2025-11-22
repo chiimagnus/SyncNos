@@ -25,35 +25,26 @@ struct WeReadLoginView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            WeReadWebView(webView: webView)
-                .onAppear {
-                    if webView.url == nil {
-                        if let url = URL(string: "https://weread.qq.com/") {
-                            let request = URLRequest(url: url)
-                            webView.load(request)
-                        }
+        WeReadWebView(webView: webView)
+            .onAppear {
+                if webView.url == nil {
+                    if let url = URL(string: "https://weread.qq.com/") {
+                        let request = URLRequest(url: url)
+                        webView.load(request)
                     }
                 }
-
-            HStack {
+            }
+        .frame(minWidth: 640, minHeight: 600)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
                 Button {
                     captureCookiesFromWebView()
+                    dismiss()
                 } label: {
                     Label("Save Cookies from WebView", systemImage: "checkmark.circle")
                 }
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Done")
-                }
             }
-            .padding()
         }
-        .frame(minWidth: 640, minHeight: 600)
     }
 
     private func captureCookiesFromWebView() {
