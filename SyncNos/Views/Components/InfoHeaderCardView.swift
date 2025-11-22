@@ -14,6 +14,19 @@ struct SelectionPlaceholderView: View {
 
     private var isMultipleSelection: Bool { count ?? 0 > 0 && onSyncSelected != nil }
 
+    private func colorForTitle(_ title: String) -> Color {
+        switch title.lowercased() {
+        case let t where t.contains("apple"): # #FE9509, 十六进制写法
+            return Color(red: 0xFE / 255, green: 0x95 / 255, blue: 0x09 / 255)
+        case let t where t.contains("goodlinks"): # #EA3558
+            return Color(red: 0xEA / 255, green: 0x35 / 255, blue: 0x58 / 255)
+        case let t where t.contains("weread"): # #30ACFE
+            return Color(red: 0x30 / 255, green: 0xAC / 255, blue: 0xFE / 255)
+        default:
+            return .primary
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -27,6 +40,7 @@ struct SelectionPlaceholderView: View {
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .fontWidth(.compressed)
                     .minimumScaleFactor(0.8)
+                    .foregroundColor(colorForTitle(title))
 
                 if isMultipleSelection, let count {
                     Button {
