@@ -44,66 +44,6 @@ struct IAPDebugView: View {
                 }
             }
             
-            // Device Info Section
-            Section(header: Text("Device Info")) {
-                if let fingerprint = viewModel.debugInfo?.deviceFingerprint {
-                    LabeledContent("Device Fingerprint") {
-                        Text(fingerprint)
-                            .font(.caption)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                } else {
-                    Text("No device fingerprint")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-            }
-            
-            // UserDefaults Keys Section
-            Section(header: Text("UserDefaults Keys")) {
-                if let keys = viewModel.debugInfo?.userDefaultsKeys, !keys.isEmpty {
-                    ForEach(Array(keys.keys.sorted()), id: \.self) { key in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(key)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            Text(keys[key] ?? "")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                } else {
-                    Text("No UserDefaults keys")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-            }
-            
-            // Keychain Data Section
-            Section(header: Text("Keychain Data")) {
-                if let data = viewModel.debugInfo?.keychainData, !data.isEmpty {
-                    ForEach(Array(data.keys.sorted()), id: \.self) { key in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(key)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            Text(data[key] ?? "")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                } else {
-                    Text("No Keychain data")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-            }
-            
             // Actions Section (Development Only)
             if viewModel.isDevEnvironment {
                 Section(header: Text("Actions")) {

@@ -378,12 +378,7 @@ extension IAPService {
             isInTrialPeriod: isInTrialPeriod,
             trialDaysRemaining: trialDaysRemaining,
             firstLaunchDate: getFirstLaunchDate(),
-            deviceFingerprint: UserDefaults.standard.string(forKey: deviceFingerprintKey),
-            lastReminderDate: UserDefaults.standard.object(forKey: lastReminderDateKey) as? Date,
-            hasShownWelcome: UserDefaults.standard.bool(forKey: hasShownWelcomeKey),
-            environmentType: DIContainer.shared.environmentDetector.environmentType(),
-            userDefaultsKeys: getAllIAPUserDefaultsKeys(),
-            keychainData: getAllIAPKeychainData()
+            environmentType: DIContainer.shared.environmentDetector.environmentType()
         )
     }
     
@@ -432,42 +427,5 @@ extension IAPService {
         }
         
         logger.info("Simulation complete. New state: \(getDebugInfo())")
-    }
-    
-    // MARK: - Private Helpers
-    
-    private func getAllIAPUserDefaultsKeys() -> [String: String] {
-        var result: [String: String] = [:]
-        
-        let keys = [
-            annualSubscriptionKey,
-            lifetimeLicenseKey,
-            firstLaunchDateKey,
-            deviceFingerprintKey,
-            lastReminderDateKey,
-            hasShownWelcomeKey
-        ]
-        
-        for key in keys {
-            if let value = UserDefaults.standard.object(forKey: key) {
-                result[key] = String(describing: value)
-            }
-        }
-        
-        return result
-    }
-    
-    private func getAllIAPKeychainData() -> [String: String] {
-        var result: [String: String] = [:]
-        
-        if let firstLaunch = KeychainHelper.shared.getFirstLaunchDate() {
-            result["firstLaunchDate"] = ISO8601DateFormatter().string(from: firstLaunch)
-        }
-        
-        if let fingerprint = KeychainHelper.shared.getDeviceFingerprint() {
-            result["deviceFingerprint"] = fingerprint
-        }
-        
-        return result
     }
 }
