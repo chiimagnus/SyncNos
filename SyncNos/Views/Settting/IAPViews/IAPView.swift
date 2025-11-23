@@ -9,14 +9,64 @@ struct IAPView: View {
             Section(header: Text("Status")) {
                 // Purchase Status
                 if viewModel.hasPurchased {
-                    HStack {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.green)
-                        Text("Pro Features Unlocked")
-                        Spacer()
-                        Text("Purchased")
-                            .font(.caption)
-                            .foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                            Text(viewModel.purchaseType.displayName)
+                                .font(.headline)
+                            Spacer()
+                            Text("Active")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                        
+                        // 显示购买日期
+                        if let purchaseDate = viewModel.purchaseDate {
+                            HStack {
+                                Text("Purchased:")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(purchaseDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        // 如果是年度订阅，显示到期时间
+                        if viewModel.purchaseType == .annual, let expirationDate = viewModel.expirationDate {
+                            HStack {
+                                Text("Expires:")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(expirationDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundStyle(expirationDate < Date() ? .red : .secondary)
+                            }
+                            
+                            // 显示剩余天数
+                            let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
+                            if daysRemaining > 0 {
+                                Text("\(daysRemaining) days remaining")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if daysRemaining == 0 {
+                                Text("Expires today")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            } else {
+                                Text("Expired")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        
+                        // 如果是终身，显示说明
+                        if viewModel.purchaseType == .lifetime {
+                            Text("Lifetime access - never expires")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     // Trial Status - Always show

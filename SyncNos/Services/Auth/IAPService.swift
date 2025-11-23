@@ -33,6 +33,24 @@ final class IAPService: IAPServiceProtocol {
         UserDefaults.standard.bool(forKey: annualSubscriptionKey) ||
         UserDefaults.standard.bool(forKey: lifetimeLicenseKey)
     }
+    
+    var hasPurchasedAnnual: Bool {
+        UserDefaults.standard.bool(forKey: annualSubscriptionKey)
+    }
+    
+    var hasPurchasedLifetime: Bool {
+        UserDefaults.standard.bool(forKey: lifetimeLicenseKey)
+    }
+    
+    var purchaseType: PurchaseType {
+        if hasPurchasedLifetime {
+            return .lifetime
+        } else if hasPurchasedAnnual {
+            return .annual
+        } else {
+            return .none
+        }
+    }
 
     var isInTrialPeriod: Bool {
         guard let firstLaunchDate = getFirstLaunchDate() else {
@@ -258,6 +276,53 @@ final class IAPService: IAPServiceProtocol {
             }
         }
         return isProUnlocked
+    }
+    
+    // MARK: - Purchase Details
+    
+    /// 获取年度订阅的到期时间（如果有）
+    func getAnnualSubscriptionExpirationDate() async -> Date? {
+        guard let latest = await Transaction.latest(for: IAPProductIds.annualSubscription.rawValue) else {
+            return nil
+        }
+        
+        switch latest {
+        case .verified(let transaction):
+            // 对于 NonConsumable 类型，expirationDate 为 nil
+            // 我们需要使用 purchaseDate 加上一年来计算到期时间
+            let purchaseDate = transaction.purchaseDate
+            return Calendar.current.date(byAdding: .year, value: 1, to: purchaseDate)
+        case .unverified:
+            return nil
+        }
+    }
+    
+    /// 获取购买日期
+    func getPurchaseDate() async -> Date? {
+        // 优先返回终身购买日期，其次是年度订阅
+        if hasPurchasedLifetime {
+            if let latest = await Transaction.latest(for: IAPProductIds.lifetimeLicense.rawValue) {
+                switch latest {
+                case .verified(let transaction):
+                    return transaction.purchaseDate
+                case .unverified:
+                    return nil
+                }
+            }
+        }
+        
+        if hasPurchasedAnnual {
+            if let latest = await Transaction.latest(for: IAPProductIds.annualSubscription.rawValue) {
+                switch latest {
+                case .verified(let transaction):
+                    return transaction.purchaseDate
+                case .unverified:
+                    return nil
+                }
+            }
+        }
+        
+        return nil
     }
 }
 

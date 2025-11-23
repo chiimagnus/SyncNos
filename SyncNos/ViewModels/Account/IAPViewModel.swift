@@ -9,8 +9,11 @@ final class IAPViewModel: ObservableObject {
     @Published var message: String?
     @Published var isProUnlocked: Bool = DIContainer.shared.iapService.isProUnlocked
     @Published var hasPurchased: Bool = DIContainer.shared.iapService.hasPurchased
+    @Published var purchaseType: PurchaseType = DIContainer.shared.iapService.purchaseType
     @Published var isInTrialPeriod: Bool = DIContainer.shared.iapService.isInTrialPeriod
     @Published var trialDaysRemaining: Int = DIContainer.shared.iapService.trialDaysRemaining
+    @Published var expirationDate: Date?
+    @Published var purchaseDate: Date?
 
     private let iap: IAPServiceProtocol
     private var cancellables: Set<AnyCancellable> = []
@@ -32,8 +35,15 @@ final class IAPViewModel: ObservableObject {
     private func updateStatus() {
         isProUnlocked = iap.isProUnlocked
         hasPurchased = iap.hasPurchased
+        purchaseType = iap.purchaseType
         isInTrialPeriod = iap.isInTrialPeriod
         trialDaysRemaining = iap.trialDaysRemaining
+        
+        // 异步获取日期信息
+        Task {
+            expirationDate = await iap.getAnnualSubscriptionExpirationDate()
+            purchaseDate = await iap.getPurchaseDate()
+        }
     }
 
     func onAppear() {
