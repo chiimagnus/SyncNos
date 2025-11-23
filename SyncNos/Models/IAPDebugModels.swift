@@ -22,7 +22,6 @@ struct IAPDebugInfo: Codable {
     let isInTrialPeriod: Bool
     let trialDaysRemaining: Int
     let firstLaunchDate: Date?
-    let environmentType: EnvironmentType
 }
 
 // MARK: - Simulated Purchase State

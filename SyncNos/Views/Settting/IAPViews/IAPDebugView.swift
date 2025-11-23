@@ -5,15 +5,6 @@ struct IAPDebugView: View {
     
     var body: some View {
         List {
-            // Environment Section
-            Section(header: Text("Environment")) {
-                LabeledContent("Environment Type") {
-                    Text(viewModel.debugInfo?.environmentType.description ?? "Unknown")
-                        .foregroundStyle(viewModel.isDevEnvironment ? .green : .red)
-                        .fontWeight(.semibold)
-                }
-            }
-            
             // Purchase Status Section
             Section(header: Text("Purchase Status")) {
                 StatusRow(
@@ -44,46 +35,44 @@ struct IAPDebugView: View {
                 }
             }
             
-            // Actions Section (Development Only)
-            if viewModel.isDevEnvironment {
-                Section(header: Text("Actions")) {
-                    Button(action: {
-                        viewModel.requestReset()
-                    }) {
-                        Label("Reset All IAP Data", systemImage: "trash.fill")
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Menu {
-                        Button("Purchased Annual") {
-                            viewModel.simulateState(.purchasedAnnual)
-                        }
-                        Button("Purchased Lifetime") {
-                            viewModel.simulateState(.purchasedLifetime)
-                        }
-                        Divider()
-                        Button("Trial Day 1") {
-                            viewModel.simulateState(.trialDay(1))
-                        }
-                        Button("Trial Day 7") {
-                            viewModel.simulateState(.trialDay(7))
-                        }
-                        Button("Trial Day 15") {
-                            viewModel.simulateState(.trialDay(15))
-                        }
-                        Button("Trial Day 29") {
-                            viewModel.simulateState(.trialDay(29))
-                        }
-                        Divider()
-                        Button("Trial Expired") {
-                            viewModel.simulateState(.trialExpired)
-                        }
-                    } label: {
-                        Label("Simulate State", systemImage: "wand.and.stars")
-                    }
-                    .buttonStyle(.bordered)
+            // Actions Section
+            Section(header: Text("Actions")) {
+                Button(action: {
+                    viewModel.requestReset()
+                }) {
+                    Label("Reset All IAP Data", systemImage: "trash.fill")
+                        .foregroundStyle(.red)
                 }
+                .buttonStyle(.bordered)
+                
+                Menu {
+                    Button("Purchased Annual") {
+                        viewModel.simulateState(.purchasedAnnual)
+                    }
+                    Button("Purchased Lifetime") {
+                        viewModel.simulateState(.purchasedLifetime)
+                    }
+                    Divider()
+                    Button("Trial Day 1") {
+                        viewModel.simulateState(.trialDay(1))
+                    }
+                    Button("Trial Day 7") {
+                        viewModel.simulateState(.trialDay(7))
+                    }
+                    Button("Trial Day 15") {
+                        viewModel.simulateState(.trialDay(15))
+                    }
+                    Button("Trial Day 29") {
+                        viewModel.simulateState(.trialDay(29))
+                    }
+                    Divider()
+                    Button("Trial Expired") {
+                        viewModel.simulateState(.trialExpired)
+                    }
+                } label: {
+                    Label("Simulate State", systemImage: "wand.and.stars")
+                }
+                .buttonStyle(.bordered)
             }
         }
         .listStyle(.sidebar)
