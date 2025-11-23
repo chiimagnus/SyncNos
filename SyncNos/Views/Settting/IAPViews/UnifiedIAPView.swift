@@ -150,7 +150,7 @@ struct UnifiedIAPView: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.isProUnlocked)
+        .disabled(viewModel.hasPurchased)  // 只有已购买时才禁用，试用期内可以购买
     }
     
     // MARK: - Actions Section
