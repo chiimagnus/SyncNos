@@ -4,7 +4,6 @@ import Combine
 @MainActor
 final class IAPDebugViewModel: ObservableObject {
     @Published var debugInfo: IAPDebugInfo?
-    @Published var isDevEnvironment: Bool = false
     @Published var showResetConfirmation: Bool = false
     @Published var showAlert: Bool = false
     @Published var alertMessage: String?
@@ -15,7 +14,6 @@ final class IAPDebugViewModel: ObservableObject {
     
     init(iapService: IAPServiceProtocol = DIContainer.shared.iapService) {
         self.iapService = iapService
-        self.isDevEnvironment = DIContainer.shared.environmentDetector.isDevEnvironment()
         
         // Subscribe to IAP status changes
         NotificationCenter.default

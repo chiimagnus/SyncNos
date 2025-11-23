@@ -377,8 +377,7 @@ extension IAPService {
             hasPurchasedLifetime: UserDefaults.standard.bool(forKey: lifetimeLicenseKey),
             isInTrialPeriod: isInTrialPeriod,
             trialDaysRemaining: trialDaysRemaining,
-            firstLaunchDate: getFirstLaunchDate(),
-            environmentType: DIContainer.shared.environmentDetector.environmentType()
+            firstLaunchDate: getFirstLaunchDate()
         )
     }
     
