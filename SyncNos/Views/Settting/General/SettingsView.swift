@@ -48,11 +48,11 @@ struct SettingsView: View {
 #endif
                 }
                 .collapsible(false)
-#if DEBUG
-                Section(header: Text("Support")) {
+
+                Section(header: Text("Support the Project")) {
                     NavigationLink(destination: IAPView()) {
                         HStack {
-                            Label("Support & Pro Unlock", systemImage: "heart.circle")
+                            Label("Pro Features", systemImage: "star.circle.fill")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
@@ -62,7 +62,6 @@ struct SettingsView: View {
                     .help("Support development and unlock Pro features")
                 }
                 .collapsible(false)
-#endif
 
                 Section(header: Text("Sync Data To")) {
                     NavigationLink(value: "notion") {
