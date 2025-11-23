@@ -3,19 +3,23 @@ import StoreKit
 
 // MARK: - Product Identifiers
 enum IAPProductIds: String, CaseIterable {
-    case pro = "com.chiimagnus.syncnos.pro"
+    case annualSubscription = "com.syncnos.annual.20"
+    case lifetimeLicense = "com.syncnos.lifetime.68"
 }
 
 // MARK: - IAP Service (StoreKit 2)
 final class IAPService: IAPServiceProtocol {
     private let logger = DIContainer.shared.loggerService
-    private let unlockedKey = "syncnos.pro.unlocked"
+    private let annualSubscriptionKey = "syncnos.annual.subscription.unlocked"
+    private let lifetimeLicenseKey = "syncnos.lifetime.license.unlocked"
     private var updatesTask: Task<Void, Never>?
 
     static let statusChangedNotification = Notification.Name("IAPServiceStatusChanged")
 
     var isProUnlocked: Bool {
-        UserDefaults.standard.bool(forKey: unlockedKey)
+        // Pro unlocked if either annual subscription or lifetime license is active
+        UserDefaults.standard.bool(forKey: annualSubscriptionKey) ||
+        UserDefaults.standard.bool(forKey: lifetimeLicenseKey)
     }
 
     // MARK: - Public API
@@ -95,31 +99,44 @@ final class IAPService: IAPServiceProtocol {
 
     // MARK: - Helpers
     @MainActor
-    private func setUnlocked(_ newValue: Bool) {
-        let current = isProUnlocked
+    private func setUnlocked(_ productId: String, _ newValue: Bool) {
+        let key = keyForProduct(productId)
+        let current = UserDefaults.standard.bool(forKey: key)
         guard current != newValue else { return }
-        UserDefaults.standard.set(newValue, forKey: unlockedKey)
+        UserDefaults.standard.set(newValue, forKey: key)
         NotificationCenter.default.post(name: Self.statusChangedNotification, object: nil)
-        logger.info("Pro unlocked state changed to: \(newValue)")
+        logger.info("Product \(productId) unlocked state changed to: \(newValue)")
+    }
+
+    private func keyForProduct(_ productId: String) -> String {
+        switch productId {
+        case IAPProductIds.annualSubscription.rawValue:
+            return annualSubscriptionKey
+        case IAPProductIds.lifetimeLicense.rawValue:
+            return lifetimeLicenseKey
+        default:
+            return "syncnos.unknown.product"
+        }
     }
 
     private func setUnlockedIfNeeded(for transaction: Transaction) async {
         // Non-consumable unlock stays as long as not revoked
-        if transaction.productID == IAPProductIds.pro.rawValue {
-            await setUnlocked(transaction.revocationDate == nil)
-        }
+        let isValid = transaction.revocationDate == nil
+        await setUnlocked(transaction.productID, isValid)
     }
 
     func refreshPurchasedStatus() async -> Bool {
-        if let latest = await Transaction.latest(for: IAPProductIds.pro.rawValue) {
-            switch latest {
-            case .verified(let transaction):
-                await setUnlocked(transaction.revocationDate == nil)
-            case .unverified(_, let error):
-                logger.warning("Latest transaction unverified: \(error.localizedDescription)")
+        for productId in IAPProductIds.allCases {
+            if let latest = await Transaction.latest(for: productId.rawValue) {
+                switch latest {
+                case .verified(let transaction):
+                    await setUnlocked(transaction.productID, transaction.revocationDate == nil)
+                case .unverified(_, let error):
+                    logger.warning("Latest transaction unverified for \(productId.rawValue): \(error.localizedDescription)")
+                }
+            } else {
+                await setUnlocked(productId.rawValue, false)
             }
-        } else {
-            await setUnlocked(false)
         }
         return isProUnlocked
     }
