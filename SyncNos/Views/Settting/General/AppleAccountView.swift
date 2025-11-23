@@ -57,7 +57,7 @@ struct AppleAccountView: View {
                                 Text("User Identifier：\(user.userIdentifier)")
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
-                                #if DEBUG
+#if DEBUG
                                 if let code = user.authorizationCode, !code.isEmpty {
                                     Text("authorization_code：\(code)")
                                         .font(.footnote)
@@ -70,7 +70,7 @@ struct AppleAccountView: View {
                                         .foregroundColor(.secondary)
                                         .textSelection(.enabled)
                                 }
-                                #endif
+#endif
                                 Button("Reset status") { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }

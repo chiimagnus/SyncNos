@@ -14,11 +14,11 @@ final class LoggerService: LoggerServiceProtocol {
 
     private init() {
         // 在开发环境中默认为debug级别，生产环境中默认为info级别
-        #if DEBUG
+#if DEBUG
         self.currentLevel = .debug
-        #else
+#else
         self.currentLevel = .info
-        #endif
+#endif
     }
 
     var currentLevel: LogLevel = .info
