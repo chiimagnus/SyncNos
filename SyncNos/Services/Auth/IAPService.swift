@@ -332,21 +332,21 @@ extension IAPService {
     
     func resetAllPurchaseData() throws {
         let beforeState = getDebugInfo()
-        logger.info("Starting IAP reset. Before state: hasPurchasedAnnual=\(beforeState.hasPurchasedAnnual), hasPurchasedLifetime=\(beforeState.hasPurchasedLifetime), isInTrialPeriod=\(beforeState.isInTrialPeriod), trialDaysRemaining=\(beforeState.trialDaysRemaining)")
+        logger.debug("Starting IAP reset. Before state: hasPurchasedAnnual=\(beforeState.hasPurchasedAnnual), hasPurchasedLifetime=\(beforeState.hasPurchasedLifetime), isInTrialPeriod=\(beforeState.isInTrialPeriod), trialDaysRemaining=\(beforeState.trialDaysRemaining)")
         
-        logger.info("Clearing UserDefaults IAP keys...")
+        logger.debug("Clearing UserDefaults IAP keys...")
         UserDefaults.standard.removeObject(forKey: annualSubscriptionKey)
         UserDefaults.standard.removeObject(forKey: lifetimeLicenseKey)
         UserDefaults.standard.removeObject(forKey: firstLaunchDateKey)
         UserDefaults.standard.removeObject(forKey: deviceFingerprintKey)
         UserDefaults.standard.removeObject(forKey: lastReminderDateKey)
         UserDefaults.standard.removeObject(forKey: hasShownWelcomeKey)
-        logger.info("UserDefaults cleared")
+        logger.debug("UserDefaults cleared")
         
-        logger.info("Clearing Keychain IAP data...")
+        logger.debug("Clearing Keychain IAP data...")
         KeychainHelper.shared.deleteFirstLaunchDate()
         KeychainHelper.shared.deleteDeviceFingerprint()
-        logger.info("Keychain cleared")
+        logger.debug("Keychain cleared")
         
         Task { @MainActor in
             NotificationCenter.default.post(
@@ -354,10 +354,10 @@ extension IAPService {
                 object: nil
             )
         }
-        logger.info("Status change notification sent")
+        logger.debug("Status change notification sent")
         
         let afterState = getDebugInfo()
-        logger.info("IAP reset complete. After state: hasPurchasedAnnual=\(afterState.hasPurchasedAnnual), hasPurchasedLifetime=\(afterState.hasPurchasedLifetime), isInTrialPeriod=\(afterState.isInTrialPeriod), trialDaysRemaining=\(afterState.trialDaysRemaining)")
+        logger.debug("IAP reset complete. After state: hasPurchasedAnnual=\(afterState.hasPurchasedAnnual), hasPurchasedLifetime=\(afterState.hasPurchasedLifetime), isInTrialPeriod=\(afterState.isInTrialPeriod), trialDaysRemaining=\(afterState.trialDaysRemaining)")
     }
     
     func getDebugInfo() -> IAPDebugInfo {
@@ -371,28 +371,28 @@ extension IAPService {
     }
     
     func simulatePurchaseState(_ state: SimulatedPurchaseState) throws {
-        logger.info("Simulating purchase state: \(state)")
+        logger.debug("Simulating purchase state: \(state)")
         
         switch state {
         case .purchasedAnnual:
             UserDefaults.standard.set(true, forKey: annualSubscriptionKey)
-            logger.info("Simulated: Annual subscription purchased")
+            logger.debug("Simulated: Annual subscription purchased")
             
         case .purchasedLifetime:
             UserDefaults.standard.set(true, forKey: lifetimeLicenseKey)
-            logger.info("Simulated: Lifetime license purchased")
+            logger.debug("Simulated: Lifetime license purchased")
             
         case .trialDay(let day):
             let targetDate = Calendar.current.date(byAdding: .day, value: -day, to: Date())!
             UserDefaults.standard.set(targetDate, forKey: firstLaunchDateKey)
             KeychainHelper.shared.saveFirstLaunchDate(targetDate)
-            logger.info("Simulated: Trial day \(day) (first launch: \(targetDate))")
+            logger.debug("Simulated: Trial day \(day) (first launch: \(targetDate))")
             
         case .trialExpired:
             let expiredDate = Calendar.current.date(byAdding: .day, value: -31, to: Date())!
             UserDefaults.standard.set(expiredDate, forKey: firstLaunchDateKey)
             KeychainHelper.shared.saveFirstLaunchDate(expiredDate)
-            logger.info("Simulated: Trial expired (first launch: \(expiredDate))")
+            logger.debug("Simulated: Trial expired (first launch: \(expiredDate))")
             
         case .reset:
             try resetAllPurchaseData()
@@ -406,6 +406,6 @@ extension IAPService {
             )
         }
         
-        logger.info("Simulation complete. New state: \(getDebugInfo())")
+        logger.debug("Simulation complete. New state: \(getDebugInfo())")
     }
 }
