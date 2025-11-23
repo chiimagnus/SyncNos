@@ -13,8 +13,16 @@ struct SyncNosApp: App {
             DIContainer.shared.loggerService.warning("No saved bookmark to restore")
         }
 
-        // Start observing IAP transactions
+        // Start observing IAP transactions and check trial status
         DIContainer.shared.iapService.startObservingTransactions()
+        
+        // Initialize trial period (records first launch if needed)
+        let iapService = DIContainer.shared.iapService
+        if iapService.isInTrialPeriod {
+            DIContainer.shared.loggerService.info("Trial period active: \(iapService.trialDaysRemaining) days remaining")
+        } else if !iapService.hasPurchased {
+            DIContainer.shared.loggerService.warning("Trial period expired, purchase required")
+        }
 
         // Start Auto Sync if any source enabled
         let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")

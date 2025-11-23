@@ -7,11 +7,46 @@ struct IAPView: View {
     var body: some View {
         List {
             Section(header: Text("Status")) {
-                HStack {
-                    Text("Pro Features Unlocked")
-                    Spacer()
-                    Image(systemName: viewModel.isProUnlocked ? "checkmark.seal.fill" : "xmark.seal")
-                        .foregroundColor(viewModel.isProUnlocked ? .green : .secondary)
+                // Purchase Status
+                if viewModel.hasPurchased {
+                    HStack {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        Text("Pro Features Unlocked")
+                        Spacer()
+                        Text("Purchased")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                } else {
+                    // Trial Status - Always show
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: viewModel.isInTrialPeriod ? "clock.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(viewModel.isInTrialPeriod ? .blue : .red)
+                            Text("Trial Period")
+                            Spacer()
+                            if viewModel.isInTrialPeriod {
+                                Text("\(viewModel.trialDaysRemaining) days left")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("Expired")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        
+                        if viewModel.isInTrialPeriod {
+                            Text("Enjoy full access during your trial period.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Purchase to continue using SyncNos.")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
             }
 
