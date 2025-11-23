@@ -283,8 +283,8 @@ protocol WeReadAuthServiceProtocol: AnyObject {
 
     /// 更新并持久化新的 Cookie Header
     func updateCookieHeader(_ header: String)
-    /// 清除本地存储的 Cookie 与登录状态
-    func clearCookies()
+    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
+    func clearCookies() async
 }
 
 /// WeRead API 服务协议
