@@ -15,26 +15,6 @@
   ],
   "products" : [
     {
-      "displayPrice" : "18.0",
-      "familyShareable" : false,
-      "internalID" : "6755643555",
-      "localizations" : [
-        {
-          "description" : "Annual subscription for unlimited syncing",
-          "displayName" : "SyncNos Annual Subscription",
-          "locale" : "en_US"
-        },
-        {
-          "description" : "年度订阅，无限同步",
-          "displayName" : "SyncNos 年订阅",
-          "locale" : "zh_Hans"
-        }
-      ],
-      "productID" : "com.syncnos.annual.20",
-      "referenceName" : "年订阅18",
-      "type" : "NonConsumable"
-    },
-    {
       "displayPrice" : "68.0",
       "familyShareable" : false,
       "internalID" : "6755643605",
@@ -73,7 +53,48 @@
     "_timeRate" : 0
   },
   "subscriptionGroups" : [
+    {
+      "id" : "54D0AB47",
+      "localizations" : [
 
+      ],
+      "name" : "SyncNos Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "18",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "80DB5C5D",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Annual subscription for unlimited syncing",
+              "displayName" : "SyncNos Annual Subscription",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "年度订阅，无限同步",
+              "displayName" : "SyncNos 年度订阅",
+              "locale" : "zh_Hans"
+            }
+          ],
+          "productID" : "com.syncnos.annual.18",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "年订阅18",
+          "subscriptionGroupID" : "54D0AB47",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 4,
