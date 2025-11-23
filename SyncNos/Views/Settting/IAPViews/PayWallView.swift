@@ -83,7 +83,7 @@ struct PayWallView: View {
         HStack(spacing: 8) {
             Image(systemName: "clock.badge.exclamationmark")
                 .foregroundStyle(daysRemaining <= 1 ? .red : .orange)
-            Text("\(daysRemaining) day\(daysRemaining == 1 ? "" : "s") remaining")
+            Text("\(daysRemaining) days left")
                 .font(.headline)
                 .foregroundStyle(.primary)
         }
