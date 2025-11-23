@@ -22,12 +22,7 @@ struct IAPDebugInfo: Codable {
     let isInTrialPeriod: Bool
     let trialDaysRemaining: Int
     let firstLaunchDate: Date?
-    let deviceFingerprint: String?
-    let lastReminderDate: Date?
-    let hasShownWelcome: Bool
     let environmentType: EnvironmentType
-    let userDefaultsKeys: [String: String]
-    let keychainData: [String: String]
 }
 
 // MARK: - Simulated Purchase State
