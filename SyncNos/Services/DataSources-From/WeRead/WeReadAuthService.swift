@@ -59,11 +59,12 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
 
     // MARK: - WebKit Cookie helpers
 
+    @MainActor
     private func clearWebKitCookies() async {
         let store = WKWebsiteDataStore.default()
         
         // 使用 async/await 确保清理完成
-        await withCheckedContinuation { continuation in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             store.httpCookieStore.getAllCookies { cookies in
                 let wereadCookies = cookies.filter { cookie in
                     cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
@@ -79,8 +80,10 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
                 }
                 
                 group.notify(queue: .main) {
-                    self.logger.info("[WeRead] Cleared \(wereadCookies.count) WebKit cookies.")
-                    continuation.resume()
+                    Task { @MainActor in
+                        self.logger.info("[WeRead] Cleared \(wereadCookies.count) WebKit cookies.")
+                        continuation.resume()
+                    }
                 }
             }
         }
