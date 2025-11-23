@@ -8,9 +8,8 @@ struct MainListView: View {
     @State private var selectedWeReadBookIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @Environment(\.openWindow) private var openWindow
-    @State private var showPaywall = false
-    @State private var showWelcome = false
-    @State private var showTrialReminder = false
+    @State private var showIAPView = false
+    @State private var iapPresentationMode: IAPPresentationMode = .welcome
 
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
@@ -371,14 +370,8 @@ struct MainListView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-        }
-        .sheet(isPresented: $showWelcome) {
-            WelcomeView()
-        }
-        .sheet(isPresented: $showTrialReminder) {
-            TrialReminderView(daysRemaining: iapService.trialDaysRemaining)
+        .sheet(isPresented: $showIAPView) {
+            UnifiedIAPView(presentationMode: iapPresentationMode)
         }
         .onAppear {
             checkTrialStatus()
@@ -391,19 +384,22 @@ struct MainListView: View {
     private func checkTrialStatus() {
         // Priority 1: Show welcome for first-time users
         if !iapService.hasShownWelcome {
-            showWelcome = true
+            iapPresentationMode = .welcome
+            showIAPView = true
             return
         }
         
         // Priority 2: Show paywall if trial expired and not purchased
         if !iapService.isProUnlocked {
-            showPaywall = true
+            iapPresentationMode = .trialExpired
+            showIAPView = true
             return
         }
         
         // Priority 3: Show gentle reminder at 7, 3, 1 days remaining
         if iapService.shouldShowTrialReminder() {
-            showTrialReminder = true
+            iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
+            showIAPView = true
         }
     }
 }
