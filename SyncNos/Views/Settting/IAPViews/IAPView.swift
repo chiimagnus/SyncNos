@@ -57,16 +57,13 @@ struct IAPView: View {
                         viewModel.simulateState(.purchasedLifetime)
                     }
                     Divider()
-                    Button("Trial Day 1") {
-                        viewModel.simulateState(.trialDay(1))
+                    Button("Trial Day 23 (7 days left)") {
+                        viewModel.simulateState(.trialDay(23))
                     }
-                    Button("Trial Day 7") {
-                        viewModel.simulateState(.trialDay(7))
+                    Button("Trial Day 27 (3 days left)") {
+                        viewModel.simulateState(.trialDay(27))
                     }
-                    Button("Trial Day 15") {
-                        viewModel.simulateState(.trialDay(15))
-                    }
-                    Button("Trial Day 29") {
+                    Button("Trial Day 29 (1 day left)") {
                         viewModel.simulateState(.trialDay(29))
                     }
                     Divider()
