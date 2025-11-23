@@ -78,7 +78,7 @@ struct IAPView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Support the Project")
+        .navigationTitle("Support")
         .onAppear {
             viewModel.onAppear()
         }
@@ -125,7 +125,7 @@ struct IAPView: View {
                 // 显示剩余天数
                 let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
                 if daysRemaining > 0 {
-                    Text("\(daysRemaining) days remaining")
+                    Text("\(daysRemaining) days left")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else if daysRemaining == 0 {
