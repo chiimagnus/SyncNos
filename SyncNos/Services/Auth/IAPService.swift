@@ -288,10 +288,16 @@ final class IAPService: IAPServiceProtocol {
         
         switch latest {
         case .verified(let transaction):
-            // 对于 NonConsumable 类型，expirationDate 为 nil
-            // 我们需要使用 purchaseDate 加上一年来计算到期时间
-            let purchaseDate = transaction.purchaseDate
-            return Calendar.current.date(byAdding: .year, value: 1, to: purchaseDate)
+            // 对于自动续费订阅，直接使用 expirationDate
+            // 如果 expirationDate 为 nil（理论上不应该），则回退到手动计算
+            if let expirationDate = transaction.expirationDate {
+                return expirationDate
+            } else {
+                // 回退方案：使用 purchaseDate 加上一年
+                logger.warning("Auto-renewing subscription missing expirationDate, using fallback calculation")
+                let purchaseDate = transaction.purchaseDate
+                return Calendar.current.date(byAdding: .year, value: 1, to: purchaseDate)
+            }
         case .unverified:
             return nil
         }
