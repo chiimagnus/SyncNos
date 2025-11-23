@@ -280,6 +280,16 @@ struct PayWallView: View {
     // MARK: - Actions
     
     private func handlePurchaseSuccess() {
+        let logger = DIContainer.shared.loggerService
+        logger.info("Purchase successful, handling completion")
+        
+        // 如果当前是欢迎模式，标记已显示
+        if case .welcome = presentationMode {
+            logger.debug("Welcome mode detected, marking welcome as shown")
+            DIContainer.shared.iapService.markWelcomeShown()
+        }
+        
+        logger.debug("Dismissing paywall view")
         dismiss()
     }
 }

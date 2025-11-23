@@ -377,30 +377,50 @@ struct MainListView: View {
             checkTrialStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
+            let logger = DIContainer.shared.loggerService
+            logger.debug("IAP status changed notification received, rechecking trial status")
             checkTrialStatus()
         }
     }
 
     private func checkTrialStatus() {
-        // Priority 1: Show welcome for first-time users
-        if !iapService.hasShownWelcome {
-            iapPresentationMode = .welcome
-            showIAPView = true
+        let logger = DIContainer.shared.loggerService
+        logger.debug("checkTrialStatus called: hasPurchased=\(iapService.hasPurchased), isProUnlocked=\(iapService.isProUnlocked), hasShownWelcome=\(iapService.hasShownWelcome), trialDaysRemaining=\(iapService.trialDaysRemaining)")
+        
+        // Priority 1: 如果已购买，不显示任何付费墙
+        if iapService.hasPurchased {
+            logger.debug("User has purchased, hiding paywall")
+            showIAPView = false
             return
         }
         
-        // Priority 2: Show paywall if trial expired and not purchased
+        // Priority 2: 如果试用期过期且未购买，显示过期视图
         if !iapService.isProUnlocked {
+            logger.debug("Trial expired, showing trialExpired view")
             iapPresentationMode = .trialExpired
             showIAPView = true
             return
         }
         
-        // Priority 3: Show gentle reminder at 7, 3, 1 days remaining
+        // Priority 3: 如果应该显示试用提醒，显示提醒视图
         if iapService.shouldShowTrialReminder() {
+            logger.debug("Should show trial reminder, showing trialReminder view")
             iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
             showIAPView = true
+            return
         }
+        
+        // Priority 4: 如果是首次使用且在试用期内，显示欢迎视图
+        if !iapService.hasShownWelcome {
+            logger.debug("First time user, showing welcome view")
+            iapPresentationMode = .welcome
+            showIAPView = true
+            return
+        }
+        
+        // 其他情况不显示付费墙
+        logger.debug("No paywall needed, hiding")
+        showIAPView = false
     }
 }
 
