@@ -8,6 +8,9 @@ final class IAPViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var message: String?
     @Published var isProUnlocked: Bool = DIContainer.shared.iapService.isProUnlocked
+    @Published var hasPurchased: Bool = DIContainer.shared.iapService.hasPurchased
+    @Published var isInTrialPeriod: Bool = DIContainer.shared.iapService.isInTrialPeriod
+    @Published var trialDaysRemaining: Int = DIContainer.shared.iapService.trialDaysRemaining
 
     private let iap: IAPServiceProtocol
     private var cancellables: Set<AnyCancellable> = []
@@ -20,13 +23,21 @@ final class IAPViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+                    self?.updateStatus()
                 }
             }
             .store(in: &cancellables)
     }
 
+    private func updateStatus() {
+        isProUnlocked = iap.isProUnlocked
+        hasPurchased = iap.hasPurchased
+        isInTrialPeriod = iap.isInTrialPeriod
+        trialDaysRemaining = iap.trialDaysRemaining
+    }
+
     func onAppear() {
+        updateStatus()
         Task { @MainActor [weak self] in
             await self?.refresh()
         }

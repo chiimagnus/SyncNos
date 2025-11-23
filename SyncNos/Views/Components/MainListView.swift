@@ -8,6 +8,9 @@ struct MainListView: View {
     @State private var selectedWeReadBookIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @Environment(\.openWindow) private var openWindow
+    @State private var showPaywall = false
+    @State private var showWelcome = false
+    @State private var showTrialReminder = false
 
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
@@ -15,6 +18,10 @@ struct MainListView: View {
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
+
+    private var iapService: IAPServiceProtocol {
+        DIContainer.shared.iapService
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -364,7 +371,40 @@ struct MainListView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+        }
+        .sheet(isPresented: $showWelcome) {
+            WelcomeView()
+        }
+        .sheet(isPresented: $showTrialReminder) {
+            TrialReminderView(daysRemaining: iapService.trialDaysRemaining)
+        }
+        .onAppear {
+            checkTrialStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
+            checkTrialStatus()
+        }
+    }
+
+    private func checkTrialStatus() {
+        // Priority 1: Show welcome for first-time users
+        if !iapService.hasShownWelcome {
+            showWelcome = true
+            return
+        }
         
+        // Priority 2: Show paywall if trial expired and not purchased
+        if !iapService.isProUnlocked {
+            showPaywall = true
+            return
+        }
+        
+        // Priority 3: Show gentle reminder at 7, 3, 1 days remaining
+        if iapService.shouldShowTrialReminder() {
+            showTrialReminder = true
+        }
     }
 }
 
