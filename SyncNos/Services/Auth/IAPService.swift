@@ -1,5 +1,6 @@
 import Foundation
 import StoreKit
+import IOKit
 
 // MARK: - Product Identifiers
 enum IAPProductIds: String, CaseIterable {
@@ -12,14 +13,132 @@ final class IAPService: IAPServiceProtocol {
     private let logger = DIContainer.shared.loggerService
     private let annualSubscriptionKey = "syncnos.annual.subscription.unlocked"
     private let lifetimeLicenseKey = "syncnos.lifetime.license.unlocked"
+    private let firstLaunchDateKey = "syncnos.first.launch.date"
+    private let deviceFingerprintKey = "syncnos.device.fingerprint"
+    private let lastReminderDateKey = "syncnos.last.reminder.date"
+    private let hasShownWelcomeKey = "syncnos.has.shown.welcome"
+    private let trialDays = 30
     private var updatesTask: Task<Void, Never>?
 
     static let statusChangedNotification = Notification.Name("IAPServiceStatusChanged")
+    static let showWelcomeNotification = Notification.Name("IAPServiceShowWelcome")
+    static let showTrialReminderNotification = Notification.Name("IAPServiceShowTrialReminder")
 
     var isProUnlocked: Bool {
-        // Pro unlocked if either annual subscription or lifetime license is active
+        // Pro unlocked if either purchased or in trial period
+        hasPurchased || isInTrialPeriod
+    }
+
+    var hasPurchased: Bool {
         UserDefaults.standard.bool(forKey: annualSubscriptionKey) ||
         UserDefaults.standard.bool(forKey: lifetimeLicenseKey)
+    }
+
+    var isInTrialPeriod: Bool {
+        guard let firstLaunchDate = getFirstLaunchDate() else {
+            // First time launch, record it and return true
+            recordFirstLaunch()
+            return true
+        }
+        let daysSinceLaunch = Calendar.current.dateComponents([.day], from: firstLaunchDate, to: Date()).day ?? 0
+        return daysSinceLaunch < trialDays
+    }
+
+    var trialDaysRemaining: Int {
+        guard let firstLaunchDate = getFirstLaunchDate() else { return trialDays }
+        let daysSinceLaunch = Calendar.current.dateComponents([.day], from: firstLaunchDate, to: Date()).day ?? 0
+        return max(0, trialDays - daysSinceLaunch)
+    }
+
+    var hasShownWelcome: Bool {
+        UserDefaults.standard.bool(forKey: hasShownWelcomeKey)
+    }
+
+    func markWelcomeShown() {
+        UserDefaults.standard.set(true, forKey: hasShownWelcomeKey)
+    }
+
+    func shouldShowTrialReminder() -> Bool {
+        // Don't show if already purchased
+        guard !hasPurchased else { return false }
+        
+        // Don't show if trial not started or expired
+        guard isInTrialPeriod else { return false }
+        
+        let remaining = trialDaysRemaining
+        
+        // Show reminder at 7, 3, 1 days remaining
+        guard remaining == 7 || remaining == 3 || remaining == 1 else { return false }
+        
+        // Check if we already showed reminder today
+        if let lastReminder = UserDefaults.standard.object(forKey: lastReminderDateKey) as? Date {
+            let calendar = Calendar.current
+            if calendar.isDateInToday(lastReminder) {
+                return false
+            }
+        }
+        
+        return true
+    }
+
+    func markReminderShown() {
+        UserDefaults.standard.set(Date(), forKey: lastReminderDateKey)
+    }
+
+    private func getFirstLaunchDate() -> Date? {
+        // Try UserDefaults first
+        if let date = UserDefaults.standard.object(forKey: firstLaunchDateKey) as? Date {
+            return date
+        }
+        
+        // Try Keychain as backup (more persistent)
+        if let keychainDate = KeychainHelper.shared.getFirstLaunchDate() {
+            // Sync back to UserDefaults
+            UserDefaults.standard.set(keychainDate, forKey: firstLaunchDateKey)
+            return keychainDate
+        }
+        
+        return nil
+    }
+
+    private func recordFirstLaunch() {
+        guard getFirstLaunchDate() == nil else { return }
+        
+        let now = Date()
+        
+        // Save to both UserDefaults and Keychain
+        UserDefaults.standard.set(now, forKey: firstLaunchDateKey)
+        KeychainHelper.shared.saveFirstLaunchDate(now)
+        
+        // Generate and save device fingerprint
+        let fingerprint = generateDeviceFingerprint()
+        UserDefaults.standard.set(fingerprint, forKey: deviceFingerprintKey)
+        KeychainHelper.shared.saveDeviceFingerprint(fingerprint)
+        
+        logger.info("First launch recorded, 30-day trial started")
+        logger.info("Device fingerprint: \(fingerprint)")
+    }
+
+    private func generateDeviceFingerprint() -> String {
+        // Use hardware UUID as device fingerprint (survives app reinstall)
+        var uuid = ""
+        
+        // Get hardware UUID from IOKit
+        let platformExpert = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+        if platformExpert != 0 {
+            if let serialNumber = IORegistryEntryCreateCFProperty(platformExpert, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String {
+                uuid = serialNumber
+            }
+            IOObjectRelease(platformExpert)
+        }
+        
+        // Fallback to a combination of system info
+        if uuid.isEmpty {
+            let host = Host.current()
+            uuid = "\(host.localizedName ?? "unknown")-\(ProcessInfo.processInfo.hostName)"
+        }
+        
+        return uuid
     }
 
     // MARK: - Public API

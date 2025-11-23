@@ -202,10 +202,17 @@ struct NotionPageSummary: Identifiable, Decodable {
 // MARK: - In-App Purchase Service Protocol
 protocol IAPServiceProtocol: AnyObject {
     var isProUnlocked: Bool { get }
+    var hasPurchased: Bool { get }
+    var isInTrialPeriod: Bool { get }
+    var trialDaysRemaining: Int { get }
+    var hasShownWelcome: Bool { get }
     func fetchProducts() async throws -> [Product]
     func purchase(product: Product) async throws -> Bool
     func restorePurchases() async -> Bool
     func startObservingTransactions()
+    func shouldShowTrialReminder() -> Bool
+    func markReminderShown()
+    func markWelcomeShown()
 }
 
 // MARK: - Login Item Service Protocol
