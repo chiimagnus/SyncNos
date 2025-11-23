@@ -1,0 +1,82 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "20B06B66",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "18.0",
+      "familyShareable" : false,
+      "internalID" : "6755643555",
+      "localizations" : [
+        {
+          "description" : "Annual subscription for unlimited syncing",
+          "displayName" : "SyncNos Annual Subscription",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "年度订阅，无限同步",
+          "displayName" : "SyncNos 年订阅",
+          "locale" : "zh_Hans"
+        }
+      ],
+      "productID" : "com.syncnos.annual.20",
+      "referenceName" : "年订阅18",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "68.0",
+      "familyShareable" : false,
+      "internalID" : "6755643605",
+      "localizations" : [
+        {
+          "description" : "Lifetime access to all features",
+          "displayName" : "SyncNos Lifetime",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "终身访问所有功能",
+          "displayName" : "SyncNos 买断制",
+          "locale" : "zh_Hans"
+        }
+      ],
+      "productID" : "com.syncnos.lifetime.68",
+      "referenceName" : "买断制68",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6752426176",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "RDQHYSDFFG",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 785558834.34850001,
+    "_locale" : "zh_Hans",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
