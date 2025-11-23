@@ -3,20 +3,44 @@ import StoreKit
 import IOKit
 
 // MARK: - Product Identifiers
+/// IAP 产品 ID 定义
+/// - annualSubscription: 年度订阅 ($18/年)
+/// - lifetimeLicense: 终身买断 ($68 一次性)
 enum IAPProductIds: String, CaseIterable {
     case annualSubscription = "com.syncnos.annual.18"
     case lifetimeLicense = "com.syncnos.lifetime.68"
 }
 
 // MARK: - IAP Service (StoreKit 2)
+/// IAP 服务管理类，处理应用内购买、试用期和购买恢复
+/// 
+/// 数据存储策略：
+/// 1. 购买状态 (UserDefaults)：快速本地缓存，用于 UI 判断
+/// 2. 购买状态 (Apple 服务器)：真实来源，通过 Restore Purchases 同步
+/// 3. 试用期数据 (UserDefaults + Keychain)：双重存储，Keychain 更持久
+/// 4. 设备指纹 (UserDefaults + Keychain)：防止试用期滥用
+///
+/// 跨设备恢复：
+/// - 同一 Apple ID 换电脑：✅ 可恢复（通过 Restore Purchases 从 Apple 服务器同步）
+/// - 不同 Apple ID：❌ 无法恢复（购买绑定到原 Apple ID）
+/// - 本地缓存：❌ 无法跨设备（仅存储在本机）
 final class IAPService: IAPServiceProtocol {
     private let logger = DIContainer.shared.loggerService
+    
+    // MARK: - UserDefaults Keys (本地缓存)
+    /// 年度订阅购买状态缓存 (UserDefaults)
     private let annualSubscriptionKey = "syncnos.annual.subscription.unlocked"
+    /// 终身买断购买状态缓存 (UserDefaults)
     private let lifetimeLicenseKey = "syncnos.lifetime.license.unlocked"
+    /// 首次启动日期 (UserDefaults + Keychain 双重存储)
     private let firstLaunchDateKey = "syncnos.first.launch.date"
+    /// 设备指纹 (UserDefaults + Keychain 双重存储)
     private let deviceFingerprintKey = "syncnos.device.fingerprint"
+    /// 最后一次试用期提醒日期
     private let lastReminderDateKey = "syncnos.last.reminder.date"
+    /// 是否已显示欢迎页面
     private let hasShownWelcomeKey = "syncnos.has.shown.welcome"
+    
     private let trialDays = 30
     private var updatesTask: Task<Void, Never>?
 
@@ -120,21 +144,32 @@ final class IAPService: IAPServiceProtocol {
     }
 
     private func recordFirstLaunch() {
-        guard getFirstLaunchDate() == nil else { return }
+        guard getFirstLaunchDate() == nil else {
+            logger.debug("⏭️ 首次启动已记录，跳过重复记录")
+            return
+        }
         
         let now = Date()
         
-        // Save to both UserDefaults and Keychain
-        UserDefaults.standard.set(now, forKey: firstLaunchDateKey)
-        KeychainHelper.shared.saveFirstLaunchDate(now)
+        // 双重存储策略：
+        // 1. UserDefaults：快速访问，用于日常判断
+        // 2. Keychain：更持久，防止 UserDefaults 被清除
+        logger.debug("📝 记录首次启动...")
         
-        // Generate and save device fingerprint
+        UserDefaults.standard.set(now, forKey: firstLaunchDateKey)
+        logger.debug("  💾 已保存到 UserDefaults: \(firstLaunchDateKey)")
+        
+        KeychainHelper.shared.saveFirstLaunchDate(now)
+        logger.debug("  🔐 已保存到 Keychain (更持久)")
+        
+        // 生成并保存设备指纹，用于防止试用期滥用
         let fingerprint = generateDeviceFingerprint()
         UserDefaults.standard.set(fingerprint, forKey: deviceFingerprintKey)
         KeychainHelper.shared.saveDeviceFingerprint(fingerprint)
+        logger.debug("  🔑 设备指纹已生成并保存: \(fingerprint)")
         
-        logger.info("First launch recorded, 30-day trial started")
-        logger.info("Device fingerprint: \(fingerprint)")
+        logger.info("✅ 首次启动已记录 - 30天试用期已开始")
+        logger.info("📅 试用期开始时间: \(now)")
     }
 
     private func generateDeviceFingerprint() -> String {
@@ -200,13 +235,31 @@ final class IAPService: IAPServiceProtocol {
 
     func restorePurchases() async -> Bool {
         do {
+            logger.debug("🔄 开始恢复购买流程...")
+            logger.debug("📱 当前 Apple ID 的购买记录将从 Apple 服务器同步")
+            
+            // 1. 从 Apple 服务器同步最新的购买记录
+            // 这是跨设备恢复的关键步骤：
+            // - 同一 Apple ID 换电脑：✅ 可恢复（AppStore.sync() 会从服务器拉取购买记录）
+            // - 不同 Apple ID：❌ 无法恢复（购买绑定到原 Apple ID）
+            logger.debug("🌐 正在从 Apple 服务器 fetch 购买记录...")
             try await AppStore.sync()
-            logger.info("Requested AppStore.sync()")
-            // After sync, refresh entitlements
+            logger.info("✅ AppStore.sync() 完成 - 已从 Apple 服务器同步购买记录到本地 StoreKit 缓存")
+
+            // 2. 查询每个产品的最新交易记录，更新本地缓存
+            logger.debug("🔍 查询本地缓存的购买状态...")
             let unlocked = await refreshPurchasedStatus()
+            
+            if unlocked {
+                logger.info("✅ 恢复成功 - 检测到有效的购买记录")
+            } else {
+                logger.info("ℹ️ 恢复完成 - 未找到有效的购买记录")
+            }
+            
             return unlocked
         } catch {
-            logger.error("Restore failed: \(error.localizedDescription)")
+            logger.error("❌ 恢复购买失败: \(error.localizedDescription)")
+            logger.error("💡 提示：确保使用与购买时相同的 Apple ID")
             return false
         }
     }
@@ -239,10 +292,20 @@ final class IAPService: IAPServiceProtocol {
     private func setUnlocked(_ productId: String, _ newValue: Bool) {
         let key = keyForProduct(productId)
         let current = UserDefaults.standard.bool(forKey: key)
-        guard current != newValue else { return }
+        
+        // 只有状态改变时才更新
+        guard current != newValue else {
+            logger.debug("  ℹ️ 产品 \(productId) 状态未变化，跳过更新")
+            return
+        }
+        
+        // 更新 UserDefaults 本地缓存
         UserDefaults.standard.set(newValue, forKey: key)
+        logger.debug("  💾 已更新 UserDefaults: \(key) = \(newValue)")
+        
+        // 发送通知，触发 UI 更新
         NotificationCenter.default.post(name: Self.statusChangedNotification, object: nil)
-        logger.info("Product \(productId) unlocked state changed to: \(newValue)")
+        logger.info("🔔 产品 \(productId) 解锁状态已变更: \(newValue)")
     }
 
     private func keyForProduct(_ productId: String) -> String {
@@ -263,18 +326,38 @@ final class IAPService: IAPServiceProtocol {
     }
 
     func refreshPurchasedStatus() async -> Bool {
+        logger.debug("🔄 刷新购买状态 - 从本地 StoreKit 缓存查询最新交易记录")
+        logger.debug("   (注：数据来自 AppStore.sync() 同步的本地缓存，非实时 fetch Apple 服务器)")
+        
         for productId in IAPProductIds.allCases {
+            logger.debug("  📦 检查产品: \(productId.rawValue)")
+            
+            // 从本地 StoreKit 缓存获取最新交易
+            // Transaction.latest() 返回该产品的最新有效交易（从本地缓存读取）
             if let latest = await Transaction.latest(for: productId.rawValue) {
                 switch latest {
                 case .verified(let transaction):
-                    await setUnlocked(transaction.productID, transaction.revocationDate == nil)
+                    // 验证通过，检查是否被撤销
+                    let isValid = transaction.revocationDate == nil
+                    logger.debug("    ✅ 交易验证通过 - 产品ID: \(transaction.productID), 有效: \(isValid)")
+                    logger.debug("    📅 购买日期: \(transaction.purchaseDate)")
+                    if let expirationDate = transaction.expirationDate {
+                        logger.debug("    ⏰ 到期日期: \(expirationDate)")
+                    }
+                    
+                    // 更新本地 UserDefaults 缓存
+                    await setUnlocked(transaction.productID, isValid)
+                    
                 case .unverified(_, let error):
-                    logger.warning("Latest transaction unverified for \(productId.rawValue): \(error.localizedDescription)")
+                    logger.warning("    ⚠️ 交易验证失败 - 产品: \(productId.rawValue), 错误: \(error.localizedDescription)")
                 }
             } else {
+                logger.debug("    ℹ️ 未找到该产品的交易记录")
                 await setUnlocked(productId.rawValue, false)
             }
         }
+        
+        logger.debug("✅ 购买状态刷新完成 - isProUnlocked: \(isProUnlocked)")
         return isProUnlocked
     }
     
