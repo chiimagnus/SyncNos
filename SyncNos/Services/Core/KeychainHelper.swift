@@ -69,3 +69,15 @@ final class KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 }
+
+
+// MARK: - Delete Methods (for IAP Debug)
+extension KeychainHelper {
+    func deleteFirstLaunchDate() {
+        delete(service: trialService, account: firstLaunchAccount)
+    }
+    
+    func deleteDeviceFingerprint() {
+        delete(service: trialService, account: deviceFingerprintAccount)
+    }
+}

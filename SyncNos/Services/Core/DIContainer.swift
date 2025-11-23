@@ -26,6 +26,8 @@ class DIContainer {
     // WeRead
     private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
+    // Environment
+    private var _environmentDetector: EnvironmentDetectorProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -159,6 +161,13 @@ class DIContainer {
         return _weReadAPIService!
     }
 
+    var environmentDetector: EnvironmentDetectorProtocol {
+        if _environmentDetector == nil {
+            _environmentDetector = EnvironmentDetector()
+        }
+        return _environmentDetector!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -232,6 +241,10 @@ class DIContainer {
 
     func register(weReadAPIService: WeReadAPIServiceProtocol) {
         self._weReadAPIService = weReadAPIService
+    }
+
+    func register(environmentDetector: EnvironmentDetectorProtocol) {
+        self._environmentDetector = environmentDetector
     }
 
 }

@@ -260,3 +260,149 @@ final class IAPService: IAPServiceProtocol {
         return isProUnlocked
     }
 }
+
+
+// MARK: - Debug Functions (Development Only)
+extension IAPService {
+    
+    func resetAllPurchaseData() throws {
+        // 1. Check environment
+        guard DIContainer.shared.environmentDetector.isDevEnvironment() else {
+            logger.error("Reset attempted in production environment - blocked")
+            throw IAPError.productionEnvironmentResetNotAllowed
+        }
+        
+        // 2. Record state before reset
+        let beforeState = getDebugInfo()
+        logger.info("Starting IAP reset. Before state: hasPurchasedAnnual=\(beforeState.hasPurchasedAnnual), hasPurchasedLifetime=\(beforeState.hasPurchasedLifetime), isInTrialPeriod=\(beforeState.isInTrialPeriod), trialDaysRemaining=\(beforeState.trialDaysRemaining)")
+        
+        // 3. Clear UserDefaults
+        logger.info("Clearing UserDefaults IAP keys...")
+        UserDefaults.standard.removeObject(forKey: annualSubscriptionKey)
+        UserDefaults.standard.removeObject(forKey: lifetimeLicenseKey)
+        UserDefaults.standard.removeObject(forKey: firstLaunchDateKey)
+        UserDefaults.standard.removeObject(forKey: deviceFingerprintKey)
+        UserDefaults.standard.removeObject(forKey: lastReminderDateKey)
+        UserDefaults.standard.removeObject(forKey: hasShownWelcomeKey)
+        logger.info("UserDefaults cleared")
+        
+        // 4. Clear Keychain
+        logger.info("Clearing Keychain IAP data...")
+        KeychainHelper.shared.deleteFirstLaunchDate()
+        KeychainHelper.shared.deleteDeviceFingerprint()
+        logger.info("Keychain cleared")
+        
+        // 5. Notify status change
+        Task { @MainActor in
+            NotificationCenter.default.post(
+                name: Self.statusChangedNotification,
+                object: nil
+            )
+        }
+        logger.info("Status change notification sent")
+        
+        // 6. Record state after reset
+        let afterState = getDebugInfo()
+        logger.info("IAP reset complete. After state: hasPurchasedAnnual=\(afterState.hasPurchasedAnnual), hasPurchasedLifetime=\(afterState.hasPurchasedLifetime), isInTrialPeriod=\(afterState.isInTrialPeriod), trialDaysRemaining=\(afterState.trialDaysRemaining)")
+    }
+    
+    func getDebugInfo() -> IAPDebugInfo {
+        return IAPDebugInfo(
+            hasPurchasedAnnual: UserDefaults.standard.bool(forKey: annualSubscriptionKey),
+            hasPurchasedLifetime: UserDefaults.standard.bool(forKey: lifetimeLicenseKey),
+            isInTrialPeriod: isInTrialPeriod,
+            trialDaysRemaining: trialDaysRemaining,
+            firstLaunchDate: getFirstLaunchDate(),
+            deviceFingerprint: UserDefaults.standard.string(forKey: deviceFingerprintKey),
+            lastReminderDate: UserDefaults.standard.object(forKey: lastReminderDateKey) as? Date,
+            hasShownWelcome: UserDefaults.standard.bool(forKey: hasShownWelcomeKey),
+            environmentType: DIContainer.shared.environmentDetector.environmentType(),
+            userDefaultsKeys: getAllIAPUserDefaultsKeys(),
+            keychainData: getAllIAPKeychainData()
+        )
+    }
+    
+    func simulatePurchaseState(_ state: SimulatedPurchaseState) throws {
+        // 1. Check environment
+        guard DIContainer.shared.environmentDetector.isDevEnvironment() else {
+            logger.error("Simulation attempted in production environment - blocked")
+            throw IAPError.productionEnvironmentSimulationNotAllowed
+        }
+        
+        logger.info("Simulating purchase state: \(state)")
+        
+        // 2. Apply simulation
+        switch state {
+        case .purchasedAnnual:
+            UserDefaults.standard.set(true, forKey: annualSubscriptionKey)
+            logger.info("Simulated: Annual subscription purchased")
+            
+        case .purchasedLifetime:
+            UserDefaults.standard.set(true, forKey: lifetimeLicenseKey)
+            logger.info("Simulated: Lifetime license purchased")
+            
+        case .trialDay(let day):
+            let targetDate = Calendar.current.date(byAdding: .day, value: -day, to: Date())!
+            UserDefaults.standard.set(targetDate, forKey: firstLaunchDateKey)
+            KeychainHelper.shared.saveFirstLaunchDate(targetDate)
+            logger.info("Simulated: Trial day \(day) (first launch: \(targetDate))")
+            
+        case .trialExpired:
+            let expiredDate = Calendar.current.date(byAdding: .day, value: -31, to: Date())!
+            UserDefaults.standard.set(expiredDate, forKey: firstLaunchDateKey)
+            KeychainHelper.shared.saveFirstLaunchDate(expiredDate)
+            logger.info("Simulated: Trial expired (first launch: \(expiredDate))")
+            
+        case .reset:
+            try resetAllPurchaseData()
+            return // resetAllPurchaseData already sends notification
+        }
+        
+        // 3. Notify status change
+        Task { @MainActor in
+            NotificationCenter.default.post(
+                name: Self.statusChangedNotification,
+                object: nil
+            )
+        }
+        
+        logger.info("Simulation complete. New state: \(getDebugInfo())")
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func getAllIAPUserDefaultsKeys() -> [String: String] {
+        var result: [String: String] = [:]
+        
+        let keys = [
+            annualSubscriptionKey,
+            lifetimeLicenseKey,
+            firstLaunchDateKey,
+            deviceFingerprintKey,
+            lastReminderDateKey,
+            hasShownWelcomeKey
+        ]
+        
+        for key in keys {
+            if let value = UserDefaults.standard.object(forKey: key) {
+                result[key] = String(describing: value)
+            }
+        }
+        
+        return result
+    }
+    
+    private func getAllIAPKeychainData() -> [String: String] {
+        var result: [String: String] = [:]
+        
+        if let firstLaunch = KeychainHelper.shared.getFirstLaunchDate() {
+            result["firstLaunchDate"] = ISO8601DateFormatter().string(from: firstLaunch)
+        }
+        
+        if let fingerprint = KeychainHelper.shared.getDeviceFingerprint() {
+            result["deviceFingerprint"] = fingerprint
+        }
+        
+        return result
+    }
+}
