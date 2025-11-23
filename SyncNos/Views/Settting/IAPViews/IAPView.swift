@@ -178,101 +178,44 @@ struct IAPView: View {
     }
 
 #if DEBUG
-    // MARK: - Debug Views
-
     private var debugSection: some View {
-        Group {
-            Section(header: Text("Debug Panel")) {
-                if let debugInfo = viewModel.debugInfo {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Annual Subscription")
-                                .font(.caption)
-                            Spacer()
-                            Image(systemName: debugInfo.hasPurchasedAnnual ? "checkmark.circle.fill" : "xmark.circle")
-                                .foregroundStyle(debugInfo.hasPurchasedAnnual ? .green : .secondary)
-                        }
-                        
-                        HStack {
-                            Text("Lifetime License")
-                                .font(.caption)
-                            Spacer()
-                            Image(systemName: debugInfo.hasPurchasedLifetime ? "checkmark.circle.fill" : "xmark.circle")
-                                .foregroundStyle(debugInfo.hasPurchasedLifetime ? .green : .secondary)
-                        }
-                        
-                        Divider()
-                        
-                        HStack {
-                            Text("In Trial Period")
-                                .font(.caption)
-                            Spacer()
-                            Text(debugInfo.isInTrialPeriod ? "Yes" : "No")
-                                .font(.caption)
-                                .foregroundStyle(debugInfo.isInTrialPeriod ? .green : .red)
-                        }
-                        
-                        HStack {
-                            Text("Days Remaining")
-                                .font(.caption)
-                            Spacer()
-                            Text("\(debugInfo.trialDaysRemaining)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        if let firstLaunch = debugInfo.firstLaunchDate {
-                            HStack {
-                                Text("First Launch")
-                                    .font(.caption)
-                                Spacer()
-                                Text(firstLaunch, style: .date)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+        Section(header: Text("Debug Actions")) {
+            Button(action: {
+                viewModel.requestReset()
+            }) {
+                Label("Reset All IAP Data", systemImage: "trash.fill")
+                    .foregroundStyle(.red)
             }
+            .buttonStyle(.bordered)
 
-            Section(header: Text("Debug Actions")) {
-                Button(action: {
-                    viewModel.requestReset()
-                }) {
-                    Label("Reset All IAP Data", systemImage: "trash.fill")
-                        .foregroundStyle(.red)
+            Menu {
+                Button("Purchased Annual") {
+                    viewModel.simulateState(.purchasedAnnual)
                 }
-                .buttonStyle(.bordered)
-
-                Menu {
-                    Button("Purchased Annual") {
-                        viewModel.simulateState(.purchasedAnnual)
-                    }
-                    Button("Purchased Lifetime") {
-                        viewModel.simulateState(.purchasedLifetime)
-                    }
-                    Divider()
-                    Button("Trial Day 1") {
-                        viewModel.simulateState(.trialDay(1))
-                    }
-                    Button("Trial Day 7") {
-                        viewModel.simulateState(.trialDay(7))
-                    }
-                    Button("Trial Day 15") {
-                        viewModel.simulateState(.trialDay(15))
-                    }
-                    Button("Trial Day 29") {
-                        viewModel.simulateState(.trialDay(29))
-                    }
-                    Divider()
-                    Button("Trial Expired") {
-                        viewModel.simulateState(.trialExpired)
-                    }
-                } label: {
-                    Label("Simulate State", systemImage: "wand.and.stars")
+                Button("Purchased Lifetime") {
+                    viewModel.simulateState(.purchasedLifetime)
                 }
-                .buttonStyle(.bordered)
+                Divider()
+                Button("Trial Day 1") {
+                    viewModel.simulateState(.trialDay(1))
+                }
+                Button("Trial Day 7") {
+                    viewModel.simulateState(.trialDay(7))
+                }
+                Button("Trial Day 15") {
+                    viewModel.simulateState(.trialDay(15))
+                }
+                Button("Trial Day 29") {
+                    viewModel.simulateState(.trialDay(29))
+                }
+                Divider()
+                Button("Trial Expired") {
+                    viewModel.simulateState(.trialExpired)
+                }
+            } label: {
+                Label("Simulate State", systemImage: "wand.and.stars")
             }
+            .buttonStyle(.bordered)
         }
     }
 #endif
