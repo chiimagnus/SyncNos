@@ -4,6 +4,7 @@ import Combine
 
 @MainActor
 final class IAPViewModel: ObservableObject {
+    // MARK: - Production Properties
     @Published var products: [Product] = []
     @Published var isLoading: Bool = false
     @Published var message: String?
@@ -15,7 +16,13 @@ final class IAPViewModel: ObservableObject {
     @Published var expirationDate: Date?
     @Published var purchaseDate: Date?
 
+#if DEBUG
+    // MARK: - Debug Properties
+    @Published var debugInfo: IAPDebugInfo?
+#endif
+
     private let iap: IAPServiceProtocol
+    private let logger = DIContainer.shared.loggerService
     private var cancellables: Set<AnyCancellable> = []
 
     init(iap: IAPServiceProtocol = DIContainer.shared.iapService) {
@@ -32,6 +39,8 @@ final class IAPViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    // MARK: - Production Methods
+    
     private func updateStatus() {
         isProUnlocked = iap.isProUnlocked
         hasPurchased = iap.hasPurchased
@@ -39,11 +48,14 @@ final class IAPViewModel: ObservableObject {
         isInTrialPeriod = iap.isInTrialPeriod
         trialDaysRemaining = iap.trialDaysRemaining
         
-        // 异步获取日期信息
         Task {
             expirationDate = await iap.getAnnualSubscriptionExpirationDate()
             purchaseDate = await iap.getPurchaseDate()
         }
+        
+#if DEBUG
+        refreshDebugInfo()
+#endif
     }
 
     func onAppear() {
@@ -89,4 +101,32 @@ final class IAPViewModel: ObservableObject {
             self.message = ok ? NSLocalizedString("Restored successfully.", comment: "") : NSLocalizedString("Restore failed.", comment: "")
         }
     }
+
+#if DEBUG
+    // MARK: - Debug Methods
+    
+    private func refreshDebugInfo() {
+        debugInfo = iap.getDebugInfo()
+    }
+
+    func requestReset() {
+        do {
+            try iap.resetAllPurchaseData()
+            logger.debug("IAP data reset successfully")
+            refreshDebugInfo()
+        } catch {
+            logger.error("Reset failed: \(error.localizedDescription)")
+        }
+    }
+
+    func simulateState(_ state: SimulatedPurchaseState) {
+        do {
+            try iap.simulatePurchaseState(state)
+            logger.debug("IAP state simulated successfully")
+            refreshDebugInfo()
+        } catch {
+            logger.error("Simulation failed: \(error.localizedDescription)")
+        }
+    }
+#endif
 }
