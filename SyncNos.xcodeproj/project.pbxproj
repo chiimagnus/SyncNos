@@ -28,7 +28,6 @@
 				ChangeLog.md,
 				image.png,
 				PRIVACY_POLICY.md,
-				SyncNos.storekit,
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
