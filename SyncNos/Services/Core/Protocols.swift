@@ -221,7 +221,6 @@ protocol IAPServiceProtocol: AnyObject {
     
     // Debug functions (development environment only)
     /// Resets all IAP purchase data and trial period information. Only available in development environment.
-    /// - Throws: `IAPError.productionEnvironmentResetNotAllowed` if called in production
     func resetAllPurchaseData() throws
     
     /// Returns comprehensive debug information about current IAP state
@@ -229,7 +228,6 @@ protocol IAPServiceProtocol: AnyObject {
     
     /// Simulates a specific purchase or trial state for testing. Only available in development environment.
     /// - Parameter state: The state to simulate
-    /// - Throws: `IAPError.productionEnvironmentSimulationNotAllowed` if called in production
     func simulatePurchaseState(_ state: SimulatedPurchaseState) throws
 }
 
