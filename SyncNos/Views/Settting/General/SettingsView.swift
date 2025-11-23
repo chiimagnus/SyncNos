@@ -60,6 +60,22 @@ struct SettingsView: View {
                         }
                     }
                     .help("Support development and unlock Pro features")
+                    
+#if DEBUG
+                    // IAP Debug Panel (Development Only)
+                    if DIContainer.shared.environmentDetector.isDevEnvironment() {
+                        NavigationLink(destination: IAPDebugView()) {
+                            HStack {
+                                Label("IAP Debug", systemImage: "ant.fill")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.body.weight(.regular))
+                            }
+                        }
+                        .help("Debug and reset IAP purchase state (Development only)")
+                    }
+#endif
                 }
                 .collapsible(false)
 
