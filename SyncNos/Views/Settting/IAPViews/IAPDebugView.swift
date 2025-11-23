@@ -82,21 +82,6 @@ struct IAPDebugView: View {
         .onAppear {
             viewModel.onAppear()
         }
-        .alert("Confirm Reset", isPresented: $viewModel.showResetConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Reset", role: .destructive) {
-                viewModel.confirmReset()
-            }
-        } message: {
-            Text("This will clear all IAP purchase data and trial period information. This action cannot be undone.")
-        }
-        .alert("Result", isPresented: $viewModel.showAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            if let message = viewModel.alertMessage {
-                Text(message)
-            }
-        }
     }
 }
 

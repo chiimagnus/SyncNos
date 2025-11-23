@@ -4,9 +4,6 @@ import Combine
 @MainActor
 final class IAPDebugViewModel: ObservableObject {
     @Published var debugInfo: IAPDebugInfo?
-    @Published var showResetConfirmation: Bool = false
-    @Published var showAlert: Bool = false
-    @Published var alertMessage: String?
     
     private let iapService: IAPServiceProtocol
     private let logger = DIContainer.shared.loggerService
@@ -34,18 +31,11 @@ final class IAPDebugViewModel: ObservableObject {
     }
     
     func requestReset() {
-        showResetConfirmation = true
-    }
-    
-    func confirmReset() {
         do {
             try iapService.resetAllPurchaseData()
-            alertMessage = NSLocalizedString("Reset successful. All IAP data has been cleared.", comment: "")
-            showAlert = true
+            logger.debug("IAP data reset successfully")
             refreshDebugInfo()
         } catch {
-            alertMessage = String(format: NSLocalizedString("Reset failed: %@", comment: ""), error.localizedDescription)
-            showAlert = true
             logger.error("Reset failed: \(error.localizedDescription)")
         }
     }
@@ -53,12 +43,9 @@ final class IAPDebugViewModel: ObservableObject {
     func simulateState(_ state: SimulatedPurchaseState) {
         do {
             try iapService.simulatePurchaseState(state)
-            alertMessage = NSLocalizedString("State simulated successfully.", comment: "")
-            showAlert = true
+            logger.debug("IAP state simulated successfully")
             refreshDebugInfo()
         } catch {
-            alertMessage = String(format: NSLocalizedString("Simulation failed: %@", comment: ""), error.localizedDescription)
-            showAlert = true
             logger.error("Simulation failed: \(error.localizedDescription)")
         }
     }
