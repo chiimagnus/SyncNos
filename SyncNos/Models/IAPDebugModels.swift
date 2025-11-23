@@ -35,17 +35,11 @@ enum SimulatedPurchaseState {
 
 // MARK: - IAP Error
 enum IAPError: LocalizedError {
-    case productionEnvironmentResetNotAllowed
-    case productionEnvironmentSimulationNotAllowed
     case resetFailed(String)
     case simulationFailed(String)
     
     var errorDescription: String? {
         switch self {
-        case .productionEnvironmentResetNotAllowed:
-            return NSLocalizedString("Reset is not allowed in production environment", comment: "")
-        case .productionEnvironmentSimulationNotAllowed:
-            return NSLocalizedString("Simulation is not allowed in production environment", comment: "")
         case .resetFailed(let reason):
             return String(format: NSLocalizedString("Reset failed: %@", comment: ""), reason)
         case .simulationFailed(let reason):

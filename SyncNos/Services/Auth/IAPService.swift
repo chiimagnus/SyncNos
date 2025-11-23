@@ -331,17 +331,9 @@ final class IAPService: IAPServiceProtocol {
 extension IAPService {
     
     func resetAllPurchaseData() throws {
-        // 1. Check environment
-        guard DIContainer.shared.environmentDetector.isDevEnvironment() else {
-            logger.error("Reset attempted in production environment - blocked")
-            throw IAPError.productionEnvironmentResetNotAllowed
-        }
-        
-        // 2. Record state before reset
         let beforeState = getDebugInfo()
         logger.info("Starting IAP reset. Before state: hasPurchasedAnnual=\(beforeState.hasPurchasedAnnual), hasPurchasedLifetime=\(beforeState.hasPurchasedLifetime), isInTrialPeriod=\(beforeState.isInTrialPeriod), trialDaysRemaining=\(beforeState.trialDaysRemaining)")
         
-        // 3. Clear UserDefaults
         logger.info("Clearing UserDefaults IAP keys...")
         UserDefaults.standard.removeObject(forKey: annualSubscriptionKey)
         UserDefaults.standard.removeObject(forKey: lifetimeLicenseKey)
@@ -351,13 +343,11 @@ extension IAPService {
         UserDefaults.standard.removeObject(forKey: hasShownWelcomeKey)
         logger.info("UserDefaults cleared")
         
-        // 4. Clear Keychain
         logger.info("Clearing Keychain IAP data...")
         KeychainHelper.shared.deleteFirstLaunchDate()
         KeychainHelper.shared.deleteDeviceFingerprint()
         logger.info("Keychain cleared")
         
-        // 5. Notify status change
         Task { @MainActor in
             NotificationCenter.default.post(
                 name: Self.statusChangedNotification,
@@ -366,7 +356,6 @@ extension IAPService {
         }
         logger.info("Status change notification sent")
         
-        // 6. Record state after reset
         let afterState = getDebugInfo()
         logger.info("IAP reset complete. After state: hasPurchasedAnnual=\(afterState.hasPurchasedAnnual), hasPurchasedLifetime=\(afterState.hasPurchasedLifetime), isInTrialPeriod=\(afterState.isInTrialPeriod), trialDaysRemaining=\(afterState.trialDaysRemaining)")
     }
@@ -382,15 +371,8 @@ extension IAPService {
     }
     
     func simulatePurchaseState(_ state: SimulatedPurchaseState) throws {
-        // 1. Check environment
-        guard DIContainer.shared.environmentDetector.isDevEnvironment() else {
-            logger.error("Simulation attempted in production environment - blocked")
-            throw IAPError.productionEnvironmentSimulationNotAllowed
-        }
-        
         logger.info("Simulating purchase state: \(state)")
         
-        // 2. Apply simulation
         switch state {
         case .purchasedAnnual:
             UserDefaults.standard.set(true, forKey: annualSubscriptionKey)
@@ -417,7 +399,6 @@ extension IAPService {
             return // resetAllPurchaseData already sends notification
         }
         
-        // 3. Notify status change
         Task { @MainActor in
             NotificationCenter.default.post(
                 name: Self.statusChangedNotification,
