@@ -39,8 +39,6 @@ final class IAPViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    // MARK: - Production Methods
-    
     private func updateStatus() {
         isProUnlocked = iap.isProUnlocked
         hasPurchased = iap.hasPurchased
@@ -54,7 +52,7 @@ final class IAPViewModel: ObservableObject {
         }
         
 #if DEBUG
-        refreshDebugInfo()
+        debugInfo = iap.getDebugInfo()
 #endif
     }
 
@@ -103,19 +101,14 @@ final class IAPViewModel: ObservableObject {
     }
 
 #if DEBUG
-    // MARK: - Debug Methods
-    
-    private func refreshDebugInfo() {
-        debugInfo = iap.getDebugInfo()
-    }
-
     func requestReset() {
         do {
             try iap.resetAllPurchaseData()
             logger.debug("IAP data reset successfully")
-            refreshDebugInfo()
+            updateStatus()
         } catch {
             logger.error("Reset failed: \(error.localizedDescription)")
+            message = error.localizedDescription
         }
     }
 
@@ -123,9 +116,10 @@ final class IAPViewModel: ObservableObject {
         do {
             try iap.simulatePurchaseState(state)
             logger.debug("IAP state simulated successfully")
-            refreshDebugInfo()
+            updateStatus()
         } catch {
             logger.error("Simulation failed: \(error.localizedDescription)")
+            message = error.localizedDescription
         }
     }
 #endif
