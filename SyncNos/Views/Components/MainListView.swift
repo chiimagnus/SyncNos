@@ -371,7 +371,7 @@ struct MainListView: View {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
         .sheet(isPresented: $showIAPView) {
-            UnifiedIAPView(presentationMode: iapPresentationMode)
+            PayWallView(presentationMode: iapPresentationMode)
         }
         .onAppear {
             checkTrialStatus()

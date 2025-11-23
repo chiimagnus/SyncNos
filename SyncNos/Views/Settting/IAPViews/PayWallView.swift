@@ -2,7 +2,7 @@ import SwiftUI
 import StoreKit
 
 /// 统一的 IAP 视图，根据不同状态显示不同内容，但始终包含购买选项
-struct UnifiedIAPView: View {
+struct PayWallView: View {
     let presentationMode: IAPPresentationMode
     @StateObject private var viewModel = IAPViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -295,21 +295,21 @@ enum IAPPresentationMode {
 // MARK: - Previews
 
 #Preview("Welcome") {
-    UnifiedIAPView(presentationMode: .welcome)
+    PayWallView(presentationMode: .welcome)
 }
 
 #Preview("Trial Reminder - 7 Days") {
-    UnifiedIAPView(presentationMode: .trialReminder(daysRemaining: 7))
+    PayWallView(presentationMode: .trialReminder(daysRemaining: 7))
 }
 
 #Preview("Trial Reminder - 3 Days") {
-    UnifiedIAPView(presentationMode: .trialReminder(daysRemaining: 3))
+    PayWallView(presentationMode: .trialReminder(daysRemaining: 3))
 }
 
 #Preview("Trial Reminder - 1 Day") {
-    UnifiedIAPView(presentationMode: .trialReminder(daysRemaining: 1))
+    PayWallView(presentationMode: .trialReminder(daysRemaining: 1))
 }
 
 #Preview("Trial Expired") {
-    UnifiedIAPView(presentationMode: .trialExpired)
+    PayWallView(presentationMode: .trialExpired)
 }
