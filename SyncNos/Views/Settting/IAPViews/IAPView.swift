@@ -105,7 +105,7 @@ struct IAPView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isProUnlocked)
+                .disabled(viewModel.hasPurchased)
             }
         }
         .padding(.vertical, 4)
