@@ -46,13 +46,10 @@ struct SettingsView: View {
                     }
                     .help("Manage Apple sign-in and account info")
 #endif
-                }
-                .collapsible(false)
 
-                Section(header: Text("Support the Project")) {
                     NavigationLink(destination: IAPView()) {
                         HStack {
-                            Label("Pro Features", systemImage: "star")
+                            Label("Support", systemImage: "star")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
