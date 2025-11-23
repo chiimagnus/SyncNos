@@ -52,7 +52,7 @@ struct SettingsView: View {
                 Section(header: Text("Support the Project")) {
                     NavigationLink(destination: IAPView()) {
                         HStack {
-                            Label("Pro Features", systemImage: "star.circle.fill")
+                            Label("Pro Features", systemImage: "star")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
