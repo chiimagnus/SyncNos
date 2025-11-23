@@ -26,8 +26,10 @@
 			membershipExceptions = (
 				ChangeLog.cn.md,
 				ChangeLog.md,
+				IAP_DEBUG_GUIDE.md,
 				image.png,
 				PRIVACY_POLICY.md,
+				TRIAL_IMPLEMENTATION.md,
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
