@@ -4,7 +4,7 @@ import IOKit
 
 // MARK: - Product Identifiers
 enum IAPProductIds: String, CaseIterable {
-    case annualSubscription = "com.syncnos.annual.20"
+    case annualSubscription = "com.syncnos.annual.18"
     case lifetimeLicense = "com.syncnos.lifetime.68"
 }
 
