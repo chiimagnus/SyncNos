@@ -203,6 +203,9 @@ struct NotionPageSummary: Identifiable, Decodable {
 protocol IAPServiceProtocol: AnyObject {
     var isProUnlocked: Bool { get }
     var hasPurchased: Bool { get }
+    var hasPurchasedAnnual: Bool { get }
+    var hasPurchasedLifetime: Bool { get }
+    var purchaseType: PurchaseType { get }
     var isInTrialPeriod: Bool { get }
     var trialDaysRemaining: Int { get }
     var hasShownWelcome: Bool { get }
@@ -213,6 +216,8 @@ protocol IAPServiceProtocol: AnyObject {
     func shouldShowTrialReminder() -> Bool
     func markReminderShown()
     func markWelcomeShown()
+    func getAnnualSubscriptionExpirationDate() async -> Date?
+    func getPurchaseDate() async -> Date?
     
     // Debug functions (development environment only)
     /// Resets all IAP purchase data and trial period information. Only available in development environment.

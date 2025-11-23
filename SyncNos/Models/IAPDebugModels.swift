@@ -1,5 +1,20 @@
 import Foundation
 
+// MARK: - Purchase Type
+enum PurchaseType {
+    case none
+    case annual
+    case lifetime
+    
+    var displayName: String {
+        switch self {
+        case .none: return "None"
+        case .annual: return "Annual Subscription"
+        case .lifetime: return "Lifetime License"
+        }
+    }
+}
+
 // MARK: - IAP Debug Info
 struct IAPDebugInfo: Codable {
     let hasPurchasedAnnual: Bool
