@@ -25,7 +25,7 @@ enum LogLevel: Int, CaseIterable, Comparable {
 
     var color: NSColor {
         switch self {
-        case .debug: return .gray
+        case .debug: return .blue
         case .info: return .gray
         case .warning: return .systemYellow
         case .error: return .systemRed
