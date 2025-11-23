@@ -121,29 +121,6 @@ struct IAPView: View {
                         .font(.caption)
                         .foregroundStyle(expirationDate < Date() ? .red : .secondary)
                 }
-                
-                // 显示剩余天数
-                let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
-                if daysRemaining > 0 {
-                    Text("\(daysRemaining) days left")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if daysRemaining == 0 {
-                    Text("Expires today")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("Expired")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-            
-            // 如果是终身，显示说明
-            if viewModel.purchaseType == .lifetime {
-                Text("Lifetime access - never expires")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
