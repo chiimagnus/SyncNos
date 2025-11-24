@@ -7,6 +7,7 @@ struct PayWallView: View {
     @StateObject private var viewModel = IAPViewModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
+    @State private var loadingPlanID: String? = nil
     
     var body: some View {
         VStack(spacing: 24) {
@@ -105,7 +106,17 @@ struct PayWallView: View {
     
     @ViewBuilder
     private func productCard(for product: Product) -> some View {
-        Button(action: { viewModel.buy(product: product) }) {
+        let isLoading = loadingPlanID == product.id
+        
+        Button(action: {
+            loadingPlanID = product.id
+            Task {
+                viewModel.buy(product: product)
+                // 购买流程完成后清空加载状态（无论成功或失败）
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒延迟，确保状态更新完成
+                loadingPlanID = nil
+            }
+        }) {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(product.displayName)
@@ -117,10 +128,17 @@ struct PayWallView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Text(product.displayPrice)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
+                
+                // 显示加载指示器或价格
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8, anchor: .center)
+                } else {
+                    Text(product.displayPrice)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                }
             }
             .padding()
             .background(
@@ -133,7 +151,7 @@ struct PayWallView: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.hasPurchased)  // 只有已购买时才禁用，试用期内可以购买
+        .disabled(viewModel.hasPurchased || isLoading)  // 已购买或正在加载时禁用
     }
     
     // MARK: - Actions Section
