@@ -209,12 +209,6 @@ struct OnboardingSourcesView: View {
                     title: "Apple Books",
                     isOn: $viewModel.appleBooksEnabled
                 )
-                .onChange(of: viewModel.appleBooksEnabled) { _, newValue in
-                    if newValue && viewModel.appleBooksPath == nil {
-                        // Prompt permission if needed
-                         viewModel.requestAppleBooksAccess()
-                    }
-                }
                 
                 // GoodLinks
                 SourceToggleRow(
