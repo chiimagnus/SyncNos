@@ -20,8 +20,6 @@ struct OnboardingView: View {
                         OnboardingNotionView(viewModel: viewModel)
                     case .enableSources:
                         OnboardingSourcesView(viewModel: viewModel)
-                    case .proAccess:
-                        OnboardingProView(viewModel: viewModel)
                     }
                 }
                 .transition(.asymmetric(
@@ -292,20 +290,6 @@ struct SourceToggleRow: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Step 4: Pro Access
-struct OnboardingProView: View {
-    @ObservedObject var viewModel: OnboardingViewModel
-    
-    var body: some View {
-        PayWallView(
-            presentationMode: .welcome,
-            onFinish: {
-                viewModel.completeOnboarding()
-            }
         )
     }
 }
