@@ -39,17 +39,20 @@ final class OnboardingViewModel: ObservableObject {
     private let notionOAuthService: NotionOAuthService
     private let iapService: IAPServiceProtocol
     private let weReadAuthService: WeReadAuthServiceProtocol
+    private let environmentDetector: EnvironmentDetectorProtocol
     
     init(
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         notionOAuthService: NotionOAuthService = DIContainer.shared.notionOAuthService,
         iapService: IAPServiceProtocol = DIContainer.shared.iapService,
-        weReadAuthService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService
+        weReadAuthService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        environmentDetector: EnvironmentDetectorProtocol = DIContainer.shared.environmentDetector
     ) {
         self.notionConfig = notionConfig
         self.notionOAuthService = notionOAuthService
         self.iapService = iapService
         self.weReadAuthService = weReadAuthService
+        self.environmentDetector = environmentDetector
         
         // Initialize states
         self.checkNotionStatus()
@@ -71,6 +74,11 @@ final class OnboardingViewModel: ObservableObject {
         
         // Observe IAP status
         self.isProUnlocked = iapService.isProUnlocked
+
+        // 开发环境下：直接跳转到 Pro Access 步骤，方便每次启动调试 OnboardingProView
+        if environmentDetector.isDevEnvironment() {
+            self.currentStep = .proAccess
+        }
     }
     
     // MARK: - Actions

@@ -204,7 +204,11 @@ struct PayWallView: View {
         case .trialReminder:
             Button(action: {
                 DIContainer.shared.iapService.markReminderShown()
-                dismiss()
+                if let onFinish = onFinish {
+                    onFinish()
+                } else {
+                    dismiss()
+                }
             }) {
                 Text("Remind Me Later")
                     .font(.headline)
