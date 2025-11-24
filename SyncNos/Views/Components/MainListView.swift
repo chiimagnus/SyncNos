@@ -8,6 +8,8 @@ struct MainListView: View {
     @State private var selectedWeReadBookIds: Set<String> = []
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @Environment(\.openWindow) private var openWindow
+    @State private var showIAPView = false
+    @State private var iapPresentationMode: IAPPresentationMode = .welcome
 
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
@@ -15,6 +17,10 @@ struct MainListView: View {
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
+
+    private var iapService: IAPServiceProtocol {
+        DIContainer.shared.iapService
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -364,7 +370,65 @@ struct MainListView: View {
         } message: {
             Text("Please configure Notion API Key and Page ID before syncing.")
         }
+        .sheet(isPresented: $showIAPView) {
+            PayWallView(presentationMode: iapPresentationMode)
+        }
+        .onAppear {
+            checkTrialStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
+            let logger = DIContainer.shared.loggerService
+            logger.debug("IAP status changed notification received, rechecking trial status")
+            checkTrialStatus()
+        }
+    }
+
+    private func checkTrialStatus() {
+        let logger = DIContainer.shared.loggerService
+        logger.debug("checkTrialStatus called: hasPurchased=\(iapService.hasPurchased), hasEverPurchasedAnnual=\(iapService.hasEverPurchasedAnnual), isProUnlocked=\(iapService.isProUnlocked), hasShownWelcome=\(iapService.hasShownWelcome), trialDaysRemaining=\(iapService.trialDaysRemaining)")
         
+        // Priority 1: 如果已购买，不显示任何付费墙
+        if iapService.hasPurchased {
+            logger.debug("User has purchased, hiding paywall")
+            showIAPView = false
+            return
+        }
+        
+        // Priority 2: 如果曾经购买过年订阅但已过期，显示订阅过期视图
+        if iapService.hasEverPurchasedAnnual && !iapService.hasPurchased {
+            logger.debug("Annual subscription expired, showing subscriptionExpired view")
+            iapPresentationMode = .subscriptionExpired
+            showIAPView = true
+            return
+        }
+        
+        // Priority 3: 如果试用期过期且从未购买，显示试用期过期视图
+        if !iapService.isProUnlocked {
+            logger.debug("Trial expired, showing trialExpired view")
+            iapPresentationMode = .trialExpired
+            showIAPView = true
+            return
+        }
+        
+        // Priority 4: 如果应该显示试用提醒，显示提醒视图
+        if iapService.shouldShowTrialReminder() {
+            logger.debug("Should show trial reminder, showing trialReminder view")
+            iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
+            showIAPView = true
+            return
+        }
+        
+        // Priority 5: 如果是首次使用且在试用期内，显示欢迎视图
+        if !iapService.hasShownWelcome {
+            logger.debug("First time user, showing welcome view")
+            iapPresentationMode = .welcome
+            showIAPView = true
+            return
+        }
+        
+        // 其他情况不显示付费墙
+        logger.debug("No paywall needed, hiding")
+        showIAPView = false
     }
 }
 

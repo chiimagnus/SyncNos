@@ -138,7 +138,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             logger.error("[WeReadAPI] Cookie refresh failed: \(error.localizedDescription)")
             
             // 清除过期的 Cookie
-            authService.clearCookies()
+            await authService.clearCookies()
             
             // 抛出包含刷新失败信息的错误
             throw WeReadAPIError.sessionExpiredWithRefreshFailure(
