@@ -65,6 +65,7 @@ struct SyncNosApp: App {
             }
             .animation(.spring(), value: hasCompletedOnboarding)
         }
+        .windowStyle(.hiddenTitleBar) //隐藏标题栏
         .commands {
             AppCommands()
         }
