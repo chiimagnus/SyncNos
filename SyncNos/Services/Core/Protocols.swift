@@ -25,7 +25,7 @@ enum LogLevel: Int, CaseIterable, Comparable {
 
     var color: NSColor {
         switch self {
-        case .debug: return .gray
+        case .debug: return .blue
         case .info: return .gray
         case .warning: return .systemYellow
         case .error: return .systemRed
@@ -202,10 +202,35 @@ struct NotionPageSummary: Identifiable, Decodable {
 // MARK: - In-App Purchase Service Protocol
 protocol IAPServiceProtocol: AnyObject {
     var isProUnlocked: Bool { get }
+    var hasPurchased: Bool { get }
+    var hasPurchasedAnnual: Bool { get }
+    var hasPurchasedLifetime: Bool { get }
+    var purchaseType: PurchaseType { get }
+    var hasEverPurchasedAnnual: Bool { get }
+    var isInTrialPeriod: Bool { get }
+    var trialDaysRemaining: Int { get }
+    var hasShownWelcome: Bool { get }
     func fetchProducts() async throws -> [Product]
     func purchase(product: Product) async throws -> Bool
     func restorePurchases() async -> Bool
+    func refreshPurchasedStatus() async -> Bool
     func startObservingTransactions()
+    func shouldShowTrialReminder() -> Bool
+    func markReminderShown()
+    func markWelcomeShown()
+    func getAnnualSubscriptionExpirationDate() async -> Date?
+    func getPurchaseDate() async -> Date?
+    
+    // Debug functions (development environment only)
+    /// Resets all IAP purchase data and trial period information. Only available in development environment.
+    func resetAllPurchaseData() throws
+    
+    /// Returns comprehensive debug information about current IAP state
+    func getDebugInfo() -> IAPDebugInfo
+    
+    /// Simulates a specific purchase or trial state for testing. Only available in development environment.
+    /// - Parameter state: The state to simulate
+    func simulatePurchaseState(_ state: SimulatedPurchaseState) throws
 }
 
 // MARK: - Login Item Service Protocol
@@ -260,8 +285,8 @@ protocol WeReadAuthServiceProtocol: AnyObject {
 
     /// 更新并持久化新的 Cookie Header
     func updateCookieHeader(_ header: String)
-    /// 清除本地存储的 Cookie 与登录状态
-    func clearCookies()
+    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
+    func clearCookies() async
 }
 
 /// WeRead API 服务协议

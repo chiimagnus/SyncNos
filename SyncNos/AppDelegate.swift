@@ -76,6 +76,14 @@ import SwiftUI
         return true
     }
     
+    // MARK: - Application Lifecycle
+    /// 应用从后台恢复时，刷新订阅状态
+    func applicationDidBecomeActive(_ notification: Notification) {
+        Task {
+            await DIContainer.shared.iapService.refreshPurchasedStatus()
+        }
+    }
+    
     // MARK: - URL Scheme Handling
     /// 处理自定义 URL scheme 回调（备用机制）
     /// 主要处理由 ASWebAuthenticationSession 负责，此方法作为备用

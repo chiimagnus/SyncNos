@@ -29,10 +29,10 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
         saveCookieHeaderToKeychain(normalized)
     }
 
-    func clearCookies() {
+    func clearCookies() async {
         cachedHeader = nil
         removeCookieHeaderFromKeychain()
-        clearWebKitCookies()
+        await clearWebKitCookies()
         logger.info("[WeRead] Cookie header cleared from Keychain and WebKit.")
     }
 
@@ -59,14 +59,32 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
 
     // MARK: - WebKit Cookie helpers
 
-    private func clearWebKitCookies() {
+    @MainActor
+    private func clearWebKitCookies() async {
         let store = WKWebsiteDataStore.default()
-        store.httpCookieStore.getAllCookies { cookies in
-            let wereadCookies = cookies.filter { cookie in
-                cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
-            }
-            for cookie in wereadCookies {
-                store.httpCookieStore.delete(cookie)
+        
+        // 使用 async/await 确保清理完成
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            store.httpCookieStore.getAllCookies { cookies in
+                let wereadCookies = cookies.filter { cookie in
+                    cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
+                }
+                
+                // 同步删除所有 WeRead cookies
+                let group = DispatchGroup()
+                for cookie in wereadCookies {
+                    group.enter()
+                    store.httpCookieStore.delete(cookie) {
+                        group.leave()
+                    }
+                }
+                
+                group.notify(queue: .main) {
+                    Task { @MainActor in
+                        self.logger.info("[WeRead] Cleared \(wereadCookies.count) WebKit cookies.")
+                        continuation.resume()
+                    }
+                }
             }
         }
     }

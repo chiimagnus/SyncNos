@@ -4,19 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books 和 GoodLinks 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks 和 WeRead 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
 - ✅ **智能分页**：大量数据的分页处理，确保性能优化，支持增量加载
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
+- ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
 - ✅ **同步队列管理**：实时同步进度显示，任务排队和状态跟踪
-- ✅ **高亮颜色管理**：支持 Apple Books 和 GoodLinks 的颜色标签同步
+- ✅ **高亮颜色管理**：支持 Apple Books、GoodLinks 和 WeRead 的颜色标签同步
 - ✅ **自动后台同步**：可配置时间间隔，支持按来源独立启用/禁用
 - ✅ **Apple Sign In 认证**：通过 FastAPI 后端安全认证，支持 OAuth 授权
+- ✅ **应用内购买系统**：30天试用期，统一付费墙界面，调试工具支持
 - ✅ **国际化支持**：16 种语言（英、中、丹麦、荷兰、芬兰、法、德、印尼、日、韩、巴西葡、俄、西、瑞典、泰、越南）
 - ✅ **空状态视图**：优雅的占位页面提示
 - ✅ **模块化设置**：分类明确的设置界面和语言切换
@@ -24,6 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ **增量同步**：基于时间戳的增量同步机制
 - ✅ **菜单栏视图**：新增 MenuBarView 和 MenuBarViewModel，提供快捷访问功能
 - ✅ **窗口标题优化**：隐藏主窗口标题，优化界面显示
+- ✅ **日志级别颜色编码**：UI 中不同日志级别的颜色区分
 
 ## 架构
 
@@ -34,8 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 SyncNos/
 ├── SyncNosApp.swift              # 应用入口
-├── Infrastructure/
-│   └── AppDelegate.swift         # 应用生命周期管理
+├── AppDelegate.swift            # 应用生命周期管理（移至根目录）
 ├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── AppTheme.swift        # 应用主题和样式
@@ -55,13 +57,15 @@ SyncNos/
 │   │   ├── GoodLinksListView.swift
 │   │   └── GoodLinksDetailView.swift
 │   ├── WeRead/                   # 微信读书视图
-│   │   ├── WeReadListView.swift
-│   │   └── WeReadDetailView.swift
+│   │   ├── WeReadListView.swift       # 支持排序筛选和通知刷新
+│   │   ├── WeReadDetailView.swift     # 支持多个评论和高亮显示
 │   └── Settting/                 # 设置视图（重构）
 │       ├── General/
 │       │   ├── AboutView.swift           # 关于页面
 │       │   ├── AppleAccountView.swift    # Apple 账户
-│       │   ├── IAPView.swift             # 应用内购买
+│       │   ├── IAPViews/               # 应用内购买视图目录
+│       │   │   ├── PayWallView.swift      # 统一付费墙界面
+│       │   │   └── IAPView.swift         # 传统IAP界面
 │       │   ├── LanguageView.swift        # 语言设置（新增）
 │       │   ├── LogWindow.swift           # 日志窗口
 │       │   ├── SettingsView.swift        # 主设置页面
@@ -113,12 +117,12 @@ SyncNos/
 └── Services/                     # 业务逻辑和数据访问（重构）
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
-    │   ├── IAPService.swift      # 应用内购买
-    │   └── KeychainHelper.swift  # 安全凭证存储
+    │   └── IAPService.swift      # 应用内购买（支持试用期管理）
     ├── Core/                     # 核心服务
     │   ├── ConcurrencyLimiter.swift      # 并发控制
     │    ├── DIContainer.swift            # 中心服务容器
-    │   ├── LoggerService.swift           # 统一日志记录
+    │   ├── LoggerService.swift           # 统一日志记录（支持颜色编码）
+    │   ├── KeychainHelper.swift         # 安全凭证存储（从Auth移入）
     │   └── Protocols.swift               # 服务协议定义
     ├── DataSources-From/         # 数据源（从...获取）
     │   ├── AppleBooks/           # Apple Books SQLite 访问
@@ -141,7 +145,6 @@ SyncNos/
     │       ├── WeReadAuthService.swift          # Cookie 认证服务
     │       ├── WeReadCookieRefreshService.swift # Cookie 自动刷新服务
     │       ├── CookieRefreshCoordinator.swift   # 刷新协调器（Actor）
-    │       ├── WeReadDataService.swift          # SwiftData 数据管理
     │       └── WeReadSyncService.swift          # 同步服务协调器
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Lark/                 # 飞书（目录预留）
@@ -247,13 +250,14 @@ DIContainer.shared.autoSyncService
   - 确保并发请求只触发一次刷新
   - 多个等待请求共享刷新结果
   - 线程安全的并发控制
-- `WeReadDataService`: SwiftData 数据管理，支持书籍和高亮的持久化存储
 - `WeReadSyncService`: 同步服务协调器，处理与 Notion 的同步逻辑
 - 支持功能：
-  - 基于Cookie的Web API认证
+  - 基于Cookie的Web API认证（自动检测会话过期errCode -2012或HTTP 401）
+  - 透明的 Cookie 自动刷新机制（刷新成功后自动重试原始请求）
   - 书籍信息、高亮、笔记的完整提取
-  - 自动 Cookie 刷新，减少手动登录频率
-  - SwiftData 本地缓存和增量同步
+  - 自动 Cookie 刷新，减少手动登录频率（15秒超时保护）
+  - Actor-based 并发控制（CookieRefreshCoordinator确保线程安全）
+  - 简化数据流：移除SwiftData，采用 API → DTO → UI 模型直接流程
   - 与 Notion 数据库的无缝集成
 
 **6. 核心服务** (Services/Core/)
@@ -588,3 +592,38 @@ open SyncNos.xcodeproj
 - **遵循服务协议**：所有服务实现协议以支持测试
 - **避免业务逻辑在视图中**：保持 SwiftUI 视图的纯函数性
 - **本地化优先**：新功能开发时同时考虑多语言支持
+
+## 最新重要更新（基于最近提交记录）
+
+### WeRead 集成重大改进
+- **Cookie 自动刷新机制**：`0318632` - 实现了 `CookieRefreshCoordinator` (Actor) 和 `WeReadCookieRefreshService`
+- **透明认证流程**：`f67eb78` - 简化登录UI，移除手动cookie输入
+- **WebKit Cookie 清除**：`91284ad` - 在认证服务中集成 Cookie 清除功能
+- **数据流简化**：`9d37af0` - 移除 SwiftData 持久化，采用 API → DTO → UI 模型的直接流程
+
+### IAP 系统重构
+- **30天试用期**：`067ee6c` - 实现试用期管理和到期检查
+- **统一付费墙**：`aa53827` - 整合为 `PayWallView`，替代分散的IAP界面
+- **调试工具整合**：`d9e000b` - 将调试功能集中到主 `IAPViewModel`
+- **购买类型跟踪**：`fba3d0b` - 支持不同购买类型的识别和管理
+- **订阅过期检测**：实现完整的订阅过期监听和状态同步机制
+  - 4 种检测时机：启动、后台恢复、交易通知、定期轮询（每小时）
+  - 订阅历史追踪：`hasEverPurchasedAnnual` 区分"从未购买"和"曾经购买但已过期"
+  - 新增 `.subscriptionExpired` 付费墙模式
+  - 优先级决策树：已购买 → 订阅过期 → 试用期过期 → 试用期提醒 → 欢迎页面
+
+### 架构优化
+- **KeychainHelper 重定位**：`a0503cf` - 从 Auth 移至 Core 服务，提高复用性
+- **AppDelegate 重定位**：`f8e00fc` - 移至根目录，简化项目结构
+- **部署目标升级**：`7a3c58b` - 从 macOS 13.0 升级到 14.0，支持最新特性
+
+### UI/UX 改进
+- **日志颜色编码**：`37fa63b` - 为不同日志级别添加颜色区分
+- **动态语言切换**：`363f276` - 实现无需重启的实时语言切换
+- **时间戳显示优化**：`3511c5a` - 统一跨视图的最后同步时间显示
+
+### WeRead API 增强
+- **自动会话过期检测**：识别 errCode -2012 和 HTTP 401
+- **透明重试机制**：刷新成功后自动重试原始请求
+- **并发刷新控制**：确保多个并发请求只触发一次刷新
+- **15秒超时保护**：Cookie 刷新操作的安全超时机制

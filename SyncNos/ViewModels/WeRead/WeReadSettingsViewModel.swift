@@ -70,10 +70,12 @@ final class WeReadSettingsViewModel: ObservableObject {
     }
 
     func clearLogin() {
-        authService.clearCookies()
-        refreshLoginStatus()
-        message = "Logged out"
         Task {
+            await authService.clearCookies()
+            await MainActor.run {
+                refreshLoginStatus()
+                message = "Logged out"
+            }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
                 if self.message == "Logged out" {

@@ -46,13 +46,10 @@ struct SettingsView: View {
                     }
                     .help("Manage Apple sign-in and account info")
 #endif
-                }
-                .collapsible(false)
-#if DEBUG
-                Section(header: Text("Support")) {
+
                     NavigationLink(destination: IAPView()) {
                         HStack {
-                            Label("Support & Pro Unlock", systemImage: "heart.circle")
+                            Label("Support", systemImage: "star")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
@@ -62,7 +59,6 @@ struct SettingsView: View {
                     .help("Support development and unlock Pro features")
                 }
                 .collapsible(false)
-#endif
 
                 Section(header: Text("Sync Data To")) {
                     NavigationLink(value: "notion") {
