@@ -105,7 +105,7 @@ struct IAPView: View {
                     Text("Purchased:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(purchaseDate, style: .date)
+                    Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -117,7 +117,7 @@ struct IAPView: View {
                     Text("Expires:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(expirationDate, style: .date)
+                    Text(expirationDate.formatted(date: .abbreviated, time: .standard))
                         .font(.caption)
                         .foregroundStyle(expirationDate < Date() ? .red : .secondary)
                 }

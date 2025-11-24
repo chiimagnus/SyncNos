@@ -212,6 +212,7 @@ protocol IAPServiceProtocol: AnyObject {
     func fetchProducts() async throws -> [Product]
     func purchase(product: Product) async throws -> Bool
     func restorePurchases() async -> Bool
+    func refreshPurchasedStatus() async -> Bool
     func startObservingTransactions()
     func shouldShowTrialReminder() -> Bool
     func markReminderShown()

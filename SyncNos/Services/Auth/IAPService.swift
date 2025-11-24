@@ -290,6 +290,8 @@ final class IAPService: IAPServiceProtocol {
 
     func startObservingTransactions() {
         guard updatesTask == nil else { return }
+        
+        // 1. 监听新交易（购买、续费、退款等）
         updatesTask = Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             for await update in Transaction.updates {
@@ -297,10 +299,41 @@ final class IAPService: IAPServiceProtocol {
                     let verification = update
                     switch verification {
                     case .verified(let transaction):
+                        self.logger.debug("📬 收到交易更新: \(transaction.productID)")
                         await self.setUnlockedIfNeeded(for: transaction)
                         await transaction.finish()
+                        
+                        // 交易更新后，立即刷新所有产品的状态（检查过期）
+                        await self.refreshPurchasedStatus()
+                        
                     case .unverified(_, let error):
                         self.logger.warning("Unverified transaction update: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+        
+        // 2. 定期检查订阅过期状态（每小时检查一次）
+        // 因为 Transaction.updates 不会推送过期事件，需要主动轮询
+        Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                // 等待 1 小时
+                try? await Task.sleep(nanoseconds: 3600 * 1_000_000_000)
+                
+                self.logger.debug("⏰ 定期检查订阅状态...")
+                let wasUnlocked = await self.isProUnlocked
+                await self.refreshPurchasedStatus()
+                let isUnlocked = await self.isProUnlocked
+                
+                // 如果状态从解锁变为锁定，说明订阅过期了
+                if wasUnlocked && !isUnlocked {
+                    self.logger.warning("⚠️ 订阅已过期！")
+                    await MainActor.run {
+                        NotificationCenter.default.post(
+                            name: Self.statusChangedNotification,
+                            object: nil
+                        )
                     }
                 }
             }
@@ -417,19 +450,33 @@ final class IAPService: IAPServiceProtocol {
             if let latest = await Transaction.latest(for: productId.rawValue) {
                 switch latest {
                 case .verified(let transaction):
-                    // 验证通过，检查是否被撤销
-                    let isValid = transaction.revocationDate == nil
-                    logger.debug("    ✅ 交易验证通过 - 产品ID: \(transaction.productID), 有效: \(isValid)")
-                    logger.debug("    📅 购买日期: \(transaction.purchaseDate)")
+                    // 1. 检查是否被撤销
+                    let isRevoked = transaction.revocationDate != nil
+                    
+                    // 2. 检查订阅是否过期（仅适用于订阅类产品）
+                    var isExpired = false
                     if let expirationDate = transaction.expirationDate {
+                        isExpired = expirationDate < Date()
                         logger.debug("    ⏰ 到期日期: \(expirationDate)")
+                        logger.debug("    ⏰ 当前时间: \(Date())")
+                        logger.debug("    ⏰ 是否过期: \(isExpired)")
                     }
+                    
+                    // 3. 综合判断：未被撤销 且 未过期
+                    let isValid = !isRevoked && !isExpired
+                    
+                    logger.debug("    ✅ 交易验证通过 - 产品ID: \(transaction.productID)")
+                    logger.debug("    📅 购买日期: \(transaction.purchaseDate)")
+                    logger.debug("    💳 是否被撤销: \(isRevoked)")
+                    logger.debug("    ⏰ 是否过期: \(isExpired)")
+                    logger.debug("    ✅ 最终有效状态: \(isValid)")
                     
                     // 更新本地 UserDefaults 缓存
                     await setUnlocked(transaction.productID, isValid)
                     
                 case .unverified(_, let error):
                     logger.warning("    ⚠️ 交易验证失败 - 产品: \(productId.rawValue), 错误: \(error.localizedDescription)")
+                    await setUnlocked(productId.rawValue, false)
                 }
             } else {
                 logger.debug("    ℹ️ 未找到该产品的交易记录")
