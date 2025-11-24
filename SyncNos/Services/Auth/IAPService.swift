@@ -3,7 +3,6 @@ import StoreKit
 import IOKit
 
 // MARK: - Product Identifiers
-/// IAP 产品 ID 定义
 /// - annualSubscription: 年度订阅 ($18/年)
 /// - lifetimeLicense: 终身买断 ($68 一次性)
 enum IAPProductIds: String, CaseIterable {
@@ -212,7 +211,7 @@ final class IAPService: IAPServiceProtocol {
                     await transaction.finish()
                     return true
                     
-                case .unverified(let transaction, let error):
+                case .unverified(_, let error):
                     logger.error("Transaction verification failed: \(error.localizedDescription)")
                     throw error
                 }
@@ -252,7 +251,7 @@ final class IAPService: IAPServiceProtocol {
                     await self.setUnlockedIfNeeded(for: transaction)
                     await transaction.finish()
                     // 交易更新后，立即刷新所有产品的状态（检查过期）
-                    await self.refreshPurchasedStatus()
+                    _ = await self.refreshPurchasedStatus()
                 case .unverified(_, let error):
                     self.logger.error("Transaction verification failed: \(error.localizedDescription)")
                 }
@@ -265,9 +264,9 @@ final class IAPService: IAPServiceProtocol {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 3600 * 1_000_000_000)
                 
-                let wasUnlocked = await self.isProUnlocked
-                await self.refreshPurchasedStatus()
-                let isUnlocked = await self.isProUnlocked
+                let wasUnlocked = self.isProUnlocked
+                _ = await self.refreshPurchasedStatus()
+                let isUnlocked = self.isProUnlocked
                 
                 // 如果状态从解锁变为锁定，说明订阅过期了
                 if wasUnlocked && !isUnlocked {
