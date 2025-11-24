@@ -25,9 +25,6 @@ final class OnboardingViewModel: ObservableObject {
     @Published var isAuthorizingNotion: Bool = false
     @Published var notionErrorMessage: String?
     
-    // Apple Books Permissions
-    @Published var appleBooksPath: String?
-    
     // WeRead State
     @Published var isWeReadLoggedIn: Bool = false
     @Published var sourceSelectionError: String?
@@ -55,20 +52,6 @@ final class OnboardingViewModel: ObservableObject {
         // Initialize states
         self.checkNotionStatus()
         self.checkWeReadStatus()
-        
-        // Listen for Apple Books path selection
-        NotificationCenter.default.addObserver(
-            forName: Notification.Name("AppleBooksContainerSelected"),
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            if let path = notification.object as? String {
-                Task { @MainActor in
-                    self?.appleBooksPath = path
-                }
-                // If user just enabled it and selected path, we keep it enabled.
-            }
-        }
         
         // Observe IAP status
         self.isProUnlocked = iapService.isProUnlocked
@@ -120,10 +103,6 @@ final class OnboardingViewModel: ObservableObject {
                 }
             }
         }
-    }
-    
-    func requestAppleBooksAccess() {
-        AppleBooksPicker.pickAppleBooksContainer()
     }
     
     func checkNotionStatus() {
