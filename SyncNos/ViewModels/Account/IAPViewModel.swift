@@ -4,12 +4,26 @@ import Combine
 
 @MainActor
 final class IAPViewModel: ObservableObject {
+    // MARK: - Production Properties
     @Published var products: [Product] = []
     @Published var isLoading: Bool = false
     @Published var message: String?
     @Published var isProUnlocked: Bool = DIContainer.shared.iapService.isProUnlocked
+    @Published var hasPurchased: Bool = DIContainer.shared.iapService.hasPurchased
+    @Published var purchaseType: PurchaseType = DIContainer.shared.iapService.purchaseType
+    @Published var hasEverPurchasedAnnual: Bool = DIContainer.shared.iapService.hasEverPurchasedAnnual
+    @Published var isInTrialPeriod: Bool = DIContainer.shared.iapService.isInTrialPeriod
+    @Published var trialDaysRemaining: Int = DIContainer.shared.iapService.trialDaysRemaining
+    @Published var expirationDate: Date?
+    @Published var purchaseDate: Date?
+
+#if DEBUG
+    // MARK: - Debug Properties
+    @Published var debugInfo: IAPDebugInfo?
+#endif
 
     private let iap: IAPServiceProtocol
+    private let logger = DIContainer.shared.loggerService
     private var cancellables: Set<AnyCancellable> = []
 
     init(iap: IAPServiceProtocol = DIContainer.shared.iapService) {
@@ -20,13 +34,32 @@ final class IAPViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.isProUnlocked = DIContainer.shared.iapService.isProUnlocked
+                    self?.updateStatus()
                 }
             }
             .store(in: &cancellables)
     }
 
+    private func updateStatus() {
+        isProUnlocked = iap.isProUnlocked
+        hasPurchased = iap.hasPurchased
+        purchaseType = iap.purchaseType
+        hasEverPurchasedAnnual = iap.hasEverPurchasedAnnual
+        isInTrialPeriod = iap.isInTrialPeriod
+        trialDaysRemaining = iap.trialDaysRemaining
+        
+        Task {
+            expirationDate = await iap.getAnnualSubscriptionExpirationDate()
+            purchaseDate = await iap.getPurchaseDate()
+        }
+        
+#if DEBUG
+        debugInfo = iap.getDebugInfo()
+#endif
+    }
+
     func onAppear() {
+        updateStatus()
         Task { @MainActor [weak self] in
             await self?.refresh()
         }
@@ -68,4 +101,28 @@ final class IAPViewModel: ObservableObject {
             self.message = ok ? NSLocalizedString("Restored successfully.", comment: "") : NSLocalizedString("Restore failed.", comment: "")
         }
     }
+
+#if DEBUG
+    func requestReset() {
+        do {
+            try iap.resetAllPurchaseData()
+            logger.debug("IAP data reset successfully")
+            updateStatus()
+        } catch {
+            logger.error("Reset failed: \(error.localizedDescription)")
+            message = error.localizedDescription
+        }
+    }
+
+    func simulateState(_ state: SimulatedPurchaseState) {
+        do {
+            try iap.simulatePurchaseState(state)
+            logger.debug("IAP state simulated successfully")
+            updateStatus()
+        } catch {
+            logger.error("Simulation failed: \(error.localizedDescription)")
+            message = error.localizedDescription
+        }
+    }
+#endif
 }

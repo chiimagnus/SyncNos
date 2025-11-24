@@ -16,11 +16,11 @@ struct SelectionPlaceholderView: View {
 
     private func colorForTitle(_ title: String) -> Color {
         switch title.lowercased() {
-        case let t where t.contains("apple"): # #FE9509, 十六进制写法
+        case let t where t.contains("apple"): // #FE9509, 十六进制写法
             return Color(red: 0xFE / 255, green: 0x95 / 255, blue: 0x09 / 255)
-        case let t where t.contains("goodlinks"): # #EA3558
+        case let t where t.contains("goodlinks"): // #EA3558
             return Color(red: 0xEA / 255, green: 0x35 / 255, blue: 0x58 / 255)
-        case let t where t.contains("weread"): # #30ACFE
+        case let t where t.contains("weread"): // #30ACFE
             return Color(red: 0x30 / 255, green: 0xAC / 255, blue: 0xFE / 255)
         default:
             return .primary
