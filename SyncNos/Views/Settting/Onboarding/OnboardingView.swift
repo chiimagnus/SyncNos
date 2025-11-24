@@ -4,33 +4,25 @@ struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
     
     var body: some View {
-        ZStack {
-            // Background
-            VisualEffectBackground(material: .windowBackground)
-                .ignoresSafeArea()
-            
-            VStack {
-                // Content with transition
-                Group {
-                    switch viewModel.currentStep {
-                    case .welcome:
-                        OnboardingWelcomeView(viewModel: viewModel)
-                    case .connectNotion:
-                        OnboardingNotionView(viewModel: viewModel)
-                    case .enableSources:
-                        OnboardingSourcesView(viewModel: viewModel)
-                    }
+        VStack {
+            // Content with transition
+            Group {
+                switch viewModel.currentStep {
+                case .welcome:
+                    OnboardingWelcomeView(viewModel: viewModel)
+                case .connectNotion:
+                    OnboardingNotionView(viewModel: viewModel)
+                case .enableSources:
+                    OnboardingSourcesView(viewModel: viewModel)
                 }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-                .id(viewModel.currentStep) // Force transition on step change
             }
-            .frame(width: 600, height: 500) // Fixed size for onboarding window
+            .transition(.asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            ))
+            .id(viewModel.currentStep) // Force transition on step change
         }
-        // Ensure the window is large enough if it's the main window
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(width: 600, height: 500) // Fixed size for onboarding window
     }
 }
 
