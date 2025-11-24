@@ -4,6 +4,9 @@ import SwiftUI
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
+    @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
+    @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
     @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
     @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
@@ -14,6 +17,31 @@ struct ViewCommands: Commands {
     @AppStorage("highlight_sort_ascending") private var highlightSortAscending: Bool = false
     @AppStorage("highlight_has_notes") private var highlightHasNotes: Bool = false
     @AppStorage("highlight_selected_mask") private var highlightSelectedMask: Int = 0
+
+    /// 当前有效的数据源（如果存储值已被用户在设置中关闭，则回退到第一个启用的数据源）
+    private var currentSource: ContentSource {
+        let stored = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
+        let enabled = enabledContentSources
+        if !isDataSourceEnabled(stored), let first = enabled.first {
+            return first
+        }
+        return stored
+    }
+
+    private var enabledContentSources: [ContentSource] {
+        ContentSource.allCases.filter { isDataSourceEnabled($0) }
+    }
+
+    private func isDataSourceEnabled(_ source: ContentSource) -> Bool {
+        switch source {
+        case .appleBooks:
+            return appleBooksSourceEnabled
+        case .goodLinks:
+            return goodLinksSourceEnabled
+        case .weRead:
+            return weReadSourceEnabled
+        }
+    }
 
     var body: some Commands {
         // View 菜单 - 视图相关
@@ -30,28 +58,33 @@ struct ViewCommands: Commands {
             Divider()
 
             // 数据源切换
-            Button("Apple Books", systemImage: "book") {
-                contentSourceRawValue = ContentSource.appleBooks.rawValue
+            if isDataSourceEnabled(.appleBooks) {
+                Button("Apple Books", systemImage: "book") {
+                    contentSourceRawValue = ContentSource.appleBooks.rawValue
+                }
+                .keyboardShortcut("1", modifiers: .command)
+                .disabled(currentSource == .appleBooks)
             }
-            .keyboardShortcut("1", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.appleBooks.rawValue)
 
-            Button("GoodLinks", systemImage: "bookmark") {
-                contentSourceRawValue = ContentSource.goodLinks.rawValue
+            if isDataSourceEnabled(.goodLinks) {
+                Button("GoodLinks", systemImage: "bookmark") {
+                    contentSourceRawValue = ContentSource.goodLinks.rawValue
+                }
+                .keyboardShortcut("2", modifiers: .command)
+                .disabled(currentSource == .goodLinks)
             }
-            .keyboardShortcut("2", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.goodLinks.rawValue)
 
-            Button("WeRead", systemImage: "text.book.closed") {
-                contentSourceRawValue = ContentSource.weRead.rawValue
+            if isDataSourceEnabled(.weRead) {
+                Button("WeRead", systemImage: "text.book.closed") {
+                    contentSourceRawValue = ContentSource.weRead.rawValue
+                }
+                .keyboardShortcut("3", modifiers: .command)
+                .disabled(currentSource == .weRead)
             }
-            .keyboardShortcut("3", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.weRead.rawValue)
 
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
-            let currentSource = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
             if currentSource == .appleBooks {
                 // Apple Books 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
