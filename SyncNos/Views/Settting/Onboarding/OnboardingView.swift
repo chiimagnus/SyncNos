@@ -2,7 +2,6 @@ import SwiftUI
 
 struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
-    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     
     var body: some View {
         ZStack {
@@ -117,11 +116,11 @@ struct OnboardingNotionView: View {
                 .foregroundStyle(.primary)
             
             VStack(spacing: 12) {
-                Text("Connect Your Workspace")
+                Text("Connect Your Notion")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                Text("We'll create a secure database in your Notion workspace\nto store all your synced highlights.")
+                Text("We'll create several secure databases in your Notion workspace\nto store all your synced highlights.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -142,27 +141,34 @@ struct OnboardingNotionView: View {
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(10)
                     
-                    Button("Continue") {
-                        viewModel.nextStep()
+                    Button(action: { viewModel.nextStep() }) {
+                        Text("Continue")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 60)
+                    .padding(.bottom, 40)
                 }
             } else {
                 Button(action: { viewModel.connectNotion() }) {
                     HStack {
+                        Text("Connect Notion")
                         if viewModel.isAuthorizingNotion {
                             ProgressView()
                                 .controlSize(.small)
                                 .padding(.trailing, 5)
                         }
-                        Text("Connect Notion")
                     }
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.primary)
-                    .foregroundColor(Color("WindowBackgroundColor")) // Invert
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
                     .cornerRadius(10)
                 }
                 .buttonStyle(.plain)
@@ -183,7 +189,6 @@ struct OnboardingNotionView: View {
             }
             
             Spacer()
-                .frame(height: 20)
         }
         .padding()
     }
@@ -243,6 +248,13 @@ struct OnboardingSourcesView: View {
             .padding(.horizontal, 40)
             
             Spacer()
+            
+            if let error = viewModel.sourceSelectionError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.bottom, -20)
+            }
             
             Button(action: { viewModel.nextStep() }) {
                 Text("Continue")

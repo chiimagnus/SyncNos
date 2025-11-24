@@ -29,6 +29,7 @@ final class OnboardingViewModel: ObservableObject {
     
     // WeRead State
     @Published var isWeReadLoggedIn: Bool = false
+    @Published var sourceSelectionError: String?
     
     // Pro Access
     @Published var isProUnlocked: Bool = false // To track purchase status if needed
@@ -76,8 +77,11 @@ final class OnboardingViewModel: ObservableObject {
     
     func nextStep() {
         if currentStep == .enableSources {
-            // Check if any source enabled but not configured?
-            // Ideally we prompt them during the toggle action, but here we just proceed.
+            guard appleBooksEnabled || goodLinksEnabled || weReadEnabled else {
+                sourceSelectionError = "Please open at least one synchronization source"
+                return
+            }
+            sourceSelectionError = nil
         }
         
         if let next = OnboardingStep(rawValue: currentStep.rawValue + 1) {
