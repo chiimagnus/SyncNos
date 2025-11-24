@@ -15,6 +15,14 @@ struct GoodLinksSettingsView: View {
                         }
                 }
 
+                Toggle("Enable GoodLinks source", isOn: $viewModel.isSourceEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .help("Show GoodLinks in the main list and commands")
+                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                        viewModel.save()
+                    }
+
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
