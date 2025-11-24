@@ -40,6 +40,14 @@ struct WeReadSettingsView: View {
                         }
                 }
 
+                Toggle("Enable WeRead source", isOn: $viewModel.isSourceEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .help("Show WeRead in the main list and commands")
+                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                        viewModel.save()
+                    }
+
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
