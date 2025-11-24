@@ -11,6 +11,7 @@ final class IAPViewModel: ObservableObject {
     @Published var isProUnlocked: Bool = DIContainer.shared.iapService.isProUnlocked
     @Published var hasPurchased: Bool = DIContainer.shared.iapService.hasPurchased
     @Published var purchaseType: PurchaseType = DIContainer.shared.iapService.purchaseType
+    @Published var hasEverPurchasedAnnual: Bool = DIContainer.shared.iapService.hasEverPurchasedAnnual
     @Published var isInTrialPeriod: Bool = DIContainer.shared.iapService.isInTrialPeriod
     @Published var trialDaysRemaining: Int = DIContainer.shared.iapService.trialDaysRemaining
     @Published var expirationDate: Date?
@@ -43,6 +44,7 @@ final class IAPViewModel: ObservableObject {
         isProUnlocked = iap.isProUnlocked
         hasPurchased = iap.hasPurchased
         purchaseType = iap.purchaseType
+        hasEverPurchasedAnnual = iap.hasEverPurchasedAnnual
         isInTrialPeriod = iap.isInTrialPeriod
         trialDaysRemaining = iap.trialDaysRemaining
         

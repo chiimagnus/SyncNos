@@ -385,7 +385,7 @@ struct MainListView: View {
 
     private func checkTrialStatus() {
         let logger = DIContainer.shared.loggerService
-        logger.debug("checkTrialStatus called: hasPurchased=\(iapService.hasPurchased), isProUnlocked=\(iapService.isProUnlocked), hasShownWelcome=\(iapService.hasShownWelcome), trialDaysRemaining=\(iapService.trialDaysRemaining)")
+        logger.debug("checkTrialStatus called: hasPurchased=\(iapService.hasPurchased), hasEverPurchasedAnnual=\(iapService.hasEverPurchasedAnnual), isProUnlocked=\(iapService.isProUnlocked), hasShownWelcome=\(iapService.hasShownWelcome), trialDaysRemaining=\(iapService.trialDaysRemaining)")
         
         // Priority 1: 如果已购买，不显示任何付费墙
         if iapService.hasPurchased {
@@ -394,7 +394,15 @@ struct MainListView: View {
             return
         }
         
-        // Priority 2: 如果试用期过期且未购买，显示过期视图
+        // Priority 2: 如果曾经购买过年订阅但已过期，显示订阅过期视图
+        if iapService.hasEverPurchasedAnnual && !iapService.hasPurchased {
+            logger.debug("Annual subscription expired, showing subscriptionExpired view")
+            iapPresentationMode = .subscriptionExpired
+            showIAPView = true
+            return
+        }
+        
+        // Priority 3: 如果试用期过期且从未购买，显示试用期过期视图
         if !iapService.isProUnlocked {
             logger.debug("Trial expired, showing trialExpired view")
             iapPresentationMode = .trialExpired
@@ -402,7 +410,7 @@ struct MainListView: View {
             return
         }
         
-        // Priority 3: 如果应该显示试用提醒，显示提醒视图
+        // Priority 4: 如果应该显示试用提醒，显示提醒视图
         if iapService.shouldShowTrialReminder() {
             logger.debug("Should show trial reminder, showing trialReminder view")
             iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
@@ -410,7 +418,7 @@ struct MainListView: View {
             return
         }
         
-        // Priority 4: 如果是首次使用且在试用期内，显示欢迎视图
+        // Priority 5: 如果是首次使用且在试用期内，显示欢迎视图
         if !iapService.hasShownWelcome {
             logger.debug("First time user, showing welcome view")
             iapPresentationMode = .welcome

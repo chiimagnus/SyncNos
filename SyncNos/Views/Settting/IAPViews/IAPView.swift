@@ -8,8 +8,13 @@ struct IAPView: View {
         List {
             Section(header: Text("Status")) {
                 if viewModel.hasPurchased {
+                    // 当前有有效购买
                     purchasedStatusView
+                } else if viewModel.hasEverPurchasedAnnual {
+                    // 曾经购买过年订阅但已过期
+                    expiredSubscriptionView
                 } else {
+                    // 从未购买过，显示试用期状态
                     trialStatusView
                 }
             }
@@ -152,6 +157,49 @@ struct IAPView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+        }
+    }
+    
+    private var expiredSubscriptionView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundColor(.red)
+                Text("Annual Subscription")
+                    .font(.headline)
+                Spacer()
+                Text("Expired")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            
+            // 显示购买日期
+            if let purchaseDate = viewModel.purchaseDate {
+                HStack {
+                    Text("Purchased:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            // 显示到期时间
+            if let expirationDate = viewModel.expirationDate {
+                HStack {
+                    Text("Expired:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(expirationDate.formatted(date: .abbreviated, time: .standard))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            
+            Text("Your subscription has expired. Renew to continue using SyncNos.")
+                .font(.caption)
+                .foregroundStyle(.red)
         }
     }
 

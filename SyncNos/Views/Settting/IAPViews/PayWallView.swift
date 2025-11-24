@@ -210,8 +210,8 @@ struct PayWallView: View {
             }
             .buttonStyle(.plain)
             
-        case .trialExpired:
-            // No primary action button for expired trial
+        case .trialExpired, .subscriptionExpired:
+            // No primary action button for expired states
             EmptyView()
         }
     }
@@ -231,6 +231,8 @@ struct PayWallView: View {
             }
         case .trialExpired:
             return "star.circle.fill"
+        case .subscriptionExpired:
+            return "exclamationmark.circle.fill"
         }
     }
     
@@ -247,6 +249,8 @@ struct PayWallView: View {
             }
         case .trialExpired:
             return .yellow
+        case .subscriptionExpired:
+            return .red
         }
     }
     
@@ -263,6 +267,8 @@ struct PayWallView: View {
             }
         case .trialExpired:
             return "Trial Period Ended"
+        case .subscriptionExpired:
+            return "Subscription Expired"
         }
     }
     
@@ -274,6 +280,8 @@ struct PayWallView: View {
             return "Your free trial will expire in \(days) day\(days == 1 ? "" : "s"). Purchase now to continue enjoying unlimited syncing."
         case .trialExpired:
             return "Your 30-day free trial has expired. Purchase to continue using SyncNos."
+        case .subscriptionExpired:
+            return "Your annual subscription has expired. Renew now to continue syncing your highlights."
         }
     }
     
@@ -300,6 +308,7 @@ enum IAPPresentationMode {
     case welcome
     case trialReminder(daysRemaining: Int)
     case trialExpired
+    case subscriptionExpired  // 新增：年订阅已过期
 }
 
 // MARK: - Previews
@@ -322,4 +331,8 @@ enum IAPPresentationMode {
 
 #Preview("Trial Expired") {
     PayWallView(presentationMode: .trialExpired)
+}
+
+#Preview("Subscription Expired") {
+    PayWallView(presentationMode: .subscriptionExpired)
 }
