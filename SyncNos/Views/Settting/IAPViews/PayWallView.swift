@@ -4,6 +4,7 @@ import StoreKit
 /// 统一的 IAP 视图，根据不同状态显示不同内容，但始终包含购买选项
 struct PayWallView: View {
     let presentationMode: IAPPresentationMode
+    var onFinish: (() -> Void)? = nil
     @StateObject private var viewModel = IAPViewModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
@@ -184,7 +185,11 @@ struct PayWallView: View {
         case .welcome:
             Button(action: {
                 DIContainer.shared.iapService.markWelcomeShown()
-                dismiss()
+                if let onFinish = onFinish {
+                    onFinish()
+                } else {
+                    dismiss()
+                }
             }) {
                 Text("Start Free Trial")
                     .font(.headline)
@@ -298,8 +303,12 @@ struct PayWallView: View {
             DIContainer.shared.iapService.markWelcomeShown()
         }
         
-        logger.debug("Dismissing paywall view")
-        dismiss()
+        if let onFinish = onFinish {
+            onFinish()
+        } else {
+            logger.debug("Dismissing paywall view")
+            dismiss()
+        }
     }
 }
 
