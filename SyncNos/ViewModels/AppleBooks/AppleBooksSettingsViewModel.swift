@@ -6,6 +6,8 @@ final class AppleBooksSettingsViewModel: ObservableObject {
     @Published var syncMode: String = "single"
     @Published var appleBooksDbId: String = ""
     @Published var autoSync: Bool = false
+    /// 数据源是否启用（影响 UI 中是否展示 Apple Books 数据源）
+    @Published var isSourceEnabled: Bool = true
     @Published var message: String?
 
     private let notionConfig: NotionConfigStoreProtocol
@@ -19,6 +21,8 @@ final class AppleBooksSettingsViewModel: ObservableObject {
         }
         // read autoSync flag from AppStorage via UserDefaults bridge
         self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
+        // read datasource enabled flag (默认启用 Apple Books 源)
+        self.isSourceEnabled = (UserDefaults.standard.object(forKey: "datasource.appleBooks.enabled") as? Bool) ?? true
 
         // keep syncMode in sync if external changes happen
         // no external publisher available; omit
@@ -26,6 +30,7 @@ final class AppleBooksSettingsViewModel: ObservableObject {
 
     func save() {
         notionConfig.setDatabaseId(appleBooksDbId.trimmingCharacters(in: .whitespacesAndNewlines), forSource: "appleBooks")
+        UserDefaults.standard.set(isSourceEnabled, forKey: "datasource.appleBooks.enabled")
         notionConfig.syncMode = syncMode.trimmingCharacters(in: .whitespacesAndNewlines)
         let previous = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
         UserDefaults.standard.set(autoSync, forKey: "autoSync.appleBooks")

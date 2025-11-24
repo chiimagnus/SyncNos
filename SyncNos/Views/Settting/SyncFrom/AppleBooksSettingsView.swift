@@ -23,6 +23,14 @@ struct AppleBooksSettingsView: View {
                         }
                 }
 
+                Toggle("Enable Apple Books source", isOn: $viewModel.isSourceEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .help("Show Apple Books in the main list and commands")
+                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                        viewModel.save()
+                    }
+
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)

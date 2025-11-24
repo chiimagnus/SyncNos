@@ -4,7 +4,19 @@ import StoreKit
 @main
 struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    
     init() {
+#if DEBUG
+        // Debug flag：通过 UserDefaults(debug.forceOnboardingEveryLaunch) 控制是否每次启动都重置引导状态
+        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": true])
+        let envDetector = DIContainer.shared.environmentDetector
+        let shouldForceOnboarding = UserDefaults.standard.bool(forKey: "debug.forceOnboardingEveryLaunch")
+        if envDetector.isDevEnvironment() && shouldForceOnboarding {
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        }
+#endif
+
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
             let started = BookmarkStore.shared.startAccessing(url: url)
@@ -42,8 +54,18 @@ struct SyncNosApp: App {
     var body: some Scene {
         // 隐藏可见窗口标题（保留重新打开时的 id），以避免在工具栏中显示应用程序名称。
         Window("", id: "main") {
-            MainListView()
+            Group {
+                if hasCompletedOnboarding {
+                    MainListView()
+                        .transition(.opacity)
+                } else {
+                    OnboardingView()
+                        .transition(.opacity)
+                }
+            }
+            .animation(.spring(), value: hasCompletedOnboarding)
         }
+        .windowStyle(.hiddenTitleBar) //隐藏标题栏
         .commands {
             AppCommands()
         }

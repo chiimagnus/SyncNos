@@ -4,6 +4,9 @@ import SwiftUI
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
+    @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
+    @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
     @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
     @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
@@ -14,6 +17,47 @@ struct ViewCommands: Commands {
     @AppStorage("highlight_sort_ascending") private var highlightSortAscending: Bool = false
     @AppStorage("highlight_has_notes") private var highlightHasNotes: Bool = false
     @AppStorage("highlight_selected_mask") private var highlightSelectedMask: Int = 0
+
+    /// 当前有效的数据源（如果存储值已被用户在设置中关闭，则回退到第一个启用的数据源）
+    private var currentSource: ContentSource {
+        let stored = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
+        let enabled = enabledContentSources
+        if !isDataSourceEnabled(stored), let first = enabled.first {
+            return first
+        }
+        return stored
+    }
+
+    private var enabledContentSources: [ContentSource] {
+        ContentSource.allCases.filter { isDataSourceEnabled($0) }
+    }
+
+    private func isDataSourceEnabled(_ source: ContentSource) -> Bool {
+        switch source {
+        case .appleBooks:
+            return appleBooksSourceEnabled
+        case .goodLinks:
+            return goodLinksSourceEnabled
+        case .weRead:
+            return weReadSourceEnabled
+        }
+    }
+
+    /// 在当前启用的数据源列表中查找指定 source 的索引（0 表示第一个、1 表示第二个、2 表示第三个）
+    private func indexForSource(_ source: ContentSource) -> Int? {
+        enabledContentSources.firstIndex(of: source)
+    }
+
+    /// 根据“第几个启用的数据源”返回对应的快捷键（cmd+1 / cmd+2 / cmd+3）
+    private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
+        guard let index = indexForSource(source) else { return nil }
+        switch index {
+        case 0: return "1"
+        case 1: return "2"
+        case 2: return "3"
+        default: return nil
+        }
+    }
 
     var body: some Commands {
         // View 菜单 - 视图相关
@@ -29,29 +73,55 @@ struct ViewCommands: Commands {
             .keyboardShortcut("r", modifiers: .command)
             Divider()
 
-            // 数据源切换
-            Button("Apple Books", systemImage: "book") {
-                contentSourceRawValue = ContentSource.appleBooks.rawValue
+            // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到“第 1/2/3 个启用的数据源”）
+            if isDataSourceEnabled(.appleBooks) {
+                if let key = shortcutKey(for: .appleBooks) {
+                    Button("Apple Books", systemImage: "book") {
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .appleBooks)
+                } else {
+                    Button("Apple Books", systemImage: "book") {
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                    }
+                    .disabled(currentSource == .appleBooks)
+                }
             }
-            .keyboardShortcut("1", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.appleBooks.rawValue)
 
-            Button("GoodLinks", systemImage: "bookmark") {
-                contentSourceRawValue = ContentSource.goodLinks.rawValue
+            if isDataSourceEnabled(.goodLinks) {
+                if let key = shortcutKey(for: .goodLinks) {
+                    Button("GoodLinks", systemImage: "bookmark") {
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .goodLinks)
+                } else {
+                    Button("GoodLinks", systemImage: "bookmark") {
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                    }
+                    .disabled(currentSource == .goodLinks)
+                }
             }
-            .keyboardShortcut("2", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.goodLinks.rawValue)
 
-            Button("WeRead", systemImage: "text.book.closed") {
-                contentSourceRawValue = ContentSource.weRead.rawValue
+            if isDataSourceEnabled(.weRead) {
+                if let key = shortcutKey(for: .weRead) {
+                    Button("WeRead", systemImage: "text.book.closed") {
+                        contentSourceRawValue = ContentSource.weRead.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .weRead)
+                } else {
+                    Button("WeRead", systemImage: "text.book.closed") {
+                        contentSourceRawValue = ContentSource.weRead.rawValue
+                    }
+                    .disabled(currentSource == .weRead)
+                }
             }
-            .keyboardShortcut("3", modifiers: .command)
-            .disabled(contentSourceRawValue == ContentSource.weRead.rawValue)
 
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
-            let currentSource = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
             if currentSource == .appleBooks {
                 // Apple Books 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
