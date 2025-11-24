@@ -23,6 +23,11 @@ struct SyncNosApp: App {
         } else if !iapService.hasPurchased {
             DIContainer.shared.loggerService.warning("Trial period expired, purchase required")
         }
+        
+        // 启动时刷新订阅状态（检查是否过期）
+        Task {
+            await DIContainer.shared.iapService.refreshPurchasedStatus()
+        }
 
         // Start Auto Sync if any source enabled
         let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
