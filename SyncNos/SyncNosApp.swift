@@ -7,11 +7,15 @@ struct SyncNosApp: App {
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     
     init() {
-        // 开发环境：每次启动都重置引导完成标记，方便反复体验 Onboarding
+#if DEBUG
+        // Debug flag：通过 UserDefaults(debug.forceOnboardingEveryLaunch) 控制是否每次启动都重置引导状态
+        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": true])
         let envDetector = DIContainer.shared.environmentDetector
-        if envDetector.isDevEnvironment() {
+        let shouldForceOnboarding = UserDefaults.standard.bool(forKey: "debug.forceOnboardingEveryLaunch")
+        if envDetector.isDevEnvironment() && shouldForceOnboarding {
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
         }
+#endif
 
         // Try auto-restore bookmark at launch
         if let url = BookmarkStore.shared.restore() {
