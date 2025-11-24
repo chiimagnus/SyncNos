@@ -81,6 +81,12 @@ final class IAPService: IAPServiceProtocol {
             return .none
         }
     }
+    
+    /// 是否曾经购买过年订阅（包括已过期的）
+    var hasEverPurchasedAnnual: Bool {
+        // 检查是否有年订阅的 Transaction ID 记录
+        return UserDefaults.standard.string(forKey: annualSubscriptionTransactionIdKey) != nil
+    }
 
     var isInTrialPeriod: Bool {
         guard let firstLaunchDate = getFirstLaunchDate() else {

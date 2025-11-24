@@ -206,6 +206,7 @@ protocol IAPServiceProtocol: AnyObject {
     var hasPurchasedAnnual: Bool { get }
     var hasPurchasedLifetime: Bool { get }
     var purchaseType: PurchaseType { get }
+    var hasEverPurchasedAnnual: Bool { get }
     var isInTrialPeriod: Bool { get }
     var trialDaysRemaining: Int { get }
     var hasShownWelcome: Bool { get }
