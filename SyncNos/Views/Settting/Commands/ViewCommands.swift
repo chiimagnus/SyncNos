@@ -43,6 +43,22 @@ struct ViewCommands: Commands {
         }
     }
 
+    /// 在当前启用的数据源列表中查找指定 source 的索引（0 表示第一个、1 表示第二个、2 表示第三个）
+    private func indexForSource(_ source: ContentSource) -> Int? {
+        enabledContentSources.firstIndex(of: source)
+    }
+
+    /// 根据“第几个启用的数据源”返回对应的快捷键（cmd+1 / cmd+2 / cmd+3）
+    private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
+        guard let index = indexForSource(source) else { return nil }
+        switch index {
+        case 0: return "1"
+        case 1: return "2"
+        case 2: return "3"
+        default: return nil
+        }
+    }
+
     var body: some Commands {
         // View 菜单 - 视图相关
         CommandGroup(after: .toolbar) {
@@ -57,29 +73,50 @@ struct ViewCommands: Commands {
             .keyboardShortcut("r", modifiers: .command)
             Divider()
 
-            // 数据源切换
+            // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到“第 1/2/3 个启用的数据源”）
             if isDataSourceEnabled(.appleBooks) {
-                Button("Apple Books", systemImage: "book") {
-                    contentSourceRawValue = ContentSource.appleBooks.rawValue
+                if let key = shortcutKey(for: .appleBooks) {
+                    Button("Apple Books", systemImage: "book") {
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .appleBooks)
+                } else {
+                    Button("Apple Books", systemImage: "book") {
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                    }
+                    .disabled(currentSource == .appleBooks)
                 }
-                .keyboardShortcut("1", modifiers: .command)
-                .disabled(currentSource == .appleBooks)
             }
 
             if isDataSourceEnabled(.goodLinks) {
-                Button("GoodLinks", systemImage: "bookmark") {
-                    contentSourceRawValue = ContentSource.goodLinks.rawValue
+                if let key = shortcutKey(for: .goodLinks) {
+                    Button("GoodLinks", systemImage: "bookmark") {
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .goodLinks)
+                } else {
+                    Button("GoodLinks", systemImage: "bookmark") {
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                    }
+                    .disabled(currentSource == .goodLinks)
                 }
-                .keyboardShortcut("2", modifiers: .command)
-                .disabled(currentSource == .goodLinks)
             }
 
             if isDataSourceEnabled(.weRead) {
-                Button("WeRead", systemImage: "text.book.closed") {
-                    contentSourceRawValue = ContentSource.weRead.rawValue
+                if let key = shortcutKey(for: .weRead) {
+                    Button("WeRead", systemImage: "text.book.closed") {
+                        contentSourceRawValue = ContentSource.weRead.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .weRead)
+                } else {
+                    Button("WeRead", systemImage: "text.book.closed") {
+                        contentSourceRawValue = ContentSource.weRead.rawValue
+                    }
+                    .disabled(currentSource == .weRead)
                 }
-                .keyboardShortcut("3", modifiers: .command)
-                .disabled(currentSource == .weRead)
             }
 
             Divider()
