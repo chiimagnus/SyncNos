@@ -40,9 +40,6 @@
     "_askToBuyEnabled" : false,
     "_billingGracePeriodEnabled" : false,
     "_billingIssuesEnabled" : false,
-    "_compatibilityTimeRate" : {
-      "3" : 6
-    },
     "_developerTeamID" : "RDQHYSDFFG",
     "_disableDialogs" : false,
     "_failTransactionsEnabled" : false,
@@ -53,7 +50,7 @@
     "_storeKitErrors" : [
 
     ],
-    "_timeRate" : 1004
+    "_timeRate" : 0
   },
   "subscriptionGroups" : [
     {
