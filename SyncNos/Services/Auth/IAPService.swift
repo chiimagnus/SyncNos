@@ -450,6 +450,9 @@ extension IAPService {
         UserDefaults.standard.removeObject(forKey: deviceFingerprintKey)
         UserDefaults.standard.removeObject(forKey: lastReminderDateKey)
         UserDefaults.standard.removeObject(forKey: hasShownWelcomeKey)
+        // 清除 Transaction ID（用于 hasEverPurchasedAnnual 判断）
+        UserDefaults.standard.removeObject(forKey: annualSubscriptionTransactionIdKey)
+        UserDefaults.standard.removeObject(forKey: lifetimeLicenseTransactionIdKey)
         logger.debug("UserDefaults cleared")
         
         logger.debug("Clearing Keychain IAP data...")
