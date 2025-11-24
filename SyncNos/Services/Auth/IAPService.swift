@@ -386,14 +386,28 @@ final class IAPService: IAPServiceProtocol {
         // 非消耗性产品（买断制）的处理：
         // - 如果是首次购买：Apple 返回新的交易记录，收费
         // - 如果已购买过：Apple 返回现有的交易记录，不收费
-        let isValid = transaction.revocationDate == nil
         
         logger.debug("🔍 检查交易有效性...")
         logger.debug("   交易ID: \(transaction.id)")
         logger.debug("   产品ID: \(transaction.productID)")
         logger.debug("   购买日期: \(transaction.purchaseDate)")
         logger.debug("   撤销日期: \(transaction.revocationDate?.description ?? "无")")
-        logger.debug("   有效状态: \(isValid)")
+        
+        // 1. 检查是否被撤销
+        let isRevoked = transaction.revocationDate != nil
+        
+        // 2. 检查订阅是否过期（仅适用于订阅类产品）
+        var isExpired = false
+        if let expirationDate = transaction.expirationDate {
+            isExpired = expirationDate < Date()
+            logger.debug("   ⏰ 到期日期: \(expirationDate)")
+            logger.debug("   ⏰ 当前时间: \(Date())")
+            logger.debug("   ⏰ 是否过期: \(isExpired)")
+        }
+        
+        // 3. 综合判断：未被撤销 且 未过期
+        let isValid = !isRevoked && !isExpired
+        logger.debug("   ✅ 最终有效状态: \(isValid)")
         
         // 真正可靠的判断方法：比较 Transaction ID
         // - 如果 Transaction ID 与之前的相同 → 重复购买（不收费）
@@ -476,6 +490,13 @@ final class IAPService: IAPServiceProtocol {
                     logger.debug("    💳 是否被撤销: \(isRevoked)")
                     logger.debug("    ⏰ 是否过期: \(isExpired)")
                     logger.debug("    ✅ 最终有效状态: \(isValid)")
+                    
+                    // 保存 Transaction ID（用于 hasEverPurchasedAnnual 判断）
+                    let currentTransactionId = String(transaction.id)
+                    if getPreviousTransactionId(for: transaction.productID) == nil {
+                        savePreviousTransactionId(currentTransactionId, for: transaction.productID)
+                        logger.debug("    💾 首次记录 Transaction ID: \(currentTransactionId)")
+                    }
                     
                     // 更新本地 UserDefaults 缓存
                     await setUnlocked(transaction.productID, isValid)
