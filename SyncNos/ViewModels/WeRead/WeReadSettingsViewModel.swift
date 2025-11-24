@@ -4,6 +4,8 @@ import Foundation
 final class WeReadSettingsViewModel: ObservableObject {
     @Published var weReadDbId: String = ""
     @Published var autoSync: Bool = false
+    /// 数据源是否启用（影响 UI 中是否展示 WeRead 数据源）
+    @Published var isSourceEnabled: Bool = false
     @Published var message: String?
     @Published var isLoggedIn: Bool = false
     @Published var showLoginSheet: Bool = false
@@ -25,6 +27,8 @@ final class WeReadSettingsViewModel: ObservableObject {
             self.weReadDbId = id
         }
         self.autoSync = UserDefaults.standard.bool(forKey: "autoSync.weRead")
+        // read datasource enabled flag（默认关闭 WeRead 源）
+        self.isSourceEnabled = (UserDefaults.standard.object(forKey: "datasource.weRead.enabled") as? Bool) ?? false
         refreshLoginStatus()
     }
 
@@ -37,6 +41,7 @@ final class WeReadSettingsViewModel: ObservableObject {
             weReadDbId.trimmingCharacters(in: .whitespacesAndNewlines),
             forSource: "weRead"
         )
+        UserDefaults.standard.set(isSourceEnabled, forKey: "datasource.weRead.enabled")
 
         let previous = UserDefaults.standard.bool(forKey: "autoSync.weRead")
         UserDefaults.standard.set(autoSync, forKey: "autoSync.weRead")
