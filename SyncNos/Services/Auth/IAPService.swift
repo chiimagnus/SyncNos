@@ -156,32 +156,18 @@ final class IAPService: IAPServiceProtocol {
     }
 
     private func recordFirstLaunch() {
-        guard getFirstLaunchDate() == nil else {
-            logger.debug("⏭️ 首次启动已记录，跳过重复记录")
-            return
-        }
+        guard getFirstLaunchDate() == nil else { return }
         
         let now = Date()
         
-        // 双重存储策略：
-        // 1. UserDefaults：快速访问，用于日常判断
-        // 2. Keychain：更持久，防止 UserDefaults 被清除
-        logger.debug("📝 记录首次启动...")
-        
         UserDefaults.standard.set(now, forKey: firstLaunchDateKey)
-        logger.debug("  💾 已保存到 UserDefaults: \(firstLaunchDateKey)")
-        
         KeychainHelper.shared.saveFirstLaunchDate(now)
-        logger.debug("  🔐 已保存到 Keychain (更持久)")
         
-        // 生成并保存设备指纹，用于防止试用期滥用
         let fingerprint = generateDeviceFingerprint()
         UserDefaults.standard.set(fingerprint, forKey: deviceFingerprintKey)
         KeychainHelper.shared.saveDeviceFingerprint(fingerprint)
-        logger.debug("  🔑 设备指纹已生成并保存: \(fingerprint)")
         
-        logger.info("✅ 首次启动已记录 - 30天试用期已开始")
-        logger.info("📅 试用期开始时间: \(now)")
+        logger.info("Trial period started")
     }
 
     private func generateDeviceFingerprint() -> String {
@@ -216,80 +202,40 @@ final class IAPService: IAPServiceProtocol {
 
     func purchase(product: Product) async throws -> Bool {
         do {
-            logger.debug("🛒 开始购买流程...")
-            logger.debug("   产品: \(product.id)")
-            logger.debug("   价格: \(product.displayPrice)")
-            logger.debug("   🌐 正在向 Apple StoreKit 服务发送购买请求...")
-            
-            // product.purchase() 会：
-            // 1. 向 Apple 服务器发送购买请求
-            // 2. 如果是非消耗性产品且已购买过，Apple 会返回现有交易（不收费）
-            // 3. 如果是新购买，会弹出支付确认
             let result = try await product.purchase()
             
             switch result {
             case .success(let verification):
-                logger.debug("✅ 购买请求成功返回")
                 switch verification {
                 case .verified(let transaction):
-                    logger.info("🔐 交易验证通过: \(transaction.productID)")
-                    logger.debug("   📅 购买日期: \(transaction.purchaseDate)")
-                    logger.debug("   💳 是否被撤销: \(transaction.revocationDate != nil)")
-                    
-                    // 对于非消耗性产品（如买断制）：
-                    // - 如果是首次购买：transaction 是新的购买记录
-                    // - 如果已购买过：transaction 是现有的购买记录（Apple 服务器返回）
                     await setUnlockedIfNeeded(for: transaction)
                     await transaction.finish()
                     return true
                     
                 case .unverified(let transaction, let error):
-                    logger.error("❌ 交易验证失败: \(transaction.productID), 错误: \(error.localizedDescription)")
+                    logger.error("Transaction verification failed: \(error.localizedDescription)")
                     throw error
                 }
             case .userCancelled:
-                logger.info("⚠️ 用户取消了购买")
                 return false
             case .pending:
-                logger.info("⏳ 购买待处理（可能需要家长批准或其他验证）")
                 return false
             @unknown default:
-                logger.warning("⚠️ 未知的购买结果")
                 return false
             }
         } catch {
-            logger.error("❌ 购买过程出错: \(error.localizedDescription)")
+            logger.error("Purchase failed: \(error.localizedDescription)")
             throw error
         }
     }
 
     func restorePurchases() async -> Bool {
         do {
-            logger.debug("🔄 开始恢复购买流程...")
-            logger.debug("📱 当前 Apple ID 的购买记录将从 Apple 服务器同步")
-            
-            // 1. 从 Apple 服务器同步最新的购买记录
-            // 这是跨设备恢复的关键步骤：
-            // - 同一 Apple ID 换电脑：✅ 可恢复（AppStore.sync() 会从服务器拉取购买记录）
-            // - 不同 Apple ID：❌ 无法恢复（购买绑定到原 Apple ID）
-            logger.debug("🌐 正在从 Apple 服务器 fetch 购买记录...")
             try await AppStore.sync()
-            logger.info("✅ AppStore.sync() 完成 - 已从 Apple 服务器同步购买记录到本地 StoreKit 缓存")
-
-            // 2. 查询每个产品的最新交易记录，更新本地缓存
-            logger.debug("🔍 查询本地缓存的购买状态...")
             let unlocked = await refreshPurchasedStatus()
-            
-            if unlocked {
-                logger.info("✅ 恢复成功 - 检测到有效的购买记录")
-            } else {
-                logger.info("ℹ️ 恢复完成 - 未找到有效的购买记录")
-            }
-            
             return unlocked
         } catch {
-            logger.error("❌ 恢复购买失败: \(error.localizedDescription)")
-            logger.error("💡 提示：确保使用与购买时相同的 Apple ID")
+            logger.error("Restore purchases failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -301,40 +247,30 @@ final class IAPService: IAPServiceProtocol {
         updatesTask = Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             for await update in Transaction.updates {
-                do {
-                    let verification = update
-                    switch verification {
-                    case .verified(let transaction):
-                        self.logger.debug("📬 收到交易更新: \(transaction.productID)")
-                        await self.setUnlockedIfNeeded(for: transaction)
-                        await transaction.finish()
-                        
-                        // 交易更新后，立即刷新所有产品的状态（检查过期）
-                        await self.refreshPurchasedStatus()
-                        
-                    case .unverified(_, let error):
-                        self.logger.warning("Unverified transaction update: \(error.localizedDescription)")
-                    }
+                switch update {
+                case .verified(let transaction):
+                    await self.setUnlockedIfNeeded(for: transaction)
+                    await transaction.finish()
+                    // 交易更新后，立即刷新所有产品的状态（检查过期）
+                    await self.refreshPurchasedStatus()
+                case .unverified(_, let error):
+                    self.logger.error("Transaction verification failed: \(error.localizedDescription)")
                 }
             }
         }
         
         // 2. 定期检查订阅过期状态（每小时检查一次）
-        // 因为 Transaction.updates 不会推送过期事件，需要主动轮询
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
-                // 等待 1 小时
                 try? await Task.sleep(nanoseconds: 3600 * 1_000_000_000)
                 
-                self.logger.debug("⏰ 定期检查订阅状态...")
                 let wasUnlocked = await self.isProUnlocked
                 await self.refreshPurchasedStatus()
                 let isUnlocked = await self.isProUnlocked
                 
                 // 如果状态从解锁变为锁定，说明订阅过期了
                 if wasUnlocked && !isUnlocked {
-                    self.logger.warning("⚠️ 订阅已过期！")
                     await MainActor.run {
                         NotificationCenter.default.post(
                             name: Self.statusChangedNotification,
@@ -356,19 +292,10 @@ final class IAPService: IAPServiceProtocol {
         let key = keyForProduct(productId)
         let current = UserDefaults.standard.bool(forKey: key)
         
-        // 只有状态改变时才更新
-        guard current != newValue else {
-            logger.debug("  ℹ️ 产品 \(productId) 状态未变化，跳过更新")
-            return
-        }
+        guard current != newValue else { return }
         
-        // 更新 UserDefaults 本地缓存
         UserDefaults.standard.set(newValue, forKey: key)
-        logger.debug("  💾 已更新 UserDefaults: \(key) = \(newValue)")
-        
-        // 发送通知，触发 UI 更新
         NotificationCenter.default.post(name: Self.statusChangedNotification, object: nil)
-        logger.info("🔔 产品 \(productId) 解锁状态已变更: \(newValue)")
     }
 
     private func keyForProduct(_ productId: String) -> String {
@@ -383,16 +310,6 @@ final class IAPService: IAPServiceProtocol {
     }
 
     private func setUnlockedIfNeeded(for transaction: Transaction) async {
-        // 非消耗性产品（买断制）的处理：
-        // - 如果是首次购买：Apple 返回新的交易记录，收费
-        // - 如果已购买过：Apple 返回现有的交易记录，不收费
-        
-        logger.debug("🔍 检查交易有效性...")
-        logger.debug("   交易ID: \(transaction.id)")
-        logger.debug("   产品ID: \(transaction.productID)")
-        logger.debug("   购买日期: \(transaction.purchaseDate)")
-        logger.debug("   撤销日期: \(transaction.revocationDate?.description ?? "无")")
-        
         // 1. 检查是否被撤销
         let isRevoked = transaction.revocationDate != nil
         
@@ -400,34 +317,14 @@ final class IAPService: IAPServiceProtocol {
         var isExpired = false
         if let expirationDate = transaction.expirationDate {
             isExpired = expirationDate < Date()
-            logger.debug("   ⏰ 到期日期: \(expirationDate)")
-            logger.debug("   ⏰ 当前时间: \(Date())")
-            logger.debug("   ⏰ 是否过期: \(isExpired)")
         }
         
         // 3. 综合判断：未被撤销 且 未过期
         let isValid = !isRevoked && !isExpired
-        logger.debug("   ✅ 最终有效状态: \(isValid)")
         
-        // 真正可靠的判断方法：比较 Transaction ID
-        // - 如果 Transaction ID 与之前的相同 → 重复购买（不收费）
-        // - 如果 Transaction ID 是新的 → 首次购买（收费）
-        let previousTransactionId = getPreviousTransactionId(for: transaction.productID)
+        // 保存 Transaction ID（用于判断重复购买）
         let currentTransactionId = String(transaction.id)
-        
-        logger.debug("   📊 Transaction ID 对比:")
-        logger.debug("      之前的 ID: \(previousTransactionId ?? "无")")
-        logger.debug("      当前的 ID: \(currentTransactionId)")
-        
-        if let previousId = previousTransactionId, previousId == currentTransactionId {
-            // Transaction ID 相同 → 重复购买
-            logger.info("💳 ✅ 这是重复购买（Transaction ID 相同）- 不收费")
-            logger.info("   💡 Apple 返回了你之前的购买记录，未收费")
-        } else {
-            // Transaction ID 不同 → 首次购买
-            logger.info("💳 ⚠️ 这很可能是首次购买（Transaction ID 不同）- 可能已收费")
-            logger.info("   💡 请检查 Apple 账单确认是否被收费")
-            // 保存当前的 Transaction ID
+        if getPreviousTransactionId(for: transaction.productID) == nil {
             savePreviousTransactionId(currentTransactionId, for: transaction.productID)
         }
 
@@ -444,7 +341,6 @@ final class IAPService: IAPServiceProtocol {
     private func savePreviousTransactionId(_ transactionId: String, for productId: String) {
         let key = transactionIdKey(for: productId)
         UserDefaults.standard.set(transactionId, forKey: key)
-        logger.debug("💾 已保存 Transaction ID: \(transactionId)")
     }
     
     private func transactionIdKey(for productId: String) -> String {
@@ -459,14 +355,7 @@ final class IAPService: IAPServiceProtocol {
     }
 
     func refreshPurchasedStatus() async -> Bool {
-        logger.debug("🔄 刷新购买状态 - 从本地 StoreKit 缓存查询最新交易记录")
-        logger.debug("   (注：数据来自 AppStore.sync() 同步的本地缓存，非实时 fetch Apple 服务器)")
-        
         for productId in IAPProductIds.allCases {
-            logger.debug("  📦 检查产品: \(productId.rawValue)")
-            
-            // 从本地 StoreKit 缓存获取最新交易
-            // Transaction.latest() 返回该产品的最新有效交易（从本地缓存读取）
             if let latest = await Transaction.latest(for: productId.rawValue) {
                 switch latest {
                 case .verified(let transaction):
@@ -477,41 +366,28 @@ final class IAPService: IAPServiceProtocol {
                     var isExpired = false
                     if let expirationDate = transaction.expirationDate {
                         isExpired = expirationDate < Date()
-                        logger.debug("    ⏰ 到期日期: \(expirationDate)")
-                        logger.debug("    ⏰ 当前时间: \(Date())")
-                        logger.debug("    ⏰ 是否过期: \(isExpired)")
                     }
                     
                     // 3. 综合判断：未被撤销 且 未过期
                     let isValid = !isRevoked && !isExpired
                     
-                    logger.debug("    ✅ 交易验证通过 - 产品ID: \(transaction.productID)")
-                    logger.debug("    📅 购买日期: \(transaction.purchaseDate)")
-                    logger.debug("    💳 是否被撤销: \(isRevoked)")
-                    logger.debug("    ⏰ 是否过期: \(isExpired)")
-                    logger.debug("    ✅ 最终有效状态: \(isValid)")
-                    
                     // 保存 Transaction ID（用于 hasEverPurchasedAnnual 判断）
                     let currentTransactionId = String(transaction.id)
                     if getPreviousTransactionId(for: transaction.productID) == nil {
                         savePreviousTransactionId(currentTransactionId, for: transaction.productID)
-                        logger.debug("    💾 首次记录 Transaction ID: \(currentTransactionId)")
                     }
                     
-                    // 更新本地 UserDefaults 缓存
                     await setUnlocked(transaction.productID, isValid)
                     
                 case .unverified(_, let error):
-                    logger.warning("    ⚠️ 交易验证失败 - 产品: \(productId.rawValue), 错误: \(error.localizedDescription)")
+                    logger.error("Transaction verification failed: \(error.localizedDescription)")
                     await setUnlocked(productId.rawValue, false)
                 }
             } else {
-                logger.debug("    ℹ️ 未找到该产品的交易记录")
                 await setUnlocked(productId.rawValue, false)
             }
         }
         
-        logger.debug("✅ 购买状态刷新完成 - isProUnlocked: \(isProUnlocked)")
         return isProUnlocked
     }
     
