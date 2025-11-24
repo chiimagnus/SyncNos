@@ -1,5 +1,32 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.8.0 November 24, 2025
+
+*Added*
+
+- IAP Loading States: Added loading state indicator to product purchase button for better user feedback
+- Annual Subscription Tracking: Implemented annual subscription expiration tracking and display functionality
+- Subscription Status Polling: Added subscription status polling and app lifecycle refresh mechanisms
+- Purchase Duplicate Detection: Added transaction ID tracking to detect duplicate purchases
+- 30-Day Trial Period: Implemented 30-day trial period with refactored paywall UI
+- Purchase Type Tracking: Added purchase type tracking and expiration date retrieval for subscriptions
+- StoreKit Configuration: Added StoreKit configuration and comprehensive IAP localization
+
+*Changed*
+
+- IAP System Consolidation: Consolidated IAP views into unified presentation system with PayWallView
+- IAP Debug Tools: Consolidated debug functionality into main IAPViewModel, removed separate debug views
+- Settings Layout: Simplified settings layout and updated IAP messaging for clarity
+- WeRead Authentication: Enhanced WebKit cookie clearing in authentication service with MainActor support
+- UI Dynamic Colors: Added dynamic title color based on source type
+- Debug Logging: Updated debug log level color from gray to blue, downgraded some logging from info to debug
+- Trial Status Logic: Improved trial status logic with comprehensive logging and documentation
+
+*Fixed*
+
+- Purchase Button State: Updated purchase button disabled state logic to use hasPurchased properly
+- Cookie Clearing Concurrency: Made cookie clearing async with WebKit synchronization for thread safety
+
 ## v0.7.0 November 22, 2025
 
 *Added*
