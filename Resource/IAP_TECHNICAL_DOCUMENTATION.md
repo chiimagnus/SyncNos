@@ -617,6 +617,7 @@ enum IAPPresentationMode {
     case welcome                        // 欢迎页面（首次启动）
     case trialReminder(daysRemaining: Int)  // 试用期提醒（7/3/1 天）
     case trialExpired                   // 试用期过期
+    case subscriptionExpired            // 年订阅已过期（新增）
 }
 ```
 
@@ -1134,34 +1135,119 @@ func startObservingTransactions() {
 ### 5.2 订阅过期检测
 
 **检测时机**:
-1. 应用启动时
-2. 应用从后台恢复时
-3. 收到 `Transaction.updates` 通知时
+1. **应用启动时**: `SyncNosApp.init()` → `refreshPurchasedStatus()`
+2. **应用从后台恢复时**: `AppDelegate.applicationDidBecomeActive()` → `refreshPurchasedStatus()`
+3. **收到新交易通知时**: `Transaction.updates` → `setUnlockedIfNeeded()` → `refreshPurchasedStatus()`
+4. **定期轮询**: 每小时自动检查一次（后台 Task）
+
+**为什么需要定期轮询**:
+- ⚠️ `Transaction.updates` 只推送新交易（购买、续费、退款），**不推送过期事件**
+- ⚠️ 订阅过期需要主动检查 `expirationDate`，而不是被动等待通知
+- ✅ 定期轮询确保即使没有新交易，也能及时检测到过期状态
 
 **检测逻辑**:
 
 ```swift
 func refreshPurchasedStatus() async -> Bool {
-    if let latest = await Transaction.latest(for: IAPProductIds.annualSubscription.rawValue) {
-        switch latest {
-        case .verified(let transaction):
-            // 检查是否过期
-            if let expirationDate = transaction.expirationDate {
-                let isExpired = expirationDate < Date()
-                let isValid = !isExpired && transaction.revocationDate == nil
+    logger.debug("🔄 刷新购买状态 - 从本地 StoreKit 缓存查询最新交易记录")
+    
+    for productId in IAPProductIds.allCases {
+        if let latest = await Transaction.latest(for: productId.rawValue) {
+            switch latest {
+            case .verified(let transaction):
+                // 1. 检查是否被撤销
+                let isRevoked = transaction.revocationDate != nil
+                
+                // 2. 检查订阅是否过期（仅适用于订阅类产品）
+                var isExpired = false
+                if let expirationDate = transaction.expirationDate {
+                    isExpired = expirationDate < Date()
+                    logger.debug("    ⏰ 到期日期: \(expirationDate)")
+                    logger.debug("    ⏰ 当前时间: \(Date())")
+                    logger.debug("    ⏰ 是否过期: \(isExpired)")
+                }
+                
+                // 3. 综合判断：未被撤销 且 未过期
+                let isValid = !isRevoked && !isExpired
                 
                 if isExpired {
                     logger.warning("⚠️ 订阅已过期: \(expirationDate)")
                 }
                 
+                // 保存 Transaction ID（用于 hasEverPurchasedAnnual 判断）
+                let currentTransactionId = String(transaction.id)
+                if getPreviousTransactionId(for: transaction.productID) == nil {
+                    savePreviousTransactionId(currentTransactionId, for: transaction.productID)
+                }
+                
                 await setUnlocked(transaction.productID, isValid)
-                return isValid
+            case .unverified:
+                await setUnlocked(productId.rawValue, false)
             }
-        case .unverified:
-            return false
+        } else {
+            await setUnlocked(productId.rawValue, false)
         }
     }
-    return false
+    
+    return isProUnlocked
+}
+```
+
+**定期轮询实现**:
+
+```swift
+func startObservingTransactions() {
+    // 1. 监听新交易（购买、续费、退款等）
+    updatesTask = Task.detached(priority: .background) { [weak self] in
+        for await update in Transaction.updates {
+            switch update {
+            case .verified(let transaction):
+                await self?.setUnlockedIfNeeded(for: transaction)
+                await transaction.finish()
+                // 交易更新后，立即刷新所有产品的状态（检查过期）
+                await self?.refreshPurchasedStatus()
+            case .unverified(_, let error):
+                self?.logger.warning("Unverified transaction: \(error)")
+            }
+        }
+    }
+    
+    // 2. 定期检查订阅过期状态（每小时检查一次）
+    // 因为 Transaction.updates 不会推送过期事件，需要主动轮询
+    Task.detached(priority: .background) { [weak self] in
+        while !Task.isCancelled {
+            // 等待 1 小时
+            try? await Task.sleep(nanoseconds: 3600 * 1_000_000_000)
+            
+            self?.logger.debug("⏰ 定期检查订阅状态...")
+            let wasUnlocked = await self?.isProUnlocked ?? false
+            await self?.refreshPurchasedStatus()
+            let isUnlocked = await self?.isProUnlocked ?? false
+            
+            // 如果状态从解锁变为锁定，说明订阅过期了
+            if wasUnlocked && !isUnlocked {
+                self?.logger.warning("⚠️ 订阅已过期！")
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: Self.statusChangedNotification,
+                        object: nil
+                    )
+                }
+            }
+        }
+    }
+}
+```
+
+**订阅历史追踪**:
+
+为了区分"从未购买"和"曾经购买但已过期"，我们引入了 `hasEverPurchasedAnnual` 属性：
+
+```swift
+/// 是否曾经购买过年订阅（包括已过期的）
+var hasEverPurchasedAnnual: Bool {
+    // 检查是否有年订阅的 Transaction ID 记录
+    return UserDefaults.standard.string(forKey: annualSubscriptionTransactionIdKey) != nil
 }
 ```
 
@@ -1176,13 +1262,52 @@ private func checkTrialStatus() {
         return
     }
     
-    // Priority 2: 订阅过期且试用期也过期 → 显示过期付费墙
+    // Priority 2: 曾经购买过年订阅但已过期 → 显示订阅过期视图
+    if iapService.hasEverPurchasedAnnual && !iapService.hasPurchased {
+        iapPresentationMode = .subscriptionExpired
+        showIAPView = true
+        return
+    }
+    
+    // Priority 3: 试用期过期且从未购买 → 显示试用期过期视图
     if !iapService.isProUnlocked {
         iapPresentationMode = .trialExpired
         showIAPView = true
         return
     }
 }
+```
+
+**UI 状态显示**:
+
+1. **IAPView.swift** - 设置页面显示三种状态：
+   - `purchasedStatusView`: 当前有有效购买
+   - `expiredSubscriptionView`: 曾经购买但已过期（新增）
+   - `trialStatusView`: 从未购买，显示试用期状态
+
+2. **PayWallView.swift** - 付费墙显示四种模式：
+   - `.welcome`: 欢迎页面（首次启动）
+   - `.trialReminder(daysRemaining)`: 试用期提醒（7/3/1 天）
+   - `.trialExpired`: 试用期过期
+   - `.subscriptionExpired`: 年订阅已过期（新增）
+
+**数据流向图**:
+
+```mermaid
+graph TB
+    A[应用启动] -->|自动| B[refreshPurchasedStatus]
+    C[后台恢复] -->|自动| B
+    D[Transaction.updates] -->|新交易| E[setUnlockedIfNeeded]
+    E --> B
+    F[定期轮询<br/>每小时] -->|自动| B
+    
+    B --> G{检查 expirationDate}
+    G -->|未过期| H[setUnlocked = true]
+    G -->|已过期| I[setUnlocked = false]
+    
+    I --> J[发送通知]
+    J --> K[UI 更新]
+    K --> L[显示订阅过期视图]
 ```
 
 ### 5.3 宽限期（Grace Period）处理
@@ -1361,15 +1486,17 @@ if viewModel.subscriptionWillExpire {
 flowchart TD
     Start[checkTrialStatus] --> A{已购买?}
     A -->|是| End1[不显示付费墙]
-    A -->|否| B{试用期过期?}
-    B -->|是| End2[显示 trialExpired]
-    B -->|否| C{剩余 7/3/1 天?}
-    C -->|是| D{今天已提醒?}
-    D -->|是| End1
-    D -->|否| End3[显示 trialReminder]
-    C -->|否| E{首次启动?}
-    E -->|是| End4[显示 welcome]
-    E -->|否| End1
+    A -->|否| B{曾购买年订阅?}
+    B -->|是| End2[显示 subscriptionExpired]
+    B -->|否| C{试用期过期?}
+    C -->|是| End3[显示 trialExpired]
+    C -->|否| D{剩余 7/3/1 天?}
+    D -->|是| E{今天已提醒?}
+    E -->|是| End1
+    E -->|否| End4[显示 trialReminder]
+    D -->|否| F{首次启动?}
+    F -->|是| End5[显示 welcome]
+    F -->|否| End1
 ```
 
 **代码实现**:
@@ -1382,21 +1509,28 @@ private func checkTrialStatus() {
         return
     }
     
-    // Priority 2: 试用期过期 → 显示过期视图
+    // Priority 2: 曾经购买过年订阅但已过期 → 显示订阅过期视图
+    if iapService.hasEverPurchasedAnnual && !iapService.hasPurchased {
+        iapPresentationMode = .subscriptionExpired
+        showIAPView = true
+        return
+    }
+    
+    // Priority 3: 试用期过期且从未购买 → 显示试用期过期视图
     if !iapService.isProUnlocked {
         iapPresentationMode = .trialExpired
         showIAPView = true
         return
     }
     
-    // Priority 3: 试用期提醒 → 显示提醒视图
+    // Priority 4: 试用期提醒 → 显示提醒视图
     if iapService.shouldShowTrialReminder() {
         iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
         showIAPView = true
         return
     }
     
-    // Priority 4: 首次启动 → 显示欢迎视图
+    // Priority 5: 首次启动 → 显示欢迎视图
     if !iapService.hasShownWelcome {
         iapPresentationMode = .welcome
         showIAPView = true
