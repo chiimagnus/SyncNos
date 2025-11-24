@@ -606,6 +606,11 @@ open SyncNos.xcodeproj
 - **统一付费墙**：`aa53827` - 整合为 `PayWallView`，替代分散的IAP界面
 - **调试工具整合**：`d9e000b` - 将调试功能集中到主 `IAPViewModel`
 - **购买类型跟踪**：`fba3d0b` - 支持不同购买类型的识别和管理
+- **订阅过期检测**：实现完整的订阅过期监听和状态同步机制
+  - 4 种检测时机：启动、后台恢复、交易通知、定期轮询（每小时）
+  - 订阅历史追踪：`hasEverPurchasedAnnual` 区分"从未购买"和"曾经购买但已过期"
+  - 新增 `.subscriptionExpired` 付费墙模式
+  - 优先级决策树：已购买 → 订阅过期 → 试用期过期 → 试用期提醒 → 欢迎页面
 
 ### 架构优化
 - **KeychainHelper 重定位**：`a0503cf` - 从 Auth 移至 Core 服务，提高复用性
