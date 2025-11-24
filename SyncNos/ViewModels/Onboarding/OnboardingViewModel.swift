@@ -13,10 +13,11 @@ final class OnboardingViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentStep: OnboardingStep = .welcome
     
-    // Source Toggles (Sync with UserDefaults)
-    @AppStorage("autoSync.appleBooks") var appleBooksEnabled: Bool = false
-    @AppStorage("autoSync.goodLinks") var goodLinksEnabled: Bool = false
-    @AppStorage("autoSync.weRead") var weReadEnabled: Bool = false
+    // Source Toggles (datasource visibility, independent from Auto Sync)
+    // 默认：仅启用 Apple Books，其余数据源关闭
+    @AppStorage("datasource.appleBooks.enabled") var appleBooksEnabled: Bool = true
+    @AppStorage("datasource.goodLinks.enabled") var goodLinksEnabled: Bool = false
+    @AppStorage("datasource.weRead.enabled") var weReadEnabled: Bool = false
     
     // Notion State
     @Published var isNotionConnected: Bool = false
