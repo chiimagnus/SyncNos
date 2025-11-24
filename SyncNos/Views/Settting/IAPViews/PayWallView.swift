@@ -58,8 +58,6 @@ struct PayWallView: View {
             // Trial info badge (if applicable)
             if case .welcome = presentationMode {
                 trialBadge
-            } else if case .trialReminder(let days) = presentationMode {
-                trialWarningBadge(daysRemaining: days)
             }
         }
     }
@@ -76,21 +74,6 @@ struct PayWallView: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.green.opacity(0.1))
-        )
-    }
-    
-    private func trialWarningBadge(daysRemaining: Int) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "clock.badge.exclamationmark")
-                .foregroundStyle(daysRemaining <= 1 ? .red : .orange)
-            Text("\(daysRemaining) days left")
-                .font(.headline)
-                .foregroundStyle(.primary)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill((daysRemaining <= 1 ? Color.red : Color.orange).opacity(0.1))
         )
     }
     
