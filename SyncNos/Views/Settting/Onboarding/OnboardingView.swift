@@ -39,7 +39,7 @@ struct OnboardingWelcomeView: View {
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 140, height: 140)
+                    .frame(width: 180, height: 180)
                 
                 // Satellite Icons
                 satelliteIcon("book.fill", color: .orange, angle: -90) // Apple Books
@@ -86,13 +86,13 @@ struct OnboardingWelcomeView: View {
     
     func satelliteIcon(_ systemName: String, color: Color, angle: Double) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: 24))
+            .font(.system(size: 20))
             .foregroundStyle(.white)
             .padding(12)
             .background(color)
             .clipShape(Circle())
             .shadow(radius: 4)
-            .offset(x: 100 * cos(angle * .pi / 180), y: 100 * sin(angle * .pi / 180))
+            .offset(x: 120 * cos(angle * .pi / 180), y: 120 * sin(angle * .pi / 180))
     }
 }
 
