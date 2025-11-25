@@ -265,6 +265,7 @@ protocol AutoSyncServiceProtocol: AnyObject {
     // New per-source immediate triggers (public API)
     func triggerAppleBooksNow()
     func triggerGoodLinksNow()
+    func triggerWeReadNow()
 }
 
 // MARK: - Sync Timestamp Store Protocol
