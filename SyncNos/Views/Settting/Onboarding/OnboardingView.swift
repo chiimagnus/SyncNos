@@ -23,6 +23,8 @@ struct OnboardingView: View {
             .id(viewModel.currentStep) // Force transition on step change
         }
         .frame(width: 600, height: 500) // Fixed size for onboarding window
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // 填满整个窗口
+        .background(Color("BackgroundColor"))
     }
 }
 
@@ -37,7 +39,7 @@ struct OnboardingWelcomeView: View {
             // Logo Cluster
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.1))
+                    .fill(Color("OnboardingLogoCircleColor"))
                     .frame(width: 120, height: 120)
                 
                 Image(nsImage: NSImage(named: "AppIcon") ?? NSImage()) // Fallback
@@ -48,8 +50,8 @@ struct OnboardingWelcomeView: View {
                 
                 // Satellite Icons
                 satelliteIcon("book.fill", color: .orange, angle: -90) // Apple Books
-                satelliteIcon("link", color: .blue, angle: 30)         // GoodLinks
-                satelliteIcon("text.book.closed.fill", color: .green, angle: 150) // WeRead placeholder
+                satelliteIcon("bookmark.fill", color: .red, angle: 30) // GoodLinks
+                satelliteIcon("text.book.closed.fill", color: .blue, angle: 150) // WeRead
             }
             .frame(height: 150)
             
@@ -57,11 +59,12 @@ struct OnboardingWelcomeView: View {
             VStack(spacing: 16) {
                 Text("All your highlights, unified.")
                     .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(Color("OnboardingTextColor"))
                     .multilineTextAlignment(.center)
                 
                 Text("Sync Apple Books, GoodLinks, and WeRead highlights\ndirectly to your Notion database.")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .multilineTextAlignment(.center)
             }
             
@@ -73,7 +76,7 @@ struct OnboardingWelcomeView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accentColor)
+                    .background(Color("OnboardingButtonColor"))
                     .foregroundColor(.white)
                     .cornerRadius(10)
             }
@@ -103,18 +106,19 @@ struct OnboardingNotionView: View {
         VStack(spacing: 30) {
             Spacer()
             
-            Image(systemName: "server.rack") // Placeholder
+            Image(systemName: "n.square") // Notion
                 .font(.system(size: 60))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color("OnboardingTextColor"))
             
             VStack(spacing: 12) {
                 Text("Connect Your Notion")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundStyle(Color("OnboardingTextColor"))
                 
                 Text("We'll create several secure databases in your Notion workspace\nto store all your synced highlights.")
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -125,12 +129,13 @@ struct OnboardingNotionView: View {
                 VStack(spacing: 20) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color("OnboardingButtonColor"))
                         Text("Connected: \(viewModel.workspaceName ?? "Workspace")")
                             .font(.headline)
+                            .foregroundStyle(Color("OnboardingTextColor"))
                     }
                     .padding()
-                    .background(Color.green.opacity(0.1))
+                    .background(Color("OnboardingLogoCircleColor"))
                     .cornerRadius(10)
                     
                     Button(action: { viewModel.nextStep() }) {
@@ -138,7 +143,7 @@ struct OnboardingNotionView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.accentColor)
+                            .background(Color("OnboardingButtonColor"))
                             .foregroundColor(.white)
                             .cornerRadius(10)
                     }
@@ -159,7 +164,7 @@ struct OnboardingNotionView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accentColor)
+                    .background(Color("OnboardingButtonColor"))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
@@ -177,7 +182,7 @@ struct OnboardingNotionView: View {
                     viewModel.nextStep()
                 }
                 .buttonStyle(.link)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.6))
             }
             
             Spacer()
@@ -196,8 +201,9 @@ struct OnboardingSourcesView: View {
                 Text("Enable Sources")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundStyle(Color("OnboardingTextColor"))
                 Text("Choose which apps you want to sync from.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
             .padding(.top, 40)
             
@@ -212,8 +218,8 @@ struct OnboardingSourcesView: View {
                 
                 // GoodLinks
                 SourceToggleRow(
-                    icon: "link",
-                    color: .blue,
+                    icon: "bookmark.fill",
+                    color: .red,
                     title: "GoodLinks",
                     isOn: $viewModel.goodLinksEnabled
                 )
@@ -221,7 +227,7 @@ struct OnboardingSourcesView: View {
                 // WeRead
                 SourceToggleRow(
                     icon: "text.book.closed.fill",
-                    color: .green,
+                    color: .blue,
                     title: "WeRead",
                     isOn: $viewModel.weReadEnabled
                 )
@@ -247,7 +253,7 @@ struct OnboardingSourcesView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accentColor)
+                    .background(Color("OnboardingButtonColor"))
                     .foregroundColor(.white)
                     .cornerRadius(10)
             }
@@ -275,6 +281,7 @@ struct SourceToggleRow: View {
             
             Text(title)
                 .font(.headline)
+                .foregroundStyle(Color("OnboardingTextColor"))
             
             Spacer()
             
@@ -283,11 +290,17 @@ struct SourceToggleRow: View {
                 .labelsHidden()
         }
         .padding()
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color("OnboardingCardColor"))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                .stroke(Color("OnboardingTextColor").opacity(0.15), lineWidth: 1)
         )
     }
+}
+
+// MARK: - Previews
+
+#Preview("Onboarding") {
+    OnboardingView()
 }
