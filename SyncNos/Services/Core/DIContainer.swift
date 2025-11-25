@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // MARK: - Dependency Injection Container
 class DIContainer {
@@ -26,6 +27,8 @@ class DIContainer {
     // WeRead
     private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
+    private var _weReadCacheService: WeReadCacheServiceProtocol?
+    private var _weReadModelContainer: ModelContainer?
     // Environment
     private var _environmentDetector: EnvironmentDetectorProtocol?
 
@@ -160,6 +163,45 @@ class DIContainer {
         }
         return _weReadAPIService!
     }
+    
+    /// WeRead 数据的 ModelContainer
+    var weReadModelContainer: ModelContainer? {
+        if _weReadModelContainer == nil {
+            do {
+                let schema = Schema([
+                    CachedWeReadBook.self,
+                    CachedWeReadHighlight.self,
+                    WeReadSyncState.self
+                ])
+                let modelConfiguration = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    allowsSave: true
+                )
+                _weReadModelContainer = try ModelContainer(
+                    for: schema,
+                    configurations: [modelConfiguration]
+                )
+            } catch {
+                loggerService.error("[DIContainer] Failed to create WeRead ModelContainer: \(error.localizedDescription)")
+            }
+        }
+        return _weReadModelContainer
+    }
+    
+    var weReadCacheService: WeReadCacheServiceProtocol? {
+        if _weReadCacheService == nil {
+            guard let container = weReadModelContainer else {
+                loggerService.warning("[DIContainer] WeRead ModelContainer not available, cache service disabled")
+                return nil
+            }
+            _weReadCacheService = WeReadCacheService(
+                modelContainer: container,
+                logger: loggerService
+            )
+        }
+        return _weReadCacheService
+    }
 
     var environmentDetector: EnvironmentDetectorProtocol {
         if _environmentDetector == nil {
@@ -241,6 +283,14 @@ class DIContainer {
 
     func register(weReadAPIService: WeReadAPIServiceProtocol) {
         self._weReadAPIService = weReadAPIService
+    }
+    
+    func register(weReadCacheService: WeReadCacheServiceProtocol) {
+        self._weReadCacheService = weReadCacheService
+    }
+    
+    func register(weReadModelContainer: ModelContainer) {
+        self._weReadModelContainer = weReadModelContainer
     }
 
     func register(environmentDetector: EnvironmentDetectorProtocol) {
