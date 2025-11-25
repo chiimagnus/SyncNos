@@ -175,6 +175,7 @@ struct OnboardingTrialView: View {
         case "orange": return .orange
         case "red": return .red
         case "yellow": return .yellow
+        case "gray": return Color(white: 0.4)  // 深灰色，带有悲伤感
         default: return .secondary
         }
     }
