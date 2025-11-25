@@ -13,7 +13,6 @@ class DIContainer {
     private var _notionConfigStore: NotionConfigStoreProtocol?
     private var _notionService: NotionServiceProtocol?
     private var _loggerService: LoggerServiceProtocol?
-    private var _appleBooksSyncService: AppleBooksSyncServiceProtocol?
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _autoSyncService: AutoSyncServiceProtocol?
@@ -29,6 +28,9 @@ class DIContainer {
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadCacheService: WeReadCacheServiceProtocol?
     private var _weReadModelContainer: ModelContainer?
+    // Sync Engine
+    private var _notionSyncEngine: NotionSyncEngine?
+    private var _goodLinksSyncService: GoodLinksSyncServiceProtocol?
     // Environment
     private var _environmentDetector: EnvironmentDetectorProtocol?
 
@@ -66,15 +68,6 @@ class DIContainer {
             _loggerService = LoggerService.shared
         }
         return _loggerService!
-    }
-
-    
-
-    var appleBooksSyncService: AppleBooksSyncServiceProtocol {
-        if _appleBooksSyncService == nil {
-            _appleBooksSyncService = AppleBooksSyncService()
-        }
-        return _appleBooksSyncService!
     }
 
     var iapService: IAPServiceProtocol {
@@ -202,6 +195,34 @@ class DIContainer {
         }
         return _weReadCacheService
     }
+    
+    // MARK: - Sync Engine
+    
+    var notionSyncEngine: NotionSyncEngine {
+        if _notionSyncEngine == nil {
+            _notionSyncEngine = NotionSyncEngine(
+                notionService: notionService,
+                notionConfig: notionConfigStore,
+                logger: loggerService,
+                timestampStore: syncTimestampStore
+            )
+        }
+        return _notionSyncEngine!
+    }
+    
+    var goodLinksSyncService: GoodLinksSyncServiceProtocol {
+        if _goodLinksSyncService == nil {
+            _goodLinksSyncService = GoodLinksSyncService(
+                syncEngine: notionSyncEngine,
+                notionService: notionService,
+                notionConfig: notionConfigStore,
+                databaseService: goodLinksService,
+                logger: loggerService,
+                timestampStore: syncTimestampStore
+            )
+        }
+        return _goodLinksSyncService!
+    }
 
     var environmentDetector: EnvironmentDetectorProtocol {
         if _environmentDetector == nil {
@@ -229,12 +250,6 @@ class DIContainer {
 
     func register(loggerService: LoggerServiceProtocol) {
         self._loggerService = loggerService
-    }
-
-    
-
-    func register(appleBooksSyncService: AppleBooksSyncServiceProtocol) {
-        self._appleBooksSyncService = appleBooksSyncService
     }
 
     func register(iapService: IAPServiceProtocol) {
@@ -291,6 +306,14 @@ class DIContainer {
     
     func register(weReadModelContainer: ModelContainer) {
         self._weReadModelContainer = weReadModelContainer
+    }
+    
+    func register(notionSyncEngine: NotionSyncEngine) {
+        self._notionSyncEngine = notionSyncEngine
+    }
+    
+    func register(goodLinksSyncService: GoodLinksSyncServiceProtocol) {
+        self._goodLinksSyncService = goodLinksSyncService
     }
 
     func register(environmentDetector: EnvironmentDetectorProtocol) {

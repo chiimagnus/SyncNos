@@ -265,6 +265,7 @@ protocol AutoSyncServiceProtocol: AnyObject {
     // New per-source immediate triggers (public API)
     func triggerAppleBooksNow()
     func triggerGoodLinksNow()
+    func triggerWeReadNow()
 }
 
 // MARK: - Sync Timestamp Store Protocol
@@ -315,12 +316,6 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     ///   - syncKey: 上次同步的 synckey，传 0 表示全量获取
     /// - Returns: 增量响应，包含新的 synckey、更新的高亮和删除的高亮 ID
     func fetchBookmarksIncremental(bookId: String, syncKey: Int) async throws -> BookmarksIncrementalResponse
-}
-
-/// WeRead -> Notion 同步服务协议
-protocol WeReadSyncServiceProtocol: AnyObject {
-    /// 同步单本 WeRead 书籍的高亮到 Notion
-    func syncHighlights(for book: WeReadBookListItem, progress: @escaping (String) -> Void) async throws
 }
 
 /// WeRead 本地缓存服务协议

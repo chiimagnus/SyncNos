@@ -43,7 +43,9 @@ struct SyncNosApp: App {
         }
 
         // Start Auto Sync if any source enabled
-        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+        let autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") 
+            || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
+            || UserDefaults.standard.bool(forKey: "autoSync.weRead")
         if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 
         // 初始化同步状态监控，确保尽早开始监听通知

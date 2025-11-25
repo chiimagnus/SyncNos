@@ -147,8 +147,13 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(VisualEffectBackground(material: .windowBackground))
             .navigationDestination(for: String.self) { destination in
-                if destination == "notion" {
+                switch destination {
+                case "notion":
                     NotionIntegrationView()
+                case "weread":
+                    WeReadSettingsView()
+                default:
+                    EmptyView()
                 }
             }
         }
@@ -165,6 +170,14 @@ struct SettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNotionSettings"))) { _ in
             navigationPath.append("notion")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadLogin"))) { _ in
+            // 先导航到 WeReadSettingsView，然后它会自动打开登录 Sheet
+            navigationPath.append("weread")
+            // 延迟发送通知，等待 WeReadSettingsView 加载完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                NotificationCenter.default.post(name: Notification.Name("WeReadSettingsShowLoginSheet"), object: nil)
+            }
         }
     }
 }

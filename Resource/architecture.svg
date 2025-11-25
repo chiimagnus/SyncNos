@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sourceGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#11998e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38ef7d;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="unifiedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f093fb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f5576c;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="targetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="notionGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#232526;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#414345;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="obsidianGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="larkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+    <filter id="shadowLight" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#f8fafc"/>
+  
+  <!-- Header -->
+  <rect x="50" y="20" width="1100" height="60" rx="12" fill="url(#headerGrad)" filter="url(#shadow)"/>
+  <text x="600" y="58" text-anchor="middle" fill="white" font-size="24" font-weight="700">SyncNos Architecture</text>
+  <text x="600" y="75" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="12">Multi-Source → Multi-Target Sync Engine</text>
+  
+  <!-- Data Sources Section -->
+  <text x="600" y="120" text-anchor="middle" fill="#64748b" font-size="14" font-weight="600">DATA SOURCES</text>
+  
+  <!-- Apple Books -->
+  <g transform="translate(150, 140)">
+    <rect width="200" height="100" rx="12" fill="url(#sourceGrad)" filter="url(#shadowLight)"/>
+    <text x="100" y="35" text-anchor="middle" fill="white" font-size="16" font-weight="600">📚 Apple Books</text>
+    <text x="100" y="55" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Local SQLite Database</text>
+    <text x="100" y="75" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10">Highlights • Notes • Colors</text>
+  </g>
+  
+  <!-- GoodLinks -->
+  <g transform="translate(500, 140)">
+    <rect width="200" height="100" rx="12" fill="url(#sourceGrad)" filter="url(#shadowLight)"/>
+    <text x="100" y="35" text-anchor="middle" fill="white" font-size="16" font-weight="600">🔗 GoodLinks</text>
+    <text x="100" y="55" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Local SQLite Database</text>
+    <text x="100" y="75" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10">Articles • Tags • Highlights</text>
+  </g>
+  
+  <!-- WeRead -->
+  <g transform="translate(850, 140)">
+    <rect width="200" height="100" rx="12" fill="url(#sourceGrad)" filter="url(#shadowLight)"/>
+    <text x="100" y="35" text-anchor="middle" fill="white" font-size="16" font-weight="600">📖 WeRead</text>
+    <text x="100" y="55" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Web API + Cache</text>
+    <text x="100" y="75" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10">Books • Thoughts • Notes</text>
+  </g>
+  
+  <!-- Arrows from sources -->
+  <path d="M250 240 L250 280 L600 280" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M600 240 L600 280" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  <path d="M950 240 L950 280 L600 280" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  
+  <!-- Arrow marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  
+  <!-- SyncSourceProtocol -->
+  <g transform="translate(350, 300)">
+    <rect width="500" height="80" rx="12" fill="url(#unifiedGrad)" filter="url(#shadow)"/>
+    <text x="250" y="30" text-anchor="middle" fill="white" font-size="16" font-weight="600">SyncSourceProtocol</text>
+    <text x="250" y="50" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Unified Data Source Interface</text>
+    <text x="250" y="70" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10">sourceKey • syncItem • fetchHighlights() • additionalProperties()</text>
+  </g>
+  
+  <!-- Arrow -->
+  <path d="M600 380 L600 420" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- UnifiedHighlight -->
+  <g transform="translate(350, 420)">
+    <rect width="500" height="70" rx="12" fill="#fff" stroke="#e2e8f0" stroke-width="2" filter="url(#shadowLight)"/>
+    <text x="250" y="28" text-anchor="middle" fill="#1e293b" font-size="14" font-weight="600">UnifiedHighlight / UnifiedSyncItem</text>
+    <text x="250" y="48" text-anchor="middle" fill="#64748b" font-size="11">uuid • text • note • color • dateCreated • dateModified</text>
+  </g>
+  
+  <!-- Arrow -->
+  <path d="M600 490 L600 530" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- SyncTargetRegistry -->
+  <g transform="translate(350, 530)">
+    <rect width="500" height="70" rx="12" fill="url(#targetGrad)" filter="url(#shadow)"/>
+    <text x="250" y="28" text-anchor="middle" fill="white" font-size="16" font-weight="600">SyncTargetRegistry</text>
+    <text x="250" y="48" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Target Management &amp; Routing</text>
+    <text x="250" y="63" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10">register() • enabledTargets • activeTargets</text>
+  </g>
+  
+  <!-- Arrows to targets -->
+  <path d="M450 600 L250 640" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M600 600 L600 640" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M750 600 L950 640" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- Sync Targets Section -->
+  <text x="600" y="630" text-anchor="middle" fill="#64748b" font-size="14" font-weight="600">SYNC TARGETS</text>
+  
+  <!-- NotionTarget -->
+  <g transform="translate(100, 660)">
+    <rect width="240" height="120" rx="12" fill="url(#notionGrad)" filter="url(#shadow)"/>
+    <text x="120" y="30" text-anchor="middle" fill="white" font-size="16" font-weight="600">📝 Notion</text>
+    <text x="120" y="50" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Cloud API</text>
+    <rect x="20" y="65" width="200" height="40" rx="6" fill="rgba(255,255,255,0.1)"/>
+    <text x="120" y="85" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">NotionSyncEngine</text>
+    <text x="120" y="98" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">Database • Pages • Blocks</text>
+  </g>
+  
+  <!-- ObsidianTarget -->
+  <g transform="translate(480, 660)">
+    <rect width="240" height="120" rx="12" fill="url(#obsidianGrad)" filter="url(#shadow)"/>
+    <text x="120" y="30" text-anchor="middle" fill="white" font-size="16" font-weight="600">💎 Obsidian</text>
+    <text x="120" y="50" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Local Files</text>
+    <rect x="20" y="65" width="200" height="40" rx="6" fill="rgba(255,255,255,0.1)"/>
+    <text x="120" y="85" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">MarkdownWriter</text>
+    <text x="120" y="98" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">Vault • *.md Files</text>
+  </g>
+  
+  <!-- LarkTarget -->
+  <g transform="translate(860, 660)">
+    <rect width="240" height="120" rx="12" fill="url(#larkGrad)" filter="url(#shadow)"/>
+    <text x="120" y="30" text-anchor="middle" fill="white" font-size="16" font-weight="600">🐦 Lark / 飞书</text>
+    <text x="120" y="50" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Cloud API</text>
+    <rect x="20" y="65" width="200" height="40" rx="6" fill="rgba(255,255,255,0.1)"/>
+    <text x="120" y="85" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">LarkService</text>
+    <text x="120" y="98" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">云文档 • Documents</text>
+  </g>
+  
+  <!-- Arrows to final destinations -->
+  <path d="M220 780 L220 820" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M600 780 L600 820" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M980 780 L980 820" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- Final Destinations -->
+  <g transform="translate(100, 830)">
+    <rect width="240" height="40" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="120" y="25" text-anchor="middle" fill="#475569" font-size="12">Notion API</text>
+  </g>
+  
+  <g transform="translate(480, 830)">
+    <rect width="240" height="40" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="120" y="25" text-anchor="middle" fill="#475569" font-size="12">Local Vault (*.md)</text>
+  </g>
+  
+  <g transform="translate(860, 830)">
+    <rect width="240" height="40" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="120" y="25" text-anchor="middle" fill="#475569" font-size="12">Lark API (飞书)</text>
+  </g>
+  
+  <!-- Legend -->
+  <g transform="translate(50, 820)">
+    <text x="0" y="0" fill="#94a3b8" font-size="10">Multi-Source → Multi-Target Architecture</text>
+  </g>
+</svg>
+
