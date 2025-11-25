@@ -181,6 +181,7 @@ SyncNos/
         ├── AutoSyncSourceProvider.swift    # 自动同步协议
         ├── AppleBooksAutoSyncProvider.swift # Apple Books 自动同步
         ├── GoodLinksAutoSyncProvider.swift  # GoodLinks 自动同步
+        ├── WeReadAutoSyncProvider.swift     # WeRead 自动同步
         ├── SyncActivityMonitor.swift       # 同步活动监控
         └── SyncQueueStore.swift            # 同步队列存储
 ```
@@ -294,6 +295,7 @@ DIContainer.shared.syncTimestampStore
 - `AutoSyncSourceProvider`: 自动同步协议
 - `AppleBooksAutoSyncProvider`: Apple Books 自动同步实现
 - `GoodLinksAutoSyncProvider`: GoodLinks 自动同步实现
+- `WeReadAutoSyncProvider`: WeRead 自动同步实现
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
