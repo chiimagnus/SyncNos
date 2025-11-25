@@ -17,7 +17,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				"Services/DataSources-To/Notion/Core/NotionConfig.swift.example",
+				"Services/DataSources-To/Notion/Configuration/NotionConfig.swift.example",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};

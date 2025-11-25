@@ -29,7 +29,7 @@ class AppleBooksDetailViewModel: ObservableObject {
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
-    private let syncService: AppleBooksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let notionConfig: NotionConfigStoreProtocol
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
@@ -39,10 +39,10 @@ class AppleBooksDetailViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-         syncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService,
+         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
          notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.databaseService = databaseService
-        self.syncService = syncService
+        self.syncEngine = syncEngine
         self.notionConfig = notionConfig
 
         // Load initial values from UserDefaults
@@ -301,8 +301,9 @@ class AppleBooksDetailViewModel: ObservableObject {
             let limiter = DIContainer.shared.syncConcurrencyLimiter
             await limiter.withPermit {
                 do {
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])                
-                    try await self.syncService.syncSmart(book: book, dbPath: dbPath) { progress in
+                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])
+                    let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: self.notionConfig)
+                    try await self.syncEngine.syncSmart(source: adapter) { progress in
                         Task { @MainActor in self.syncProgressText = progress }
                     }
                     await MainActor.run {

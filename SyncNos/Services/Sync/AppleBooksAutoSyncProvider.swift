@@ -8,7 +8,8 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
 
     private let logger: LoggerServiceProtocol
     private let databaseService: DatabaseServiceProtocol
-    private let appleBooksSyncService: AppleBooksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
+    private let notionConfig: NotionConfigStoreProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let bookmarkStore: BookmarkStoreProtocol
 
@@ -18,14 +19,16 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-        appleBooksSyncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore
     ) {
         self.intervalSeconds = intervalSeconds
         self.logger = logger
         self.databaseService = databaseService
-        self.appleBooksSyncService = appleBooksSyncService
+        self.syncEngine = syncEngine
+        self.notionConfig = notionConfig
         self.syncTimestampStore = syncTimestampStore
         self.bookmarkStore = bookmarkStore
     }
@@ -161,7 +164,8 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
 
         // 局部引用，避免在并发闭包中强捕获 self 成员
         let logger = self.logger
-        let syncService = self.appleBooksSyncService
+        let syncEngine = self.syncEngine
+        let notionConfig = self.notionConfig
         let dbPathLocal = annotationDBPath
 
         // 有界并发：最多同时处理 maxConcurrentBooks 本书
@@ -195,7 +199,8 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                             userInfo: ["bookId": id, "status": "started"]
                         )
                         do {
-                            try await syncService.syncSmart(book: book, dbPath: dbPathLocal) { progress in
+                            let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
+                            try await syncEngine.syncSmart(source: adapter) { progress in
                                 logger.debug("AutoSync progress[\(id)]: \(progress)")
                             }
                             NotificationCenter.default.post(
