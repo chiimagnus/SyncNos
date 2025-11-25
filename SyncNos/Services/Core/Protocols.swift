@@ -301,12 +301,83 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     func fetchReviews(bookId: String) async throws -> [WeReadReview]
     /// 获取书籍的高亮并与想法合并（基于 range 字段）
     func fetchMergedHighlights(bookId: String) async throws -> [WeReadBookmark]
+    
+    // MARK: - 增量同步 API
+    
+    /// 增量获取 Notebook 列表（使用 synckey）
+    /// - Parameter syncKey: 上次同步的 synckey，传 0 表示全量获取
+    /// - Returns: 增量响应，包含新的 synckey、更新的书籍和删除的书籍 ID
+    func fetchNotebooksIncremental(syncKey: Int) async throws -> NotebooksIncrementalResponse
+    
+    /// 增量获取单本书的高亮（使用 synckey）
+    /// - Parameters:
+    ///   - bookId: 书籍 ID
+    ///   - syncKey: 上次同步的 synckey，传 0 表示全量获取
+    /// - Returns: 增量响应，包含新的 synckey、更新的高亮和删除的高亮 ID
+    func fetchBookmarksIncremental(bookId: String, syncKey: Int) async throws -> BookmarksIncrementalResponse
 }
 
 /// WeRead -> Notion 同步服务协议
 protocol WeReadSyncServiceProtocol: AnyObject {
     /// 同步单本 WeRead 书籍的高亮到 Notion
     func syncHighlights(for book: WeReadBookListItem, progress: @escaping (String) -> Void) async throws
+}
+
+/// WeRead 本地缓存服务协议
+/// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
+@MainActor
+protocol WeReadCacheServiceProtocol: AnyObject {
+    // MARK: - 书籍操作
+    
+    /// 获取所有缓存的书籍
+    func getAllBooks() async throws -> [CachedWeReadBook]
+    
+    /// 获取指定书籍
+    func getBook(bookId: String) async throws -> CachedWeReadBook?
+    
+    /// 保存书籍列表到缓存
+    func saveBooks(_ notebooks: [WeReadNotebook]) async throws
+    
+    /// 删除指定书籍
+    func deleteBooks(ids: [String]) async throws
+    
+    /// 更新书籍的高亮数量
+    func updateBookHighlightCount(bookId: String, count: Int) async throws
+    
+    // MARK: - 高亮操作
+    
+    /// 获取指定书籍的所有高亮
+    func getHighlights(bookId: String) async throws -> [CachedWeReadHighlight]
+    
+    /// 保存高亮列表到缓存
+    func saveHighlights(_ bookmarks: [WeReadBookmark], bookId: String) async throws
+    
+    /// 删除指定高亮
+    func deleteHighlights(ids: [String]) async throws
+    
+    // MARK: - 同步状态
+    
+    /// 获取全局同步状态
+    func getSyncState() async throws -> WeReadSyncState
+    
+    /// 更新全局同步状态
+    func updateSyncState(notebookSyncKey: Int?, lastSyncAt: Date?) async throws
+    
+    /// 获取指定书籍的高亮 synckey
+    func getBookSyncKey(bookId: String) async throws -> Int?
+    
+    /// 更新指定书籍的高亮 synckey
+    func updateBookSyncKey(bookId: String, syncKey: Int) async throws
+    
+    // MARK: - 清理
+    
+    /// 清除所有缓存数据
+    func clearAllCache() async throws
+    
+    // MARK: - 统计
+    
+    /// 获取缓存统计信息
+    func getCacheStats() async throws -> WeReadCacheStats
 }
 
 // MARK: - Auth Service Protocol

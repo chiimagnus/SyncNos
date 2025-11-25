@@ -163,19 +163,24 @@ struct PayWallView: View {
             // Primary action button
             primaryActionButton
             
-            // Restore purchases button
-            Button("Restore Purchases") {
-                viewModel.restore()
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            
             // Message display
             if let msg = viewModel.message, !msg.isEmpty {
                 Text(msg)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            
+            // Legal links
+            Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            // Restore purchases button
+            Button("Restore Purchases") {
+                viewModel.restore()
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
         }
     }
     
