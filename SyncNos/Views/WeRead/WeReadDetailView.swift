@@ -46,22 +46,29 @@ struct WeReadDetailView: View {
                                 Image(systemName: "highlighter")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                Text("\(book.highlightCount) highlights")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                // 显示已加载/总数
+                                if detailViewModel.totalFilteredCount > 0 {
+                                    Text("\(detailViewModel.visibleHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("\(book.highlightCount) highlights")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
 
                         if detailViewModel.isLoading {
                             ProgressView("Loading highlights...")
                                 .padding(.top)
-                        } else if detailViewModel.highlights.isEmpty {
+                        } else if detailViewModel.visibleHighlights.isEmpty {
                             Text("No highlights found for this book.")
                                 .foregroundColor(.secondary)
                                 .padding(.top)
                         } else {
                             WaterfallLayout(minColumnWidth: 280, spacing: 12) {
-                                ForEach(detailViewModel.highlights) { h in
+                                ForEach(detailViewModel.visibleHighlights) { h in
                                     HighlightCardView(
                                         colorMark: color(for: h.colorIndex),
                                         content: h.text,
@@ -70,9 +77,56 @@ struct WeReadDetailView: View {
                                         createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
                                         modifiedDate: nil  // WeRead 没有 modified time
                                     )
+                                    .onAppear {
+                                        // 当卡片出现时，检查是否需要加载更多
+                                        detailViewModel.loadMoreIfNeeded(currentItem: h)
+                                    }
                                 }
                             }
                             .padding(.top)
+                            
+                            // 加载更多指示器
+                            if detailViewModel.isLoadingMore {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Loading more...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                }
+                                .padding()
+                            } else if detailViewModel.canLoadMore {
+                                // 手动加载更多按钮（备用）
+                                HStack {
+                                    Spacer()
+                                    Button {
+                                        detailViewModel.loadNextPage()
+                                    } label: {
+                                        Text("Load More (\(detailViewModel.totalFilteredCount - detailViewModel.visibleHighlights.count) remaining)")
+                                            .font(.caption)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundColor(.accentColor)
+                                    Spacer()
+                                }
+                                .padding()
+                            }
+                        }
+                        
+                        // 后台同步指示器
+                        if detailViewModel.isBackgroundSyncing {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                Text("Syncing in background...")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
                     .padding()
@@ -128,6 +182,11 @@ struct WeReadDetailView: View {
             }
         }
         .onAppear {
+            // 注入缓存服务
+            if let cacheService = DIContainer.shared.weReadCacheService {
+                detailViewModel.setCacheService(cacheService)
+            }
+            
             if let book = selectedBook {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)

@@ -353,6 +353,73 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         return []
     }
 
+    // MARK: - Incremental Sync API
+    
+    /// 增量获取 Notebook 列表
+    func fetchNotebooksIncremental(syncKey: Int) async throws -> NotebooksIncrementalResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("/api/user/notebook"), resolvingAgainstBaseURL: false)!
+        if syncKey > 0 {
+            components.queryItems = [URLQueryItem(name: "synckey", value: String(syncKey))]
+        }
+        
+        let data = try await performRequest(url: components.url!)
+        
+        // 解析响应
+        guard let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
+            return NotebooksIncrementalResponse(syncKey: syncKey, updated: [], removed: nil)
+        }
+        
+        // 获取新的 synckey
+        let newSyncKey = json["synckey"] as? Int ?? syncKey
+        
+        // 解码书籍列表
+        let notebooks = try decodeNotebookList(from: data)
+        
+        // 获取已删除的书籍 ID（如果有）
+        let removed = json["removed"] as? [String]
+        
+        logger.info("[WeReadAPI] Incremental notebooks fetch: syncKey \(syncKey) -> \(newSyncKey), updated: \(notebooks.count), removed: \(removed?.count ?? 0)")
+        
+        return NotebooksIncrementalResponse(
+            syncKey: newSyncKey,
+            updated: notebooks,
+            removed: removed
+        )
+    }
+    
+    /// 增量获取单本书的高亮
+    func fetchBookmarksIncremental(bookId: String, syncKey: Int) async throws -> BookmarksIncrementalResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent("/web/book/bookmarklist"), resolvingAgainstBaseURL: false)!
+        var queryItems = [URLQueryItem(name: "bookId", value: bookId)]
+        if syncKey > 0 {
+            queryItems.append(URLQueryItem(name: "synckey", value: String(syncKey)))
+        }
+        components.queryItems = queryItems
+        
+        let data = try await performRequest(url: components.url!)
+        
+        // 解析响应获取 synckey
+        guard let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
+            return BookmarksIncrementalResponse(syncKey: syncKey, updated: [], removed: nil)
+        }
+        
+        let newSyncKey = json["synckey"] as? Int ?? syncKey
+        
+        // 解码高亮列表
+        let bookmarks = try decodeBookmarks(from: data, bookId: bookId)
+        
+        // 获取已删除的高亮 ID
+        let removed = json["removed"] as? [String]
+        
+        logger.info("[WeReadAPI] Incremental bookmarks fetch for bookId=\(bookId): syncKey \(syncKey) -> \(newSyncKey), updated: \(bookmarks.count), removed: \(removed?.count ?? 0)")
+        
+        return BookmarksIncrementalResponse(
+            syncKey: newSyncKey,
+            updated: bookmarks,
+            removed: removed
+        )
+    }
+
     // MARK: - Highlight Merging
 
     /// 获取书籍的高亮并与想法合并

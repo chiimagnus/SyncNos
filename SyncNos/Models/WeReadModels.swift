@@ -260,3 +260,19 @@ struct WeReadHighlightResponse: Decodable {
     let removed: [String]?
     let chapters: [ChapterItem]?
 }
+
+// MARK: - 增量同步响应模型
+
+/// Notebook 增量同步响应
+struct NotebooksIncrementalResponse {
+    let syncKey: Int
+    let updated: [WeReadNotebook]
+    let removed: [String]?
+}
+
+/// 高亮增量同步响应
+struct BookmarksIncrementalResponse {
+    let syncKey: Int
+    let updated: [WeReadBookmark]
+    let removed: [String]?
+}

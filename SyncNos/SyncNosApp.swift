@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import AppKit
 import StoreKit
 @main
@@ -49,6 +50,11 @@ struct SyncNosApp: App {
         _ = DIContainer.shared.syncActivityMonitor
         // 初始化同步队列存储，确保尽早开始监听入队/状态事件
         _ = DIContainer.shared.syncQueueStore
+        
+        // 初始化 WeRead 缓存服务（预热 SwiftData ModelContainer）
+        if let _ = DIContainer.shared.weReadCacheService {
+            DIContainer.shared.loggerService.info("WeRead cache service initialized")
+        }
     }
 
     var body: some Scene {
