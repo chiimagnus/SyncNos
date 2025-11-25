@@ -39,7 +39,7 @@
 - **Error Retry**: Intelligent error retry mechanism
 - **Apple Sign In**: Secure Apple ID authentication integration
 
-## Download SyncNos from Mac App Store
+## 🎉 Download SyncNos from Mac App Store
 
 [Download SyncNos from Mac App Store ->](https://apps.apple.com/app/syncnos/id6755133888)
 
