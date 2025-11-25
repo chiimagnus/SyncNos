@@ -317,12 +317,6 @@ protocol WeReadAPIServiceProtocol: AnyObject {
     func fetchBookmarksIncremental(bookId: String, syncKey: Int) async throws -> BookmarksIncrementalResponse
 }
 
-/// WeRead -> Notion 同步服务协议
-protocol WeReadSyncServiceProtocol: AnyObject {
-    /// 同步单本 WeRead 书籍的高亮到 Notion
-    func syncHighlights(for book: WeReadBookListItem, progress: @escaping (String) -> Void) async throws
-}
-
 /// WeRead 本地缓存服务协议
 /// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
 @MainActor

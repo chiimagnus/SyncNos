@@ -91,7 +91,7 @@ final class WeReadDetailViewModel: ObservableObject {
     // MARK: - Private Properties
     
     private let apiService: WeReadAPIServiceProtocol
-    private let syncService: WeReadSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
     
@@ -113,13 +113,13 @@ final class WeReadDetailViewModel: ObservableObject {
     
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         cacheService: WeReadCacheServiceProtocol? = nil
     ) {
         self.apiService = apiService
-        self.syncService = syncService
+        self.syncEngine = syncEngine
         self.logger = logger
         self.notionConfig = notionConfig
         self.cacheService = cacheService
@@ -456,7 +456,8 @@ final class WeReadDetailViewModel: ObservableObject {
                     userInfo: ["bookId": book.bookId, "status": "started"]
                 )
                 do {
-                    try await syncService.syncHighlights(for: book) { [weak self] progressText in
+                    let adapter = WeReadNotionAdapter.create(book: book, apiService: self.apiService)
+                    try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
                         Task { @MainActor in
                             self?.syncProgressText = progressText
                         }
