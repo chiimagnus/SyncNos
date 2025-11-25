@@ -74,7 +74,11 @@ struct WeReadSettingsView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadLogin")).receive(on: DispatchQueue.main)) { _ in
-            // 自动打开登录页面（当会话过期时）
+            // 自动打开登录页面（当会话过期时）- 旧通知，保持兼容
+            viewModel.showLoginSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WeReadSettingsShowLoginSheet")).receive(on: DispatchQueue.main)) { _ in
+            // 从 SettingsView 导航过来后，打开登录 Sheet
             viewModel.showLoginSheet = true
         }
     }

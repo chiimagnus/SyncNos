@@ -136,7 +136,7 @@ struct WeReadListView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadSettings")).receive(on: DispatchQueue.main)) { _ in
-            // 导航到 WeRead 登录设置页面
+            // 打开设置窗口，SettingsView 会监听 NavigateToWeReadLogin 通知并导航到 WeReadSettingsView
             openWindow(id: "setting")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NotificationCenter.default.post(name: Notification.Name("NavigateToWeReadLogin"), object: nil)
