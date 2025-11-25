@@ -6,40 +6,42 @@ struct OnboardingSourcesView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            Spacer()
+            
             // 中央区域 - 三个数据源卡片水平排列
             HStack(spacing: 24) {
-                    SourceCard(
-                        icon: "book.fill",
-                        color: .orange,
-                        title: "Apple Books",
-                        isOn: $viewModel.appleBooksEnabled
-                    )
-                    
-                    SourceCard(
-                        icon: "bookmark.fill",
-                        color: .red,
-                        title: "GoodLinks",
-                        isOn: $viewModel.goodLinksEnabled
-                    )
-                    
-                    SourceCard(
-                        icon: "text.book.closed.fill",
-                        color: .blue,
-                        title: "WeRead",
-                        isOn: $viewModel.weReadEnabled
-                    )
-                    .onChange(of: viewModel.weReadEnabled) { _, newValue in
-                        if newValue && !viewModel.isWeReadLoggedIn {
-                            // We could show a tip here
-                        }
+                SourceCard(
+                    icon: "book.fill",
+                    color: .orange,
+                    title: "Apple Books",
+                    isOn: $viewModel.appleBooksEnabled
+                )
+                
+                SourceCard(
+                    icon: "bookmark.fill",
+                    color: .red,
+                    title: "GoodLinks",
+                    isOn: $viewModel.goodLinksEnabled
+                )
+                
+                SourceCard(
+                    icon: "text.book.closed.fill",
+                    color: .blue,
+                    title: "WeRead",
+                    isOn: $viewModel.weReadEnabled
+                )
+                .onChange(of: viewModel.weReadEnabled) { _, newValue in
+                    if newValue && !viewModel.isWeReadLoggedIn {
+                        // We could show a tip here
                     }
+                }
             }
             
-            // 底部区域 - 与前两页保持一致
-            VStack {
-                Spacer()
-                
+            Spacer()  // 弹性空间
+            
+            // 底部区域
+            VStack(spacing: 0) {
                 // 错误提示
                 if let error = viewModel.sourceSelectionError {
                     Text(error)
