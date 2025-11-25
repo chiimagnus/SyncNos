@@ -75,6 +75,10 @@ struct MainListView: View {
             checkTrialStatus()
             // 启动时根据当前启用数据源校正 contentSource
             ensureValidContentSource()
+            // 注入 WeRead 缓存服务
+            if let cacheService = DIContainer.shared.weReadCacheService {
+                weReadVM.setCacheService(cacheService)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
             let logger = DIContainer.shared.loggerService
