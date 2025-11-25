@@ -1,6 +1,33 @@
 import Foundation
 
-// 串行化按来源的 ensure（避免并发创建多个同名数据库）
+// MARK: - Static Date Formatters (from NotionServiceCore)
+
+/// ISO8601 formatter for highlight timestamps when syncing to Notion (UTC)
+let notionIsoDateFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+}()
+
+/// ISO8601 formatter for system timezone when syncing to Notion
+let notionSystemTimeZoneIsoDateFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withTimeZone]
+    f.timeZone = TimeZone.current
+    return f
+}()
+
+/// Date formatter for Unix timestamps with system timezone
+let notionSystemTimeZoneDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+    f.timeZone = TimeZone.current
+    return f
+}()
+
+// MARK: - Concurrency Control Actors
+
+/// 串行化按来源的 ensure（避免并发创建多个同名数据库）
 private actor NotionSourceEnsureLock {
     private var waitersByKey: [String: [CheckedContinuation<Void, Never>]] = [:]
 
@@ -20,60 +47,73 @@ private actor NotionSourceEnsureLock {
     }
 }
 
+/// Serialize property ensure per database to avoid racing PATCH on schema
+private actor NotionDBPropsEnsureLock {
+    private var waitersByDb: [String: [CheckedContinuation<Void, Never>]] = [:]
+    func begin(dbId: String) async {
+        if waitersByDb[dbId] != nil {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                waitersByDb[dbId]!.append(c)
+            }
+        } else {
+            waitersByDb[dbId] = []
+        }
+    }
+    func end(dbId: String) {
+        let waiters = waitersByDb.removeValue(forKey: dbId) ?? []
+        for w in waiters { w.resume() }
+    }
+}
+
+// MARK: - NotionService
+
 final class NotionService: NotionServiceProtocol {
-    // Core service components
-    private let core: NotionServiceCore
+    // MARK: - Core Properties
+    
+    let configStore: NotionConfigStoreProtocol
+    private let logger: LoggerServiceProtocol
+    private let apiBase = URL(string: "https://api.notion.com/v1/")!
+    private let notionVersion = "2022-06-28"
+    
+    // MARK: - Helper Components
+    
     private let requestHelper: NotionRequestHelper
     private let helperMethods: NotionHelperMethods
 
-    // Operation modules
+    // MARK: - Operation Modules
+    
     private let databaseOps: NotionDatabaseOperations
     private let pageOps: NotionPageOperations
     private let highlightOps: NotionHighlightOperations
     private let queryOps: NotionQueryOperations
-    // 串行化 ensure（按来源）
+    
+    // MARK: - Concurrency Control
+    
     private static let sourceEnsureLock = NotionSourceEnsureLock()
-
-    // Serialize property ensure per database to avoid racing PATCH on schema
-    private actor NotionDBPropsEnsureLock {
-        private var waitersByDb: [String: [CheckedContinuation<Void, Never>]] = [:]
-        func begin(dbId: String) async {
-            if waitersByDb[dbId] != nil {
-                await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
-                    waitersByDb[dbId]!.append(c)
-                }
-            } else {
-                waitersByDb[dbId] = []
-            }
-        }
-        func end(dbId: String) {
-            let waiters = waitersByDb.removeValue(forKey: dbId) ?? []
-            for w in waiters { w.resume() }
-        }
-    }
-
     private static let dbPropsEnsureLock = NotionDBPropsEnsureLock()
 
+    // MARK: - Initialization
+    
     init(configStore: NotionConfigStoreProtocol) {
-        // Initialize core components
-        self.core = NotionServiceCore(configStore: configStore)
+        self.configStore = configStore
+        self.logger = DIContainer.shared.loggerService
         self.requestHelper = NotionRequestHelper(
             configStore: configStore,
-            apiBase: core.apiBase,
-            notionVersion: core.notionVersion,
-            logger: core.logger
+            apiBase: apiBase,
+            notionVersion: notionVersion,
+            logger: logger
         )
         self.helperMethods = NotionHelperMethods()
 
         // Initialize operation modules
         self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper)
         self.pageOps = NotionPageOperations(requestHelper: requestHelper, helperMethods: helperMethods)
-        self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: core.logger)
+        self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: logger)
         self.highlightOps = NotionHighlightOperations(
             requestHelper: requestHelper,
             helperMethods: helperMethods,
             pageOperations: pageOps,
-            logger: core.logger
+            logger: logger
         )
     }
     // Lightweight exists check by querying minimal page
@@ -82,7 +122,7 @@ final class NotionService: NotionServiceProtocol {
     }
 
     func createDatabase(title: String) async throws -> NotionDatabase {
-        guard let pageId = core.configStore.notionPageId else {
+        guard let pageId = configStore.notionPageId else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         return try await databaseOps.createDatabase(title: title, pageId: pageId)
@@ -148,7 +188,7 @@ final class NotionService: NotionServiceProtocol {
 
     // MARK: - Per-book database (方案2)
     func createPerBookHighlightDatabase(bookTitle: String, author: String, assetId: String) async throws -> NotionDatabase {
-        guard let pageId = core.configStore.notionPageId else {
+        guard let pageId = configStore.notionPageId else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         return try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: pageId)
@@ -183,31 +223,31 @@ final class NotionService: NotionServiceProtocol {
         defer { Task { await Self.sourceEnsureLock.end(key: sourceKey) } }
 
         // 1) 双检：进入锁后再次检查与验证存在
-        if let saved = core.configStore.databaseIdForSource(sourceKey) {
+        if let saved = configStore.databaseIdForSource(sourceKey) {
             if await databaseOps.databaseExists(databaseId: saved) { return saved }
-            core.configStore.setDatabaseId(nil, forSource: sourceKey)
+            configStore.setDatabaseId(nil, forSource: sourceKey)
         }
 
         // 4) fallback to search-by-title (existing behavior)
         if let found = try await databaseOps.findDatabaseId(title: title, parentPageId: parentPageId) {
-            core.configStore.setDatabaseId(found, forSource: sourceKey)
+            configStore.setDatabaseId(found, forSource: sourceKey)
             return found
         }
 
         // 5) create new database as last resort
         let created = try await databaseOps.createDatabase(title: title, pageId: parentPageId)
-        core.configStore.setDatabaseId(created.id, forSource: sourceKey)
+        configStore.setDatabaseId(created.id, forSource: sourceKey)
         return created.id
     }
 
     /// Ensure a per-book database exists (used by per-book strategy). Returns (id, recreated)
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool) {
-        if let saved = core.configStore.databaseIdForBook(assetId: assetId) {
+        if let saved = configStore.databaseIdForBook(assetId: assetId) {
             if await databaseOps.databaseExists(databaseId: saved) { return (saved, false) }
-            core.configStore.setDatabaseId(nil, forBook: assetId)
+            configStore.setDatabaseId(nil, forBook: assetId)
         }
-        let db = try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: core.configStore.notionPageId ?? "")
-        core.configStore.setDatabaseId(db.id, forBook: assetId)
+        let db = try await databaseOps.createPerBookHighlightDatabase(bookTitle: bookTitle, author: author, assetId: assetId, pageId: configStore.notionPageId ?? "")
+        configStore.setDatabaseId(db.id, forBook: assetId)
         return (db.id, true)
     }
 
@@ -242,7 +282,7 @@ final class NotionService: NotionServiceProtocol {
         var cursor: String? = nil
         var attempt = 1
         repeat {
-            core.logger.info("Notion search attempt \(attempt) starting, cursor=\(cursor ?? "nil"), query=\(searchQuery ?? "")")
+            logger.info("Notion search attempt \(attempt) starting, cursor=\(cursor ?? "nil"), query=\(searchQuery ?? "")")
             var body: [String: Any] = [
                 "filter": ["property": "object", "value": "page"],
                 "page_size": pageSize
@@ -275,14 +315,14 @@ final class NotionService: NotionServiceProtocol {
                 addedThisPage += 1
             }
 
-            core.logger.info("Notion search attempt \(attempt) completed, rawResults=\(decoded.results.count), pagesAdded=\(addedThisPage), has_more=\(decoded.has_more == true)")
+            logger.info("Notion search attempt \(attempt) completed, rawResults=\(decoded.results.count), pagesAdded=\(addedThisPage), has_more=\(decoded.has_more == true)")
 
             // 如果本页找到了任何可用页面，则立即返回，不继续翻页（动态一批一批查找）
             if addedThisPage > 0 {
-                core.logger.info("Notion search found pages on attempt \(attempt), returning \(addedThisPage) pages")
+                logger.info("Notion search found pages on attempt \(attempt), returning \(addedThisPage) pages")
                 break
             } else {
-                core.logger.info("Notion search attempt \(attempt) found no usable pages, continuing to next page if any")
+                logger.info("Notion search attempt \(attempt) found no usable pages, continuing to next page if any")
             }
 
             cursor = decoded.has_more == true ? decoded.next_cursor : nil

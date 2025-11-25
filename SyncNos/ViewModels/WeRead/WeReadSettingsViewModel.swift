@@ -55,9 +55,9 @@ final class WeReadSettingsViewModel: ObservableObject {
         UserDefaults.standard.set(anyEnabled, forKey: "autoSyncEnabled")
         if anyEnabled {
             autoSyncService.start()
-            // WeRead 尚未接入 AutoSyncProvider 触发器，此处暂不立即触发一次同步
+            // 首次启用 WeRead 自动同步时，立即触发一次同步
             if !previous && autoSync {
-                // 预留：触发一次 WeRead 增量同步
+                autoSyncService.triggerWeReadNow()
             }
         } else {
             autoSyncService.stop()

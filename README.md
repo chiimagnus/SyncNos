@@ -5,7 +5,7 @@
 
 [<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
-> **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books and GoodLinks to Notion, supporting multiple sync strategies and powerful customization features.
+> **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books, GoodLinks, and WeRead to Notion, supporting multiple sync strategies and powerful customization features.
 
 ## ✨ Main Features
 
@@ -42,6 +42,115 @@
 ## Download SyncNos from Mac App Store
 
 [Download SyncNos from Mac App Store ->](https://apps.apple.com/app/syncnos/id6755133888)
+
+## 🏗️ Architecture
+
+<p align="center">
+  <img src="Resource/architecture.svg" alt="SyncNos Architecture" width="100%">
+</p>
+
+<details>
+<summary>📊 View Text-based Architecture Diagram</summary>
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                   SyncNos                                        │
+│                         Multi-Source → Multi-Target Sync                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                              ┌─────────────────┐
+                              │   User / App    │
+                              └────────┬────────┘
+                                       │
+                              ┌────────▼────────┐
+                              │   ViewModels    │
+                              │ (Business Logic)│
+                              └────────┬────────┘
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+         ▼                             ▼                             ▼
+┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
+│  AppleBooks     │          │   GoodLinks     │          │    WeRead       │
+│  Adapter        │          │   Adapter       │          │    Adapter      │
+│ (Local SQLite)  │          │ (Local SQLite)  │          │   (Web API)     │
+└────────┬────────┘          └────────┬────────┘          └────────┬────────┘
+         │                             │                             │
+         └─────────────────────────────┼─────────────────────────────┘
+                                       │
+                                       ▼
+        ┌─────────────────────────────────────────────────────────────┐
+        │                    SyncSourceProtocol                        │
+        │              (Unified Data Source Interface)                 │
+        └──────────────────────────────┬──────────────────────────────┘
+                                       │
+                                       ▼
+        ┌─────────────────────────────────────────────────────────────┐
+        │                 UnifiedHighlight / UnifiedSyncItem           │
+        │                    (Unified Data Models)                     │
+        └──────────────────────────────┬──────────────────────────────┘
+                                       │
+                                       ▼
+        ┌─────────────────────────────────────────────────────────────┐
+        │                    SyncTargetRegistry                        │
+        │              (Target Management & Routing)                   │
+        └──────────────────────────────┬──────────────────────────────┘
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+         ▼                             ▼                             ▼
+┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
+│  NotionTarget   │          │ ObsidianTarget  │          │   LarkTarget    │
+│  (Cloud API)    │          │ (Local Files)   │          │  (Cloud API)    │
+└────────┬────────┘          └────────┬────────┘          └────────┬────────┘
+         │                             │                             │
+         ▼                             ▼                             ▼
+┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
+│  Notion API     │          │  Local Vault    │          │   Lark API      │
+└─────────────────┘          └─────────────────┘          └─────────────────┘
+```
+
+</details>
+
+### Sync Strategies
+
+| Mode | Description |
+|------|-------------|
+| **Single Database** | All books in one Notion database, each book as a page |
+| **Per-Book Database** | Each book gets its own database with highlights as items |
+
+### Data Flow
+
+```
+1. User selects books/articles to sync
+                    ↓
+2. ViewModel creates Adapter (e.g., WeReadNotionAdapter)
+                    ↓
+3. Adapter implements SyncSourceProtocol
+   - fetchHighlights() → [UnifiedHighlight]
+   - syncItem → UnifiedSyncItem
+                    ↓
+4. SyncTargetRegistry routes to enabled targets
+                    ↓
+5. Each SyncTarget (Notion/Obsidian/Lark) processes data
+   - NotionTarget → NotionSyncEngine → Notion API
+   - ObsidianTarget → MarkdownWriter → Local .md files
+   - LarkTarget → LarkService → Lark API
+                    ↓
+6. SyncTimestampStore records last sync time
+```
+
+### Extensibility
+
+| Add New Data Source | Add New Sync Target |
+|---------------------|---------------------|
+| 1. Create `XxxModels.swift` | 1. Create `YyyConfigStore.swift` |
+| 2. Create `XxxNotionAdapter.swift` | 2. Create `YyySyncTarget.swift` |
+| 3. Implement `SyncSourceProtocol` | 3. Implement `SyncTargetProtocol` |
+| 4. Create ViewModel & Views | 4. Create Integration Views |
+| 5. Register in DIContainer | 5. Register in SyncTargetRegistry |
+
+> See [ADD_NEW_DATASOURCE_CHECKLIST.md](Resource/ADD_NEW_DATASOURCE_CHECKLIST.md) and [ADD_NEW_SYNC_TARGET_CHECKLIST.md](Resource/ADD_NEW_SYNC_TARGET_CHECKLIST.md) for detailed guides.
 
 ## 📄 License
 

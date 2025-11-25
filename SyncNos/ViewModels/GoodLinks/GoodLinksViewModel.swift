@@ -78,7 +78,7 @@ final class GoodLinksViewModel: ObservableObject {
     private var currentPageSize: Int = 0
 
     init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-         syncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
+         syncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
          logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
          syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
          notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
