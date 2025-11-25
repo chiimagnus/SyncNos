@@ -171,7 +171,9 @@ struct PayWallView: View {
             }
             
             // Legal links
-            legalLinksSection
+            Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             
             // Restore purchases button
             Button("Restore Purchases") {
@@ -180,20 +182,6 @@ struct PayWallView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
         }
-    }
-    
-    @ViewBuilder
-    private var legalLinksSection: some View {
-        HStack(spacing: 16) {
-            Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacy")!)
-            
-            Text("·")
-                .foregroundStyle(.tertiary)
-            
-            Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
     
     @ViewBuilder

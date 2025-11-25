@@ -100,7 +100,7 @@ private func openPrivacyPolicy() {
     // 打开仓库内的隐私政策文件（在 Finder/默认编辑器中）
     if let url = Bundle.main.url(forResource: "PRIVACY_POLICY", withExtension: "md", subdirectory: "Resource") {
         NSWorkspace.shared.open(url)
-    } else if let web = URL(string: "https://chiimagnus.notion.site/privacy") {
+    } else if let web = URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse") {
         NSWorkspace.shared.open(web)
     }
 }
