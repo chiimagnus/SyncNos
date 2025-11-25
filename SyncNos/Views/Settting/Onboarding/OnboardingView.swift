@@ -39,6 +39,7 @@ struct OnboardingWelcomeView: View {
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
+                    .shadow(radius: 6)
                     .frame(width: 180, height: 180)
                 
                 // Satellite Icons
