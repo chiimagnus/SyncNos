@@ -22,8 +22,9 @@ struct OnboardingTrialView: View {
     // Gift 图标摇摆动画状态
     @State private var wiggleAngle: Double = 0
     
-    // Header 图标放大动画状态
+    // Header 图标动画状态
     @State private var headerIconScale: CGFloat = 1.0
+    @State private var headerIconShake: CGFloat = 0
     
     // MARK: - Convenience Initializers
     
@@ -104,6 +105,7 @@ struct OnboardingTrialView: View {
             .font(.system(size: 60))
             .foregroundStyle(headerIconColor)
             .scaleEffect(shouldPulseHeaderIcon ? headerIconScale : 1.0)
+            .offset(x: shouldPulseHeaderIcon ? headerIconShake : 0)
             .onAppear {
                 if shouldPulseHeaderIcon {
                     startHeaderIconPulse()
@@ -119,28 +121,50 @@ struct OnboardingTrialView: View {
         return false
     }
     
-    /// 启动 Header Icon 脉冲放大动画
+    /// 启动 Header Icon 脉冲放大 + 颤抖动画
     private func startHeaderIconPulse() {
-        // 执行一次脉冲动画
-        func performPulse() {
+        // 执行一次完整的动画序列：放大 -> 颤抖 -> 复原
+        func performPulseAndShake() {
+            // 1. 放大
             withAnimation(.easeOut(duration: 0.2)) {
                 headerIconScale = 1.35
             }
+            
+            // 2. 颤抖（放大后开始）
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                performShake()
+            }
+            
+            // 3. 复原（颤抖结束后）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2 + 0.4) {
                 withAnimation(.easeIn(duration: 0.15)) {
                     headerIconScale = 1.0
                 }
             }
         }
         
-        // 立即开始第一次动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            performPulse()
+        // 颤抖动画序列
+        func performShake() {
+            let shakeDuration = 0.05
+            let shakeSequence: [CGFloat] = [-6, 6, -5, 5, -3, 3, -2, 0]
+            
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + shakeDuration * Double(index)) {
+                    withAnimation(.linear(duration: shakeDuration)) {
+                        headerIconShake = offset
+                    }
+                }
+            }
         }
         
-        // 循环放大动画（每 1.5 秒一次）
-        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
-            performPulse()
+        // 立即开始第一次动画
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            performPulseAndShake()
+        }
+        
+        // 循环动画（每 2 秒一次）
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            performPulseAndShake()
         }
     }
     
