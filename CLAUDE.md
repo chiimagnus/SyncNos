@@ -116,7 +116,8 @@ SyncNos/
 │   ├── HighlightColorScheme.swift # 高亮颜色管理
 │   ├── SyncQueueModels.swift     # 同步队列模型
 │   ├── GoodLinksModels.swift     # GoodLinks 数据模型
-│   └── WeReadModels.swift        # 微信读书数据模型
+│   ├── WeReadModels.swift        # 微信读书 API DTO 模型
+│   └── WeReadCacheModels.swift   # 微信读书 SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -144,10 +145,12 @@ SyncNos/
     │   │   ├── GoodLinksService.swift
     │   │   └── GoodLinksTagParser.swift
     │   └── WeRead/               # 微信读书集成
-    │       ├── WeReadAPIService.swift
-    │       ├── WeReadAuthService.swift
-    │       ├── WeReadCookieRefreshService.swift
-    │       └── CookieRefreshCoordinator.swift
+    │       ├── WeReadAPIService.swift          # API 客户端
+    │       ├── WeReadAuthService.swift         # Cookie 认证服务
+    │       ├── WeReadCookieRefreshService.swift # Cookie 自动刷新
+    │       ├── CookieRefreshCoordinator.swift  # 刷新协调器（Actor）
+    │       ├── WeReadCacheService.swift        # SwiftData 本地缓存
+    │       └── WeReadIncrementalSyncService.swift # 增量同步服务
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Notion/               # Notion 集成（重构后）
     │   │   ├── Configuration/    # 配置管理
@@ -289,6 +292,13 @@ DIContainer.shared.syncTimestampStore
 - `WeReadAuthService`: Cookie 认证服务
 - `WeReadCookieRefreshService`: Cookie 自动刷新
 - `CookieRefreshCoordinator`: 刷新协调器（Actor）
+- `WeReadCacheService`: SwiftData 本地缓存服务
+  - 缓存书籍列表和高亮数据
+  - 支持离线访问和快速启动
+  - 记录增量同步状态
+- `WeReadIncrementalSyncService`: 增量同步服务
+  - 基于 syncKey 的增量同步机制
+  - 减少 API 调用次数
 
 **7. 通用同步调度** (Services/Sync/)
 - `AutoSyncService`: 后台同步调度器（定时触发各数据源同步）
@@ -324,6 +334,11 @@ DIContainer.shared.syncTimestampStore
 - `WeReadNotebook`: 书籍列表响应模型（API DTO）
 - `WeReadBookInfo`: 书籍详细信息模型
 - `WeReadBookmark`: 书签/高亮数据模型
+
+**WeRead 缓存模型**（Models/WeReadCacheModels.swift）：
+- `CachedWeReadBook`: SwiftData 缓存的书籍
+- `CachedWeReadHighlight`: SwiftData 缓存的高亮
+- `WeReadSyncState`: 同步状态（syncKey、lastSyncAt）
 
 ## 开发模式
 
@@ -473,7 +488,13 @@ swift package update
 ### WeRead 集成
 - **Cookie 自动刷新机制**：`CookieRefreshCoordinator` (Actor) 和 `WeReadCookieRefreshService`
 - **透明认证流程**：简化登录UI，移除手动cookie输入
-- **数据流简化**：移除SwiftData，采用 API → DTO → UI 模型直接流程
+- **本地缓存**：使用 SwiftData 缓存书籍和高亮数据
+  - `WeReadCacheService`：本地持久化服务
+  - `CachedWeReadBook`/`CachedWeReadHighlight`：SwiftData 模型
+  - 支持快速启动和离线访问
+- **增量同步**：`WeReadIncrementalSyncService` 基于 syncKey 的增量同步
+- **自动同步**：`WeReadAutoSyncProvider` 支持后台定时同步
+- **登录导航修复**：Cookie 过期时自动导航到 WeRead 设置并打开登录 Sheet
 
 ### IAP 系统
 - **30天试用期**：试用期管理和到期检查
