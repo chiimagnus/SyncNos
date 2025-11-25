@@ -15,25 +15,25 @@
 - WeRead
 - Notion
 
-### 📚 Apple Books Sync
+### Apple Books Sync
 - **Complete Data Extraction**: Book title, author, highlights, notes, color labels
 - **Timestamp Support**: Precise sync of creation and modification times
 - **Smart Pagination**: Paginated processing of large amounts of data for performance optimization
 - **Database Monitoring**: Automatic detection of the latest Apple Books database files
 
-### 🔗 GoodLinks Sync
+### GoodLinks Sync
 - **Article Content Sync**: Title, link, full content, tags
 - **Highlight Notes**: Support for all GoodLinks highlighting features
 - **Tag Parsing**: Complete tag system support
 - **Batch Processing**: Efficient handling of large amounts of article data
 
-### 🔄 Smart Sync Strategies
+### Smart Sync Strategies
 - **Single Database Mode**: All content managed in one Notion database
 - **Multi-Database Mode**: Separate databases for each book/article for better organization
 - **Idempotent Sync**: UUID-based to ensure no duplicate syncing
 - **Incremental Sync**: Timestamp-based intelligent incremental updates
 
-### 🎯 Advanced Features
+### Advanced Features
 - **Auto Sync**: Configurable background scheduled sync
 - **Real-time Status**: Real-time display of sync progress
 - **Error Retry**: Intelligent error retry mechanism
