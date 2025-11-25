@@ -259,7 +259,7 @@ struct OnboardingTrialView: View {
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
             
             // Privacy Policy
-            Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+            Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
             
             // Message display（购买成功后不显示，因为底部已经有成功提示）
