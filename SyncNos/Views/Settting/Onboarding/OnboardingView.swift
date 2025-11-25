@@ -33,51 +33,54 @@ struct OnboardingWelcomeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     
     var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            // Logo Cluster
+        ZStack {
+            // Logo Cluster - 整个视图的正中央（水平+垂直居中）
             ZStack {
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 120, height: 120)
+                    .frame(width: 140, height: 140)
                 
                 // Satellite Icons
                 satelliteIcon("book.fill", color: .orange, angle: -90) // Apple Books
                 satelliteIcon("bookmark.fill", color: .red, angle: 30) // GoodLinks
                 satelliteIcon("text.book.closed.fill", color: .blue, angle: 150) // WeRead
             }
-            // .frame(height: 150)
             
-            // Text
-            VStack(spacing: 16) {
-                Text("All your highlights, unified.")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(Color("OnboardingTextColor"))
-                    .multilineTextAlignment(.center)
+            // 底部区域 - 文字 + 箭头按钮
+            VStack {
+                Spacer()
                 
-                Text("Sync Apple Books, GoodLinks, and WeRead highlights\ndirectly to your Notion database.")
-                    .font(.title3)
-                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                    .multilineTextAlignment(.center)
+                HStack(alignment: .center, spacing: 20) {
+                    // 文字部分
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All your highlights, unified.")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color("OnboardingTextColor"))
+                        
+                        Text("Sync Apple Books, GoodLinks, and WeRead highlights directly to your Notion database.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                            .lineLimit(2)
+                    }
+                    
+                    Spacer()
+                    
+                    // 右箭头按钮
+                    Button(action: { viewModel.nextStep() }) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 50, height: 50)
+                            .background(Color("OnboardingButtonColor"))
+                            .clipShape(Circle())
+                            .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 40)
+                .padding(.bottom, 40)
             }
-            
-            Spacer()
-            
-            // Button
-            Button(action: { viewModel.nextStep() }) {
-                Text("Start Setup")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color("OnboardingButtonColor"))
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 60)
-            .padding(.bottom, 40)
         }
     }
     
@@ -89,7 +92,7 @@ struct OnboardingWelcomeView: View {
             .background(color)
             .clipShape(Circle())
             .shadow(radius: 4)
-            .offset(x: 90 * cos(angle * .pi / 180), y: 90 * sin(angle * .pi / 180))
+            .offset(x: 100 * cos(angle * .pi / 180), y: 100 * sin(angle * .pi / 180))
     }
 }
 
