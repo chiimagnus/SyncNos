@@ -138,7 +138,7 @@ extension TrialViewModel {
             default: return "clock"
             }
         case .trialExpired:
-            return "star.circle.fill"
+            return "face.dashed.fill"  // 虚线脸，表示试用期结束
         case .subscriptionExpired:
             return "exclamationmark.circle.fill"
         }
@@ -157,7 +157,7 @@ extension TrialViewModel {
             default: return "secondary"
             }
         case .trialExpired:
-            return "yellow"
+            return "gray"  // 悲伤的灰色
         case .subscriptionExpired:
             return "red"
         }
