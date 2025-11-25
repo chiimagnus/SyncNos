@@ -36,7 +36,9 @@ struct OnboardingTrialView: View {
     }
     
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            Spacer()
+            
             // 中央区域 - 头部图标 + 产品列表
             VStack(spacing: 16) {
                 // 非 Onboarding 模式显示头部图标
@@ -53,49 +55,47 @@ struct OnboardingTrialView: View {
                 productsSection
             }
             
+            Spacer()  // 弹性空间
+            
             // 底部区域
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 12) {
-                    HStack(alignment: .center, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(viewModel.headerTitle(for: presentationMode))
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(Color("OnboardingTextColor"))
-                            
-                            Text(viewModel.headerMessage(for: presentationMode))
-                                .font(.subheadline)
-                                .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                                .lineLimit(2)
-                        }
+            VStack(spacing: 12) {
+                HStack(alignment: .center, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(viewModel.headerTitle(for: presentationMode))
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color("OnboardingTextColor"))
                         
-                        Spacer()
-                        
-                        // 主按钮
-                        primaryActionButton
+                        Text(viewModel.headerMessage(for: presentationMode))
+                            .font(.subheadline)
+                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                            .lineLimit(2)
                     }
-                    .padding(.horizontal, 40)
                     
-                    // 底部链接
-                    HStack(spacing: 16) {
-                        // Restore purchases
-                        Button("Restore Purchases") {
-                            viewModel.restorePurchases()
-                        }
-                        .buttonStyle(.link)
-                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-                        
-                        Text("•")
-                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
-                        
-                        // Privacy Policy
-                        Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
-                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-                    }
-                    .font(.caption)
-                    .padding(.bottom, 40)
+                    Spacer()
+                    
+                    // 主按钮
+                    primaryActionButton
                 }
+                .padding(.horizontal, 40)
+                
+                // 底部链接
+                HStack(spacing: 16) {
+                    // Restore purchases
+                    Button("Restore Purchases") {
+                        viewModel.restorePurchases()
+                    }
+                    .buttonStyle(.link)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+                    
+                    Text("•")
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+                    
+                    // Privacy Policy
+                    Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+                }
+                .font(.caption)
+                .padding(.bottom, 40)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

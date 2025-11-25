@@ -6,7 +6,9 @@ struct OnboardingNotionView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            Spacer()
+            
             // 中央区域 - Notion 图标 + 标题
             HStack(spacing: 16) {
                 Image(systemName: "n.square") // Notion
@@ -19,17 +21,15 @@ struct OnboardingNotionView: View {
                     .multilineTextAlignment(.leading)
             }
             
+            Spacer()  // 弹性空间
+            
             // 底部区域
-            VStack {
-                Spacer()
-                
-                if viewModel.isNotionConnected {
-                    // 已连接状态
-                    connectedStateView
-                } else {
-                    // 未连接状态
-                    disconnectedStateView
-                }
+            if viewModel.isNotionConnected {
+                // 已连接状态
+                connectedStateView
+            } else {
+                // 未连接状态
+                disconnectedStateView
             }
         }
     }
