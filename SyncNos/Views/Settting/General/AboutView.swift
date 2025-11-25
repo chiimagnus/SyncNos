@@ -35,7 +35,7 @@ struct AboutView: View {
             }
             .padding(.top, 8)
 
-            Text("Made with SwiftUI ⋅ macOS 13+")
+            Text("Made with SwiftUI ⋅ macOS 14+")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
@@ -100,7 +100,7 @@ private func openPrivacyPolicy() {
     // 打开仓库内的隐私政策文件（在 Finder/默认编辑器中）
     if let url = Bundle.main.url(forResource: "PRIVACY_POLICY", withExtension: "md", subdirectory: "Resource") {
         NSWorkspace.shared.open(url)
-    } else if let web = URL(string: "https://github.com/chiimagnus/SyncNos/blob/main/Resource/PRIVACY_POLICY.md") {
+    } else if let web = URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse") {
         NSWorkspace.shared.open(web)
     }
 }
