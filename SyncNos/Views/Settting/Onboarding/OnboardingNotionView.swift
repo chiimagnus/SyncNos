@@ -8,14 +8,15 @@ struct OnboardingNotionView: View {
     var body: some View {
         ZStack {
             // 中央区域 - Notion 图标 + 标题
-            VStack(spacing: 16) {
+            HStack(spacing: 16) {
                 Image(systemName: "n.square") // Notion
-                    .font(.system(size: 80))
+                    .font(.system(size: 120))
                     .foregroundStyle(Color("OnboardingTextColor"))
-                
-                Text("Connect Your Notion")
+            
+                Text("Notion\nOAuth")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Color("OnboardingTextColor"))
+                    .multilineTextAlignment(.leading)
             }
             
             // 底部区域
@@ -67,8 +68,12 @@ struct OnboardingNotionView: View {
         VStack(spacing: 16) {
             HStack(alignment: .center, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("Connect Your Notion")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(Color("OnboardingTextColor"))
+                    
                     Text("We'll create secure databases in your Notion workspace.")
-                        .font(.headline)
+                        .font(.subheadline)
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                         .lineLimit(2)
                     
@@ -119,4 +124,3 @@ struct OnboardingNotionView: View {
         .frame(width: 600, height: 500)
         .background(Color("BackgroundColor"))
 }
-
