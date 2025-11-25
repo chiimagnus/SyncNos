@@ -524,12 +524,8 @@ struct MainListView: View {
             return
         }
         
-        // Priority 5: 如果是首次使用且在试用期内，显示欢迎视图
-        if !iapService.hasShownWelcome {
-            logger.debug("First time user, showing welcome view")
-            iapPresentationMode = .welcome
-            return
-        }
+        // Note: .welcome 模式已移至 Onboarding 流程中的第四步 (OnboardingTrialView)
+        // 用户完成 Onboarding 后，hasShownWelcome 已被标记为 true
         
         // 其他情况不显示付费墙
         logger.debug("No paywall needed, hiding")
