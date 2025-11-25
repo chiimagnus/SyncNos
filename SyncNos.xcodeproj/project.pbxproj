@@ -26,7 +26,6 @@
 			membershipExceptions = (
 				ChangeLog.cn.md,
 				ChangeLog.md,
-				IAP_TECHNICAL_DOCUMENTATION.md,
 				image.png,
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
