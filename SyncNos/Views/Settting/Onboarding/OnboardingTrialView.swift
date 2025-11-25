@@ -103,8 +103,8 @@ struct OnboardingTrialView: View {
         .onAppear {
             viewModel.onAppear()
         }
-        .onChange(of: viewModel.isProUnlocked) { _, newValue in
-            if newValue && viewModel.hasPurchased {
+        .onChange(of: viewModel.hasPurchased) { _, newValue in
+            if newValue {
                 handlePurchaseSuccess()
             }
         }
@@ -133,18 +133,14 @@ struct OnboardingTrialView: View {
     // MARK: - Trial Badge
     
     private var trialBadge: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 12) {
             Image(systemName: "gift.fill")
+                .font(.system(size: 60))
                 .foregroundStyle(.green)
             Text("30-day free trial included")
                 .font(.headline)
                 .foregroundStyle(Color("OnboardingTextColor"))
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.green.opacity(0.1))
-        )
     }
     
     // MARK: - Products Section
@@ -166,8 +162,8 @@ struct OnboardingTrialView: View {
             .padding(.horizontal, 60)
         }
         
-        // Message display
-        if let msg = viewModel.message, !msg.isEmpty {
+        // Message display（购买成功后不显示，因为底部已经有成功提示）
+        if !viewModel.hasPurchased, let msg = viewModel.message, !msg.isEmpty {
             Text(msg)
                 .font(.caption)
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
@@ -223,42 +219,59 @@ struct OnboardingTrialView: View {
     private var primaryActionButton: some View {
         switch presentationMode {
         case .onboarding:
+            // Onboarding 模式：始终显示箭头按钮
             OnboardingNextButton {
-                startTrial()
+                handleOnboardingNext()
             }
             
         case .trialReminder:
-            Button(action: {
-                viewModel.markReminderShown()
-                finishFlow()
-            }) {
-                Text("Later")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(width: 80, height: 44)
-                    .background(Color.secondary)
-                    .cornerRadius(22)
+            if viewModel.hasPurchased {
+                // 购买成功后显示箭头按钮
+                OnboardingNextButton {
+                    finishFlow()
+                }
+            } else {
+                Button(action: {
+                    viewModel.markReminderShown()
+                    finishFlow()
+                }) {
+                    Text("Later")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 44)
+                        .background(Color.secondary)
+                        .cornerRadius(22)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             
         case .trialExpired, .subscriptionExpired:
-            // 过期状态下没有跳过按钮，必须购买
-            EmptyView()
+            // 过期状态下：购买成功后显示箭头按钮，否则不显示
+            if viewModel.hasPurchased {
+                OnboardingNextButton {
+                    finishFlow()
+                }
+            } else {
+                EmptyView()
+            }
         }
     }
     
     // MARK: - Actions
     
-    private func startTrial() {
+    private func handleOnboardingNext() {
+        // Onboarding 模式下点击箭头：标记欢迎页已显示，然后完成
         viewModel.markWelcomeShown()
         completeOnboarding()
     }
     
     private func handlePurchaseSuccess() {
-        if presentationMode == .onboarding {
-            viewModel.markWelcomeShown()
+        // 购买成功后，仅在非 Onboarding 模式下自动完成流程
+        // Onboarding 模式下，用户需要手动点击箭头按钮
+        if presentationMode != .onboarding {
+            finishFlow()
         }
-        completeOnboarding()
+        // Onboarding 模式下，不做任何事情，等待用户点击箭头
     }
     
     private func completeOnboarding() {
