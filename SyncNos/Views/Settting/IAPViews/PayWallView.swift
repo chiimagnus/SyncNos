@@ -163,20 +163,37 @@ struct PayWallView: View {
             // Primary action button
             primaryActionButton
             
-            // Restore purchases button
-            Button("Restore Purchases") {
-                viewModel.restore()
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            
             // Message display
             if let msg = viewModel.message, !msg.isEmpty {
                 Text(msg)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            
+            // Legal links
+            legalLinksSection
+            
+            // Restore purchases button
+            Button("Restore Purchases") {
+                viewModel.restore()
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
         }
+    }
+    
+    @ViewBuilder
+    private var legalLinksSection: some View {
+        HStack(spacing: 16) {
+            Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacy")!)
+            
+            Text("·")
+                .foregroundStyle(.tertiary)
+            
+            Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
     
     @ViewBuilder
