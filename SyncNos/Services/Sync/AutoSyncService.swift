@@ -75,10 +75,11 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         } else {
             let apple = AppleBooksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
             let goodLinks = GoodLinksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
+            let weRead = WeReadAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
             self.providers = [
                 .appleBooks: apple,
-                .goodLinks: goodLinks
-                // WeReadAutoSyncProvider 将在后续阶段加入
+                .goodLinks: goodLinks,
+                .weRead: weRead
             ]
         }
     }
@@ -93,9 +94,10 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         guard timerCancellable == nil else { return }
         logger.info("AutoSyncService starting…")
 
-        // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books 与 GoodLinks）
+        // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books、GoodLinks、WeRead）
         notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
             .merge(with: NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")))
+            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("WeReadLoginSucceeded")))
             .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -134,5 +136,9 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
     func triggerGoodLinksNow() {
         providers[.goodLinks]?.triggerManualSyncNow()
+    }
+
+    func triggerWeReadNow() {
+        providers[.weRead]?.triggerManualSyncNow()
     }
 }
