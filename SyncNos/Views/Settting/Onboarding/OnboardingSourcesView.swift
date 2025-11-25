@@ -100,6 +100,7 @@ struct SourceCard: View {
             // Toggle
             Toggle("", isOn: $isOn)
                 .toggleStyle(.switch)
+                .controlSize(.mini)
                 .labelsHidden()
         }
         .frame(width: 120)
