@@ -1,36 +1,70 @@
 import SwiftUI
 import StoreKit
 
-// MARK: - Step 4: Trial / Purchase
+// MARK: - Step 4: Trial / Purchase (Unified)
 
+/// 统一的试用期/付费墙视图
+/// - 在 Onboarding 流程中作为第四步
+/// - 在 MainListView 中作为独立付费墙
 struct OnboardingTrialView: View {
-    @ObservedObject var viewModel: OnboardingViewModel
-    @StateObject private var iapViewModel = IAPViewModel()
-    @State private var loadingPlanID: String? = nil
+    // Onboarding 模式时使用
+    var onboardingViewModel: OnboardingViewModel?
+    
+    // 展示模式
+    let presentationMode: TrialPresentationMode
+    
+    // 完成回调（非 Onboarding 模式时使用）
+    var onFinish: (() -> Void)?
+    
+    @StateObject private var viewModel = TrialViewModel()
+    @Environment(\.dismiss) private var dismiss
+    
+    // MARK: - Convenience Initializers
+    
+    /// Onboarding 模式初始化
+    init(viewModel: OnboardingViewModel) {
+        self.onboardingViewModel = viewModel
+        self.presentationMode = .onboarding
+        self.onFinish = nil
+    }
+    
+    /// 独立付费墙模式初始化
+    init(presentationMode: TrialPresentationMode, onFinish: (() -> Void)? = nil) {
+        self.onboardingViewModel = nil
+        self.presentationMode = presentationMode
+        self.onFinish = onFinish
+    }
     
     var body: some View {
         ZStack {
-            // 中央区域 - 产品列表
+            // 中央区域 - 头部图标 + 产品列表
             VStack(spacing: 16) {
-                // Trial badge
-                trialBadge
+                // 非 Onboarding 模式显示头部图标
+                if presentationMode != .onboarding {
+                    headerIcon
+                }
+                
+                // Trial badge（仅 Onboarding 模式显示）
+                if presentationMode == .onboarding {
+                    trialBadge
+                }
                 
                 // Products
                 productsSection
             }
             
-            // 底部区域 - 与前三页保持一致
+            // 底部区域
             VStack {
                 Spacer()
                 
                 VStack(spacing: 12) {
                     HStack(alignment: .center, spacing: 20) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Start Your Free Trial")
+                            Text(viewModel.headerTitle(for: presentationMode))
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Color("OnboardingTextColor"))
                             
-                            Text("30 days free, then choose a plan to continue syncing.")
+                            Text(viewModel.headerMessage(for: presentationMode))
                                 .font(.subheadline)
                                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                                 .lineLimit(2)
@@ -38,10 +72,8 @@ struct OnboardingTrialView: View {
                         
                         Spacer()
                         
-                        // 开始试用按钮
-                        OnboardingNextButton {
-                            startTrial()
-                        }
+                        // 主按钮
+                        primaryActionButton
                     }
                     .padding(.horizontal, 40)
                     
@@ -49,7 +81,7 @@ struct OnboardingTrialView: View {
                     HStack(spacing: 16) {
                         // Restore purchases
                         Button("Restore Purchases") {
-                            iapViewModel.restore()
+                            viewModel.restorePurchases()
                         }
                         .buttonStyle(.link)
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
@@ -66,14 +98,35 @@ struct OnboardingTrialView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color("BackgroundColor"))
         .onAppear {
-            iapViewModel.onAppear()
+            viewModel.onAppear()
         }
-        .onChange(of: iapViewModel.isProUnlocked) { _, newValue in
-            if newValue && iapViewModel.hasPurchased {
-                // 购买成功，完成引导
-                completeOnboarding()
+        .onChange(of: viewModel.isProUnlocked) { _, newValue in
+            if newValue && viewModel.hasPurchased {
+                handlePurchaseSuccess()
             }
+        }
+    }
+    
+    // MARK: - Header Icon (非 Onboarding 模式)
+    
+    @ViewBuilder
+    private var headerIcon: some View {
+        Image(systemName: viewModel.headerIconName(for: presentationMode))
+            .font(.system(size: 60))
+            .foregroundStyle(headerIconColor)
+    }
+    
+    private var headerIconColor: Color {
+        switch viewModel.headerIconColorName(for: presentationMode) {
+        case "green": return .green
+        case "blue": return .blue
+        case "orange": return .orange
+        case "red": return .red
+        case "yellow": return .yellow
+        default: return .secondary
         }
     }
     
@@ -98,15 +151,15 @@ struct OnboardingTrialView: View {
     
     @ViewBuilder
     private var productsSection: some View {
-        if iapViewModel.isLoading {
+        if viewModel.isLoading {
             ProgressView()
                 .padding()
-        } else if iapViewModel.products.isEmpty {
+        } else if viewModel.products.isEmpty {
             Text("Loading products...")
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
         } else {
             VStack(spacing: 12) {
-                ForEach(iapViewModel.products, id: \.id) { product in
+                ForEach(viewModel.products, id: \.id) { product in
                     productCard(for: product)
                 }
             }
@@ -114,7 +167,7 @@ struct OnboardingTrialView: View {
         }
         
         // Message display
-        if let msg = iapViewModel.message, !msg.isEmpty {
+        if let msg = viewModel.message, !msg.isEmpty {
             Text(msg)
                 .font(.caption)
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
@@ -123,15 +176,10 @@ struct OnboardingTrialView: View {
     
     @ViewBuilder
     private func productCard(for product: Product) -> some View {
-        let isLoading = loadingPlanID == product.id
+        let isLoading = viewModel.loadingProductID == product.id
         
         Button(action: {
-            loadingPlanID = product.id
-            Task {
-                iapViewModel.buy(product: product)
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                loadingPlanID = nil
-            }
+            viewModel.buyProduct(product)
         }) {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -166,26 +214,98 @@ struct OnboardingTrialView: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(iapViewModel.hasPurchased || isLoading)
+        .disabled(viewModel.hasPurchased || isLoading)
+    }
+    
+    // MARK: - Primary Action Button
+    
+    @ViewBuilder
+    private var primaryActionButton: some View {
+        switch presentationMode {
+        case .onboarding:
+            OnboardingNextButton {
+                startTrial()
+            }
+            
+        case .trialReminder:
+            Button(action: {
+                viewModel.markReminderShown()
+                finishFlow()
+            }) {
+                Text("Later")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(width: 80, height: 44)
+                    .background(Color.secondary)
+                    .cornerRadius(22)
+            }
+            .buttonStyle(.plain)
+            
+        case .trialExpired, .subscriptionExpired:
+            // 过期状态下没有跳过按钮，必须购买
+            EmptyView()
+        }
     }
     
     // MARK: - Actions
     
     private func startTrial() {
-        // 标记欢迎页已显示（试用期开始）
-        DIContainer.shared.iapService.markWelcomeShown()
-        // 完成引导流程
+        viewModel.markWelcomeShown()
+        completeOnboarding()
+    }
+    
+    private func handlePurchaseSuccess() {
+        if presentationMode == .onboarding {
+            viewModel.markWelcomeShown()
+        }
         completeOnboarding()
     }
     
     private func completeOnboarding() {
-        viewModel.completeOnboarding()
+        if let vm = onboardingViewModel {
+            vm.completeOnboarding()
+        } else {
+            finishFlow()
+        }
+    }
+    
+    private func finishFlow() {
+        if let onFinish = onFinish {
+            onFinish()
+        } else {
+            dismiss()
+        }
     }
 }
 
-#Preview("Trial") {
+// MARK: - Previews
+
+#Preview("Onboarding Trial") {
     OnboardingTrialView(viewModel: OnboardingViewModel())
         .frame(width: 600, height: 500)
-        .background(Color("BackgroundColor"))
 }
 
+#Preview("Trial Reminder - 7 Days") {
+    OnboardingTrialView(presentationMode: .trialReminder(daysRemaining: 7))
+        .frame(width: 600, height: 500)
+}
+
+#Preview("Trial Reminder - 3 Days") {
+    OnboardingTrialView(presentationMode: .trialReminder(daysRemaining: 3))
+        .frame(width: 600, height: 500)
+}
+
+#Preview("Trial Reminder - 1 Day") {
+    OnboardingTrialView(presentationMode: .trialReminder(daysRemaining: 1))
+        .frame(width: 600, height: 500)
+}
+
+#Preview("Trial Expired") {
+    OnboardingTrialView(presentationMode: .trialExpired)
+        .frame(width: 600, height: 500)
+}
+
+#Preview("Subscription Expired") {
+    OnboardingTrialView(presentationMode: .subscriptionExpired)
+        .frame(width: 600, height: 500)
+}
