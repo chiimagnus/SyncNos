@@ -324,6 +324,8 @@ protocol WeReadSyncServiceProtocol: AnyObject {
 }
 
 /// WeRead 本地缓存服务协议
+/// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
+@MainActor
 protocol WeReadCacheServiceProtocol: AnyObject {
     // MARK: - 书籍操作
     
