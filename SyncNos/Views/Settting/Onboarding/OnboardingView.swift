@@ -38,22 +38,17 @@ struct OnboardingWelcomeView: View {
             
             // Logo Cluster
             ZStack {
-                Circle()
-                    .fill(Color("OnboardingLogoCircleColor"))
-                    .frame(width: 120, height: 120)
-                
-                Image(nsImage: NSImage(named: "AppIcon") ?? NSImage()) // Fallback
+                Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 80, height: 80)
-                    .shadow(radius: 10)
+                    .frame(width: 120, height: 120)
                 
                 // Satellite Icons
                 satelliteIcon("book.fill", color: .orange, angle: -90) // Apple Books
                 satelliteIcon("bookmark.fill", color: .red, angle: 30) // GoodLinks
                 satelliteIcon("text.book.closed.fill", color: .blue, angle: 150) // WeRead
             }
-            .frame(height: 150)
+            // .frame(height: 150)
             
             // Text
             VStack(spacing: 16) {
