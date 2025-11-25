@@ -11,9 +11,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     // MARK: - 初始化
     
-    init(
+    /// 非隔离初始化器，允许在任何上下文中创建实例
+    nonisolated init(
         modelContainer: ModelContainer,
-        logger: LoggerServiceProtocol = DIContainer.shared.loggerService
+        logger: LoggerServiceProtocol
     ) {
         self.modelContainer = modelContainer
         self.logger = logger
@@ -35,7 +36,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     @MainActor
     func getBook(bookId: String) async throws -> CachedWeReadBook? {
         let context = modelContainer.mainContext
-        let predicate = #Predicate<CachedWeReadBook> { $0.bookId == bookId }
+        let targetBookId = bookId
+        let predicate = #Predicate<CachedWeReadBook> { book in
+            book.bookId == targetBookId
+        }
         var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
         descriptor.fetchLimit = 1
         let results = try context.fetch(descriptor)
@@ -47,8 +51,11 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
         let context = modelContainer.mainContext
         
         for notebook in notebooks {
-            // 检查是否已存在
-            let predicate = #Predicate<CachedWeReadBook> { $0.bookId == notebook.bookId }
+            // 检查是否已存在 - 先获取 bookId 到本地变量
+            let targetBookId = notebook.bookId
+            let predicate = #Predicate<CachedWeReadBook> { book in
+                book.bookId == targetBookId
+            }
             var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
             descriptor.fetchLimit = 1
             let existing = try context.fetch(descriptor).first
@@ -78,7 +85,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
         let context = modelContainer.mainContext
         
         for bookId in ids {
-            let predicate = #Predicate<CachedWeReadBook> { $0.bookId == bookId }
+            let targetBookId = bookId
+            let predicate = #Predicate<CachedWeReadBook> { book in
+                book.bookId == targetBookId
+            }
             var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
             descriptor.fetchLimit = 1
             
@@ -94,7 +104,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     @MainActor
     func updateBookHighlightCount(bookId: String, count: Int) async throws {
         let context = modelContainer.mainContext
-        let predicate = #Predicate<CachedWeReadBook> { $0.bookId == bookId }
+        let targetBookId = bookId
+        let predicate = #Predicate<CachedWeReadBook> { book in
+            book.bookId == targetBookId
+        }
         var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
         descriptor.fetchLimit = 1
         
@@ -109,7 +122,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     @MainActor
     func getHighlights(bookId: String) async throws -> [CachedWeReadHighlight] {
         let context = modelContainer.mainContext
-        let predicate = #Predicate<CachedWeReadHighlight> { $0.bookId == bookId }
+        let targetBookId = bookId
+        let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+            highlight.bookId == targetBookId
+        }
         let descriptor = FetchDescriptor<CachedWeReadHighlight>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
@@ -124,14 +140,20 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
         let context = modelContainer.mainContext
         
         // 获取关联的书籍
-        let bookPredicate = #Predicate<CachedWeReadBook> { $0.bookId == bookId }
+        let targetBookId = bookId
+        let bookPredicate = #Predicate<CachedWeReadBook> { book in
+            book.bookId == targetBookId
+        }
         var bookDescriptor = FetchDescriptor<CachedWeReadBook>(predicate: bookPredicate)
         bookDescriptor.fetchLimit = 1
         let book = try context.fetch(bookDescriptor).first
         
         for bookmark in bookmarks {
             // 检查是否已存在
-            let predicate = #Predicate<CachedWeReadHighlight> { $0.highlightId == bookmark.highlightId }
+            let targetHighlightId = bookmark.highlightId
+            let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+                highlight.highlightId == targetHighlightId
+            }
             var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
             descriptor.fetchLimit = 1
             let existing = try context.fetch(descriptor).first
@@ -161,7 +183,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
         let context = modelContainer.mainContext
         
         for highlightId in ids {
-            let predicate = #Predicate<CachedWeReadHighlight> { $0.highlightId == highlightId }
+            let targetHighlightId = highlightId
+            let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+                highlight.highlightId == targetHighlightId
+            }
             var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
             descriptor.fetchLimit = 1
             
@@ -179,7 +204,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     @MainActor
     func getSyncState() async throws -> WeReadSyncState {
         let context = modelContainer.mainContext
-        let predicate = #Predicate<WeReadSyncState> { $0.id == "global" }
+        let targetId = "global"
+        let predicate = #Predicate<WeReadSyncState> { state in
+            state.id == targetId
+        }
         var descriptor = FetchDescriptor<WeReadSyncState>(predicate: predicate)
         descriptor.fetchLimit = 1
         
@@ -218,7 +246,10 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     @MainActor
     func updateBookSyncKey(bookId: String, syncKey: Int) async throws {
         let context = modelContainer.mainContext
-        let predicate = #Predicate<CachedWeReadBook> { $0.bookId == bookId }
+        let targetBookId = bookId
+        let predicate = #Predicate<CachedWeReadBook> { book in
+            book.bookId == targetBookId
+        }
         var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
         descriptor.fetchLimit = 1
         
@@ -289,4 +320,3 @@ struct WeReadCacheStats {
     let highlightCount: Int
     let lastSyncAt: Date?
 }
-
