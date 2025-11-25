@@ -165,6 +165,11 @@ extension TrialViewModel {
     
     /// 获取标题
     func headerTitle(for mode: TrialPresentationMode) -> String {
+        // 如果已购买，显示购买成功标题
+        if hasPurchased {
+            return "Purchase Successful!"
+        }
+        
         switch mode {
         case .onboarding:
             return "Start Your Free Trial"
@@ -184,6 +189,11 @@ extension TrialViewModel {
     
     /// 获取描述信息
     func headerMessage(for mode: TrialPresentationMode) -> String {
+        // 如果已购买，显示购买成功消息
+        if hasPurchased {
+            return "Thank you for your support! Click the arrow to continue."
+        }
+        
         switch mode {
         case .onboarding:
             return "30 days free, then choose a plan to continue syncing."
