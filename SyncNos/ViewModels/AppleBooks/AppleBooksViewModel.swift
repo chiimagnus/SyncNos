@@ -44,7 +44,7 @@ class AppleBooksViewModel: ObservableObject {
     @Published var showNotionConfigAlert: Bool = false
 
     private let databaseService: DatabaseServiceProtocol
-    private let appleBooksSyncService: AppleBooksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let bookmarkStore: BookmarkStoreProtocol
     private let logger = DIContainer.shared.loggerService
     private let syncTimestampStore: SyncTimestampStoreProtocol
@@ -64,12 +64,12 @@ class AppleBooksViewModel: ObservableObject {
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore,
          syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
-         appleBooksSyncService: AppleBooksSyncServiceProtocol = DIContainer.shared.appleBooksSyncService,
+         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
          notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
         self.databaseService = databaseService
         self.bookmarkStore = bookmarkStore
         self.syncTimestampStore = syncTimestampStore
-        self.appleBooksSyncService = appleBooksSyncService
+        self.syncEngine = syncEngine
         self.notionConfig = notionConfig
 
         // Load initial values from UserDefaults
@@ -448,7 +448,8 @@ extension AppleBooksViewModel {
         let ids = Array(bookIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
-        let syncService = self.appleBooksSyncService
+        let syncEngine = self.syncEngine
+        let notionConfig = self.notionConfig
 
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -460,7 +461,8 @@ extension AppleBooksViewModel {
                             // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
                             NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])                        
                             do {
-                                try await syncService.syncSmart(book: book, dbPath: dbPath) { progress in
+                                let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
+                                try await syncEngine.syncSmart(source: adapter) { progress in
                                     // 广播该书的同步进度，供详情页监听并显示
                                     NotificationCenter.default.post(name: ABVMNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                 }

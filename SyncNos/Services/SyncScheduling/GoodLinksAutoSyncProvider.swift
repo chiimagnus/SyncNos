@@ -17,7 +17,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         goodLinksDatabaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        goodLinksSyncService: GoodLinksSyncServiceProtocol = GoodLinksSyncService(),
+        goodLinksSyncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.intervalSeconds = intervalSeconds

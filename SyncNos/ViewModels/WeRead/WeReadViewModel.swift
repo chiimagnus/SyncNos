@@ -38,7 +38,7 @@ final class WeReadViewModel: ObservableObject {
 
     // 依赖
     private let apiService: WeReadAPIServiceProtocol
-    private let syncService: WeReadSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let notionConfig: NotionConfigStoreProtocol
@@ -53,14 +53,14 @@ final class WeReadViewModel: ObservableObject {
 
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        syncService: WeReadSyncServiceProtocol = WeReadSyncService(),
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         cacheService: WeReadCacheServiceProtocol? = nil
     ) {
         self.apiService = apiService
-        self.syncService = syncService
+        self.syncEngine = syncEngine
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
@@ -362,7 +362,8 @@ final class WeReadViewModel: ObservableObject {
         let ids = Array(bookIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
-        let syncService = self.syncService
+        let syncEngine = self.syncEngine
+        let apiService = self.apiService
 
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -378,7 +379,8 @@ final class WeReadViewModel: ObservableObject {
                                 userInfo: ["bookId": id, "status": "started"]
                             )
                             do {
-                                try await syncService.syncHighlights(for: book) { progressText in
+                                let adapter = WeReadNotionAdapter.create(book: book, apiService: apiService)
+                                try await syncEngine.syncSmart(source: adapter) { progressText in
                                     NotificationCenter.default.post(
                                         name: Notification.Name("SyncProgressUpdated"),
                                         object: self,
