@@ -121,8 +121,8 @@ struct WeReadListView: View {
             NSLocalizedString("Session Expired", comment: ""),
             isPresented: $viewModel.showRefreshFailedAlert
         ) {
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {
-                // 关闭弹窗
+            Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) {
+                // 关闭弹窗，稍后提醒
             }
             Button(NSLocalizedString("Go to Login", comment: "")) {
                 viewModel.navigateToWeReadLogin()
