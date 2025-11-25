@@ -241,15 +241,38 @@ mkdir -p SyncNos/ViewModels/Xxx
 
 > **参考**: `ViewModels/WeRead/` 目录下的文件
 
+### 4.2 ViewModel 必须实现的方法
+
+| 方法 | 说明 | 参考 |
+|------|------|------|
+| `loadBooks()` | 加载书籍列表 | `WeReadViewModel.loadBooks()` |
+| `syncBook(_:)` | 同步单本书 | `WeReadViewModel.syncBook(_:)` |
+| `batchSync(bookIds:concurrency:)` | 批量同步（用于多选同步） | `WeReadViewModel.batchSync(...)` |
+| `setCacheService(_:)` | 注入缓存服务 | `WeReadViewModel.setCacheService(_:)` |
+| `navigateToXxxLogin()` | 导航到登录页 | `WeReadViewModel.navigateToWeReadLogin()` |
+| `getLastSyncTime(for:)` | 获取上次同步时间 | `WeReadViewModel.getLastSyncTime(for:)` |
+
+### 4.3 ViewModel 必须暴露的属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `books` / `displayBooks` | `[XxxBookListItem]` | 书籍列表（用于 UI 展示） |
+| `isLoading` | `Bool` | 加载状态 |
+| `errorMessage` | `String?` | 错误信息 |
+| `syncingBookIds` | `Set<String>` | 正在同步的书籍 ID |
+| `syncProgress` | `[String: String]` | 同步进度 |
+| `showRefreshFailedAlert` | `Bool` | 显示刷新失败弹窗 |
+| `refreshFailureReason` | `String` | 刷新失败原因 |
+
 ### Checklist
 
 - [ ] 创建 `ViewModels/Xxx/` 目录
 - [ ] 创建 `XxxViewModel.swift`
 - [ ] 创建 `XxxSettingsViewModel.swift`
 - [ ] （可选）创建 `XxxDetailViewModel.swift`
+- [ ] 实现所有必需方法（见 4.2）
+- [ ] 暴露所有必需属性（见 4.3）
 - [ ] 实现书籍加载、同步、错误处理逻辑
-- [ ] 实现 `setCacheService()` 方法（如需缓存）
-- [ ] 实现 `navigateToXxxLogin()` 导航方法
 
 ---
 
@@ -270,21 +293,126 @@ mkdir -p SyncNos/Views/Xxx
 | `XxxSettingsView.swift` | 设置视图（在 `Views/Settting/SyncFrom/`） | ✅ |
 | `XxxLoginView.swift` | 登录视图（在 `Views/Settting/SyncFrom/`） | 如需 WebView 登录 |
 
-> **参考**: `Views/WeRead/` 和 `Views/Settting/SyncFrom/WeRead*`
+#### ListView 必需参数
+
+```swift
+struct XxxListView: View {
+    @ObservedObject var viewModel: XxxViewModel
+    @Binding var selectionIds: Set<String>
+    // ...
+}
+```
+
+#### DetailView 必需参数
+
+```swift
+struct XxxDetailView: View {
+    @ObservedObject var listViewModel: XxxViewModel
+    @Binding var selectedBookId: String?
+    // ...
+}
+```
+
+> **参考**: `Views/WeRead/WeReadListView.swift` 和 `WeReadDetailView.swift`
 
 ### 5.2 更新 MainListView
 
 **文件**: `SyncNos/Views/Components/MainListView.swift`
 
-添加：
-1. `@AppStorage("datasource.xxx.enabled")` 开关
-2. `@StateObject private var xxxVM = XxxViewModel()`
-3. 在 `availableSources` 中添加条件
-4. 在视图切换中添加 `case .xxx`
-5. 在 `onAppear` 中注入缓存服务
-6. 添加 `onChange(of: xxxSourceEnabled)` 监听
+需要在多个位置添加代码：
 
-> **参考**: 搜索 `weReadSourceEnabled` 查看添加位置
+#### 5.2.1 添加状态变量（文件顶部）
+
+```swift
+// 1. 数据源启用开关
+@AppStorage("datasource.xxx.enabled") private var xxxSourceEnabled: Bool = false
+
+// 2. 选中项 ID 集合
+@State private var selectedXxxIds: Set<String> = []
+
+// 3. ViewModel
+@StateObject private var xxxVM = XxxViewModel()
+```
+
+> **参考**: 搜索 `weReadSourceEnabled`、`selectedWeReadBookIds`、`weReadVM`
+
+#### 5.2.2 更新 isSourceEnabled 函数
+
+```swift
+private func isSourceEnabled(_ source: ContentSource) -> Bool {
+    switch source {
+    // ... 现有 case ...
+    case .xxx:
+        return xxxSourceEnabled
+    }
+}
+```
+
+#### 5.2.3 更新 masterColumn（列表视图切换）
+
+```swift
+switch contentSource {
+// ... 现有 case ...
+case .xxx:
+    XxxListView(viewModel: xxxVM, selectionIds: $selectedXxxIds)
+}
+```
+
+#### 5.2.4 更新 detailColumn（详情视图切换）
+
+```swift
+else if contentSource == .xxx {
+    if selectedXxxIds.count == 1 {
+        let singleBinding = Binding<String?>(
+            get: { selectedXxxIds.first },
+            set: { new in selectedXxxIds = new.map { Set([$0]) } ?? [] }
+        )
+        XxxDetailView(listViewModel: xxxVM, selectedBookId: singleBinding)
+    } else {
+        SelectionPlaceholderView(
+            title: contentSource.title,
+            count: selectedXxxIds.isEmpty ? nil : selectedXxxIds.count,
+            onSyncSelected: selectedXxxIds.isEmpty ? nil : {
+                let items = selectedXxxIds.compactMap { id -> [String: Any]? in
+                    guard let b = xxxVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+                    return ["id": id, "title": b.title, "subtitle": b.author]
+                }
+                NotificationCenter.default.post(
+                    name: Notification.Name("SyncTasksEnqueued"),
+                    object: nil,
+                    userInfo: ["source": "xxx", "items": items]
+                )
+                xxxVM.batchSync(bookIds: selectedXxxIds, concurrency: NotionSyncConfig.batchConcurrency)
+            }
+        )
+    }
+}
+```
+
+#### 5.2.5 更新选择清除逻辑
+
+在处理选择变化的地方，添加 `selectedXxxIds.removeAll()`
+
+#### 5.2.6 在 onAppear 中注入缓存服务
+
+```swift
+.onAppear {
+    // ...
+    if let cacheService = DIContainer.shared.xxxCacheService {
+        xxxVM.setCacheService(cacheService)
+    }
+}
+```
+
+#### 5.2.7 添加 onChange 监听
+
+```swift
+.onChange(of: xxxSourceEnabled) { _, _ in
+    ensureValidContentSource()
+}
+```
+
+> **参考**: 搜索 `weRead` 查看所有需要添加的位置
 
 ### 5.3 更新 SettingsView
 
@@ -304,7 +432,16 @@ mkdir -p SyncNos/Views/Xxx
 - [ ] （可选）创建 `XxxDetailView.swift`
 - [ ] 创建 `Views/Settting/SyncFrom/XxxSettingsView.swift`
 - [ ] （可选）创建 `XxxLoginView.swift`
-- [ ] 在 `MainListView.swift` 中添加数据源开关和视图
+- [ ] **MainListView.swift** 更新：
+  - [ ] 添加 `@AppStorage` 开关
+  - [ ] 添加 `@State` 选中 ID 集合
+  - [ ] 添加 `@StateObject` ViewModel
+  - [ ] 更新 `isSourceEnabled()` 函数
+  - [ ] 更新 `masterColumn` 视图切换
+  - [ ] 更新 `detailColumn` 视图切换
+  - [ ] 更新选择清除逻辑
+  - [ ] 在 `onAppear` 中注入缓存服务
+  - [ ] 添加 `onChange` 监听
 - [ ] 在 `SettingsView.swift` 中添加设置入口和导航
 
 ---
