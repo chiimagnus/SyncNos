@@ -14,6 +14,8 @@ struct OnboardingView: View {
                     OnboardingNotionView(viewModel: viewModel)
                 case .enableSources:
                     OnboardingSourcesView(viewModel: viewModel)
+                case .trial:
+                    OnboardingTrialView(viewModel: viewModel)
                 }
             }
             .transition(.asymmetric(
