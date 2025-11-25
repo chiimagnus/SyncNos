@@ -19,6 +19,12 @@ struct OnboardingTrialView: View {
     @StateObject private var viewModel = TrialViewModel()
     @Environment(\.dismiss) private var dismiss
     
+    // Gift 图标摇摆动画状态
+    @State private var wiggleAngle: Double = 0
+    
+    // Header 图标放大动画状态
+    @State private var headerIconScale: CGFloat = 1.0
+    
     // MARK: - Convenience Initializers
     
     /// Onboarding 模式初始化
@@ -58,45 +64,25 @@ struct OnboardingTrialView: View {
             Spacer()  // 弹性空间
             
             // 底部区域
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(viewModel.headerTitle(for: presentationMode))
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(Color("OnboardingTextColor"))
-                        
-                        Text(viewModel.headerMessage(for: presentationMode))
-                            .font(.subheadline)
-                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                            .lineLimit(2)
-                    }
+            HStack(alignment: .center, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(viewModel.headerTitle(for: presentationMode))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(Color("OnboardingTextColor"))
                     
-                    Spacer()
-                    
-                    // 主按钮
-                    primaryActionButton
+                    Text(viewModel.headerMessage(for: presentationMode))
+                        .font(.subheadline)
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                        .lineLimit(2)
                 }
-                .padding(.horizontal, 40)
                 
-                // 底部链接
-                HStack(spacing: 16) {
-                    // Restore purchases
-                    Button("Restore Purchases") {
-                        viewModel.restorePurchases()
-                    }
-                    .buttonStyle(.link)
-                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-                    
-                    Text("•")
-                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
-                    
-                    // Privacy Policy
-                    Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
-                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-                }
-                .font(.caption)
-                .padding(.bottom, 40)
+                Spacer()
+                
+                // 主按钮
+                primaryActionButton
             }
+            .padding(.horizontal, 40)
+            .padding(.bottom, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color("BackgroundColor"))
@@ -117,6 +103,45 @@ struct OnboardingTrialView: View {
         Image(systemName: viewModel.headerIconName(for: presentationMode))
             .font(.system(size: 60))
             .foregroundStyle(headerIconColor)
+            .scaleEffect(shouldPulseHeaderIcon ? headerIconScale : 1.0)
+            .onAppear {
+                if shouldPulseHeaderIcon {
+                    startHeaderIconPulse()
+                }
+            }
+    }
+    
+    /// 是否应该给 Header Icon 添加脉冲动画（仅限紧急提醒：3天和1天）
+    private var shouldPulseHeaderIcon: Bool {
+        if case .trialReminder(let days) = presentationMode {
+            return days <= 3
+        }
+        return false
+    }
+    
+    /// 启动 Header Icon 脉冲放大动画
+    private func startHeaderIconPulse() {
+        // 执行一次脉冲动画
+        func performPulse() {
+            withAnimation(.easeOut(duration: 0.2)) {
+                headerIconScale = 1.35
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.easeIn(duration: 0.15)) {
+                    headerIconScale = 1.0
+                }
+            }
+        }
+        
+        // 立即开始第一次动画
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            performPulse()
+        }
+        
+        // 循环放大动画（每 1.5 秒一次）
+        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+            performPulse()
+        }
     }
     
     private var headerIconColor: Color {
@@ -137,9 +162,43 @@ struct OnboardingTrialView: View {
             Image(systemName: "gift.fill")
                 .font(.system(size: 60))
                 .foregroundStyle(.green)
+                .rotationEffect(.degrees(wiggleAngle), anchor: .bottom)
+                .onAppear {
+                    startWiggleAnimation()
+                }
             Text("30-day free trial included")
                 .font(.headline)
                 .foregroundStyle(Color("OnboardingTextColor"))
+        }
+    }
+    
+    /// 启动摇摆动画循环
+    private func startWiggleAnimation() {
+        // 执行一次完整的摇摆序列
+        func performWiggle() {
+            let wiggleDuration = 0.1
+            let wiggleAngleValue = 10.0
+            
+            // 摇摆序列：左 -> 右 -> 左 -> 右 -> 左 -> 中
+            let sequence: [Double] = [-wiggleAngleValue, wiggleAngleValue, -wiggleAngleValue, wiggleAngleValue, -wiggleAngleValue * 0.5, 0]
+            
+            for (index, angle) in sequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + wiggleDuration * Double(index)) {
+                    withAnimation(.easeInOut(duration: wiggleDuration)) {
+                        wiggleAngle = angle
+                    }
+                }
+            }
+        }
+        
+        // 立即开始第一次摇摆
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            performWiggle()
+        }
+        
+        // 循环摇摆（每 3 秒一次）
+        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            performWiggle()
         }
     }
     
@@ -162,12 +221,32 @@ struct OnboardingTrialView: View {
             .padding(.horizontal, 60)
         }
         
-        // Message display（购买成功后不显示，因为底部已经有成功提示）
-        if !viewModel.hasPurchased, let msg = viewModel.message, !msg.isEmpty {
-            Text(msg)
-                .font(.caption)
-                .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+        // 链接和消息行
+        HStack(spacing: 16) {
+            // Restore purchases
+            Button("Restore Purchases") {
+                viewModel.restorePurchases()
+            }
+            .buttonStyle(.link)
+            .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+            
+            Text("•")
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+            
+            // Privacy Policy
+            Link("Privacy Policy", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+            
+            // Message display（购买成功后不显示，因为底部已经有成功提示）
+            if !viewModel.hasPurchased, let msg = viewModel.message, !msg.isEmpty {
+                Text("•")
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+                Text(msg)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+            }
         }
+        .font(.caption)
+        .padding(.top, 16)
     }
     
     @ViewBuilder
