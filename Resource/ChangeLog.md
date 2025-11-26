@@ -6,7 +6,9 @@
 
 - RootView Architecture: Added RootView as root view to manage Onboarding, PayWall, and MainListView transitions
 - PayWall Priority: Moved PayWall check logic from MainListView to RootView, ensuring display before data source initialization
-- Bookmark Restoration Delay: Moved Apple Books bookmark restoration from SyncNosApp.init to MainListView.onAppear to avoid triggering system security dialogs before PayWall
+- Lazy Bookmark Restoration: Bookmark restoration now uses lazy loading, only triggered when user switches to the corresponding data source
+  - Apple Books: AppleBooksListView.onAppear → viewModel.restoreBookmarkAndConfigureRoot()
+  - GoodLinks: GoodLinksListView.onAppear → loadRecentLinks() → resolveDatabasePath()
 
 *Improvements*
 
