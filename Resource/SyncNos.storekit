@@ -44,9 +44,9 @@
     "_disableDialogs" : false,
     "_failTransactionsEnabled" : false,
     "_lastSynchronizedDate" : 785558834.34850001,
-    "_locale" : "zh_Hans",
+    "_locale" : "en_US",
     "_renewalBillingIssuesEnabled" : false,
-    "_storefront" : "CHN",
+    "_storefront" : "USA",
     "_storeKitErrors" : [
 
     ],
