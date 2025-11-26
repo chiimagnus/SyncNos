@@ -210,6 +210,56 @@ class MyViewModel: ObservableObject {
 - 统一错误处理机制
 - 避免在 View 层处理复杂错误逻辑
 
+## 通知与事件管理
+
+### 唯一入口原则
+
+当多个操作触发相同的副作用（如发送通知、更新状态）时，应该**统一到一个入口点**，而不是在每个触发点分别处理。
+
+#### 正确示例
+```swift
+// ✅ 正确：所有切换操作最终都通过 ViewModel 的统一方法
+class DataSourceSwitchViewModel: ObservableObject {
+    func switchTo(index: Int) {
+        activeIndex = index
+        triggerHapticFeedback()
+        notifyDataSourceSwitch(to: source)  // 唯一发送通知的地方
+    }
+    
+    private func notifyDataSourceSwitch(to source: ContentSource) {
+        NotificationCenter.default.post(name: notificationName, object: nil)
+    }
+}
+
+// 触控板滑动 → switchTo(index:)
+// 键盘快捷键 → contentSourceRawValue → MainListView.onChange → switchTo(source:)
+// 点击指示器 → switchTo(index:)
+```
+
+#### 错误示例
+```swift
+// ❌ 错误：在多个地方分别发送通知
+class SwipeContainer {
+    func handleSwipe() {
+        activeIndex += 1
+        NotificationCenter.default.post(...)  // 重复的通知发送
+    }
+}
+
+struct ViewCommands {
+    func switchDataSource() {
+        contentSourceRawValue = source.rawValue
+        NotificationCenter.default.post(...)  // 重复的通知发送
+    }
+}
+```
+
+### 通知使用规范
+- **发送点唯一**: 同一类型的通知只在一个地方发送
+- **接收点明确**: 只有需要响应的组件监听通知
+- **避免通知链**: 不要让通知触发另一个通知
+- **优先使用绑定**: 能用 `@Published`/`@Binding` 解决的，不要用通知
+
 ## 禁止事项
 
 ### 架构层面
@@ -219,6 +269,7 @@ class MyViewModel: ObservableObject {
 - ❌ 多个 View 共享同一个 ViewModel 实例
 - ❌ 在 ViewModel 中直接操作 UI
 - ❌ 在View中直接访问数据库
+- ❌ 在多个地方发送相同类型的通知
 
 ### 代码实现
 - ❌ 手动计算屏幕尺寸和比例
