@@ -331,7 +331,7 @@ final class TrackpadSwipeHandler: ObservableObject {
             Menu {
                 Text("Filter options")
             } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+                Image(systemName: "line.3.horizontal.decrease")
             }
             .menuIndicator(.hidden)
         }
