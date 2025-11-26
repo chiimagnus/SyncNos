@@ -505,7 +505,9 @@ swift package update
 ### RootView 架构
 - **视图层级管理**：`RootView` 作为根视图，管理 Onboarding、PayWall、MainListView 的切换
 - **PayWall 前置**：确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用
-- **书签恢复延迟**：Apple Books 书签恢复从 `SyncNosApp.init` 移至 `MainListView.onAppear`
+- **书签恢复懒加载**：书签恢复只在用户切换到对应数据源时才触发，避免在 PayWall 之前触发系统安全弹窗
+  - Apple Books: `AppleBooksListView.onAppear` → `viewModel.restoreBookmarkAndConfigureRoot()`
+  - GoodLinks: `GoodLinksListView.onAppear` → `loadRecentLinks()` → `resolveDatabasePath()`
 - **视图切换流程**：
   ```
   SyncNosApp
@@ -514,7 +516,8 @@ swift package update
           ├── OnboardingView      (未完成引导时)
           ├── PayWallView         (需要显示付费墙时)
           └── MainListView        (正常使用时)
-              └── onAppear: restoreAppleBooksBookmarkOnce()
+              ├── AppleBooksListView.onAppear → restoreBookmarkAndConfigureRoot()
+              └── GoodLinksListView.onAppear → loadRecentLinks()
   ```
 
 ### UI/UX 改进

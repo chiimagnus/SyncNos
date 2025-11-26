@@ -46,32 +46,10 @@ struct MainListView: View {
 
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
-    
-    /// 标记是否已恢复书签，避免重复执行
-    @State private var hasRestoredBookmark = false
-    
-    // MARK: - Apple Books Bookmark
-    
-    /// 恢复 Apple Books 数据库书签访问权限（只执行一次）
-    /// 从 SyncNosApp.init 移至此处，确保在 PayWall 之后才触发系统安全弹窗
-    private func restoreAppleBooksBookmarkOnce() {
-        guard !hasRestoredBookmark else { return }
-        hasRestoredBookmark = true
-        
-        let logger = DIContainer.shared.loggerService
-        if let url = BookmarkStore.shared.restore() {
-            let started = BookmarkStore.shared.startAccessing(url: url)
-            logger.info("Restored bookmark: \(url.path), startAccess=\(started)")
-        } else {
-            logger.warning("No saved bookmark to restore")
-        }
-    }
 
     var body: some View {
         mainContent
             .onAppear {
-                // 恢复 Apple Books 数据库书签访问权限（只执行一次）
-                restoreAppleBooksBookmarkOnce()
                 // 启动时根据当前启用数据源校正 contentSource
                 ensureValidContentSource()
                 // 注入 WeRead 缓存服务
