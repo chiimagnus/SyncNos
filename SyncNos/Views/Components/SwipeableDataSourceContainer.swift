@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// 可滑动的数据源容器
-/// 包含滑动区域和底部指示器
+/// 包含滑动区域和悬浮底部指示器
 struct SwipeableDataSourceContainer: View {
     @ObservedObject var viewModel: DataSourceSwitchViewModel
     
@@ -21,7 +21,7 @@ struct SwipeableDataSourceContainer: View {
     @State private var previousIndex: Int = 0
     
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             // 滑动区域
             if viewModel.hasEnabledSources {
                 GeometryReader { geometry in
@@ -33,13 +33,16 @@ struct SwipeableDataSourceContainer: View {
                     }
                     .offset(x: -CGFloat(viewModel.activeIndex) * geometry.size.width + dragOffset)
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: viewModel.activeIndex)
-                    .gesture(
-                        DragGesture()
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 20)
                             .onChanged { value in
-                                dragOffset = value.translation.width
+                                // 只处理水平滑动（水平位移大于垂直位移）
+                                if abs(value.translation.width) > abs(value.translation.height) {
+                                    dragOffset = value.translation.width
+                                }
                             }
                             .onEnded { value in
-                                let threshold: CGFloat = geometry.size.width * 0.2
+                                let threshold: CGFloat = geometry.size.width * 0.15
                                 let predictedEndOffset = value.predictedEndTranslation.width
                                 
                                 withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8)) {
@@ -63,9 +66,10 @@ struct SwipeableDataSourceContainer: View {
                 emptyStateView
             }
             
-            // 底部指示器
-            if viewModel.hasEnabledSources {
+            // 悬浮底部指示器
+            if viewModel.hasEnabledSources && viewModel.enabledDataSources.count > 1 {
                 DataSourceIndicatorBar(viewModel: viewModel)
+                    .padding(.bottom, 8)
             }
         }
     }
