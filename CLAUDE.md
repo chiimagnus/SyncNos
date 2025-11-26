@@ -40,6 +40,7 @@ SyncNos/
 ├── SyncNosApp.swift              # 应用入口
 ├── AppDelegate.swift             # 应用生命周期管理
 ├── Views/                        # SwiftUI 视图（UI 层）
+│   ├── RootView.swift            # 根视图：管理 Onboarding/PayWall/MainListView 切换
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── AppTheme.swift        # 应用主题和样式
 │   │   ├── ArticleContentCardView.swift
@@ -501,7 +502,23 @@ swift package update
 - **统一付费墙**：整合为 `PayWallView`
 - **订阅过期检测**：完整的订阅过期监听和状态同步机制
 
+### RootView 架构
+- **视图层级管理**：`RootView` 作为根视图，管理 Onboarding、PayWall、MainListView 的切换
+- **PayWall 前置**：确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用
+- **书签恢复延迟**：Apple Books 书签恢复从 `SyncNosApp.init` 移至 `MainListView.onAppear`
+- **视图切换流程**：
+  ```
+  SyncNosApp
+  └── Window("main")
+      └── RootView
+          ├── OnboardingView      (未完成引导时)
+          ├── PayWallView         (需要显示付费墙时)
+          └── MainListView        (正常使用时)
+              └── onAppear: restoreAppleBooksBookmarkOnce()
+  ```
+
 ### UI/UX 改进
 - **日志颜色编码**：为不同日志级别添加颜色区分
 - **动态语言切换**：无需重启应用，实时更新界面语言
 - **时间戳显示优化**：统一跨视图的最后同步时间显示
+- **PayWallView UI**：采用 Onboarding 风格的底部布局，添加礼物图标摇摆动画和紧急提醒脉冲动画

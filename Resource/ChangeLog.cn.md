@@ -1,5 +1,19 @@
 # 更新日志
 
+## v0.8.4.2 2025年11月26日
+
+*架构重构*
+
+- RootView 架构：新增 RootView 作为根视图，管理 Onboarding、PayWall 和 MainListView 的切换
+- PayWall 前置：将 PayWall 检查逻辑从 MainListView 移至 RootView，确保在数据源初始化之前显示
+- 书签恢复延迟：将 Apple Books 书签恢复从 SyncNosApp.init 移至 MainListView.onAppear，避免在 PayWall 之前触发系统安全弹窗
+
+*功能改进*
+
+- PayWallView UI 重构：采用 Onboarding 风格的底部布局，添加礼物图标摇摆动画和紧急提醒脉冲动画
+- 背景覆盖：修复 PayWallView 背景未覆盖整个视图的问题
+- 代码清理：从 MainListView 中移除 PayWall 相关代码，简化视图结构
+
 ## v0.8.4.1 2025年11月26日
 
 *新增功能*
