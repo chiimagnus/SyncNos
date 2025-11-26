@@ -158,9 +158,6 @@ struct WeReadDetailView: View {
                     }
                     .padding()
                 }
-            } else {
-                Text("Select a WeRead book to view details")
-                    .foregroundColor(.secondary)
             }
         }
         .navigationTitle("WeRead")

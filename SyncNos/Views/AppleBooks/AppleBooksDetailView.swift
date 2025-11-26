@@ -150,8 +150,6 @@ struct AppleBooksDetailView: View {
                         }
                     }
                 }
-            } else {
-                Text("Select a book to view details").foregroundColor(.secondary)
             }
         }
         .frame(minWidth: 400, idealWidth: 600)
