@@ -7,8 +7,16 @@ final class GoodLinksConnectionService: Sendable {
     private let logger = DIContainer.shared.loggerService
 
     func defaultDatabasePath() -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/Library/Group Containers/group.com.ngocluu.goodlinks/Data/data.sqlite"
+        // 使用用户的真实 home 目录，而不是沙盒容器路径
+        // FileManager.default.homeDirectoryForCurrentUser 在沙盒应用中会返回应用容器路径
+        let realHomeDirectory: String
+        if let pw = getpwuid(getuid()), let home = pw.pointee.pw_dir {
+            realHomeDirectory = String(cString: home)
+        } else {
+            // Fallback to environment variable
+            realHomeDirectory = ProcessInfo.processInfo.environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
+        }
+        return "\(realHomeDirectory)/Library/Group Containers/group.com.ngocluu.goodlinks/Data/data.sqlite"
     }
 
     func canOpenReadOnly(dbPath: String) -> Bool {

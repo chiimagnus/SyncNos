@@ -206,8 +206,16 @@ public struct GoodLinksPicker {
         panel.prompt = "Choose"
         panel.message = "请选择 GoodLinks 的共享容器目录 (group.com.ngocluu.goodlinks) 或其 Data 路径"
 
-        let home = NSHomeDirectory()
-        let defaultContainer = "\(home)/Library/Group Containers/group.com.ngocluu.goodlinks"
+        // 使用用户的真实 home 目录，而不是沙盒容器路径
+        // NSHomeDirectory() 在沙盒应用中会返回应用容器路径，所以我们需要使用 pw_dir
+        let realHomeDirectory: String
+        if let pw = getpwuid(getuid()), let home = pw.pointee.pw_dir {
+            realHomeDirectory = String(cString: home)
+        } else {
+            // Fallback to environment variable
+            realHomeDirectory = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
+        }
+        let defaultContainer = "\(realHomeDirectory)/Library/Group Containers/group.com.ngocluu.goodlinks"
         panel.directoryURL = URL(fileURLWithPath: defaultContainer, isDirectory: true)
 
         panel.begin { response in
