@@ -6,10 +6,10 @@ struct GoodLinksDetailView: View {
     @Binding var selectedLinkId: String?
     @Environment(\.openWindow) private var openWindow
 
-    // Freeze layout width during live resize to avoid heavy recomputation.
-    @State private var isLiveResizing: Bool = false
+    // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
     @State private var measuredLayoutWidth: CGFloat = 0
-    @State private var frozenLayoutWidth: CGFloat? = nil
+    @State private var debouncedLayoutWidth: CGFloat = 0
+    @State private var layoutWidthDebounceTask: Task<Void, Never>?
     @State private var articleIsExpanded: Bool = false
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
@@ -40,7 +40,7 @@ struct GoodLinksDetailView: View {
                             InfoHeaderCardView(
                                 title: link.title?.isEmpty == false ? link.title! : link.url,
                                 subtitle: link.author,
-                                overrideWidth: frozenLayoutWidth,
+                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                                 timestamps: TimestampInfo(
                                     addedAt: link.addedAt > 0 ? Date(timeIntervalSince1970: link.addedAt) : nil,
                                     modifiedAt: link.modifiedAt > 0 ? Date(timeIntervalSince1970: link.modifiedAt) : nil,
@@ -133,14 +133,14 @@ struct GoodLinksDetailView: View {
                             ArticleContentCardView(
                                 wordCount: contentRow.wordCount,
                                 contentText: fullText,
-                                overrideWidth: frozenLayoutWidth,
+                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                                 measuredWidth: $measuredLayoutWidth,
                                 isExpanded: $articleIsExpanded
                             )
                         } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             ArticleContentCardView(
                                 wordCount: 0,
-                                overrideWidth: frozenLayoutWidth,
+                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                                 measuredWidth: $measuredLayoutWidth,
                                 revealThreshold: nil,
                                 customSlot: AnyView(
@@ -180,7 +180,7 @@ struct GoodLinksDetailView: View {
                             .padding(.top, 4)
 
                             if !filteredHighlights.isEmpty {
-                                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                                WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
                                     ForEach(filteredHighlights, id: \.id) { item in
                                         HighlightCardView(
                                             colorMark: item.color.map { HighlightColorUI.color(for: $0, source: .goodLinks) } ?? Color.gray.opacity(0.5),
@@ -208,9 +208,21 @@ struct GoodLinksDetailView: View {
                                     GeometryReader { proxy in
                                         let w = proxy.size.width
                                         Color.clear
-                                            .onAppear { measuredLayoutWidth = w }
+                                            .onAppear {
+                                                measuredLayoutWidth = w
+                                                debouncedLayoutWidth = w
+                                            }
                                             .onChange(of: w) { _, newValue in
                                                 measuredLayoutWidth = newValue
+                                                // 取消之前的 debounce 任务
+                                                layoutWidthDebounceTask?.cancel()
+                                                // 创建新的 debounce 任务，延迟 0.3 秒更新
+                                                layoutWidthDebounceTask = Task { @MainActor in
+                                                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 秒
+                                                    if !Task.isCancelled {
+                                                        debouncedLayoutWidth = newValue
+                                                    }
+                                                }
                                             }
                                     }
                                 )
@@ -261,14 +273,6 @@ struct GoodLinksDetailView: View {
                     } else {
                         externalIsSyncing = false
                         externalSyncProgress = nil
-                    }
-                }
-                .background(LiveResizeObserver(isResizing: $isLiveResizing))
-                .onChange(of: isLiveResizing) { _, resizing in
-                    if resizing {
-                        frozenLayoutWidth = measuredLayoutWidth
-                    } else {
-                        frozenLayoutWidth = nil
                     }
                 }
                 .navigationTitle("GoodLinks")

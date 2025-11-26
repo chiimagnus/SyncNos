@@ -7,10 +7,10 @@ struct AppleBooksDetailView: View {
     @StateObject private var viewModel = AppleBooksDetailViewModel()
     @State private var isSyncing = false
     @Environment(\.openWindow) private var openWindow
-    // Freeze layout width during live resize to avoid heavy recomputation.
-    @State private var isLiveResizing: Bool = false
+    // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
     @State private var measuredLayoutWidth: CGFloat = 0
-    @State private var frozenLayoutWidth: CGFloat? = nil
+    @State private var debouncedLayoutWidth: CGFloat = 0
+    @State private var layoutWidthDebounceTask: Task<Void, Never>?
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
     // External (batch) sync state for the currently selected book
@@ -47,7 +47,7 @@ struct AppleBooksDetailView: View {
                             InfoHeaderCardView(
                                 title: book.hasTitle ? book.bookTitle : "No Title",
                                 subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud"))",
-                                overrideWidth: frozenLayoutWidth,
+                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                                 timestamps: TimestampInfo(
                                     addedAt: book.createdAt,
                                     modifiedAt: book.modifiedAt,
@@ -69,7 +69,7 @@ struct AppleBooksDetailView: View {
                                 }
                             }
                             // Highlights section (Waterfall / Masonry)
-                            WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: frozenLayoutWidth) {
+                            WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
                                 ForEach(viewModel.highlights, id: \.uuid) { highlight in
                                     HighlightCardView(
                                         colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
@@ -102,9 +102,21 @@ struct AppleBooksDetailView: View {
                                 GeometryReader { proxy in
                                     let w = proxy.size.width
                                     Color.clear
-                                        .onAppear { measuredLayoutWidth = w }
+                                        .onAppear {
+                                            measuredLayoutWidth = w
+                                            debouncedLayoutWidth = w
+                                        }
                                         .onChange(of: w) { _, newValue in
                                             measuredLayoutWidth = newValue
+                                            // 取消之前的 debounce 任务
+                                            layoutWidthDebounceTask?.cancel()
+                                            // 创建新的 debounce 任务，延迟 0.3 秒更新
+                                            layoutWidthDebounceTask = Task { @MainActor in
+                                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 秒
+                                                if !Task.isCancelled {
+                                                    debouncedLayoutWidth = newValue
+                                                }
+                                            }
                                         }
                                 }
                             )
@@ -170,14 +182,6 @@ struct AppleBooksDetailView: View {
             }
         }
         .navigationTitle("Apple Books")
-        .background(LiveResizeObserver(isResizing: $isLiveResizing))
-        .onChange(of: isLiveResizing) { _, resizing in
-            if resizing {
-                frozenLayoutWidth = measuredLayoutWidth
-            } else {
-                frozenLayoutWidth = nil
-            }
-        }
         .toolbar {
             // 中间区域：Filter 控件
             ToolbarItem(placement: .automatic) {
