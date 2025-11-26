@@ -37,6 +37,9 @@ class AppleBooksDetailViewModel: ObservableObject {
     private let pageSize = NotionSyncConfig.appleBooksDetailPageSize
     private var expectedTotalCount = 0
     private var cancellables: Set<AnyCancellable> = []
+    
+    /// 当前加载任务，用于在切换书籍时取消
+    private var currentLoadTask: Task<Void, Never>?
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
@@ -171,13 +174,22 @@ class AppleBooksDetailViewModel: ObservableObject {
     }
     
     deinit {
-        Task { @MainActor [weak self] in
-            self?.closeSession()
-        }
+        // 取消正在进行的加载任务
+        currentLoadTask?.cancel()
+        // 同步关闭 session（DatabaseReadOnlySession.close() 是线程安全的）
+        session?.close()
     }
     
     func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) async {
         errorMessage = nil
+        
+        // 取消之前的加载任务，避免竞态条件
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        
+        // 等待一小段时间，确保之前的任务有机会响应取消
+        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        
         closeSession()
         highlights = []
         currentOffset = 0
@@ -237,10 +249,14 @@ class AppleBooksDetailViewModel: ObservableObject {
         let selectedStylesLocal = self.selectedStyles
         let pageSizeLocal = self.pageSize
 
-        do {
-            let stylesArray = selectedStylesLocal.isEmpty ? nil : Array(selectedStylesLocal)
-            let rows = try await Task.detached(priority: .userInitiated) { () throws -> [HighlightRow] in
-                try s.fetchHighlightPage(
+        // 创建可取消的后台加载任务
+        let loadTask = Task<[HighlightRow]?, Never> {
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return nil }
+            
+            do {
+                let stylesArray = selectedStylesLocal.isEmpty ? nil : Array(selectedStylesLocal)
+                let rows = try s.fetchHighlightPage(
                     assetId: asset,
                     limit: pageSizeLocal,
                     offset: currentOffsetLocal,
@@ -250,36 +266,67 @@ class AppleBooksDetailViewModel: ObservableObject {
                     noteFilter: noteFilterLocal,
                     styles: stylesArray
                 )
-            }.value
-
-            // If the current asset changed during the fetch, ignore these results
-            guard asset == currentAssetId else {
-                isLoadingPage = false
-                return
+                
+                // 再次检查取消状态
+                guard !Task.isCancelled else { return nil }
+                
+                return rows
+            } catch {
+                // 如果任务被取消或 session 已关闭，静默返回
+                if Task.isCancelled { return nil }
+                
+                // 检查是否是 session 关闭导致的错误
+                let errorDesc = error.localizedDescription
+                if errorDesc.contains("closed") || errorDesc.contains("Database session") {
+                    return nil
+                }
+                
+                await MainActor.run { [weak self] in
+                    self?.errorMessage = errorDesc
+                    self?.isLoadingPage = false
+                }
+                return nil
             }
-
-            let page = rows.map { r in
-                Highlight(
-                    uuid: r.uuid,
-                    text: r.text,
-                    note: r.note,
-                    style: r.style,
-                    dateAdded: r.dateAdded,
-                    modified: r.modified,
-                    location: r.location
-                )
-            }
-            if reset {
-                highlights = page
-            } else {
-                highlights.append(contentsOf: page)
-            }
-            currentOffset = currentOffsetLocal + page.count
-            isLoadingPage = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoadingPage = false
         }
+        
+        // 保存任务引用以便取消
+        currentLoadTask = Task {
+            _ = await loadTask.value
+        }
+        
+        // 等待结果
+        guard let rows = await loadTask.value else {
+            // 任务被取消或出错
+            if !Task.isCancelled {
+                isLoadingPage = false
+            }
+            return
+        }
+
+        // If the current asset changed during the fetch, ignore these results
+        guard asset == currentAssetId, !Task.isCancelled else {
+            isLoadingPage = false
+            return
+        }
+
+        let page = rows.map { r in
+            Highlight(
+                uuid: r.uuid,
+                text: r.text,
+                note: r.note,
+                style: r.style,
+                dateAdded: r.dateAdded,
+                modified: r.modified,
+                location: r.location
+            )
+        }
+        if reset {
+            highlights = page
+        } else {
+            highlights.append(contentsOf: page)
+        }
+        currentOffset = currentOffsetLocal + page.count
+        isLoadingPage = false
     }
     
     private func closeSession() {
