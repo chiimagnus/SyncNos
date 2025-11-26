@@ -1,5 +1,58 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.8.7 November 27, 2025
+
+- Version bump release (same as v0.8.6.5)
+
+## v0.8.6.5 November 27, 2025
+
+*Added*
+
+- Item Count Display: Added filtered/total item count display in SelectionPlaceholderView for better user clarity
+- Access Denied Handling: Enhanced error handling in AppleBooksListView with improved access denial messaging and app restart functionality
+
+*Changed*
+
+- GoodLinks Path: Updated GoodLinksConnectionService and GoodLinksService to use the user's real home directory instead of sandbox container paths
+- Restart Logic: Simplified application restart logic in LanguageView using 'open -n' for cleaner implementation
+- UI Cleanup: Removed redundant text prompts in AppleBooksDetailView and WeReadDetailView
+- Transition Animation: Updated RootView transition animations for consistent visual effects
+- i18n: Added comprehensive translations for new features
+
+## v0.8.6.4 November 27, 2025
+
+*Changed*
+
+- Performance: Implemented debounce mechanism for layout width updates in detail views to enhance performance during window resizing
+
+## v0.8.6.3 November 27, 2025
+
+*Changed*
+
+- Visual: Updated accent colors for content sources to improve visual distinction
+- Code Quality: Marked AppleBooksViewModel and AppleBooksDetailViewModel as final classes for improved performance
+- Code Cleanup: Removed unnecessary SwiftUI imports from ViewModels
+
+## v0.8.6.2 November 27, 2025
+
+*Added*
+
+- Swipeable Data Source: Implemented trackpad swipe gesture support for seamless data source switching
+- Keyboard Navigation: Added circular data source switching with keyboard shortcuts (⌘1/⌘2/⌘3)
+- Focus Management: Implemented data source focus notifications for seamless switching in ListViews
+
+*Changed*
+
+- Thread Safety: Enhanced DatabaseReadOnlySession with serial queue and improved task cancellation handling
+- Selection Commands: Removed hardcoded selection commands from list views and implemented dynamic selection commands in SwipeableDataSourceContainer
+- Filter Menu: Integrated filter menu into SwipeableDataSourceContainer for enhanced data source management
+
+## v0.8.6.1 November 27, 2025
+
+*Changed*
+
+- Localization: Updated localization strings and improved IAPView layout for better user experience
+
 ## v0.8.5 November 26, 2025
 
 *Added*
