@@ -17,13 +17,8 @@ struct SyncNosApp: App {
         }
 #endif
 
-        // Try auto-restore bookmark at launch
-        if let url = BookmarkStore.shared.restore() {
-            let started = BookmarkStore.shared.startAccessing(url: url)
-            DIContainer.shared.loggerService.info("Restored bookmark: \(url.path), startAccess=\(started)")
-        } else {
-            DIContainer.shared.loggerService.warning("No saved bookmark to restore")
-        }
+        // 注意：书签恢复已移至 MainListView 首次加载时执行
+        // 避免在 PayWall 显示之前触发系统安全弹窗
 
         // Start observing IAP transactions and check trial status
         DIContainer.shared.iapService.startObservingTransactions()
