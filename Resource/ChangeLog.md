@@ -1,5 +1,19 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.8.4.2 November 26, 2025
+
+*Architecture Refactoring*
+
+- RootView Architecture: Added RootView as root view to manage Onboarding, PayWall, and MainListView transitions
+- PayWall Priority: Moved PayWall check logic from MainListView to RootView, ensuring display before data source initialization
+- Bookmark Restoration Delay: Moved Apple Books bookmark restoration from SyncNosApp.init to MainListView.onAppear to avoid triggering system security dialogs before PayWall
+
+*Improvements*
+
+- PayWallView UI Refactor: Adopted Onboarding-style bottom layout, added gift icon wiggle animation and urgent reminder pulse animation
+- Background Coverage: Fixed PayWallView background not covering entire view
+- Code Cleanup: Removed PayWall-related code from MainListView, simplified view structure
+
 ## v0.8.0 November 24, 2025
 
 *Added*
