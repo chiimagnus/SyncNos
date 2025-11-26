@@ -10,6 +10,9 @@ struct OnboardingTrialView: View {
     // Onboarding 模式时使用
     var onboardingViewModel: OnboardingViewModel?
     
+    // 是否为 Onboarding 模式（影响 UI 布局和完成逻辑）
+    let isOnboardingMode: Bool
+    
     // 展示模式
     let presentationMode: TrialPresentationMode
     
@@ -28,16 +31,18 @@ struct OnboardingTrialView: View {
     
     // MARK: - Convenience Initializers
     
-    /// Onboarding 模式初始化
-    init(viewModel: OnboardingViewModel) {
-        self.onboardingViewModel = viewModel
-        self.presentationMode = .onboarding
+    /// Onboarding 模式初始化（自动根据 IAP 状态决定展示模式）
+    init(onboardingViewModel: OnboardingViewModel, trialViewModel: TrialViewModel) {
+        self.onboardingViewModel = onboardingViewModel
+        self.isOnboardingMode = true
+        self.presentationMode = trialViewModel.getOnboardingPresentationMode()
         self.onFinish = nil
     }
     
     /// 独立付费墙模式初始化
     init(presentationMode: TrialPresentationMode, onFinish: (() -> Void)? = nil) {
         self.onboardingViewModel = nil
+        self.isOnboardingMode = false
         self.presentationMode = presentationMode
         self.onFinish = onFinish
     }
@@ -49,13 +54,18 @@ struct OnboardingTrialView: View {
             // 中央区域 - 头部图标 + 产品列表
             VStack(spacing: 16) {
                 // 非 Onboarding 模式显示头部图标
-                if presentationMode != .onboarding {
+                if !isOnboardingMode {
                     headerIcon
                 }
                 
-                // Trial badge（仅 Onboarding 模式显示）
-                if presentationMode == .onboarding {
+                // Trial badge（仅 Onboarding 模式且为新用户时显示）
+                if isOnboardingMode && presentationMode == .onboarding {
                     trialBadge
+                }
+                
+                // Onboarding 模式但不是新用户时，显示头部图标
+                if isOnboardingMode && presentationMode != .onboarding {
+                    headerIcon
                 }
                 
                 // Products
@@ -321,42 +331,48 @@ struct OnboardingTrialView: View {
     
     @ViewBuilder
     private var primaryActionButton: some View {
-        switch presentationMode {
-        case .onboarding:
+        if isOnboardingMode {
             // Onboarding 模式：始终显示箭头按钮
             OnboardingNextButton {
                 handleOnboardingNext()
             }
-            
-        case .trialReminder:
-            if viewModel.hasPurchased {
-                // 购买成功后显示箭头按钮
-                OnboardingNextButton {
-                    finishFlow()
-                }
-            } else {
-                Button(action: {
-                    viewModel.markReminderShown()
-                    finishFlow()
-                }) {
-                    Text("Later")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(width: 80, height: 44)
-                        .background(Color.secondary)
-                        .cornerRadius(22)
-                }
-                .buttonStyle(.plain)
-            }
-            
-        case .trialExpired, .subscriptionExpired:
-            // 过期状态下：购买成功后显示箭头按钮，否则不显示
-            if viewModel.hasPurchased {
-                OnboardingNextButton {
-                    finishFlow()
-                }
-            } else {
+        } else {
+            // 独立付费墙模式
+            switch presentationMode {
+            case .onboarding:
+                // 这种情况不应该发生（独立模式不会使用 .onboarding）
                 EmptyView()
+                
+            case .trialReminder:
+                if viewModel.hasPurchased {
+                    // 购买成功后显示箭头按钮
+                    OnboardingNextButton {
+                        finishFlow()
+                    }
+                } else {
+                    Button(action: {
+                        viewModel.markReminderShown()
+                        finishFlow()
+                    }) {
+                        Text("Later")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(width: 80, height: 44)
+                            .background(Color.secondary)
+                            .cornerRadius(22)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+            case .trialExpired, .subscriptionExpired:
+                // 过期状态下：购买成功后显示箭头按钮，否则不显示
+                if viewModel.hasPurchased {
+                    OnboardingNextButton {
+                        finishFlow()
+                    }
+                } else {
+                    EmptyView()
+                }
             }
         }
     }
@@ -366,13 +382,14 @@ struct OnboardingTrialView: View {
     private func handleOnboardingNext() {
         // Onboarding 模式下点击箭头：标记欢迎页已显示，然后完成
         viewModel.markWelcomeShown()
+        viewModel.markReminderShown()  // 同时标记提醒已显示，避免 MainListView 再次触发
         completeOnboarding()
     }
     
     private func handlePurchaseSuccess() {
         // 购买成功后，仅在非 Onboarding 模式下自动完成流程
         // Onboarding 模式下，用户需要手动点击箭头按钮
-        if presentationMode != .onboarding {
+        if !isOnboardingMode {
             finishFlow()
         }
         // Onboarding 模式下，不做任何事情，等待用户点击箭头
@@ -398,7 +415,7 @@ struct OnboardingTrialView: View {
 // MARK: - Previews
 
 #Preview("Onboarding Trial") {
-    OnboardingTrialView(viewModel: OnboardingViewModel())
+    OnboardingTrialView(onboardingViewModel: OnboardingViewModel(), trialViewModel: TrialViewModel())
         .frame(width: 600, height: 500)
 }
 
