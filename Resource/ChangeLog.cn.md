@@ -1,5 +1,58 @@
 # 更新日志
 
+## v0.8.7 2025年11月27日
+
+- 版本号发布（与 v0.8.6.5 相同）
+
+## v0.8.6.5 2025年11月27日
+
+*新增功能*
+
+- 数量显示：在 SelectionPlaceholderView 中添加过滤后/总数量显示，提升用户体验
+- 访问拒绝处理：增强 AppleBooksListView 的错误处理，提供访问被拒绝的提示和应用重启功能
+
+*功能改进*
+
+- GoodLinks 路径：更新 GoodLinksConnectionService 和 GoodLinksService 使用用户真实主目录而非沙盒容器路径
+- 重启逻辑：使用 'open -n' 简化 LanguageView 中的应用重启逻辑，实现更简洁
+- UI 清理：移除 AppleBooksDetailView 和 WeReadDetailView 中的冗余文本提示
+- 过渡动画：更新 RootView 过渡动画以获得一致的视觉效果
+- 国际化：为新功能添加完整翻译
+
+## v0.8.6.4 2025年11月27日
+
+*功能改进*
+
+- 性能优化：在详情视图中实现布局宽度更新的防抖机制，提升窗口调整大小时的性能
+
+## v0.8.6.3 2025年11月27日
+
+*功能改进*
+
+- 视觉优化：更新内容源的强调色以提高视觉区分度
+- 代码质量：将 AppleBooksViewModel 和 AppleBooksDetailViewModel 标记为 final 类以提高性能
+- 代码清理：从 ViewModels 中移除不必要的 SwiftUI 导入
+
+## v0.8.6.2 2025年11月27日
+
+*新增功能*
+
+- 滑动切换数据源：实现触控板滑动手势支持，无缝切换数据源
+- 键盘导航：添加循环数据源切换键盘快捷键（⌘1/⌘2/⌘3）
+- 焦点管理：实现数据源焦点通知，支持 ListView 间无缝切换
+
+*功能改进*
+
+- 线程安全：通过串行队列增强 DatabaseReadOnlySession 的线程安全性，改进任务取消处理
+- 选择命令：从列表视图中移除硬编码的选择命令，在 SwipeableDataSourceContainer 中实现动态选择命令
+- 筛选菜单：将筛选菜单集成到 SwipeableDataSourceContainer 中，增强数据源管理功能
+
+## v0.8.6.1 2025年11月27日
+
+*功能改进*
+
+- 本地化：更新本地化字符串，改进 IAPView 布局以提供更好的用户体验
+
 ## v0.8.5 2025年11月26日
 
 *新增功能*
