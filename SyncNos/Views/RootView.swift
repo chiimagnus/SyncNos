@@ -10,35 +10,14 @@ struct RootView: View {
         DIContainer.shared.iapService
     }
     
-    /// 当前应该显示的视图阶段
-    private enum ViewPhase: Equatable {
-        case onboarding
-        case paywall(IAPPresentationMode)
-        case main
-    }
-    
-    private var currentPhase: ViewPhase {
-        if !hasCompletedOnboarding {
-            return .onboarding
-        } else if let mode = iapPresentationMode {
-            return .paywall(mode)
-        } else {
-            return .main
-        }
-    }
-    
     var body: some View {
-        // 使用 switch 而不是 if-else，确保只有当前阶段的视图被创建
-        // 这样可以避免 MainListView 在 PayWall 显示时被预先初始化
-        ZStack {
-            switch currentPhase {
-            case .onboarding:
+        Group {
+            if !hasCompletedOnboarding {
+                // Step 1: Onboarding（未完成引导）
                 OnboardingView()
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
-            case .paywall(let mode):
+                    .transition(.opacity)
+            } else if let mode = iapPresentationMode {
+                // Step 2: PayWall（需要显示付费墙）
                 PayWallView(
                     presentationMode: mode,
                     onFinish: {
@@ -46,19 +25,15 @@ struct RootView: View {
                         checkTrialStatus()
                     }
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-            case .main:
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                // Step 3: MainListView（正常使用）
                 MainListView()
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
+                    .transition(.opacity)
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentPhase)
+        .animation(.spring(), value: hasCompletedOnboarding)
+        .animation(.spring(), value: iapPresentationMode != nil)
         .onAppear {
             // 只有在完成引导后才检查 PayWall 状态
             if hasCompletedOnboarding {
@@ -130,4 +105,3 @@ struct RootView: View {
 #Preview("RootView") {
     RootView()
 }
-
