@@ -101,22 +101,6 @@ struct GoodLinksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .focusedSceneValue(\.selectionCommands, SelectionCommands(
-                    selectAll: {
-                        let all = Set(viewModel.displayLinks.map { $0.id })
-                        if !all.isEmpty { selectionIds = all }
-                    },
-                    deselectAll: {
-                        selectionIds.removeAll()
-                    },
-                    canSelectAll: {
-                        let total = viewModel.displayLinks.count
-                        return total > 0 && selectionIds.count < total
-                    },
-                    canDeselect: {
-                        !selectionIds.isEmpty
-                    }
-                ))
             }
         }
         .onAppear {
