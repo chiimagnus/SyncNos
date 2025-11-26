@@ -426,6 +426,8 @@ struct MainListView: View {
             SelectionPlaceholderView(
                 title: contentSource.title,
                 count: selectedBookIds.isEmpty ? nil : selectedBookIds.count,
+                filteredCount: appleBooksVM.displayBooks.count,
+                totalCount: appleBooksVM.books.count,
                 onSyncSelected: selectedBookIds.isEmpty ? nil : { syncSelectedAppleBooks() }
             )
         }
@@ -443,6 +445,8 @@ struct MainListView: View {
             SelectionPlaceholderView(
                 title: contentSource.title,
                 count: selectedLinkIds.isEmpty ? nil : selectedLinkIds.count,
+                filteredCount: goodLinksVM.displayLinks.count,
+                totalCount: goodLinksVM.links.count,
                 onSyncSelected: selectedLinkIds.isEmpty ? nil : { syncSelectedGoodLinks() }
             )
         }
@@ -460,6 +464,8 @@ struct MainListView: View {
             SelectionPlaceholderView(
                 title: contentSource.title,
                 count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
+                filteredCount: weReadVM.displayBooks.count,
+                totalCount: weReadVM.books.count,
                 onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : { syncSelectedWeRead() }
             )
         }
