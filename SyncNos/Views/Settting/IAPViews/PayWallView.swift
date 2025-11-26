@@ -2,6 +2,7 @@ import SwiftUI
 import StoreKit
 
 /// 统一的 IAP 视图，根据不同状态显示不同内容，但始终包含购买选项
+/// 采用 Onboarding 风格的底部布局
 struct PayWallView: View {
     let presentationMode: IAPPresentationMode
     var onFinish: (() -> Void)? = nil
@@ -10,24 +11,32 @@ struct PayWallView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var loadingPlanID: String? = nil
     
+    // 动画状态
+    @State private var wiggleAngle: Double = 0  // 礼物图标摇摆
+    @State private var headerIconScale: CGFloat = 1.0  // 图标脉冲放大
+    @State private var headerIconShake: CGFloat = 0  // 图标颤抖
+    
     var body: some View {
-        VStack(spacing: 24) {
-            // Header Section - 根据不同模式显示不同的头部
-            headerSection
-                .padding(.top, 40)
+        VStack(spacing: 0) {
+            Spacer()
             
-            // Products Section - 始终显示购买选项
-            productsSection
+            // 中央区域 - 头部图标 + 产品列表
+            VStack(spacing: 16) {
+                // Header Icon with animations
+                headerIconView
+                
+                // Products Section
+                productsSection
+            }
             
             Spacer()
             
-            // Actions Section
-            actionsSection
-                .padding(.horizontal, 40)
-                .padding(.bottom, 40)
+            // 底部区域 - Onboarding 风格布局
+            bottomSection
         }
-        .frame(width: 500, height: 600)
-        .background(VisualEffectBackground(material: .windowBackground))
+        .frame(width: 600, height: 500)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color("BackgroundColor"))
         .onAppear {
             viewModel.onAppear()
         }
@@ -38,71 +47,154 @@ struct PayWallView: View {
         }
     }
     
-    // MARK: - Header Section
+    // MARK: - Header Icon View
     
     @ViewBuilder
-    private var headerSection: some View {
-        VStack(spacing: 12) {
+    private var headerIconView: some View {
+        if case .welcome = presentationMode {
+            // Welcome 模式：礼物图标 + 摇摆动画
+            VStack(spacing: 12) {
+                Image(systemName: "gift.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.green)
+                    .rotationEffect(.degrees(wiggleAngle), anchor: .bottom)
+                    .onAppear {
+                        startWiggleAnimation()
+                    }
+                Text("30-day free trial included")
+                    .font(.headline)
+                    .foregroundStyle(Color("OnboardingTextColor"))
+            }
+        } else {
+            // 其他模式：常规图标 + 脉冲动画（紧急提醒时）
             Image(systemName: headerIcon)
                 .font(.system(size: 60))
                 .foregroundStyle(headerIconColor)
-            
-            Text(headerTitle)
-                .font(.title)
-                .fontWeight(.bold)
-            
-            Text(headerMessage)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            // Trial info badge (if applicable)
-            if case .welcome = presentationMode {
-                trialBadge
-            }
+                .scaleEffect(shouldPulseHeaderIcon ? headerIconScale : 1.0)
+                .offset(x: shouldPulseHeaderIcon ? headerIconShake : 0)
+                .onAppear {
+                    if shouldPulseHeaderIcon {
+                        startHeaderIconPulse()
+                    }
+                }
         }
     }
     
-    private var trialBadge: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "gift.fill")
-                .foregroundStyle(.green)
-            Text("30-day free trial included")
-                .font(.headline)
-                .foregroundStyle(.primary)
+    /// 是否应该给 Header Icon 添加脉冲动画（仅限紧急提醒：3天和1天）
+    private var shouldPulseHeaderIcon: Bool {
+        if case .trialReminder(let days) = presentationMode {
+            return days <= 3
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.green.opacity(0.1))
-        )
+        return false
+    }
+    
+    /// 启动礼物图标摇摆动画
+    private func startWiggleAnimation() {
+        func performWiggle() {
+            let wiggleDuration = 0.1
+            let wiggleAngleValue = 10.0
+            let sequence: [Double] = [-wiggleAngleValue, wiggleAngleValue, -wiggleAngleValue, wiggleAngleValue, -wiggleAngleValue * 0.5, 0]
+            
+            for (index, angle) in sequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + wiggleDuration * Double(index)) {
+                    withAnimation(.easeInOut(duration: wiggleDuration)) {
+                        wiggleAngle = angle
+                    }
+                }
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            performWiggle()
+        }
+        
+        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            performWiggle()
+        }
+    }
+    
+    /// 启动 Header Icon 脉冲放大 + 颤抖动画
+    private func startHeaderIconPulse() {
+        func performPulseAndShake() {
+            withAnimation(.easeOut(duration: 0.2)) {
+                headerIconScale = 1.35
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                performShake()
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2 + 0.4) {
+                withAnimation(.easeIn(duration: 0.15)) {
+                    headerIconScale = 1.0
+                }
+            }
+        }
+        
+        func performShake() {
+            let shakeDuration = 0.05
+            let shakeSequence: [CGFloat] = [-6, 6, -5, 5, -3, 3, -2, 0]
+            
+            for (index, offset) in shakeSequence.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + shakeDuration * Double(index)) {
+                    withAnimation(.linear(duration: shakeDuration)) {
+                        headerIconShake = offset
+                    }
+                }
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            performPulseAndShake()
+        }
+        
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            performPulseAndShake()
+        }
     }
     
     // MARK: - Products Section
     
     @ViewBuilder
     private var productsSection: some View {
-        VStack(spacing: 12) {
-            Text("Choose Your Plan")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            
-            if viewModel.isLoading {
-                ProgressView()
-                    .padding()
-            } else if viewModel.products.isEmpty {
-                Text("Loading products...")
-                    .foregroundStyle(.secondary)
-            } else {
-                VStack(spacing: 16) {
-                    ForEach(viewModel.products, id: \.id) { product in
-                        productCard(for: product)
-                    }
+        if viewModel.isLoading {
+            ProgressView()
+                .padding()
+        } else if viewModel.products.isEmpty {
+            Text("Loading products...")
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+        } else {
+            VStack(spacing: 12) {
+                ForEach(viewModel.products, id: \.id) { product in
+                    productCard(for: product)
                 }
-                .padding(.horizontal, 40)
+            }
+            .padding(.horizontal, 60)
+        }
+        
+        // 链接和消息行
+        HStack(spacing: 16) {
+            Button("Restore Purchases") {
+                viewModel.restore()
+            }
+            .buttonStyle(.link)
+            .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+            
+            Text("•")
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+            
+            Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+            
+            if !viewModel.hasPurchased, let msg = viewModel.message, !msg.isEmpty {
+                Text("•")
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+                Text(msg)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
         }
+        .font(.caption)
+        .padding(.top, 16)
     }
     
     @ViewBuilder
@@ -113,8 +205,7 @@ struct PayWallView: View {
             loadingPlanID = product.id
             Task {
                 viewModel.buy(product: product)
-                // 购买流程完成后清空加载状态（无论成功或失败）
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒延迟，确保状态更新完成
+                try? await Task.sleep(nanoseconds: 500_000_000)
                 loadingPlanID = nil
             }
         }) {
@@ -122,15 +213,14 @@ struct PayWallView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(product.displayName)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color("OnboardingTextColor"))
                     Text(product.description)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                         .lineLimit(2)
                 }
                 Spacer()
                 
-                // 显示加载指示器或价格
                 if isLoading {
                     ProgressView()
                         .scaleEffect(0.8, anchor: .center)
@@ -138,96 +228,104 @@ struct PayWallView: View {
                     Text(product.displayPrice)
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color("OnboardingTextColor"))
                 }
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.accentColor.opacity(0.1))
+                    .fill(Color("OnboardingCardColor").opacity(0.3))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.accentColor, lineWidth: 2)
+                            .stroke(Color("OnboardingButtonColor").opacity(0.5), lineWidth: 1)
                     )
             )
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.hasPurchased || isLoading)  // 已购买或正在加载时禁用
+        .disabled(viewModel.hasPurchased || isLoading)
     }
     
-    // MARK: - Actions Section
+    // MARK: - Bottom Section (Onboarding Style)
     
     @ViewBuilder
-    private var actionsSection: some View {
-        VStack(spacing: 12) {
-            // Primary action button
+    private var bottomSection: some View {
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(headerTitle)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(Color("OnboardingTextColor"))
+                
+                Text(headerMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            // 主按钮
             primaryActionButton
-            
-            // Message display
-            if let msg = viewModel.message, !msg.isEmpty {
-                Text(msg)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            // Legal links
-            Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            
-            // Restore purchases button
-            Button("Restore Purchases") {
-                viewModel.restore()
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 40)
     }
+    
+    // MARK: - Primary Action Button
     
     @ViewBuilder
     private var primaryActionButton: some View {
         switch presentationMode {
         case .welcome:
-            Button(action: {
+            // 欢迎模式：圆形箭头按钮
+            OnboardingNextButton {
                 DIContainer.shared.iapService.markWelcomeShown()
                 if let onFinish = onFinish {
                     onFinish()
                 } else {
                     dismiss()
                 }
-            }) {
-                Text("Start Free Trial")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .cornerRadius(12)
             }
-            .buttonStyle(.plain)
             
         case .trialReminder:
-            Button(action: {
-                DIContainer.shared.iapService.markReminderShown()
-                if let onFinish = onFinish {
-                    onFinish()
-                } else {
-                    dismiss()
+            if viewModel.hasPurchased {
+                OnboardingNextButton {
+                    if let onFinish = onFinish {
+                        onFinish()
+                    } else {
+                        dismiss()
+                    }
                 }
-            }) {
-                Text("Remind Me Later")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.secondary)
-                    .cornerRadius(12)
+            } else {
+                Button(action: {
+                    DIContainer.shared.iapService.markReminderShown()
+                    if let onFinish = onFinish {
+                        onFinish()
+                    } else {
+                        dismiss()
+                    }
+                }) {
+                    Text("Later")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(width: 80, height: 44)
+                        .background(Color.secondary)
+                        .cornerRadius(22)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             
         case .trialExpired, .subscriptionExpired:
-            // No primary action button for expired states
-            EmptyView()
+            if viewModel.hasPurchased {
+                OnboardingNextButton {
+                    if let onFinish = onFinish {
+                        onFinish()
+                    } else {
+                        dismiss()
+                    }
+                }
+            } else {
+                EmptyView()
+            }
         }
     }
     
@@ -236,7 +334,7 @@ struct PayWallView: View {
     private var headerIcon: String {
         switch presentationMode {
         case .welcome:
-            return "book.circle.fill"
+            return "gift.fill"
         case .trialReminder(let days):
             switch days {
             case 7: return "clock.badge.exclamationmark"
@@ -245,7 +343,7 @@ struct PayWallView: View {
             default: return "clock"
             }
         case .trialExpired:
-            return "star.circle.fill"
+            return "face.dashed.fill"
         case .subscriptionExpired:
             return "exclamationmark.circle.fill"
         }
@@ -254,7 +352,7 @@ struct PayWallView: View {
     private var headerIconColor: Color {
         switch presentationMode {
         case .welcome:
-            return .blue
+            return .green
         case .trialReminder(let days):
             switch days {
             case 7: return .blue
@@ -263,13 +361,17 @@ struct PayWallView: View {
             default: return .secondary
             }
         case .trialExpired:
-            return .yellow
+            return Color(white: 0.4)
         case .subscriptionExpired:
             return .red
         }
     }
     
     private var headerTitle: String {
+        if viewModel.hasPurchased {
+            return "Purchase Successful!"
+        }
+        
         switch presentationMode {
         case .welcome:
             return "Welcome to SyncNos"
@@ -288,9 +390,13 @@ struct PayWallView: View {
     }
     
     private var headerMessage: String {
+        if viewModel.hasPurchased {
+            return "Thank you for your support!"
+        }
+        
         switch presentationMode {
         case .welcome:
-            return "Sync your highlights from Apple Books, GoodLinks, and WeRead to Notion effortlessly."
+            return "Sync your highlights from Apple Books, GoodLinks, and WeRead to Notion. Start your 30-day free trial!"
         case .trialReminder(let days):
             return "Your free trial will expire in \(days) day\(days == 1 ? "" : "s"). Purchase now to continue enjoying unlimited syncing."
         case .trialExpired:
@@ -306,7 +412,6 @@ struct PayWallView: View {
         let logger = DIContainer.shared.loggerService
         logger.info("Purchase successful, handling completion")
         
-        // 如果当前是欢迎模式，标记已显示
         if case .welcome = presentationMode {
             logger.debug("Welcome mode detected, marking welcome as shown")
             DIContainer.shared.iapService.markWelcomeShown()
@@ -327,7 +432,7 @@ enum IAPPresentationMode {
     case welcome
     case trialReminder(daysRemaining: Int)
     case trialExpired
-    case subscriptionExpired  // 新增：年订阅已过期
+    case subscriptionExpired
 }
 
 // MARK: - Previews
