@@ -9,7 +9,7 @@ private enum ABNotifications {
 }
 
 @MainActor
-class AppleBooksDetailViewModel: ObservableObject {
+final class AppleBooksDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
     @Published var isLoadingPage = false
     @Published var errorMessage: String?

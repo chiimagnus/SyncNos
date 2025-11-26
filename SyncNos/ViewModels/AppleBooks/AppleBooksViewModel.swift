@@ -11,7 +11,7 @@ private enum ABVMNotifications {
 }
 
 @MainActor
-class AppleBooksViewModel: ObservableObject {
+final class AppleBooksViewModel: ObservableObject {
     // Centralized UserDefaults keys
     private enum Keys {
         static let sortKey = "bookList_sort_key"
