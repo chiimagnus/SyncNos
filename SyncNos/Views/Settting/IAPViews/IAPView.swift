@@ -3,6 +3,7 @@ import StoreKit
 
 struct IAPView: View {
     @StateObject private var viewModel = IAPViewModel()
+    @State private var loadingPlanID: String? = nil
 
     var body: some View {
         List {
@@ -32,20 +33,28 @@ struct IAPView: View {
                 }
             }
 
-            Section(header: Text("Actions")) {
+            HStack {
                 Button("Restore Purchases") {
                     viewModel.restore()
                 }
-                .buttonStyle(.bordered)
-            }
+                .buttonStyle(.link)
+                .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
 
-            if let msg = viewModel.message, !msg.isEmpty {
-                Section {
+                Text("•")
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+
+                Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+                
+                if let msg = viewModel.message, !msg.isEmpty {
+                    Text("•")
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
+
                     Text(msg)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
+                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+                }                
             }
+            .font(.caption)
 
 #if DEBUG
             Section(header: Text("Debug Actions")) {
@@ -205,6 +214,8 @@ struct IAPView: View {
 
     @ViewBuilder
     private func productRow(for product: Product) -> some View {
+        let isLoading = loadingPlanID == product.id
+
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.displayName)
@@ -218,12 +229,24 @@ struct IAPView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(product.displayPrice)
                     .font(.headline)
-                Button(action: { viewModel.buy(product: product) }) {
-                    Text("Purchase")
-                        .font(.caption)
+                Button(action: {
+                    loadingPlanID = product.id
+                    Task {
+                        viewModel.buy(product: product)
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        loadingPlanID = nil
+                    }
+                }) {
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8, anchor: .center)
+                    } else {
+                        Text("Purchase")
+                            .font(.caption)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.hasPurchased)
+                .disabled(viewModel.hasPurchased || isLoading)
             }
         }
         .padding(.vertical, 4)
