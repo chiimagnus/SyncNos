@@ -28,7 +28,7 @@ struct AppleBooksListView: View {
                         .padding(.horizontal)
                     
                     VStack(spacing: 12) {
-                        Button("Restart App", systemImage: "arrow.clockwise") {
+                        Button("Restart", systemImage: "arrow.clockwise") {
                             // 重启应用
                             let task = Process()
                             task.launchPath = "/usr/bin/open"
