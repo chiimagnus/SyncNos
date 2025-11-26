@@ -11,7 +11,7 @@ alwaysApply: true
 - **UI框架**: SwiftUI (iOS 17+, iPadOS 17+, macOS 14+)
 - **响应式编程**: Combine
 - **数据持久化**: SwiftData
-- **语言版本**: Swift 6.1+、Swift5+
+- **语言版本**: Swift 5.9+ / Swift 6.0+
 
 ### 平台支持
 - iOS 17.0+
@@ -87,9 +87,14 @@ Feature/
    - 长期：使用 `@Environment` 或 `@StateObject`
 
 ### 禁止方式
-- ❌ 使用 `static let shared` 单例模式
-- ❌ 在ViewModel中创建全局状态
-- ❌ 多个视图共享同一个ViewModel实例
+- ❌ 使用 `static let shared` 单例模式创建 ViewModel
+- ❌ 在 ViewModel 中创建全局状态
+- ❌ 无关联的视图通过单例或全局变量共享 ViewModel
+
+### 允许的共享方式
+- ✅ 父视图创建 ViewModel，通过 `@ObservedObject` 传递给子视图
+- ✅ 通过 `.environmentObject()` 在视图层级中共享
+- ✅ List 和 Detail 视图共享同一个 ViewModel（父视图统一管理）
 
 ### 正确示例
 ```swift
@@ -196,6 +201,7 @@ class MyViewModel: ObservableObject {
             .assign(to: &$searchResults)
     }
 }
+```
 
 ### 响应式编程最佳实践
 1. **数据源响应**: 使用`@Published`属性作为数据源
@@ -203,7 +209,6 @@ class MyViewModel: ObservableObject {
 3. **链式操作**: 使用`.assign(to:)`或`.sink`订阅结果
 4. **内存管理**: 使用`Set<AnyCancellable>`管理订阅生命周期
 5. **错误处理**: 使用`.catch`、`.replaceError`处理错误情况
-```
 
 ### 错误处理
 - 使用 `catch` 操作符处理错误
@@ -258,18 +263,32 @@ struct ViewCommands {
 - **发送点唯一**: 同一类型的通知只在一个地方发送
 - **接收点明确**: 只有需要响应的组件监听通知
 - **避免通知链**: 不要让通知触发另一个通知
-- **优先使用绑定**: 能用 `@Published`/`@Binding` 解决的，不要用通知
+
+### 通知 vs 绑定的选择
+
+#### 使用 @Published/@Binding 的场景
+- 父子视图之间的数据传递
+- 有直接引用关系的组件之间
+- 同一个 ViewModel 内的状态变化
+- 需要双向绑定的场景
+
+#### 使用 NotificationCenter 的场景
+- 跨模块通信（如 Commands → Views）
+- 无直接引用关系的组件之间
+- 全局事件广播（如 "RefreshBooksRequested"、"DataSourceSwitched"）
+- 需要解耦的场景（发送方不需要知道接收方）
+- 一对多的通知场景
 
 ## 禁止事项
 
 ### 架构层面
 - ❌ 在 View 中直接处理业务逻辑
 - ❌ 在 Model 中包含业务逻辑
-- ❌ 使用单例模式创建 ViewModel
-- ❌ 多个 View 共享同一个 ViewModel 实例
+- ❌ 使用 `static let shared` 单例模式创建 ViewModel
+- ❌ 无关联的视图通过单例或全局变量共享 ViewModel
 - ❌ 在 ViewModel 中直接操作 UI
-- ❌ 在View中直接访问数据库
-- ❌ 在多个地方发送相同类型的通知
+- ❌ 在 View 中直接访问数据库
+- ❌ 在多个地方发送相同类型的通知（应统一到一个入口）
 
 ### 代码实现
 - ❌ 手动计算屏幕尺寸和比例
