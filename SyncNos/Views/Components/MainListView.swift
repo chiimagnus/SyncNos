@@ -235,56 +235,19 @@ struct MainListView: View {
     
     private var dataSourceToolbarMenu: some View {
         Menu {
-            // 数据源切换部分
-            Section("Data Source") {
-                if isSourceEnabled(.appleBooks) {
-                    Button {
-                        contentSourceRawValue = ContentSource.appleBooks.rawValue
-                    } label: {
-                        HStack {
-                            Text("Apple Books (\(appleBooksVM.displayBooks.count)/\(appleBooksVM.books.count))")
-                            if contentSource == .appleBooks { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-
-                if isSourceEnabled(.goodLinks) {
-                    Button {
-                        contentSourceRawValue = ContentSource.goodLinks.rawValue
-                    } label: {
-                        HStack {
-                            Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
-                            if contentSource == .goodLinks { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-
-                if isSourceEnabled(.weRead) {
-                    Button {
-                        contentSourceRawValue = ContentSource.weRead.rawValue
-                    } label: {
-                        HStack {
-                            Text("WeRead (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
-                            if contentSource == .weRead { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            }
-            
-            // 排序和筛选部分（根据数据源显示对应选项）
-            if contentSource == .appleBooks {
-                Divider()
+            // 排序和筛选部分（根据当前数据源显示对应选项）
+            switch contentSource {
+            case .appleBooks:
                 appleBooksFilterMenu
-            } else if contentSource == .goodLinks {
-                Divider()
+            case .goodLinks:
                 goodLinksFilterMenu
-            } else if contentSource == .weRead {
-                Divider()
+            case .weRead:
                 weReadFilterMenu
             }
         } label: {
-            Text(contentSource.title)
+            Image(systemName: "line.3.horizontal.decrease.circle")
         }
+        .menuIndicator(.hidden)
     }
     
     // MARK: - Filter Menus
