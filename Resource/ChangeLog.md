@@ -1,5 +1,16 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.8.5 November 26, 2025
+
+*Added*
+
+- i18n: Added comprehensive translations for IAP-related strings across 16 languages
+- Translation Guide: Created detailed i18n translation workflow documentation
+
+*Changed*
+
+- Lazy Bookmark Restoration: Moved Apple Books bookmark restoration from MainListView to AppleBooksListView for better UX
+
 ## v0.8.4.2 November 26, 2025
 
 *Architecture Refactoring*
@@ -7,14 +18,109 @@
 - RootView Architecture: Added RootView as root view to manage Onboarding, PayWall, and MainListView transitions
 - PayWall Priority: Moved PayWall check logic from MainListView to RootView, ensuring display before data source initialization
 - Lazy Bookmark Restoration: Bookmark restoration now uses lazy loading, only triggered when user switches to the corresponding data source
-  - Apple Books: AppleBooksListView.onAppear → viewModel.restoreBookmarkAndConfigureRoot()
-  - GoodLinks: GoodLinksListView.onAppear → loadRecentLinks() → resolveDatabasePath()
 
 *Improvements*
 
-- PayWallView UI Refactor: Adopted Onboarding-style bottom layout, added gift icon wiggle animation and urgent reminder pulse animation
+- PayWallView UI Refactor: Adopted Onboarding-style bottom layout with gift icon wiggle animation
 - Background Coverage: Fixed PayWallView background not covering entire view
-- Code Cleanup: Removed PayWall-related code from MainListView, simplified view structure
+- Code Cleanup: Removed PayWall-related code from MainListView
+
+## v0.8.4.1 November 26, 2025
+
+*Added*
+
+- Trial Onboarding: Added trial onboarding step with purchase options
+- Header Animations: Enhanced onboarding trial view with pulse and shake effects for icons
+
+*Changed*
+
+- Unified Trial Views: Replaced IAPService with TrialViewModel for improved onboarding experience
+- Layout Updates: Updated onboarding views to use VStack for improved spacing
+
+## v0.8.4 November 26, 2025
+
+*Added*
+
+- Onboarding Flow: Implemented multi-step onboarding with shared components
+- Onboarding Assets: Added color assets for onboarding views
+
+*Changed*
+
+- Onboarding Layout: Enhanced onboarding views with animations and improved styling
+- Notion Connection: Updated Notion connection prompts in onboarding
+
+## v0.8.3.3 November 25, 2025
+
+*Changed*
+
+- Documentation: Updated README and merged sync refactoring PR
+
+## v0.8.3.2 November 25, 2025
+
+*Added*
+
+- WeRead Auto-Sync: Integrated WeRead into auto-sync service with WeReadAutoSyncProvider
+
+*Fixed*
+
+- WeRead Session: Updated button label for session expiration alert
+
+*Changed*
+
+- WeRead Navigation: Enhanced WeRead integration with navigation and caching improvements
+
+## v0.8.3.1 November 25, 2025
+
+*Changed*
+
+- Notion Config: Updated Notion configuration file paths and added example config
+- Documentation: Updated CLAUDE.md to reflect unified sync engine architecture
+
+## v0.8.3 November 25, 2025
+
+*Added*
+
+- WeRead Pagination: Enhanced WeReadDetailViewModel with pagination and loading states
+
+## v0.8.2.2 November 25, 2025
+
+*Added*
+
+- WeRead Caching: Implemented WeRead caching and incremental sync functionality
+
+*Changed*
+
+- Thread Safety: Updated WeReadCacheService for thread safety and improved predicate handling
+
+## v0.8.2.1 November 25, 2025
+
+*Changed*
+
+- Legal Links: Updated privacy policy and terms of use links in PayWallView and AboutView
+- PayWall Enhancement: Added message display and legal links section
+
+## v0.8.2 November 25, 2025
+
+*Added*
+
+- Data Source Toggles: Added enable/disable toggles for Apple Books, GoodLinks, and WeRead in settings
+- Keyboard Shortcuts: Enhanced data source switching with keyboard shortcuts
+
+*Changed*
+
+- MainListView: Implemented data source management with visibility controls
+
+## v0.8.1 November 24, 2025
+
+*Added*
+
+- Onboarding Flow: Implemented onboarding flow with multiple steps and Notion integration
+- Debug Options: Enhanced onboarding flow with debug options for development
+
+*Changed*
+
+- Window Title: Hidden title bar for main application window
+- Onboarding Simplification: Removed Pro Access step from onboarding flow
 
 ## v0.8.0 November 24, 2025
 
