@@ -4,6 +4,11 @@ struct WeReadDetailView: View {
     @ObservedObject var listViewModel: WeReadViewModel
     @Binding var selectedBookId: String?
     @StateObject private var detailViewModel = WeReadDetailViewModel()
+    
+    // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
+    @State private var measuredLayoutWidth: CGFloat = 0
+    @State private var debouncedLayoutWidth: CGFloat = 0
+    @State private var layoutWidthDebounceTask: Task<Void, Never>?
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -67,7 +72,7 @@ struct WeReadDetailView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.top)
                         } else {
-                            WaterfallLayout(minColumnWidth: 280, spacing: 12) {
+                            WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
                                 ForEach(detailViewModel.visibleHighlights) { h in
                                     HighlightCardView(
                                         colorMark: color(for: h.colorIndex),
@@ -84,6 +89,28 @@ struct WeReadDetailView: View {
                                 }
                             }
                             .padding(.top)
+                            .overlay(
+                                GeometryReader { proxy in
+                                    let w = proxy.size.width
+                                    Color.clear
+                                        .onAppear {
+                                            measuredLayoutWidth = w
+                                            debouncedLayoutWidth = w
+                                        }
+                                        .onChange(of: w) { _, newValue in
+                                            measuredLayoutWidth = newValue
+                                            // 取消之前的 debounce 任务
+                                            layoutWidthDebounceTask?.cancel()
+                                            // 创建新的 debounce 任务，延迟 0.3 秒更新
+                                            layoutWidthDebounceTask = Task { @MainActor in
+                                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 秒
+                                                if !Task.isCancelled {
+                                                    debouncedLayoutWidth = newValue
+                                                }
+                                            }
+                                        }
+                                }
+                            )
                             
                             // 加载更多指示器
                             if detailViewModel.isLoadingMore {
