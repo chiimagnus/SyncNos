@@ -428,7 +428,7 @@ struct PayWallView: View {
 
 // MARK: - Presentation Mode
 
-enum IAPPresentationMode {
+enum IAPPresentationMode: Equatable {
     case welcome
     case trialReminder(daysRemaining: Int)
     case trialExpired
