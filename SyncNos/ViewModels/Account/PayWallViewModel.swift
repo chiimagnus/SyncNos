@@ -187,7 +187,7 @@ final class PayWallViewModel: ObservableObject {
 
 // MARK: - Computed Properties for UI
 
-extension TrialViewModel {
+extension PayWallViewModel {
     
     /// 获取头部图标名称
     func headerIconName(for mode: TrialPresentationMode) -> String {
