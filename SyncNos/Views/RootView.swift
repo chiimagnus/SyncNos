@@ -25,7 +25,7 @@ struct RootView: View {
                         checkTrialStatus()
                     }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity)
             } else {
                 // Step 3: MainListView（正常使用）
                 MainListView()
