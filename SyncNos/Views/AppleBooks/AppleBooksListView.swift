@@ -14,15 +14,36 @@ struct AppleBooksListView: View {
             if viewModel.isLoading || viewModel.isComputingList {
                 ProgressView("Loading...")
             } else if viewModel.errorMessage != nil {
-                VStack {
+                VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
                         .font(.largeTitle)
-                    Text("Error: Please allow SyncNos to access Apple Books notes; otherwise they cannot be loaded.")
+                    
+                    Text("Access Denied")
+                        .font(.headline)
+                    
+                    Text("SyncNos needs permission to access Apple Books notes. If you previously selected \"Don't Allow\", please restart the app and select \"Allow\" when prompted.")
                         .multilineTextAlignment(.center)
-                        .padding()
-                    Button("Open Apple Books notes", systemImage: "folder") {
-                        AppleBooksPicker.pickAppleBooksContainer()
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: 12) {
+                        Button("Restart App", systemImage: "arrow.clockwise") {
+                            // 重启应用
+                            let task = Process()
+                            task.launchPath = "/usr/bin/open"
+                            task.arguments = ["-n", Bundle.main.bundlePath]
+                            task.launch()
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                NSApplication.shared.terminate(nil)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        
+                        Button("Select Folder", systemImage: "folder") {
+                            AppleBooksPicker.pickAppleBooksContainer()
+                        }
                     }
                 }
             } else if viewModel.books.isEmpty {
