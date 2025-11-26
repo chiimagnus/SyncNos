@@ -131,7 +131,7 @@ enum HighlightSortField: String, CaseIterable {
 
     var displayName: LocalizedStringResource {
         switch self {
-        case .created: return "Creation Time"
+        case .created: return "Added Time"
         case .modified: return "Modified Time"
         }
     }

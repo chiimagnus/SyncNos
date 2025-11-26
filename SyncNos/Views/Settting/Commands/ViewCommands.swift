@@ -246,7 +246,7 @@ struct ViewCommands: Commands {
             }
 
             // Highlight 菜单 - 全局高亮排序和筛选
-            Menu("Highlight", systemImage: "highlighter") {
+            Menu("Highlights", systemImage: "highlighter") {
                 Section("Sort") {
                     ForEach(HighlightSortField.allCases, id: \.self) { k in
                         Button {
