@@ -6,30 +6,30 @@ struct OnboardingNotionView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     
     var body: some View {
-        ZStack {
+        VStack {
+            Spacer()
+
             // 中央区域 - Notion 图标 + 标题
             HStack(spacing: 16) {
                 Image(systemName: "n.square") // Notion
                     .font(.system(size: 120))
                     .foregroundStyle(Color("OnboardingTextColor"))
             
-                Text("Notion\nOAuth")
+                Text("Notion OAuth")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Color("OnboardingTextColor"))
                     .multilineTextAlignment(.leading)
             }
+
+            Spacer()
             
             // 底部区域
-            VStack {
-                Spacer()
-                
-                if viewModel.isNotionConnected {
-                    // 已连接状态
-                    connectedStateView
-                } else {
-                    // 未连接状态
-                    disconnectedStateView
-                }
+            if viewModel.isNotionConnected {
+                // 已连接状态
+                connectedStateView
+            } else {
+                // 未连接状态
+                disconnectedStateView
             }
         }
     }
@@ -65,57 +65,55 @@ struct OnboardingNotionView: View {
     // MARK: - Disconnected State
     
     private var disconnectedStateView: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .center, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Connect Your Notion")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(Color("OnboardingTextColor"))
-                    
-                    Text("We'll create secure databases in your Notion workspace.")
-                        .font(.subheadline)
-                        .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                        .lineLimit(2)
-                    
-                    if let error = viewModel.notionErrorMessage {
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
-                }
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Connect Your Notion")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(Color("OnboardingTextColor"))
                 
-                Spacer()
+                Text("We'll create secure databases in your Notion workspace.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                    .lineLimit(2)
                 
-                // 连接按钮
-                Button(action: { viewModel.connectNotion() }) {
-                    HStack(spacing: 8) {
-                        if viewModel.isAuthorizingNotion {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("Connect")
-                                .font(.headline)
-                        }
-                    }
-                    .foregroundColor(.white)
-                    .frame(width: 100, height: 44)
-                    .background(Color("OnboardingButtonColor"))
-                    .cornerRadius(22)
-                    .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
+                if let error = viewModel.notionErrorMessage {
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .font(.caption)
                 }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isAuthorizingNotion)
             }
-            .padding(.horizontal, 40)
             
+            Spacer()
+
             // Skip 按钮
-            Button("Skip for now") {
+            Button("Skip") {
                 viewModel.nextStep()
             }
             .buttonStyle(.link)
             .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-            .padding(.bottom, 40)
+
+            // 连接按钮
+            Button(action: { viewModel.connectNotion() }) {
+                HStack(spacing: 8) {
+                    if viewModel.isAuthorizingNotion {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Connect")
+                            .font(.headline)
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(width: 100, height: 44)
+                .background(Color("OnboardingButtonColor"))
+                .cornerRadius(22)
+                .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isAuthorizingNotion)
         }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 40)
     }
 }
 
