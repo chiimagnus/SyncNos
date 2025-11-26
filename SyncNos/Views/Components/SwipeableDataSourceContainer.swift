@@ -3,6 +3,7 @@ import AppKit
 
 /// 可滑动的数据源容器
 /// 包含滑动区域和悬浮底部指示器
+/// 使用触控板双指水平滑动（swipe gesture）切换数据源，不与 List 垂直滚动冲突
 struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @ObservedObject var viewModel: DataSourceSwitchViewModel
     
@@ -19,10 +20,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     // Filter 菜单
     @ViewBuilder var filterMenu: () -> FilterMenu
     
-    // 滑动状态
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging: Bool = false
-    @State private var previousIndex: Int = 0
+    // 触控板滑动监听器
+    @StateObject private var swipeHandler = TrackpadSwipeHandler()
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -30,52 +29,13 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             if viewModel.hasEnabledSources {
                 GeometryReader { geometry in
                     HStack(spacing: 0) {
-                        ForEach(Array(viewModel.enabledDataSources.enumerated()), id: \.offset) { index, source in
+                        ForEach(Array(viewModel.enabledDataSources.enumerated()), id: \.offset) { _, source in
                             dataSourceView(for: source)
                                 .frame(width: geometry.size.width)
                         }
                     }
-                    .offset(x: -CGFloat(viewModel.activeIndex) * geometry.size.width + dragOffset)
-                    .animation(isDragging ? nil : .interactiveSpring(response: 0.3, dampingFraction: 0.8), value: viewModel.activeIndex)
-                    .animation(isDragging ? nil : .interactiveSpring(response: 0.3, dampingFraction: 0.8), value: dragOffset)
-                    .gesture(
-                        DragGesture(minimumDistance: 30, coordinateSpace: .local)
-                            .onChanged { value in
-                                // 只处理水平滑动（水平位移大于垂直位移的 1.5 倍）
-                                let horizontalAmount = abs(value.translation.width)
-                                let verticalAmount = abs(value.translation.height)
-                                
-                                if horizontalAmount > verticalAmount * 1.5 {
-                                    isDragging = true
-                                    dragOffset = value.translation.width
-                                }
-                            }
-                            .onEnded { value in
-                                let threshold: CGFloat = geometry.size.width * 0.15
-                                let horizontalAmount = abs(value.translation.width)
-                                let verticalAmount = abs(value.translation.height)
-                                
-                                // 只有当水平滑动足够明显时才处理
-                                if horizontalAmount > verticalAmount * 1.5 {
-                                    let predictedEndOffset = value.predictedEndTranslation.width
-                                    
-                                    if predictedEndOffset < -threshold && viewModel.activeIndex < viewModel.enabledDataSources.count - 1 {
-                                        // 向左滑动，切换到下一个
-                                        previousIndex = viewModel.activeIndex
-                                        viewModel.activeIndex += 1
-                                        handleIndexChange(from: previousIndex, to: viewModel.activeIndex)
-                                    } else if predictedEndOffset > threshold && viewModel.activeIndex > 0 {
-                                        // 向右滑动，切换到上一个
-                                        previousIndex = viewModel.activeIndex
-                                        viewModel.activeIndex -= 1
-                                        handleIndexChange(from: previousIndex, to: viewModel.activeIndex)
-                                    }
-                                }
-                                
-                                isDragging = false
-                                dragOffset = 0
-                            }
-                    )
+                    .offset(x: -CGFloat(viewModel.activeIndex) * geometry.size.width)
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: viewModel.activeIndex)
                 }
             } else {
                 emptyStateView
@@ -108,6 +68,29 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         }
         // 根据当前活动的 DataSource 设置 SelectionCommands
         .focusedSceneValue(\.selectionCommands, currentSelectionCommands)
+        // 监听触控板滑动事件
+        .onAppear {
+            swipeHandler.onSwipeLeft = { [weak viewModel] in
+                guard let vm = viewModel else { return }
+                let previousIndex = vm.activeIndex
+                if vm.activeIndex < vm.enabledDataSources.count - 1 {
+                    vm.activeIndex += 1
+                    handleIndexChange(from: previousIndex, to: vm.activeIndex)
+                }
+            }
+            swipeHandler.onSwipeRight = { [weak viewModel] in
+                guard let vm = viewModel else { return }
+                let previousIndex = vm.activeIndex
+                if vm.activeIndex > 0 {
+                    vm.activeIndex -= 1
+                    handleIndexChange(from: previousIndex, to: vm.activeIndex)
+                }
+            }
+            swipeHandler.startListening()
+        }
+        .onDisappear {
+            swipeHandler.stopListening()
+        }
     }
     
     // MARK: - Computed Properties
@@ -220,6 +203,118 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         selectedBookIds.removeAll()
         selectedLinkIds.removeAll()
         selectedWeReadBookIds.removeAll()
+    }
+}
+
+// MARK: - Trackpad Swipe Handler
+
+/// 触控板双指水平滑动监听器
+/// 监听 macOS 的 swipe 手势事件（类似 Safari 前进/后退）
+final class TrackpadSwipeHandler: ObservableObject {
+    
+    /// 向左滑动回调（切换到下一个）
+    var onSwipeLeft: (() -> Void)?
+    
+    /// 向右滑动回调（切换到上一个）
+    var onSwipeRight: (() -> Void)?
+    
+    private var scrollEventMonitor: Any?
+    
+    // 累积的水平滚动量
+    private var accumulatedScrollX: CGFloat = 0
+    // 滚动开始时间
+    private var scrollStartTime: Date?
+    // 滚动阈值（触发切换所需的累积量）
+    private let scrollThreshold: CGFloat = 50
+    // 滚动超时时间（秒）
+    private let scrollTimeout: TimeInterval = 0.3
+    // 是否已触发切换（防止重复触发）
+    private var hasTriggered: Bool = false
+    
+    deinit {
+        // 在 deinit 中直接移除监听器（非 @MainActor 隔离）
+        if let monitor = scrollEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            scrollEventMonitor = nil
+        }
+    }
+    
+    /// 开始监听触控板滑动事件
+    func startListening() {
+        guard scrollEventMonitor == nil else { return }
+        
+        // 监听滚动事件（触控板双指滑动会产生 scrollWheel 事件）
+        scrollEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.handleScrollEvent(event)
+            return event
+        }
+    }
+    
+    /// 停止监听
+    func stopListening() {
+        if let monitor = scrollEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            scrollEventMonitor = nil
+        }
+    }
+    
+    private func handleScrollEvent(_ event: NSEvent) {
+        // 只处理触控板事件（phase 不为 .none 表示是触控板）
+        guard event.phase != [] || event.momentumPhase != [] else { return }
+        
+        let deltaX = event.scrollingDeltaX
+        let deltaY = event.scrollingDeltaY
+        
+        // 只处理水平滚动为主的情况
+        guard abs(deltaX) > abs(deltaY) * 1.5 else {
+            // 垂直滚动为主，重置状态
+            resetScrollState()
+            return
+        }
+        
+        // 处理滚动开始
+        if event.phase == .began {
+            scrollStartTime = Date()
+            accumulatedScrollX = 0
+            hasTriggered = false
+        }
+        
+        // 累积水平滚动量
+        accumulatedScrollX += deltaX
+        
+        // 检查是否超时
+        if let startTime = scrollStartTime, Date().timeIntervalSince(startTime) > scrollTimeout {
+            resetScrollState()
+            return
+        }
+        
+        // 检查是否达到阈值并触发
+        if !hasTriggered {
+            if accumulatedScrollX > scrollThreshold {
+                // 向右滑动（deltaX 为正 = 手指向右 = 切换到上一个）
+                hasTriggered = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.onSwipeRight?()
+                }
+            } else if accumulatedScrollX < -scrollThreshold {
+                // 向左滑动（deltaX 为负 = 手指向左 = 切换到下一个）
+                hasTriggered = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.onSwipeLeft?()
+                }
+            }
+        }
+        
+        // 处理滚动结束
+        if event.phase == .ended || event.phase == .cancelled {
+            resetScrollState()
+        }
+    }
+    
+    private func resetScrollState() {
+        accumulatedScrollX = 0
+        scrollStartTime = nil
+        hasTriggered = false
     }
 }
 
