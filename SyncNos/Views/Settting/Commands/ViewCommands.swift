@@ -48,7 +48,7 @@ struct ViewCommands: Commands {
         enabledContentSources.firstIndex(of: source)
     }
 
-    /// 根据“第几个启用的数据源”返回对应的快捷键（cmd+1 / cmd+2 / cmd+3）
+    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 / cmd+2 / cmd+3）
     private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
         guard let index = indexForSource(source) else { return nil }
         switch index {
@@ -57,6 +57,36 @@ struct ViewCommands: Commands {
         case 2: return "3"
         default: return nil
         }
+    }
+
+    // MARK: - Data Source Navigation (Circular)
+
+    /// 当前数据源在启用列表中的索引
+    private var currentSourceIndex: Int? {
+        indexForSource(currentSource)
+    }
+
+    /// 是否可以切换数据源（需要至少 2 个启用的数据源）
+    private var canSwitchDataSource: Bool {
+        enabledContentSources.count > 1
+    }
+
+    /// 切换到上一个数据源（循环）
+    private func switchToPreviousDataSource() {
+        guard let index = currentSourceIndex, enabledContentSources.count > 1 else { return }
+        // 循环：如果是第一个，则切换到最后一个
+        let previousIndex = index > 0 ? index - 1 : enabledContentSources.count - 1
+        let previousSource = enabledContentSources[previousIndex]
+        contentSourceRawValue = previousSource.rawValue
+    }
+
+    /// 切换到下一个数据源（循环）
+    private func switchToNextDataSource() {
+        guard let index = currentSourceIndex, enabledContentSources.count > 1 else { return }
+        // 循环：如果是最后一个，则切换到第一个
+        let nextIndex = (index + 1) % enabledContentSources.count
+        let nextSource = enabledContentSources[nextIndex]
+        contentSourceRawValue = nextSource.rawValue
     }
 
     var body: some Commands {
@@ -73,7 +103,22 @@ struct ViewCommands: Commands {
             .keyboardShortcut("r", modifiers: .command)
             Divider()
 
-            // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到“第 1/2/3 个启用的数据源”）
+            // 数据源切换：上一个/下一个（⌘+← / ⌘+→）- 循环切换
+            Button("Previous Data Source") {
+                switchToPreviousDataSource()
+            }
+            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .disabled(!canSwitchDataSource)
+
+            Button("Next Data Source") {
+                switchToNextDataSource()
+            }
+            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .disabled(!canSwitchDataSource)
+
+            Divider()
+
+            // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到"第 1/2/3 个启用的数据源"）
             if isDataSourceEnabled(.appleBooks) {
                 if let key = shortcutKey(for: .appleBooks) {
                     Button("Apple Books", systemImage: "book") {
