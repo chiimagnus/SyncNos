@@ -1,6 +1,5 @@
 import Foundation
 import Combine
-import SwiftUI
 
 final class LoginItemViewModel: ObservableObject {
     @Published var isEnabled: Bool = false
