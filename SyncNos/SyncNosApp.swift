@@ -5,7 +5,6 @@ import StoreKit
 @main
 struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     
     init() {
 #if DEBUG
@@ -62,16 +61,7 @@ struct SyncNosApp: App {
     var body: some Scene {
         // 隐藏可见窗口标题（保留重新打开时的 id），以避免在工具栏中显示应用程序名称。
         Window("", id: "main") {
-            Group {
-                if hasCompletedOnboarding {
-                    MainListView()
-                        .transition(.opacity)
-                } else {
-                    OnboardingView()
-                        .transition(.opacity)
-                }
-            }
-            .animation(.spring(), value: hasCompletedOnboarding)
+            RootView()
         }
         .windowStyle(.hiddenTitleBar) //隐藏标题栏
         .commands {

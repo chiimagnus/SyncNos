@@ -11,7 +11,6 @@ struct MainListView: View {
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @Environment(\.openWindow) private var openWindow
-    @State private var iapPresentationMode: IAPPresentationMode? = nil
 
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
@@ -48,53 +47,26 @@ struct MainListView: View {
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
 
-    private var iapService: IAPServiceProtocol {
-        DIContainer.shared.iapService
-    }
-
     var body: some View {
-        ZStack {
-            if let mode = iapPresentationMode {
-                PayWallView(
-                    presentationMode: mode,
-                    onFinish: {
-                        // 用户完成欢迎页、提醒或购买成功后，恢复主界面
-                        iapPresentationMode = nil
-                        checkTrialStatus()
-                    }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else {
-                mainContent
-                    .transition(.opacity)
+        mainContent
+            .onAppear {
+                // 启动时根据当前启用数据源校正 contentSource
+                ensureValidContentSource()
+                // 注入 WeRead 缓存服务
+                if let cacheService = DIContainer.shared.weReadCacheService {
+                    weReadVM.setCacheService(cacheService)
+                }
             }
-        }
-        .animation(.spring(), value: iapPresentationMode != nil)
-        .onAppear {
-            checkTrialStatus()
-            // 启动时根据当前启用数据源校正 contentSource
-            ensureValidContentSource()
-            // 注入 WeRead 缓存服务
-            if let cacheService = DIContainer.shared.weReadCacheService {
-                weReadVM.setCacheService(cacheService)
+            // 当数据源启用状态变化时，确保当前内容源仍然有效
+            .onChange(of: appleBooksSourceEnabled) { _, _ in
+                ensureValidContentSource()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
-            let logger = DIContainer.shared.loggerService
-            logger.debug("IAP status changed notification received, rechecking trial status")
-            checkTrialStatus()
-        }
-        // 当数据源启用状态变化时，确保当前内容源仍然有效
-        .onChange(of: appleBooksSourceEnabled) { _, _ in
-            ensureValidContentSource()
-        }
-        .onChange(of: goodLinksSourceEnabled) { _, _ in
-            ensureValidContentSource()
-        }
-        .onChange(of: weReadSourceEnabled) { _, _ in
-            ensureValidContentSource()
-        }
+            .onChange(of: goodLinksSourceEnabled) { _, _ in
+                ensureValidContentSource()
+            }
+            .onChange(of: weReadSourceEnabled) { _, _ in
+                ensureValidContentSource()
+            }
     }
 
     // MARK: - Main Content
@@ -490,50 +462,6 @@ struct MainListView: View {
                 )
             }
         }
-    }
-
-    private func checkTrialStatus() {
-        let logger = DIContainer.shared.loggerService
-        logger.debug("checkTrialStatus called: hasPurchased=\(iapService.hasPurchased), hasEverPurchasedAnnual=\(iapService.hasEverPurchasedAnnual), isProUnlocked=\(iapService.isProUnlocked), hasShownWelcome=\(iapService.hasShownWelcome), trialDaysRemaining=\(iapService.trialDaysRemaining)")
-        
-        // Priority 1: 如果已购买，不显示任何付费墙
-        if iapService.hasPurchased {
-            logger.debug("User has purchased, hiding paywall")
-            iapPresentationMode = nil
-            return
-        }
-        
-        // Priority 2: 如果曾经购买过年订阅但已过期，显示订阅过期视图
-        if iapService.hasEverPurchasedAnnual && !iapService.hasPurchased {
-            logger.debug("Annual subscription expired, showing subscriptionExpired view")
-            iapPresentationMode = .subscriptionExpired
-            return
-        }
-        
-        // Priority 3: 如果试用期过期且从未购买，显示试用期过期视图
-        if !iapService.isProUnlocked {
-            logger.debug("Trial expired, showing trialExpired view")
-            iapPresentationMode = .trialExpired
-            return
-        }
-        
-        // Priority 4: 如果应该显示试用提醒，显示提醒视图
-        if iapService.shouldShowTrialReminder() {
-            logger.debug("Should show trial reminder, showing trialReminder view")
-            iapPresentationMode = .trialReminder(daysRemaining: iapService.trialDaysRemaining)
-            return
-        }
-        
-        // Priority 5: 如果是首次使用且在试用期内，显示欢迎视图
-        if !iapService.hasShownWelcome {
-            logger.debug("First time user, showing welcome view")
-            iapPresentationMode = .welcome
-            return
-        }
-        
-        // 其他情况不显示付费墙
-        logger.debug("No paywall needed, hiding")
-        iapPresentationMode = nil
     }
 }
 
