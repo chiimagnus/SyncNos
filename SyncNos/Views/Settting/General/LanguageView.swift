@@ -74,37 +74,14 @@ struct LanguageView: View {
             NotificationCenter.default.post(name: Notification.Name("BypassQuitConfirmationOnce"), object: nil)
         }
 
-        let appBundlePath = Bundle.main.bundlePath
+        // 使用 open -n 启动新实例
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = ["-n", Bundle.main.bundlePath]
+        task.launch()
 
-        // 创建临时脚本文件来重启应用
-        let script = """
-        sleep 0.5
-        open "\(appBundlePath)"
-        """
-        let tempDirectory = NSTemporaryDirectory()
-        let scriptPath = "\(tempDirectory)/restart_\(UUID().uuidString).sh"
-
-        // 写入脚本文件
-        do {
-            try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-
-            // 设置脚本执行权限
-            try FileManager.default.setAttributes(
-                [.posixPermissions: 0o755],
-                ofItemAtPath: scriptPath
-            )
-
-            // 启动脚本（在后台执行）
-            let task = Process()
-            task.launchPath = "/bin/bash"
-            task.arguments = [scriptPath]
-            task.launch()
-        } catch {
-            LoggerService.shared.log(.error, message: "Failed to restart application: \(error)")
-        }
-
-        // 立即退出当前应用
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // 延迟退出当前应用，让新实例有时间启动
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             NSApplication.shared.terminate(nil)
         }
     }
