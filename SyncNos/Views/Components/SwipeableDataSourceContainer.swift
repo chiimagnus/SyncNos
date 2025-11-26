@@ -23,6 +23,10 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @State private var dragOffset: CGFloat = 0
     @State private var previousIndex: Int = 0
     
+    // 数据源名称提示状态
+    @State private var showDataSourceLabel: Bool = false
+    @State private var hideDataSourceLabelTask: Task<Void, Never>?
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // 滑动区域
@@ -71,27 +75,77 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             
             // 悬浮底部栏：指示器 + Filter 按钮
             if viewModel.hasEnabledSources {
-                HStack(spacing: 8) {
-                    // 左侧：数据源指示器（只在多数据源时显示）
-                    if viewModel.enabledDataSources.count > 1 {
-                        DataSourceIndicatorBar(viewModel: viewModel)
+                VStack(spacing: 6) {
+                    // 数据源名称提示（切换时临时显示）
+                    if showDataSourceLabel, let currentSource = viewModel.currentDataSource {
+                        Text(currentSource.displayName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(currentSource.accentColor)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule()
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            )
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     }
                     
-                    Spacer()
-                    
-                    // 右侧：Filter 按钮
-                    filterMenu()
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                        )
+                    GeometryReader { bottomGeometry in
+                        HStack(spacing: 8) {
+                            // 左侧：数据源指示器（只在多数据源时显示）
+                            if viewModel.enabledDataSources.count > 1 {
+                                // 当宽度小于 200 或数据源超过 3 个时使用紧凑模式
+                                let useCompactMode = bottomGeometry.size.width < 200 || viewModel.enabledDataSources.count > 3
+                                DataSourceIndicatorBar(viewModel: viewModel, compactMode: useCompactMode)
+                            }
+                            
+                            Spacer()
+                            
+                            // 右侧：Filter 按钮
+                            filterMenu()
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(.ultraThinMaterial)
+                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                )
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .bottom)
+                    }
+                    .frame(height: 40)
                 }
-                .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+            }
+        }
+        .onChange(of: viewModel.activeIndex) { _, _ in
+            showDataSourceLabelTemporarily()
+        }
+    }
+    
+    // MARK: - Data Source Label
+    
+    private func showDataSourceLabelTemporarily() {
+        // 取消之前的隐藏任务
+        hideDataSourceLabelTask?.cancel()
+        
+        // 显示标签
+        withAnimation(.easeOut(duration: 0.2)) {
+            showDataSourceLabel = true
+        }
+        
+        // 1.5 秒后隐藏
+        hideDataSourceLabelTask = Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if !Task.isCancelled {
+                await MainActor.run {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        showDataSourceLabel = false
+                    }
+                }
             }
         }
     }
