@@ -1,9 +1,13 @@
 import SwiftUI
+import AppKit
 
 struct GoodLinksListView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
+    
+    /// 用于接收焦点的 FocusState
+    @FocusState private var isListFocused: Bool
 
     var body: some View {
         Group {
@@ -101,6 +105,7 @@ struct GoodLinksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .focused($isListFocused)
             }
         }
         .onAppear {
@@ -110,6 +115,16 @@ struct GoodLinksListView: View {
                 Task {
                     await viewModel.loadRecentLinks()
                 }
+            }
+            // 延迟获取焦点，确保视图已完全加载
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isListFocused = true
+            }
+        }
+        // 监听数据源切换通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToGoodLinks")).receive(on: DispatchQueue.main)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isListFocused = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in

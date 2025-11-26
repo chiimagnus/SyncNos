@@ -78,6 +78,7 @@ struct ViewCommands: Commands {
         let previousIndex = index > 0 ? index - 1 : enabledContentSources.count - 1
         let previousSource = enabledContentSources[previousIndex]
         contentSourceRawValue = previousSource.rawValue
+        // 通知由 DataSourceSwitchViewModel.switchTo() 统一发送
     }
 
     /// 切换到下一个数据源（循环）
@@ -87,6 +88,7 @@ struct ViewCommands: Commands {
         let nextIndex = (index + 1) % enabledContentSources.count
         let nextSource = enabledContentSources[nextIndex]
         contentSourceRawValue = nextSource.rawValue
+        // 通知由 DataSourceSwitchViewModel.switchTo() 统一发送
     }
 
     var body: some Commands {
@@ -119,6 +121,7 @@ struct ViewCommands: Commands {
             Divider()
 
             // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到"第 1/2/3 个启用的数据源"）
+            // 通知由 DataSourceSwitchViewModel.switchTo() 统一发送
             if isDataSourceEnabled(.appleBooks) {
                 if let key = shortcutKey(for: .appleBooks) {
                     Button("Apple Books", systemImage: "book") {

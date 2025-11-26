@@ -50,6 +50,11 @@ final class DataSourceSwitchViewModel: ObservableObject {
         
         activeIndex = index
         triggerHapticFeedback()
+        
+        // 发送通知让对应的 ListView 获取焦点
+        if let source = enabledDataSources[safe: index] {
+            notifyDataSourceSwitch(to: source)
+        }
     }
     
     /// 切换到指定类型的数据源
@@ -57,6 +62,23 @@ final class DataSourceSwitchViewModel: ObservableObject {
     func switchTo(source: ContentSource) {
         guard let index = enabledDataSources.firstIndex(of: source) else { return }
         switchTo(index: index)
+    }
+    
+    /// 发送数据源切换通知，让对应的 ListView 获取焦点
+    private func notifyDataSourceSwitch(to source: ContentSource) {
+        let notificationName: Notification.Name
+        switch source {
+        case .appleBooks:
+            notificationName = Notification.Name("DataSourceSwitchedToAppleBooks")
+        case .goodLinks:
+            notificationName = Notification.Name("DataSourceSwitchedToGoodLinks")
+        case .weRead:
+            notificationName = Notification.Name("DataSourceSwitchedToWeRead")
+        }
+        // 延迟发送，确保视图切换动画完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NotificationCenter.default.post(name: notificationName, object: nil)
+        }
     }
     
     /// 触发触觉反馈
@@ -99,6 +121,13 @@ final class DataSourceSwitchViewModel: ObservableObject {
                 self?.loadEnabledDataSources()
             }
             .store(in: &cancellables)
+    }
+}
+
+// MARK: - Array Safe Subscript Extension
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

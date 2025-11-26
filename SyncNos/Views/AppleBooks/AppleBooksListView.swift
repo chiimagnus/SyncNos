@@ -1,9 +1,13 @@
 import SwiftUI
+import AppKit
 
 struct AppleBooksListView: View {
     @ObservedObject var viewModel: AppleBooksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
+    
+    /// 用于接收焦点的 FocusState
+    @FocusState private var isListFocused: Bool
 
     var body: some View {
         Group {
@@ -90,6 +94,7 @@ struct AppleBooksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .focused($isListFocused)
             }
         }
         .onAppear {
@@ -100,6 +105,16 @@ struct AppleBooksListView: View {
                 Task {
                     await viewModel.loadBooks()
                 }
+            }
+            // 延迟获取焦点，确保视图已完全加载
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isListFocused = true
+            }
+        }
+        // 监听数据源切换通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToAppleBooks")).receive(on: DispatchQueue.main)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isListFocused = true
             }
         }
         .onDisappear {

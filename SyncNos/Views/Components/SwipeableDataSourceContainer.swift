@@ -72,18 +72,18 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         .onAppear {
             swipeHandler.onSwipeLeft = { [weak viewModel] in
                 guard let vm = viewModel else { return }
-                let previousIndex = vm.activeIndex
+                // 切换到下一个数据源
                 if vm.activeIndex < vm.enabledDataSources.count - 1 {
-                    vm.activeIndex += 1
-                    handleIndexChange(from: previousIndex, to: vm.activeIndex)
+                    vm.switchTo(index: vm.activeIndex + 1)
+                    clearAllSelections()
                 }
             }
             swipeHandler.onSwipeRight = { [weak viewModel] in
                 guard let vm = viewModel else { return }
-                let previousIndex = vm.activeIndex
+                // 切换到上一个数据源
                 if vm.activeIndex > 0 {
-                    vm.activeIndex -= 1
-                    handleIndexChange(from: previousIndex, to: vm.activeIndex)
+                    vm.switchTo(index: vm.activeIndex - 1)
+                    clearAllSelections()
                 }
             }
             swipeHandler.startListening()
@@ -193,13 +193,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     
     // MARK: - Private Methods
     
-    private func handleIndexChange(from oldIndex: Int, to newIndex: Int) {
-        guard oldIndex != newIndex else { return }
-        
-        // 触发触觉反馈
-        viewModel.triggerHapticFeedback()
-        
-        // 清空所有选择
+    /// 清空所有数据源的选择
+    private func clearAllSelections() {
         selectedBookIds.removeAll()
         selectedLinkIds.removeAll()
         selectedWeReadBookIds.removeAll()
