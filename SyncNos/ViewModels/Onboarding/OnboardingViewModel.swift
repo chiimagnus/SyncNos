@@ -1,6 +1,13 @@
-import SwiftUI
+import SwiftUI  // 需要 SwiftUI 用于 @AppStorage 和 withAnimation
 import Combine
 
+// MARK: - OnboardingViewModel
+/// 管理 Onboarding 流程的 ViewModel
+///
+/// 注意：此 ViewModel 使用了 SwiftUI 的以下特性：
+/// - @AppStorage：简化用户偏好设置的管理
+/// - withAnimation：步骤切换动画（理想情况下应移至 View 层，但为简化代码暂时保留）
+/// 虽然理想情况下 ViewModel 不应依赖 SwiftUI，但这些是 SwiftUI 生态中被广泛接受的实践。
 @MainActor
 final class OnboardingViewModel: ObservableObject {
     // MARK: - Steps Enum
