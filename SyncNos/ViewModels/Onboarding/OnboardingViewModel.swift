@@ -8,7 +8,6 @@ final class OnboardingViewModel: ObservableObject {
         case welcome = 0
         case connectNotion
         case enableSources
-        case trial  // 第四步：试用期/购买页面
     }
     
     // MARK: - Published Properties

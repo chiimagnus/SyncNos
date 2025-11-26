@@ -65,24 +65,16 @@ SyncNos/
 │       │   ├── AboutView.swift
 │       │   ├── AppleAccountView.swift
 │       │   ├── IAPViews/
+│       │   │   ├── PayWallView.swift
 │       │   │   └── IAPView.swift
 │       │   ├── LanguageView.swift
 │       │   ├── LogWindow.swift
 │       │   ├── SettingsView.swift
 │       │   ├── UserGuideView.swift
 │       │   └── VisualEffectBackground.swift
-│       ├── Onboarding/                  # 引导流程视图
-│       │   ├── OnboardingView.swift     # 引导主容器
-│       │   ├── OnboardingWelcomeView.swift  # 第1步：欢迎
-│       │   ├── OnboardingNotionView.swift   # 第2步：连接 Notion
-│       │   ├── OnboardingSourceView.swift   # 第3步：选择数据源
-│       │   ├── OnboardingTrialView.swift    # 第4步：试用/购买（统一付费墙）
-│       │   └── OnboardingNextButton.swift   # 共用导航按钮
-│       ├── SyncFrom/
+│       ├── Sync/
 │       │   ├── AppleBooksSettingsView.swift
 │       │   ├── GoodLinksSettingsView.swift
-│       │   └── WeReadSettingsView.swift
-│       ├── SyncTo/
 │       │   └── NotionIntegrationView.swift
 │       └── Commands/
 │           ├── AppCommands.swift
@@ -112,9 +104,6 @@ SyncNos/
 │   │   └── MenuBarViewModel.swift
 │   ├── Notion/
 │   │   └── NotionIntegrationViewModel.swift
-│   ├── Onboarding/                      # 引导流程 ViewModel
-│   │   ├── OnboardingViewModel.swift    # 引导流程状态管理
-│   │   └── TrialViewModel.swift         # 试用/购买业务逻辑
 │   ├── Settings/
 │   │   └── LoginItemViewModel.swift
 │   ├── Sync/
@@ -509,20 +498,8 @@ swift package update
 
 ### IAP 系统
 - **30天试用期**：试用期管理和到期检查
-- **统一付费墙**：整合为 `OnboardingTrialView`（原 `PayWallView` 已删除）
-  - 支持 Onboarding 模式（作为引导第4步）
-  - 支持独立模式（试用提醒、试用过期、订阅过期）
-  - `TrialViewModel` 处理 IAP 业务逻辑
-  - `TrialPresentationMode` 枚举定义展示模式
+- **统一付费墙**：整合为 `PayWallView`
 - **订阅过期检测**：完整的订阅过期监听和状态同步机制
-
-### Onboarding 引导流程
-- **4步引导**：欢迎 → 连接 Notion → 选择数据源 → 试用/购买
-- **OnboardingViewModel**：管理引导步骤、Notion 连接状态、数据源选择
-- **OnboardingTrialView**：统一的试用/购买界面，支持多种展示模式
-- **动画效果**：
-  - Gift 图标摇摆动画（30天试用徽章）
-  - Header 图标脉冲+颤抖动画（紧急试用提醒：≤3天）
 
 ### UI/UX 改进
 - **日志颜色编码**：为不同日志级别添加颜色区分

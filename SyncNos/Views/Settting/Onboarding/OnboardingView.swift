@@ -2,7 +2,6 @@ import SwiftUI
 
 struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
-    @StateObject private var trialViewModel = TrialViewModel()
     
     var body: some View {
         VStack {
@@ -15,8 +14,6 @@ struct OnboardingView: View {
                     OnboardingNotionView(viewModel: viewModel)
                 case .enableSources:
                     OnboardingSourcesView(viewModel: viewModel)
-                case .trial:
-                    OnboardingTrialView(onboardingViewModel: viewModel, trialViewModel: trialViewModel)
                 }
             }
             .transition(.asymmetric(

@@ -2,18 +2,18 @@ import Foundation
 import StoreKit
 import Combine
 
-/// 试用期/付费墙的展示模式
+/// 付费墙的展示模式
 enum TrialPresentationMode: Equatable {
-    case onboarding                         // Onboarding 第四步（新用户）
+    case welcome                            // 首次启动欢迎页（开始试用）
     case trialReminder(daysRemaining: Int)  // 试用期提醒（7/3/1天）
     case trialExpired                       // 试用期已过期
     case subscriptionExpired                // 年订阅已过期
 }
 
-/// 试用期/付费墙视图的 ViewModel
+/// 付费墙视图的 ViewModel
 /// 统一管理 IAP 状态和 paywall 显示逻辑
 @MainActor
-final class TrialViewModel: ObservableObject {
+final class PayWallViewModel: ObservableObject {
     // MARK: - Published Properties
     
     @Published var products: [Product] = []
@@ -83,7 +83,14 @@ final class TrialViewModel: ObservableObject {
             return .trialExpired
         }
         
-        // Priority 4: 如果应该显示试用提醒（7/3/1天）
+        // Priority 4: 如果还没有显示过欢迎页（新用户首次启动）
+        if !iapService.hasShownWelcome {
+            logger.debug("New user, showing welcome")
+            requiredPresentationMode = .welcome
+            return .welcome
+        }
+        
+        // Priority 5: 如果应该显示试用提醒（7/3/1天）
         if iapService.shouldShowTrialReminder() {
             let days = iapService.trialDaysRemaining
             logger.debug("Should show trial reminder: \(days) days remaining")
@@ -97,35 +104,12 @@ final class TrialViewModel: ObservableObject {
         return nil
     }
     
-    /// 用于 Onboarding 流程：获取当前应该显示的模式
-    /// 与 checkPaywallRequired 类似，但新用户返回 .onboarding 而不是 nil
-    func getOnboardingPresentationMode() -> TrialPresentationMode {
-        // 如果已购买，仍然显示 onboarding（会显示购买成功状态）
-        if iapService.hasPurchased {
-            return .onboarding
-        }
-        
-        // 如果曾经购买过年订阅但已过期
-        if iapService.hasEverPurchasedAnnual {
-            return .subscriptionExpired
-        }
-        
-        // 如果试用期过期
-        if !iapService.isProUnlocked {
-            return .trialExpired
-        }
-        
-        // 如果应该显示试用提醒（7/3/1天）
-        if iapService.shouldShowTrialReminder() {
-            return .trialReminder(daysRemaining: iapService.trialDaysRemaining)
-        }
-        
-        // 新用户或试用期内正常状态
-        return .onboarding
-    }
-    
-    /// 完成 paywall 流程后调用（标记提醒已显示等）
+    /// 完成 paywall 流程后调用（标记提醒/欢迎页已显示等）
     func dismissPaywall() {
+        // 如果是欢迎模式，标记欢迎页已显示
+        if requiredPresentationMode == .welcome {
+            iapService.markWelcomeShown()
+        }
         // 标记提醒已显示，避免重复触发
         iapService.markReminderShown()
         requiredPresentationMode = nil
@@ -208,7 +192,7 @@ extension TrialViewModel {
     /// 获取头部图标名称
     func headerIconName(for mode: TrialPresentationMode) -> String {
         switch mode {
-        case .onboarding:
+        case .welcome:
             return "gift.fill"
         case .trialReminder(let days):
             switch days {
@@ -227,7 +211,7 @@ extension TrialViewModel {
     /// 获取头部图标颜色
     func headerIconColorName(for mode: TrialPresentationMode) -> String {
         switch mode {
-        case .onboarding:
+        case .welcome:
             return "green"
         case .trialReminder(let days):
             switch days {
@@ -251,8 +235,8 @@ extension TrialViewModel {
         }
         
         switch mode {
-        case .onboarding:
-            return "Start Your Free Trial"
+        case .welcome:
+            return "Welcome to SyncNos"
         case .trialReminder(let days):
             switch days {
             case 7: return "Trial Ending Soon"
@@ -271,12 +255,12 @@ extension TrialViewModel {
     func headerMessage(for mode: TrialPresentationMode) -> String {
         // 如果已购买，显示购买成功消息
         if hasPurchased {
-            return "Thank you for your support! Click the arrow to continue."
+            return "Thank you for your support!"
         }
         
         switch mode {
-        case .onboarding:
-            return "30 days free, then choose a plan to continue syncing."
+        case .welcome:
+            return "Sync your highlights from Apple Books, GoodLinks, and WeRead to Notion. Start your 30-day free trial!"
         case .trialReminder(let days):
             return "Your free trial will expire in \(days) day\(days == 1 ? "" : "s"). Purchase now to continue enjoying unlimited syncing."
         case .trialExpired:
