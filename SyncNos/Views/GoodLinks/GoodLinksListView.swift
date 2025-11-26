@@ -8,7 +8,7 @@ struct GoodLinksListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading || viewModel.isComputingList {
-                ProgressView("Loading links...")
+                ProgressView("Loading...")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle").foregroundColor(.orange).font(.largeTitle)

@@ -60,7 +60,7 @@ struct WeReadDetailView: View {
                         }
 
                         if detailViewModel.isLoading {
-                            ProgressView("Loading highlights...")
+                            ProgressView("Loading...")
                                 .padding(.top)
                         } else if detailViewModel.visibleHighlights.isEmpty {
                             Text("No highlights found for this book.")
@@ -91,7 +91,7 @@ struct WeReadDetailView: View {
                                     Spacer()
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("Loading more...")
+                                    Text("Loading...")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                     Spacer()
