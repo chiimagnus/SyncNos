@@ -2,16 +2,32 @@ import SwiftUI
 import AppKit
 
 struct MainListView: View {
-    @StateObject private var viewModel = AppleBooksViewModel()
+    // MARK: - State Objects
+    
+    @StateObject private var dataSourceSwitchVM = DataSourceSwitchViewModel()
+    @StateObject private var appleBooksVM = AppleBooksViewModel()
+    @StateObject private var goodLinksVM = GoodLinksViewModel()
+    @StateObject private var weReadVM = WeReadViewModel()
+    
+    // MARK: - Selection State
+    
     @State private var selectedBookIds: Set<String> = []
     @State private var selectedLinkIds: Set<String> = []
     @State private var selectedWeReadBookIds: Set<String> = []
+    
+    // MARK: - App Storage
+    
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
+    
+    // MARK: - Environment
+    
     @Environment(\.openWindow) private var openWindow
 
+    // MARK: - Computed Properties
+    
     private var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
     }
@@ -44,9 +60,8 @@ struct MainListView: View {
         }
     }
 
-    @StateObject private var goodLinksVM = GoodLinksViewModel()
-    @StateObject private var weReadVM = WeReadViewModel()
-
+    // MARK: - Body
+    
     var body: some View {
         mainContent
             .onAppear {
@@ -56,17 +71,42 @@ struct MainListView: View {
                 if let cacheService = DIContainer.shared.weReadCacheService {
                     weReadVM.setCacheService(cacheService)
                 }
+                // 同步滑动容器与菜单状态
+                syncSwipeViewModelWithContentSource()
             }
             // 当数据源启用状态变化时，确保当前内容源仍然有效
             .onChange(of: appleBooksSourceEnabled) { _, _ in
                 ensureValidContentSource()
+                dataSourceSwitchVM.refreshEnabledDataSources()
             }
             .onChange(of: goodLinksSourceEnabled) { _, _ in
                 ensureValidContentSource()
+                dataSourceSwitchVM.refreshEnabledDataSources()
             }
             .onChange(of: weReadSourceEnabled) { _, _ in
                 ensureValidContentSource()
+                dataSourceSwitchVM.refreshEnabledDataSources()
             }
+            // 当菜单切换时，同步到滑动容器
+            .onChange(of: contentSourceRawValue) { _, newValue in
+                if let source = ContentSource(rawValue: newValue) {
+                    dataSourceSwitchVM.switchTo(source: source)
+                }
+            }
+            // 当滑动切换时，同步到菜单
+            .onChange(of: dataSourceSwitchVM.currentDataSource) { _, newSource in
+                if let source = newSource {
+                    contentSourceRawValue = source.rawValue
+                }
+            }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func syncSwipeViewModelWithContentSource() {
+        if let source = ContentSource(rawValue: contentSourceRawValue) {
+            dataSourceSwitchVM.switchTo(source: source)
+        }
     }
 
     // MARK: - Main Content
@@ -125,7 +165,7 @@ struct MainListView: View {
                 .ignoresSafeArea()
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
-            .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
+            .alert("Notion Configuration Required", isPresented: $appleBooksVM.showNotionConfigAlert) {
                 Button("Go to Settings") {
                     openWindow(id: "setting")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -170,298 +210,342 @@ struct MainListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Master Column (侧边栏)
+    
     @ViewBuilder
     private var masterColumn: some View {
-        Group {
-            switch contentSource {
-            case .goodLinks:
-                GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
-            case .appleBooks:
-                AppleBooksListView(viewModel: viewModel, selectionIds: $selectedBookIds)
-            case .weRead:
-                WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
-            }
-        }
+        SwipeableDataSourceContainer(
+            viewModel: dataSourceSwitchVM,
+            appleBooksVM: appleBooksVM,
+            goodLinksVM: goodLinksVM,
+            weReadVM: weReadVM,
+            selectedBookIds: $selectedBookIds,
+            selectedLinkIds: $selectedLinkIds,
+            selectedWeReadBookIds: $selectedWeReadBookIds
+        )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
         .toolbar {
-            // 数据源切换菜单 + Articles 排序筛选（集成在同一菜单中）
             ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    // 数据源切换部分
-                    Section("Data Source") {
-                        if isSourceEnabled(.appleBooks) {
-                            Button {
-                                contentSourceRawValue = ContentSource.appleBooks.rawValue
-                            } label: {
-                                HStack {
-                                    Text("Apple Books (\(viewModel.displayBooks.count)/\(viewModel.books.count))")
-                                    if contentSource == .appleBooks { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
-
-                        if isSourceEnabled(.goodLinks) {
-                            Button {
-                                contentSourceRawValue = ContentSource.goodLinks.rawValue
-                            } label: {
-                                HStack {
-                                    Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
-                                    if contentSource == .goodLinks { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
-
-                        if isSourceEnabled(.weRead) {
-                            Button {
-                                contentSourceRawValue = ContentSource.weRead.rawValue
-                            } label: {
-                                HStack {
-                                    Text("WeRead (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
-                                    if contentSource == .weRead { Image(systemName: "checkmark") }
-                                }
-                            }
+                dataSourceToolbarMenu
+            }
+        }
+    }
+    
+    // MARK: - Toolbar Menu
+    
+    private var dataSourceToolbarMenu: some View {
+        Menu {
+            // 数据源切换部分
+            Section("Data Source") {
+                if isSourceEnabled(.appleBooks) {
+                    Button {
+                        contentSourceRawValue = ContentSource.appleBooks.rawValue
+                    } label: {
+                        HStack {
+                            Text("Apple Books (\(appleBooksVM.displayBooks.count)/\(appleBooksVM.books.count))")
+                            if contentSource == .appleBooks { Image(systemName: "checkmark") }
                         }
                     }
-                    // 排序和筛选部分（根据数据源显示对应选项）
-                    if contentSource == .appleBooks {
-                        Divider()
+                }
 
-                        Section("Sort") {
-                            ForEach(BookListSortKey.allCases, id: \.self) { key in
-                                Button {
-                                    viewModel.sortKey = key
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("AppleBooksFilterChanged"),
-                                        object: nil,
-                                        userInfo: ["sortKey": key.rawValue]
-                                    )
-                                } label: {
-                                    if viewModel.sortKey == key {
-                                        Label(key.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(key.displayName)
-                                    }
-                                }
-                            }
-
-                            Divider()
-
-                            Button {
-                                viewModel.sortAscending.toggle()
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("AppleBooksFilterChanged"),
-                                    object: nil,
-                                    userInfo: ["sortAscending": viewModel.sortAscending]
-                                )
-                            } label: {
-                                if viewModel.sortAscending {
-                                    Label("Ascending", systemImage: "checkmark")
-                                } else {
-                                    Label("Ascending", systemImage: "xmark")
-                                }
-                            }
-                        }
-
-                        Section("Filter") {
-                            Button {
-                                viewModel.showWithTitleOnly.toggle()
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("AppleBooksFilterChanged"),
-                                    object: nil,
-                                    userInfo: ["showWithTitleOnly": viewModel.showWithTitleOnly]
-                                )
-                            } label: {
-                                if viewModel.showWithTitleOnly {
-                                    Label("Titles only", systemImage: "checkmark")
-                                } else {
-                                    Text("Titles only")
-                                }
-                            }
-                        }
-                    } else if contentSource == .goodLinks {
-                        Divider()
-
-                        Section("Sort") {
-                            ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
-                                Button {
-                                    goodLinksVM.sortKey = key
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("GoodLinksFilterChanged"),
-                                        object: nil,
-                                        userInfo: ["sortKey": key.rawValue]
-                                    )
-                                } label: {
-                                    if goodLinksVM.sortKey == key {
-                                        Label(key.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(key.displayName)
-                                    }
-                                }
-                            }
-
-                            Divider()
-
-                            Button {
-                                goodLinksVM.sortAscending.toggle()
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("GoodLinksFilterChanged"),
-                                    object: nil,
-                                    userInfo: ["sortAscending": goodLinksVM.sortAscending]
-                                )
-                            } label: {
-                                if goodLinksVM.sortAscending {
-                                    Label("Ascending", systemImage: "checkmark")
-                                } else {
-                                    Label("Ascending", systemImage: "xmark")
-                                }
-                            }
-                        }
-
-                        Section("Filter") {
-                            Button {
-                                goodLinksVM.showStarredOnly.toggle()
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("GoodLinksFilterChanged"),
-                                    object: nil,
-                                    userInfo: ["showStarredOnly": goodLinksVM.showStarredOnly]
-                                )
-                            } label: {
-                                if goodLinksVM.showStarredOnly {
-                                    Label("Starred only", systemImage: "checkmark")
-                                } else {
-                                    Text("Starred only")
-                                }
-                            }
-                        }
-                    } else if contentSource == .weRead {
-                        Divider()
-
-                        Section("Sort") {
-                            // WeRead 只支持 title, highlightCount, lastSync
-                            let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
-                            ForEach(availableKeys, id: \.self) { key in
-                                Button {
-                                    weReadVM.sortKey = key
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("WeReadFilterChanged"),
-                                        object: nil,
-                                        userInfo: ["sortKey": key.rawValue]
-                                    )
-                                } label: {
-                                    if weReadVM.sortKey == key {
-                                        Label(key.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(key.displayName)
-                                    }
-                                }
-                            }
-
-                            Divider()
-
-                            Button {
-                                weReadVM.sortAscending.toggle()
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("WeReadFilterChanged"),
-                                    object: nil,
-                                    userInfo: ["sortAscending": weReadVM.sortAscending]
-                                )
-                            } label: {
-                                if weReadVM.sortAscending {
-                                    Label("Ascending", systemImage: "checkmark")
-                                } else {
-                                    Label("Ascending", systemImage: "xmark")
-                                }
-                            }
+                if isSourceEnabled(.goodLinks) {
+                    Button {
+                        contentSourceRawValue = ContentSource.goodLinks.rawValue
+                    } label: {
+                        HStack {
+                            Text("GoodLinks (\(goodLinksVM.displayLinks.count)/\(goodLinksVM.links.count))")
+                            if contentSource == .goodLinks { Image(systemName: "checkmark") }
                         }
                     }
+                }
+
+                if isSourceEnabled(.weRead) {
+                    Button {
+                        contentSourceRawValue = ContentSource.weRead.rawValue
+                    } label: {
+                        HStack {
+                            Text("WeRead (\(weReadVM.displayBooks.count)/\(weReadVM.books.count))")
+                            if contentSource == .weRead { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+            }
+            
+            // 排序和筛选部分（根据数据源显示对应选项）
+            if contentSource == .appleBooks {
+                Divider()
+                appleBooksFilterMenu
+            } else if contentSource == .goodLinks {
+                Divider()
+                goodLinksFilterMenu
+            } else if contentSource == .weRead {
+                Divider()
+                weReadFilterMenu
+            }
+        } label: {
+            Text(contentSource.title)
+        }
+    }
+    
+    // MARK: - Filter Menus
+    
+    @ViewBuilder
+    private var appleBooksFilterMenu: some View {
+        Section("Sort") {
+            ForEach(BookListSortKey.allCases, id: \.self) { key in
+                Button {
+                    appleBooksVM.sortKey = key
+                    NotificationCenter.default.post(
+                        name: Notification.Name("AppleBooksFilterChanged"),
+                        object: nil,
+                        userInfo: ["sortKey": key.rawValue]
+                    )
                 } label: {
-                    // 显示数据源名称而不是图标
-                    Text(contentSource.title)
+                    if appleBooksVM.sortKey == key {
+                        Label(key.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(key.displayName)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                appleBooksVM.sortAscending.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("AppleBooksFilterChanged"),
+                    object: nil,
+                    userInfo: ["sortAscending": appleBooksVM.sortAscending]
+                )
+            } label: {
+                if appleBooksVM.sortAscending {
+                    Label("Ascending", systemImage: "checkmark")
+                } else {
+                    Label("Ascending", systemImage: "xmark")
+                }
+            }
+        }
+
+        Section("Filter") {
+            Button {
+                appleBooksVM.showWithTitleOnly.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("AppleBooksFilterChanged"),
+                    object: nil,
+                    userInfo: ["showWithTitleOnly": appleBooksVM.showWithTitleOnly]
+                )
+            } label: {
+                if appleBooksVM.showWithTitleOnly {
+                    Label("Titles only", systemImage: "checkmark")
+                } else {
+                    Text("Titles only")
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var goodLinksFilterMenu: some View {
+        Section("Sort") {
+            ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
+                Button {
+                    goodLinksVM.sortKey = key
+                    NotificationCenter.default.post(
+                        name: Notification.Name("GoodLinksFilterChanged"),
+                        object: nil,
+                        userInfo: ["sortKey": key.rawValue]
+                    )
+                } label: {
+                    if goodLinksVM.sortKey == key {
+                        Label(key.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(key.displayName)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                goodLinksVM.sortAscending.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("GoodLinksFilterChanged"),
+                    object: nil,
+                    userInfo: ["sortAscending": goodLinksVM.sortAscending]
+                )
+            } label: {
+                if goodLinksVM.sortAscending {
+                    Label("Ascending", systemImage: "checkmark")
+                } else {
+                    Label("Ascending", systemImage: "xmark")
+                }
+            }
+        }
+
+        Section("Filter") {
+            Button {
+                goodLinksVM.showStarredOnly.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("GoodLinksFilterChanged"),
+                    object: nil,
+                    userInfo: ["showStarredOnly": goodLinksVM.showStarredOnly]
+                )
+            } label: {
+                if goodLinksVM.showStarredOnly {
+                    Label("Starred only", systemImage: "checkmark")
+                } else {
+                    Text("Starred only")
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var weReadFilterMenu: some View {
+        Section("Sort") {
+            let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+            ForEach(availableKeys, id: \.self) { key in
+                Button {
+                    weReadVM.sortKey = key
+                    NotificationCenter.default.post(
+                        name: Notification.Name("WeReadFilterChanged"),
+                        object: nil,
+                        userInfo: ["sortKey": key.rawValue]
+                    )
+                } label: {
+                    if weReadVM.sortKey == key {
+                        Label(key.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(key.displayName)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                weReadVM.sortAscending.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("WeReadFilterChanged"),
+                    object: nil,
+                    userInfo: ["sortAscending": weReadVM.sortAscending]
+                )
+            } label: {
+                if weReadVM.sortAscending {
+                    Label("Ascending", systemImage: "checkmark")
+                } else {
+                    Label("Ascending", systemImage: "xmark")
                 }
             }
         }
     }
 
+    // MARK: - Detail Column
+    
     @ViewBuilder
     private var detailColumn: some View {
-        if contentSource == .goodLinks {
-            if selectedLinkIds.count == 1 {
-                let singleLinkBinding = Binding<String?>(
-                    get: { selectedLinkIds.first },
-                    set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
-                )
-                GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
-            } else {
-                SelectionPlaceholderView(
-                    title: contentSource.title,
-                    count: selectedLinkIds.isEmpty ? nil : selectedLinkIds.count,
-                    onSyncSelected: selectedLinkIds.isEmpty ? nil : {
-                        let items = selectedLinkIds.compactMap { id -> [String: Any]? in
-                            guard let link = goodLinksVM.displayLinks.first(where: { $0.id == id }) else { return nil }
-                            let title = (link.title?.isEmpty == false ? link.title! : link.url)
-                            return ["id": id, "title": title, "subtitle": link.author ?? ""]
-                        }
-                        NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
-                        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
-                    }
-                )
-            }
-        } else if contentSource == .appleBooks {
-            if selectedBookIds.count == 1 {
-                let singleBookBinding = Binding<String?>(
-                    get: { selectedBookIds.first },
-                    set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
-                )
-                AppleBooksDetailView(viewModelList: viewModel, selectedBookId: singleBookBinding)
-            } else {
-                SelectionPlaceholderView(
-                    title: contentSource.title,
-                    count: selectedBookIds.isEmpty ? nil : selectedBookIds.count,
-                    onSyncSelected: selectedBookIds.isEmpty ? nil : {
-                        let items = selectedBookIds.compactMap { id -> [String: Any]? in
-                            guard let b = viewModel.displayBooks.first(where: { $0.bookId == id }) else { return nil }
-                            return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
-                        }
-                        NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
-                        viewModel.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-                    }
-                )
-            }
-        } else {
-            if contentSource == .weRead {
-                if selectedWeReadBookIds.count == 1 {
-                    let singleWeReadBinding = Binding<String?>(
-                        get: { selectedWeReadBookIds.first },
-                        set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
-                    )
-                    WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
-                } else {
-                    SelectionPlaceholderView(
-                        title: contentSource.title,
-                        count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
-                        onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : {
-                            let items = selectedWeReadBookIds.compactMap { id -> [String: Any]? in
-                                guard let b = weReadVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
-                                return ["id": id, "title": b.title, "subtitle": b.author]
-                            }
-                            NotificationCenter.default.post(
-                                name: Notification.Name("SyncTasksEnqueued"),
-                                object: nil,
-                                userInfo: ["source": "weRead", "items": items]
-                            )
-                            weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-                        }
-                    )
-                }
-            } else {
-                // 理论上不会走到这里，因为 contentSource 只有三种情况
-                SelectionPlaceholderView(
-                    title: contentSource.title,
-                    count: nil,
-                    onSyncSelected: nil
-                )
-            }
+        switch contentSource {
+        case .appleBooks:
+            appleBooksDetailView
+        case .goodLinks:
+            goodLinksDetailView
+        case .weRead:
+            weReadDetailView
         }
+    }
+    
+    @ViewBuilder
+    private var appleBooksDetailView: some View {
+        if selectedBookIds.count == 1 {
+            let singleBookBinding = Binding<String?>(
+                get: { selectedBookIds.first },
+                set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
+            )
+            AppleBooksDetailView(viewModelList: appleBooksVM, selectedBookId: singleBookBinding)
+        } else {
+            SelectionPlaceholderView(
+                title: contentSource.title,
+                count: selectedBookIds.isEmpty ? nil : selectedBookIds.count,
+                onSyncSelected: selectedBookIds.isEmpty ? nil : { syncSelectedAppleBooks() }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var goodLinksDetailView: some View {
+        if selectedLinkIds.count == 1 {
+            let singleLinkBinding = Binding<String?>(
+                get: { selectedLinkIds.first },
+                set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
+            )
+            GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
+        } else {
+            SelectionPlaceholderView(
+                title: contentSource.title,
+                count: selectedLinkIds.isEmpty ? nil : selectedLinkIds.count,
+                onSyncSelected: selectedLinkIds.isEmpty ? nil : { syncSelectedGoodLinks() }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var weReadDetailView: some View {
+        if selectedWeReadBookIds.count == 1 {
+            let singleWeReadBinding = Binding<String?>(
+                get: { selectedWeReadBookIds.first },
+                set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
+            )
+            WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
+        } else {
+            SelectionPlaceholderView(
+                title: contentSource.title,
+                count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
+                onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : { syncSelectedWeRead() }
+            )
+        }
+    }
+    
+    // MARK: - Sync Methods
+    
+    private func syncSelectedAppleBooks() {
+        let items = selectedBookIds.compactMap { id -> [String: Any]? in
+            guard let b = appleBooksVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+            return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
+        }
+        NotificationCenter.default.post(
+            name: Notification.Name("SyncTasksEnqueued"),
+            object: nil,
+            userInfo: ["source": "appleBooks", "items": items]
+        )
+        appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+    }
+    
+    private func syncSelectedGoodLinks() {
+        let items = selectedLinkIds.compactMap { id -> [String: Any]? in
+            guard let link = goodLinksVM.displayLinks.first(where: { $0.id == id }) else { return nil }
+            let title = (link.title?.isEmpty == false ? link.title! : link.url)
+            return ["id": id, "title": title, "subtitle": link.author ?? ""]
+        }
+        NotificationCenter.default.post(
+            name: Notification.Name("SyncTasksEnqueued"),
+            object: nil,
+            userInfo: ["source": "goodLinks", "items": items]
+        )
+        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
+    }
+    
+    private func syncSelectedWeRead() {
+        let items = selectedWeReadBookIds.compactMap { id -> [String: Any]? in
+            guard let b = weReadVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+            return ["id": id, "title": b.title, "subtitle": b.author]
+        }
+        NotificationCenter.default.post(
+            name: Notification.Name("SyncTasksEnqueued"),
+            object: nil,
+            userInfo: ["source": "weRead", "items": items]
+        )
+        weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
 
