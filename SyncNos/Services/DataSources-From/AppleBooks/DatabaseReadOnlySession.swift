@@ -27,8 +27,9 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
     func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?, sortField: HighlightSortField?, ascending: Bool?, noteFilter: Bool?, styles: [Int]?) throws -> [HighlightRow] {
         try accessQueue.sync {
             guard !isClosed, let db = handle else {
+                // 使用 debug 级别，因为快速切换时 session 被关闭是预期行为
                 let error = "Database session is closed"
-                logger.error("Error: \(error)")
+                logger.debug("Session closed during query (expected during fast switching): \(error)")
                 throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
             }
             return try queryService.fetchHighlightPage(db: db, assetId: assetId, limit: limit, offset: offset, since: since, sortField: sortField, ascending: ascending, noteFilter: noteFilter, styles: styles)
@@ -39,7 +40,7 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         try accessQueue.sync {
             guard !isClosed, let db = handle else {
                 let error = "Database session is closed"
-                logger.error("Error: \(error)")
+                logger.debug("Session closed during query (expected during fast switching): \(error)")
                 throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
             }
             return try queryService.fetchHighlightCountsByAsset(db: db)
@@ -50,7 +51,7 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         try accessQueue.sync {
             guard !isClosed, let db = handle else {
                 let error = "Database session is closed"
-                logger.error("Error: \(error)")
+                logger.debug("Session closed during query (expected during fast switching): \(error)")
                 throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
             }
             return try queryService.fetchHighlightStatsByAsset(db: db)
@@ -61,7 +62,7 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         try accessQueue.sync {
             guard !isClosed, let db = handle else {
                 let error = "Database session is closed"
-                logger.error("Error: \(error)")
+                logger.debug("Session closed during query (expected during fast switching): \(error)")
                 throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
             }
             return try queryService.fetchBooks(db: db, assetIds: assetIds)
