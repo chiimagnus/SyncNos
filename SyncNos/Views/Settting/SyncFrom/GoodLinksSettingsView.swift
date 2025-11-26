@@ -41,7 +41,7 @@ struct GoodLinksSettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label("Open GoodLinks data", systemImage: "folder")
+                        Label("Select Folder", systemImage: "folder")
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)

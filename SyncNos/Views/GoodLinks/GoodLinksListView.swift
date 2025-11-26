@@ -20,7 +20,7 @@ struct GoodLinksListView: View {
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
-                        Label("Open GoodLinks data", systemImage: "folder")
+                        Label("Select Folder", systemImage: "folder")
                     }
                 }
             } else if viewModel.links.isEmpty {
@@ -30,7 +30,7 @@ struct GoodLinksListView: View {
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
-                        Label("Open GoodLinks data", systemImage: "folder")
+                        Label("Select Folder", systemImage: "folder")
                     }
                 }
             } else {
