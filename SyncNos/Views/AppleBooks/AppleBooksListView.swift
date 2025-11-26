@@ -90,22 +90,6 @@ struct AppleBooksListView: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .focusedSceneValue(\.selectionCommands, SelectionCommands(
-                    selectAll: {
-                        let all = Set(viewModel.displayBooks.map { $0.bookId })
-                        if !all.isEmpty { selectionIds = all }
-                    },
-                    deselectAll: {
-                        selectionIds.removeAll()
-                    },
-                    canSelectAll: {
-                        let total = viewModel.displayBooks.count
-                        return total > 0 && selectionIds.count < total
-                    },
-                    canDeselect: {
-                        !selectionIds.isEmpty
-                    }
-                ))
             }
         }
         .onAppear {
