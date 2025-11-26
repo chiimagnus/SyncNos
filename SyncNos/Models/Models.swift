@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Types
 
@@ -14,6 +15,34 @@ enum ContentSource: String, Codable, CaseIterable {
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
         }
+    }
+    
+    /// 数据源图标 (SF Symbol)
+    var icon: String {
+        switch self {
+        case .appleBooks: return "books.vertical.fill"
+        case .goodLinks: return "link"
+        case .weRead: return "text.book.closed.fill"
+        }
+    }
+    
+    /// 数据源显示名称
+    var displayName: String {
+        title
+    }
+    
+    /// 数据源强调色
+    var accentColor: Color {
+        switch self {
+        case .appleBooks: return .orange
+        case .goodLinks: return .blue
+        case .weRead: return .green
+        }
+    }
+    
+    /// UserDefaults 启用状态键
+    var enabledKey: String {
+        "datasource.\(rawValue).enabled"
     }
 }
 
