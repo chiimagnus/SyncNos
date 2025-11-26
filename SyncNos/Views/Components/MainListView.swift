@@ -221,14 +221,10 @@ struct MainListView: View {
             weReadVM: weReadVM,
             selectedBookIds: $selectedBookIds,
             selectedLinkIds: $selectedLinkIds,
-            selectedWeReadBookIds: $selectedWeReadBookIds
+            selectedWeReadBookIds: $selectedWeReadBookIds,
+            filterMenu: { dataSourceToolbarMenu }
         )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                dataSourceToolbarMenu
-            }
-        }
     }
     
     // MARK: - Toolbar Menu

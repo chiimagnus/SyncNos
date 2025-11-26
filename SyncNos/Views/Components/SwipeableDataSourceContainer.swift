@@ -3,7 +3,7 @@ import AppKit
 
 /// 可滑动的数据源容器
 /// 包含滑动区域和悬浮底部指示器
-struct SwipeableDataSourceContainer: View {
+struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @ObservedObject var viewModel: DataSourceSwitchViewModel
     
     // 各数据源的 ViewModel
@@ -15,6 +15,9 @@ struct SwipeableDataSourceContainer: View {
     @Binding var selectedBookIds: Set<String>
     @Binding var selectedLinkIds: Set<String>
     @Binding var selectedWeReadBookIds: Set<String>
+    
+    // Filter 菜单
+    @ViewBuilder var filterMenu: () -> FilterMenu
     
     // 滑动状态
     @State private var dragOffset: CGFloat = 0
@@ -66,10 +69,29 @@ struct SwipeableDataSourceContainer: View {
                 emptyStateView
             }
             
-            // 悬浮底部指示器
-            if viewModel.hasEnabledSources && viewModel.enabledDataSources.count > 1 {
-                DataSourceIndicatorBar(viewModel: viewModel)
-                    .padding(.bottom, 8)
+            // 悬浮底部栏：指示器 + Filter 按钮
+            if viewModel.hasEnabledSources {
+                HStack(spacing: 8) {
+                    // 左侧：数据源指示器（只在多数据源时显示）
+                    if viewModel.enabledDataSources.count > 1 {
+                        DataSourceIndicatorBar(viewModel: viewModel)
+                    }
+                    
+                    Spacer()
+                    
+                    // 右侧：Filter 按钮
+                    filterMenu()
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        )
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
         }
     }
@@ -127,7 +149,15 @@ struct SwipeableDataSourceContainer: View {
         weReadVM: WeReadViewModel(),
         selectedBookIds: .constant([]),
         selectedLinkIds: .constant([]),
-        selectedWeReadBookIds: .constant([])
+        selectedWeReadBookIds: .constant([]),
+        filterMenu: {
+            Menu {
+                Text("Filter options")
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+            }
+            .menuIndicator(.hidden)
+        }
     )
     .frame(width: 300, height: 600)
 }
