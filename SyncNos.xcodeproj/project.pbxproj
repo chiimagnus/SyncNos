@@ -30,8 +30,6 @@
 				ChangeLog.cn.md,
 				ChangeLog.md,
 				image.png,
-				"Sidebar-Space-Swipe-Architecture.md",
-				"Sidebar-Space-Swipe-Implementation-Guide.md",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
