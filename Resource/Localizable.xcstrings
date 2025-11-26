@@ -11153,8 +11153,7 @@
             "value" : "下一个数据源"
           }
         }
-      },
-
+      }
     },
     "No active sync tasks" : {
       "comment" : "A message displayed when there are no active sync tasks.",
@@ -16292,8 +16291,7 @@
             "value" : "上一个数据源"
           }
         }
-      },
-
+      }
     },
     "Privacy Policy" : {
       "comment" : "Name of the privacy policy file in the app bundle resources directory.",
