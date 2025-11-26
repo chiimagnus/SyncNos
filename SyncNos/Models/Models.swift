@@ -35,8 +35,8 @@ enum ContentSource: String, Codable, CaseIterable {
     var accentColor: Color {
         switch self {
         case .appleBooks: return .orange
-        case .goodLinks: return .blue
-        case .weRead: return .green
+        case .goodLinks: return .red
+        case .weRead: return .blue
         }
     }
     
