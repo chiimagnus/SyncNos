@@ -10,18 +10,35 @@ struct RootView: View {
         DIContainer.shared.iapService
     }
     
+    /// 当前应该显示的视图阶段
+    private enum ViewPhase: Equatable {
+        case onboarding
+        case paywall(IAPPresentationMode)
+        case main
+    }
+    
+    private var currentPhase: ViewPhase {
+        if !hasCompletedOnboarding {
+            return .onboarding
+        } else if let mode = iapPresentationMode {
+            return .paywall(mode)
+        } else {
+            return .main
+        }
+    }
+    
     var body: some View {
-        Group {
-            if !hasCompletedOnboarding {
-                // Step 1: Onboarding（未完成引导）
+        // 使用 switch 而不是 if-else，确保只有当前阶段的视图被创建
+        // 这样可以避免 MainListView 在 PayWall 显示时被预先初始化
+        ZStack {
+            switch currentPhase {
+            case .onboarding:
                 OnboardingView()
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .move(edge: .leading).combined(with: .opacity)
                     ))
-            } else if let mode = iapPresentationMode {
-                // Step 2: PayWall（需要显示付费墙）
-                // 使用与 Onboarding 一致的过渡动画
+            case .paywall(let mode):
                 PayWallView(
                     presentationMode: mode,
                     onFinish: {
@@ -33,8 +50,7 @@ struct RootView: View {
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
-            } else {
-                // Step 3: MainListView（正常使用）
+            case .main:
                 MainListView()
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -42,8 +58,7 @@ struct RootView: View {
                     ))
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: hasCompletedOnboarding)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: iapPresentationMode != nil)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentPhase)
         .onAppear {
             // 只有在完成引导后才检查 PayWall 状态
             if hasCompletedOnboarding {
