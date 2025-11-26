@@ -161,7 +161,7 @@ struct PayWallView: View {
             ProgressView()
                 .padding()
         } else if viewModel.products.isEmpty {
-            Text("Loading products...")
+            Text("Loading...")
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
         } else {
             VStack(spacing: 12) {

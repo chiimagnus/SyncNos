@@ -138,7 +138,7 @@ final class WeReadIncrementalSyncService {
     @MainActor
     func fullSync(progress: ((String) -> Void)? = nil) async throws {
         logger.info("[WeReadSync] Starting full sync...")
-        progress?(NSLocalizedString("Fetching book list...", comment: ""))
+        progress?(NSLocalizedString("Fetching...", comment: ""))
         
         // 1. 获取所有书籍
         let notebooks = try await apiService.fetchNotebooks()

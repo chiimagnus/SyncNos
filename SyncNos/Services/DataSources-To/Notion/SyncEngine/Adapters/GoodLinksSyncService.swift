@@ -103,7 +103,7 @@ final class GoodLinksSyncService: GoodLinksSyncServiceProtocol {
         }
         
         // 7. 获取高亮数据
-        progress(NSLocalizedString("Fetching highlights...", comment: ""))
+        progress(NSLocalizedString("Fetching...", comment: ""))
         let highlights = try await adapter.fetchHighlights()
         
         // 8. 首次创建页面：添加文章内容 + 高亮

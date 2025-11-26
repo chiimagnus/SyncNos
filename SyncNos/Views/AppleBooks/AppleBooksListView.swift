@@ -8,7 +8,7 @@ struct AppleBooksListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading || viewModel.isComputingList {
-                ProgressView("Loading books...")
+                ProgressView("Loading...")
             } else if viewModel.errorMessage != nil {
                 VStack {
                     Image(systemName: "exclamationmark.triangle")

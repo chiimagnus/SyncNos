@@ -8,7 +8,7 @@ struct WeReadListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading || viewModel.isComputingList {
-                ProgressView("Loading WeRead books...")
+                ProgressView("Loading...")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
