@@ -5,10 +5,23 @@ struct SelectionPlaceholderView: View {
     let title: String
     let count: Int?
     let onSyncSelected: (() -> Void)?
+    
+    /// 过滤后的 item 数量
+    let filteredCount: Int
+    /// 全部 item 数量
+    let totalCount: Int
 
-    init(title: String, count: Int? = nil, onSyncSelected: (() -> Void)? = nil) {
+    init(
+        title: String,
+        count: Int? = nil,
+        filteredCount: Int = 0,
+        totalCount: Int = 0,
+        onSyncSelected: (() -> Void)? = nil
+    ) {
         self.title = title
         self.count = count
+        self.filteredCount = filteredCount
+        self.totalCount = totalCount
         self.onSyncSelected = onSyncSelected
     }
 
@@ -50,10 +63,19 @@ struct SelectionPlaceholderView: View {
                     }
                     .padding(.bottom, 16)
                 } else {
-                    Text("Please select an item")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                        .padding(.bottom, 16)
+                    HStack(spacing: 12) {
+                        Text("Please select an item")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        
+                        // 显示过滤后/全部数量
+                        if totalCount > 0 {
+                            Text("\(filteredCount)/\(totalCount)")
+                                .font(.title3.monospacedDigit())
+                                .foregroundColor(.secondary.opacity(0.7))
+                        }
+                    }
+                    .padding(.bottom, 16)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
