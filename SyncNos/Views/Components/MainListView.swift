@@ -241,7 +241,7 @@ struct MainListView: View {
                 weReadFilterMenu
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+            Image(systemName: "line.3.horizontal.decrease")
         }
         .menuIndicator(.hidden)
     }
