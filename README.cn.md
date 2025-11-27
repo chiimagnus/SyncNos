@@ -154,8 +154,6 @@
 | 4. 创建 ViewModel 和 Views | 4. 创建集成视图 |
 | 5. 在 DIContainer 中注册 | 5. 在 SyncTargetRegistry 中注册 |
 
-> 详见 [ADD_NEW_DATASOURCE_CHECKLIST.md](Resource/ADD_NEW_DATASOURCE_CHECKLIST.md) 和 [ADD_NEW_SYNC_TARGET_CHECKLIST.md](Resource/ADD_NEW_SYNC_TARGET_CHECKLIST.md)
-
 ## 📄 许可证
 
 本项目采用 [AGPL-3.0 License](LICENSE)。
