@@ -150,8 +150,6 @@
 | 4. Create ViewModel & Views | 4. Create Integration Views |
 | 5. Register in DIContainer | 5. Register in SyncTargetRegistry |
 
-> See [ADD_NEW_DATASOURCE_CHECKLIST.md](Resource/ADD_NEW_DATASOURCE_CHECKLIST.md) and [ADD_NEW_SYNC_TARGET_CHECKLIST.md](Resource/ADD_NEW_SYNC_TARGET_CHECKLIST.md) for detailed guides.
-
 ## 📄 License
 
 This project is licensed under the [AGPL-3.0 License](LICENSE).
