@@ -3,45 +3,47 @@ import AppKit
 
 struct AboutView: View {
     var body: some View {
-        VStack(spacing: 16) {
+        HStack(alignment: .top, spacing: 24) {
+            // 左侧：App Icon
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 84, height: 84)
-                .cornerRadius(18)
-                .shadow(radius: 6)
-
-            VStack(spacing: 4) {
+                .frame(width: 128, height: 128)
+                .cornerRadius(24)
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+            
+            // 右侧：信息区域
+            VStack(alignment: .leading, spacing: 12) {
+                // App 名称
                 Text(appName)
-                    .font(.title2).bold()
+                    .font(.system(size: 28, weight: .bold))
+                
+                // 版本信息
                 Text("Version \(Bundle.main.appVersion) (\(Bundle.main.appBuild))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                
+                Divider()
+                    .padding(.vertical, 4)
+                
+                // 操作链接
+                VStack(alignment: .leading, spacing: 8) {
+                    AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
+                    AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
+                    AboutLinkButton(symbol: "chevron.left.forwardslash.chevron.right", title: "Source Code", action: openGitHubRepo)
+                    AboutLinkButton(symbol: "doc.text.fill", title: "Privacy Policy", action: openPrivacyPolicy)
+                    AboutLinkButton(symbol: "clock.arrow.circlepath", title: "Changelog", action: openChangelog)
+                }
+                
+                Spacer()
+                
+                // 底部信息
+                Text("Made with SwiftUI • macOS 14+")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
             }
-
-            // 小组件：一组常用动作
-            HStack(spacing: 12) {
-                ActionCard(symbol: "heart", title: "Rate & Review") {
-                    openAppStoreReview()
-                }
-                ActionCard(symbol: "ladybug", title: "Report Issues") {
-                    openGitHubIssues()
-                }
-                ActionCard(symbol: "link", title: "Source Code") {
-                    openGitHubRepo()
-                }
-                ActionCard(symbol: "doc.plaintext", title: "Privacy Policy") {
-                    openPrivacyPolicy()
-                }
-            }
-            .padding(.top, 8)
-
-            Text("Made with SwiftUI ⋅ macOS 14+")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
         }
-        .padding(20)
-        .frame(width: 425, height: 400)
+        .padding(32)
+        .frame(width: 450, height: 320)
         .navigationTitle("About")
     }
 
@@ -50,28 +52,26 @@ struct AboutView: View {
     }
 }
 
-private struct ActionCard: View {
+// MARK: - About Link Button
+
+private struct AboutLinkButton: View {
     let symbol: String
     let title: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThickMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                Text(title)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text(title)
+                    .font(.callout)
             }
-            .padding(8)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .buttonStyle(.link)
     }
 }
 
@@ -103,6 +103,11 @@ private func openPrivacyPolicy() {
     } else if let web = URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse") {
         NSWorkspace.shared.open(web)
     }
+}
+
+private func openChangelog() {
+    let url = URL(string: "https://chiimagnus.notion.site/syncnos-changelog")!
+    NSWorkspace.shared.open(url)
 }
 
 private extension Bundle {
