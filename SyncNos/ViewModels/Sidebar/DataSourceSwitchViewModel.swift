@@ -4,6 +4,9 @@ import AppKit
 
 /// 数据源切换 ViewModel
 /// 管理侧边栏滑动切换的状态和逻辑
+/// 
+/// 注意：已启用的数据源列表由外层 View 通过 `updateEnabledDataSources(_:)` 显式注入，
+/// 不再直接监听 UserDefaults，避免双向数据流导致的循环更新和 UI 卡死。
 @MainActor
 final class DataSourceSwitchViewModel: ObservableObject {
     
@@ -12,12 +15,8 @@ final class DataSourceSwitchViewModel: ObservableObject {
     /// 当前活动的数据源索引
     @Published var activeIndex: Int = 0
     
-    /// 已启用的数据源列表
+    /// 已启用的数据源列表（由外层 View 注入，而不是直接读取 UserDefaults）
     @Published private(set) var enabledDataSources: [ContentSource] = []
-    
-    // MARK: - Private Properties
-    
-    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
     
@@ -35,8 +34,7 @@ final class DataSourceSwitchViewModel: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        loadEnabledDataSources()
-        setupUserDefaultsObservers()
+        // 默认使用空列表，具体启用的数据源由外层 View 通过 `updateEnabledDataSources(_:)` 注入
     }
     
     // MARK: - Public Methods
@@ -63,6 +61,23 @@ final class DataSourceSwitchViewModel: ObservableObject {
         switchTo(index: index)
     }
     
+    /// 更新启用的数据源列表（由外部显式传入当前启用的数据源集合）
+    /// - Parameter sources: 当前启用的数据源列表，顺序应与 `ContentSource.allCases` 保持一致
+    func updateEnabledDataSources(_ sources: [ContentSource]) {
+        enabledDataSources = sources
+        ensureValidActiveIndex()
+    }
+    
+    /// 触发触觉反馈
+    func triggerHapticFeedback() {
+        NSHapticFeedbackManager.defaultPerformer.perform(
+            .alignment,
+            performanceTime: .default
+        )
+    }
+    
+    // MARK: - Private Methods
+    
     /// 发送数据源切换通知，让对应的 ListView 获取焦点
     private func notifyDataSourceSwitch(to source: ContentSource) {
         let notificationName: Notification.Name
@@ -80,46 +95,12 @@ final class DataSourceSwitchViewModel: ObservableObject {
         }
     }
     
-    /// 触发触觉反馈
-    func triggerHapticFeedback() {
-        NSHapticFeedbackManager.defaultPerformer.perform(
-            .alignment,
-            performanceTime: .default
-        )
-    }
-    
-    /// 刷新启用的数据源列表
-    func refreshEnabledDataSources() {
-        loadEnabledDataSources()
-    }
-    
-    // MARK: - Private Methods
-    
-    private func loadEnabledDataSources() {
-        enabledDataSources = ContentSource.allCases.filter { source in
-            UserDefaults.standard.bool(forKey: source.enabledKey)
-        }
-        
-        // 确保当前索引有效
-        ensureValidActiveIndex()
-    }
-    
     private func ensureValidActiveIndex() {
         if enabledDataSources.isEmpty {
             activeIndex = 0
         } else if activeIndex >= enabledDataSources.count {
             activeIndex = enabledDataSources.count - 1
         }
-    }
-    
-    private func setupUserDefaultsObservers() {
-        // 监听 UserDefaults 变化
-        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.loadEnabledDataSources()
-            }
-            .store(in: &cancellables)
     }
 }
 
@@ -129,4 +110,3 @@ private extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
-
