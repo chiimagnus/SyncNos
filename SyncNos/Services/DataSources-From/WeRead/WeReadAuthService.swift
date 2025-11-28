@@ -2,14 +2,21 @@ import Foundation
 import WebKit
 
 /// WeRead 认证服务：管理 Cookie 字符串的安全存储与读取
+/// 
+/// 注意：采用延迟加载策略，只有在真正访问 `cookieHeader` 或 `isLoggedIn` 时才会读取 Keychain，
+/// 避免在应用启动时触发 Keychain 权限弹窗（尤其是用户未启用 WeRead 数据源的情况下）。
 final class WeReadAuthService: WeReadAuthServiceProtocol {
     private let keychainKey = "WeReadCookieHeader"
     private let logger = DIContainer.shared.loggerService
 
+    /// 缓存的 Cookie Header
     private var cachedHeader: String?
+    
+    /// 标记是否已从 Keychain 加载过
+    private var hasLoadedFromKeychain = false
 
     init() {
-        cachedHeader = loadCookieHeaderFromKeychain()
+        // 延迟加载：不在初始化时读取 Keychain，避免触发权限弹窗
     }
 
     var isLoggedIn: Bool {
@@ -20,17 +27,27 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
     }
 
     var cookieHeader: String? {
-        cachedHeader
+        ensureLoadedFromKeychain()
+        return cachedHeader
+    }
+    
+    /// 确保已从 Keychain 加载（延迟加载的核心逻辑）
+    private func ensureLoadedFromKeychain() {
+        guard !hasLoadedFromKeychain else { return }
+        cachedHeader = loadCookieHeaderFromKeychain()
+        hasLoadedFromKeychain = true
     }
 
     func updateCookieHeader(_ header: String) {
         let normalized = header.trimmingCharacters(in: .whitespacesAndNewlines)
         cachedHeader = normalized.isEmpty ? nil : normalized
+        hasLoadedFromKeychain = true  // 标记已加载，避免下次访问时重复读取
         saveCookieHeaderToKeychain(normalized)
     }
 
     func clearCookies() async {
         cachedHeader = nil
+        hasLoadedFromKeychain = true  // 标记已加载（清空也算一种加载状态）
         removeCookieHeaderFromKeychain()
         await clearWebKitCookies()
         logger.info("[WeRead] Cookie header cleared from Keychain and WebKit.")
