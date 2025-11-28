@@ -48,25 +48,13 @@ struct MainListView: View {
         }
     }
 
-    /// 确保 contentSourceRawValue 始终指向一个已启用的数据源（如果存在）
-    private func ensureValidContentSource() {
-        let available = enabledContentSources
-        // 如果全部数据源都被关闭，则保留当前值，让上层占位视图处理
-        guard !available.isEmpty else { return }
-
-        let current = ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
-        if !isSourceEnabled(current), let first = available.first {
-            contentSourceRawValue = first.rawValue
-        }
-    }
-
     // MARK: - Body
     
     var body: some View {
         mainContent
             .onAppear {
-                // 启动时根据当前启用数据源校正 contentSource
-                ensureValidContentSource()
+                // 根据当前启用的数据源初始化滑动容器
+                updateDataSourceSwitchViewModel()
                 // 注入 WeRead 缓存服务
                 if let cacheService = DIContainer.shared.weReadCacheService {
                     weReadVM.setCacheService(cacheService)
@@ -74,18 +62,15 @@ struct MainListView: View {
                 // 同步滑动容器与菜单状态
                 syncSwipeViewModelWithContentSource()
             }
-            // 当数据源启用状态变化时，确保当前内容源仍然有效
+            // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
-                ensureValidContentSource()
-                dataSourceSwitchVM.refreshEnabledDataSources()
+                updateDataSourceSwitchViewModel()
             }
             .onChange(of: goodLinksSourceEnabled) { _, _ in
-                ensureValidContentSource()
-                dataSourceSwitchVM.refreshEnabledDataSources()
+                updateDataSourceSwitchViewModel()
             }
             .onChange(of: weReadSourceEnabled) { _, _ in
-                ensureValidContentSource()
-                dataSourceSwitchVM.refreshEnabledDataSources()
+                updateDataSourceSwitchViewModel()
             }
             // 当菜单切换时，同步到滑动容器
             .onChange(of: contentSourceRawValue) { _, newValue in
@@ -93,15 +78,29 @@ struct MainListView: View {
                     dataSourceSwitchVM.switchTo(source: source)
                 }
             }
-            // 当滑动切换时，同步到菜单
+            // 当滑动切换时，同步到菜单（加 guard 避免无意义写回）
             .onChange(of: dataSourceSwitchVM.currentDataSource) { _, newSource in
-                if let source = newSource {
+                guard let source = newSource else { return }
+                if contentSourceRawValue != source.rawValue {
                     contentSourceRawValue = source.rawValue
                 }
             }
     }
     
     // MARK: - Private Methods
+    
+    /// 根据当前的启用数据源列表，更新滑动容器的 ViewModel，并保持与 contentSourceRawValue 一致
+    private func updateDataSourceSwitchViewModel() {
+        let sources = enabledContentSources
+        dataSourceSwitchVM.updateEnabledDataSources(sources)
+        
+        // 如果当前 contentSource 指向一个已经被禁用的源，让 DataSourceSwitchViewModel 决定新的当前源
+        if let current = dataSourceSwitchVM.currentDataSource {
+            if contentSourceRawValue != current.rawValue {
+                contentSourceRawValue = current.rawValue
+            }
+        }
+    }
     
     private func syncSwipeViewModelWithContentSource() {
         if let source = ContentSource(rawValue: contentSourceRawValue) {
@@ -126,8 +125,6 @@ struct MainListView: View {
                 selectedBookIds.removeAll()
                 selectedLinkIds.removeAll()
                 selectedWeReadBookIds.removeAll()
-                // 避免切换到已被关闭的数据源
-                ensureValidContentSource()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
                 guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
