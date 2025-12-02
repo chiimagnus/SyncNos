@@ -86,32 +86,86 @@ struct DedaoEbookListResponse: Codable {
 
 // MARK: - 电子书笔记模型
 
-/// 得到电子书笔记
+/// 得到电子书笔记 - 兼容多种 API 响应格式
+/// 实际 API 可能返回两种格式：
+/// 1. 标准格式：包含 note_id, note_line 等字段（纯电子书笔记）
+/// 2. 混合格式：包含 origin_note_id_hazy, highlights, video 等字段（课程/视频笔记）
 struct DedaoEbookNote: Codable, Identifiable {
-    let noteId: Int64
-    let noteIdStr: String
+    // === 标准格式字段 ===
+    let noteId: Int64?
+    let noteIdStr: String?
     let noteIdHazy: String?
     let uid: Int?
     let isFromMe: Int?          // 1 = 自己的笔记
     let notesOwner: DedaoNotesOwner?
     let noteType: Int?
     let sourceType: Int?
-    let note: String            // 用户备注
+    let note: String?           // 用户备注（可能为空字符串）
     let noteTitle: String?
-    let noteLine: String        // 划线内容
+    let noteLine: String?       // 划线内容（标准格式）
     let noteLineStyle: String?
-    let createTime: Int64
-    let updateTime: Int64
+    let createTime: Int64?
+    let updateTime: Int64?
     let tips: String?
     let shareUrl: String?
-    let extra: DedaoNoteExtra
+    let extra: DedaoNoteExtra?
     let notesCount: DedaoNotesCount?
     let canEdit: Bool?
     let isPermission: Bool?
     
-    var id: Int64 { noteId }
+    // === 混合格式字段 ===
+    let originNoteIdHazy: String?    // 原始笔记ID（混合格式）
+    let rootNoteId: Int64?
+    let rootNoteIdHazy: String?
+    let originContentType: Int?
+    let contentType: Int?
+    let noteClass: Int?              // "class" 是 Swift 关键字，重命名
+    let highlights: [DedaoHighlightItem]?  // 高亮列表
+    let rootHighlights: [DedaoHighlightItem]?
+    let state: Int?
+    let auditState: Int?
+    let lesson: DedaoLesson?         // 课程信息
+    let ddurl: DedaoDdUrl?           // 得到 URL
+    let video: DedaoVideo?           // 视频信息
+    let notesLikeCount: Int?
+    
+    /// 获取有效的唯一标识符
+    var effectiveId: String {
+        if let str = noteIdStr, !str.isEmpty { return str }
+        if let id = noteId { return String(id) }
+        if let hazy = originNoteIdHazy, !hazy.isEmpty { return hazy }
+        if let hazy = noteIdHazy, !hazy.isEmpty { return hazy }
+        return UUID().uuidString
+    }
+    
+    /// 获取有效的划线内容（优先标准格式，否则从 highlights 提取）
+    var effectiveNoteLine: String {
+        if let line = noteLine, !line.isEmpty { return line }
+        if let highlights = highlights, let first = highlights.first {
+            return first.text ?? ""
+        }
+        return ""
+    }
+    
+    /// 获取有效的创建时间
+    var effectiveCreateTime: Int64 {
+        createTime ?? 0
+    }
+    
+    /// 获取有效的更新时间
+    var effectiveUpdateTime: Int64 {
+        updateTime ?? createTime ?? 0
+    }
+    
+    /// 判断是否为有效的电子书笔记（有实际内容）
+    var isValidEbookNote: Bool {
+        !effectiveNoteLine.isEmpty || (note != nil && !note!.isEmpty)
+    }
+    
+    var id: String { effectiveId }
     
     private enum CodingKeys: String, CodingKey {
+        // 标准格式
         case noteId = "note_id"
         case noteIdStr = "note_id_str"
         case noteIdHazy = "note_id_hazy"
@@ -132,6 +186,75 @@ struct DedaoEbookNote: Codable, Identifiable {
         case notesCount = "notes_count"
         case canEdit = "can_edit"
         case isPermission = "is_permission"
+        // 混合格式
+        case originNoteIdHazy = "origin_note_id_hazy"
+        case rootNoteId = "root_note_id"
+        case rootNoteIdHazy = "root_note_id_hazy"
+        case originContentType = "origin_content_type"
+        case contentType = "content_type"
+        case noteClass = "class"
+        case highlights
+        case rootHighlights = "root_highlights"
+        case state
+        case auditState = "audit_state"
+        case lesson
+        case ddurl
+        case video
+        case notesLikeCount = "notes_like_count"
+    }
+}
+
+/// 高亮项目（混合格式中的 highlights 数组元素）
+struct DedaoHighlightItem: Codable {
+    let text: String?
+    let startPos: Int?
+    let endPos: Int?
+    let color: Int?
+    
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case startPos = "start_pos"
+        case endPos = "end_pos"
+        case color
+    }
+}
+
+/// 课程信息
+struct DedaoLesson: Codable {
+    let ptype: Int?
+    let pid: Int?
+    let pidStr: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case ptype, pid
+        case pidStr = "pid_str"
+    }
+}
+
+/// 得到 URL 信息
+struct DedaoDdUrl: Codable {
+    let needCheckBuy: Bool?
+    let url1: String?
+    let url2: String?
+    let needVisitorPopLoginView: Bool?
+}
+
+/// 视频信息
+struct DedaoVideo: Codable {
+    let videoId: Int?
+    let videoDuration: Int?
+    let videoDurationLabel: String?
+    let videoCover: String?
+    let videoState: Int?
+    let resource: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case videoId = "video_id"
+        case videoDuration = "video_duration"
+        case videoDurationLabel = "video_duration_label"
+        case videoCover = "video_cover"
+        case videoState = "video_state"
+        case resource
     }
 }
 
@@ -162,18 +285,18 @@ struct DedaoNoteExtra: Codable {
 
 /// 笔记拥有者
 struct DedaoNotesOwner: Codable {
-    let id: String
-    let uid: Int
-    let name: String
-    let avatar: String
+    let id: String?
+    let uid: Int?
+    let name: String?
+    let avatar: String?
 }
 
 /// 笔记统计
 struct DedaoNotesCount: Codable {
-    let repostCount: Int
-    let commentCount: Int
-    let likeCount: Int
-    let wordCount: Int
+    let repostCount: Int?
+    let commentCount: Int?
+    let likeCount: Int?
+    let wordCount: Int?
     
     private enum CodingKeys: String, CodingKey {
         case repostCount = "repost_count"
