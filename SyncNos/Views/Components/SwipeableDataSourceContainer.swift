@@ -25,6 +25,9 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     // 触控板滑动监听器
     @StateObject private var swipeHandler = TrackpadSwipeHandler()
     
+    /// 底部栏的高度（用于内容区域的底部空间）
+    private let bottomBarHeight: CGFloat = 20
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // 滑动区域
@@ -34,6 +37,10 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                         ForEach(Array(viewModel.enabledDataSources.enumerated()), id: \.offset) { _, source in
                             dataSourceView(for: source)
                                 .frame(width: geometry.size.width)
+                                .safeAreaInset(edge: .bottom) {
+                                    // 底部空间，避免被底部栏遮挡
+                                    Color.clear.frame(height: bottomBarHeight)
+                                }
                         }
                     }
                     .offset(x: -CGFloat(viewModel.activeIndex) * geometry.size.width)
