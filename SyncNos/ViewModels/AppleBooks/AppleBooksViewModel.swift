@@ -457,23 +457,29 @@ extension AppleBooksViewModel {
                         guard let self else { return }
                         await limiter.withPermit {
                             // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
-                            NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])                        
+                            await MainActor.run {
+                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
+                            }
                             do {
                                 let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
                                 try await syncEngine.syncSmart(source: adapter) { progress in
                                     // 广播该书的同步进度，供详情页监听并显示
-                                    NotificationCenter.default.post(name: ABVMNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                    Task { @MainActor in
+                                        NotificationCenter.default.post(name: ABVMNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                    }
                                 }
-                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])                        
                                 await MainActor.run {
                                     self.syncingBookIds.remove(id)
                                     self.syncedBookIds.insert(id)
+                                    NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
                                 }
                             } catch {
-                                _ = await MainActor.run { self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)") }
-                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])                        
-                                _ = await MainActor.run {
+                                await MainActor.run {
+                                    self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     self.syncingBookIds.remove(id)
+                                }
+                                await MainActor.run {
+                                    NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])
                                 }
                             }
                         }

@@ -411,41 +411,45 @@ final class WeReadViewModel: ObservableObject {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            await MainActor.run { _ = self.syncingBookIds.insert(id) }
-                            NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
-                                object: self,
-                                userInfo: ["bookId": id, "status": "started"]
-                            )
-                            do {
-                                let adapter = WeReadNotionAdapter.create(book: book, apiService: apiService)
-                                try await syncEngine.syncSmart(source: adapter) { progressText in
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("SyncProgressUpdated"),
-                                        object: self,
-                                        userInfo: ["bookId": id, "progress": progressText]
-                                    )
-                                }
+                            await MainActor.run {
+                                _ = self.syncingBookIds.insert(id)
                                 NotificationCenter.default.post(
                                     name: Notification.Name("SyncBookStatusChanged"),
                                     object: self,
-                                    userInfo: ["bookId": id, "status": "succeeded"]
+                                    userInfo: ["bookId": id, "status": "started"]
                                 )
+                            }
+                            do {
+                                let adapter = WeReadNotionAdapter.create(book: book, apiService: apiService)
+                                try await syncEngine.syncSmart(source: adapter) { progressText in
+                                    Task { @MainActor in
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("SyncProgressUpdated"),
+                                            object: self,
+                                            userInfo: ["bookId": id, "progress": progressText]
+                                        )
+                                    }
+                                }
                                 await MainActor.run {
                                     _ = self.syncingBookIds.remove(id)
                                     _ = self.syncedBookIds.insert(id)
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "succeeded"]
+                                    )
                                 }
                             } catch {
                                 await MainActor.run {
                                     self.logger.error("[WeRead] batchSync error for id=\(id): \(error.localizedDescription)")
-                                }
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("SyncBookStatusChanged"),
-                                    object: self,
-                                    userInfo: ["bookId": id, "status": "failed"]
-                                )
-                                await MainActor.run {
                                     _ = self.syncingBookIds.remove(id)
+                                }
+                                await MainActor.run {
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "failed"]
+                                    )
                                 }
                             }
                         }
