@@ -10,6 +10,7 @@ enum WeReadAPIError: LocalizedError {
     case invalidResponse
     case httpError(statusCode: Int, body: String)
     case apiError(code: Int, message: String)
+    case rateLimited
     
     var errorDescription: String? {
         switch self {
@@ -27,12 +28,14 @@ enum WeReadAPIError: LocalizedError {
             return NSLocalizedString("WeRead HTTP error \(statusCode)", comment: "")
         case .apiError(let code, let message):
             return "WeRead API error \(code): \(message)"
+        case .rateLimited:
+            return NSLocalizedString("WeRead rate limited. Please try again later.", comment: "")
         }
     }
     
     var isAuthenticationError: Bool {
         switch self {
-        case .notLoggedIn, .unauthorized, .sessionExpired:
+        case .notLoggedIn, .unauthorized, .sessionExpired, .sessionExpiredWithRefreshFailure:
             return true
         default:
             return false
@@ -40,11 +43,13 @@ enum WeReadAPIError: LocalizedError {
     }
 }
 
-/// WeRead API 客户端实现，基于 Cookie 认证与 URLSession
+/// WeRead API 客户端实现
+/// 集成令牌桶限流器 + 重试机制，有效防止触发反爬
 final class WeReadAPIService: WeReadAPIServiceProtocol {
     private let authService: WeReadAuthServiceProtocol
     private let logger: LoggerServiceProtocol
     private let refreshCoordinator = CookieRefreshCoordinator()
+    private let limiter: WeReadRequestLimiter
 
     /// WeRead Web 端基础 URL
     private let baseURL = URL(string: "https://weread.qq.com")!
@@ -55,14 +60,18 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     ) {
         self.authService = authService
         self.logger = logger
+        self.limiter = WeReadRequestLimiter(logger: logger)
     }
 
     // MARK: - Public API
 
     func fetchNotebooks() async throws -> [WeReadNotebook] {
         let url = baseURL.appendingPathComponent("/api/user/notebook")
-        let data = try await performRequest(url: url)
-        // WeRead 返回的 JSON 结构可能为 { "books": [ ... ] } 或 { "notebooks": [ ... ] }
+        
+        let data = try await limiter.withRetry(operationName: "fetchNotebooks") { [self] in
+            try await performRequest(url: url)
+        }
+        
         let decoded = try decodeNotebookList(from: data)
         logger.info("[WeReadAPI] fetched notebooks: \(decoded.count)")
         return decoded
@@ -71,7 +80,11 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     func fetchBookInfo(bookId: String) async throws -> WeReadBookInfo {
         var components = URLComponents(url: baseURL.appendingPathComponent("/web/book/info"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "bookId", value: bookId)]
-        let data = try await performRequest(url: components.url!)
+        
+        let data = try await limiter.withRetry(operationName: "fetchBookInfo(\(bookId))") { [self] in
+            try await performRequest(url: components.url!)
+        }
+        
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .useDefaultKeys
         return try decoder.decode(WeReadBookInfo.self, from: data)
@@ -80,7 +93,11 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     func fetchBookmarks(bookId: String) async throws -> [WeReadBookmark] {
         var components = URLComponents(url: baseURL.appendingPathComponent("/web/book/bookmarklist"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "bookId", value: bookId)]
-        let data = try await performRequest(url: components.url!)
+        
+        let data = try await limiter.withRetry(operationName: "fetchBookmarks(\(bookId))") { [self] in
+            try await performRequest(url: components.url!)
+        }
+        
         let bookmarks = try decodeBookmarks(from: data, bookId: bookId)
         logger.info("[WeReadAPI] fetched bookmarks for bookId=\(bookId): \(bookmarks.count)")
         return bookmarks
@@ -94,7 +111,11 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             URLQueryItem(name: "mine", value: "1"),
             URLQueryItem(name: "synckey", value: "0")
         ]
-        let data = try await performRequest(url: components.url!)
+        
+        let data = try await limiter.withRetry(operationName: "fetchReviews(\(bookId))") { [self] in
+            try await performRequest(url: components.url!)
+        }
+        
         let reviews = try decodeReviews(from: data, bookId: bookId)
         logger.info("[WeReadAPI] fetched reviews for bookId=\(bookId): \(reviews.count)")
         return reviews
@@ -171,9 +192,14 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             let bodyPreview = String(data: data.prefix(256), encoding: .utf8) ?? ""
             logger.error("[WeReadAPI] HTTP \(http.statusCode) for \(url.absoluteString), body=\(bodyPreview)")
             
-            if http.statusCode == 401 {
+            switch http.statusCode {
+            case 401:
                 throw WeReadAPIError.unauthorized
-            } else {
+            case 403:
+                throw WeReadAPIError.rateLimited
+            case 429:
+                throw WeReadAPIError.rateLimited
+            default:
                 throw WeReadAPIError.httpError(statusCode: http.statusCode, body: bodyPreview)
             }
         }
@@ -362,7 +388,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             components.queryItems = [URLQueryItem(name: "synckey", value: String(syncKey))]
         }
         
-        let data = try await performRequest(url: components.url!)
+        let data = try await limiter.withRetry(operationName: "fetchNotebooksIncremental") { [self] in
+            try await performRequest(url: components.url!)
+        }
         
         // 解析响应
         guard let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
@@ -396,7 +424,9 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
         }
         components.queryItems = queryItems
         
-        let data = try await performRequest(url: components.url!)
+        let data = try await limiter.withRetry(operationName: "fetchBookmarksIncremental(\(bookId))") { [self] in
+            try await performRequest(url: components.url!)
+        }
         
         // 解析响应获取 synckey
         guard let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
