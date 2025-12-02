@@ -170,6 +170,21 @@ struct ViewCommands: Commands {
                 }
             }
 
+            if isDataSourceEnabled(.dedao) {
+                if let key = shortcutKey(for: .dedao) {
+                    Button("Dedao", systemImage: "book.closed") {
+                        contentSourceRawValue = ContentSource.dedao.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .dedao)
+                } else {
+                    Button("Dedao", systemImage: "book.closed") {
+                        contentSourceRawValue = ContentSource.dedao.rawValue
+                    }
+                    .disabled(currentSource == .dedao)
+                }
+            }
+
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
@@ -261,7 +276,7 @@ struct ViewCommands: Commands {
                         }
                     }
                 }
-            } else {
+            } else if currentSource == .weRead {
                 // WeRead 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
@@ -285,6 +300,38 @@ struct ViewCommands: Commands {
                         Button {
                             bookListSortAscending.toggle()
                             NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
+                        } label: {
+                            if bookListSortAscending {
+                                Label("Ascending", systemImage: "checkmark")
+                            } else {
+                                Label("Ascending", systemImage: "xmark")
+                            }
+                        }
+                    }
+                }
+            } else if currentSource == .dedao {
+                // Dedao 的排序菜单（与 WeRead 类似，只支持 title, highlightCount, lastSync）
+                Menu("Books", systemImage: "book.closed") {
+                    Section("Sort") {
+                        let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+                        ForEach(availableKeys, id: \.self) { k in
+                            Button {
+                                bookListSortKey = k.rawValue
+                                NotificationCenter.default.post(name: Notification.Name("DedaoFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            } label: {
+                                if bookListSortKey == k.rawValue {
+                                    Label(k.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(k.displayName)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            bookListSortAscending.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("DedaoFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
                         } label: {
                             if bookListSortAscending {
                                 Label("Ascending", systemImage: "checkmark")
