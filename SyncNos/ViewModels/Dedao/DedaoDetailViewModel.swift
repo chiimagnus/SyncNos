@@ -234,30 +234,38 @@ final class DedaoDetailViewModel: ObservableObject {
             return
         }
         
+        let isNewBook = currentBookId != bookId
         currentBookId = bookId
-        isLoading = true
         
-        // 重置数据
-        allNotes = []
-        filteredHighlights = []
-        visibleHighlights = []
-        currentPageCount = 0
-        
-        // 1. 先尝试从缓存加载
+        // 1. 先尝试从缓存加载（不清空现有数据，避免闪烁）
         do {
             let cached = try await cacheService.getHighlights(bookId: bookId)
             if !cached.isEmpty {
+                // 有缓存：立即显示，不显示 Loading
                 allNotes = cached.map { cachedToNote($0) }
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
+                
+                // 后台异步同步（不阻塞）
+                Task {
+                    await performBackgroundSync(bookId: bookId)
+                }
+                return
             }
         } catch {
             logger.warning("[DedaoDetail] Cache load failed: \(error.localizedDescription)")
         }
         
-        // 2. 后台从 API 同步
+        // 2. 没有缓存：显示 Loading，从 API 加载
+        if isNewBook {
+            allNotes = []
+            filteredHighlights = []
+            visibleHighlights = []
+            currentPageCount = 0
+        }
+        isLoading = true
         await performBackgroundSync(bookId: bookId)
     }
     
