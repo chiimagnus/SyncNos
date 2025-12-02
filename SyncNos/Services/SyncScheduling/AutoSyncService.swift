@@ -141,4 +141,8 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     func triggerWeReadNow() {
         providers[.weRead]?.triggerManualSyncNow()
     }
+
+    func triggerDedaoNow() {
+        providers[.dedao]?.triggerManualSyncNow()
+    }
 }

@@ -28,6 +28,11 @@ class DIContainer {
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadCacheService: WeReadCacheServiceProtocol?
     private var _weReadModelContainer: ModelContainer?
+    // Dedao
+    private var _dedaoAuthService: DedaoAuthServiceProtocol?
+    private var _dedaoAPIService: DedaoAPIServiceProtocol?
+    private var _dedaoCacheService: DedaoCacheServiceProtocol?
+    private var _dedaoModelContainer: ModelContainer?
     // Sync Engine
     private var _notionSyncEngine: NotionSyncEngine?
     private var _goodLinksSyncService: GoodLinksSyncServiceProtocol?
@@ -196,6 +201,63 @@ class DIContainer {
         return _weReadCacheService
     }
     
+    // MARK: - Dedao Services
+    
+    var dedaoAuthService: DedaoAuthServiceProtocol {
+        if _dedaoAuthService == nil {
+            _dedaoAuthService = DedaoAuthService()
+        }
+        return _dedaoAuthService!
+    }
+    
+    var dedaoAPIService: DedaoAPIServiceProtocol {
+        if _dedaoAPIService == nil {
+            _dedaoAPIService = DedaoAPIService(
+                authService: dedaoAuthService,
+                logger: loggerService
+            )
+        }
+        return _dedaoAPIService!
+    }
+    
+    /// Dedao 数据的 ModelContainer
+    var dedaoModelContainer: ModelContainer? {
+        if _dedaoModelContainer == nil {
+            do {
+                let schema = Schema([
+                    CachedDedaoBook.self,
+                    CachedDedaoHighlight.self,
+                    DedaoSyncState.self
+                ])
+                let modelConfiguration = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    allowsSave: true
+                )
+                _dedaoModelContainer = try ModelContainer(
+                    for: schema,
+                    configurations: [modelConfiguration]
+                )
+            } catch {
+                loggerService.error("[DIContainer] Failed to create Dedao ModelContainer: \(error.localizedDescription)")
+            }
+        }
+        return _dedaoModelContainer
+    }
+    
+    var dedaoCacheService: DedaoCacheServiceProtocol {
+        if _dedaoCacheService == nil {
+            guard let container = dedaoModelContainer else {
+                fatalError("[DIContainer] Dedao ModelContainer not available")
+            }
+            _dedaoCacheService = DedaoCacheService(
+                modelContainer: container,
+                logger: loggerService
+            )
+        }
+        return _dedaoCacheService!
+    }
+    
     // MARK: - Sync Engine
     
     var notionSyncEngine: NotionSyncEngine {
@@ -318,6 +380,22 @@ class DIContainer {
 
     func register(environmentDetector: EnvironmentDetectorProtocol) {
         self._environmentDetector = environmentDetector
+    }
+    
+    func register(dedaoAuthService: DedaoAuthServiceProtocol) {
+        self._dedaoAuthService = dedaoAuthService
+    }
+    
+    func register(dedaoAPIService: DedaoAPIServiceProtocol) {
+        self._dedaoAPIService = dedaoAPIService
+    }
+    
+    func register(dedaoCacheService: DedaoCacheServiceProtocol) {
+        self._dedaoCacheService = dedaoCacheService
+    }
+    
+    func register(dedaoModelContainer: ModelContainer) {
+        self._dedaoModelContainer = dedaoModelContainer
     }
 
 }

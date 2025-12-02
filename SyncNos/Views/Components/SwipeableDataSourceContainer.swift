@@ -11,11 +11,13 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @ObservedObject var appleBooksVM: AppleBooksViewModel
     @ObservedObject var goodLinksVM: GoodLinksViewModel
     @ObservedObject var weReadVM: WeReadViewModel
+    @ObservedObject var dedaoVM: DedaoViewModel
     
     // 选择状态绑定
     @Binding var selectedBookIds: Set<String>
     @Binding var selectedLinkIds: Set<String>
     @Binding var selectedWeReadBookIds: Set<String>
+    @Binding var selectedDedaoBookIds: Set<String>
     
     // Filter 菜单
     @ViewBuilder var filterMenu: () -> FilterMenu
@@ -158,6 +160,23 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                     !selectedWeReadBookIds.isEmpty
                 }
             )
+        case .dedao:
+            return SelectionCommands(
+                selectAll: {
+                    let all = Set(dedaoVM.displayBooks.map { $0.bookId })
+                    if !all.isEmpty { selectedDedaoBookIds = all }
+                },
+                deselectAll: {
+                    selectedDedaoBookIds.removeAll()
+                },
+                canSelectAll: {
+                    let total = dedaoVM.displayBooks.count
+                    return total > 0 && selectedDedaoBookIds.count < total
+                },
+                canDeselect: {
+                    !selectedDedaoBookIds.isEmpty
+                }
+            )
         }
     }
     
@@ -172,6 +191,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
         case .weRead:
             WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
+        case .dedao:
+            DedaoListView(viewModel: dedaoVM, selectionIds: $selectedDedaoBookIds)
         }
     }
     
@@ -198,6 +219,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         selectedBookIds.removeAll()
         selectedLinkIds.removeAll()
         selectedWeReadBookIds.removeAll()
+        selectedDedaoBookIds.removeAll()
     }
 }
 
@@ -313,24 +335,8 @@ final class TrackpadSwipeHandler: ObservableObject {
     }
 }
 
-#Preview {
-    SwipeableDataSourceContainer(
-        viewModel: DataSourceSwitchViewModel(),
-        appleBooksVM: AppleBooksViewModel(),
-        goodLinksVM: GoodLinksViewModel(),
-        weReadVM: WeReadViewModel(),
-        selectedBookIds: .constant([]),
-        selectedLinkIds: .constant([]),
-        selectedWeReadBookIds: .constant([]),
-        filterMenu: {
-            Menu {
-                Text("Filter options")
-            } label: {
-                Image(systemName: "line.3.horizontal.decrease")
-            }
-            .menuIndicator(.hidden)
-        }
-    )
-    .frame(width: 300, height: 600)
-}
+// Preview disabled due to dependency injection requirements
+// #Preview {
+//     SwipeableDataSourceContainer(...)
+// }
 
