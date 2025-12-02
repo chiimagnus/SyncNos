@@ -81,6 +81,8 @@ final class DedaoSettingsViewModel: ObservableObject {
             await MainActor.run {
                 refreshLoginStatus()
                 message = String(localized: "dedao.loggedOut")
+                // 发送登录状态变化通知，让 DedaoListView/DedaoViewModel 更新 UI
+                NotificationCenter.default.post(name: Notification.Name("DedaoLoginStatusChanged"), object: nil)
             }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {

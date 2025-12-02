@@ -23,6 +23,9 @@ final class WeReadViewModel: ObservableObject {
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
     // 注：showNotionConfigAlert 和会话过期弹窗已移至 MainListView 统一处理
+    
+    // 登录状态相关
+    @Published var showLoginSheet: Bool = false
 
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -33,6 +36,7 @@ final class WeReadViewModel: ObservableObject {
     private var currentPageSize: Int = 0
 
     // 依赖
+    private let authService: WeReadAuthServiceProtocol
     private let apiService: WeReadAPIServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
@@ -48,6 +52,7 @@ final class WeReadViewModel: ObservableObject {
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     init(
+        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
@@ -55,6 +60,7 @@ final class WeReadViewModel: ObservableObject {
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         cacheService: WeReadCacheServiceProtocol? = nil
     ) {
+        self.authService = authService
         self.apiService = apiService
         self.syncEngine = syncEngine
         self.logger = logger
@@ -138,6 +144,19 @@ final class WeReadViewModel: ObservableObject {
                 self.triggerRecompute()
             }
             .store(in: &cancellables)
+        
+        // 订阅登录状态变化通知（退出登录时触发 UI 更新）
+        NotificationCenter.default.publisher(for: Notification.Name("WeReadLoginStatusChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                // 清空书籍列表，触发 UI 更新显示未登录状态
+                self.books = []
+                self.displayBooks = []
+                self.visibleBooks = []
+                self.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Public API
@@ -148,6 +167,11 @@ final class WeReadViewModel: ObservableObject {
 
     /// 加载书籍（优先从缓存，后台增量同步）
     func loadBooks() async {
+        guard authService.isLoggedIn else {
+            logger.info("[WeRead] Not logged in, skip loading books")
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
@@ -319,12 +343,15 @@ final class WeReadViewModel: ObservableObject {
         }
     }
     
-    /// 导航到 WeRead 登录页面
+    // MARK: - Login Status
+    
+    var isLoggedIn: Bool {
+        authService.isLoggedIn
+    }
+    
+    /// 导航到 WeRead 登录页面（直接在 ListView 中打开登录 Sheet）
     func navigateToWeReadLogin() {
-        NotificationCenter.default.post(
-            name: Notification.Name("NavigateToWeReadSettings"),
-            object: nil
-        )
+        showLoginSheet = true
     }
 
     func loadMoreIfNeeded(currentItem: WeReadBookListItem) {
