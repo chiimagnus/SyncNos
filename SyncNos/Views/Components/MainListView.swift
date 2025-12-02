@@ -643,57 +643,22 @@ struct MainListView: View {
     }
     
     // MARK: - Sync Methods
+    // 注意：SyncTasksEnqueued 通知由各 ViewModel 的 batchSync() 方法统一发送，
+    // 此处不应重复发送，遵循唯一入口原则。
     
     private func syncSelectedAppleBooks() {
-        let items = selectedBookIds.compactMap { id -> [String: Any]? in
-            guard let b = appleBooksVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
-        }
-        NotificationCenter.default.post(
-            name: Notification.Name("SyncTasksEnqueued"),
-            object: nil,
-            userInfo: ["source": "appleBooks", "items": items]
-        )
         appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     private func syncSelectedGoodLinks() {
-        let items = selectedLinkIds.compactMap { id -> [String: Any]? in
-            guard let link = goodLinksVM.displayLinks.first(where: { $0.id == id }) else { return nil }
-            let title = (link.title?.isEmpty == false ? link.title! : link.url)
-            return ["id": id, "title": title, "subtitle": link.author ?? ""]
-        }
-        NotificationCenter.default.post(
-            name: Notification.Name("SyncTasksEnqueued"),
-            object: nil,
-            userInfo: ["source": "goodLinks", "items": items]
-        )
         goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     private func syncSelectedWeRead() {
-        let items = selectedWeReadBookIds.compactMap { id -> [String: Any]? in
-            guard let b = weReadVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return ["id": id, "title": b.title, "subtitle": b.author]
-        }
-        NotificationCenter.default.post(
-            name: Notification.Name("SyncTasksEnqueued"),
-            object: nil,
-            userInfo: ["source": "weRead", "items": items]
-        )
         weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     private func syncSelectedDedao() {
-        let items = selectedDedaoBookIds.compactMap { id -> [String: Any]? in
-            guard let b = dedaoVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return ["id": id, "title": b.title, "subtitle": b.author]
-        }
-        NotificationCenter.default.post(
-            name: Notification.Name("SyncTasksEnqueued"),
-            object: nil,
-            userInfo: ["source": "dedao", "items": items]
-        )
         dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
