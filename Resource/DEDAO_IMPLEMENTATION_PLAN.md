@@ -67,8 +67,10 @@
 | 类型 | 命名模式 | 参考文件 |
 |------|----------|----------|
 | 数据模型 | `DedaoModels.swift` | `WeReadModels.swift` |
+| **本地存储模型** | `DedaoCacheModels.swift` | `WeReadCacheModels.swift` |
 | API 服务 | `DedaoAPIService.swift` | `WeReadAPIService.swift` |
 | 认证服务 | `DedaoAuthService.swift` | `WeReadAuthService.swift` |
+| **本地存储服务** | `DedaoCacheService.swift` | `WeReadCacheService.swift` |
 | 适配器 | `DedaoNotionAdapter.swift` | `WeReadNotionAdapter.swift` |
 | ViewModel | `DedaoViewModel.swift` | `WeReadViewModel.swift` |
 | ListView | `DedaoListView.swift` | `WeReadListView.swift` |
@@ -459,14 +461,129 @@ extension UnifiedSyncItem {
 }
 ```
 
+### 1.4 创建本地存储模型（SwiftData）
+
+**文件**: `SyncNos/Models/DedaoCacheModels.swift`
+
+> **参考**: `WeReadCacheModels.swift`
+
+```swift
+import Foundation
+import SwiftData
+
+// MARK: - Cached Dedao Book
+
+/// 本地存储的得到电子书元数据
+@Model
+final class CachedDedaoBook {
+    @Attribute(.unique) var bookId: String  // enid
+    var title: String
+    var author: String
+    var cover: String?
+    var highlightCount: Int
+    var lastFetchedAt: Date?
+    
+    @Relationship(deleteRule: .cascade, inverse: \CachedDedaoHighlight.book)
+    var highlights: [CachedDedaoHighlight]?
+    
+    init(bookId: String, title: String, author: String, cover: String? = nil, highlightCount: Int = 0) {
+        self.bookId = bookId
+        self.title = title
+        self.author = author
+        self.cover = cover
+        self.highlightCount = highlightCount
+    }
+    
+    /// 从 API DTO 创建本地存储模型
+    convenience init(from ebook: DedaoEbook) {
+        self.init(
+            bookId: ebook.enid,
+            title: ebook.title,
+            author: ebook.author ?? "",
+            cover: ebook.icon
+        )
+    }
+}
+
+// MARK: - Cached Dedao Highlight
+
+/// 本地存储的得到电子书笔记
+@Model
+final class CachedDedaoHighlight {
+    @Attribute(.unique) var highlightId: String  // noteIdStr
+    var bookId: String
+    var text: String           // noteLine
+    var note: String?          // note
+    var chapterTitle: String?  // extra.title
+    var createdAt: Date?
+    var updatedAt: Date?
+    
+    var book: CachedDedaoBook?
+    
+    init(highlightId: String, bookId: String, text: String, note: String? = nil, 
+         chapterTitle: String? = nil, createdAt: Date? = nil, updatedAt: Date? = nil) {
+        self.highlightId = highlightId
+        self.bookId = bookId
+        self.text = text
+        self.note = note
+        self.chapterTitle = chapterTitle
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    /// 从 API DTO 创建本地存储模型
+    convenience init(from note: DedaoEbookNote) {
+        self.init(
+            highlightId: note.noteIdStr,
+            bookId: note.extra.bookName,
+            text: note.noteLine,
+            note: note.note.isEmpty ? nil : note.note,
+            chapterTitle: note.extra.title,
+            createdAt: Date(timeIntervalSince1970: TimeInterval(note.createTime)),
+            updatedAt: Date(timeIntervalSince1970: TimeInterval(note.updateTime))
+        )
+    }
+}
+
+// MARK: - Dedao Sync State
+
+/// 全局同步状态
+@Model
+final class DedaoSyncState {
+    @Attribute(.unique) var id: String
+    var lastFullSyncAt: Date?
+    var lastIncrementalSyncAt: Date?
+    
+    init() {
+        self.id = "global"
+    }
+}
+
+// MARK: - Conversion Extensions
+
+extension DedaoBookListItem {
+    /// 从本地存储模型创建 UI 列表模型
+    init(from cached: CachedDedaoBook) {
+        self.init(
+            bookId: cached.bookId,
+            title: cached.title,
+            author: cached.author,
+            cover: cached.cover ?? "",
+            highlightCount: cached.highlightCount
+        )
+    }
+}
+```
+
 ### Checklist - 第一阶段
 
-- [ ] 在 `SyncSource` 枚举中添加 `case dedao`
-- [ ] 在 `ContentSource` 枚举中添加 `case dedao` 和显示名称
-- [ ] 在 `HighlightSource` 枚举中添加 `case dedao`
-- [ ] 在 `HighlightColorScheme.allDefinitions` 中添加颜色映射
-- [ ] 创建 `Models/DedaoModels.swift`
-- [ ] 在 `UnifiedHighlight.swift` 中添加转换初始化器
+- [x] 在 `SyncSource` 枚举中添加 `case dedao`
+- [x] 在 `ContentSource` 枚举中添加 `case dedao` 和显示名称
+- [x] 在 `HighlightSource` 枚举中添加 `case dedao`
+- [x] 在 `HighlightColorScheme.allDefinitions` 中添加颜色映射
+- [x] 创建 `Models/DedaoModels.swift`
+- [x] 在 `UnifiedHighlight.swift` 中添加转换初始化器
+- [ ] **创建 `Models/DedaoCacheModels.swift`（SwiftData 本地存储模型）**
 
 ---
 
@@ -547,13 +664,54 @@ actor DedaoRateLimiter {
 }
 ```
 
+### 2.6 创建本地存储服务
+
+**文件**: `SyncNos/Services/DataSources-From/Dedao/DedaoCacheService.swift`
+
+> **参考**: `WeReadCacheService.swift`
+
+本地存储服务职责：
+- 从 SwiftData 读取/写入数据
+- 提供快速的本地数据访问
+- 管理数据生命周期
+- 减少 API 调用次数（降低反爬虫风险）
+
+```swift
+import Foundation
+import SwiftData
+
+/// 得到本地存储服务协议
+protocol DedaoCacheServiceProtocol: AnyObject {
+    func getCachedBooks() async throws -> [CachedDedaoBook]
+    func getCachedHighlights(for bookId: String) async throws -> [CachedDedaoHighlight]
+    func saveBooks(_ books: [DedaoEbook]) async throws
+    func saveHighlights(_ highlights: [DedaoEbookNote], for bookId: String) async throws
+    func updateHighlightCount(for bookId: String, count: Int) async throws
+    func clearCache() async throws
+}
+
+/// 得到本地存储服务实现
+@MainActor
+final class DedaoCacheService: DedaoCacheServiceProtocol {
+    private let modelContainer: ModelContainer
+    
+    init(modelContainer: ModelContainer) {
+        self.modelContainer = modelContainer
+    }
+    
+    // 实现数据读写逻辑...
+}
+```
+
 ### Checklist - 第二阶段
 
 - [ ] 创建 `Services/DataSources-From/Dedao/` 目录
 - [ ] 在 `Protocols.swift` 中添加 `DedaoAuthServiceProtocol`
 - [ ] 在 `Protocols.swift` 中添加 `DedaoAPIServiceProtocol`
+- [ ] **在 `Protocols.swift` 中添加 `DedaoCacheServiceProtocol`**
 - [ ] 创建 `DedaoAuthService.swift`
 - [ ] 创建 `DedaoAPIService.swift`
+- [ ] **创建 `DedaoCacheService.swift`（本地存储服务）**
 - [ ] 实现速率限制器 `DedaoRateLimiter`
 
 ---
@@ -875,20 +1033,22 @@ xcodebuild -scheme SyncNos -configuration Debug build 2>&1 | grep -E "error:|war
 
 ## 完整文件清单
 
-### 新建文件 (11 个)
+### 新建文件 (13 个)
 
-| 路径 | 必需 |
-|------|------|
-| `Models/DedaoModels.swift` | ✅ |
-| `Services/DataSources-From/Dedao/DedaoAuthService.swift` | ✅ |
-| `Services/DataSources-From/Dedao/DedaoAPIService.swift` | ✅ |
-| `Services/DataSources-To/Notion/SyncEngine/Adapters/DedaoNotionAdapter.swift` | ✅ |
-| `ViewModels/Dedao/DedaoViewModel.swift` | ✅ |
-| `ViewModels/Dedao/DedaoSettingsViewModel.swift` | ✅ |
-| `Views/Dedao/DedaoListView.swift` | ✅ |
-| `Views/Settting/SyncFrom/DedaoSettingsView.swift` | ✅ |
-| `Views/Settting/SyncFrom/DedaoLoginView.swift` | ✅ |
-| `Services/SyncScheduling/DedaoAutoSyncProvider.swift` | ✅ |
+| 路径 | 必需 | 说明 |
+|------|------|------|
+| `Models/DedaoModels.swift` | ✅ | API 响应模型 |
+| `Models/DedaoCacheModels.swift` | ✅ | **SwiftData 本地存储模型** |
+| `Services/DataSources-From/Dedao/DedaoAuthService.swift` | ✅ | 认证服务 |
+| `Services/DataSources-From/Dedao/DedaoAPIService.swift` | ✅ | API 服务 |
+| `Services/DataSources-From/Dedao/DedaoCacheService.swift` | ✅ | **本地存储服务** |
+| `Services/DataSources-To/Notion/SyncEngine/Adapters/DedaoNotionAdapter.swift` | ✅ | 同步适配器 |
+| `ViewModels/Dedao/DedaoViewModel.swift` | ✅ | 列表 ViewModel |
+| `ViewModels/Dedao/DedaoSettingsViewModel.swift` | ✅ | 设置 ViewModel |
+| `Views/Dedao/DedaoListView.swift` | ✅ | 列表视图 |
+| `Views/Settting/SyncFrom/DedaoSettingsView.swift` | ✅ | 设置视图 |
+| `Views/Settting/SyncFrom/DedaoLoginView.swift` | ✅ | 登录视图 |
+| `Services/SyncScheduling/DedaoAutoSyncProvider.swift` | ✅ | 自动同步 |
 
 ### 修改文件 (10 个)
 
@@ -1037,18 +1197,49 @@ iv := []byte("6fd89a1b3a7f48fb")
 
 | 阶段 | 工期 | 说明 |
 |------|------|------|
-| 第一阶段：数据模型 | 1 天 | |
-| 第二阶段：数据读取服务 | 2 天 | 包含速率限制器 |
+| 第一阶段：数据模型 | 1.5 天 | **含 SwiftData 本地存储模型** |
+| 第二阶段：数据读取服务 | 2.5 天 | 含速率限制器 + **本地存储服务** |
 | 第三阶段：同步适配器 | 1 天 | |
 | 第四阶段：ViewModel | 1 天 | |
 | 第五阶段：Views | 2 天 | 包含扫码登录 WebView |
 | 第六阶段：自动同步 | 1 天 | |
 | 第七阶段：配置与注册 | 0.5 天 | |
 | 第八阶段：测试与验证 | 1.5 天 | |
-| **总计** | **10 天** | |
+| **总计** | **11 天** | |
 
 ---
 
-*文档版本: 2.0*
+## 未来改进（低优先级）
+
+以下是可以在未来迭代中考虑的改进项：
+
+### 1. 统一命名风格
+
+当前 WeRead 使用 "Cache" 命名，Dedao 也保持一致。未来可以考虑统一重命名为更语义化的 "LocalStorage"：
+
+| 当前命名 | 建议命名 |
+|---------|---------|
+| `WeReadCacheModels.swift` | `WeReadLocalModels.swift` |
+| `WeReadCacheService.swift` | `WeReadLocalStorageService.swift` |
+| `CachedWeReadBook` | `LocalWeReadBook` |
+| `CachedWeReadHighlight` | `LocalWeReadHighlight` |
+| `DedaoCacheModels.swift` | `DedaoLocalModels.swift` |
+| `DedaoCacheService.swift` | `DedaoLocalStorageService.swift` |
+| `CachedDedaoBook` | `LocalDedaoBook` |
+| `CachedDedaoHighlight` | `LocalDedaoHighlight` |
+
+### 2. 得到课程笔记 API
+
+得到 API 目前只支持**电子书笔记**。未来如果得到开放**课程笔记** API（用户私有笔记，而非公开评论），可以考虑添加支持。
+
+### 3. 电子书原文同步
+
+需要实现 AES 解密 SVG 内容，复杂度较高。如有需求，可在未来版本添加。
+
+---
+
+*文档版本: 2.1*
 *创建日期: 2025-12-02*
+*更新日期: 2025-12-02*
 *基于: ADD_NEW_DATASOURCE_CHECKLIST.md v2.0*
+*更新: 添加 SwiftData 本地存储功能*
