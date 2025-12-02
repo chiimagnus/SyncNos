@@ -10,7 +10,7 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var queuedCount: Int = 0
     @Published private(set) var failedCount: Int = 0
     @Published private(set) var isAutoSyncRunning: Bool = false
-    @Published var showNotionConfigAlert: Bool = false
+    // 注：showNotionConfigAlert 已移至 MainListView 统一处理
 
     // MARK: - Dependencies
     private let autoSyncService: AutoSyncServiceProtocol
@@ -50,7 +50,7 @@ final class MenuBarViewModel: ObservableObject {
     // MARK: - Actions
     func syncAppleBooksNow() {
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         autoSyncService.triggerAppleBooksNow()
@@ -59,7 +59,7 @@ final class MenuBarViewModel: ObservableObject {
 
     func syncGoodLinksNow() {
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         autoSyncService.triggerGoodLinksNow()

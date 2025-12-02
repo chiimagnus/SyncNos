@@ -22,11 +22,7 @@ final class WeReadViewModel: ObservableObject {
     // 同步状态（列表）
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
-    @Published var showNotionConfigAlert: Bool = false
-    
-    // Cookie 刷新失败 Alert
-    @Published var showRefreshFailedAlert: Bool = false
-    @Published var refreshFailureReason: String = ""
+    // 注：showNotionConfigAlert 和会话过期弹窗已移至 MainListView 统一处理
 
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -214,8 +210,12 @@ final class WeReadViewModel: ObservableObject {
                     // 如果是认证错误，显示提示
                     if let apiError = error as? WeReadAPIError,
                        case .sessionExpiredWithRefreshFailure(let reason) = apiError {
-                        refreshFailureReason = reason
-                        showRefreshFailedAlert = true
+                        // 发送会话过期通知到 MainListView
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ShowSessionExpiredAlert"),
+                            object: nil,
+                            userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
+                        )
                     }
                 }
             }
@@ -270,9 +270,12 @@ final class WeReadViewModel: ObservableObject {
             logger.info("[WeRead] fetched notebooks: \(notebooks.count)")
         } catch let error as WeReadAPIError {
             if case .sessionExpiredWithRefreshFailure(let reason) = error {
-                // Cookie 刷新失败，显示 Alert 提示用户需要手动登录
-                refreshFailureReason = reason
-                showRefreshFailedAlert = true
+                // Cookie 刷新失败，发送会话过期通知到 MainListView
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowSessionExpiredAlert"),
+                    object: nil,
+                    userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
+                )
             } else {
                 errorMessage = error.localizedDescription
             }
@@ -342,7 +345,7 @@ final class WeReadViewModel: ObservableObject {
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
 

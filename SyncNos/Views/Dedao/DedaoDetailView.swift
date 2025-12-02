@@ -34,267 +34,300 @@ struct DedaoDetailView: View {
     private let dedaoColor = Color(red: 255/255, green: 107/255, blue: 0/255)
 
     var body: some View {
+        mainContent
+    }
+    
+    // MARK: - Main Content
+    
+    @ViewBuilder
+    private var mainContent: some View {
         Group {
             if let book = selectedBook {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        InfoHeaderCardView(
-                            title: book.title,
-                            subtitle: book.author.isEmpty ? nil : book.author,
-                            timestamps: TimestampInfo(
-                                addedAt: nil,  // Dedao 不提供添加时间
-                                modifiedAt: nil,  // Dedao 不提供修改时间
-                                lastSyncAt: listViewModel.lastSync(for: book.bookId)
-                            )
-                        ) {
-                            if let url = URL(string: "https://www.dedao.cn/") {
-                                Link("Open in Dedao Web", destination: url)
-                                    .font(.subheadline)
-                            }
-                        } content: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "highlighter")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                // 显示已加载/总数
-                                if detailViewModel.totalFilteredCount > 0 {
-                                    Text("\(detailViewModel.visibleHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-
-                        if detailViewModel.isLoading {
-                            ProgressView("Loading...")
-                                .padding(.top)
-                        } else if detailViewModel.visibleHighlights.isEmpty {
-                            Text("No highlights found for this book.")
-                                .foregroundColor(.secondary)
-                                .padding(.top)
-                        } else {
-                            WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
-                                ForEach(detailViewModel.visibleHighlights) { h in
-                                    HighlightCardView(
-                                        colorMark: dedaoColor,  // 使用得到品牌色
-                                        content: h.text,
-                                        note: h.note,
-                                        reviewContents: [],  // 得到没有想法功能
-                                        createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
-                                        modifiedDate: h.updatedAt.map { Self.dateFormatter.string(from: $0) }
-                                    )
-                                    .onAppear {
-                                        // 当卡片出现时，检查是否需要加载更多
-                                        detailViewModel.loadMoreIfNeeded(currentItem: h)
-                                    }
-                                }
-                            }
-                            .padding(.top)
-                            .overlay(
-                                GeometryReader { proxy in
-                                    let w = proxy.size.width
-                                    Color.clear
-                                        .onAppear {
-                                            measuredLayoutWidth = w
-                                            debouncedLayoutWidth = w
-                                        }
-                                        .onChange(of: w) { _, newValue in
-                                            measuredLayoutWidth = newValue
-                                            // 取消之前的 debounce 任务
-                                            layoutWidthDebounceTask?.cancel()
-                                            // 创建新的 debounce 任务，延迟 0.3 秒更新
-                                            layoutWidthDebounceTask = Task { @MainActor in
-                                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 秒
-                                                if !Task.isCancelled {
-                                                    debouncedLayoutWidth = newValue
-                                                }
-                                            }
-                                        }
-                                }
-                            )
-                            
-                            // 加载更多指示器
-                            if detailViewModel.isLoadingMore {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("Loading...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                }
-                                .padding()
-                            } else if detailViewModel.canLoadMore {
-                                // 手动加载更多按钮（备用）
-                                HStack {
-                                    Spacer()
-                                    Button {
-                                        detailViewModel.loadNextPage()
-                                    } label: {
-                                        Text("Load More (\(detailViewModel.totalFilteredCount - detailViewModel.visibleHighlights.count) remaining)")
-                                            .font(.caption)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .foregroundColor(.accentColor)
-                                    Spacer()
-                                }
-                                .padding()
-                            }
-                        }
-                        
-                        // 后台同步指示器
-                        if detailViewModel.isBackgroundSyncing {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .scaleEffect(0.6)
-                                Text("Syncing in background...")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .padding()
-                }
+                bookDetailView(book: book)
+            } else {
+                Text("Select a book")
+                    .foregroundColor(.secondary)
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func bookDetailView(book: DedaoBookListItem) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                bookHeaderView(book: book)
+                highlightsContentView(book: book)
+                backgroundSyncIndicator
+                loadMoreIndicator
+            }
+            .padding()
         }
         .navigationTitle("Dedao")
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                FiltetSortBar(
-                    noteFilter: $detailViewModel.noteFilter,
-                    selectedStyles: $detailViewModel.selectedStyles,
-                    colorTheme: .dedao,
-                    sortField: detailViewModel.sortField,
-                    isAscending: detailViewModel.isAscending,
-                    availableSortFields: [.created, .modified],  // Dedao 支持创建和修改时间排序
-                    onSortFieldChanged: { field in
-                        detailViewModel.sortField = field
-                        Task { await detailViewModel.reloadCurrent() }
-                    },
-                    onAscendingChanged: { asc in
-                        detailViewModel.isAscending = asc
-                        Task { await detailViewModel.reloadCurrent() }
-                    }
-                )
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Spacer()
-            }
-
-            ToolbarItem(placement: .automatic) {
-                if externalIsSyncing {
-                    // 外部（批量）同步状态
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        if let progress = externalSyncProgress {
-                            Text(progress).font(.caption)
-                        } else {
-                            Text("Syncing...").font(.caption)
-                        }
-                    }
-                    .help("Sync in progress")
-                } else if detailViewModel.isSyncing {
-                    // 内部同步状态
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        if let progress = detailViewModel.syncProgressText {
-                            Text(progress).font(.caption)
-                        } else {
-                            Text("Syncing...").font(.caption)
-                        }
-                    }
-                    .help("Sync in progress")
-                } else if let book = selectedBook {
-                    Button {
-                        detailViewModel.syncSmart(book: book)
-                    } label: {
-                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .help("Sync highlights to Notion")
-                }
-            }
-        }
-        .onAppear {
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-                // 如果该书正在批量同步，显示外部同步状态
-                if let id = selectedBookId, listViewModel.syncingBookIds.contains(id) {
-                    externalIsSyncing = true
-                }
-            }
-        }
-        .onChange(of: selectedBookId) { _, _ in
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-            }
-            // 切换时更新外部同步状态
-            if let id = selectedBookId {
-                externalIsSyncing = listViewModel.syncingBookIds.contains(id)
-                if !externalIsSyncing { externalSyncProgress = nil }
-            } else {
-                externalIsSyncing = false
-                externalSyncProgress = nil
-            }
-        }
-        // 监听批量同步进度更新
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
-            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
-            if bookId == (selectedBookId ?? "") {
-                externalIsSyncing = true
-                externalSyncProgress = info["progress"] as? String
-            }
-        }
-        // 监听同步状态变化
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
-            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
-            if bookId == (selectedBookId ?? "") {
-                switch status {
-                case "started": externalIsSyncing = true
-                case "succeeded", "failed", "skipped": externalIsSyncing = false; externalSyncProgress = nil
-                default: break
-                }
-            }
-        }
-        // 同步错误弹窗
+        .toolbar { toolbarContent(book: book) }
+        .onAppear { loadHighlightsForBook(book) }
+        .onChange(of: selectedBookId) { _, newId in handleBookIdChange(newId: newId) }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
         .alert("Sync Error", isPresented: $showingSyncError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
         }
-        // Notion 配置弹窗
-        .alert("Notion Configuration Required", isPresented: $detailViewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
-        // 监听同步消息变化（仅显示错误）
         .onChange(of: detailViewModel.syncMessage) { _, newMessage in
-            if let message = newMessage {
+            if let msg = newMessage, !msg.isEmpty {
                 let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
-                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
+                let isSuccess = successKeywords.contains { msg.localizedCaseInsensitiveContains($0) }
                 if !isSuccess {
-                    syncErrorMessage = message
+                    syncErrorMessage = msg
                     showingSyncError = true
                 }
+            }
+        }
+    }
+    
+    // MARK: - Header View
+    
+    @ViewBuilder
+    private func bookHeaderView(book: DedaoBookListItem) -> some View {
+        InfoHeaderCardView(
+            title: book.title,
+            subtitle: book.author.isEmpty ? nil : book.author,
+            timestamps: TimestampInfo(
+                addedAt: nil,
+                modifiedAt: nil,
+                lastSyncAt: listViewModel.lastSync(for: book.bookId)
+            )
+        ) {
+            if let url = URL(string: "https://www.dedao.cn/") {
+                Link("Open in Dedao Web", destination: url)
+                    .font(.subheadline)
+            }
+        } content: {
+            highlightCountLabel(book: book)
+        }
+    }
+    
+    @ViewBuilder
+    private func highlightCountLabel(book: DedaoBookListItem) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "highlighter")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            if detailViewModel.totalFilteredCount > 0 {
+                Text("\(detailViewModel.visibleHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("\(book.highlightCount) highlights")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    // MARK: - Highlights Content
+    
+    @ViewBuilder
+    private func highlightsContentView(book: DedaoBookListItem) -> some View {
+        if detailViewModel.isLoading {
+            ProgressView("Loading...")
+                .padding(.top)
+        } else if detailViewModel.visibleHighlights.isEmpty {
+            Text("No highlights found for this book.")
+                .foregroundColor(.secondary)
+                .padding(.top)
+        } else {
+            highlightsWaterfallView
+        }
+    }
+    
+    @ViewBuilder
+    private var highlightsWaterfallView: some View {
+        WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
+            ForEach(detailViewModel.visibleHighlights) { h in
+                HighlightCardView(
+                    colorMark: dedaoColor,
+                    content: h.text,
+                    note: h.note,
+                    reviewContents: [],
+                    createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
+                    modifiedDate: h.updatedAt.map { Self.dateFormatter.string(from: $0) }
+                )
+                .onAppear {
+                    detailViewModel.loadMoreIfNeeded(currentItem: h)
+                }
+            }
+        }
+        .padding(.top)
+        .overlay(layoutWidthMeasurer)
+    }
+    
+    private var layoutWidthMeasurer: some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width
+            Color.clear
+                .onAppear { updateLayoutWidth(w) }
+                .onChange(of: w) { _, newW in updateLayoutWidth(newW) }
+        }
+    }
+    
+    // MARK: - Indicators
+    
+    @ViewBuilder
+    private var backgroundSyncIndicator: some View {
+        if detailViewModel.isBackgroundSyncing {
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.6)
+                Text("Syncing in background...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+        }
+    }
+    
+    @ViewBuilder
+    private var loadMoreIndicator: some View {
+        if detailViewModel.isLoadingMore {
+            HStack {
+                Spacer()
+                ProgressView().scaleEffect(0.8)
+                Text("Loading...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding()
+        } else if detailViewModel.canLoadMore && !detailViewModel.visibleHighlights.isEmpty {
+            HStack {
+                Spacer()
+                Button {
+                    detailViewModel.loadNextPage()
+                } label: {
+                    Text("Load More (\(detailViewModel.totalFilteredCount - detailViewModel.visibleHighlights.count) remaining)")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+                Spacer()
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Toolbar
+    
+    @ToolbarContentBuilder
+    private func toolbarContent(book: DedaoBookListItem) -> some ToolbarContent {
+        ToolbarItem(placement: .automatic) {
+            FiltetSortBar(
+                noteFilter: $detailViewModel.noteFilter,
+                selectedStyles: $detailViewModel.selectedStyles,
+                colorTheme: .dedao,
+                sortField: detailViewModel.sortField,
+                isAscending: detailViewModel.isAscending,
+                availableSortFields: [.created, .modified],
+                onSortFieldChanged: { field in
+                    detailViewModel.sortField = field
+                    Task { await detailViewModel.reloadCurrent() }
+                },
+                onAscendingChanged: { asc in
+                    detailViewModel.isAscending = asc
+                    Task { await detailViewModel.reloadCurrent() }
+                }
+            )
+        }
+
+        ToolbarItem(placement: .automatic) {
+            Spacer()
+        }
+
+        ToolbarItem(placement: .automatic) {
+            syncToolbarButton(book: book)
+        }
+    }
+    
+    @ViewBuilder
+    private func syncToolbarButton(book: DedaoBookListItem) -> some View {
+        if externalIsSyncing {
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.8)
+                Text(externalSyncProgress ?? "Syncing...")
+                    .font(.caption)
+            }
+            .help("Sync in progress")
+        } else if detailViewModel.isSyncing {
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.8)
+                Text(detailViewModel.syncProgressText ?? "Syncing...")
+                    .font(.caption)
+            }
+            .help("Sync in progress")
+        } else {
+            Button {
+                detailViewModel.syncSmart(book: book)
+            } label: {
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .help("Sync highlights to Notion")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func loadHighlightsForBook(_ book: DedaoBookListItem) {
+        Task {
+            await detailViewModel.loadHighlights(for: book.bookId)
+        }
+        if listViewModel.syncingBookIds.contains(book.bookId) {
+            externalIsSyncing = true
+        }
+    }
+    
+    private func handleBookIdChange(newId: String?) {
+        if let id = newId {
+            Task {
+                await detailViewModel.loadHighlights(for: id)
+            }
+            externalIsSyncing = listViewModel.syncingBookIds.contains(id)
+            if !externalIsSyncing { externalSyncProgress = nil }
+        } else {
+            externalIsSyncing = false
+            externalSyncProgress = nil
+        }
+    }
+    
+    private func handleSyncProgressUpdate(_ notification: Notification) {
+        guard let userInfo = notification.userInfo as? [String: Any],
+              let bookId = userInfo["bookId"] as? String,
+              bookId == (selectedBookId ?? "") else { return }
+        externalIsSyncing = true
+        externalSyncProgress = userInfo["progress"] as? String
+    }
+    
+    private func handleSyncStatusChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo as? [String: Any],
+              let bookId = userInfo["bookId"] as? String,
+              let status = userInfo["status"] as? String,
+              bookId == (selectedBookId ?? "") else { return }
+        switch status {
+        case "started":
+            externalIsSyncing = true
+        case "succeeded", "failed", "skipped":
+            externalIsSyncing = false
+            externalSyncProgress = nil
+        default:
+            break
+        }
+    }
+    
+    private func updateLayoutWidth(_ width: CGFloat) {
+        layoutWidthDebounceTask?.cancel()
+        measuredLayoutWidth = width
+        layoutWidthDebounceTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if !Task.isCancelled {
+                debouncedLayoutWidth = width
             }
         }
     }

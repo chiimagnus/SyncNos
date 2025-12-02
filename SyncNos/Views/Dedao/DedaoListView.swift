@@ -125,38 +125,7 @@ struct DedaoListView: View {
                 isListFocused = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-        }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
-        .alert(
-            String(localized: "dedao.sessionExpired"),
-            isPresented: $viewModel.showLoginFailedAlert
-        ) {
-            Button(String(localized: "remindMeLater"), role: .cancel) {
-                // 关闭弹窗，稍后提醒
-            }
-            Button(String(localized: "goToLogin")) {
-                viewModel.navigateToDedaoLogin()
-            }
-        } message: {
-            Text(viewModel.loginFailureReason)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
-            Task {
-                await viewModel.loadBooks()
-            }
-        }
+        // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoSettings")).receive(on: DispatchQueue.main)) { _ in
             // 打开设置窗口
             openWindow(id: "setting")
