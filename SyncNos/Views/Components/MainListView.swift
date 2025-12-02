@@ -544,14 +544,21 @@ struct MainListView: View {
     
     @ViewBuilder
     private var dedaoDetailView: some View {
-        // Dedao 暂不支持详情视图，仅显示选择占位符
-        SelectionPlaceholderView(
-            title: contentSource.title,
-            count: selectedDedaoBookIds.isEmpty ? nil : selectedDedaoBookIds.count,
-            filteredCount: dedaoVM.displayBooks.count,
-            totalCount: dedaoVM.books.count,
-            onSyncSelected: selectedDedaoBookIds.isEmpty ? nil : { syncSelectedDedao() }
-        )
+        if selectedDedaoBookIds.count == 1 {
+            let singleDedaoBookBinding = Binding<String?>(
+                get: { selectedDedaoBookIds.first },
+                set: { new in selectedDedaoBookIds = new.map { Set([$0]) } ?? [] }
+            )
+            DedaoDetailView(listViewModel: dedaoVM, selectedBookId: singleDedaoBookBinding)
+        } else {
+            SelectionPlaceholderView(
+                title: contentSource.title,
+                count: selectedDedaoBookIds.isEmpty ? nil : selectedDedaoBookIds.count,
+                filteredCount: dedaoVM.displayBooks.count,
+                totalCount: dedaoVM.books.count,
+                onSyncSelected: selectedDedaoBookIds.isEmpty ? nil : { syncSelectedDedao() }
+            )
+        }
     }
     
     // MARK: - Sync Methods

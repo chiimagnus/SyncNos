@@ -114,16 +114,20 @@ final class CachedDedaoHighlight {
     }
     
     /// 从 API DTO 创建本地存储模型
+    /// 支持标准格式和混合格式两种 API 响应
     convenience init(from apiNote: DedaoEbookNote) {
+        let createTs = apiNote.effectiveCreateTime
+        let updateTs = apiNote.effectiveUpdateTime
+        
         self.init(
-            highlightId: apiNote.noteIdStr,
-            bookId: apiNote.extra.bookName ?? "",
-            text: apiNote.noteLine,
-            note: apiNote.note.isEmpty ? nil : apiNote.note,
-            chapterTitle: apiNote.extra.title,
-            bookSection: apiNote.extra.bookSection,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(apiNote.createTime)),
-            updatedAt: Date(timeIntervalSince1970: TimeInterval(apiNote.updateTime))
+            highlightId: apiNote.effectiveId,
+            bookId: apiNote.extra?.bookName ?? "",
+            text: apiNote.effectiveNoteLine,
+            note: (apiNote.note?.isEmpty == false) ? apiNote.note : nil,
+            chapterTitle: apiNote.extra?.title,
+            bookSection: apiNote.extra?.bookSection,
+            createdAt: createTs > 0 ? Date(timeIntervalSince1970: TimeInterval(createTs)) : nil,
+            updatedAt: updateTs > 0 ? Date(timeIntervalSince1970: TimeInterval(updateTs)) : nil
         )
     }
 }
