@@ -166,42 +166,80 @@ final class DedaoViewModel: ObservableObject {
         await performBackgroundSync()
     }
     
-    /// 执行后台同步
+    /// 执行后台同步（分批加载，先显示书籍列表，再逐步获取笔记数量）
     private func performBackgroundSync() async {
         isSyncing = true
         
         do {
-            // 从 API 获取书籍列表
+            // 第 1 阶段：获取书籍列表并立即显示
             let ebooks = try await apiService.fetchAllEbooks()
             
             // 保存到本地存储
             try await cacheService.saveBooks(ebooks)
             
-            // 转换为 UI 模型
-            let newBooks = ebooks.map { DedaoBookListItem(from: $0) }
+            // 立即转换并显示书籍列表（笔记数量暂时为 0 或使用缓存值）
+            var newBooks = ebooks.map { DedaoBookListItem(from: $0) }
             
-            // 更新每本书的高亮数量（并发获取）
-            var booksWithCounts: [DedaoBookListItem] = []
-            for var book in newBooks {
-                do {
-                    let notes = try await apiService.fetchEbookNotes(ebookEnid: book.bookId)
-                    book.highlightCount = notes.count
-                    
-                    // 更新本地存储中的高亮数量
-                    try await cacheService.updateBookHighlightCount(bookId: book.bookId, count: notes.count)
-                } catch {
-                    logger.warning("[Dedao] Failed to fetch notes for bookId=\(book.bookId): \(error.localizedDescription)")
+            // 从缓存中恢复之前的笔记数量（避免显示为 0）
+            for i in 0..<newBooks.count {
+                if let cached = try? await cacheService.getBook(bookId: newBooks[i].bookId) {
+                    newBooks[i].highlightCount = cached.highlightCount
                 }
-                booksWithCounts.append(book)
             }
             
-            books = booksWithCounts
+            // 立即更新 UI，用户可以马上看到书籍列表
+            books = newBooks
+            isLoading = false  // 结束加载状态，让用户可以交互
+            
+            logger.info("[Dedao] Displayed \(ebooks.count) books (fetching note counts in background)")
+            
+            // 第 2 阶段：分批获取每本书的笔记数量
+            let batchSize = 5  // 每批处理 5 本书
+            let totalBatches = (newBooks.count + batchSize - 1) / batchSize
+            
+            for batchIndex in 0..<totalBatches {
+                let start = batchIndex * batchSize
+                let end = min(start + batchSize, newBooks.count)
+                
+                // 并发获取当前批次的笔记数量
+                await withTaskGroup(of: (Int, Int).self) { group in
+                    for i in start..<end {
+                        let bookId = newBooks[i].bookId
+                        group.addTask { [weak self] in
+                            guard let self else { return (i, 0) }
+                            do {
+                                let notes = try await self.apiService.fetchEbookNotes(ebookEnid: bookId)
+                                
+                                // 保存笔记到本地缓存
+                                try await self.cacheService.saveHighlights(notes, bookId: bookId)
+                                try await self.cacheService.updateBookHighlightCount(bookId: bookId, count: notes.count)
+                                
+                                return (i, notes.count)
+                            } catch {
+                                self.logger.warning("[Dedao] Failed to fetch notes for bookId=\(bookId): \(error.localizedDescription)")
+                                return (i, newBooks[i].highlightCount)  // 保持原值
+                            }
+                        }
+                    }
+                    
+                    // 收集结果并更新
+                    for await (index, count) in group {
+                        if index < newBooks.count {
+                            newBooks[index].highlightCount = count
+                        }
+                    }
+                }
+                
+                // 每批完成后更新 UI
+                books = newBooks
+                logger.debug("[Dedao] Updated batch \(batchIndex + 1)/\(totalBatches)")
+            }
             
             // 更新同步状态
             try await cacheService.updateSyncState(lastFullSyncAt: nil, lastIncrementalSyncAt: Date())
             lastSyncAt = Date()
             
-            logger.info("[Dedao] Synced \(ebooks.count) books from API")
+            logger.info("[Dedao] Synced all \(ebooks.count) books with note counts")
         } catch let error as DedaoAPIError {
             switch error {
             case .sessionExpired, .notLoggedIn:
