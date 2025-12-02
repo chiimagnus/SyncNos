@@ -1,16 +1,14 @@
 import Foundation
 
-/// Dedao API 客户端实现，基于 Cookie 认证与 URLSession
+/// Dedao API 客户端实现
+/// 集成令牌桶限流器 + 重试机制，有效防止触发反爬
 final class DedaoAPIService: DedaoAPIServiceProtocol {
     private let authService: DedaoAuthServiceProtocol
     private let logger: LoggerServiceProtocol
+    private let limiter: DedaoRequestLimiter
     
     /// Dedao Web 端基础 URL
     private let baseURL = URL(string: "https://www.dedao.cn")!
-    
-    /// 请求间隔控制（防止触发反爬）
-    private var lastRequestTime: Date = .distantPast
-    private let minRequestInterval: TimeInterval = 1.0  // 最小请求间隔 1 秒
     
     /// 每页数量
     private let pageSize = 18
@@ -21,60 +19,23 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     ) {
         self.authService = authService
         self.logger = logger
+        self.limiter = DedaoRequestLimiter(logger: logger)
     }
     
     // MARK: - Public API
-    
-    /// 获取用户书架中的电子书列表（单页）
-    /// - Returns: 元组包含书籍列表、总数和是否有更多
-    private func fetchEbooksPage(page: Int) async throws -> (list: [DedaoEbook], total: Int?, hasMore: Bool) {
-        let url = baseURL.appendingPathComponent("/api/hades/v2/product/list")
-        
-        let body: [String: Any] = [
-            "category": "ebook",
-            "display_group": true,
-            "filter": "all",
-            "group_id": 0,
-            "order": "study",
-            "filter_complete": 0,
-            "page": page,
-            "page_size": pageSize,
-            "sort_type": "desc"
-        ]
-        
-        let data = try await performPostRequest(url: url, body: body)
-        let response = try decodeResponse(DedaoEbookListResponse.self, from: data)
-        
-        // 更智能的分页判断：
-        // 1. 优先使用 isMore 字段（如果存在且为 1）
-        // 2. 否则根据本页数量判断（如果本页满 pageSize，则可能有更多）
-        let hasMore: Bool
-        if let isMore = response.isMore {
-            hasMore = (isMore == 1)
-        } else {
-            // 如果 isMore 不存在，根据本页数量判断
-            hasMore = (response.list.count >= pageSize)
-        }
-        
-        logger.info("[DedaoAPI] Fetched ebooks page \(page): \(response.list.count) items, total=\(response.total ?? -1), isMore=\(response.isMore ?? -1), hasMore=\(hasMore)")
-        return (response.list, response.total, hasMore)
-    }
-    
-    /// 获取用户书架中的电子书列表（单页）- 兼容旧接口
-    func fetchEbooks(page: Int) async throws -> [DedaoEbook] {
-        let (list, _, _) = try await fetchEbooksPage(page: page)
-        return list
-    }
     
     /// 获取电子书总数
     /// 通过调用首页分类 API 获取电子书架中的电子书数量
     func fetchEbookCount() async throws -> Int {
         let url = baseURL.appendingPathComponent("/api/hades/v1/index/detail")
         
-        let data = try await performPostRequest(url: url, body: [:])
+        let data = try await limiter.withRetry(operationName: "fetchEbookCount") { [self] in
+            try await performPostRequest(url: url, body: [:])
+        }
+        
         let response = try decodeResponse(DedaoCategoryListResponse.self, from: data)
         
-        // 查找电子书分类（注意：响应嵌套在 data 字段中）
+        // 查找电子书分类
         if let ebookCategory = response.data.list.first(where: { $0.category == "ebook" }) {
             logger.info("[DedaoAPI] Ebook count from index: \(ebookCategory.count)")
             return ebookCategory.count
@@ -84,9 +45,15 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         return 0
     }
     
-    /// 获取所有电子书（自动分页）
+    /// 获取用户书架中的电子书列表（单页）
+    func fetchEbooks(page: Int) async throws -> [DedaoEbook] {
+        let (list, _, _) = try await fetchEbooksPage(page: page)
+        return list
+    }
+    
+    /// 获取所有电子书（自动分页，带重试）
     func fetchAllEbooks() async throws -> [DedaoEbook] {
-        // 方法1：先获取电子书总数，然后计算需要多少页
+        // 先获取电子书总数，然后计算需要多少页
         let totalCount = try await fetchEbookCount()
         guard totalCount > 0 else {
             logger.info("[DedaoAPI] No ebooks in bookshelf")
@@ -120,27 +87,22 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         return allEbooks
     }
     
-    /// 获取指定电子书的笔记列表
+    /// 获取指定电子书的笔记列表（带重试）
     /// 自动过滤掉无效笔记（空内容、非电子书类型等）
-    /// - Parameters:
-    ///   - ebookEnid: 电子书加密 ID
-    ///   - bookTitle: 书名（可选，用于日志记录）
     func fetchEbookNotes(ebookEnid: String, bookTitle: String? = nil) async throws -> [DedaoEbookNote] {
         let url = baseURL.appendingPathComponent("/api/pc/ledgers/ebook/list")
+        let body: [String: Any] = ["book_enid": ebookEnid]
+        let displayName = bookTitle ?? ebookEnid
         
-        let body: [String: Any] = [
-            "book_enid": ebookEnid
-        ]
-        
-        let data = try await performPostRequest(url: url, body: body)
+        let data = try await limiter.withRetry(operationName: "fetchNotes(\(displayName))") { [self] in
+            try await performPostRequest(url: url, body: body)
+        }
         
         let response = try decodeResponse(DedaoEbookNotesResponse.self, from: data)
         
-        // 过滤有效的电子书笔记（有实际划线内容或用户备注）
+        // 过滤有效的电子书笔记
         let validNotes = response.list.filter { $0.isValidEbookNote }
         
-        // 日志中优先显示书名，否则显示 ID
-        let displayName = bookTitle ?? ebookEnid
         let filteredOutCount = response.list.count - validNotes.count
         logger.info("[DedaoAPI] Fetched notes for \"\(displayName)\": \(response.list.count) total, \(validNotes.count) valid, \(filteredOutCount) filtered out")
         
@@ -151,18 +113,20 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     func fetchUserInfo() async throws -> DedaoUserInfo {
         let url = baseURL.appendingPathComponent("/api/pc/user/info")
         
-        let data = try await performGetRequest(url: url)
-        let userInfo = try decodeResponse(DedaoUserInfo.self, from: data)
+        let data = try await limiter.withRetry(operationName: "fetchUserInfo") { [self] in
+            try await performGetRequest(url: url)
+        }
         
+        let userInfo = try decodeResponse(DedaoUserInfo.self, from: data)
         logger.info("[DedaoAPI] Fetched user info: \(userInfo.nickname)")
         return userInfo
     }
     
     /// 生成二维码用于扫码登录
     func generateQRCode() async throws -> DedaoQRCodeResponse {
-        // 第一步：获取 Access Token
+        // 第一步：获取 Access Token（不需要认证，不走限流器）
         let accessTokenURL = baseURL.appendingPathComponent("/loginapi/getAccessToken")
-        let accessTokenData = try await performPostRequest(url: accessTokenURL, body: [:], requiresAuth: false)
+        let accessTokenData = try await performPostRequestDirect(url: accessTokenURL, body: [:], requiresAuth: false)
         
         guard let json = try? JSONSerialization.jsonObject(with: accessTokenData) as? [String: Any],
               let accessToken = json["accessToken"] as? String else {
@@ -196,7 +160,7 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     func checkQRCodeLogin(qrCodeString: String) async throws -> DedaoCheckLoginResponse {
         // 需要先获取 Access Token
         let accessTokenURL = baseURL.appendingPathComponent("/loginapi/getAccessToken")
-        let accessTokenData = try await performPostRequest(url: accessTokenURL, body: [:], requiresAuth: false)
+        let accessTokenData = try await performPostRequestDirect(url: accessTokenURL, body: [:], requiresAuth: false)
         
         guard let json = try? JSONSerialization.jsonObject(with: accessTokenData) as? [String: Any],
               let accessToken = json["accessToken"] as? String else {
@@ -241,9 +205,42 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
     }
     
-    private func performGetRequest(url: URL) async throws -> Data {
-        try await waitForNextRequest()
+    /// 获取用户书架中的电子书列表（单页，内部使用）
+    private func fetchEbooksPage(page: Int) async throws -> (list: [DedaoEbook], total: Int?, hasMore: Bool) {
+        let url = baseURL.appendingPathComponent("/api/hades/v2/product/list")
         
+        let body: [String: Any] = [
+            "category": "ebook",
+            "display_group": true,
+            "filter": "all",
+            "group_id": 0,
+            "order": "study",
+            "filter_complete": 0,
+            "page": page,
+            "page_size": pageSize,
+            "sort_type": "desc"
+        ]
+        
+        let data = try await limiter.withRetry(operationName: "fetchEbooksPage(\(page))") { [self] in
+            try await performPostRequest(url: url, body: body)
+        }
+        
+        let response = try decodeResponse(DedaoEbookListResponse.self, from: data)
+        
+        // 分页判断
+        let hasMore: Bool
+        if let isMore = response.isMore {
+            hasMore = (isMore == 1)
+        } else {
+            hasMore = (response.list.count >= pageSize)
+        }
+        
+        logger.info("[DedaoAPI] Fetched ebooks page \(page): \(response.list.count) items, total=\(response.total ?? -1), hasMore=\(hasMore)")
+        return (response.list, response.total, hasMore)
+    }
+    
+    /// 执行 GET 请求（走限流器）
+    private func performGetRequest(url: URL) async throws -> Data {
         guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
             throw DedaoAPIError.notLoggedIn
         }
@@ -259,9 +256,8 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         return try await executeRequest(request)
     }
     
+    /// 执行 POST 请求（走限流器）
     private func performPostRequest(url: URL, body: [String: Any], requiresAuth: Bool = true) async throws -> Data {
-        try await waitForNextRequest()
-        
         if requiresAuth {
             guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
                 throw DedaoAPIError.notLoggedIn
@@ -291,10 +287,44 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         return try await executeRequest(request)
     }
     
-    private func executeRequest(_ request: URLRequest) async throws -> Data {
+    /// 直接执行 POST 请求（不走限流器，用于登录相关 API）
+    private func performPostRequestDirect(url: URL, body: [String: Any], requiresAuth: Bool = true) async throws -> Data {
+        if requiresAuth {
+            guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
+                throw DedaoAPIError.notLoggedIn
+            }
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+        
+        if requiresAuth, let cookie = authService.cookieHeader {
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+            
+            if let csrfToken = extractCSRFToken(from: cookie) {
+                request.setValue(csrfToken, forHTTPHeaderField: "Xi-Csrf-Token")
+                request.setValue("web", forHTTPHeaderField: "Xi-DT")
+            }
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        lastRequestTime = Date()
+        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw DedaoAPIError.invalidResponse
+        }
+        
+        return data
+    }
+    
+    /// 执行请求并处理响应
+    private func executeRequest(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let http = response as? HTTPURLResponse else {
             throw DedaoAPIError.invalidResponse
@@ -321,15 +351,6 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         }
         
         return data
-    }
-    
-    /// 请求间隔控制
-    private func waitForNextRequest() async throws {
-        let timeSinceLastRequest = Date().timeIntervalSince(lastRequestTime)
-        if timeSinceLastRequest < minRequestInterval {
-            let waitTime = minRequestInterval - timeSinceLastRequest
-            try await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
-        }
     }
     
     /// 从 Cookie 中提取 CSRF Token
@@ -370,7 +391,6 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         }
         
         // 尝试从 "c" 字段解码实际数据
-        // 注意：不使用 .convertFromSnakeCase，因为 DedaoEbookNote 等模型已有 CodingKeys 手动映射
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let content = json["c"] {
             let contentData = try JSONSerialization.data(withJSONObject: content)
@@ -397,4 +417,3 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         }
     }
 }
-
