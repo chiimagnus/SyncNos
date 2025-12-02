@@ -22784,7 +22784,7 @@
             "value" : "SyncNos benötigt Berechtigung zum Zugriff auf Apple Books-Notizen. Wenn Sie zuvor \"Nicht erlauben\" ausgewählt haben, starten Sie die App neu und wählen Sie \"Erlauben\" aus, wenn Sie dazu aufgefordert werden."
           }
         },
-        "es" : {
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "SyncNos necesita permiso para acceder a las notas de Apple Books. Si anteriormente seleccionaste \"No permitir\", reinicia la aplicación y selecciona \"Permitir\" cuando se te solicite."
