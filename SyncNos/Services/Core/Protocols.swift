@@ -398,3 +398,106 @@ protocol SyncQueueStoreProtocol: AnyObject {
     /// 任务流（主线程交付）
     var tasksPublisher: AnyPublisher<[SyncQueueTask], Never> { get }
 }
+
+// MARK: - Dedao Auth & Data Protocols
+
+/// 管理 Dedao 认证 Cookie 的服务协议
+protocol DedaoAuthServiceProtocol: AnyObject {
+    /// 当前是否已登录（依据是否存在可用 Cookie）
+    var isLoggedIn: Bool { get }
+    /// 已持久化的 Cookie Header（`Cookie: ...` 的值部分）
+    var cookieHeader: String? { get }
+    
+    /// 更新并持久化新的 Cookie Header
+    func updateCookieHeader(_ header: String)
+    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
+    func clearCookies() async
+}
+
+/// Dedao API 服务协议
+protocol DedaoAPIServiceProtocol: AnyObject {
+    /// 获取用户书架中的电子书列表
+    /// - Parameter page: 页码，从 1 开始
+    /// - Returns: 电子书列表
+    func fetchEbooks(page: Int) async throws -> [DedaoEbook]
+    
+    /// 获取所有电子书（自动分页）
+    /// - Returns: 所有电子书
+    func fetchAllEbooks() async throws -> [DedaoEbook]
+    
+    /// 获取指定电子书的笔记列表
+    /// - Parameter ebookEnid: 电子书的 enid
+    /// - Returns: 笔记列表
+    func fetchEbookNotes(ebookEnid: String) async throws -> [DedaoEbookNote]
+    
+    /// 获取用户信息
+    /// - Returns: 用户信息
+    func fetchUserInfo() async throws -> DedaoUserInfo
+    
+    /// 生成二维码用于扫码登录
+    /// - Returns: 二维码响应
+    func generateQRCode() async throws -> DedaoQRCodeResponse
+    
+    /// 检查二维码登录状态
+    /// - Parameter qrCodeString: 二维码字符串
+    /// - Returns: 登录检查响应
+    func checkQRCodeLogin(qrCodeString: String) async throws -> DedaoCheckLoginResponse
+}
+
+/// Dedao 本地数据存储服务协议
+/// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
+@MainActor
+protocol DedaoCacheServiceProtocol: AnyObject {
+    // MARK: - 书籍操作
+    
+    /// 获取所有本地存储的书籍
+    func getAllBooks() async throws -> [CachedDedaoBook]
+    
+    /// 获取指定书籍
+    func getBook(bookId: String) async throws -> CachedDedaoBook?
+    
+    /// 保存书籍列表
+    func saveBooks(_ ebooks: [DedaoEbook]) async throws
+    
+    /// 删除指定书籍
+    func deleteBooks(ids: [String]) async throws
+    
+    /// 更新书籍的高亮数量
+    func updateBookHighlightCount(bookId: String, count: Int) async throws
+    
+    // MARK: - 高亮操作
+    
+    /// 获取指定书籍的所有高亮
+    func getHighlights(bookId: String) async throws -> [CachedDedaoHighlight]
+    
+    /// 保存高亮列表
+    func saveHighlights(_ notes: [DedaoEbookNote], bookId: String) async throws
+    
+    /// 删除指定高亮
+    func deleteHighlights(ids: [String]) async throws
+    
+    // MARK: - 同步状态
+    
+    /// 获取全局同步状态
+    func getSyncState() async throws -> DedaoSyncState
+    
+    /// 更新同步状态
+    func updateSyncState(lastFullSyncAt: Date?, lastIncrementalSyncAt: Date?) async throws
+    
+    // MARK: - 清理
+    
+    /// 清除所有本地数据
+    func clearAllData() async throws
+    
+    // MARK: - 统计
+    
+    /// 获取本地数据统计信息
+    func getDataStats() async throws -> DedaoDataStats
+}
+
+/// Dedao 本地数据统计
+struct DedaoDataStats {
+    let bookCount: Int
+    let highlightCount: Int
+    let lastSyncAt: Date?
+}
