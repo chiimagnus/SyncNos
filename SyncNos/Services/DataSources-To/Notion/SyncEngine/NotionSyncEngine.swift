@@ -126,34 +126,33 @@ final class NotionSyncEngine {
         progress(NSLocalizedString("Fetching highlights...", comment: ""))
         let highlights = try await source.fetchHighlights()
         
-        guard !highlights.isEmpty else {
-            progress(NSLocalizedString("No highlights to sync.", comment: ""))
-            return
-        }
-        
-        // 7. 执行同步
-        if created {
-            // 新创建的页面：直接追加所有高亮
-            try await appendAllHighlights(
-                pageId: pageId,
-                highlights: highlights,
-                item: item,
-                source: source,
-                progress: progress
-            )
+        // 7. 执行同步（如果有高亮）
+        if !highlights.isEmpty {
+            if created {
+                // 新创建的页面：直接追加所有高亮
+                try await appendAllHighlights(
+                    pageId: pageId,
+                    highlights: highlights,
+                    item: item,
+                    source: source,
+                    progress: progress
+                )
+            } else {
+                // 已存在的页面：增量更新
+                try await syncExistingPage(
+                    pageId: pageId,
+                    highlights: highlights,
+                    item: item,
+                    source: source,
+                    incremental: incremental,
+                    progress: progress
+                )
+            }
         } else {
-            // 已存在的页面：增量更新
-            try await syncExistingPage(
-                pageId: pageId,
-                highlights: highlights,
-                item: item,
-                source: source,
-                incremental: incremental,
-                progress: progress
-            )
+            progress(NSLocalizedString("No highlights to sync.", comment: ""))
         }
         
-        // 8. 更新计数和时间戳
+        // 8. 更新计数和时间戳（无论是否有高亮都要更新）
         try await updateCountAndTimestamp(pageId: pageId, count: highlights.count, itemId: item.itemId)
     }
     
@@ -180,12 +179,14 @@ final class NotionSyncEngine {
         progress(NSLocalizedString("Fetching highlights...", comment: ""))
         let highlights = try await source.fetchHighlights()
         
+        // 3. 如果没有高亮，只更新时间戳
         guard !highlights.isEmpty else {
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
+            timestampStore.setLastSyncTime(for: item.itemId, to: Date())
             return
         }
         
-        // 3. 如果数据库是新创建的，执行全量同步
+        // 4. 如果数据库是新创建的，执行全量同步
         if recreated {
             progress(NSLocalizedString("Detected database recreation, performing full sync...", comment: ""))
             try await fullSyncPerBook(
