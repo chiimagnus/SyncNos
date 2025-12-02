@@ -57,6 +57,14 @@ final class GoodLinksViewModel: ObservableObject {
     @Published var highlightNoteFilter: NoteFilter = false
     @Published var highlightSelectedStyles: Set<Int> = []
     @Published var highlightSortField: HighlightSortField = .created
+    
+    // 分页属性
+    @Published var visibleHighlights: [GoodLinksHighlightRow] = []
+    @Published var isLoadingMoreHighlights: Bool = false
+    private let highlightPageSize: Int = 50
+    private var currentHighlightPage: Int = 0
+    private var currentHighlightLinkId: String?
+    private var allFilteredHighlights: [GoodLinksHighlightRow] = []
     @Published var highlightIsAscending: Bool = false
     @Published var showNotionConfigAlert: Bool = false
 
@@ -658,6 +666,68 @@ extension GoodLinksViewModel {
         }
 
         return filtered
+    }
+    
+    // MARK: - Highlight Pagination
+    
+    /// 总高亮数量（筛选后）
+    var totalFilteredHighlightCount: Int {
+        allFilteredHighlights.count
+    }
+    
+    /// 是否还有更多高亮可加载
+    var canLoadMoreHighlights: Bool {
+        visibleHighlights.count < allFilteredHighlights.count
+    }
+    
+    /// 初始化高亮分页（切换 link 时调用）
+    func initializeHighlightPagination(for linkId: String) {
+        currentHighlightLinkId = linkId
+        allFilteredHighlights = getFilteredHighlights(for: linkId)
+        currentHighlightPage = 1
+        let endIndex = min(highlightPageSize, allFilteredHighlights.count)
+        visibleHighlights = Array(allFilteredHighlights.prefix(endIndex))
+    }
+    
+    /// 重新应用筛选和排序（筛选条件变化时调用）
+    func reapplyHighlightFilters() {
+        guard let linkId = currentHighlightLinkId else { return }
+        allFilteredHighlights = getFilteredHighlights(for: linkId)
+        currentHighlightPage = 1
+        let endIndex = min(highlightPageSize, allFilteredHighlights.count)
+        visibleHighlights = Array(allFilteredHighlights.prefix(endIndex))
+    }
+    
+    /// 加载更多高亮
+    func loadMoreHighlightsIfNeeded(currentItem: GoodLinksHighlightRow) {
+        guard let index = visibleHighlights.firstIndex(where: { $0.id == currentItem.id }) else { return }
+        
+        // 当滚动到倒数第 10 项时，加载更多
+        let threshold = max(visibleHighlights.count - 10, 0)
+        guard index >= threshold else { return }
+        
+        loadNextHighlightPage()
+    }
+    
+    /// 加载下一页高亮
+    func loadNextHighlightPage() {
+        guard canLoadMoreHighlights, !isLoadingMoreHighlights else { return }
+        
+        isLoadingMoreHighlights = true
+        
+        let startIndex = currentHighlightPage * highlightPageSize
+        let endIndex = min(startIndex + highlightPageSize, allFilteredHighlights.count)
+        
+        guard startIndex < endIndex else {
+            isLoadingMoreHighlights = false
+            return
+        }
+        
+        let nextPage = Array(allFilteredHighlights[startIndex..<endIndex])
+        visibleHighlights.append(contentsOf: nextPage)
+        currentHighlightPage += 1
+        
+        isLoadingMoreHighlights = false
     }
 
     /// Reset highlight filters to default
