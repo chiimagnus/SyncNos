@@ -147,8 +147,8 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         let book = try context.fetch(bookDescriptor).first
         
         for note in notes {
-            // 检查是否已存在
-            let targetHighlightId = note.noteIdStr
+            // 使用计算属性获取有效的 ID
+            let targetHighlightId = note.effectiveId
             let predicate = #Predicate<CachedDedaoHighlight> { highlight in
                 highlight.highlightId == targetHighlightId
             }
@@ -157,12 +157,13 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
             let existing = try context.fetch(descriptor).first
             
             if let existing {
-                // 更新现有记录
-                existing.text = note.noteLine
-                existing.note = note.note.isEmpty ? nil : note.note
-                existing.chapterTitle = note.extra.title  // 可选
-                existing.bookSection = note.extra.bookSection  // 可选
-                existing.updatedAt = Date(timeIntervalSince1970: TimeInterval(note.updateTime))
+                // 更新现有记录（使用计算属性处理可选字段）
+                existing.text = note.effectiveNoteLine
+                existing.note = (note.note?.isEmpty == false) ? note.note : nil
+                existing.chapterTitle = note.extra?.title
+                existing.bookSection = note.extra?.bookSection
+                let updateTs = note.effectiveUpdateTime
+                existing.updatedAt = updateTs > 0 ? Date(timeIntervalSince1970: TimeInterval(updateTs)) : nil
             } else {
                 // 创建新记录
                 let newHighlight = CachedDedaoHighlight(from: note)

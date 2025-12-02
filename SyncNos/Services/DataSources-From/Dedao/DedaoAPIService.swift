@@ -74,6 +74,7 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     }
     
     /// 获取指定电子书的笔记列表
+    /// 自动过滤掉无效笔记（空内容、非电子书类型等）
     func fetchEbookNotes(ebookEnid: String) async throws -> [DedaoEbookNote] {
         let url = baseURL.appendingPathComponent("/api/pc/ledgers/ebook/list")
         
@@ -84,8 +85,17 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         let data = try await performPostRequest(url: url, body: body)
         let response = try decodeResponse(DedaoEbookNotesResponse.self, from: data)
         
-        logger.info("[DedaoAPI] Fetched notes for ebook \(ebookEnid): \(response.list.count) items")
-        return response.list
+        // 过滤有效的电子书笔记（有实际划线内容或用户备注）
+        let validNotes = response.list.filter { note in
+            // 必须是自己的笔记（isFromMe == 1）或未指定
+            let isOwnNote = (note.isFromMe ?? 1) == 1
+            // 必须有实际内容
+            let hasContent = note.isValidEbookNote
+            return isOwnNote && hasContent
+        }
+        
+        logger.info("[DedaoAPI] Fetched notes for ebook \(ebookEnid): \(response.list.count) total, \(validNotes.count) valid")
+        return validNotes
     }
     
     /// 获取用户信息
