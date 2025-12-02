@@ -4,11 +4,20 @@ struct WeReadDetailView: View {
     @ObservedObject var listViewModel: WeReadViewModel
     @Binding var selectedBookId: String?
     @StateObject private var detailViewModel = WeReadDetailViewModel()
+    @Environment(\.openWindow) private var openWindow
     
     // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
     @State private var measuredLayoutWidth: CGFloat = 0
     @State private var debouncedLayoutWidth: CGFloat = 0
     @State private var layoutWidthDebounceTask: Task<Void, Never>?
+    
+    // 外部（批量）同步状态
+    @State private var externalIsSyncing: Bool = false
+    @State private var externalSyncProgress: String?
+    
+    // 弹窗状态
+    @State private var showingSyncError = false
+    @State private var syncErrorMessage = ""
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -186,7 +195,19 @@ struct WeReadDetailView: View {
             }
 
             ToolbarItem(placement: .automatic) {
-                if detailViewModel.isSyncing {
+                if externalIsSyncing {
+                    // 外部（批量）同步状态
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        if let progress = externalSyncProgress {
+                            Text(progress).font(.caption)
+                        } else {
+                            Text("Syncing...").font(.caption)
+                        }
+                    }
+                    .help("Sync in progress")
+                } else if detailViewModel.isSyncing {
+                    // 内部同步状态
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = detailViewModel.syncProgressText {
@@ -195,6 +216,7 @@ struct WeReadDetailView: View {
                             Text("Syncing...").font(.caption)
                         }
                     }
+                    .help("Sync in progress")
                 } else if let book = selectedBook {
                     Button {
                         detailViewModel.syncSmart(book: book)
@@ -215,12 +237,72 @@ struct WeReadDetailView: View {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)
                 }
+                // 如果该书正在批量同步，显示外部同步状态
+                if let id = selectedBookId, listViewModel.syncingBookIds.contains(id) {
+                    externalIsSyncing = true
+                }
             }
         }
         .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)
+                }
+            }
+            // 切换时更新外部同步状态
+            if let id = selectedBookId {
+                externalIsSyncing = listViewModel.syncingBookIds.contains(id)
+                if !externalIsSyncing { externalSyncProgress = nil }
+            } else {
+                externalIsSyncing = false
+                externalSyncProgress = nil
+            }
+        }
+        // 监听批量同步进度更新
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
+            if bookId == (selectedBookId ?? "") {
+                externalIsSyncing = true
+                externalSyncProgress = info["progress"] as? String
+            }
+        }
+        // 监听同步状态变化
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
+            guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
+            if bookId == (selectedBookId ?? "") {
+                switch status {
+                case "started": externalIsSyncing = true
+                case "succeeded", "failed", "skipped": externalIsSyncing = false; externalSyncProgress = nil
+                default: break
+                }
+            }
+        }
+        // 同步错误弹窗
+        .alert("Sync Error", isPresented: $showingSyncError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(syncErrorMessage)
+        }
+        // Notion 配置弹窗
+        .alert("Notion Configuration Required", isPresented: $detailViewModel.showNotionConfigAlert) {
+            Button("Go to Settings") {
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please configure Notion API Key and Page ID before syncing.")
+        }
+        // 监听同步消息变化（仅显示错误）
+        .onChange(of: detailViewModel.syncMessage) { _, newMessage in
+            if let message = newMessage {
+                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
+                if !isSuccess {
+                    syncErrorMessage = message
+                    showingSyncError = true
                 }
             }
         }
