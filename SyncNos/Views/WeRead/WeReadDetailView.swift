@@ -228,11 +228,6 @@ struct WeReadDetailView: View {
             }
         }
         .onAppear {
-            // 注入缓存服务
-            if let cacheService = DIContainer.shared.weReadCacheService {
-                detailViewModel.setCacheService(cacheService)
-            }
-            
             if let book = selectedBook {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)

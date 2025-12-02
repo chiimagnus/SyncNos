@@ -89,13 +89,13 @@ final class WeReadDetailViewModel: ObservableObject {
     // MARK: - Private Properties
     
     private let apiService: WeReadAPIServiceProtocol
+    private let cacheService: WeReadCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
     
-    // 缓存服务（可选）
-    private var cacheService: WeReadCacheServiceProtocol?
-    private var incrementalSyncService: WeReadIncrementalSyncService?
+    // 增量同步服务
+    private let incrementalSyncService: WeReadIncrementalSyncService
 
     private var currentBookId: String?
     
@@ -111,38 +111,26 @@ final class WeReadDetailViewModel: ObservableObject {
     
     init(
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
+        cacheService: WeReadCacheServiceProtocol = DIContainer.shared.weReadCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        cacheService: WeReadCacheServiceProtocol? = nil
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.apiService = apiService
+        self.cacheService = cacheService
         self.syncEngine = syncEngine
         self.logger = logger
         self.notionConfig = notionConfig
-        self.cacheService = cacheService
         
-        // 如果有缓存服务，创建增量同步服务
-        if let cache = cacheService {
-            self.incrementalSyncService = WeReadIncrementalSyncService(
-                apiService: apiService,
-                cacheService: cache,
-                logger: logger
-            )
-        }
+        // 创建增量同步服务
+        self.incrementalSyncService = WeReadIncrementalSyncService(
+            apiService: apiService,
+            cacheService: cacheService,
+            logger: logger
+        )
         
         setupNotificationSubscriptions()
         setupFilterSortSubscriptions()
-    }
-    
-    /// 设置缓存服务（用于延迟注入）
-    func setCacheService(_ service: WeReadCacheServiceProtocol) {
-        self.cacheService = service
-        self.incrementalSyncService = WeReadIncrementalSyncService(
-            apiService: apiService,
-            cacheService: service,
-            logger: logger
-        )
     }
     
     // MARK: - Setup
@@ -268,20 +256,18 @@ final class WeReadDetailViewModel: ObservableObject {
         visibleHighlights = []
         currentPageCount = 0
         
-        // 1. 先尝试从缓存加载
-        if let cacheService {
-            do {
-                let cached = try await cacheService.getHighlights(bookId: bookId)
-                if !cached.isEmpty {
-                    allBookmarks = cached.map { WeReadBookmark(from: $0) }
-                    applyFiltersAndSort()
-                    resetPagination()
-                    isLoading = false
-                    logger.info("[WeReadDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
-                }
-            } catch {
-                logger.warning("[WeReadDetail] Cache load failed: \(error.localizedDescription)")
+        // 1. 先从缓存加载
+        do {
+            let cached = try await cacheService.getHighlights(bookId: bookId)
+            if !cached.isEmpty {
+                allBookmarks = cached.map { WeReadBookmark(from: $0) }
+                applyFiltersAndSort()
+                resetPagination()
+                isLoading = false
+                logger.info("[WeReadDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
             }
+        } catch {
+            logger.warning("[WeReadDetail] Cache load failed: \(error.localizedDescription)")
         }
         
         // 2. 后台增量同步
@@ -290,42 +276,33 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 执行后台同步
     private func performBackgroundSync(bookId: String) async {
-        // 如果有增量同步服务，使用增量同步
-        if let incrementalSyncService {
-            isBackgroundSyncing = true
-            do {
-                let result = try await incrementalSyncService.syncHighlights(bookId: bookId)
-                
-                switch result {
-                case .noChanges:
-                    logger.info("[WeReadDetail] No changes for bookId=\(bookId)")
-                case .updated(let added, let removed):
-                    logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
-                    // 重新从缓存加载
-                    if let cacheService {
-                        let updated = try await cacheService.getHighlights(bookId: bookId)
-                        allBookmarks = updated.map { WeReadBookmark(from: $0) }
-                        applyFiltersAndSort()
-                        resetPagination()
-                    }
-                case .fullSyncRequired:
-                    // 全量拉取
-                    await fullFetchFromAPI(bookId: bookId)
-                }
-            } catch {
-                // 如果缓存为空，需要全量拉取
-                if allBookmarks.isEmpty {
-                    await fullFetchFromAPI(bookId: bookId)
-                } else {
-                    logger.error("[WeReadDetail] Incremental sync failed: \(error.localizedDescription)")
-                }
+        isBackgroundSyncing = true
+        do {
+            let result = try await incrementalSyncService.syncHighlights(bookId: bookId)
+            
+            switch result {
+            case .noChanges:
+                logger.info("[WeReadDetail] No changes for bookId=\(bookId)")
+            case .updated(let added, let removed):
+                logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
+                // 重新从缓存加载
+                let updated = try await cacheService.getHighlights(bookId: bookId)
+                allBookmarks = updated.map { WeReadBookmark(from: $0) }
+                applyFiltersAndSort()
+                resetPagination()
+            case .fullSyncRequired:
+                // 全量拉取
+                await fullFetchFromAPI(bookId: bookId)
             }
-            isBackgroundSyncing = false
-        } else {
-            // 没有缓存服务，直接从 API 拉取
-            await fullFetchFromAPI(bookId: bookId)
+        } catch {
+            // 如果缓存为空，需要全量拉取
+            if allBookmarks.isEmpty {
+                await fullFetchFromAPI(bookId: bookId)
+            } else {
+                logger.error("[WeReadDetail] Incremental sync failed: \(error.localizedDescription)")
+            }
         }
-        
+        isBackgroundSyncing = false
         isLoading = false
     }
     
@@ -338,10 +315,8 @@ final class WeReadDetailViewModel: ObservableObject {
             // 保存合并后的数据
             allBookmarks = mergedBookmarks
             
-            // 如果有缓存服务，保存到缓存
-            if let cacheService {
-                try await cacheService.saveHighlights(mergedBookmarks, bookId: bookId)
-            }
+            // 保存到缓存
+            try await cacheService.saveHighlights(mergedBookmarks, bookId: bookId)
             
             // 应用筛选和排序
             applyFiltersAndSort()
@@ -367,18 +342,16 @@ final class WeReadDetailViewModel: ObservableObject {
         isLoading = true
         
         // 清除该书的缓存高亮
-        if let cacheService {
-            do {
-                let highlights = try await cacheService.getHighlights(bookId: bookId)
-                let ids = highlights.map { $0.highlightId }
-                if !ids.isEmpty {
-                    try await cacheService.deleteHighlights(ids: ids)
-                }
-                // 重置 synckey
-                try await cacheService.updateBookSyncKey(bookId: bookId, syncKey: 0)
-            } catch {
-                logger.warning("[WeReadDetail] Failed to clear cache: \(error.localizedDescription)")
+        do {
+            let highlights = try await cacheService.getHighlights(bookId: bookId)
+            let ids = highlights.map { $0.highlightId }
+            if !ids.isEmpty {
+                try await cacheService.deleteHighlights(ids: ids)
             }
+            // 重置 synckey
+            try await cacheService.updateBookSyncKey(bookId: bookId, syncKey: 0)
+        } catch {
+            logger.warning("[WeReadDetail] Failed to clear cache: \(error.localizedDescription)")
         }
         
         // 清空当前数据

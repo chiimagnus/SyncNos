@@ -197,18 +197,17 @@ class DIContainer {
         return _weReadModelContainer
     }
     
-    var weReadCacheService: WeReadCacheServiceProtocol? {
+    var weReadCacheService: WeReadCacheServiceProtocol {
         if _weReadCacheService == nil {
             guard let container = weReadModelContainer else {
-                loggerService.warning("[DIContainer] WeRead ModelContainer not available, cache service disabled")
-                return nil
+                fatalError("[DIContainer] WeRead ModelContainer not available")
             }
             _weReadCacheService = WeReadCacheService(
                 modelContainer: container,
                 logger: loggerService
             )
         }
-        return _weReadCacheService
+        return _weReadCacheService!
     }
     
     // MARK: - Dedao Services

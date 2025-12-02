@@ -79,10 +79,6 @@ struct MainListView: View {
             .onAppear {
                 // 根据当前启用的数据源初始化滑动容器
                 updateDataSourceSwitchViewModel()
-                // 注入 WeRead 缓存服务
-                if let cacheService = DIContainer.shared.weReadCacheService {
-                    weReadVM.setCacheService(cacheService)
-                }
                 // 同步滑动容器与菜单状态
                 syncSwipeViewModelWithContentSource()
             }
