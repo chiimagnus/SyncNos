@@ -205,7 +205,7 @@ final class DedaoViewModel: ObservableObject {
         } catch let error as DedaoAPIError {
             switch error {
             case .sessionExpired, .notLoggedIn:
-                loginFailureReason = error.localizedDescription ?? "Session expired"
+                loginFailureReason = error.localizedDescription
                 showLoginFailedAlert = true
             case .needVerification:
                 loginFailureReason = String(localized: "dedao.error.needVerification")
