@@ -60,9 +60,7 @@ final class DedaoNotionAdapter: NotionSyncSourceProtocol {
     func fetchHighlights() async throws -> [UnifiedHighlight] {
         if preferCache {
             // 优先使用本地缓存
-            let cachedHighlights = try await MainActor.run {
-                try cacheService.getHighlights(bookId: book.bookId)
-            }
+            let cachedHighlights = try await cacheService.getHighlights(bookId: book.bookId)
             
             if !cachedHighlights.isEmpty {
                 return cachedHighlights.map { UnifiedHighlight(from: $0) }
@@ -72,13 +70,11 @@ final class DedaoNotionAdapter: NotionSyncSourceProtocol {
         // 从 API 获取
         let notes = try await apiService.fetchEbookNotes(ebookEnid: book.bookId)
         
-        // 保存到本地缓存
-        await MainActor.run {
-            do {
-                try cacheService.saveHighlights(notes, bookId: book.bookId)
-            } catch {
-                // 缓存失败不影响同步
-            }
+        // 保存到本地缓存（忽略错误）
+        do {
+            try await cacheService.saveHighlights(notes, bookId: book.bookId)
+        } catch {
+            // 缓存失败不影响同步
         }
         
         return notes.map { UnifiedHighlight(from: $0) }
