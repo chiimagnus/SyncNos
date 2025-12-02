@@ -76,10 +76,12 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             let apple = AppleBooksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
             let goodLinks = GoodLinksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
             let weRead = WeReadAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
+            let dedao = DedaoAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
             self.providers = [
                 .appleBooks: apple,
                 .goodLinks: goodLinks,
-                .weRead: weRead
+                .weRead: weRead,
+                .dedao: dedao
             ]
         }
     }
