@@ -160,8 +160,8 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
                 // 更新现有记录
                 existing.text = note.noteLine
                 existing.note = note.note.isEmpty ? nil : note.note
-                existing.chapterTitle = note.extra.title
-                existing.bookSection = note.extra.bookSection
+                existing.chapterTitle = note.extra.title  // 可选
+                existing.bookSection = note.extra.bookSection  // 可选
                 existing.updatedAt = Date(timeIntervalSince1970: TimeInterval(note.updateTime))
             } else {
                 // 创建新记录
