@@ -1,47 +1,87 @@
 import Foundation
 import Combine
 
-/// 得到书籍详情 ViewModel
-/// 负责加载和管理单本书籍的笔记列表
+// MARK: - 显示模型
+
+/// 得到高亮显示模型
+struct DedaoHighlightDisplay: Identifiable {
+    let id: String
+    let text: String
+    let note: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+    let chapterTitle: String?
+    
+    init(from note: DedaoEbookNote) {
+        self.id = note.effectiveId
+        self.text = note.effectiveNoteLine
+        self.note = note.note
+        self.createdAt = note.effectiveCreateTime > 0
+            ? Date(timeIntervalSince1970: TimeInterval(note.effectiveCreateTime))
+            : nil
+        self.updatedAt = note.effectiveUpdateTime > 0 && note.effectiveUpdateTime != note.effectiveCreateTime
+            ? Date(timeIntervalSince1970: TimeInterval(note.effectiveUpdateTime))
+            : nil
+        self.chapterTitle = note.extra?.title
+    }
+    
+    init(from cached: CachedDedaoHighlight) {
+        self.id = cached.highlightId
+        self.text = cached.text
+        self.note = cached.note
+        self.createdAt = cached.createdAt
+        self.updatedAt = cached.updatedAt
+        self.chapterTitle = cached.chapterTitle
+    }
+}
+
+// MARK: - ViewModel
+
 @MainActor
 final class DedaoDetailViewModel: ObservableObject {
     // MARK: - Published Properties
     
-    /// 高亮笔记列表
-    @Published private(set) var highlights: [DedaoEbookNote] = []
+    /// 当前显示的高亮（分页后的可见数据）
+    @Published var visibleHighlights: [DedaoHighlightDisplay] = []
     
-    /// 可见的高亮列表（分页加载）
-    @Published private(set) var visibleHighlights: [DedaoEbookNote] = []
-    
-    /// 总过滤后数量
-    @Published private(set) var totalFilteredCount: Int = 0
-    
-    /// 是否正在加载
-    @Published private(set) var isLoading: Bool = false
+    /// 是否正在加载首页
+    @Published var isLoading: Bool = false
     
     /// 是否正在加载更多
-    @Published private(set) var isLoadingMore: Bool = false
+    @Published var isLoadingMore: Bool = false
     
-    /// 是否正在同步
-    @Published private(set) var isSyncing: Bool = false
+    /// 后台同步状态
+    @Published var isBackgroundSyncing: Bool = false
     
-    /// 同步进度文本
-    @Published private(set) var syncProgressText: String?
-    
-    /// 笔记过滤器（true = 仅显示有笔记的，false = 显示全部）
+    // 高亮筛选与排序
     @Published var noteFilter: NoteFilter = false
-    
-    /// 选中的颜色样式（得到不支持颜色，保留为空）
-    @Published var selectedStyles: Set<Int> = []
-    
-    /// 排序字段
+    @Published var selectedStyles: Set<Int> = []  // 得到不支持颜色，但保留接口一致性
     @Published var sortField: HighlightSortField = .created
-    
-    /// 升序/降序
     @Published var isAscending: Bool = false
     
-    /// 当前书籍 ID
-    private(set) var currentBookId: String?
+    // 同步状态
+    @Published var isSyncing: Bool = false
+    @Published var syncProgressText: String?
+    @Published var syncMessage: String?
+    @Published var showNotionConfigAlert: Bool = false
+    
+    // MARK: - Pagination Properties
+    
+    /// 每页大小
+    private let pageSize: Int = 50
+    
+    /// 当前已加载的页数
+    private var currentPageCount: Int = 0
+    
+    /// 是否还有更多数据可加载
+    var canLoadMore: Bool {
+        currentPageCount * pageSize < filteredHighlights.count
+    }
+    
+    /// 总高亮数量（筛选后）
+    var totalFilteredCount: Int {
+        filteredHighlights.count
+    }
     
     // MARK: - Private Properties
     
@@ -49,21 +89,17 @@ final class DedaoDetailViewModel: ObservableObject {
     private let cacheService: DedaoCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     
-    private let pageSize: Int = 50
-    private var currentPage: Int = 0
-    private var allFilteredHighlights: [DedaoEbookNote] = []
+    private var currentBookId: String?
+    
+    /// 所有原始数据（未筛选）
+    private var allNotes: [DedaoEbookNote] = []
+    
+    /// 筛选和排序后的数据
+    private var filteredHighlights: [DedaoHighlightDisplay] = []
     
     private var cancellables = Set<AnyCancellable>()
-    
-    /// 当前加载任务（用于取消）
-    private var loadingTask: Task<Void, Never>?
-    
-    // MARK: - Computed Properties
-    
-    var canLoadMore: Bool {
-        visibleHighlights.count < totalFilteredCount
-    }
     
     // MARK: - Initialization
     
@@ -71,94 +107,97 @@ final class DedaoDetailViewModel: ObservableObject {
         apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
         cacheService: DedaoCacheServiceProtocol = DIContainer.shared.dedaoCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
-        logger: LoggerServiceProtocol = DIContainer.shared.loggerService
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.apiService = apiService
         self.cacheService = cacheService
         self.syncEngine = syncEngine
         self.logger = logger
+        self.notionConfig = notionConfig
         
-        setupFilterPipeline()
+        setupNotificationSubscriptions()
+        setupFilterSortSubscriptions()
     }
     
-    // MARK: - Public Methods
+    // MARK: - Setup
     
-    /// 当前书名（用于日志）
-    private(set) var currentBookTitle: String?
-    
-    /// 加载指定书籍的高亮笔记
-    /// - Parameters:
-    ///   - bookId: 书籍 ID
-    ///   - bookTitle: 书名（用于日志记录）
-    func loadHighlights(for bookId: String, bookTitle: String? = nil) {
-        // 如果是同一本书，不重复加载
-        guard currentBookId != bookId else { return }
-        
-        // 取消之前的加载任务
-        loadingTask?.cancel()
-        
-        currentBookId = bookId
-        currentBookTitle = bookTitle
-        isLoading = true
-        highlights = []
-        visibleHighlights = []
-        allFilteredHighlights = []
-        currentPage = 0
-        
-        let displayName = bookTitle ?? bookId
-        
-        // 创建新的加载任务
-        loadingTask = Task { [weak self] in
-            guard let self else { return }
-            
-            do {
-                // 检查任务是否被取消
-                try Task.checkCancellation()
+    private func setupNotificationSubscriptions() {
+        // 订阅来自 ViewCommands 的高亮排序/筛选通知
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                guard let info = notification.userInfo else { return }
                 
-                // 1. 先尝试从本地缓存加载
-                let cached = try await self.cacheService.getHighlights(bookId: bookId)
-                
-                try Task.checkCancellation()
-                
-                if !cached.isEmpty {
-                    let notes = cached.map { self.cachedToNote($0) }
-                    self.applyFiltersAndSort(notes)
-                    self.isLoading = false
-                    self.logger.debug("[DedaoDetail] Loaded \(cached.count) highlights from cache for \"\(displayName)\"")
+                if let sortKeyRaw = info["sortKey"] as? String,
+                   let newField = HighlightSortField(rawValue: sortKeyRaw) {
+                    self.sortField = newField
                 }
                 
-                try Task.checkCancellation()
+                if let ascending = info["sortAscending"] as? Bool {
+                    self.isAscending = ascending
+                }
                 
-                // 2. 从 API 获取最新数据
-                let apiNotes = try await self.apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: bookTitle)
-                
-                try Task.checkCancellation()
-                
-                // 3. 保存到缓存
-                try await self.cacheService.saveHighlights(apiNotes, bookId: bookId)
-                
-                try Task.checkCancellation()
-                
-                // 4. 更新显示
-                self.applyFiltersAndSort(apiNotes)
-                
-                self.logger.info("[DedaoDetail] Loaded \(apiNotes.count) highlights from API for \"\(displayName)\"")
-            } catch is CancellationError {
-                self.logger.debug("[DedaoDetail] Loading cancelled for \"\(displayName)\"")
-            } catch {
-                self.logger.error("[DedaoDetail] Failed to load highlights for \"\(displayName)\": \(error.localizedDescription)")
+                Task { await self.reloadCurrent() }
             }
-            
-            self.isLoading = false
-        }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                guard let info = notification.userInfo else { return }
+                
+                if let hasNotes = info["hasNotes"] as? Bool {
+                    self.noteFilter = hasNotes
+                }
+                
+                if let selectedArray = info["selectedStyles"] as? [Int] {
+                    self.selectedStyles = Set(selectedArray)
+                }
+                
+                Task { await self.reloadCurrent() }
+            }
+            .store(in: &cancellables)
     }
     
-    /// 重新加载当前书籍
-    func reloadCurrent() {
-        guard let bookId = currentBookId else { return }
-        let title = currentBookTitle
-        currentBookId = nil  // 强制重新加载
-        loadHighlights(for: bookId, bookTitle: title)
+    private func setupFilterSortSubscriptions() {
+        // 监听筛选和排序属性的变化，自动重新应用
+        Publishers.CombineLatest4(
+            $noteFilter,
+            $selectedStyles,
+            $sortField,
+            $isAscending
+        )
+        .dropFirst() // 跳过初始值
+        .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+        .sink { [weak self] _, _, _, _ in
+            self?.applyFiltersAndSort()
+            self?.resetPagination()
+        }
+        .store(in: &cancellables)
+    }
+    
+    // MARK: - Pagination Methods
+    
+    /// 重置分页状态
+    private func resetPagination() {
+        currentPageCount = 1
+        let endIndex = min(pageSize, filteredHighlights.count)
+        visibleHighlights = Array(filteredHighlights.prefix(endIndex))
+    }
+    
+    /// 加载更多数据
+    func loadMoreIfNeeded(currentItem: DedaoHighlightDisplay) {
+        // 检查是否需要加载更多
+        guard let index = visibleHighlights.firstIndex(where: { $0.id == currentItem.id }) else { return }
+        
+        // 当滚动到倒数第 10 项时，加载更多
+        let threshold = max(visibleHighlights.count - 10, 0)
+        guard index >= threshold else { return }
+        
+        loadNextPage()
     }
     
     /// 加载下一页
@@ -166,107 +205,223 @@ final class DedaoDetailViewModel: ObservableObject {
         guard canLoadMore, !isLoadingMore else { return }
         
         isLoadingMore = true
-        currentPage += 1
         
-        let startIndex = currentPage * pageSize
-        let endIndex = min(startIndex + pageSize, allFilteredHighlights.count)
+        // 计算下一页的范围
+        let startIndex = currentPageCount * pageSize
+        let endIndex = min(startIndex + pageSize, filteredHighlights.count)
         
-        if startIndex < allFilteredHighlights.count {
-            let newItems = Array(allFilteredHighlights[startIndex..<endIndex])
-            visibleHighlights.append(contentsOf: newItems)
+        guard startIndex < endIndex else {
+            isLoadingMore = false
+            return
         }
+        
+        // 添加下一页数据
+        let nextPage = Array(filteredHighlights[startIndex..<endIndex])
+        visibleHighlights.append(contentsOf: nextPage)
+        currentPageCount += 1
+        
+        logger.debug("[DedaoDetail] Loaded page \(currentPageCount), showing \(visibleHighlights.count)/\(filteredHighlights.count) highlights")
         
         isLoadingMore = false
     }
     
-    /// 检查是否需要加载更多
-    func loadMoreIfNeeded(currentItem: DedaoEbookNote) {
-        guard let index = visibleHighlights.firstIndex(where: { $0.effectiveId == currentItem.effectiveId }) else { return }
+    // MARK: - Data Loading
+    
+    /// 加载高亮（优先缓存，后台同步）
+    func loadHighlights(for bookId: String) async {
+        // 如果是同一本书且数据不为空，不重复加载
+        if currentBookId == bookId && !allNotes.isEmpty {
+            return
+        }
         
-        let threshold = max(visibleHighlights.count - 10, 0)
-        guard index >= threshold else { return }
+        currentBookId = bookId
+        isLoading = true
         
-        loadNextPage()
+        // 重置数据
+        allNotes = []
+        filteredHighlights = []
+        visibleHighlights = []
+        currentPageCount = 0
+        
+        // 1. 先尝试从缓存加载
+        do {
+            let cached = try await cacheService.getHighlights(bookId: bookId)
+            if !cached.isEmpty {
+                allNotes = cached.map { cachedToNote($0) }
+                applyFiltersAndSort()
+                resetPagination()
+                isLoading = false
+                logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
+            }
+        } catch {
+            logger.warning("[DedaoDetail] Cache load failed: \(error.localizedDescription)")
+        }
+        
+        // 2. 后台从 API 同步
+        await performBackgroundSync(bookId: bookId)
     }
     
-    /// 同步当前书籍到 Notion
-    func syncSmart(book: DedaoBookListItem) {
-        guard !isSyncing else { return }
+    /// 执行后台同步
+    private func performBackgroundSync(bookId: String) async {
+        isBackgroundSyncing = true
         
-        isSyncing = true
-        syncProgressText = "Preparing..."
+        do {
+            // 从 API 获取最新数据
+            let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: nil)
+            
+            // 保存到缓存
+            try await cacheService.saveHighlights(apiNotes, bookId: bookId)
+            
+            // 如果数据有变化，更新显示
+            if apiNotes.count != allNotes.count || allNotes.isEmpty {
+                allNotes = apiNotes
+                applyFiltersAndSort()
+                resetPagination()
+                logger.info("[DedaoDetail] Synced \(apiNotes.count) highlights from API for bookId=\(bookId)")
+            } else {
+                logger.debug("[DedaoDetail] No changes for bookId=\(bookId)")
+            }
+        } catch {
+            // 如果缓存为空，需要显示错误
+            if allNotes.isEmpty {
+                logger.error("[DedaoDetail] Failed to load highlights: \(error.localizedDescription)")
+            } else {
+                logger.warning("[DedaoDetail] Background sync failed: \(error.localizedDescription)")
+            }
+        }
         
-        Task {
-            defer {
-                isSyncing = false
-                syncProgressText = nil
+        isBackgroundSyncing = false
+        isLoading = false
+    }
+    
+    func reloadCurrent() async {
+        // 重新应用筛选和排序
+        applyFiltersAndSort()
+        resetPagination()
+    }
+    
+    /// 强制刷新（清除缓存后重新加载）
+    func forceRefresh() async {
+        guard let bookId = currentBookId else { return }
+        
+        isLoading = true
+        
+        // 清空当前数据
+        allNotes = []
+        filteredHighlights = []
+        visibleHighlights = []
+        currentPageCount = 0
+        
+        // 重新加载
+        await performBackgroundSync(bookId: bookId)
+    }
+    
+    // MARK: - Filtering and Sorting
+    
+    private func applyFiltersAndSort() {
+        var result: [DedaoHighlightDisplay] = []
+        
+        for note in allNotes {
+            // 应用筛选
+            // "仅笔记"过滤
+            if noteFilter {
+                let hasNote = (note.note != nil && !note.note!.isEmpty)
+                if !hasNote {
+                    continue
+                }
             }
             
-            do {
-                let adapter = DedaoNotionAdapter.create(book: book, preferCache: false)
-                try await syncEngine.syncSmart(source: adapter) { [weak self] progress in
-                    self?.syncProgressText = progress
-                }
-                logger.info("[DedaoDetail] Sync completed for bookId=\(book.bookId)")
-            } catch {
-                logger.error("[DedaoDetail] Sync failed for bookId=\(book.bookId): \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func setupFilterPipeline() {
-        // 监听过滤条件变化
-        Publishers.CombineLatest3($noteFilter, $sortField, $isAscending)
-            .dropFirst()
-            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
-            .sink { [weak self] _, _, _ in
-                guard let self else { return }
-                self.applyFiltersAndSort(self.highlights)
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func applyFiltersAndSort(_ notes: [DedaoEbookNote]) {
-        highlights = notes
-        
-        // 1. 应用笔记过滤（true = 仅显示有笔记的）
-        var filtered = notes
-        if noteFilter {
-            filtered = filtered.filter { note in
-                guard let noteContent = note.note else { return false }
-                return !noteContent.isEmpty
-            }
+            result.append(DedaoHighlightDisplay(from: note))
         }
         
-        // 2. 应用排序
-        filtered.sort { a, b in
+        // 排序
+        result.sort { a, b in
             switch sortField {
             case .created:
-                let t1 = a.effectiveCreateTime
-                let t2 = b.effectiveCreateTime
-                return isAscending ? (t1 < t2) : (t1 > t2)
+                let t1 = a.createdAt
+                let t2 = b.createdAt
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return !isAscending }
+                if t2 == nil { return isAscending }
+                return isAscending ? (t1! < t2!) : (t1! > t2!)
             case .modified:
-                let t1 = a.effectiveUpdateTime
-                let t2 = b.effectiveUpdateTime
-                return isAscending ? (t1 < t2) : (t1 > t2)
+                let t1 = a.updatedAt ?? a.createdAt
+                let t2 = b.updatedAt ?? b.createdAt
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return !isAscending }
+                if t2 == nil { return isAscending }
+                return isAscending ? (t1! < t2!) : (t1! > t2!)
             }
         }
         
-        allFilteredHighlights = filtered
-        totalFilteredCount = filtered.count
-        
-        // 3. 重置分页
-        currentPage = 0
-        let endIndex = min(pageSize, filtered.count)
-        visibleHighlights = Array(filtered.prefix(endIndex))
+        filteredHighlights = result
     }
     
-    /// 将缓存的高亮转换为 API 模型（用于统一处理）
+    // MARK: - Notion Sync
+    
+    func syncSmart(book: DedaoBookListItem) {
+        guard checkNotionConfig() else {
+            showNotionConfigAlert = true
+            return
+        }
+        if isSyncing { return }
+        
+        isSyncing = true
+        syncMessage = nil
+        syncProgressText = nil
+        
+        let limiter = DIContainer.shared.syncConcurrencyLimiter
+        
+        Task {
+            await limiter.withPermit {
+                NotificationCenter.default.post(
+                    name: Notification.Name("SyncBookStatusChanged"),
+                    object: self,
+                    userInfo: ["bookId": book.bookId, "status": "started"]
+                )
+                do {
+                    let adapter = DedaoNotionAdapter.create(book: book, preferCache: false)
+                    try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
+                        Task { @MainActor in
+                            self?.syncProgressText = progressText
+                        }
+                    }
+                    await MainActor.run {
+                        self.isSyncing = false
+                        self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                        self.syncProgressText = nil
+                        NotificationCenter.default.post(
+                            name: Notification.Name("SyncBookStatusChanged"),
+                            object: self,
+                            userInfo: ["bookId": book.bookId, "status": "succeeded"]
+                        )
+                    }
+                } catch {
+                    let desc = error.localizedDescription
+                    await MainActor.run {
+                        self.logger.error("[DedaoDetail] syncSmart error: \(desc)")
+                        self.isSyncing = false
+                        self.syncMessage = desc
+                        self.syncProgressText = nil
+                        NotificationCenter.default.post(
+                            name: Notification.Name("SyncBookStatusChanged"),
+                            object: self,
+                            userInfo: ["bookId": book.bookId, "status": "failed"]
+                        )
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func checkNotionConfig() -> Bool {
+        notionConfig.isConfigured
+    }
+    
+    /// 将缓存的高亮转换为 API 模型
     private func cachedToNote(_ cached: CachedDedaoHighlight) -> DedaoEbookNote {
-        // 创建一个简化的 DedaoEbookNote 用于显示
-        // 由于 DedaoEbookNote 所有字段都是可选的，我们可以创建一个部分填充的实例
         return DedaoEbookNote(
             noteId: nil,
             noteIdStr: cached.highlightId,
