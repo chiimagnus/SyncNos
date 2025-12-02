@@ -8,12 +8,14 @@ struct MainListView: View {
     @StateObject private var appleBooksVM = AppleBooksViewModel()
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
+    @StateObject private var dedaoVM: DedaoViewModel
     
     // MARK: - Selection State
     
     @State private var selectedBookIds: Set<String> = []
     @State private var selectedLinkIds: Set<String> = []
     @State private var selectedWeReadBookIds: Set<String> = []
+    @State private var selectedDedaoBookIds: Set<String> = []
     
     // MARK: - App Storage
     
@@ -21,6 +23,17 @@ struct MainListView: View {
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
+    @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
+    
+    // MARK: - Initialization
+    
+    init() {
+        _dedaoVM = StateObject(wrappedValue: DedaoViewModel(
+            authService: DIContainer.shared.dedaoAuthService,
+            apiService: DIContainer.shared.dedaoAPIService,
+            cacheService: DIContainer.shared.dedaoCacheService
+        ))
+    }
     
     // MARK: - Environment
     
@@ -45,6 +58,8 @@ struct MainListView: View {
             return goodLinksSourceEnabled
         case .weRead:
             return weReadSourceEnabled
+        case .dedao:
+            return dedaoSourceEnabled
         }
     }
 
@@ -70,6 +85,9 @@ struct MainListView: View {
                 updateDataSourceSwitchViewModel()
             }
             .onChange(of: weReadSourceEnabled) { _, _ in
+                updateDataSourceSwitchViewModel()
+            }
+            .onChange(of: dedaoSourceEnabled) { _, _ in
                 updateDataSourceSwitchViewModel()
             }
             // 当菜单切换时，同步到滑动容器
@@ -125,6 +143,7 @@ struct MainListView: View {
                 selectedBookIds.removeAll()
                 selectedLinkIds.removeAll()
                 selectedWeReadBookIds.removeAll()
+                selectedDedaoBookIds.removeAll()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
                 guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
@@ -132,17 +151,26 @@ struct MainListView: View {
                     contentSourceRawValue = ContentSource.appleBooks.rawValue
                     selectedLinkIds.removeAll()
                     selectedWeReadBookIds.removeAll()
+                    selectedDedaoBookIds.removeAll()
                     selectedBookIds = Set([id])
                 } else if source == ContentSource.goodLinks.rawValue {
                     contentSourceRawValue = ContentSource.goodLinks.rawValue
                     selectedBookIds.removeAll()
                     selectedWeReadBookIds.removeAll()
+                    selectedDedaoBookIds.removeAll()
                     selectedLinkIds = Set([id])
                 } else if source == ContentSource.weRead.rawValue {
                     contentSourceRawValue = ContentSource.weRead.rawValue
                     selectedBookIds.removeAll()
                     selectedLinkIds.removeAll()
+                    selectedDedaoBookIds.removeAll()
                     selectedWeReadBookIds = Set([id])
+                } else if source == ContentSource.dedao.rawValue {
+                    contentSourceRawValue = ContentSource.dedao.rawValue
+                    selectedBookIds.removeAll()
+                    selectedLinkIds.removeAll()
+                    selectedWeReadBookIds.removeAll()
+                    selectedDedaoBookIds = Set([id])
                 }
             }
             .background {
@@ -216,9 +244,11 @@ struct MainListView: View {
             appleBooksVM: appleBooksVM,
             goodLinksVM: goodLinksVM,
             weReadVM: weReadVM,
+            dedaoVM: dedaoVM,
             selectedBookIds: $selectedBookIds,
             selectedLinkIds: $selectedLinkIds,
             selectedWeReadBookIds: $selectedWeReadBookIds,
+            selectedDedaoBookIds: $selectedDedaoBookIds,
             filterMenu: { dataSourceToolbarMenu }
         )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -236,6 +266,8 @@ struct MainListView: View {
                 goodLinksFilterMenu
             case .weRead:
                 weReadFilterMenu
+            case .dedao:
+                dedaoFilterMenu
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
@@ -396,6 +428,46 @@ struct MainListView: View {
             }
         }
     }
+    
+    @ViewBuilder
+    private var dedaoFilterMenu: some View {
+        Section("Sort") {
+            let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+            ForEach(availableKeys, id: \.self) { key in
+                Button {
+                    dedaoVM.sortKey = key
+                    NotificationCenter.default.post(
+                        name: Notification.Name("DedaoFilterChanged"),
+                        object: nil,
+                        userInfo: ["sortKey": key.rawValue]
+                    )
+                } label: {
+                    if dedaoVM.sortKey == key {
+                        Label(key.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(key.displayName)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                dedaoVM.sortAscending.toggle()
+                NotificationCenter.default.post(
+                    name: Notification.Name("DedaoFilterChanged"),
+                    object: nil,
+                    userInfo: ["sortAscending": dedaoVM.sortAscending]
+                )
+            } label: {
+                if dedaoVM.sortAscending {
+                    Label("Ascending", systemImage: "checkmark")
+                } else {
+                    Label("Ascending", systemImage: "xmark")
+                }
+            }
+        }
+    }
 
     // MARK: - Detail Column
     
@@ -408,6 +480,8 @@ struct MainListView: View {
             goodLinksDetailView
         case .weRead:
             weReadDetailView
+        case .dedao:
+            dedaoDetailView
         }
     }
     
@@ -468,6 +542,18 @@ struct MainListView: View {
         }
     }
     
+    @ViewBuilder
+    private var dedaoDetailView: some View {
+        // Dedao 暂不支持详情视图，仅显示选择占位符
+        SelectionPlaceholderView(
+            title: contentSource.title,
+            count: selectedDedaoBookIds.isEmpty ? nil : selectedDedaoBookIds.count,
+            filteredCount: dedaoVM.displayBooks.count,
+            totalCount: dedaoVM.books.count,
+            onSyncSelected: selectedDedaoBookIds.isEmpty ? nil : { syncSelectedDedao() }
+        )
+    }
+    
     // MARK: - Sync Methods
     
     private func syncSelectedAppleBooks() {
@@ -508,6 +594,19 @@ struct MainListView: View {
             userInfo: ["source": "weRead", "items": items]
         )
         weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+    }
+    
+    private func syncSelectedDedao() {
+        let items = selectedDedaoBookIds.compactMap { id -> [String: Any]? in
+            guard let b = dedaoVM.displayBooks.first(where: { $0.bookId == id }) else { return nil }
+            return ["id": id, "title": b.title, "subtitle": b.author]
+        }
+        NotificationCenter.default.post(
+            name: Notification.Name("SyncTasksEnqueued"),
+            object: nil,
+            userInfo: ["source": "dedao", "items": items]
+        )
+        dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
 
