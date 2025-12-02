@@ -223,7 +223,7 @@ final class DedaoViewModel: ObservableObject {
                         }
                     }
                     
-                    // 收集结果并更新
+                    // 收集结果（不立即更新 UI）
                     for await (index, count) in group {
                         if index < newBooks.count {
                             newBooks[index].highlightCount = count
@@ -231,10 +231,11 @@ final class DedaoViewModel: ObservableObject {
                     }
                 }
                 
-                // 每批完成后更新 UI
-                books = newBooks
-                logger.debug("[Dedao] Updated batch \(batchIndex + 1)/\(totalBatches)")
+                logger.debug("[Dedao] Fetched batch \(batchIndex + 1)/\(totalBatches)")
             }
+            
+            // 所有批次完成后一次性更新 UI（避免重复刷新）
+            books = newBooks
             
             // 更新同步状态
             try await cacheService.updateSyncState(lastFullSyncAt: nil, lastIncrementalSyncAt: Date())
