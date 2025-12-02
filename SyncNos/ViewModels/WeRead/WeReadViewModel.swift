@@ -38,14 +38,14 @@ final class WeReadViewModel: ObservableObject {
     // 依赖
     private let authService: WeReadAuthServiceProtocol
     private let apiService: WeReadAPIServiceProtocol
+    private let cacheService: WeReadCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let notionConfig: NotionConfigStoreProtocol
     
-    // 缓存服务（可选，因为需要 ModelContainer）
-    private var cacheService: WeReadCacheServiceProtocol?
-    private var incrementalSyncService: WeReadIncrementalSyncService?
+    // 增量同步服务
+    private let incrementalSyncService: WeReadIncrementalSyncService
 
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "WeReadViewModel.compute", qos: .userInitiated)
@@ -54,41 +54,29 @@ final class WeReadViewModel: ObservableObject {
     init(
         authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
+        cacheService: WeReadCacheServiceProtocol = DIContainer.shared.weReadCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
-        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        cacheService: WeReadCacheServiceProtocol? = nil
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.authService = authService
         self.apiService = apiService
+        self.cacheService = cacheService
         self.syncEngine = syncEngine
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
-        self.cacheService = cacheService
         
-        // 如果有缓存服务，创建增量同步服务
-        if let cache = cacheService {
-            self.incrementalSyncService = WeReadIncrementalSyncService(
-                apiService: apiService,
-                cacheService: cache,
-                logger: logger
-            )
-        }
+        // 创建增量同步服务
+        self.incrementalSyncService = WeReadIncrementalSyncService(
+            apiService: apiService,
+            cacheService: cacheService,
+            logger: logger
+        )
 
         setupPipelines()
         subscribeSyncStatusNotifications()
-    }
-    
-    /// 设置缓存服务（用于延迟注入）
-    func setCacheService(_ service: WeReadCacheServiceProtocol) {
-        self.cacheService = service
-        self.incrementalSyncService = WeReadIncrementalSyncService(
-            apiService: apiService,
-            cacheService: service,
-            logger: logger
-        )
     }
 
     // MARK: - Pipelines
@@ -175,22 +163,20 @@ final class WeReadViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // 1. 先尝试从缓存加载（快速显示）
-        if let cacheService {
-            do {
-                let cachedBooks = try await cacheService.getAllBooks()
-                if !cachedBooks.isEmpty {
-                    books = cachedBooks.map { WeReadBookListItem(from: $0) }
-                    isLoading = false
-                    logger.info("[WeRead] Loaded \(cachedBooks.count) books from cache")
-                    
-                    // 获取上次同步时间
-                    let state = try await cacheService.getSyncState()
-                    lastSyncAt = state.lastIncrementalSyncAt ?? state.lastFullSyncAt
-                }
-            } catch {
-                logger.warning("[WeRead] Cache load failed: \(error.localizedDescription)")
+        // 1. 先从缓存加载（快速显示）
+        do {
+            let cachedBooks = try await cacheService.getAllBooks()
+            if !cachedBooks.isEmpty {
+                books = cachedBooks.map { WeReadBookListItem(from: $0) }
+                isLoading = false
+                logger.info("[WeRead] Loaded \(cachedBooks.count) books from cache")
+                
+                // 获取上次同步时间
+                let state = try await cacheService.getSyncState()
+                lastSyncAt = state.lastIncrementalSyncAt ?? state.lastFullSyncAt
             }
+        } catch {
+            logger.warning("[WeRead] Cache load failed: \(error.localizedDescription)")
         }
         
         // 2. 后台增量同步
@@ -199,60 +185,49 @@ final class WeReadViewModel: ObservableObject {
     
     /// 执行后台同步
     private func performBackgroundSync() async {
-        // 如果有增量同步服务，使用增量同步
-        if let incrementalSyncService {
-            isSyncing = true
-            do {
-                let result = try await incrementalSyncService.syncNotebooks()
-                
-                switch result {
-                case .noChanges:
-                    logger.info("[WeRead] No changes from server")
-                case .updated(let added, let removed):
-                    logger.info("[WeRead] Synced: +\(added) -\(removed) books")
-                    // 重新从缓存加载更新后的数据
-                    if let cacheService {
-                        let updatedBooks = try await cacheService.getAllBooks()
-                        books = updatedBooks.map { WeReadBookListItem(from: $0) }
-                    }
-                case .fullSyncRequired:
-                    // 需要全量同步
-                    try await incrementalSyncService.fullSync()
-                    if let cacheService {
-                        let updatedBooks = try await cacheService.getAllBooks()
-                        books = updatedBooks.map { WeReadBookListItem(from: $0) }
-                    }
-                }
-                
-                lastSyncAt = Date()
-            } catch {
-                // 如果缓存为空，需要全量拉取
-                if books.isEmpty {
-                    await fullFetchFromAPI()
-                } else {
-                    logger.error("[WeRead] Incremental sync failed: \(error.localizedDescription)")
-                    // 如果是认证错误，显示提示
-                    if let apiError = error as? WeReadAPIError,
-                       case .sessionExpiredWithRefreshFailure(let reason) = apiError {
-                        // 发送会话过期通知到 MainListView
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShowSessionExpiredAlert"),
-                            object: nil,
-                            userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
-                        )
-                    }
+        isSyncing = true
+        do {
+            let result = try await incrementalSyncService.syncNotebooks()
+            
+            switch result {
+            case .noChanges:
+                logger.info("[WeRead] No changes from server")
+            case .updated(let added, let removed):
+                logger.info("[WeRead] Synced: +\(added) -\(removed) books")
+                // 重新从缓存加载更新后的数据
+                let updatedBooks = try await cacheService.getAllBooks()
+                books = updatedBooks.map { WeReadBookListItem(from: $0) }
+            case .fullSyncRequired:
+                // 需要全量同步
+                try await incrementalSyncService.fullSync()
+                let updatedBooks = try await cacheService.getAllBooks()
+                books = updatedBooks.map { WeReadBookListItem(from: $0) }
+            }
+            
+            lastSyncAt = Date()
+        } catch {
+            // 如果缓存为空，需要全量拉取
+            if books.isEmpty {
+                await fullFetchFromAPI()
+            } else {
+                logger.error("[WeRead] Incremental sync failed: \(error.localizedDescription)")
+                // 如果是认证错误，显示提示
+                if let apiError = error as? WeReadAPIError,
+                   case .sessionExpiredWithRefreshFailure(let reason) = apiError {
+                    // 发送会话过期通知到 MainListView
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ShowSessionExpiredAlert"),
+                        object: nil,
+                        userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
+                    )
                 }
             }
-            isSyncing = false
-        } else {
-            // 没有缓存服务，直接从 API 拉取
-            await fullFetchFromAPI()
         }
-        
+        isSyncing = false
         isLoading = false
     }
     
-    /// 全量从 API 拉取（无缓存时使用）
+    /// 全量从 API 拉取（缓存为空时使用）
     private func fullFetchFromAPI() async {
         do {
             // 从 WeRead 远端拉取 Notebook 列表
@@ -283,12 +258,10 @@ final class WeReadViewModel: ObservableObject {
                 WeReadBookListItem(from: notebook, highlightCount: count)
             }
             
-            // 如果有缓存服务，保存到缓存
-            if let cacheService {
-                try await cacheService.saveBooks(notebooks)
-                for (notebook, count) in booksWithCounts {
-                    try await cacheService.updateBookHighlightCount(bookId: notebook.bookId, count: count)
-                }
+            // 保存到缓存
+            try await cacheService.saveBooks(notebooks)
+            for (notebook, count) in booksWithCounts {
+                try await cacheService.updateBookHighlightCount(bookId: notebook.bookId, count: count)
             }
             
             logger.info("[WeRead] fetched notebooks: \(notebooks.count)")
@@ -316,13 +289,11 @@ final class WeReadViewModel: ObservableObject {
         errorMessage = nil
         
         // 清除缓存
-        if let cacheService {
-            do {
-                try await cacheService.clearAllCache()
-                logger.info("[WeRead] Cache cleared for force refresh")
-            } catch {
-                logger.warning("[WeRead] Failed to clear cache: \(error.localizedDescription)")
-            }
+        do {
+            try await cacheService.clearAllCache()
+            logger.info("[WeRead] Cache cleared for force refresh")
+        } catch {
+            logger.warning("[WeRead] Failed to clear cache: \(error.localizedDescription)")
         }
         
         // 重新加载
