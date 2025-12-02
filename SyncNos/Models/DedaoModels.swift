@@ -72,12 +72,15 @@ struct DedaoEbook: Codable, Identifiable {
 struct DedaoEbookListResponse: Codable {
     let list: [DedaoEbook]
     let total: Int?
+    let page: Int?
+    let pageSize: Int?
     let isMore: Int?
     let sphereGuide: Bool?
     let bottomTips: String?
     
     private enum CodingKeys: String, CodingKey {
-        case list, total
+        case list, total, page
+        case pageSize = "page_size"
         case isMore = "is_more"
         case sphereGuide = "sphere_guide"
         case bottomTips = "bottom_tips"
@@ -309,6 +312,34 @@ struct DedaoNotesCount: Codable {
 /// 笔记列表响应
 struct DedaoEbookNotesResponse: Codable {
     let list: [DedaoEbookNote]
+}
+
+// MARK: - 首页分类
+
+/// 首页分类响应（用于获取各类别的数量）
+/// 注意：API 响应嵌套在 "data" 字段中
+struct DedaoCategoryListResponse: Codable {
+    let data: DedaoCategoryData
+}
+
+/// 分类数据
+struct DedaoCategoryData: Codable {
+    let list: [DedaoCategory]
+    let isShowUrl: Bool?
+    let pcUrl: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case list
+        case isShowUrl = "is_show_url"
+        case pcUrl = "pc_url"
+    }
+}
+
+/// 分类信息
+struct DedaoCategory: Codable {
+    let name: String
+    let count: Int
+    let category: String
 }
 
 // MARK: - 用户信息

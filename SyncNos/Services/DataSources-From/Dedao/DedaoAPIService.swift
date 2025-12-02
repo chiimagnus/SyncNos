@@ -26,7 +26,8 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     // MARK: - Public API
     
     /// 获取用户书架中的电子书列表（单页）
-    func fetchEbooks(page: Int) async throws -> [DedaoEbook] {
+    /// - Returns: 元组包含书籍列表、总数和是否有更多
+    private func fetchEbooksPage(page: Int) async throws -> (list: [DedaoEbook], total: Int?, hasMore: Bool) {
         let url = baseURL.appendingPathComponent("/api/hades/v2/product/list")
         
         let body: [String: Any] = [
@@ -44,32 +45,78 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         let data = try await performPostRequest(url: url, body: body)
         let response = try decodeResponse(DedaoEbookListResponse.self, from: data)
         
-        logger.info("[DedaoAPI] Fetched ebooks page \(page): \(response.list.count) items")
-        return response.list
+        // 更智能的分页判断：
+        // 1. 优先使用 isMore 字段（如果存在且为 1）
+        // 2. 否则根据本页数量判断（如果本页满 pageSize，则可能有更多）
+        let hasMore: Bool
+        if let isMore = response.isMore {
+            hasMore = (isMore == 1)
+        } else {
+            // 如果 isMore 不存在，根据本页数量判断
+            hasMore = (response.list.count >= pageSize)
+        }
+        
+        logger.info("[DedaoAPI] Fetched ebooks page \(page): \(response.list.count) items, total=\(response.total ?? -1), isMore=\(response.isMore ?? -1), hasMore=\(hasMore)")
+        return (response.list, response.total, hasMore)
+    }
+    
+    /// 获取用户书架中的电子书列表（单页）- 兼容旧接口
+    func fetchEbooks(page: Int) async throws -> [DedaoEbook] {
+        let (list, _, _) = try await fetchEbooksPage(page: page)
+        return list
+    }
+    
+    /// 获取电子书总数
+    /// 通过调用首页分类 API 获取电子书架中的电子书数量
+    func fetchEbookCount() async throws -> Int {
+        let url = baseURL.appendingPathComponent("/api/hades/v1/index/detail")
+        
+        let data = try await performPostRequest(url: url, body: [:])
+        let response = try decodeResponse(DedaoCategoryListResponse.self, from: data)
+        
+        // 查找电子书分类（注意：响应嵌套在 data 字段中）
+        if let ebookCategory = response.data.list.first(where: { $0.category == "ebook" }) {
+            logger.info("[DedaoAPI] Ebook count from index: \(ebookCategory.count)")
+            return ebookCategory.count
+        }
+        
+        logger.warning("[DedaoAPI] Ebook category not found in index response")
+        return 0
     }
     
     /// 获取所有电子书（自动分页）
     func fetchAllEbooks() async throws -> [DedaoEbook] {
-        var allEbooks: [DedaoEbook] = []
-        var currentPage = 1
-        var hasMore = true
+        // 方法1：先获取电子书总数，然后计算需要多少页
+        let totalCount = try await fetchEbookCount()
+        guard totalCount > 0 else {
+            logger.info("[DedaoAPI] No ebooks in bookshelf")
+            return []
+        }
         
-        while hasMore {
-            let ebooks = try await fetchEbooks(page: currentPage)
+        let totalPages = Int(ceil(Double(totalCount) / Double(pageSize)))
+        logger.info("[DedaoAPI] Will fetch \(totalPages) pages for \(totalCount) ebooks (pageSize=\(pageSize))")
+        
+        var allEbooks: [DedaoEbook] = []
+        
+        for page in 1...totalPages {
+            let (ebooks, _, _) = try await fetchEbooksPage(page: page)
             allEbooks.append(contentsOf: ebooks)
             
-            // 如果返回的数量少于 pageSize，说明没有更多数据了
-            hasMore = ebooks.count >= pageSize
-            currentPage += 1
+            logger.debug("[DedaoAPI] Progress: \(allEbooks.count)/\(totalCount) ebooks fetched")
             
-            // 防止无限循环
-            if currentPage > 100 {
-                logger.warning("[DedaoAPI] Reached max page limit (100) when fetching ebooks")
+            // 如果返回为空，提前结束
+            if ebooks.isEmpty {
+                logger.warning("[DedaoAPI] Page \(page) returned empty, stopping early")
+                break
+            }
+            
+            // 已经获取足够数量，可以提前停止
+            if allEbooks.count >= totalCount {
                 break
             }
         }
         
-        logger.info("[DedaoAPI] Fetched all ebooks: \(allEbooks.count) total")
+        logger.info("[DedaoAPI] Fetched all ebooks: \(allEbooks.count) total (expected: \(totalCount))")
         return allEbooks
     }
     
