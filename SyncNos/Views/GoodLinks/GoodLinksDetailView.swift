@@ -20,9 +20,9 @@ struct GoodLinksDetailView: View {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
     }
 
+    /// 使用分页后的高亮（而非全部）
     private var filteredHighlights: [GoodLinksHighlightRow] {
-        guard let linkId = selectedLinkId else { return [] }
-        return viewModel.getFilteredHighlights(for: linkId)
+        viewModel.visibleHighlights
     }
 
     var body: some View {
@@ -180,6 +180,16 @@ struct GoodLinksDetailView: View {
                             .padding(.top, 4)
 
                             if !filteredHighlights.isEmpty {
+                                // 显示已加载/总数
+                                if viewModel.totalFilteredHighlightCount > 0 {
+                                    HStack {
+                                        Text("\(filteredHighlights.count)/\(viewModel.totalFilteredHighlightCount) highlights")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                    }
+                                }
+                                
                                 WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
                                     ForEach(filteredHighlights, id: \.id) { item in
                                         HighlightCardView(
@@ -201,6 +211,10 @@ struct GoodLinksDetailView: View {
                                             .buttonStyle(.plain)
                                             .help("Open in GoodLinks")
                                             .accessibilityLabel("Open in GoodLinks")
+                                        }
+                                        .onAppear {
+                                            // 滚动加载更多
+                                            viewModel.loadMoreHighlightsIfNeeded(currentItem: item)
                                         }
                                     }
                                 }
@@ -226,6 +240,34 @@ struct GoodLinksDetailView: View {
                                             }
                                     }
                                 )
+                                
+                                // 加载更多 UI
+                                if viewModel.isLoadingMoreHighlights {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Loading...")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                    }
+                                    .padding()
+                                } else if viewModel.canLoadMoreHighlights {
+                                    HStack {
+                                        Spacer()
+                                        Button {
+                                            viewModel.loadNextHighlightPage()
+                                        } label: {
+                                            Text("Load More (\(viewModel.totalFilteredHighlightCount - filteredHighlights.count) remaining)")
+                                                .font(.caption)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundColor(.accentColor)
+                                        Spacer()
+                                    }
+                                    .padding()
+                                }
                             } else {
                                 // 空状态提示
                                 Text("No highlights for this link yet")
@@ -257,6 +299,8 @@ struct GoodLinksDetailView: View {
                     Task {
                         await viewModel.loadHighlights(for: linkId)
                         await viewModel.loadContent(for: linkId)
+                        // 初始化分页
+                        viewModel.initializeHighlightPagination(for: linkId)
                     }
                     if let id = selectedLinkId, viewModel.syncingLinkIds.contains(id) {
                         externalIsSyncing = true
@@ -266,6 +310,8 @@ struct GoodLinksDetailView: View {
                     Task {
                         await viewModel.loadHighlights(for: newLinkId)
                         await viewModel.loadContent(for: newLinkId)
+                        // 初始化分页
+                        viewModel.initializeHighlightPagination(for: newLinkId)
                     }
                     if let id = selectedLinkId {
                         externalIsSyncing = viewModel.syncingLinkIds.contains(id)
@@ -287,9 +333,11 @@ struct GoodLinksDetailView: View {
                             isAscending: viewModel.highlightIsAscending,
                             onSortFieldChanged: { field in
                                 viewModel.highlightSortField = field
+                                viewModel.reapplyHighlightFilters()
                             },
                             onAscendingChanged: { ascending in
                                 viewModel.highlightIsAscending = ascending
+                                viewModel.reapplyHighlightFilters()
                             }
                         )
                     }
@@ -342,6 +390,8 @@ struct GoodLinksDetailView: View {
                 Task {
                     await viewModel.loadHighlights(for: linkId)
                     await viewModel.loadContent(for: linkId)
+                    // 重新初始化分页
+                    viewModel.initializeHighlightPagination(for: linkId)
                 }
             }
         }
@@ -377,8 +427,16 @@ struct GoodLinksDetailView: View {
             externalSyncProgress = nil
         }
         .onChange(of: viewModel.highlightsByLinkId) { _, _ in
-            // Trigger UI update when highlights are loaded
-            // The filteredHighlights computed property will automatically refresh
+            // 高亮加载完成后，重新初始化分页
+            if let linkId = selectedLinkId, !linkId.isEmpty {
+                viewModel.initializeHighlightPagination(for: linkId)
+            }
+        }
+        .onChange(of: viewModel.highlightNoteFilter) { _, _ in
+            viewModel.reapplyHighlightFilters()
+        }
+        .onChange(of: viewModel.highlightSelectedStyles) { _, _ in
+            viewModel.reapplyHighlightFilters()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
