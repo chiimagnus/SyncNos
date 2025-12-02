@@ -369,12 +369,14 @@ final class DedaoViewModel: ObservableObject {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            await MainActor.run { _ = self.syncingBookIds.insert(id) }
-                            NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
-                                object: self,
-                                userInfo: ["bookId": id, "status": "started"]
-                            )
+                            await MainActor.run {
+                                _ = self.syncingBookIds.insert(id)
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncBookStatusChanged"),
+                                    object: self,
+                                    userInfo: ["bookId": id, "status": "started"]
+                                )
+                            }
                             do {
                                 let adapter = DedaoNotionAdapter(
                                     book: book,
@@ -382,32 +384,35 @@ final class DedaoViewModel: ObservableObject {
                                     cacheService: cacheService
                                 )
                                 try await syncEngine.syncSmart(source: adapter) { progressText in
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("SyncProgressUpdated"),
-                                        object: self,
-                                        userInfo: ["bookId": id, "progress": progressText]
-                                    )
+                                    Task { @MainActor in
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("SyncProgressUpdated"),
+                                            object: self,
+                                            userInfo: ["bookId": id, "progress": progressText]
+                                        )
+                                    }
                                 }
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("SyncBookStatusChanged"),
-                                    object: self,
-                                    userInfo: ["bookId": id, "status": "succeeded"]
-                                )
                                 await MainActor.run {
                                     _ = self.syncingBookIds.remove(id)
                                     _ = self.syncedBookIds.insert(id)
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "succeeded"]
+                                    )
                                 }
                             } catch {
                                 await MainActor.run {
                                     self.logger.error("[Dedao] batchSync error for id=\(id): \(error.localizedDescription)")
-                                }
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("SyncBookStatusChanged"),
-                                    object: self,
-                                    userInfo: ["bookId": id, "status": "failed"]
-                                )
-                                await MainActor.run {
                                     _ = self.syncingBookIds.remove(id)
+                                }
+                                // 确保在主线程发送通知，避免时序问题
+                                await MainActor.run {
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "failed"]
+                                    )
                                 }
                             }
                         }
