@@ -240,6 +240,12 @@ struct DedaoDdUrl: Codable {
     let url1: String?
     let url2: String?
     let needVisitorPopLoginView: Bool?
+    
+    private enum CodingKeys: String, CodingKey {
+        case needCheckBuy = "need_check_buy"
+        case url1, url2
+        case needVisitorPopLoginView = "need_visitor_pop_login_view"
+    }
 }
 
 /// 视频信息
