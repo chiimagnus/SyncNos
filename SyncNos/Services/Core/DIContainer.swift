@@ -171,9 +171,19 @@ class DIContainer {
                     CachedWeReadHighlight.self,
                     WeReadSyncState.self
                 ])
+                
+                // 使用独立的存储文件，避免与其他 ModelContainer 冲突
+                let storeURL = URL.applicationSupportDirectory
+                    .appendingPathComponent("SyncNos", isDirectory: true)
+                    .appendingPathComponent("weread.store")
+                
+                // 确保目录存在
+                let directory = storeURL.deletingLastPathComponent()
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                
                 let modelConfiguration = ModelConfiguration(
                     schema: schema,
-                    isStoredInMemoryOnly: false,
+                    url: storeURL,
                     allowsSave: true
                 )
                 _weReadModelContainer = try ModelContainer(
@@ -229,9 +239,19 @@ class DIContainer {
                     CachedDedaoHighlight.self,
                     DedaoSyncState.self
                 ])
+                
+                // 使用独立的存储文件，避免与其他 ModelContainer 冲突
+                let storeURL = URL.applicationSupportDirectory
+                    .appendingPathComponent("SyncNos", isDirectory: true)
+                    .appendingPathComponent("dedao.store")
+                
+                // 确保目录存在
+                let directory = storeURL.deletingLastPathComponent()
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                
                 let modelConfiguration = ModelConfiguration(
                     schema: schema,
-                    isStoredInMemoryOnly: false,
+                    url: storeURL,
                     allowsSave: true
                 )
                 _dedaoModelContainer = try ModelContainer(
