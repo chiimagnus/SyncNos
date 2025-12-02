@@ -79,7 +79,7 @@ struct UnifiedHighlight: Identifiable, Equatable {
         self.colorIndex = 0  // 得到不提供颜色信息，使用默认
         self.dateAdded = Date(timeIntervalSince1970: TimeInterval(note.createTime))
         self.dateModified = Date(timeIntervalSince1970: TimeInterval(note.updateTime))
-        self.location = note.extra.title  // 章节标题
+        self.location = note.extra.title  // 章节标题（可选）
         self.source = .dedao
     }
     

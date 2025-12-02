@@ -62,24 +62,24 @@ struct DedaoEbookListResponse: Codable {
 struct DedaoEbookNote: Codable, Identifiable {
     let noteId: Int64
     let noteIdStr: String
-    let noteIdHazy: String
-    let uid: Int
-    let isFromMe: Int          // 1 = 自己的笔记
-    let notesOwner: DedaoNotesOwner
-    let noteType: Int
-    let sourceType: Int
-    let note: String           // 用户备注
-    let noteTitle: String
-    let noteLine: String       // 划线内容
-    let noteLineStyle: String
+    let noteIdHazy: String?
+    let uid: Int?
+    let isFromMe: Int?          // 1 = 自己的笔记
+    let notesOwner: DedaoNotesOwner?
+    let noteType: Int?
+    let sourceType: Int?
+    let note: String            // 用户备注
+    let noteTitle: String?
+    let noteLine: String        // 划线内容
+    let noteLineStyle: String?
     let createTime: Int64
     let updateTime: Int64
-    let tips: String
-    let shareUrl: String
+    let tips: String?
+    let shareUrl: String?
     let extra: DedaoNoteExtra
-    let notesCount: DedaoNotesCount
-    let canEdit: Bool
-    let isPermission: Bool
+    let notesCount: DedaoNotesCount?
+    let canEdit: Bool?
+    let isPermission: Bool?
     
     var id: Int64 { noteId }
     
@@ -109,15 +109,15 @@ struct DedaoEbookNote: Codable, Identifiable {
 
 /// 笔记扩展信息
 struct DedaoNoteExtra: Codable {
-    let title: String          // 章节标题
-    let sourceType: Int
-    let sourceTypeName: String
-    let bookId: Int
-    let bookName: String
-    let bookSection: String    // 章节标识
-    let bookStartPos: Int
-    let bookOffset: Int
-    let bookAuthor: String
+    let title: String?          // 章节标题
+    let sourceType: Int?
+    let sourceTypeName: String?
+    let bookId: Int?
+    let bookName: String?
+    let bookSection: String?    // 章节标识
+    let bookStartPos: Int?
+    let bookOffset: Int?
+    let bookAuthor: String?
     
     private enum CodingKeys: String, CodingKey {
         case title
