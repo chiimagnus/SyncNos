@@ -17,6 +17,15 @@ struct MainListView: View {
     @State private var selectedWeReadBookIds: Set<String> = []
     @State private var selectedDedaoBookIds: Set<String> = []
     
+    // MARK: - Centralized Alert State
+    
+    /// 统一的 Notion 配置弹窗状态
+    @State private var showNotionConfigAlert: Bool = false
+    /// 统一的会话过期弹窗状态
+    @State private var showSessionExpiredAlert: Bool = false
+    @State private var sessionExpiredSource: ContentSource = .weRead
+    @State private var sessionExpiredReason: String = ""
+    
     // MARK: - App Storage
     
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
@@ -190,7 +199,9 @@ struct MainListView: View {
                 .ignoresSafeArea()
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
-            .alert("Notion Configuration Required", isPresented: $appleBooksVM.showNotionConfigAlert) {
+            // MARK: - Centralized Alerts
+            // 统一的 Notion 配置弹窗
+            .alert("Notion Configuration Required", isPresented: $showNotionConfigAlert) {
                 Button("Go to Settings") {
                     openWindow(id: "setting")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -201,16 +212,86 @@ struct MainListView: View {
             } message: {
                 Text("Please configure Notion API Key and Page ID before syncing.")
             }
-            .alert("Notion Configuration Required", isPresented: $goodLinksVM.showNotionConfigAlert) {
-                Button("Go to Settings") {
-                    openWindow(id: "setting")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                    }
+            // 统一的会话过期弹窗（WeRead/Dedao）
+            .alert(
+                sessionExpiredSource == .weRead
+                    ? NSLocalizedString("Session Expired", comment: "")
+                    : String(localized: "dedao.sessionExpired"),
+                isPresented: $showSessionExpiredAlert
+            ) {
+                Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }
+                Button(NSLocalizedString("Go to Login", comment: "")) {
+                    navigateToLogin(for: sessionExpiredSource)
                 }
-                Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Please configure Notion API Key and Page ID before syncing.")
+                Text(sessionExpiredReason)
+            }
+            // MARK: - Centralized Notification Listeners
+            // 监听 Notion 配置弹窗通知
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNotionConfigAlert")).receive(on: DispatchQueue.main)) { _ in
+                showNotionConfigAlert = true
+            }
+            // 监听会话过期弹窗通知
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowSessionExpiredAlert")).receive(on: DispatchQueue.main)) { notification in
+                if let userInfo = notification.userInfo,
+                   let sourceRaw = userInfo["source"] as? String,
+                   let source = ContentSource(rawValue: sourceRaw),
+                   let reason = userInfo["reason"] as? String {
+                    sessionExpiredSource = source
+                    sessionExpiredReason = reason
+                    showSessionExpiredAlert = true
+                }
+            }
+            // 监听同步选中项通知
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
+                syncSelectedForCurrentSource()
+            }
+            // 监听刷新请求通知
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+                refreshCurrentSource()
+            }
+        }
+    }
+    
+    // MARK: - Centralized Navigation
+    
+    private func navigateToLogin(for source: ContentSource) {
+        switch source {
+        case .weRead:
+            weReadVM.navigateToWeReadLogin()
+        case .dedao:
+            dedaoVM.navigateToDedaoLogin()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Centralized Sync & Refresh
+    
+    private func syncSelectedForCurrentSource() {
+        switch contentSource {
+        case .appleBooks:
+            appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+        case .goodLinks:
+            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
+        case .weRead:
+            weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+        case .dedao:
+            dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+        }
+    }
+    
+    private func refreshCurrentSource() {
+        Task {
+            switch contentSource {
+            case .appleBooks:
+                await appleBooksVM.loadBooks()
+            case .goodLinks:
+                await goodLinksVM.loadRecentLinks()
+            case .weRead:
+                await weReadVM.loadBooks()
+            case .dedao:
+                await dedaoVM.loadBooks()
             }
         }
     }

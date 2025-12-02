@@ -68,8 +68,6 @@ final class WeReadDetailViewModel: ObservableObject {
     @Published var isSyncing: Bool = false
     @Published var syncProgressText: String?
     @Published var syncMessage: String?
-    @Published var showNotionConfigAlert: Bool = false
-    
     // MARK: - Pagination Properties
     
     /// 每页大小
@@ -437,7 +435,7 @@ final class WeReadDetailViewModel: ObservableObject {
     
     func syncSmart(book: WeReadBookListItem) {
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         if isSyncing { return }

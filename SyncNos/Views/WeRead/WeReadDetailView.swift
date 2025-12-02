@@ -283,18 +283,7 @@ struct WeReadDetailView: View {
         } message: {
             Text(syncErrorMessage)
         }
-        // Notion 配置弹窗
-        .alert("Notion Configuration Required", isPresented: $detailViewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
+        // Notion 配置弹窗已移至 MainListView 统一处理
         // 监听同步消息变化（仅显示错误）
         .onChange(of: detailViewModel.syncMessage) { _, newMessage in
             if let message = newMessage {

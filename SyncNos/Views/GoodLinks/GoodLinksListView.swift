@@ -132,27 +132,9 @@ struct GoodLinksListView: View {
                 await viewModel.loadRecentLinks()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
-            Task {
-                await viewModel.loadRecentLinks()
-            }
-        }
         // 注意：不要在 onDisappear 中强制关闭 GoodLinks 的安全范围访问，
         // 以免在自动同步或后台同步仍在访问数据库时导致权限被撤销（authorization denied）。
         // 安全范围生命周期由 GoodLinksBookmarkStore 自身和自动同步 Provider 统一管理。
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-        }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
+        // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗已移至 MainListView 统一处理
     }
 }
