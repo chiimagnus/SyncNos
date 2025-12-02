@@ -56,6 +56,9 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     
+    /// 当前加载任务（用于取消）
+    private var loadingTask: Task<Void, Never>?
+    
     // MARK: - Computed Properties
     
     var canLoadMore: Bool {
@@ -87,8 +90,12 @@ final class DedaoDetailViewModel: ObservableObject {
     /// - Parameters:
     ///   - bookId: 书籍 ID
     ///   - bookTitle: 书名（用于日志记录）
-    func loadHighlights(for bookId: String, bookTitle: String? = nil) async {
+    func loadHighlights(for bookId: String, bookTitle: String? = nil) {
+        // 如果是同一本书，不重复加载
         guard currentBookId != bookId else { return }
+        
+        // 取消之前的加载任务
+        loadingTask?.cancel()
         
         currentBookId = bookId
         currentBookTitle = bookTitle
@@ -100,38 +107,58 @@ final class DedaoDetailViewModel: ObservableObject {
         
         let displayName = bookTitle ?? bookId
         
-        do {
-            // 1. 先尝试从本地缓存加载
-            let cached = try await cacheService.getHighlights(bookId: bookId)
-            if !cached.isEmpty {
-                let notes = cached.map { cachedToNote($0) }
-                applyFiltersAndSort(notes)
-                isLoading = false
-                logger.debug("[DedaoDetail] Loaded \(cached.count) highlights from cache for \"\(displayName)\"")
+        // 创建新的加载任务
+        loadingTask = Task { [weak self] in
+            guard let self else { return }
+            
+            do {
+                // 检查任务是否被取消
+                try Task.checkCancellation()
+                
+                // 1. 先尝试从本地缓存加载
+                let cached = try await self.cacheService.getHighlights(bookId: bookId)
+                
+                try Task.checkCancellation()
+                
+                if !cached.isEmpty {
+                    let notes = cached.map { self.cachedToNote($0) }
+                    self.applyFiltersAndSort(notes)
+                    self.isLoading = false
+                    self.logger.debug("[DedaoDetail] Loaded \(cached.count) highlights from cache for \"\(displayName)\"")
+                }
+                
+                try Task.checkCancellation()
+                
+                // 2. 从 API 获取最新数据
+                let apiNotes = try await self.apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: bookTitle)
+                
+                try Task.checkCancellation()
+                
+                // 3. 保存到缓存
+                try await self.cacheService.saveHighlights(apiNotes, bookId: bookId)
+                
+                try Task.checkCancellation()
+                
+                // 4. 更新显示
+                self.applyFiltersAndSort(apiNotes)
+                
+                self.logger.info("[DedaoDetail] Loaded \(apiNotes.count) highlights from API for \"\(displayName)\"")
+            } catch is CancellationError {
+                self.logger.debug("[DedaoDetail] Loading cancelled for \"\(displayName)\"")
+            } catch {
+                self.logger.error("[DedaoDetail] Failed to load highlights for \"\(displayName)\": \(error.localizedDescription)")
             }
             
-            // 2. 从 API 获取最新数据
-            let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: bookTitle)
-            
-            // 3. 保存到缓存
-            try await cacheService.saveHighlights(apiNotes, bookId: bookId)
-            
-            // 4. 更新显示
-            applyFiltersAndSort(apiNotes)
-            
-            logger.info("[DedaoDetail] Loaded \(apiNotes.count) highlights from API for \"\(displayName)\"")
-        } catch {
-            logger.error("[DedaoDetail] Failed to load highlights for \"\(displayName)\": \(error.localizedDescription)")
+            self.isLoading = false
         }
-        
-        isLoading = false
     }
     
     /// 重新加载当前书籍
-    func reloadCurrent() async {
+    func reloadCurrent() {
         guard let bookId = currentBookId else { return }
+        let title = currentBookTitle
         currentBookId = nil  // 强制重新加载
-        await loadHighlights(for: bookId)
+        loadHighlights(for: bookId, bookTitle: title)
     }
     
     /// 加载下一页
