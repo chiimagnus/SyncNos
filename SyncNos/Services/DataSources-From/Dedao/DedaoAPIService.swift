@@ -289,6 +289,11 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     
     /// 解码得到 API 的通用响应格式
     private func decodeResponse<T: Codable>(_ type: T.Type, from data: Data) throws -> T {
+        // 打印原始响应（调试用）
+        if let rawString = String(data: data, encoding: .utf8) {
+            logger.debug("[DedaoAPI] Raw response preview: \(String(rawString.prefix(500)))")
+        }
+        
         // 先检查响应头的错误码
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let header = json["h"] as? [String: Any],
@@ -311,13 +316,27 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
             let contentData = try JSONSerialization.data(withJSONObject: content)
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
-            return try decoder.decode(T.self, from: contentData)
+            do {
+                return try decoder.decode(T.self, from: contentData)
+            } catch {
+                // 打印详细的解码错误
+                logger.error("[DedaoAPI] Decode error for \(T.self): \(error)")
+                if let contentString = String(data: contentData, encoding: .utf8) {
+                    logger.error("[DedaoAPI] Content that failed to decode: \(String(contentString.prefix(1000)))")
+                }
+                throw error
+            }
         }
         
         // 兜底：尝试直接解码
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: data)
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            logger.error("[DedaoAPI] Direct decode error for \(T.self): \(error)")
+            throw error
+        }
     }
 }
 

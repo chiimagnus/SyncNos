@@ -52,7 +52,7 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         
         for ebook in ebooks {
             // 检查是否已存在
-            let targetBookId = ebook.enid
+            let targetBookId = ebook.effectiveId
             let predicate = #Predicate<CachedDedaoBook> { book in
                 book.bookId == targetBookId
             }
