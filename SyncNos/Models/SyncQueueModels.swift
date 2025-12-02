@@ -4,7 +4,8 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
     case appleBooks
     case goodLinks
     case weRead
-}
+    case dedao
+}  
 
 enum SyncTaskState: String, Codable, Sendable {
     case queued
