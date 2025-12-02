@@ -20,10 +20,14 @@ final class WeReadAuthService: WeReadAuthServiceProtocol {
     }
 
     var isLoggedIn: Bool {
-        if let header = cookieHeader {
-            return !header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-        return false
+        guard let header = cookieHeader else { return false }
+        let trimmed = header.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        
+        // 验证 cookie 是否包含必要的微信读书认证字段
+        // 有效的 WeRead cookie 应该包含 wr_vid 或 wr_skey
+        let hasRequiredFields = trimmed.contains("wr_vid=") || trimmed.contains("wr_skey=")
+        return hasRequiredFields
     }
 
     var cookieHeader: String? {

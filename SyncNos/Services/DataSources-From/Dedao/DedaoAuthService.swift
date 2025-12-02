@@ -20,10 +20,14 @@ final class DedaoAuthService: DedaoAuthServiceProtocol {
     }
     
     var isLoggedIn: Bool {
-        if let header = cookieHeader {
-            return !header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-        return false
+        guard let header = cookieHeader else { return false }
+        let trimmed = header.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        
+        // 验证 cookie 是否包含必要的得到认证字段
+        // 有效的 Dedao cookie 应该包含 token 或 GAT
+        let hasRequiredFields = trimmed.contains("token=") || trimmed.contains("GAT=")
+        return hasRequiredFields
     }
     
     var cookieHeader: String? {
