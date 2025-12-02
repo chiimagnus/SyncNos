@@ -75,7 +75,10 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     
     /// 获取指定电子书的笔记列表
     /// 自动过滤掉无效笔记（空内容、非电子书类型等）
-    func fetchEbookNotes(ebookEnid: String) async throws -> [DedaoEbookNote] {
+    /// - Parameters:
+    ///   - ebookEnid: 电子书加密 ID
+    ///   - bookTitle: 书名（可选，用于日志记录）
+    func fetchEbookNotes(ebookEnid: String, bookTitle: String? = nil) async throws -> [DedaoEbookNote] {
         let url = baseURL.appendingPathComponent("/api/pc/ledgers/ebook/list")
         
         let body: [String: Any] = [
@@ -94,7 +97,9 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
             return isOwnNote && hasContent
         }
         
-        logger.info("[DedaoAPI] Fetched notes for ebook \(ebookEnid): \(response.list.count) total, \(validNotes.count) valid")
+        // 日志中优先显示书名，否则显示 ID
+        let displayName = bookTitle ?? ebookEnid
+        logger.info("[DedaoAPI] Fetched notes for \"\(displayName)\": \(response.list.count) total, \(validNotes.count) valid")
         return validNotes
     }
     

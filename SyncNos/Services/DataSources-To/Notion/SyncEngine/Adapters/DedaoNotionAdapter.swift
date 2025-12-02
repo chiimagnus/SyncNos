@@ -67,8 +67,8 @@ final class DedaoNotionAdapter: NotionSyncSourceProtocol {
             }
         }
         
-        // 从 API 获取
-        let notes = try await apiService.fetchEbookNotes(ebookEnid: book.bookId)
+        // 从 API 获取（传递书名用于日志）
+        let notes = try await apiService.fetchEbookNotes(ebookEnid: book.bookId, bookTitle: book.title)
         
         // 保存到本地缓存（忽略错误）
         do {

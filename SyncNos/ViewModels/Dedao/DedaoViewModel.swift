@@ -205,10 +205,11 @@ final class DedaoViewModel: ObservableObject {
                 await withTaskGroup(of: (Int, Int).self) { group in
                     for i in start..<end {
                         let bookId = newBooks[i].bookId
+                        let bookTitle = newBooks[i].title
                         group.addTask { [weak self] in
                             guard let self else { return (i, 0) }
                             do {
-                                let notes = try await self.apiService.fetchEbookNotes(ebookEnid: bookId)
+                                let notes = try await self.apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: bookTitle)
                                 
                                 // 保存笔记到本地缓存
                                 try await self.cacheService.saveHighlights(notes, bookId: bookId)
@@ -216,7 +217,7 @@ final class DedaoViewModel: ObservableObject {
                                 
                                 return (i, notes.count)
                             } catch {
-                                self.logger.warning("[Dedao] Failed to fetch notes for bookId=\(bookId): \(error.localizedDescription)")
+                                self.logger.warning("[Dedao] Failed to fetch notes for \"\(bookTitle)\": \(error.localizedDescription)")
                                 return (i, newBooks[i].highlightCount)  // 保持原值
                             }
                         }
