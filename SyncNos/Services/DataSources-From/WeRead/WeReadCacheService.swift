@@ -1,30 +1,99 @@
 import Foundation
 import SwiftData
 
+// MARK: - WeRead Cache Error
+
+/// WeRead 缓存服务错误
+enum WeReadCacheError: LocalizedError {
+    case modelContainerNotAvailable
+    case modelContainerCreationFailed(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .modelContainerNotAvailable:
+            return "WeRead cache storage is not available"
+        case .modelContainerCreationFailed(let error):
+            return "Failed to create WeRead cache storage: \(error.localizedDescription)"
+        }
+    }
+}
+
 // MARK: - WeRead Cache Service
 
 /// WeRead 本地缓存服务实现
 /// 使用 SwiftData 持久化书籍和高亮数据
+/// 与 Apple Books 的 DatabaseService 设计一致：初始化不会失败，方法调用时处理错误
 final class WeReadCacheService: WeReadCacheServiceProtocol {
-    private let modelContainer: ModelContainer
+    private var _modelContainer: ModelContainer?
+    private var containerCreationError: Error?
     private let logger: LoggerServiceProtocol
     
     // MARK: - 初始化
     
     /// 非隔离初始化器，允许在任何上下文中创建实例
-    nonisolated init(
-        modelContainer: ModelContainer,
-        logger: LoggerServiceProtocol
-    ) {
-        self.modelContainer = modelContainer
+    /// 初始化永远不会失败，ModelContainer 会在首次使用时惰性创建
+    nonisolated init(logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
         self.logger = logger
+    }
+    
+    // MARK: - Private Helpers
+    
+    /// 获取或创建 ModelContainer（惰性初始化）
+    private func getModelContainer() throws -> ModelContainer {
+        // 如果之前创建失败，直接抛出错误
+        if let error = containerCreationError {
+            throw WeReadCacheError.modelContainerCreationFailed(error)
+        }
+        
+        // 如果已经创建成功，直接返回
+        if let container = _modelContainer {
+            return container
+        }
+        
+        // 首次创建
+        do {
+            let schema = Schema([
+                CachedWeReadBook.self,
+                CachedWeReadHighlight.self,
+                WeReadSyncState.self
+            ])
+            
+            // 使用独立的存储文件，避免与其他 ModelContainer 冲突
+            let storeURL = URL.applicationSupportDirectory
+                .appendingPathComponent("SyncNos", isDirectory: true)
+                .appendingPathComponent("weread.store")
+            
+            // 确保目录存在
+            let directory = storeURL.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            
+            let modelConfiguration = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                allowsSave: true
+            )
+            
+            let container = try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
+            
+            _modelContainer = container
+            logger.info("[WeReadCache] ModelContainer created successfully")
+            return container
+        } catch {
+            containerCreationError = error
+            logger.error("[WeReadCache] Failed to create ModelContainer: \(error.localizedDescription)")
+            throw WeReadCacheError.modelContainerCreationFailed(error)
+        }
     }
     
     // MARK: - 书籍操作
     
     @MainActor
     func getAllBooks() async throws -> [CachedWeReadBook] {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let descriptor = FetchDescriptor<CachedWeReadBook>(
             sortBy: [SortDescriptor(\.title, order: .forward)]
         )
@@ -35,7 +104,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func getBook(bookId: String) async throws -> CachedWeReadBook? {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let targetBookId = bookId
         let predicate = #Predicate<CachedWeReadBook> { book in
             book.bookId == targetBookId
@@ -48,7 +118,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func saveBooks(_ notebooks: [WeReadNotebook]) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         for notebook in notebooks {
             // 检查是否已存在 - 先获取 bookId 到本地变量
@@ -82,7 +153,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func deleteBooks(ids: [String]) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         for bookId in ids {
             let targetBookId = bookId
@@ -103,7 +175,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func updateBookHighlightCount(bookId: String, count: Int) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let targetBookId = bookId
         let predicate = #Predicate<CachedWeReadBook> { book in
             book.bookId == targetBookId
@@ -121,7 +194,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func getHighlights(bookId: String) async throws -> [CachedWeReadHighlight] {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let targetBookId = bookId
         let predicate = #Predicate<CachedWeReadHighlight> { highlight in
             highlight.bookId == targetBookId
@@ -137,7 +211,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func saveHighlights(_ bookmarks: [WeReadBookmark], bookId: String) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         // 获取关联的书籍
         let targetBookId = bookId
@@ -180,7 +255,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func deleteHighlights(ids: [String]) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         for highlightId in ids {
             let targetHighlightId = highlightId
@@ -203,7 +279,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func getSyncState() async throws -> WeReadSyncState {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let targetId = "global"
         let predicate = #Predicate<WeReadSyncState> { state in
             state.id == targetId
@@ -224,7 +301,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func updateSyncState(notebookSyncKey: Int?, lastSyncAt: Date?) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let state = try await getSyncState()
         
         if let key = notebookSyncKey {
@@ -245,7 +323,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func updateBookSyncKey(bookId: String, syncKey: Int) async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         let targetBookId = bookId
         let predicate = #Predicate<CachedWeReadBook> { book in
             book.bookId == targetBookId
@@ -263,7 +342,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func clearAllCache() async throws {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         // 删除所有高亮
         let highlightDescriptor = FetchDescriptor<CachedWeReadHighlight>()
@@ -294,7 +374,8 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     @MainActor
     func getCacheStats() async throws -> WeReadCacheStats {
-        let context = modelContainer.mainContext
+        let container = try getModelContainer()
+        let context = container.mainContext
         
         let bookDescriptor = FetchDescriptor<CachedWeReadBook>()
         let books = try context.fetch(bookDescriptor)
