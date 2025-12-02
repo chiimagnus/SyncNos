@@ -133,20 +133,52 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         ]
         
         let data = try await performPostRequest(url: url, body: body)
+        
+        // 调试：打印原始响应的第一条笔记结构
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let content = json["c"] as? [String: Any],
+           let list = content["list"] as? [[String: Any]],
+           let first = list.first {
+            let displayName = bookTitle ?? ebookEnid
+            logger.warning("[DedaoAPI] Raw note structure for \"\(displayName)\": \(first.keys.sorted())")
+            // 打印第一条笔记的部分字段
+            let sampleFields = first.filter { ["note_line", "note", "note_id_str", "is_from_me", "text", "content", "mark_text", "underline_text"].contains($0.key) }
+            logger.warning("[DedaoAPI] Sample fields: \(sampleFields)")
+        }
+        
         let response = try decodeResponse(DedaoEbookNotesResponse.self, from: data)
         
         // 过滤有效的电子书笔记（有实际划线内容或用户备注）
+        // 注意：不再根据 is_from_me 过滤，因为 API 返回的值可能不准确
+        // 调试：打印前几个被过滤掉的笔记信息
+        var filteredOutCount = 0
+        var filteredOutSamples: [String] = []
+        
         let validNotes = response.list.filter { note in
-            // 必须是自己的笔记（isFromMe == 1）或未指定
-            let isOwnNote = (note.isFromMe ?? 1) == 1
-            // 必须有实际内容
+            // 只根据内容判断，不过滤 is_from_me
             let hasContent = note.isValidEbookNote
-            return isOwnNote && hasContent
+            
+            // 调试：记录被过滤掉的笔记
+            if !hasContent {
+                filteredOutCount += 1
+                if filteredOutSamples.count < 3 {
+                    let sample = "noteId=\(note.noteIdStr ?? "nil"), isFromMe=\(note.isFromMe ?? -1), noteLine='\(note.noteLine?.prefix(50) ?? "nil")', note='\(note.note?.prefix(30) ?? "nil")', highlights=\(note.highlights?.count ?? 0)"
+                    filteredOutSamples.append(sample)
+                }
+            }
+            
+            return hasContent
         }
         
         // 日志中优先显示书名，否则显示 ID
         let displayName = bookTitle ?? ebookEnid
-        logger.info("[DedaoAPI] Fetched notes for \"\(displayName)\": \(response.list.count) total, \(validNotes.count) valid")
+        logger.info("[DedaoAPI] Fetched notes for \"\(displayName)\": \(response.list.count) total, \(validNotes.count) valid, \(filteredOutCount) filtered out")
+        
+        // 如果有大量笔记被过滤，输出样本以供调试
+        if filteredOutCount > 0 && filteredOutSamples.count > 0 {
+            logger.warning("[DedaoAPI] Filtered out samples: \(filteredOutSamples.joined(separator: " | "))")
+        }
+        
         return validNotes
     }
     
