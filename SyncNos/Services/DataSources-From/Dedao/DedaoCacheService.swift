@@ -146,35 +146,26 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         bookDescriptor.fetchLimit = 1
         let book = try context.fetch(bookDescriptor).first
         
+        // ⚠️ 先删除该书的所有旧高亮（完全替换策略，避免残留错误数据）
+        let highlightPredicate = #Predicate<CachedDedaoHighlight> { highlight in
+            highlight.bookId == targetBookId
+        }
+        let highlightDescriptor = FetchDescriptor<CachedDedaoHighlight>(predicate: highlightPredicate)
+        let existingHighlights = try context.fetch(highlightDescriptor)
+        for highlight in existingHighlights {
+            context.delete(highlight)
+        }
+        
+        // 插入新数据
         for note in notes {
-            // 使用计算属性获取有效的 ID
-            let targetHighlightId = note.effectiveId
-            let predicate = #Predicate<CachedDedaoHighlight> { highlight in
-                highlight.highlightId == targetHighlightId
-            }
-            var descriptor = FetchDescriptor<CachedDedaoHighlight>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            let existing = try context.fetch(descriptor).first
-            
-            if let existing {
-                // 更新现有记录（使用计算属性处理可选字段）
-                existing.text = note.effectiveNoteLine
-                existing.note = (note.note?.isEmpty == false) ? note.note : nil
-                existing.chapterTitle = note.extra?.title
-                existing.bookSection = note.extra?.bookSection
-                let updateTs = note.effectiveUpdateTime
-                existing.updatedAt = updateTs > 0 ? Date(timeIntervalSince1970: TimeInterval(updateTs)) : nil
-            } else {
-                // 创建新记录
-                let newHighlight = CachedDedaoHighlight(from: note)
-                newHighlight.bookId = bookId
-                newHighlight.book = book
-                context.insert(newHighlight)
-            }
+            let newHighlight = CachedDedaoHighlight(from: note)
+            newHighlight.bookId = bookId
+            newHighlight.book = book
+            context.insert(newHighlight)
         }
         
         try context.save()
-        logger.info("[DedaoCache] Saved \(notes.count) highlights for bookId=\(bookId)")
+        logger.info("[DedaoCache] Replaced \(existingHighlights.count) → \(notes.count) highlights for bookId=\(bookId)")
     }
     
     @MainActor
