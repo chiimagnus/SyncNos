@@ -117,7 +117,7 @@ final class CachedDedaoHighlight {
     convenience init(from apiNote: DedaoEbookNote) {
         self.init(
             highlightId: apiNote.noteIdStr,
-            bookId: apiNote.extra.bookName,
+            bookId: apiNote.extra.bookName ?? "",
             text: apiNote.noteLine,
             note: apiNote.note.isEmpty ? nil : apiNote.note,
             chapterTitle: apiNote.extra.title,
