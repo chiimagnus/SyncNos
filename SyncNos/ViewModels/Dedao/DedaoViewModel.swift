@@ -122,6 +122,19 @@ final class DedaoViewModel: ObservableObject {
                 self.triggerRecompute()
             }
             .store(in: &cancellables)
+        
+        // 订阅登录状态变化通知（退出登录时触发 UI 更新）
+        NotificationCenter.default.publisher(for: Notification.Name("DedaoLoginStatusChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                // 清空书籍列表，触发 UI 更新显示未登录状态
+                self.books = []
+                self.displayBooks = []
+                self.visibleBooks = []
+                self.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Public API
