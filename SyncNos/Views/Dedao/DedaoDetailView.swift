@@ -200,14 +200,14 @@ struct DedaoDetailView: View {
         .onAppear {
             if let book = selectedBook {
                 Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
+                    await detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
                 }
             }
         }
         .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
                 Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
+                    await detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
                 }
             }
         }

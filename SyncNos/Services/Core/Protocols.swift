@@ -427,9 +427,11 @@ protocol DedaoAPIServiceProtocol: AnyObject {
     func fetchAllEbooks() async throws -> [DedaoEbook]
     
     /// 获取指定电子书的笔记列表
-    /// - Parameter ebookEnid: 电子书的 enid
+    /// - Parameters:
+    ///   - ebookEnid: 电子书的 enid
+    ///   - bookTitle: 书名（可选，用于日志记录）
     /// - Returns: 笔记列表
-    func fetchEbookNotes(ebookEnid: String) async throws -> [DedaoEbookNote]
+    func fetchEbookNotes(ebookEnid: String, bookTitle: String?) async throws -> [DedaoEbookNote]
     
     /// 获取用户信息
     /// - Returns: 用户信息

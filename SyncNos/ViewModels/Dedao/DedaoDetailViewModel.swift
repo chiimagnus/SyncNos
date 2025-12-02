@@ -80,16 +80,25 @@ final class DedaoDetailViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// 当前书名（用于日志）
+    private(set) var currentBookTitle: String?
+    
     /// 加载指定书籍的高亮笔记
-    func loadHighlights(for bookId: String) async {
+    /// - Parameters:
+    ///   - bookId: 书籍 ID
+    ///   - bookTitle: 书名（用于日志记录）
+    func loadHighlights(for bookId: String, bookTitle: String? = nil) async {
         guard currentBookId != bookId else { return }
         
         currentBookId = bookId
+        currentBookTitle = bookTitle
         isLoading = true
         highlights = []
         visibleHighlights = []
         allFilteredHighlights = []
         currentPage = 0
+        
+        let displayName = bookTitle ?? bookId
         
         do {
             // 1. 先尝试从本地缓存加载
@@ -98,11 +107,11 @@ final class DedaoDetailViewModel: ObservableObject {
                 let notes = cached.map { cachedToNote($0) }
                 applyFiltersAndSort(notes)
                 isLoading = false
-                logger.debug("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
+                logger.debug("[DedaoDetail] Loaded \(cached.count) highlights from cache for \"\(displayName)\"")
             }
             
             // 2. 从 API 获取最新数据
-            let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId)
+            let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: bookTitle)
             
             // 3. 保存到缓存
             try await cacheService.saveHighlights(apiNotes, bookId: bookId)
@@ -110,9 +119,9 @@ final class DedaoDetailViewModel: ObservableObject {
             // 4. 更新显示
             applyFiltersAndSort(apiNotes)
             
-            logger.info("[DedaoDetail] Loaded \(apiNotes.count) highlights from API for bookId=\(bookId)")
+            logger.info("[DedaoDetail] Loaded \(apiNotes.count) highlights from API for \"\(displayName)\"")
         } catch {
-            logger.error("[DedaoDetail] Failed to load highlights for bookId=\(bookId): \(error.localizedDescription)")
+            logger.error("[DedaoDetail] Failed to load highlights for \"\(displayName)\": \(error.localizedDescription)")
         }
         
         isLoading = false
