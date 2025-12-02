@@ -11,7 +11,23 @@ struct WeReadListView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading || viewModel.isComputingList {
+            if !viewModel.isLoggedIn {
+                // 未登录状态
+                VStack(spacing: 16) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("weread.notLoggedIn")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    Button {
+                        viewModel.navigateToWeReadLogin()
+                    } label: {
+                        Label("weread.login", systemImage: "qrcode")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else if viewModel.isLoading || viewModel.isComputingList {
                 ProgressView("Loading...")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
@@ -86,7 +102,7 @@ struct WeReadListView: View {
         }
         .onAppear {
             viewModel.triggerRecompute()
-            if viewModel.books.isEmpty {
+            if viewModel.books.isEmpty && viewModel.isLoggedIn {
                 Task {
                     await viewModel.loadBooks()
                 }
@@ -108,6 +124,14 @@ struct WeReadListView: View {
             openWindow(id: "setting")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NotificationCenter.default.post(name: Notification.Name("NavigateToWeReadLogin"), object: nil)
+            }
+        }
+        .sheet(isPresented: $viewModel.showLoginSheet) {
+            WeReadLoginView {
+                // 登录成功后刷新书籍列表
+                Task {
+                    await viewModel.loadBooks()
+                }
             }
         }
     }
