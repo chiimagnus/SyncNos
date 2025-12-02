@@ -164,11 +164,11 @@ struct DedaoDetailView: View {
                     availableSortFields: [.created, .modified],
                     onSortFieldChanged: { field in
                         detailViewModel.sortField = field
-                        Task { await detailViewModel.reloadCurrent() }
+                        detailViewModel.reloadCurrent()
                     },
                     onAscendingChanged: { asc in
                         detailViewModel.isAscending = asc
-                        Task { await detailViewModel.reloadCurrent() }
+                        detailViewModel.reloadCurrent()
                     }
                 )
             }
@@ -199,16 +199,12 @@ struct DedaoDetailView: View {
         }
         .onAppear {
             if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
-                }
+                detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
             }
         }
         .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
-                }
+                detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
             }
         }
     }
