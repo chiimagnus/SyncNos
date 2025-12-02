@@ -309,6 +309,15 @@ final class DedaoViewModel: ObservableObject {
         showLoginSheet = true
     }
     
+    /// 登录成功后调用，触发 UI 更新并加载书籍
+    func onLoginSuccess() {
+        // 触发 SwiftUI 重新检查 isLoggedIn
+        objectWillChange.send()
+        Task {
+            await loadBooks()
+        }
+    }
+    
     func loadMoreIfNeeded(currentItem: DedaoBookListItem) {
         guard let index = visibleBooks.firstIndex(where: { $0.bookId == currentItem.bookId }) else { return }
         let threshold = max(visibleBooks.count - 10, 0)

@@ -137,7 +137,10 @@ struct DedaoListView: View {
             DedaoLoginView(viewModel: DedaoLoginViewModel(
                 authService: DIContainer.shared.dedaoAuthService,
                 apiService: DIContainer.shared.dedaoAPIService
-            ))
+            )) {
+                // 登录成功后触发 UI 更新并刷新书籍列表
+                viewModel.onLoginSuccess()
+            }
         }
     }
 }

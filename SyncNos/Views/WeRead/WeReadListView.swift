@@ -128,10 +128,8 @@ struct WeReadListView: View {
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {
             WeReadLoginView {
-                // 登录成功后刷新书籍列表
-                Task {
-                    await viewModel.loadBooks()
-                }
+                // 登录成功后触发 UI 更新并刷新书籍列表
+                viewModel.onLoginSuccess()
             }
         }
     }
