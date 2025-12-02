@@ -1,16 +1,15 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## 项目概述
 
-**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks 和 WeRead 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead 和 Dedao（得到）中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
 - ✅ **智能分页**：大量数据的分页处理，确保性能优化，支持增量加载
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
+- ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
@@ -61,6 +60,9 @@ SyncNos/
 │   ├── WeRead/
 │   │   ├── WeReadListView.swift
 │   │   └── WeReadDetailView.swift
+│   ├── Dedao/
+│   │   ├── DedaoListView.swift
+│   │   └── DedaoDetailView.swift
 │   └── Settting/
 │       ├── General/
 │       │   ├── AboutView.swift
@@ -76,6 +78,9 @@ SyncNos/
 │       ├── Sync/
 │       │   ├── AppleBooksSettingsView.swift
 │       │   ├── GoodLinksSettingsView.swift
+│       │   ├── WeReadSettingsView.swift
+│       │   ├── DedaoSettingsView.swift
+│       │   ├── DedaoLoginView.swift
 │       │   └── NotionIntegrationView.swift
 │       └── Commands/
 │           ├── AppCommands.swift
@@ -97,6 +102,11 @@ SyncNos/
 │   │   ├── WeReadDetailViewModel.swift       # 使用 NotionSyncEngine + Adapter
 │   │   ├── WeReadLoginViewModel.swift
 │   │   └── WeReadSettingsViewModel.swift
+│   ├── Dedao/
+│   │   ├── DedaoViewModel.swift              # 使用 NotionSyncEngine + Adapter
+│   │   ├── DedaoDetailViewModel.swift        # 使用 NotionSyncEngine + Adapter
+│   │   ├── DedaoLoginViewModel.swift
+│   │   └── DedaoSettingsViewModel.swift
 │   ├── Account/
 │   │   ├── AccountViewModel.swift
 │   │   ├── AppleSignInViewModel.swift
@@ -118,7 +128,9 @@ SyncNos/
 │   ├── SyncQueueModels.swift     # 同步队列模型
 │   ├── GoodLinksModels.swift     # GoodLinks 数据模型
 │   ├── WeReadModels.swift        # 微信读书 API DTO 模型
-│   └── WeReadCacheModels.swift   # 微信读书 SwiftData 缓存模型
+│   ├── WeReadCacheModels.swift   # 微信读书 SwiftData 缓存模型
+│   ├── DedaoModels.swift         # 得到 API DTO 模型
+│   └── DedaoCacheModels.swift    # 得到 SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -145,13 +157,18 @@ SyncNos/
     │   │   ├── GoodLinksQueryService.swift
     │   │   ├── GoodLinksService.swift
     │   │   └── GoodLinksTagParser.swift
-    │   └── WeRead/               # 微信读书集成
-    │       ├── WeReadAPIService.swift          # API 客户端
-    │       ├── WeReadAuthService.swift         # Cookie 认证服务
-    │       ├── WeReadCookieRefreshService.swift # Cookie 自动刷新
-    │       ├── CookieRefreshCoordinator.swift  # 刷新协调器（Actor）
-    │       ├── WeReadCacheService.swift        # SwiftData 本地缓存
-    │       └── WeReadIncrementalSyncService.swift # 增量同步服务
+    │   ├── WeRead/               # 微信读书集成
+    │   │   ├── WeReadAPIService.swift          # API 客户端
+    │   │   ├── WeReadAuthService.swift         # Cookie 认证服务
+    │   │   ├── WeReadCookieRefreshService.swift # Cookie 自动刷新
+    │   │   ├── CookieRefreshCoordinator.swift  # 刷新协调器（Actor）
+    │   │   ├── WeReadCacheService.swift        # SwiftData 本地缓存
+    │   │   └── WeReadIncrementalSyncService.swift # 增量同步服务
+    │   └── Dedao/                # 得到电子书集成
+    │       ├── DedaoAPIService.swift           # API 客户端（令牌桶限流）
+    │       ├── DedaoAuthService.swift          # Cookie 认证服务
+    │       ├── DedaoRequestLimiter.swift       # 请求限流器
+    │       └── DedaoCacheService.swift         # SwiftData 本地缓存
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Notion/               # Notion 集成（重构后）
     │   │   ├── Configuration/    # 配置管理
@@ -177,15 +194,17 @@ SyncNos/
     │   │       └── Adapters/                        # 数据源适配器
     │   │           ├── AppleBooksNotionAdapter.swift
     │   │           ├── GoodLinksNotionAdapter.swift
-    │   │           └── WeReadNotionAdapter.swift
+    │   │           ├── WeReadNotionAdapter.swift
+    │   │           └── DedaoNotionAdapter.swift
     │   ├── Lark/                 # 飞书（目录预留）
     │   └── Obsidian/             # Obsidian（目录预留）
-    └── Sync/                     # 通用同步调度（与同步目标无关）
+    └── SyncScheduling/           # 通用同步调度（与同步目标无关）
         ├── AutoSyncService.swift           # 自动同步调度器
         ├── AutoSyncSourceProvider.swift    # 自动同步协议
         ├── AppleBooksAutoSyncProvider.swift # Apple Books 自动同步
         ├── GoodLinksAutoSyncProvider.swift  # GoodLinks 自动同步
         ├── WeReadAutoSyncProvider.swift     # WeRead 自动同步
+        ├── DedaoAutoSyncProvider.swift      # Dedao 自动同步
         ├── SyncActivityMonitor.swift       # 同步活动监控
         └── SyncQueueStore.swift            # 同步队列存储
 ```
@@ -245,6 +264,16 @@ DIContainer.shared.databaseService
 DIContainer.shared.goodLinksSyncService
 DIContainer.shared.autoSyncService
 DIContainer.shared.syncTimestampStore
+
+// WeRead 服务
+DIContainer.shared.weReadAuthService
+DIContainer.shared.weReadAPIService
+DIContainer.shared.weReadCacheService
+
+// Dedao 服务
+DIContainer.shared.dedaoAuthService
+DIContainer.shared.dedaoAPIService
+DIContainer.shared.dedaoCacheService
 ```
 
 ### 关键服务层
@@ -267,6 +296,7 @@ DIContainer.shared.syncTimestampStore
   - `AppleBooksNotionAdapter`: Apple Books → Notion
   - `GoodLinksNotionAdapter`: GoodLinks → Notion
   - `WeReadNotionAdapter`: WeRead → Notion
+  - `DedaoNotionAdapter`: Dedao → Notion
 
 **3. Notion API 集成** (Services/DataSources-To/Notion/Core/)
 - `NotionService`: 主要协调器，封装所有 Notion API 操作
@@ -301,22 +331,34 @@ DIContainer.shared.syncTimestampStore
   - 基于 syncKey 的增量同步机制
   - 减少 API 调用次数
 
-**7. 通用同步调度** (Services/Sync/)
+**7. Dedao 集成** (Services/DataSources-From/Dedao/)
+- `DedaoAPIService`: 得到 API 客户端
+  - 令牌桶限流器防止触发反爬
+  - 自动重试机制
+  - 支持二维码扫码登录
+- `DedaoAuthService`: Cookie 认证服务
+- `DedaoRequestLimiter`: 请求限流器（令牌桶算法）
+- `DedaoCacheService`: SwiftData 本地缓存服务
+  - 缓存书籍列表和高亮数据
+  - 支持离线访问
+
+**8. 通用同步调度** (Services/SyncScheduling/)
 - `AutoSyncService`: 后台同步调度器（定时触发各数据源同步）
 - `AutoSyncSourceProvider`: 自动同步协议
 - `AppleBooksAutoSyncProvider`: Apple Books 自动同步实现
 - `GoodLinksAutoSyncProvider`: GoodLinks 自动同步实现
 - `WeReadAutoSyncProvider`: WeRead 自动同步实现
+- `DedaoAutoSyncProvider`: Dedao 自动同步实现
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
-**8. 核心服务** (Services/Core/)
+**9. 核心服务** (Services/Core/)
 - `DIContainer`: 中心服务容器和依赖注入
 - `LoggerService`: 统一日志记录
 - `ConcurrencyLimiter`: 全局并发控制
 - `Protocols`: 所有服务协议定义
 
-**9. 认证与购买** (Services/Auth/)
+**10. 认证与购买** (Services/Auth/)
 - `AuthService`: Apple Sign In 集成
 - `IAPService`: 应用内购买服务
 - `KeychainHelper`: 安全凭证存储
@@ -340,6 +382,18 @@ DIContainer.shared.syncTimestampStore
 - `CachedWeReadBook`: SwiftData 缓存的书籍
 - `CachedWeReadHighlight`: SwiftData 缓存的高亮
 - `WeReadSyncState`: 同步状态（syncKey、lastSyncAt）
+
+**Dedao 模型**（Models/DedaoModels.swift）：
+- `DedaoEbook`: 电子书 API DTO（支持 enid 和 id 双重标识）
+- `DedaoEbookNote`: 电子书笔记（兼容标准格式和混合格式两种 API 响应）
+- `DedaoBookListItem`: UI 列表展示模型
+- `DedaoUserInfo`: 用户信息模型
+- `DedaoQRCodeResponse`: 二维码登录响应
+
+**Dedao 缓存模型**（Models/DedaoCacheModels.swift）：
+- `CachedDedaoBook`: SwiftData 缓存的书籍
+- `CachedDedaoHighlight`: SwiftData 缓存的高亮
+- `DedaoSyncState`: 全局同步状态
 
 ## 开发模式
 
@@ -497,6 +551,22 @@ swift package update
 - **自动同步**：`WeReadAutoSyncProvider` 支持后台定时同步
 - **登录导航修复**：Cookie 过期时自动导航到 WeRead 设置并打开登录 Sheet
 
+### Dedao（得到）集成
+- **WebView 登录**：通过 WKWebView 实现 dedao.cn 登录，自动捕获 Cookie
+- **令牌桶限流**：`DedaoRequestLimiter` 防止触发反爬机制
+  - 每秒 2 个令牌，最大桶容量 10 个
+  - 自动指数退避重试
+- **API 客户端**：`DedaoAPIService` 封装所有 API 调用
+  - 电子书列表获取（支持分页）
+  - 笔记/高亮获取（自动过滤无效笔记）
+  - 用户信息获取
+- **本地缓存**：使用 SwiftData 缓存书籍和高亮数据
+  - `DedaoCacheService`：本地持久化服务
+  - `CachedDedaoBook`/`CachedDedaoHighlight`：SwiftData 模型
+- **适配器模式**：`DedaoNotionAdapter` 实现 `NotionSyncSourceProtocol`
+- **自动同步**：`DedaoAutoSyncProvider` 支持后台定时同步
+- **兼容双格式 API**：支持标准格式和混合格式两种 API 响应
+
 ### IAP 系统
 - **30天试用期**：试用期管理和到期检查
 - **统一付费墙**：整合为 `PayWallView`
@@ -517,11 +587,16 @@ swift package update
           ├── PayWallView         (需要显示付费墙时)
           └── MainListView        (正常使用时)
               ├── AppleBooksListView.onAppear → restoreBookmarkAndConfigureRoot()
-              └── GoodLinksListView.onAppear → loadRecentLinks()
+              ├── GoodLinksListView.onAppear → loadRecentLinks()
+              ├── WeReadListView.onAppear → loadBooks()
+              └── DedaoListView.onAppear → loadBooks()
   ```
 
 ### UI/UX 改进
 - **日志颜色编码**：为不同日志级别添加颜色区分
+- **日志搜索功能**：LogWindow 新增搜索框，支持在消息、文件名、函数名中搜索
+- **日志文本选择**：日志条目支持文本选择和复制
 - **动态语言切换**：无需重启应用，实时更新界面语言
 - **时间戳显示优化**：统一跨视图的最后同步时间显示
 - **PayWallView UI**：采用 Onboarding 风格的底部布局，添加礼物图标摇摆动画和紧急提醒脉冲动画
+- **Notion 配置弹窗统一**：将分散在各视图的 Notion 配置提示弹窗统一到 `MainListView` 处理
