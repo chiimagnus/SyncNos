@@ -21,7 +21,7 @@ struct DedaoResponseHeader: Codable {
 /// 得到电子书模型（来自书架列表 API）
 struct DedaoEbook: Codable, Identifiable {
     let id: Int
-    let enid: String           // 加密 ID（用作唯一标识）
+    let enid: String?          // 加密 ID（可能不存在，使用 id 作为备用）
     let title: String
     let author: String?
     let icon: String?          // 封面图
@@ -34,25 +34,53 @@ struct DedaoEbook: Codable, Identifiable {
     let duration: Int?         // 时长
     let courseNum: Int?        // 课程数量
     let publishNum: Int?       // 已发布数量
+    let isFinished: Int?       // 是否已完成
+    let status: Int?           // 状态
+    let isNew: Int?            // 是否新内容
+    let groupId: Int?          // 分组 ID
+    let ddUrl: String?         // 得到 App URL
+    let extInfo: String?       // 扩展信息
+    let isCollected: Bool?     // 是否收藏
+    let isSelfBuildGroup: Bool? // 是否自建分组
+    let productIntro: String?  // 产品介绍
+    let lastReadInfo: String?  // 最后阅读信息
+    
+    /// 获取有效的唯一标识符（优先使用 enid，否则使用 id）
+    var effectiveId: String {
+        enid ?? String(id)
+    }
     
     private enum CodingKeys: String, CodingKey {
-        case id, enid, title, author, icon, intro, progress, price, type, duration
+        case id, enid, title, author, icon, intro, progress, price, type, duration, status
         case isVipBook = "is_vip_book"
         case classType = "class_type"
         case courseNum = "course_num"
         case publishNum = "publish_num"
+        case isFinished = "is_finished"
+        case isNew = "is_new"
+        case groupId = "group_id"
+        case ddUrl = "dd_url"
+        case extInfo = "ext_info"
+        case isCollected = "is_collected"
+        case isSelfBuildGroup = "is_self_build_group"
+        case productIntro = "product_intro"
+        case lastReadInfo = "last_read_info"
     }
 }
 
 /// 书籍列表响应
 struct DedaoEbookListResponse: Codable {
     let list: [DedaoEbook]
-    let total: Int
-    let isMore: Int
+    let total: Int?
+    let isMore: Int?
+    let sphereGuide: Bool?
+    let bottomTips: String?
     
     private enum CodingKeys: String, CodingKey {
         case list, total
         case isMore = "is_more"
+        case sphereGuide = "sphere_guide"
+        case bottomTips = "bottom_tips"
     }
 }
 
@@ -190,7 +218,7 @@ struct DedaoBookListItem: Identifiable, Hashable {
     
     /// 从 API 响应模型创建
     init(from ebook: DedaoEbook, highlightCount: Int = 0) {
-        self.bookId = ebook.enid
+        self.bookId = ebook.effectiveId
         self.title = ebook.title
         self.author = ebook.author ?? ""
         self.cover = ebook.icon ?? ""
