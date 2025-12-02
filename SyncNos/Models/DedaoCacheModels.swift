@@ -49,7 +49,7 @@ final class CachedDedaoBook {
     /// 从 API DTO 创建本地存储模型
     convenience init(from ebook: DedaoEbook) {
         self.init(
-            bookId: ebook.enid,
+            bookId: ebook.effectiveId,
             title: ebook.title,
             author: ebook.author ?? "",
             cover: ebook.icon
