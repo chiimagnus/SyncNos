@@ -7,6 +7,7 @@ struct ViewCommands: Commands {
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
+    @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
     @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
     @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
     @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
@@ -40,6 +41,8 @@ struct ViewCommands: Commands {
             return goodLinksSourceEnabled
         case .weRead:
             return weReadSourceEnabled
+        case .dedao:
+            return dedaoSourceEnabled
         }
     }
 
@@ -341,6 +344,7 @@ struct ViewCommands: Commands {
                         case .appleBooks: return .appleBooks
                         case .goodLinks: return .goodLinks
                         case .weRead: return .weRead
+                        case .dedao: return .dedao
                         }
                     }()
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）
