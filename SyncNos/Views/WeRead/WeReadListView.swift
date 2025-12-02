@@ -102,38 +102,7 @@ struct WeReadListView: View {
                 isListFocused = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-        }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
-        .alert(
-            NSLocalizedString("Session Expired", comment: ""),
-            isPresented: $viewModel.showRefreshFailedAlert
-        ) {
-            Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) {
-                // 关闭弹窗，稍后提醒
-            }
-            Button(NSLocalizedString("Go to Login", comment: "")) {
-                viewModel.navigateToWeReadLogin()
-            }
-        } message: {
-            Text(viewModel.refreshFailureReason)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
-            Task {
-                await viewModel.loadBooks()
-            }
-        }
+        // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadSettings")).receive(on: DispatchQueue.main)) { _ in
             // 打开设置窗口，SettingsView 会监听 NavigateToWeReadLogin 通知并导航到 WeReadSettingsView
             openWindow(id: "setting")

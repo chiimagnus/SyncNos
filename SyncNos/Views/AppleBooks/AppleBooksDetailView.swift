@@ -239,17 +239,7 @@ struct AppleBooksDetailView: View {
         } message: {
             Text(syncErrorMessage)
         }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
+        // Notion 配置弹窗已移至 MainListView 统一处理
         .onChange(of: viewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
                 // 仅在消息明显是错误时弹窗；“同步完成”等成功文案不提示

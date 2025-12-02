@@ -41,8 +41,6 @@ final class AppleBooksViewModel: ObservableObject {
     @Published var sortAscending: Bool = true
 
     @Published var showWithTitleOnly: Bool = false
-    @Published var showNotionConfigAlert: Bool = false
-
     private let databaseService: DatabaseServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let bookmarkStore: BookmarkStoreProtocol
@@ -428,7 +426,7 @@ extension AppleBooksViewModel {
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         guard let dbPath = self.annotationDatabasePath else {

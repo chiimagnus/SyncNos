@@ -66,8 +66,6 @@ final class GoodLinksViewModel: ObservableObject {
     private var currentHighlightLinkId: String?
     private var allFilteredHighlights: [GoodLinksHighlightRow] = []
     @Published var highlightIsAscending: Bool = false
-    @Published var showNotionConfigAlert: Bool = false
-
     /// 当前用于列表渲染的子集（支持分页/增量加载）
     @Published var visibleLinks: [GoodLinksLinkRow] = []
 
@@ -471,7 +469,7 @@ final class GoodLinksViewModel: ObservableObject {
     func syncSmart(link: GoodLinksLinkRow, pageSize: Int = NotionSyncConfig.goodLinksPageSize) {
         if isSyncing { return }
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         syncMessage = nil
@@ -552,7 +550,7 @@ extension GoodLinksViewModel {
     func batchSync(linkIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !linkIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         let dbPath = service.resolveDatabasePath()

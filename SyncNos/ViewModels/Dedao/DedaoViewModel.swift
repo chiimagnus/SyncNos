@@ -22,12 +22,10 @@ final class DedaoViewModel: ObservableObject {
     // 同步状态（列表）
     @Published var syncingBookIds: Set<String> = []
     @Published var syncedBookIds: Set<String> = []
-    @Published var showNotionConfigAlert: Bool = false
+    // 注：showNotionConfigAlert 和会话过期弹窗已移至 MainListView 统一处理
     
     // 登录状态相关
     @Published var showLoginSheet: Bool = false
-    @Published var showLoginFailedAlert: Bool = false
-    @Published var loginFailureReason: String = ""
     
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -245,11 +243,19 @@ final class DedaoViewModel: ObservableObject {
         } catch let error as DedaoAPIError {
             switch error {
             case .sessionExpired, .notLoggedIn:
-                loginFailureReason = error.localizedDescription
-                showLoginFailedAlert = true
+                // 发送会话过期通知到 MainListView
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowSessionExpiredAlert"),
+                    object: nil,
+                    userInfo: ["source": ContentSource.dedao.rawValue, "reason": error.localizedDescription]
+                )
             case .needVerification:
-                loginFailureReason = String(localized: "dedao.error.needVerification")
-                showLoginFailedAlert = true
+                // 发送需要验证的通知到 MainListView
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowSessionExpiredAlert"),
+                    object: nil,
+                    userInfo: ["source": ContentSource.dedao.rawValue, "reason": String(localized: "dedao.error.needVerification")]
+                )
             default:
                 if books.isEmpty {
                     errorMessage = error.localizedDescription
@@ -310,7 +316,7 @@ final class DedaoViewModel: ObservableObject {
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         

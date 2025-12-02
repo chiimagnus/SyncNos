@@ -63,8 +63,6 @@ final class DedaoDetailViewModel: ObservableObject {
     @Published var isSyncing: Bool = false
     @Published var syncProgressText: String?
     @Published var syncMessage: String?
-    @Published var showNotionConfigAlert: Bool = false
-    
     // MARK: - Pagination Properties
     
     /// 每页大小
@@ -369,7 +367,7 @@ final class DedaoDetailViewModel: ObservableObject {
     
     func syncSmart(book: DedaoBookListItem) {
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         if isSyncing { return }

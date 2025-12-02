@@ -141,34 +141,15 @@ struct AppleBooksListView: View {
         .onDisappear {
             viewModel.stopAccessingIfNeeded()
         }
-        .onReceive(
-            NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
-                .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
-                .receive(on: DispatchQueue.main)
-        ) { notification in
-            if notification.name == Notification.Name("AppleBooksContainerSelected") {
-                guard let selectedPath = notification.object as? String else { return }
-                let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
-                viewModel.setDbRootOverride(rootCandidate)
-            }
+        // 只监听 AppleBooksContainerSelected（用户选择数据库路径时）
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected")).receive(on: DispatchQueue.main)) { notification in
+            guard let selectedPath = notification.object as? String else { return }
+            let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
+            viewModel.setDbRootOverride(rootCandidate)
             Task {
                 await viewModel.loadBooks()
             }
         }
-        
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
-            viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-        }
-        .alert("Notion Configuration Required", isPresented: $viewModel.showNotionConfigAlert) {
-            Button("Go to Settings") {
-                openWindow(id: "setting")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Please configure Notion API Key and Page ID before syncing.")
-        }
+        // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗已移至 MainListView 统一处理
     }
 }
