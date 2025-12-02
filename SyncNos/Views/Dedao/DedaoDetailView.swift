@@ -64,29 +64,19 @@ struct DedaoDetailView: View {
                             ProgressView("Loading...")
                                 .padding(.top)
                         } else if detailViewModel.visibleHighlights.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "text.quote")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.secondary)
-                                Text("No highlights found for this book.")
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
+                            Text("No highlights found for this book.")
+                                .foregroundColor(.secondary)
+                                .padding(.top)
                         } else {
                             WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
-                                ForEach(detailViewModel.visibleHighlights, id: \.effectiveId) { h in
+                                ForEach(detailViewModel.visibleHighlights) { h in
                                     HighlightCardView(
                                         colorMark: dedaoColor,  // 使用得到品牌色
-                                        content: h.effectiveNoteLine,
+                                        content: h.text,
                                         note: h.note,
                                         reviewContents: [],  // 得到没有想法功能
-                                        createdDate: h.effectiveCreateTime > 0 
-                                            ? Self.dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(h.effectiveCreateTime))) 
-                                            : nil,
-                                        modifiedDate: h.effectiveUpdateTime > 0 && h.effectiveUpdateTime != h.effectiveCreateTime
-                                            ? Self.dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(h.effectiveUpdateTime)))
-                                            : nil
+                                        createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
+                                        modifiedDate: h.updatedAt.map { Self.dateFormatter.string(from: $0) }
                                     )
                                     .onAppear {
                                         // 当卡片出现时，检查是否需要加载更多
@@ -147,6 +137,20 @@ struct DedaoDetailView: View {
                                 .padding()
                             }
                         }
+                        
+                        // 后台同步指示器
+                        if detailViewModel.isBackgroundSyncing {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                Text("Syncing in background...")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
                     .padding()
                 }
@@ -161,14 +165,14 @@ struct DedaoDetailView: View {
                     colorTheme: .dedao,
                     sortField: detailViewModel.sortField,
                     isAscending: detailViewModel.isAscending,
-                    availableSortFields: [.created, .modified],
+                    availableSortFields: [.created, .modified],  // Dedao 支持创建和修改时间排序
                     onSortFieldChanged: { field in
                         detailViewModel.sortField = field
-                        detailViewModel.reloadCurrent()
+                        Task { await detailViewModel.reloadCurrent() }
                     },
                     onAscendingChanged: { asc in
                         detailViewModel.isAscending = asc
-                        detailViewModel.reloadCurrent()
+                        Task { await detailViewModel.reloadCurrent() }
                     }
                 )
             }
@@ -199,14 +203,17 @@ struct DedaoDetailView: View {
         }
         .onAppear {
             if let book = selectedBook {
-                detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
+                Task {
+                    await detailViewModel.loadHighlights(for: book.bookId)
+                }
             }
         }
         .onChange(of: selectedBookId) { _, _ in
             if let book = selectedBook {
-                detailViewModel.loadHighlights(for: book.bookId, bookTitle: book.title)
+                Task {
+                    await detailViewModel.loadHighlights(for: book.bookId)
+                }
             }
         }
     }
 }
-
