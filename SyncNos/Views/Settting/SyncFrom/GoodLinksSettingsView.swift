@@ -6,7 +6,7 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "bookmark")) {
+            Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
                 LabeledContent("Database ID (optional)") {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)
@@ -26,7 +26,7 @@ struct GoodLinksSettingsView: View {
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
-                    .help("Enable automatic sync for GoodLinks (checked means AutoSyncService will run)")
+                    .help("Enable automatic sync for GoodLinks")
                     .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
@@ -49,7 +49,7 @@ struct GoodLinksSettingsView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("Choose GoodLinks group container and load data")
+                .help("Choose data folder and load notes")
             }
 
             if let message = viewModel.message {
