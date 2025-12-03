@@ -8,12 +8,14 @@ enum ContentSource: String, Codable, CaseIterable {
     case appleBooks = "appleBooks"
     case goodLinks = "goodLinks"
     case weRead = "weRead"
+    case dedao = "dedao"
 
     var title: String {
         switch self {
         case .appleBooks: return "Apple Books"
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
+        case .dedao: return String(localized: "source.dedao")
         }
     }
     
@@ -23,6 +25,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .appleBooks: return "books.vertical.fill"
         case .goodLinks: return "link"
         case .weRead: return "text.book.closed.fill"
+        case .dedao: return "book.closed.fill"
         }
     }
     
@@ -37,6 +40,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .appleBooks: return .orange
         case .goodLinks: return .red
         case .weRead: return .blue
+        case .dedao: return .orange
         }
     }
     

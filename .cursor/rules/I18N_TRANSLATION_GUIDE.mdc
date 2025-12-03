@@ -403,7 +403,50 @@ sed -i '' '/"字符串" : {/,/^    },$/c\
 3. 检查特殊字符是否正确转义
 4. 使用 `python3 -m json.tool file.json` 查看详细错误信息
 
-### Q3: 如何回滚错误的修改？
+### Q3: 空条目插入翻译后出现多余逗号？
+
+当原始字符串条目只有 `comment` 字段而没有 `localizations` 块时：
+
+**原始结构（空条目）：**
+```json
+"dedao.error.rateLimited" : {
+
+},
+```
+
+使用 sed 插入 `localizations` 块后可能导致结构错误：
+```json
+"dedao.error.rateLimited" : {
+      "localizations" : {
+        ...
+      },
+
+    },  // ← 多余的闭合括号和逗号
+```
+
+**解决方案：**
+
+1. 插入翻译后，检查 JSON 有效性：
+```bash
+python3 -m json.tool file.json 2>&1 | head -5
+```
+
+2. 如果报错 "Illegal trailing comma"，查看报错行号附近的内容：
+```bash
+sed -n '报错行号-5,报错行号+5p' file.json
+```
+
+3. 手动修复多余的逗号或空行：
+```bash
+# 删除多余的空行和逗号
+sed -i '' '问题行号d' file.json
+# 或修复逗号
+sed -i '' '问题行号s/      },/      }/' file.json
+```
+
+**预防措施：** 在步骤 2 中查看字符串上下文时，特别注意空条目（只有 `{}` 或只有 `comment` 字段），插入后需要额外验证。
+
+### Q4: 如何回滚错误的修改？
 
 使用 Git 回滚：
 ```bash
@@ -424,4 +467,4 @@ git checkout -- Resource/Localizable.xcstrings
 
 ---
 
-*最后更新: 2025年11月27日*
+*最后更新: 2025年12月3日*

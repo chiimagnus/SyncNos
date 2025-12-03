@@ -30,6 +30,29 @@ struct LogWindow: View {
         .frame(minWidth: 600, minHeight: 300)
         .navigationTitle("Logs")
         .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                // 搜索框
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Search logs...", text: $viewModel.searchText)
+                        .textFieldStyle(.plain)
+                        .frame(width: 150)
+                    if !viewModel.searchText.isEmpty {
+                        Button {
+                            viewModel.searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .cornerRadius(6)
+            }
+            
             ToolbarItemGroup(placement: .primaryAction) {
                 Picker("Level", selection: $viewModel.levelFilter) {
                     ForEach(LogLevel.allCases, id: \ .self) { level in
@@ -55,6 +78,7 @@ struct LogWindow: View {
         Text(formatted(entry: entry))
             .font(.system(.caption, design: .monospaced))
             .foregroundColor(Color(entry.level.color))
+            .textSelection(.enabled)
     }
 
     private func formatted(entry: LogEntry) -> String {

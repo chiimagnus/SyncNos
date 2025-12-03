@@ -24,8 +24,6 @@ final class AppleBooksDetailViewModel: ObservableObject {
     @Published var noteFilter: NoteFilter = false
 
     @Published var selectedStyles: Set<Int> = []
-    @Published var showNotionConfigAlert: Bool = false
-
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
@@ -338,7 +336,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
     // 统一入口：智能同步（创建/补齐/更新）
     func syncSmart(book: BookListItem, dbPath: String?) {
         guard checkNotionConfig() else {
-            showNotionConfigAlert = true
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         syncMessage = nil

@@ -5,7 +5,7 @@
 
 [<img src="Resource/image.png" alt="Download on the Mac App Store" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
-> **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books, GoodLinks, and WeRead to Notion, supporting multiple sync strategies and powerful customization features.
+> **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books, GoodLinks, WeRead, and Dedao to Notion, supporting multiple sync strategies and powerful customization features.
 
 ## ✨ Main Features
 
@@ -13,6 +13,7 @@
 - Apple Books
 - GoodLinks
 - WeRead
+- Dedao
 - Notion
 
 ### Apple Books Sync
@@ -26,6 +27,19 @@
 - **Highlight Notes**: Support for all GoodLinks highlighting features
 - **Tag Parsing**: Complete tag system support
 - **Batch Processing**: Efficient handling of large amounts of article data
+
+### WeRead Sync
+- **Book List Sync**: Complete bookshelf data synchronization
+- **Highlights & Thoughts**: Full sync of annotations and highlights
+- **Cookie Auto-Refresh**: Transparent authentication management
+- **Local Caching**: SwiftData persistence for offline access
+
+### Dedao Sync
+- **WebView Login**: Secure login through dedao.cn WebView
+- **Ebook Library**: Complete bookshelf data synchronization
+- **Notes & Highlights**: Full sync of annotations and highlights
+- **Token Bucket Rate Limiting**: Intelligent rate limiting to prevent anti-crawler blocks
+- **Local Caching**: SwiftData persistence for offline access
 
 ### Smart Sync Strategies
 - **Single Database Mode**: All content managed in one Notion database

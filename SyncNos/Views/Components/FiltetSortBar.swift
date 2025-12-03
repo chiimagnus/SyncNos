@@ -4,12 +4,14 @@ enum HighlightColorTheme: String, CaseIterable {
     case appleBooks = "appleBooks"
     case goodLinks = "goodLinks"
     case weRead = "weRead"
+    case dedao = "dedao"
 
     var displayName: String {
         switch self {
         case .appleBooks: return "Apple Books"
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
+        case .dedao: return "Dedao"
         }
     }
 
@@ -18,6 +20,7 @@ enum HighlightColorTheme: String, CaseIterable {
         case .appleBooks: return .appleBooks
         case .goodLinks: return .goodLinks
         case .weRead: return .weRead
+        case .dedao: return .dedao
         }
     }
 
