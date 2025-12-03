@@ -133,7 +133,7 @@ struct DedaoDetailView: View {
             ProgressView("Loading...")
                 .padding(.top)
         } else if detailViewModel.visibleHighlights.isEmpty {
-            Text("No highlights found for this book.")
+            Text("No highlights found")
                 .foregroundColor(.secondary)
                 .padding(.top)
         } else {
