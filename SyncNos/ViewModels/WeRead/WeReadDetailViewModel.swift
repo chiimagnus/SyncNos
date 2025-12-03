@@ -435,7 +435,7 @@ final class WeReadDetailViewModel: ObservableObject {
                     }
                     await MainActor.run {
                         self.isSyncing = false
-                        self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                        self.syncMessage = String(localized: "Sync completed")
                         self.syncProgressText = nil
                         NotificationCenter.default.post(
                             name: Notification.Name("SyncBookStatusChanged"),
