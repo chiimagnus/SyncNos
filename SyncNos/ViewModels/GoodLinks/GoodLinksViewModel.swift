@@ -490,7 +490,7 @@ final class GoodLinksViewModel: ObservableObject {
                         Task { @MainActor in self?.syncProgressText = progressText }
                     }
                     await MainActor.run {
-                        self.syncMessage = NSLocalizedString("同步完成", comment: "")
+                        self.syncMessage = String(localized: "Sync completed")
                         self.syncProgressText = nil
                         // 发布完成通知
                         NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])

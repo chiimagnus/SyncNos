@@ -352,7 +352,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
                         Task { @MainActor in self.syncProgressText = progress }
                     }
                     await MainActor.run {
-                        self.syncMessage = "同步完成"
+                        self.syncMessage = String(localized: "Sync completed")
                         self.syncProgressText = nil
                         self.isSyncing = false
                         NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                

@@ -75,7 +75,7 @@ struct DedaoDetailView: View {
         }
         .onChange(of: detailViewModel.syncMessage) { _, newMessage in
             if let msg = newMessage, !msg.isEmpty {
-                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
                 let isSuccess = successKeywords.contains { msg.localizedCaseInsensitiveContains($0) }
                 if !isSuccess {
                     syncErrorMessage = msg

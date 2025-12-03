@@ -282,7 +282,7 @@ struct WeReadDetailView: View {
         // 监听同步消息变化（仅显示错误）
         .onChange(of: detailViewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
-                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
                 let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
                 if !isSuccess {
                     syncErrorMessage = message

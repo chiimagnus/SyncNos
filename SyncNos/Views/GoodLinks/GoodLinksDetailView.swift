@@ -403,7 +403,7 @@ struct GoodLinksDetailView: View {
         // Notion 配置弹窗已移至 MainListView 统一处理
         .onChange(of: viewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
-                let successKeywords = ["同步完成", "增量同步完成", "全量同步完成"]
+                let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
                 let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
                 if !isSuccess {
                     syncErrorMessage = message
