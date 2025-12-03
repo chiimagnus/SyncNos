@@ -34,7 +34,7 @@ struct AppleBooksSettingsView: View {
                 Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
-                    .help("Enable automatic sync for Apple Books (checked means AutoSyncService will run)")
+                    .help("Enable automatic sync for Apple Books")
                     .onChange(of: viewModel.autoSync) { _, _ in
                         viewModel.save()
                     }
@@ -50,7 +50,7 @@ struct AppleBooksSettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label("Open Apple Books notes", systemImage: "folder")
+                        Label("Select Folder", systemImage: "folder")
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)
@@ -58,7 +58,7 @@ struct AppleBooksSettingsView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("Choose Apple Books container directory and load notes")
+                .help("Choose data folder and load notes")
             }
 
             if let message = viewModel.message {
