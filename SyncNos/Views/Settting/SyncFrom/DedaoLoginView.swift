@@ -58,7 +58,7 @@ struct DedaoLoginView: View {
             }
             guard !relevant.isEmpty else {
                 Task { @MainActor in
-                    viewModel.statusMessage = "No Dedao cookies found. Please login in the web view first."
+                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.")
                 }
                 return
             }

@@ -447,21 +447,21 @@ enum DedaoAPIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            return String(localized: "dedao.error.notLoggedIn")
+            return String(localized: "Not logged in to Dedao.")
         case .sessionExpired:
-            return String(localized: "dedao.error.sessionExpired")
+            return String(localized: "Session expired. Please log in again.")
         case .invalidResponse:
-            return String(localized: "dedao.error.invalidResponse")
+            return String(localized: "Invalid response from Dedao API.")
         case .serverError(let code, let message):
-            return String(localized: "dedao.error.serverError \(code): \(message)")
+            return String(localized: "Server error \(code): \(message)")
         case .networkError(let error):
-            return String(localized: "dedao.error.networkError \(error.localizedDescription)")
+            return String(localized: "Network error: \(error.localizedDescription)")
         case .rateLimited:
-            return String(localized: "dedao.error.rateLimited")
+            return String(localized: "Rate limited. Please try again later.")
         case .needVerification:
-            return String(localized: "dedao.error.needVerification")
+            return String(localized: "Verification required. Please open the Dedao app to complete verification.")
         case .qrCodeExpired:
-            return String(localized: "dedao.error.qrCodeExpired")
+            return String(localized: "QR code expired. Please refresh to get a new one.")
         }
     }
 }

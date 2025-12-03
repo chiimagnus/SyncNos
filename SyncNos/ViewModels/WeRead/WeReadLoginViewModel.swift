@@ -16,9 +16,9 @@ final class WeReadLoginViewModel: ObservableObject {
     func refreshState() {
         isLoggedIn = authService.isLoggedIn
         if isLoggedIn {
-            statusMessage = NSLocalizedString("WeRead login detected.", comment: "")
+            statusMessage = String(localized: "Login detected.")
         } else {
-            statusMessage = NSLocalizedString("Please login to WeRead in the web view or paste cookie below.", comment: "")
+            statusMessage = String(localized: "Please log in via the web view.")
         }
     }
 
@@ -26,9 +26,9 @@ final class WeReadLoginViewModel: ObservableObject {
         authService.updateCookieHeader(header)
         isLoggedIn = authService.isLoggedIn
         if isLoggedIn {
-            statusMessage = NSLocalizedString("Cookie saved successfully.", comment: "")
+            statusMessage = String(localized: "Cookie saved successfully.")
         } else {
-            statusMessage = NSLocalizedString("Cookie is empty or invalid.", comment: "")
+            statusMessage = String(localized: "Cookie is empty or invalid. Please log in first.")
         }
     }
 

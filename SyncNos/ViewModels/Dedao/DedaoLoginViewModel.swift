@@ -21,9 +21,9 @@ final class DedaoLoginViewModel: ObservableObject {
     func refreshState() {
         isLoggedIn = authService.isLoggedIn
         if isLoggedIn {
-            statusMessage = NSLocalizedString("Dedao login detected.", comment: "")
+            statusMessage = String(localized: "Login detected.")
         } else {
-            statusMessage = NSLocalizedString("Please login to Dedao in the web view.", comment: "")
+            statusMessage = String(localized: "Please log in via the web view.")
         }
     }
 
@@ -31,9 +31,9 @@ final class DedaoLoginViewModel: ObservableObject {
         authService.updateCookieHeader(header)
         isLoggedIn = authService.isLoggedIn
         if isLoggedIn {
-            statusMessage = NSLocalizedString("Cookie saved successfully.", comment: "")
+            statusMessage = String(localized: "Cookie saved successfully.")
         } else {
-            statusMessage = NSLocalizedString("Cookie is empty or invalid. Please login first.", comment: "")
+            statusMessage = String(localized: "Cookie is empty or invalid. Please log in first.")
         }
     }
 
@@ -45,6 +45,6 @@ final class DedaoLoginViewModel: ObservableObject {
     func logout() async {
         await authService.clearCookies()
         isLoggedIn = false
-        statusMessage = NSLocalizedString("Logged out.", comment: "")
+        statusMessage = String(localized: "Logged Out")
     }
 }

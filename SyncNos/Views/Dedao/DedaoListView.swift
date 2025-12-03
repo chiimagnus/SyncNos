@@ -17,13 +17,13 @@ struct DedaoListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("dedao.notLoggedIn")
+                    Text("Not logged in to Dedao.")
                         .font(.headline)
                         .foregroundColor(.secondary)
                     Button {
                         viewModel.navigateToDedaoLogin()
                     } label: {
-                        Label("dedao.login", systemImage: "qrcode")
+                        Label("Log In", systemImage: "qrcode")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -50,7 +50,7 @@ struct DedaoListView: View {
                     Image(systemName: "text.book.closed")
                         .foregroundColor(.secondary)
                         .font(.largeTitle)
-                    Text("dedao.noBooks")
+                    Text("No books in your Dedao library.")
                         .foregroundColor(.secondary)
                 }
             } else {

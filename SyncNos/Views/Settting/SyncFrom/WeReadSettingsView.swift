@@ -17,7 +17,7 @@ struct WeReadSettingsView: View {
                     Button {
                         viewModel.showLoginSheet = true
                     } label: {
-                        Label("Open WeRead Login", systemImage: "safari")
+                        Label("Open Login", systemImage: "safari")
                     }
 
                     Spacer()
@@ -25,7 +25,7 @@ struct WeReadSettingsView: View {
                     Button(role: .destructive) {
                         viewModel.clearLogin()
                     } label: {
-                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.forward")
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.forward")
                     }
                     .disabled(!viewModel.isLoggedIn)
                 }

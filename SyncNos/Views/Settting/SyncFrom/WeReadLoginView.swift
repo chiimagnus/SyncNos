@@ -55,7 +55,7 @@ struct WeReadLoginView: View {
             }
             guard !relevant.isEmpty else {
                 Task { @MainActor in
-                    viewModel.statusMessage = NSLocalizedString("No WeRead cookies found. Please login in the web view first.", comment: "")
+                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.")
                 }
                 return
             }
