@@ -103,19 +103,19 @@ struct SettingsView: View {
                         }
                     }
 
-#if DEBUG
-                    NavigationLink(destination: EmptyView()) {
+                    NavigationLink(destination: DedaoSettingsView()) {
                         HStack {
-                            Label("Get", systemImage: "")
+                            Label("Dedao", systemImage: "book.closed")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                         }
                     }
 
+#if DEBUG
                     NavigationLink(destination: EmptyView()) {
                         HStack {
-                            Label("Dedao", systemImage: "")
+                            Label("Get", systemImage: "")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
@@ -152,6 +152,8 @@ struct SettingsView: View {
                     NotionIntegrationView()
                 case "weread":
                     WeReadSettingsView()
+                case "dedao":
+                    DedaoSettingsView()
                 default:
                     EmptyView()
                 }
@@ -177,6 +179,14 @@ struct SettingsView: View {
             // 延迟发送通知，等待 WeReadSettingsView 加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NotificationCenter.default.post(name: Notification.Name("WeReadSettingsShowLoginSheet"), object: nil)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoLogin"))) { _ in
+            // 先导航到 DedaoSettingsView，然后它会自动打开登录 Sheet
+            navigationPath.append("dedao")
+            // 延迟发送通知，等待 DedaoSettingsView 加载完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                NotificationCenter.default.post(name: Notification.Name("DedaoSettingsShowLoginSheet"), object: nil)
             }
         }
     }

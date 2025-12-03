@@ -1,8 +1,8 @@
 import SwiftUI
 import AppKit
 
-struct WeReadListView: View {
-    @ObservedObject var viewModel: WeReadViewModel
+struct DedaoListView: View {
+    @ObservedObject var viewModel: DedaoViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
     
@@ -17,13 +17,13 @@ struct WeReadListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("weread.notLoggedIn")
+                    Text("dedao.notLoggedIn")
                         .font(.headline)
                         .foregroundColor(.secondary)
                     Button {
-                        viewModel.navigateToWeReadLogin()
+                        viewModel.navigateToDedaoLogin()
                     } label: {
-                        Label("weread.login", systemImage: "qrcode")
+                        Label("dedao.login", systemImage: "qrcode")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -37,13 +37,20 @@ struct WeReadListView: View {
                     Text(error)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                    Button {
+                        Task {
+                            await viewModel.forceRefresh()
+                        }
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                    }
                 }
             } else if viewModel.books.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "text.book.closed")
                         .foregroundColor(.secondary)
                         .font(.largeTitle)
-                    Text("No WeRead books found")
+                    Text("dedao.noBooks")
                         .foregroundColor(.secondary)
                 }
             } else {
@@ -113,24 +120,28 @@ struct WeReadListView: View {
             }
         }
         // 监听数据源切换通知，切换到此视图时获取焦点
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToWeRead")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToDedao")).receive(on: DispatchQueue.main)) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isListFocused = true
             }
         }
         // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadSettings")).receive(on: DispatchQueue.main)) { _ in
-            // 打开设置窗口，SettingsView 会监听 NavigateToWeReadLogin 通知并导航到 WeReadSettingsView
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoSettings")).receive(on: DispatchQueue.main)) { _ in
+            // 打开设置窗口
             openWindow(id: "setting")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NotificationCenter.default.post(name: Notification.Name("NavigateToWeReadLogin"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("NavigateToDedaoLogin"), object: nil)
             }
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {
-            WeReadLoginView {
+            DedaoLoginView(viewModel: DedaoLoginViewModel(
+                authService: DIContainer.shared.dedaoAuthService,
+                apiService: DIContainer.shared.dedaoAPIService
+            )) {
                 // 登录成功后触发 UI 更新并刷新书籍列表
                 viewModel.onLoginSuccess()
             }
         }
     }
 }
+

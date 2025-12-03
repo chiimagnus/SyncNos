@@ -85,9 +85,11 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
               let status = info["status"] as? String else { return }
 
         var changed = false
+        var matchedCount = 0
         stateQueue.sync {
             for key in enqueuedOrder {
                 guard var t = tasksById[key], t.rawId == rawId else { continue }
+                matchedCount += 1
                 switch status {
                 case "started": t.state = .running
                 case "succeeded": t.state = .succeeded
@@ -107,6 +109,12 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                 scheduleDelayedCleanup_locked()
             }
         }
+        
+        // 调试日志：如果没有匹配到任何任务，记录警告
+        if matchedCount == 0 {
+            print("[SyncQueueStore] WARNING: No task matched for rawId=\(rawId), status=\(status)")
+        }
+        
         if changed { publish() }
     }
 

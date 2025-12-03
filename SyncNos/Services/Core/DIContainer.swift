@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 // MARK: - Dependency Injection Container
 class DIContainer {
@@ -27,7 +26,10 @@ class DIContainer {
     private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadCacheService: WeReadCacheServiceProtocol?
-    private var _weReadModelContainer: ModelContainer?
+    // Dedao
+    private var _dedaoAuthService: DedaoAuthServiceProtocol?
+    private var _dedaoAPIService: DedaoAPIServiceProtocol?
+    private var _dedaoCacheService: DedaoCacheServiceProtocol?
     // Sync Engine
     private var _notionSyncEngine: NotionSyncEngine?
     private var _goodLinksSyncService: GoodLinksSyncServiceProtocol?
@@ -157,43 +159,41 @@ class DIContainer {
         return _weReadAPIService!
     }
     
-    /// WeRead 数据的 ModelContainer
-    var weReadModelContainer: ModelContainer? {
-        if _weReadModelContainer == nil {
-            do {
-                let schema = Schema([
-                    CachedWeReadBook.self,
-                    CachedWeReadHighlight.self,
-                    WeReadSyncState.self
-                ])
-                let modelConfiguration = ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: false,
-                    allowsSave: true
-                )
-                _weReadModelContainer = try ModelContainer(
-                    for: schema,
-                    configurations: [modelConfiguration]
-                )
-            } catch {
-                loggerService.error("[DIContainer] Failed to create WeRead ModelContainer: \(error.localizedDescription)")
-            }
+    var weReadCacheService: WeReadCacheServiceProtocol {
+        if _weReadCacheService == nil {
+            // WeReadCacheService 内部管理 ModelContainer，初始化不会失败
+            // 与 Apple Books 的 DatabaseService 设计一致
+            _weReadCacheService = WeReadCacheService(logger: loggerService)
         }
-        return _weReadModelContainer
+        return _weReadCacheService!
     }
     
-    var weReadCacheService: WeReadCacheServiceProtocol? {
-        if _weReadCacheService == nil {
-            guard let container = weReadModelContainer else {
-                loggerService.warning("[DIContainer] WeRead ModelContainer not available, cache service disabled")
-                return nil
-            }
-            _weReadCacheService = WeReadCacheService(
-                modelContainer: container,
+    // MARK: - Dedao Services
+    
+    var dedaoAuthService: DedaoAuthServiceProtocol {
+        if _dedaoAuthService == nil {
+            _dedaoAuthService = DedaoAuthService()
+        }
+        return _dedaoAuthService!
+    }
+    
+    var dedaoAPIService: DedaoAPIServiceProtocol {
+        if _dedaoAPIService == nil {
+            _dedaoAPIService = DedaoAPIService(
+                authService: dedaoAuthService,
                 logger: loggerService
             )
         }
-        return _weReadCacheService
+        return _dedaoAPIService!
+    }
+    
+    var dedaoCacheService: DedaoCacheServiceProtocol {
+        if _dedaoCacheService == nil {
+            // DedaoCacheService 内部管理 ModelContainer，初始化不会失败
+            // 与 Apple Books 的 DatabaseService 设计一致
+            _dedaoCacheService = DedaoCacheService(logger: loggerService)
+        }
+        return _dedaoCacheService!
     }
     
     // MARK: - Sync Engine
@@ -304,9 +304,6 @@ class DIContainer {
         self._weReadCacheService = weReadCacheService
     }
     
-    func register(weReadModelContainer: ModelContainer) {
-        self._weReadModelContainer = weReadModelContainer
-    }
     
     func register(notionSyncEngine: NotionSyncEngine) {
         self._notionSyncEngine = notionSyncEngine
@@ -319,5 +316,16 @@ class DIContainer {
     func register(environmentDetector: EnvironmentDetectorProtocol) {
         self._environmentDetector = environmentDetector
     }
-
+    
+    func register(dedaoAuthService: DedaoAuthServiceProtocol) {
+        self._dedaoAuthService = dedaoAuthService
+    }
+    
+    func register(dedaoAPIService: DedaoAPIServiceProtocol) {
+        self._dedaoAPIService = dedaoAPIService
+    }
+    
+    func register(dedaoCacheService: DedaoCacheServiceProtocol) {
+        self._dedaoCacheService = dedaoCacheService
+    }
 }

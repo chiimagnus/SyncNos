@@ -1,53 +1,48 @@
 import Foundation
 import Combine
 
-// 临时结构体用于存储高亮数据
-struct WeReadHighlightDisplay: Identifiable {
+// MARK: - 显示模型
+
+/// 得到高亮显示模型
+struct DedaoHighlightDisplay: Identifiable {
     let id: String
     let text: String
     let note: String?
-    let reviewContents: [String]  // 关联的多条想法内容
-    let colorIndex: Int?
     let createdAt: Date?
+    let updatedAt: Date?
     let chapterTitle: String?
     
-    init(from bookmark: WeReadBookmark) {
-        self.id = bookmark.highlightId
-        self.text = bookmark.text
-        self.note = bookmark.note
-        self.reviewContents = bookmark.reviewContents
-        self.colorIndex = bookmark.colorIndex
-        self.createdAt = bookmark.timestamp.map { Date(timeIntervalSince1970: $0) }
-        self.chapterTitle = bookmark.chapterTitle
+    init(from note: DedaoEbookNote) {
+        self.id = note.effectiveId
+        self.text = note.effectiveNoteLine
+        self.note = note.note
+        self.createdAt = note.effectiveCreateTime > 0
+            ? Date(timeIntervalSince1970: TimeInterval(note.effectiveCreateTime))
+            : nil
+        self.updatedAt = note.effectiveUpdateTime > 0 && note.effectiveUpdateTime != note.effectiveCreateTime
+            ? Date(timeIntervalSince1970: TimeInterval(note.effectiveUpdateTime))
+            : nil
+        self.chapterTitle = note.extra?.title
     }
     
-    init(from review: WeReadReview) {
-        self.id = "review-\(review.reviewId)"
-        self.text = review.content
-        self.note = review.content
-        self.reviewContents = []
-        self.colorIndex = nil
-        self.createdAt = review.timestamp.map { Date(timeIntervalSince1970: $0) }
-        self.chapterTitle = nil
-    }
-    
-    init(from cached: CachedWeReadHighlight) {
+    init(from cached: CachedDedaoHighlight) {
         self.id = cached.highlightId
         self.text = cached.text
         self.note = cached.note
-        self.reviewContents = cached.reviewContents
-        self.colorIndex = cached.colorIndex
         self.createdAt = cached.createdAt
+        self.updatedAt = cached.updatedAt
         self.chapterTitle = cached.chapterTitle
     }
 }
 
+// MARK: - ViewModel
+
 @MainActor
-final class WeReadDetailViewModel: ObservableObject {
+final class DedaoDetailViewModel: ObservableObject {
     // MARK: - Published Properties
     
     /// 当前显示的高亮（分页后的可见数据）
-    @Published var visibleHighlights: [WeReadHighlightDisplay] = []
+    @Published var visibleHighlights: [DedaoHighlightDisplay] = []
     
     /// 是否正在加载首页
     @Published var isLoading: Bool = false
@@ -57,13 +52,13 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 后台同步状态
     @Published var isBackgroundSyncing: Bool = false
-
+    
     // 高亮筛选与排序
     @Published var noteFilter: NoteFilter = false
-    @Published var selectedStyles: Set<Int> = []
+    @Published var selectedStyles: Set<Int> = []  // 得到不支持颜色，但保留接口一致性
     @Published var sortField: HighlightSortField = .created
     @Published var isAscending: Bool = false
-
+    
     // 同步状态
     @Published var isSyncing: Bool = false
     @Published var syncProgressText: String?
@@ -85,33 +80,30 @@ final class WeReadDetailViewModel: ObservableObject {
     var totalFilteredCount: Int {
         filteredHighlights.count
     }
-
+    
     // MARK: - Private Properties
     
-    private let apiService: WeReadAPIServiceProtocol
-    private let cacheService: WeReadCacheServiceProtocol
+    private let apiService: DedaoAPIServiceProtocol
+    private let cacheService: DedaoCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
     
-    // 增量同步服务
-    private let incrementalSyncService: WeReadIncrementalSyncService
-
     private var currentBookId: String?
     
     /// 所有原始数据（未筛选）
-    private var allBookmarks: [WeReadBookmark] = []
+    private var allNotes: [DedaoEbookNote] = []
     
     /// 筛选和排序后的数据
-    private var filteredHighlights: [WeReadHighlightDisplay] = []
-
+    private var filteredHighlights: [DedaoHighlightDisplay] = []
+    
     private var cancellables = Set<AnyCancellable>()
-
+    
     // MARK: - Initialization
     
     init(
-        apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        cacheService: WeReadCacheServiceProtocol = DIContainer.shared.weReadCacheService,
+        apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
+        cacheService: DedaoCacheServiceProtocol = DIContainer.shared.dedaoCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
@@ -121,13 +113,6 @@ final class WeReadDetailViewModel: ObservableObject {
         self.syncEngine = syncEngine
         self.logger = logger
         self.notionConfig = notionConfig
-        
-        // 创建增量同步服务
-        self.incrementalSyncService = WeReadIncrementalSyncService(
-            apiService: apiService,
-            cacheService: cacheService,
-            logger: logger
-        )
         
         setupNotificationSubscriptions()
         setupFilterSortSubscriptions()
@@ -202,7 +187,7 @@ final class WeReadDetailViewModel: ObservableObject {
     }
     
     /// 加载更多数据
-    func loadMoreIfNeeded(currentItem: WeReadHighlightDisplay) {
+    func loadMoreIfNeeded(currentItem: DedaoHighlightDisplay) {
         // 检查是否需要加载更多
         guard let index = visibleHighlights.firstIndex(where: { $0.id == currentItem.id }) else { return }
         
@@ -233,102 +218,88 @@ final class WeReadDetailViewModel: ObservableObject {
         visibleHighlights.append(contentsOf: nextPage)
         currentPageCount += 1
         
-        logger.debug("[WeReadDetail] Loaded page \(currentPageCount), showing \(visibleHighlights.count)/\(filteredHighlights.count) highlights")
+        logger.debug("[DedaoDetail] Loaded page \(currentPageCount), showing \(visibleHighlights.count)/\(filteredHighlights.count) highlights")
         
         isLoadingMore = false
     }
-
+    
     // MARK: - Data Loading
     
-    /// 加载高亮（优先缓存，后台增量同步）
+    /// 加载高亮（优先缓存，后台同步）
     func loadHighlights(for bookId: String) async {
-        // 如果是同一本书，不重复加载
-        if currentBookId == bookId && !allBookmarks.isEmpty {
+        // 如果是同一本书且数据不为空，不重复加载
+        if currentBookId == bookId && !allNotes.isEmpty {
             return
         }
         
+        let isNewBook = currentBookId != bookId
         currentBookId = bookId
-        isLoading = true
         
-        // 重置数据
-        allBookmarks = []
-        filteredHighlights = []
-        visibleHighlights = []
-        currentPageCount = 0
-        
-        // 1. 先从缓存加载
+        // 1. 先尝试从缓存加载（不清空现有数据，避免闪烁）
         do {
             let cached = try await cacheService.getHighlights(bookId: bookId)
             if !cached.isEmpty {
-                allBookmarks = cached.map { WeReadBookmark(from: $0) }
+                // 有缓存：立即显示，不显示 Loading
+                allNotes = cached.map { cachedToNote($0) }
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false
-                logger.info("[WeReadDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
+                logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
+                
+                // 后台异步同步（不阻塞）
+                Task {
+                    await performBackgroundSync(bookId: bookId)
+                }
+                return
             }
         } catch {
-            logger.warning("[WeReadDetail] Cache load failed: \(error.localizedDescription)")
+            logger.warning("[DedaoDetail] Cache load failed: \(error.localizedDescription)")
         }
         
-        // 2. 后台增量同步
+        // 2. 没有缓存：显示 Loading，从 API 加载
+        if isNewBook {
+            allNotes = []
+            filteredHighlights = []
+            visibleHighlights = []
+            currentPageCount = 0
+        }
+        isLoading = true
         await performBackgroundSync(bookId: bookId)
     }
     
     /// 执行后台同步
     private func performBackgroundSync(bookId: String) async {
         isBackgroundSyncing = true
+        
         do {
-            let result = try await incrementalSyncService.syncHighlights(bookId: bookId)
+            // 从 API 获取最新数据
+            let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: nil)
             
-            switch result {
-            case .noChanges:
-                logger.info("[WeReadDetail] No changes for bookId=\(bookId)")
-            case .updated(let added, let removed):
-                logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
-                // 重新从缓存加载
-                let updated = try await cacheService.getHighlights(bookId: bookId)
-                allBookmarks = updated.map { WeReadBookmark(from: $0) }
+            // 保存到缓存
+            try await cacheService.saveHighlights(apiNotes, bookId: bookId)
+            
+            // 如果数据有变化，更新显示
+            if apiNotes.count != allNotes.count || allNotes.isEmpty {
+                allNotes = apiNotes
                 applyFiltersAndSort()
                 resetPagination()
-            case .fullSyncRequired:
-                // 全量拉取
-                await fullFetchFromAPI(bookId: bookId)
+                logger.info("[DedaoDetail] Synced \(apiNotes.count) highlights from API for bookId=\(bookId)")
+            } else {
+                logger.debug("[DedaoDetail] No changes for bookId=\(bookId)")
             }
         } catch {
-            // 如果缓存为空，需要全量拉取
-            if allBookmarks.isEmpty {
-                await fullFetchFromAPI(bookId: bookId)
+            // 如果缓存为空，需要显示错误
+            if allNotes.isEmpty {
+                logger.error("[DedaoDetail] Failed to load highlights: \(error.localizedDescription)")
             } else {
-                logger.error("[WeReadDetail] Incremental sync failed: \(error.localizedDescription)")
+                logger.warning("[DedaoDetail] Background sync failed: \(error.localizedDescription)")
             }
         }
+        
         isBackgroundSyncing = false
         isLoading = false
     }
     
-    /// 全量从 API 拉取
-    private func fullFetchFromAPI(bookId: String) async {
-        do {
-            // 使用合并 API 获取高亮（已包含关联的想法）
-            let mergedBookmarks = try await apiService.fetchMergedHighlights(bookId: bookId)
-            
-            // 保存合并后的数据
-            allBookmarks = mergedBookmarks
-            
-            // 保存到缓存
-            try await cacheService.saveHighlights(mergedBookmarks, bookId: bookId)
-            
-            // 应用筛选和排序
-            applyFiltersAndSort()
-            resetPagination()
-            
-            logger.info("[WeReadDetail] Fetched \(mergedBookmarks.count) highlights from API for bookId=\(bookId)")
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[WeReadDetail] loadHighlights error: \(desc)")
-        }
-    }
-
     func reloadCurrent() async {
         // 重新应用筛选和排序
         applyFiltersAndSort()
@@ -341,21 +312,8 @@ final class WeReadDetailViewModel: ObservableObject {
         
         isLoading = true
         
-        // 清除该书的缓存高亮
-        do {
-            let highlights = try await cacheService.getHighlights(bookId: bookId)
-            let ids = highlights.map { $0.highlightId }
-            if !ids.isEmpty {
-                try await cacheService.deleteHighlights(ids: ids)
-            }
-            // 重置 synckey
-            try await cacheService.updateBookSyncKey(bookId: bookId, syncKey: 0)
-        } catch {
-            logger.warning("[WeReadDetail] Failed to clear cache: \(error.localizedDescription)")
-        }
-        
         // 清空当前数据
-        allBookmarks = []
+        allNotes = []
         filteredHighlights = []
         visibleHighlights = []
         currentPageCount = 0
@@ -367,58 +325,59 @@ final class WeReadDetailViewModel: ObservableObject {
     // MARK: - Filtering and Sorting
     
     private func applyFiltersAndSort() {
-        var result: [WeReadHighlightDisplay] = []
+        var result: [DedaoHighlightDisplay] = []
         
-        // 转换合并后的 bookmarks（已包含 reviewContents）
-        for bm in allBookmarks {
+        for note in allNotes {
             // 应用筛选
-            // "仅笔记"过滤：检查是否有 note 或 reviewContents（关联的想法）
+            // "仅笔记"过滤
             if noteFilter {
-                let hasNote = (bm.note != nil && !bm.note!.isEmpty)
-                let hasReviews = !bm.reviewContents.isEmpty
-                if !hasNote && !hasReviews {
+                let hasNote = (note.note != nil && !note.note!.isEmpty)
+                if !hasNote {
                     continue
                 }
             }
             
-            // 颜色筛选
-            if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
-                continue
-            }
-            
-            result.append(WeReadHighlightDisplay(from: bm))
+            result.append(DedaoHighlightDisplay(from: note))
         }
         
-        // 排序（WeRead 只有 createdAt）
+        // 排序
         result.sort { a, b in
-            let t1 = a.createdAt
-            let t2 = b.createdAt
-            
-            if t1 == nil && t2 == nil { return false }
-            if t1 == nil { return !isAscending }
-            if t2 == nil { return isAscending }
-            
-            return isAscending ? (t1! < t2!) : (t1! > t2!)
+            switch sortField {
+            case .created:
+                let t1 = a.createdAt
+                let t2 = b.createdAt
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return !isAscending }
+                if t2 == nil { return isAscending }
+                return isAscending ? (t1! < t2!) : (t1! > t2!)
+            case .modified:
+                let t1 = a.updatedAt ?? a.createdAt
+                let t2 = b.updatedAt ?? b.createdAt
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return !isAscending }
+                if t2 == nil { return isAscending }
+                return isAscending ? (t1! < t2!) : (t1! > t2!)
+            }
         }
         
         filteredHighlights = result
     }
-
+    
     // MARK: - Notion Sync
     
-    func syncSmart(book: WeReadBookListItem) {
+    func syncSmart(book: DedaoBookListItem) {
         guard checkNotionConfig() else {
             NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
         if isSyncing { return }
-
+        
         isSyncing = true
         syncMessage = nil
         syncProgressText = nil
-
+        
         let limiter = DIContainer.shared.syncConcurrencyLimiter
-
+        
         Task {
             await limiter.withPermit {
                 NotificationCenter.default.post(
@@ -427,7 +386,7 @@ final class WeReadDetailViewModel: ObservableObject {
                     userInfo: ["bookId": book.bookId, "status": "started"]
                 )
                 do {
-                    let adapter = WeReadNotionAdapter.create(book: book, apiService: self.apiService)
+                    let adapter = DedaoNotionAdapter.create(book: book, preferCache: false)
                     try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
                         Task { @MainActor in
                             self?.syncProgressText = progressText
@@ -446,7 +405,7 @@ final class WeReadDetailViewModel: ObservableObject {
                 } catch {
                     let desc = error.localizedDescription
                     await MainActor.run {
-                        self.logger.error("[WeReadDetail] syncSmart error: \(desc)")
+                        self.logger.error("[DedaoDetail] syncSmart error: \(desc)")
                         self.isSyncing = false
                         self.syncMessage = desc
                         self.syncProgressText = nil
@@ -460,19 +419,61 @@ final class WeReadDetailViewModel: ObservableObject {
             }
         }
     }
-
+    
     // MARK: - Helpers
-
+    
     private func checkNotionConfig() -> Bool {
         notionConfig.isConfigured
     }
-}
-
-// MARK: - Legacy Compatibility
-
-extension WeReadDetailViewModel {
-    /// 兼容旧代码：返回所有高亮（不推荐使用，应使用 visibleHighlights）
-    var highlights: [WeReadHighlightDisplay] {
-        visibleHighlights
+    
+    /// 将缓存的高亮转换为 API 模型
+    private func cachedToNote(_ cached: CachedDedaoHighlight) -> DedaoEbookNote {
+        return DedaoEbookNote(
+            noteId: nil,
+            noteIdStr: cached.highlightId,
+            noteIdHazy: nil,
+            uid: nil,
+            isFromMe: 1,
+            notesOwner: nil,
+            noteType: nil,
+            sourceType: nil,
+            note: cached.note,
+            noteTitle: nil,
+            noteLine: cached.text,
+            noteLineStyle: nil,
+            createTime: cached.createdAt.map { Int64($0.timeIntervalSince1970) },
+            updateTime: cached.updatedAt.map { Int64($0.timeIntervalSince1970) },
+            tips: nil,
+            shareUrl: nil,
+            extra: DedaoNoteExtra(
+                title: cached.chapterTitle,
+                sourceType: nil,
+                sourceTypeName: nil,
+                bookId: nil,
+                bookName: nil,
+                bookSection: cached.bookSection,
+                bookStartPos: nil,
+                bookOffset: nil,
+                bookAuthor: nil
+            ),
+            notesCount: nil,
+            canEdit: nil,
+            isPermission: nil,
+            originNoteIdHazy: nil,
+            rootNoteId: nil,
+            rootNoteIdHazy: nil,
+            originContentType: nil,
+            contentType: nil,
+            noteClass: nil,
+            highlights: nil,
+            rootHighlights: nil,
+            state: nil,
+            auditState: nil,
+            lesson: nil,
+            ddurl: nil,
+            video: nil,
+            notesLikeCount: nil
+        )
     }
 }
+

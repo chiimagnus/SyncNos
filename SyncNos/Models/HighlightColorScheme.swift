@@ -4,6 +4,7 @@ enum HighlightSource: String {
     case appleBooks
     case goodLinks
     case weRead
+    case dedao
 }
 
 struct HighlightColorDefinition {
@@ -41,6 +42,11 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 3, notionName: "green", displayName: "Green"),
                 HighlightColorDefinition(index: 4, notionName: "yellow", displayName: "Yellow")
             ]
+        case .dedao:
+            // 得到不提供高亮颜色信息，使用默认橙色
+            return [
+                HighlightColorDefinition(index: 0, notionName: "orange", displayName: "Default")
+            ]
         }
     }
 
@@ -57,6 +63,8 @@ enum HighlightColorScheme {
             return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
         case .weRead:
             return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
+        case .dedao:
+            return HighlightColorDefinition(index: index, notionName: "orange", displayName: "Default")
         }
     }
 }

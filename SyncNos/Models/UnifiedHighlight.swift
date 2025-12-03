@@ -71,6 +71,29 @@ struct UnifiedHighlight: Identifiable, Equatable {
         self.source = .weRead
     }
     
+    /// 从 DedaoEbookNote 转换（得到电子书笔记）
+    /// 支持标准格式和混合格式两种 API 响应
+    init(from note: DedaoEbookNote) {
+        self.uuid = note.effectiveId
+        self.text = note.effectiveNoteLine
+        // 用户备注：非空才使用
+        if let noteContent = note.note, !noteContent.isEmpty {
+            self.note = noteContent
+        } else {
+            self.note = nil
+        }
+        self.colorIndex = 0  // 得到不提供颜色信息，使用默认
+        
+        let createTs = note.effectiveCreateTime
+        self.dateAdded = createTs > 0 ? Date(timeIntervalSince1970: TimeInterval(createTs)) : nil
+        
+        let updateTs = note.effectiveUpdateTime
+        self.dateModified = updateTs > 0 ? Date(timeIntervalSince1970: TimeInterval(updateTs)) : nil
+        
+        self.location = note.extra?.title  // 章节标题（可选）
+        self.source = .dedao
+    }
+    
     /// 通用初始化器
     init(
         uuid: String,
@@ -163,6 +186,16 @@ struct UnifiedSyncItem: Identifiable, Equatable {
         self.author = book.author
         self.url = nil
         self.source = .weRead
+        self.highlightCount = book.highlightCount
+    }
+    
+    /// 从 DedaoBookListItem 转换（得到电子书）
+    init(from book: DedaoBookListItem) {
+        self.itemId = book.bookId
+        self.title = book.title
+        self.author = book.author
+        self.url = nil
+        self.source = .dedao
         self.highlightCount = book.highlightCount
     }
     
