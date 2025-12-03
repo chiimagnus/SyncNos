@@ -17,7 +17,7 @@ struct DedaoListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("Not logged in to Dedao.")
+                    Text("Not logged in")
                         .font(.headline)
                         .foregroundColor(.secondary)
                     Button {
@@ -50,7 +50,7 @@ struct DedaoListView: View {
                     Image(systemName: "text.book.closed")
                         .foregroundColor(.secondary)
                         .font(.largeTitle)
-                    Text("No books in your Dedao library.")
+                    Text("No books found")
                         .foregroundColor(.secondary)
                 }
             } else {
