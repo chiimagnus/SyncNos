@@ -17,13 +17,13 @@ struct WeReadListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("weread.notLoggedIn")
+                    Text("Not logged in to WeRead.")
                         .font(.headline)
                         .foregroundColor(.secondary)
                     Button {
                         viewModel.navigateToWeReadLogin()
                     } label: {
-                        Label("weread.login", systemImage: "qrcode")
+                        Label("Log In", systemImage: "qrcode")
                     }
                     .buttonStyle(.borderedProminent)
                 }

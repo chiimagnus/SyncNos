@@ -80,13 +80,13 @@ final class DedaoSettingsViewModel: ObservableObject {
             await authService.clearCookies()
             await MainActor.run {
                 refreshLoginStatus()
-                message = String(localized: "dedao.loggedOut")
+                message = String(localized: "Logged Out")
                 // 发送登录状态变化通知，让 DedaoListView/DedaoViewModel 更新 UI
                 NotificationCenter.default.post(name: Notification.Name("DedaoLoginStatusChanged"), object: nil)
             }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
-                if self.message == String(localized: "dedao.loggedOut") {
+                if self.message == String(localized: "Logged Out") {
                     self.message = nil
                 }
             }
