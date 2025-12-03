@@ -1,5 +1,52 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.8.10 December 3, 2025
+
+- Improved sync stability for WeRead and Dedao with request rate limiting
+
+## v0.8.8.4 December 3, 2025
+
+- Added ⌘4 shortcut to switch to Dedao
+- Auto-refresh book list after login
+- Fixed UI not updating after sync
+
+## v0.8.8.3 December 3, 2025
+
+- Optimized Notion configuration and session expiry alert display logic
+
+## v0.8.8.2 December 2, 2025
+
+- Pagination support for GoodLinks highlights
+- Improved sync status display for Dedao and WeRead
+- Optimized data loading performance
+
+## v0.8.8.1 December 2, 2025
+
+*Added*
+
+- Dedao Support: Full Dedao ebook data source integration
+  - WebView Login: Scan QR code to login
+  - Rate Limiting: Token bucket limiter to prevent anti-scraping
+  - Local Cache: SwiftData caching for books and highlights
+  - Auto Sync: Integrated with auto sync service
+- Log Search: Search functionality in LogWindow
+
+*Changed*
+
+- Dedao Models: Updated models with optional fields for better data handling
+- Dedao Auth: Improved authentication with WebView login and cookie validation
+- UI: Removed background color from LogWindow for cleaner design
+
+## v0.8.8 December 2, 2025
+
+- Improved AboutView layout with additional links
+
+## v0.8.7.1 November 28, 2025
+
+- Fixed Keychain permission prompt on startup with lazy WeRead cookie loading
+- Simplified DataSourceSwitchViewModel by removing UserDefaults observers
+- Performance optimizations
+
 ## v0.8.7 November 27, 2025
 
 - Version bump release (same as v0.8.6.5)
