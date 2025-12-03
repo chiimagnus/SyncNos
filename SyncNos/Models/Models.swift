@@ -15,7 +15,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .appleBooks: return "Apple Books"
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
-        case .dedao: return String(localized: "source.dedao")
+        case .dedao: return "Dedao"
         }
     }
     
