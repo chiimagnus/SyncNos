@@ -212,7 +212,7 @@ struct MainListView: View {
             .alert(
                 sessionExpiredSource == .weRead
                     ? NSLocalizedString("Session Expired", comment: "")
-                    : String(localized: "Dedao Session Expired"),
+                    : String(localized: "Session Expired"),
                 isPresented: $showSessionExpiredAlert
             ) {
                 Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }

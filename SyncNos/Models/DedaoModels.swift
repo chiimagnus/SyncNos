@@ -447,7 +447,7 @@ enum DedaoAPIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            return String(localized: "Not logged in to Dedao.")
+            return String(localized: "Not Logged In")
         case .sessionExpired:
             return String(localized: "Session expired. Please log in again.")
         case .invalidResponse:

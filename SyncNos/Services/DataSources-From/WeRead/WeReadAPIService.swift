@@ -15,11 +15,11 @@ enum WeReadAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            return NSLocalizedString("WeRead is not logged in. Please login first.", comment: "")
+            return NSLocalizedString("Not Logged In", comment: "")
         case .unauthorized:
             return NSLocalizedString("WeRead cookie expired or invalid. Please login again.", comment: "")
         case .sessionExpired:
-            return NSLocalizedString("WeRead session expired. Please login again.", comment: "")
+            return NSLocalizedString("Session expired. Please log in again.", comment: "")
         case .sessionExpiredWithRefreshFailure(let reason):
             return String(format: NSLocalizedString("WeRead session expired and auto-refresh failed: %@. Please login manually.", comment: ""), reason)
         case .invalidResponse:
