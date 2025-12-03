@@ -17,7 +17,7 @@ struct WeReadListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("Not logged in")
+                    Text("Not Logged In")
                         .font(.headline)
                         .foregroundColor(.secondary)
                     Button {
