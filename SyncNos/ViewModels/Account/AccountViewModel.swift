@@ -65,7 +65,7 @@ final class AccountViewModel: ObservableObject {
         if let token = storedAccessToken() { return token }
         // 如果没有 access，尝试 refresh
         guard let refresh = storedRefreshToken() else {
-            throw NSError(domain: "AccountVM", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Not logged in", comment: "")])
+            throw NSError(domain: "AccountVM", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Not Logged In", comment: "")])
         }
         let tokens = try await auth.refresh(refreshToken: refresh)
         store(tokens: tokens)
