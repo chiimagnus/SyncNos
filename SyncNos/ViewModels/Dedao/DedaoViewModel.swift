@@ -267,7 +267,7 @@ final class DedaoViewModel: ObservableObject {
                 NotificationCenter.default.post(
                     name: Notification.Name("ShowSessionExpiredAlert"),
                     object: nil,
-                    userInfo: ["source": ContentSource.dedao.rawValue, "reason": String(localized: "dedao.error.needVerification")]
+                    userInfo: ["source": ContentSource.dedao.rawValue, "reason": String(localized: "Verification required. Please open the Dedao app to complete verification.")]
                 )
             default:
                 if books.isEmpty {

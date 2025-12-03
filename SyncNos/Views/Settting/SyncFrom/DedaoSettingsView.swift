@@ -11,11 +11,11 @@ struct DedaoSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("dedao.account", systemImage: "person.crop.square")) {
+            Section(header: Label("Dedao Account", systemImage: "person.crop.square")) {
                 HStack {
-                    Label("dedao.loginStatus", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
+                    Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
                     Spacer()
-                    Text(viewModel.isLoggedIn ? "dedao.loggedIn" : "dedao.notLoggedIn")
+                    Text(viewModel.isLoggedIn ? "Logged In" : "Not Logged In")
                         .foregroundColor(viewModel.isLoggedIn ? .green : .secondary)
                 }
 
@@ -23,7 +23,7 @@ struct DedaoSettingsView: View {
                     Button {
                         viewModel.showLoginSheet = true
                     } label: {
-                        Label("dedao.openLogin", systemImage: "qrcode")
+                        Label("Open Login", systemImage: "qrcode")
                     }
 
                     Spacer()
@@ -31,7 +31,7 @@ struct DedaoSettingsView: View {
                     Button(role: .destructive) {
                         viewModel.clearLogin()
                     } label: {
-                        Label("dedao.logout", systemImage: "rectangle.portrait.and.arrow.forward")
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.forward")
                     }
                     .disabled(!viewModel.isLoggedIn)
                 }
