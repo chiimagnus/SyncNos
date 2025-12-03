@@ -270,7 +270,7 @@ struct GoodLinksDetailView: View {
                                 }
                             } else {
                                 // 空状态提示
-                                Text("No highlights for this link yet")
+                                Text("No highlights found")
                                     .font(.body)
                                     .foregroundColor(.secondary)
                                     .padding()

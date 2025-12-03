@@ -132,7 +132,7 @@ struct AppleBooksDetailView: View {
                                         if viewModel.isLoadingPage {
                                             ProgressView()
                                         } else {
-                                            Text("Load more")
+                                            Text("Load More")
                                         }
                                     }
                                     // .buttonStyle(.borderedProminent)
