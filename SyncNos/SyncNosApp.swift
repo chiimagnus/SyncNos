@@ -51,9 +51,8 @@ struct SyncNosApp: App {
         _ = DIContainer.shared.syncQueueStore
         
         // 初始化 WeRead 缓存服务（预热 SwiftData ModelContainer）
-        if let _ = DIContainer.shared.weReadCacheService {
-            DIContainer.shared.loggerService.info("WeRead cache service initialized")
-        }
+        _ = DIContainer.shared.weReadCacheService
+        DIContainer.shared.loggerService.info("WeRead cache service initialized")
     }
 
     var body: some Scene {

@@ -7,6 +7,7 @@ struct ViewCommands: Commands {
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
+    @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
     @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
     @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
     @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
@@ -40,6 +41,8 @@ struct ViewCommands: Commands {
             return goodLinksSourceEnabled
         case .weRead:
             return weReadSourceEnabled
+        case .dedao:
+            return dedaoSourceEnabled
         }
     }
 
@@ -48,13 +51,14 @@ struct ViewCommands: Commands {
         enabledContentSources.firstIndex(of: source)
     }
 
-    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 / cmd+2 / cmd+3）
+    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 / cmd+2 / cmd+3 / cmd+4）
     private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
         guard let index = indexForSource(source) else { return nil }
         switch index {
         case 0: return "1"
         case 1: return "2"
         case 2: return "3"
+        case 3: return "4"
         default: return nil
         }
     }
@@ -167,6 +171,21 @@ struct ViewCommands: Commands {
                 }
             }
 
+            if isDataSourceEnabled(.dedao) {
+                if let key = shortcutKey(for: .dedao) {
+                    Button("Dedao", systemImage: "book.closed") {
+                        contentSourceRawValue = ContentSource.dedao.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .dedao)
+                } else {
+                    Button("Dedao", systemImage: "book.closed") {
+                        contentSourceRawValue = ContentSource.dedao.rawValue
+                    }
+                    .disabled(currentSource == .dedao)
+                }
+            }
+
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
@@ -258,7 +277,7 @@ struct ViewCommands: Commands {
                         }
                     }
                 }
-            } else {
+            } else if currentSource == .weRead {
                 // WeRead 的排序和筛选菜单
                 Menu("Books", systemImage: "book.closed") {
                     Section("Sort") {
@@ -282,6 +301,38 @@ struct ViewCommands: Commands {
                         Button {
                             bookListSortAscending.toggle()
                             NotificationCenter.default.post(name: Notification.Name("WeReadFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
+                        } label: {
+                            if bookListSortAscending {
+                                Label("Ascending", systemImage: "checkmark")
+                            } else {
+                                Label("Ascending", systemImage: "xmark")
+                            }
+                        }
+                    }
+                }
+            } else if currentSource == .dedao {
+                // Dedao 的排序菜单（与 WeRead 类似，只支持 title, highlightCount, lastSync）
+                Menu("Books", systemImage: "book.closed") {
+                    Section("Sort") {
+                        let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
+                        ForEach(availableKeys, id: \.self) { k in
+                            Button {
+                                bookListSortKey = k.rawValue
+                                NotificationCenter.default.post(name: Notification.Name("DedaoFilterChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            } label: {
+                                if bookListSortKey == k.rawValue {
+                                    Label(k.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(k.displayName)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            bookListSortAscending.toggle()
+                            NotificationCenter.default.post(name: Notification.Name("DedaoFilterChanged"), object: nil, userInfo: ["sortAscending": bookListSortAscending])
                         } label: {
                             if bookListSortAscending {
                                 Label("Ascending", systemImage: "checkmark")
@@ -341,6 +392,7 @@ struct ViewCommands: Commands {
                         case .appleBooks: return .appleBooks
                         case .goodLinks: return .goodLinks
                         case .weRead: return .weRead
+                        case .dedao: return .dedao
                         }
                     }()
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）
