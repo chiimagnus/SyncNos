@@ -23,7 +23,7 @@ struct DedaoSettingsView: View {
                     Button {
                         viewModel.showLoginSheet = true
                     } label: {
-                        Label("Open Login", systemImage: "safari")
+                        Label("Open Login WebView", systemImage: "safari")
                     }
 
                     Spacer()
