@@ -151,6 +151,19 @@ final class DedaoSyncState {
     }
 }
 
+// MARK: - Dedao Sync State Snapshot
+
+/// Dedao 同步状态的 Sendable 快照（用于跨 actor 边界传递）
+struct DedaoSyncStateSnapshot: Sendable {
+    let lastFullSyncAt: Date?
+    let lastIncrementalSyncAt: Date?
+    
+    init(from state: DedaoSyncState) {
+        self.lastFullSyncAt = state.lastFullSyncAt
+        self.lastIncrementalSyncAt = state.lastIncrementalSyncAt
+    }
+}
+
 // MARK: - Conversion Extensions
 
 extension DedaoBookListItem {
@@ -178,6 +191,61 @@ extension UnifiedHighlight {
             dateModified: cached.updatedAt,
             location: cached.chapterTitle,
             source: .dedao
+        )
+    }
+}
+
+extension DedaoEbookNote {
+    /// 从本地存储的高亮创建 API DTO（用于跨 actor 边界传递）
+    init(from cached: CachedDedaoHighlight) {
+        // 创建 extra 信息
+        let extra = DedaoNoteExtra(
+            title: cached.chapterTitle,
+            sourceType: nil,
+            sourceTypeName: nil,
+            bookId: nil,
+            bookName: nil,
+            bookSection: cached.bookSection,
+            bookStartPos: nil,
+            bookOffset: nil,
+            bookAuthor: nil
+        )
+        
+        self.init(
+            noteId: nil,
+            noteIdStr: cached.highlightId,
+            noteIdHazy: nil,
+            uid: nil,
+            isFromMe: 1,
+            notesOwner: nil,
+            noteType: nil,
+            sourceType: nil,
+            note: cached.note,
+            noteTitle: nil,
+            noteLine: cached.text,
+            noteLineStyle: nil,
+            createTime: cached.createdAt.map { Int64($0.timeIntervalSince1970) },
+            updateTime: cached.updatedAt.map { Int64($0.timeIntervalSince1970) },
+            tips: nil,
+            shareUrl: nil,
+            extra: extra,
+            notesCount: nil,
+            canEdit: nil,
+            isPermission: nil,
+            originNoteIdHazy: nil,
+            rootNoteId: nil,
+            rootNoteIdHazy: nil,
+            originContentType: nil,
+            contentType: nil,
+            noteClass: nil,
+            highlights: nil,
+            rootHighlights: nil,
+            state: nil,
+            auditState: nil,
+            lesson: nil,
+            ddurl: nil,
+            video: nil,
+            notesLikeCount: nil
         )
     }
 }

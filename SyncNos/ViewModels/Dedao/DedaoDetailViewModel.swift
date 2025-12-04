@@ -237,10 +237,11 @@ final class DedaoDetailViewModel: ObservableObject {
         
         // 1. 先尝试从缓存加载（不清空现有数据，避免闪烁）
         do {
+            // cacheService.getHighlights 现在直接返回 [DedaoEbookNote]
             let cached = try await cacheService.getHighlights(bookId: bookId)
             if !cached.isEmpty {
                 // 有缓存：立即显示，不显示 Loading
-                allNotes = cached.map { cachedToNote($0) }
+                allNotes = cached
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false

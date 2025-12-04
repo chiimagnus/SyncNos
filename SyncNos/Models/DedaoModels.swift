@@ -290,6 +290,29 @@ struct DedaoNoteExtra: Codable {
         case bookOffset = "book_offset"
         case bookAuthor = "book_author"
     }
+    
+    /// 手动初始化器（用于从缓存创建）
+    init(
+        title: String? = nil,
+        sourceType: Int? = nil,
+        sourceTypeName: String? = nil,
+        bookId: Int? = nil,
+        bookName: String? = nil,
+        bookSection: String? = nil,
+        bookStartPos: Int? = nil,
+        bookOffset: Int? = nil,
+        bookAuthor: String? = nil
+    ) {
+        self.title = title
+        self.sourceType = sourceType
+        self.sourceTypeName = sourceTypeName
+        self.bookId = bookId
+        self.bookName = bookName
+        self.bookSection = bookSection
+        self.bookStartPos = bookStartPos
+        self.bookOffset = bookOffset
+        self.bookAuthor = bookAuthor
+    }
 }
 
 /// 笔记拥有者

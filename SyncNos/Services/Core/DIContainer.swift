@@ -189,9 +189,17 @@ class DIContainer {
     
     var dedaoCacheService: DedaoCacheServiceProtocol {
         if _dedaoCacheService == nil {
-            // DedaoCacheService 内部管理 ModelContainer，初始化不会失败
-            // 与 Apple Books 的 DatabaseService 设计一致
-            _dedaoCacheService = DedaoCacheService(logger: loggerService)
+            // 使用 @ModelActor 的 DedaoCacheService 需要 ModelContainer
+            // 如果创建失败，会在首次使用时抛出错误
+            do {
+                let container = try DedaoModelContainerFactory.createContainer()
+                _dedaoCacheService = DedaoCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] DedaoCacheService initialized with ModelContainer")
+            } catch {
+                loggerService.error("[DIContainer] Failed to create Dedao ModelContainer: \(error.localizedDescription)")
+                // 创建一个带有错误的占位服务（实际使用时会抛出错误）
+                fatalError("Failed to create Dedao ModelContainer: \(error.localizedDescription)")
+            }
         }
         return _dedaoCacheService!
     }

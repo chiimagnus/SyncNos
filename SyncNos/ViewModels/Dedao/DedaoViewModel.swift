@@ -158,10 +158,11 @@ final class DedaoViewModel: ObservableObject {
         errorMessage = nil
         
         // 1. 先尝试从本地存储加载（快速显示）
+        // 注意：cacheService 是 actor，调用其方法需要 await
         do {
             let cachedBooks = try await cacheService.getAllBooks()
             if !cachedBooks.isEmpty {
-                books = cachedBooks.map { DedaoBookListItem(from: $0) }
+                books = cachedBooks  // 已经是 [DedaoBookListItem]
                 isLoading = false
                 logger.info("[Dedao] Loaded \(cachedBooks.count) books from local storage")
                 
