@@ -5,6 +5,7 @@ import SwiftUI
 struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var iapPresentationMode: IAPPresentationMode? = nil
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
     private var iapService: IAPServiceProtocol {
         DIContainer.shared.iapService
@@ -53,6 +54,8 @@ struct RootView: View {
                 checkTrialStatus()
             }
         }
+        // 应用字体缩放到整个视图层级
+        .applyFontScale()
     }
     
     // MARK: - Trial Status Check
