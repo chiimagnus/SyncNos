@@ -122,7 +122,7 @@ final class WeReadIncrementalSyncService {
         // 7. 更新 synckey 和高亮数量
         try await cacheService.updateBookSyncKey(bookId: bookId, syncKey: response.syncKey)
         
-        // 重新计算高亮数量
+        // 重新计算高亮数量（getHighlights 直接返回 [WeReadBookmark]）
         let allHighlights = try await cacheService.getHighlights(bookId: bookId)
         try await cacheService.updateBookHighlightCount(bookId: bookId, count: allHighlights.count)
         
@@ -175,9 +175,7 @@ final class WeReadIncrementalSyncService {
             }
         }
         
-        // 3. 更新全局同步状态
-        let state = try await cacheService.getSyncState()
-        state.lastFullSyncAt = Date()
+        // 3. 更新全局同步状态（直接调用 updateSyncState，不修改 snapshot）
         try await cacheService.updateSyncState(notebookSyncKey: nil, lastSyncAt: Date())
         
         logger.info("[WeReadSync] Full sync completed")

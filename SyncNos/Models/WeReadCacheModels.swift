@@ -246,3 +246,29 @@ extension WeReadBookmark {
     }
 }
 
+// MARK: - WeRead Sync State Snapshot
+
+/// WeRead 同步状态的不可变快照（Sendable）
+/// 用于跨并发域传递同步状态数据
+struct WeReadSyncStateSnapshot: Sendable {
+    let id: String
+    let notebookSyncKey: Int?
+    let lastFullSyncAt: Date?
+    let lastIncrementalSyncAt: Date?
+    
+    init(from state: WeReadSyncState) {
+        self.id = state.id
+        self.notebookSyncKey = state.notebookSyncKey
+        self.lastFullSyncAt = state.lastFullSyncAt
+        self.lastIncrementalSyncAt = state.lastIncrementalSyncAt
+    }
+    
+    /// 创建默认空状态
+    init() {
+        self.id = "global"
+        self.notebookSyncKey = nil
+        self.lastFullSyncAt = nil
+        self.lastIncrementalSyncAt = nil
+    }
+}
+
