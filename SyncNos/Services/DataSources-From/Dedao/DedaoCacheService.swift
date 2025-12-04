@@ -1,23 +1,6 @@
 import Foundation
 import SwiftData
 
-// MARK: - Dedao Cache Error
-
-/// Dedao 缓存服务错误
-enum DedaoCacheError: LocalizedError {
-    case modelContainerNotAvailable
-    case modelContainerCreationFailed(Error)
-    
-    var errorDescription: String? {
-        switch self {
-        case .modelContainerNotAvailable:
-            return "Dedao cache storage is not available"
-        case .modelContainerCreationFailed(let error):
-            return "Failed to create Dedao cache storage: \(error.localizedDescription)"
-        }
-    }
-}
-
 // MARK: - Dedao Model Container Factory
 
 /// Dedao ModelContainer 工厂
