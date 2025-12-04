@@ -6,30 +6,39 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
-                LabeledContent("Database ID (optional)") {
+            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+                LabeledContent {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: viewModel.goodLinksDbId) { _, _ in
                             viewModel.save()
                         }
+                } label: {
+                    Text("Database ID (optional)")
+                        .scaledFont(.body)
                 }
 
-                Toggle("Enable GoodLinks source", isOn: $viewModel.isSourceEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Show GoodLinks in the main list and commands")
-                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable GoodLinks source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show GoodLinks in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
 
-                Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Enable automatic sync for GoodLinks")
-                    .onChange(of: viewModel.autoSync) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.autoSync) {
+                    Text("Auto Sync (24 hours)")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Enable automatic sync for GoodLinks")
+                .onChange(of: viewModel.autoSync) { _, _ in
+                    viewModel.save()
+                }
 
                 // GoodLinks 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {
@@ -42,6 +51,7 @@ struct GoodLinksSettingsView: View {
                 }) {
                     HStack {
                         Label("Select Folder", systemImage: "folder")
+                            .scaledFont(.body)
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)
@@ -55,6 +65,7 @@ struct GoodLinksSettingsView: View {
             if let message = viewModel.message {
                 Section {
                     Text(message)
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                 }
             }
