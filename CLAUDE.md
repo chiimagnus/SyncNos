@@ -323,7 +323,8 @@ DIContainer.shared.dedaoCacheService
 - `WeReadAuthService`: Cookie 认证服务
 - `WeReadCookieRefreshService`: Cookie 自动刷新
 - `CookieRefreshCoordinator`: 刷新协调器（Actor）
-- `WeReadCacheService`: SwiftData 本地缓存服务
+- `WeReadCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
+  - 使用 `@ModelActor` 在后台线程执行数据库操作
   - 缓存书籍列表和高亮数据
   - 支持离线访问和快速启动
   - 记录增量同步状态
@@ -338,7 +339,8 @@ DIContainer.shared.dedaoCacheService
   - 支持二维码扫码登录
 - `DedaoAuthService`: Cookie 认证服务
 - `DedaoRequestLimiter`: 请求限流器（令牌桶算法）
-- `DedaoCacheService`: SwiftData 本地缓存服务
+- `DedaoCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
+  - 使用 `@ModelActor` 在后台线程执行数据库操作
   - 缓存书籍列表和高亮数据
   - 支持离线访问
 
@@ -543,10 +545,10 @@ swift package update
 ### WeRead 集成
 - **Cookie 自动刷新机制**：`CookieRefreshCoordinator` (Actor) 和 `WeReadCookieRefreshService`
 - **透明认证流程**：简化登录UI，移除手动cookie输入
-- **本地缓存**：使用 SwiftData 缓存书籍和高亮数据
-  - `WeReadCacheService`：本地持久化服务
+- **本地缓存**：使用 SwiftData + `@ModelActor` 缓存书籍和高亮数据
+  - `WeReadCacheService`：使用 `@ModelActor` 的本地持久化服务
   - `CachedWeReadBook`/`CachedWeReadHighlight`：SwiftData 模型
-  - 支持快速启动和离线访问
+  - 支持快速启动和离线访问，后台线程执行不阻塞 UI
 - **增量同步**：`WeReadIncrementalSyncService` 基于 syncKey 的增量同步
 - **自动同步**：`WeReadAutoSyncProvider` 支持后台定时同步
 - **登录导航修复**：Cookie 过期时自动导航到 WeRead 设置并打开登录 Sheet
@@ -560,9 +562,10 @@ swift package update
   - 电子书列表获取（支持分页）
   - 笔记/高亮获取（自动过滤无效笔记）
   - 用户信息获取
-- **本地缓存**：使用 SwiftData 缓存书籍和高亮数据
-  - `DedaoCacheService`：本地持久化服务
+- **本地缓存**：使用 SwiftData + `@ModelActor` 缓存书籍和高亮数据
+  - `DedaoCacheService`：使用 `@ModelActor` 的本地持久化服务
   - `CachedDedaoBook`/`CachedDedaoHighlight`：SwiftData 模型
+  - 后台线程执行不阻塞 UI
 - **适配器模式**：`DedaoNotionAdapter` 实现 `NotionSyncSourceProtocol`
 - **自动同步**：`DedaoAutoSyncProvider` 支持后台定时同步
 - **兼容双格式 API**：支持标准格式和混合格式两种 API 响应
