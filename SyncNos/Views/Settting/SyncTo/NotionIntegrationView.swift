@@ -20,12 +20,12 @@ struct NotionIntegrationView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
                             Text("OAuth Authorized")
-                                .font(.headline)
+                                .scaledFont(.headline)
                         }
                         
                         if let workspaceName = viewModel.workspaceName {
                             Text("Workspace: \(workspaceName)")
-                                .font(.subheadline)
+                                .scaledFont(.subheadline)
                                 .foregroundColor(.secondary)
                                 .lineLimit(nil)
                         }
@@ -78,7 +78,7 @@ struct NotionIntegrationView: View {
                                             .scaleEffect(0.8)
                                     } else {
                                         Image(systemName: "arrow.clockwise")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                     }
                                 }
                                 .buttonStyle(.borderless)
@@ -96,7 +96,7 @@ struct NotionIntegrationView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Use OAuth to authorize SyncNos to access your Notion workspace. This is the recommended method.")
-                            .font(.subheadline)
+                            .scaledFont(.subheadline)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
                         
@@ -122,7 +122,7 @@ struct NotionIntegrationView: View {
                     Divider()
 
                     Text("If you have any problems with OAuth, you can manually enter credentials:")
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundColor(.secondary)
 
                     LabeledContent("NOTION_KEY") {
@@ -175,5 +175,6 @@ struct NotionIntegrationView: View {
 struct NotionIntegrationView_Previews: PreviewProvider {
     static var previews: some View {
         NotionIntegrationView()
+            .applyFontScale()
     }
 }

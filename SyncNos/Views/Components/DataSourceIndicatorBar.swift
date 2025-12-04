@@ -40,11 +40,11 @@ private struct DataSourceIndicatorItem: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: source.icon)
-                    .font(.caption2.weight(.medium)) // 使用系统样式，自动支持 Dynamic Type
+                    .scaledFont(.caption2, weight: .medium)
                 
                 if isActive {
                     Text(source.displayName)
-                        .font(.caption2.weight(.medium)) // 使用系统样式，自动支持 Dynamic Type
+                        .scaledFont(.caption2, weight: .medium)
                         .lineLimit(1)
                 }
             }
@@ -79,5 +79,5 @@ private struct DataSourceIndicatorItem: View {
 #Preview {
     DataSourceIndicatorBar(viewModel: DataSourceSwitchViewModel())
         .frame(width: 300)
+        .applyFontScale()
 }
-

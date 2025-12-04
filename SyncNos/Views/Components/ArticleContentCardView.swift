@@ -62,15 +62,15 @@ struct ArticleContentCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "doc.text.fill")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundColor(.secondary)
                 
                 Text("Article")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundColor(.primary)
                 
                 Text("\(wordCount) words")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
                 
                 Spacer()
@@ -80,13 +80,13 @@ struct ArticleContentCardView: View {
             Group {
                 if let slot = customSlot {
                     slot
-                        .font(.body)
+                        .scaledFont(.body)
                         .foregroundColor(.primary)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(contentText)
-                        .font(.body)
+                        .scaledFont(.body)
                         .foregroundColor(.primary)
                         .textSelection(.disabled)
                         .lineLimit(expandedBinding.wrappedValue ? nil : collapsedLineLimit)
@@ -107,7 +107,7 @@ struct ArticleContentCardView: View {
                         Image(systemName: expandedBinding.wrappedValue ? "chevron.up" : "chevron.down")
                             .imageScale(.small)
                     }
-                    .font(.caption)
+                    .scaledFont(.caption)
                 }
                 .buttonStyle(.link)
             }
