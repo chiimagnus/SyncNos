@@ -4,12 +4,12 @@ import SwiftUI
 
 struct OnboardingWelcomeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
-    private var logoSize: CGFloat { 180 * fontScale }
-    private var satelliteIconSize: CGFloat { 20 * fontScale }
-    private var satelliteIconPadding: CGFloat { 12 * fontScale }
-    private var orbitRadius: CGFloat { 120 * fontScale }
+    private var logoSize: CGFloat { 180 * fontScaleManager.scaleFactor }
+    private var satelliteIconSize: CGFloat { 20 * fontScaleManager.scaleFactor }
+    private var satelliteIconPadding: CGFloat { 12 * fontScaleManager.scaleFactor }
+    private var orbitRadius: CGFloat { 120 * fontScaleManager.scaleFactor }
     
     var body: some View {
         ZStack {

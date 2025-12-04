@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
 struct SelectionPlaceholderView: View {
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
     let title: String
     let count: Int?
@@ -45,15 +45,15 @@ struct SelectionPlaceholderView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // App Logo - 使用 fontScale 进行缩放
-                let logoSize: CGFloat = 120 * fontScale
+                // App Logo - 使用 fontScaleManager 进行缩放
+                let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
                     .frame(width: logoSize, height: logoSize)
 
-                // 标题 - 使用 fontScale 进行缩放
-                let titleFontSize: CGFloat = 56 * fontScale
+                // 标题 - 使用 fontScaleManager 进行缩放
+                let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
                 Text(title)
                     .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
                     .fontWidth(.compressed)
@@ -78,7 +78,8 @@ struct SelectionPlaceholderView: View {
                         // 显示过滤后/全部数量
                         if totalCount > 0 {
                             Text("\(filteredCount)/\(totalCount)")
-                                .font(.system(size: Font.TextStyle.title3.basePointSize * fontScale).monospacedDigit())
+                                .scaledFont(.title3)
+                                .monospacedDigit()
                                 .foregroundColor(.secondary.opacity(0.7))
                         }
                     }
@@ -121,8 +122,6 @@ private let infoHeaderDateFormatter: DateFormatter = {
 
 /// 通用的头部信息卡片，半透明背景，左右结构可扩展
 struct InfoHeaderCardView<Content: View, Trailing: View>: View {
-    @Environment(\.fontScale) private var fontScale
-    
     let title: String
     let subtitle: String?
     let overrideWidth: CGFloat?

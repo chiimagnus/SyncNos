@@ -6,10 +6,10 @@ import SwiftUI
 struct OnboardingNextButton: View {
     let action: () -> Void
     
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
-    private var iconSize: CGFloat { 20 * fontScale }
-    private var buttonSize: CGFloat { 50 * fontScale }
+    private var iconSize: CGFloat { 20 * fontScaleManager.scaleFactor }
+    private var buttonSize: CGFloat { 50 * fontScaleManager.scaleFactor }
     
     var body: some View {
         Button(action: action) {
