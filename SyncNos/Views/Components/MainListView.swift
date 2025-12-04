@@ -34,6 +34,9 @@ struct MainListView: View {
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
     
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var emptyStateIconSize: CGFloat = 40
+    
     // MARK: - Initialization
     
     init() {
@@ -295,7 +298,7 @@ struct MainListView: View {
     private var noSourcePlaceholder: some View {
         VStack(spacing: 16) {
             Image(systemName: "books.vertical")
-                .font(.system(size: 40))
+                .font(.system(size: emptyStateIconSize))
                 .foregroundStyle(.secondary)
             Text("No data sources enabled")
                 .font(.title3)

@@ -28,6 +28,9 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     /// 底部栏的高度（用于内容区域的底部空间）
     private let bottomBarHeight: CGFloat = 20
     
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var emptyStateIconSize: CGFloat = 48
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // 滑动区域
@@ -206,7 +209,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "books.vertical")
-                .font(.system(size: 48))
+                .font(.system(size: emptyStateIconSize))
                 .foregroundStyle(.secondary)
             Text("No data sources enabled")
                 .font(.title3)
