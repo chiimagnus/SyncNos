@@ -2,6 +2,8 @@ import SwiftUI
 
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
 struct SelectionPlaceholderView: View {
+    @Environment(\.fontScale) private var fontScale
+    
     let title: String
     let count: Int?
     let onSyncSelected: (() -> Void)?
@@ -10,10 +12,6 @@ struct SelectionPlaceholderView: View {
     let filteredCount: Int
     /// 全部 item 数量
     let totalCount: Int
-    
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 120
-    @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 56
 
     init(
         title: String,
@@ -47,13 +45,15 @@ struct SelectionPlaceholderView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // App Logo - 使用 @ScaledMetric 支持 Dynamic Type
+                // App Logo - 使用 fontScale 进行缩放
+                let logoSize: CGFloat = 120 * fontScale
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
                     .frame(width: logoSize, height: logoSize)
 
-                // 标题 - 使用 @ScaledMetric 支持 Dynamic Type
+                // 标题 - 使用 fontScale 进行缩放
+                let titleFontSize: CGFloat = 56 * fontScale
                 Text(title)
                     .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
                     .fontWidth(.compressed)
@@ -67,18 +67,18 @@ struct SelectionPlaceholderView: View {
                     } label: {
                         Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
                     }
-                    .font(.body) // 确保按钮文字支持 Dynamic Type
+                    .scaledFont(.body)
                     .padding(.bottom, 16)
                 } else {
                     HStack(spacing: 12) {
                         Text("Please select an item")
-                            .font(.title3) // 系统样式，自动支持 Dynamic Type
+                            .scaledFont(.title3)
                             .foregroundColor(.secondary)
                         
                         // 显示过滤后/全部数量
                         if totalCount > 0 {
                             Text("\(filteredCount)/\(totalCount)")
-                                .font(.title3.monospacedDigit()) // 系统样式
+                                .font(.system(size: Font.TextStyle.title3.basePointSize * fontScale).monospacedDigit())
                                 .foregroundColor(.secondary.opacity(0.7))
                         }
                     }
@@ -87,8 +87,7 @@ struct SelectionPlaceholderView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Sync Queue")
-                        .font(.title2) // 系统样式，自动支持 Dynamic Type
-                        .fontWeight(.semibold)
+                        .scaledFont(.title2, weight: .semibold)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     // 关键：无论空态或多选，均保留同一位置的 SyncQueueView，避免重新订阅
@@ -100,8 +99,6 @@ struct SelectionPlaceholderView: View {
         }
     }
 }
-
-import SwiftUI
 
 /// 时间戳信息结构
 struct TimestampInfo {
@@ -124,6 +121,8 @@ private let infoHeaderDateFormatter: DateFormatter = {
 
 /// 通用的头部信息卡片，半透明背景，左右结构可扩展
 struct InfoHeaderCardView<Content: View, Trailing: View>: View {
+    @Environment(\.fontScale) private var fontScale
+    
     let title: String
     let subtitle: String?
     let overrideWidth: CGFloat?
@@ -152,12 +151,11 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .scaledFont(.title, weight: .bold)
                         .textSelection(.enabled)
                     if let subtitle = subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.title3)
+                            .scaledFont(.title3)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -175,28 +173,28 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
                     if let addedAt = timestamps.addedAt {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Added Time")
-                                .font(.caption2)
+                                .scaledFont(.caption2)
                                 .foregroundColor(.secondary)
                             Text(infoHeaderDateFormatter.string(from: addedAt))
-                                .font(.caption)
+                                .scaledFont(.caption)
                         }
                     }
                     if let modifiedAt = timestamps.modifiedAt {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Modified Time")
-                                .font(.caption2)
+                                .scaledFont(.caption2)
                                 .foregroundColor(.secondary)
                             Text(infoHeaderDateFormatter.string(from: modifiedAt))
-                                .font(.caption)
+                                .scaledFont(.caption)
                         }
                     }
                     if let lastSyncAt = timestamps.lastSyncAt {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Last Sync Time")
-                                .font(.caption2)
+                                .scaledFont(.caption2)
                                 .foregroundColor(.secondary)
                             Text(infoHeaderDateFormatter.string(from: lastSyncAt))
-                                .font(.caption)
+                                .scaledFont(.caption)
                         }
                     }
                 }

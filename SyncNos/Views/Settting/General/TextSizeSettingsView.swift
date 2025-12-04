@@ -1,8 +1,11 @@
 import SwiftUI
 
 /// 字体大小设置视图
+/// 
+/// 允许用户调整应用内的字体大小。由于 macOS 不支持系统级 Dynamic Type，
+/// 此视图提供了应用内的字体缩放功能。
 struct TextSizeSettingsView: View {
-    @ObservedObject var fontScaleManager = FontScaleManager.shared
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @State private var selectedIndex: Double
     
     init() {
@@ -12,86 +15,20 @@ struct TextSizeSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 标题和说明
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Text Size")
-                    .font(.title2.weight(.semibold))
-                
-                Text("Adjust the text size for the app. This setting affects all text throughout the application.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-            }
+            headerSection
             
             Divider()
             
             // 预览区域
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Preview")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                previewCard
-            }
+            previewSection
             
             Divider()
             
             // 滑块控制
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Size")
-                        .font(.headline)
-                    Spacer()
-                    Text(fontScaleManager.scaleLevel.displayName)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack(spacing: 8) {
-                    // 小字体图标
-                    Image(systemName: "textformat.size.smaller")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    // 滑块
-                    Slider(
-                        value: $selectedIndex,
-                        in: 0...Double(FontScaleLevel.allCases.count - 1),
-                        step: 1
-                    ) { _ in }
-                        .onChange(of: selectedIndex) { _, newValue in
-                            fontScaleManager.scaleLevel = FontScaleLevel.from(index: Int(newValue))
-                        }
-                    
-                    // 大字体图标
-                    Image(systemName: "textformat.size.larger")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                
-                // 刻度标签
-                HStack {
-                    ForEach(Array(FontScaleLevel.allCases.enumerated()), id: \.element.id) { index, level in
-                        if index > 0 {
-                            Spacer()
-                        }
-                        Text(level.shortName)
-                            .font(.caption2)
-                            .foregroundColor(fontScaleManager.scaleLevel == level ? .primary : .secondary)
-                    }
-                }
-            }
+            sliderSection
             
             // 重置按钮
-            HStack {
-                Spacer()
-                Button("Reset to Default") {
-                    withAnimation {
-                        fontScaleManager.reset()
-                        selectedIndex = Double(fontScaleManager.scaleLevel.index)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(fontScaleManager.scaleLevel == .medium)
-            }
+            resetButton
             
             Spacer()
         }
@@ -99,7 +36,30 @@ struct TextSizeSettingsView: View {
         .frame(minWidth: 400, maxWidth: 500)
     }
     
-    // MARK: - Preview Card
+    // MARK: - Header Section
+    
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Text Size")
+                .font(.title2.weight(.semibold))
+            
+            Text("Adjust the text size for the app. This setting affects all text throughout the application.")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    // MARK: - Preview Section
+    
+    private var previewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preview")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            previewCard
+        }
+    }
     
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -130,6 +90,71 @@ struct TextSizeSettingsView: View {
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
     }
+    
+    // MARK: - Slider Section
+    
+    private var sliderSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Size")
+                    .font(.headline)
+                Spacer()
+                Text(fontScaleManager.scaleLevel.displayName)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack(spacing: 8) {
+                // 小字体图标
+                Image(systemName: "textformat.size.smaller")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                // 滑块
+                Slider(
+                    value: $selectedIndex,
+                    in: 0...Double(FontScaleLevel.allCases.count - 1),
+                    step: 1
+                ) { _ in }
+                    .onChange(of: selectedIndex) { _, newValue in
+                        fontScaleManager.scaleLevel = FontScaleLevel.from(index: Int(newValue))
+                    }
+                
+                // 大字体图标
+                Image(systemName: "textformat.size.larger")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            
+            // 刻度标签
+            HStack {
+                ForEach(Array(FontScaleLevel.allCases.enumerated()), id: \.element.id) { index, level in
+                    if index > 0 {
+                        Spacer()
+                    }
+                    Text(level.shortName)
+                        .font(.caption2)
+                        .foregroundColor(fontScaleManager.scaleLevel == level ? .primary : .secondary)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Reset Button
+    
+    private var resetButton: some View {
+        HStack {
+            Spacer()
+            Button("Reset to Default") {
+                withAnimation {
+                    fontScaleManager.reset()
+                    selectedIndex = Double(fontScaleManager.scaleLevel.index)
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(fontScaleManager.scaleLevel == .medium)
+        }
+    }
 }
 
 // MARK: - Preview
@@ -137,4 +162,3 @@ struct TextSizeSettingsView: View {
 #Preview {
     TextSizeSettingsView()
 }
-
