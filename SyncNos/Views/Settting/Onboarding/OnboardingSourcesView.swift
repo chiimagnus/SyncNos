@@ -97,11 +97,11 @@ struct SourceCard: View {
     let title: String
     @Binding var isOn: Bool
     
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
-    private var iconSize: CGFloat { 32 * fontScale }
-    private var iconContainerSize: CGFloat { 72 * fontScale }
-    private var cardWidth: CGFloat { 120 * fontScale }
+    private var iconSize: CGFloat { 32 * fontScaleManager.scaleFactor }
+    private var iconContainerSize: CGFloat { 72 * fontScaleManager.scaleFactor }
+    private var cardWidth: CGFloat { 120 * fontScaleManager.scaleFactor }
     
     var body: some View {
         VStack(spacing: 12) {

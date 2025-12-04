@@ -9,7 +9,7 @@ struct PayWallView: View {
     @StateObject private var viewModel = IAPViewModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @State private var loadingPlanID: String? = nil
     
     // 动画状态
@@ -17,7 +17,7 @@ struct PayWallView: View {
     @State private var headerIconScale: CGFloat = 1.0  // 图标脉冲放大
     @State private var headerIconShake: CGFloat = 0  // 图标颤抖
     
-    private var heroIconSize: CGFloat { 60 * fontScale }
+    private var heroIconSize: CGFloat { 60 * fontScaleManager.scaleFactor }
     
     var body: some View {
         VStack(spacing: 0) {
