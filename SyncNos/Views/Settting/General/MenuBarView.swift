@@ -16,13 +16,13 @@ struct MenuBarView: View {
         
         // MARK: - Sync Queue Status
         Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
         Label("\(viewModel.queuedCount) Waiting", systemImage: "clock")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
         Label("\(viewModel.failedCount) Failed", systemImage: "exclamationmark.triangle")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.red)
         
         Divider()
