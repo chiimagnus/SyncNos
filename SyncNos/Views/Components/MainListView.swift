@@ -34,8 +34,8 @@ struct MainListView: View {
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var emptyStateIconSize: CGFloat = 40
+    // MARK: - Font Scale Support
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
     // MARK: - Initialization
     
@@ -298,11 +298,12 @@ struct MainListView: View {
     private var noSourcePlaceholder: some View {
         VStack(spacing: 16) {
             Image(systemName: "books.vertical")
-                .font(.system(size: emptyStateIconSize))
+                .font(.system(size: 40 * fontScaleManager.scaleFactor))
                 .foregroundStyle(.secondary)
             Text("No data sources enabled")
-                .font(.title3)
+                .scaledFont(.title3)
             Text("Please enable at least one source in Settings.")
+                .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
@@ -311,6 +312,7 @@ struct MainListView: View {
             } label: {
                 Label("Open Settings", systemImage: "gearshape")
             }
+            .scaledFont(.body)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -9,19 +9,21 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             List {
-                Section(header: Text("General")) {
+                Section(header: Text("General").scaledFont(.headline)) {
                     LanguageView()
                     
                     // 字体大小设置
                     NavigationLink(destination: TextSizeSettingsView()) {
                         HStack {
                             Label("Text Size", systemImage: "textformat.size")
+                                .scaledFont(.body)
                             Spacer()
                             Text(FontScaleManager.shared.scaleLevel.shortName)
+                                .scaledFont(.subheadline)
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
+                                .scaledFont(.body)
                         }
                     }
                     .help("Adjust text size throughout the app")
@@ -34,6 +36,7 @@ struct SettingsView: View {
                         }
                     )) {
                         Label("Launch at Login", systemImage: "arrow.up.right.square")
+                            .scaledFont(.body)
                     }
                     .toggleStyle(SwitchToggleStyle())
 
@@ -41,10 +44,11 @@ struct SettingsView: View {
                     NavigationLink(destination: AboutView()) {
                         HStack {
                             Label("About", systemImage: "info.circle")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
+                                .scaledFont(.body)
                         }
                     }
                     .help("Show application about information")
@@ -53,10 +57,11 @@ struct SettingsView: View {
                     NavigationLink(destination: AppleAccountView()) {
                         HStack {
                             Label("Apple Account", systemImage: "apple.logo")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
+                                .scaledFont(.body)
                         }
                     }
                     .help("Manage Apple sign-in and account info")
@@ -65,65 +70,75 @@ struct SettingsView: View {
                     NavigationLink(destination: IAPView()) {
                         HStack {
                             Label("Support", systemImage: "star")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
+                                .scaledFont(.body)
                         }
                     }
                     .help("Support development and unlock Pro features")
                 }
                 .collapsible(false)
 
-                Section(header: Text("Sync Data To")) {
+                Section(header: Text("Sync Data To").scaledFont(.headline)) {
                     NavigationLink(value: "notion") {
                         HStack {
                             Label("Notion API", systemImage: "n.square")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
-                                .font(.body.weight(.regular))
+                                .scaledFont(.body)
                         }
                     }
                     .help("Configure Notion and run example API calls")
                 }
                 .collapsible(false)
 
-                Section(header: Text("Get Data From")) {
+                Section(header: Text("Get Data From").scaledFont(.headline)) {
                     // Per-source auto sync toggles and navigation
                     NavigationLink(destination: AppleBooksSettingsView()) {
                         HStack {
                             Label("Apple Books", systemImage: "book")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 
                     NavigationLink(destination: GoodLinksSettingsView()) {
                         HStack {
                             Label("GoodLinks", systemImage: "bookmark")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 
                     NavigationLink(destination: WeReadSettingsView()) {
                         HStack {
                             Label("WeRead", systemImage: "text.book.closed")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 
                     NavigationLink(destination: DedaoSettingsView()) {
                         HStack {
                             Label("Dedao", systemImage: "book.closed")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 
@@ -131,27 +146,33 @@ struct SettingsView: View {
                     NavigationLink(destination: EmptyView()) {
                         HStack {
                             Label("Get", systemImage: "")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 
                     NavigationLink(destination: EmptyView()) {
                         HStack {
                             Label("Logseq", systemImage: "")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
                     
                     NavigationLink(destination: EmptyView()) {
                         HStack {
                             Label("Obsidian", systemImage: "")
+                                .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
+                                .scaledFont(.caption)
                         }
                     }
 #endif

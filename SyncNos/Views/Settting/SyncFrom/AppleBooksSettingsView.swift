@@ -6,38 +6,54 @@ struct AppleBooksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
-                Picker("Sync Mode", selection: $viewModel.syncMode) {
-                    Text("One page per book").tag("single")
-                    Text("One database per book").tag("perBook")
+            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+                Picker(selection: $viewModel.syncMode) {
+                    Text("One page per book")
+                        .scaledFont(.body)
+                        .tag("single")
+                    Text("One database per book")
+                        .scaledFont(.body)
+                        .tag("perBook")
+                } label: {
+                    Text("Sync Mode")
+                        .scaledFont(.body)
                 }
                 .onChange(of: viewModel.syncMode) { _, _ in
                     viewModel.saveSyncMode()
                 }
 
-                LabeledContent("Database ID (optional)") {
+                LabeledContent {
                     TextField("Notion Database ID for Apple Books", text: $viewModel.appleBooksDbId)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: viewModel.appleBooksDbId) { _, _ in
                             viewModel.save()
                         }
+                } label: {
+                    Text("Database ID (optional)")
+                        .scaledFont(.body)
                 }
 
-                Toggle("Enable Apple Books source", isOn: $viewModel.isSourceEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Show Apple Books in the main list and commands")
-                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable Apple Books source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show Apple Books in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
 
-                Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Enable automatic sync for Apple Books")
-                    .onChange(of: viewModel.autoSync) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.autoSync) {
+                    Text("Auto Sync (24 hours)")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Enable automatic sync for Apple Books")
+                .onChange(of: viewModel.autoSync) { _, _ in
+                    viewModel.save()
+                }
 
                 // Apple Books 数据目录授权按钮（从 SettingsView 移动过来）
                 Button(action: {
@@ -51,6 +67,7 @@ struct AppleBooksSettingsView: View {
                 }) {
                     HStack {
                         Label("Select Folder", systemImage: "folder")
+                            .scaledFont(.body)
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)
@@ -64,6 +81,7 @@ struct AppleBooksSettingsView: View {
             if let message = viewModel.message {
                 Section {
                     Text(message)
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                 }
             }

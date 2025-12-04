@@ -5,7 +5,6 @@ struct AppleBooksListView: View {
     @ObservedObject var viewModel: AppleBooksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.fontScale) private var fontScale
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -18,10 +17,10 @@ struct AppleBooksListView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
-                        .font(.largeTitle)
+                        .scaledFont(.largeTitle)
                     
                     Text("Access Denied")
-                        .font(.headline)
+                        .scaledFont(.headline)
                     
                     Text("SyncNos needs permission to access Apple Books notes. If you previously selected \"Don't Allow\", please restart the app and select \"Allow\" when prompted.")
                         .multilineTextAlignment(.center)
@@ -51,8 +50,9 @@ struct AppleBooksListView: View {
                 VStack {
                     Image(systemName: "books.vertical")
                         .foregroundColor(.secondary)
-                        .font(.largeTitle)
+                        .scaledFont(.largeTitle)
                     Text("No books found")
+                        .scaledFont(.body)
                         .padding()
                     Button("Open Apple Books notes", systemImage: "folder") {
                         AppleBooksPicker.pickAppleBooksContainer()
@@ -65,17 +65,17 @@ struct AppleBooksListView: View {
                             VStack(alignment: .leading) {
                                 if book.hasTitle {
                                     Text(book.bookTitle)
-                                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                                        .scaledFont(.headline, weight: .semibold)
                                 } else {
                                     Text("No Title")
-                                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                                        .scaledFont(.headline, weight: .semibold)
                                         .foregroundColor(.orange)
                                 }
                                 Text(book.authorName)
-                                    .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScale))
+                                    .scaledFont(.subheadline)
                                     .foregroundColor(.secondary)
                                 Text("\(book.highlightCount) highlights")
-                                    .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                    .scaledFont(.caption)
                             }
                             Spacer()
                             // Sync status icon

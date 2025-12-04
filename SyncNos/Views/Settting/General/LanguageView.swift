@@ -89,10 +89,13 @@ struct LanguageView: View {
     var body: some View {
         Picker(selection: $selectedLanguage) {
             ForEach(supportedLanguages, id: \.0) { language in
-                Text(language.1).tag(language.0)
+                Text(language.1)
+                    .scaledFont(.body)
+                    .tag(language.0)
             }
         } label: {
             Label("Language", systemImage: "globe")
+                .scaledFont(.body)
         }
         .onChange(of: selectedLanguage) { _, newLanguage in
             changeAppLanguage(to: newLanguage)
@@ -107,6 +110,7 @@ struct LanguageView: View {
             }
         } message: {
             Text("Please restart the application for the language change to take effect.")
+                .scaledFont(.body)
         }
     }
 }

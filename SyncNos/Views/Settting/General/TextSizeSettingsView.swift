@@ -41,10 +41,10 @@ struct TextSizeSettingsView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Text Size")
-                .font(.title2.weight(.semibold))
+                .scaledFont(.title2, weight: .semibold)
             
             Text("Adjust the text size for the app. This setting affects all text throughout the application.")
-                .font(.body)
+                .scaledFont(.body)
                 .foregroundColor(.secondary)
         }
     }
@@ -54,7 +54,7 @@ struct TextSizeSettingsView: View {
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Preview")
-                .font(.headline)
+                .scaledFont(.headline)
                 .foregroundColor(.secondary)
             
             previewCard
@@ -66,24 +66,24 @@ struct TextSizeSettingsView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Book Title")
-                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScaleManager.scaleFactor, weight: .semibold))
+                        .scaledFont(.headline, weight: .semibold)
                     Text("Author Name")
-                        .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScaleManager.scaleFactor))
+                        .scaledFont(.subheadline)
                         .foregroundColor(.secondary)
                     Text("42 highlights")
-                        .font(.system(size: Font.TextStyle.caption.basePointSize * fontScaleManager.scaleFactor))
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                    .font(.system(size: 16 * fontScaleManager.scaleFactor))
+                    .scaledFont(.body)
             }
             
             Divider()
             
             Text("This is a sample highlight text that demonstrates how the text size setting affects the reading experience in the app.")
-                .font(.system(size: Font.TextStyle.body.basePointSize * fontScaleManager.scaleFactor))
+                .scaledFont(.body)
                 .lineSpacing(4 * fontScaleManager.scaleFactor)
         }
         .padding()
@@ -97,17 +97,17 @@ struct TextSizeSettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Size")
-                    .font(.headline)
+                    .scaledFont(.headline)
                 Spacer()
                 Text(fontScaleManager.scaleLevel.displayName)
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundColor(.secondary)
             }
             
             HStack(spacing: 8) {
                 // 小字体图标
                 Image(systemName: "textformat.size.smaller")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
                 
                 // 滑块
@@ -122,7 +122,7 @@ struct TextSizeSettingsView: View {
                 
                 // 大字体图标
                 Image(systemName: "textformat.size.larger")
-                    .font(.body)
+                    .scaledFont(.body)
                     .foregroundColor(.secondary)
             }
             
@@ -133,7 +133,7 @@ struct TextSizeSettingsView: View {
                         Spacer()
                     }
                     Text(level.shortName)
-                        .font(.caption2)
+                        .scaledFont(.caption2)
                         .foregroundColor(fontScaleManager.scaleLevel == level ? .primary : .secondary)
                 }
             }

@@ -13,7 +13,7 @@ struct NotionIntegrationView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Authorization")) {
+            Section(header: Text("Authorization").scaledFont(.headline)) {
                 if viewModel.isOAuthAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -31,7 +31,7 @@ struct NotionIntegrationView: View {
                         }
                         
                         // 当前父页面（用于在此页面下创建数据库）
-                        LabeledContent("Parent Page") {
+                        LabeledContent {
                             HStack(spacing: 8) {
                                 Picker(selection: Binding(
                                     get: {
@@ -56,12 +56,17 @@ struct NotionIntegrationView: View {
                                     }
                                 )) {
                                     if viewModel.isBusy {
-                                        Text("Loading...").tag("")
+                                        Text("Loading...")
+                                            .scaledFont(.body)
+                                            .tag("")
                                     } else if viewModel.availablePages.isEmpty {
-                                        Text("(No pages available)").tag("")
+                                        Text("(No pages available)")
+                                            .scaledFont(.body)
+                                            .tag("")
                                     } else {
                                         ForEach(viewModel.availablePages) { page in
                                             Text(pageDisplayText(page))
+                                                .scaledFont(.body)
                                                 .tag(page.id)
                                         }
                                     }
@@ -84,11 +89,15 @@ struct NotionIntegrationView: View {
                                 .buttonStyle(.borderless)
                                 .disabled(viewModel.isBusy)
                             }
+                        } label: {
+                            Text("Parent Page")
+                                .scaledFont(.body)
                         }
                         
                         Button("Revoke Authorization") {
                             viewModel.revokeOAuth()
                         }
+                        .scaledFont(.body)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
@@ -109,6 +118,7 @@ struct NotionIntegrationView: View {
                                         .scaleEffect(0.8)
                                 }
                                 Text(viewModel.isAuthorizing ? "Authorizing..." : "Authorize with Notion")
+                                    .scaledFont(.headline)
                             }
                         }
                         .buttonStyle(.borderedProminent)
@@ -125,20 +135,27 @@ struct NotionIntegrationView: View {
                         .scaledFont(.subheadline)
                         .foregroundColor(.secondary)
 
-                    LabeledContent("NOTION_KEY") {
+                    LabeledContent {
                         SecureField("NOTION_KEY", text: $viewModel.notionKeyInput)
                             .textFieldStyle(.roundedBorder)
                             .disabled(viewModel.isOAuthAuthorized)
+                    } label: {
+                        Text("NOTION_KEY")
+                            .scaledFont(.body)
                     }
 
-                    LabeledContent("NOTION_PAGE_ID") {
+                    LabeledContent {
                         TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
                             .textFieldStyle(.roundedBorder)
+                    } label: {
+                        Text("NOTION_PAGE_ID")
+                            .scaledFont(.body)
                     }
 
                     Button("Save") {
                         viewModel.saveCredentials()
                     }
+                    .scaledFont(.body)
                     .buttonStyle(.borderedProminent)
                     .disabled(viewModel.isOAuthAuthorized)
                 }
@@ -147,6 +164,7 @@ struct NotionIntegrationView: View {
             if let message = viewModel.message {
                 Section {
                     Text(message)
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                         .lineLimit(nil)
                 }
@@ -155,6 +173,7 @@ struct NotionIntegrationView: View {
             if let errorMessage = viewModel.errorMessage {
                 Section {
                     Text(errorMessage)
+                        .scaledFont(.body)
                         .foregroundColor(.red)
                         .lineLimit(nil)
                 }

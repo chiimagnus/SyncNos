@@ -5,11 +5,13 @@ struct WeReadSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("WeRead Account", systemImage: "person.crop.square")) {
+            Section(header: Label("WeRead Account", systemImage: "person.crop.square").scaledFont(.headline)) {
                 HStack {
                     Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
+                        .scaledFont(.body)
                     Spacer()
                     Text(viewModel.isLoggedIn ? "Logged In" : "Not Logged In")
+                        .scaledFont(.body)
                         .foregroundColor(viewModel.isLoggedIn ? .green : .secondary)
                 }
 
@@ -18,6 +20,7 @@ struct WeReadSettingsView: View {
                         viewModel.showLoginSheet = true
                     } label: {
                         Label("Open Login WebView", systemImage: "safari")
+                            .scaledFont(.body)
                     }
 
                     Spacer()
@@ -26,40 +29,51 @@ struct WeReadSettingsView: View {
                         viewModel.clearLogin()
                     } label: {
                         Label("Log Out", systemImage: "rectangle.portrait.and.arrow.forward")
+                            .scaledFont(.body)
                     }
                     .disabled(!viewModel.isLoggedIn)
                 }
             }
 
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square")) {
-                LabeledContent("Database ID (optional)") {
+            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+                LabeledContent {
                     TextField("Notion Database ID for WeRead", text: $viewModel.weReadDbId)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: viewModel.weReadDbId) { _, _ in
                             viewModel.save()
                         }
+                } label: {
+                    Text("Database ID (optional)")
+                        .scaledFont(.body)
                 }
 
-                Toggle("Enable WeRead source", isOn: $viewModel.isSourceEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Show WeRead in the main list and commands")
-                    .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable WeRead source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show WeRead in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
 
-                Toggle("Auto Sync (24 hours)", isOn: $viewModel.autoSync)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Enable automatic sync for WeRead")
-                    .onChange(of: viewModel.autoSync) { _, _ in
-                        viewModel.save()
-                    }
+                Toggle(isOn: $viewModel.autoSync) {
+                    Text("Auto Sync (24 hours)")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Enable automatic sync for WeRead")
+                .onChange(of: viewModel.autoSync) { _, _ in
+                    viewModel.save()
+                }
             }
 
             if let message = viewModel.message {
                 Section {
                     Text(message)
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                 }
             }
