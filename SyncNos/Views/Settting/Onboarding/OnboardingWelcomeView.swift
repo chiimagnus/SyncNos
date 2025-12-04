@@ -4,12 +4,12 @@ import SwiftUI
 
 struct OnboardingWelcomeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
+    @Environment(\.fontScale) private var fontScale
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 180
-    @ScaledMetric(relativeTo: .title) private var satelliteIconSize: CGFloat = 20
-    @ScaledMetric(relativeTo: .title) private var satelliteIconPadding: CGFloat = 12
-    @ScaledMetric(relativeTo: .title) private var orbitRadius: CGFloat = 120
+    private var logoSize: CGFloat { 180 * fontScale }
+    private var satelliteIconSize: CGFloat { 20 * fontScale }
+    private var satelliteIconPadding: CGFloat { 12 * fontScale }
+    private var orbitRadius: CGFloat { 120 * fontScale }
     
     var body: some View {
         ZStack {
@@ -35,11 +35,11 @@ struct OnboardingWelcomeView: View {
                     // 文字部分
                     VStack(alignment: .leading, spacing: 8) {
                         Text("All your highlights, unified.")
-                            .font(.title2.bold()) // 使用系统样式，自动支持 Dynamic Type
+                            .scaledFont(.title2, weight: .bold)
                             .foregroundStyle(Color("OnboardingTextColor"))
                         
                         Text("Sync Apple Books, GoodLinks, and WeRead highlights directly to your Notion database.")
-                            .font(.subheadline) // 系统样式，自动支持 Dynamic Type
+                            .scaledFont(.subheadline)
                             .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                             .lineLimit(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -60,7 +60,7 @@ struct OnboardingWelcomeView: View {
     
     private func satelliteIcon(_ systemName: String, color: Color, angle: Double) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: satelliteIconSize)) // 使用 @ScaledMetric 支持 Dynamic Type
+            .font(.system(size: satelliteIconSize))
             .foregroundStyle(.white)
             .padding(satelliteIconPadding)
             .background(color)
@@ -74,12 +74,5 @@ struct OnboardingWelcomeView: View {
     OnboardingWelcomeView(viewModel: OnboardingViewModel())
         .frame(width: 600, height: 500)
         .background(Color("BackgroundColor"))
+        .applyFontScale()
 }
-
-#Preview("Welcome - Accessibility") {
-    OnboardingWelcomeView(viewModel: OnboardingViewModel())
-        .frame(width: 600, height: 600)
-        .background(Color("BackgroundColor"))
-        .environment(\.dynamicTypeSize, .accessibility3)
-}
-

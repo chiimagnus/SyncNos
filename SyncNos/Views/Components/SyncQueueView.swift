@@ -10,11 +10,11 @@ struct SyncQueueView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Running")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(.primary)
                     if !runningTasks.isEmpty {
                         Text("\(runningTasks.count)")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -22,7 +22,7 @@ struct SyncQueueView: View {
                 
                 if runningTasks.isEmpty {
                     Text("No active sync tasks")
-                        .font(.body)
+                        .scaledFont(.body)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -43,11 +43,11 @@ struct SyncQueueView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Waiting")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(.primary)
                     if queuedTotalCount > 0 {
                         Text("\(queuedTotalCount)")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -55,7 +55,7 @@ struct SyncQueueView: View {
                 
                 if queuedTasks.isEmpty {
                     Text("No queued tasks")
-                        .font(.body)
+                        .scaledFont(.body)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -83,11 +83,11 @@ struct SyncQueueView: View {
                         Image(systemName: isFailedExpanded ? "chevron.down" : "chevron.right")
                             .foregroundStyle(.secondary)
                         Text("Failed")
-                            .font(.headline)
+                            .scaledFont(.headline)
                             .foregroundStyle(.primary)
                         if failedTotalCount > 0 {
                             Text("\(failedTotalCount)")
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -99,7 +99,7 @@ struct SyncQueueView: View {
 
                 if failedTasks.isEmpty {
                     Text("No failed tasks")
-                        .font(.body)
+                        .scaledFont(.body)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -144,20 +144,20 @@ struct SyncQueueView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(task.title)
-                        .font(.body)
+                        .scaledFont(.body)
                     
                     sourceBadge(for: task.source)
                 }
                 
                 if let subtitle = task.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 
                 if let progressText = task.progressText, !progressText.isEmpty {
                     Text(progressText)
-                        .font(.caption2)
+                        .scaledFont(.caption2)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -185,28 +185,28 @@ struct SyncQueueView: View {
         switch source {
         case .appleBooks:
             Label("Apple Books", systemImage: "book")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .foregroundStyle(.yellow)
                 .background(.yellow.opacity(0.18), in: Capsule())
         case .goodLinks:
             Label("GoodLinks", systemImage: "bookmark")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .foregroundStyle(.red)
                 .background(.red.opacity(0.12), in: Capsule())
         case .weRead:
             Label("WeRead", systemImage: "text.book.closed")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .foregroundStyle(.blue)
                 .background(.blue.opacity(0.14), in: Capsule())
         case .dedao:
             Label("Dedao", systemImage: "books.vertical")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .foregroundStyle(Color(red: 255/255, green: 107/255, blue: 0/255))  // #FF6B00

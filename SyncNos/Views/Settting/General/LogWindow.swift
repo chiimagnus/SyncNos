@@ -4,6 +4,7 @@ import AppKit
 struct LogWindow: View {
     @StateObject private var viewModel = LogViewModel()
     @State private var isAutoScrollEnabled: Bool = true
+    @Environment(\.fontScale) private var fontScale
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,8 +76,9 @@ struct LogWindow: View {
     }
 
     private func logEntryView(entry: LogEntry) -> some View {
-        Text(formatted(entry: entry))
-            .font(.system(.caption, design: .monospaced))
+        let scaledSize = Font.TextStyle.caption.basePointSize * fontScale
+        return Text(formatted(entry: entry))
+            .font(.system(size: scaledSize, design: .monospaced))
             .foregroundColor(Color(entry.level.color))
             .textSelection(.enabled)
     }
@@ -105,5 +107,6 @@ struct LogWindow: View {
 struct LogWindow_Previews: PreviewProvider {
     static var previews: some View {
         LogWindow()
+            .applyFontScale()
     }
 }

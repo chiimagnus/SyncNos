@@ -4,11 +4,11 @@ import SwiftUI
 
 struct OnboardingNotionView: View {
     @ObservedObject var viewModel: OnboardingViewModel
+    @Environment(\.fontScale) private var fontScale
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var notionIconSize: CGFloat = 120
-    @ScaledMetric(relativeTo: .title) private var titleFontSize: CGFloat = 28
-    @ScaledMetric(relativeTo: .title2) private var subtitleFontSize: CGFloat = 24
+    private var notionIconSize: CGFloat { 120 * fontScale }
+    private var titleFontSize: CGFloat { 28 * fontScale }
+    private var subtitleFontSize: CGFloat { 24 * fontScale }
     
     var body: some View {
         VStack {
@@ -53,7 +53,7 @@ struct OnboardingNotionView: View {
                 }
                 
                 Text(viewModel.workspaceName ?? "Workspace")
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
             
@@ -77,14 +77,14 @@ struct OnboardingNotionView: View {
                     .foregroundStyle(Color("OnboardingTextColor"))
                 
                 Text("We'll create secure databases in your Notion workspace.")
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .lineLimit(2)
                 
                 if let error = viewModel.notionErrorMessage {
                     Text(error)
                         .foregroundStyle(.red)
-                        .font(.caption)
+                        .scaledFont(.caption)
                 }
             }
             
@@ -105,7 +105,7 @@ struct OnboardingNotionView: View {
                             .controlSize(.small)
                     } else {
                         Text("Connect")
-                            .font(.headline)
+                            .scaledFont(.headline)
                     }
                 }
                 .foregroundColor(.white)
@@ -126,4 +126,5 @@ struct OnboardingNotionView: View {
     OnboardingNotionView(viewModel: OnboardingViewModel())
         .frame(width: 600, height: 500)
         .background(Color("BackgroundColor"))
+        .applyFontScale()
 }
