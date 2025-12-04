@@ -165,13 +165,14 @@ final class WeReadViewModel: ObservableObject {
         
         // 1. 先从缓存加载（快速显示）
         do {
+            // getAllBooks() 现在直接返回 [WeReadBookListItem]
             let cachedBooks = try await cacheService.getAllBooks()
             if !cachedBooks.isEmpty {
-                books = cachedBooks.map { WeReadBookListItem(from: $0) }
+                books = cachedBooks
                 isLoading = false
                 logger.info("[WeRead] Loaded \(cachedBooks.count) books from cache")
                 
-                // 获取上次同步时间
+                // 获取上次同步时间（返回 WeReadSyncStateSnapshot）
                 let state = try await cacheService.getSyncState()
                 lastSyncAt = state.lastIncrementalSyncAt ?? state.lastFullSyncAt
             }
@@ -194,14 +195,12 @@ final class WeReadViewModel: ObservableObject {
                 logger.info("[WeRead] No changes from server")
             case .updated(let added, let removed):
                 logger.info("[WeRead] Synced: +\(added) -\(removed) books")
-                // 重新从缓存加载更新后的数据
-                let updatedBooks = try await cacheService.getAllBooks()
-                books = updatedBooks.map { WeReadBookListItem(from: $0) }
+                // 重新从缓存加载更新后的数据（getAllBooks 直接返回 [WeReadBookListItem]）
+                books = try await cacheService.getAllBooks()
             case .fullSyncRequired:
                 // 需要全量同步
                 try await incrementalSyncService.fullSync()
-                let updatedBooks = try await cacheService.getAllBooks()
-                books = updatedBooks.map { WeReadBookListItem(from: $0) }
+                books = try await cacheService.getAllBooks()
             }
             
             lastSyncAt = Date()
