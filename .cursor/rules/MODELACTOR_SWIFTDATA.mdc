@@ -339,6 +339,40 @@ let descriptor = FetchDescriptor<CachedBook>(
 
 ## 参考实现
 
-- `SyncNos/Services/DataSources-From/Dedao/DedaoCacheService.swift`
-- `SyncNos/Services/DataSources-From/WeRead/WeReadCacheService.swift`
-- `SyncNos/docs/ModelActor_Technical_Guide.md`
+### 已实现的 CacheService
+
+| 服务 | 文件路径 |
+|------|----------|
+| Dedao | `SyncNos/Services/DataSources-From/Dedao/DedaoCacheService.swift` |
+| WeRead | `SyncNos/Services/DataSources-From/WeRead/WeReadCacheService.swift` |
+
+### 相关文件
+
+| 类型 | Dedao | WeRead |
+|------|-------|--------|
+| @Model 定义 | `SyncNos/Models/DedaoCacheModels.swift` | `SyncNos/Models/WeReadCacheModels.swift` |
+| Sendable DTO | `SyncNos/Models/DedaoModels.swift` | `SyncNos/Models/WeReadModels.swift` |
+| 协议定义 | `SyncNos/Services/Core/Protocols.swift` | 同左 |
+| DIContainer | `SyncNos/Services/Core/DIContainer.swift` | 同左 |
+
+## 参考资料
+
+### Apple 官方文档
+
+- [ModelActor Protocol](https://developer.apple.com/documentation/swiftdata/modelactor/) - `@ModelActor` 协议定义
+- [ModelActor() Macro](https://developer.apple.com/documentation/swiftdata/modelactor()/) - `@ModelActor` 宏说明
+- [SwiftData Framework](https://developer.apple.com/documentation/swiftdata/) - SwiftData 框架文档
+- [ModelContainer](https://developer.apple.com/documentation/swiftdata/modelcontainer/) - 模型容器
+- [ModelContext](https://developer.apple.com/documentation/swiftdata/modelcontext/) - 模型上下文
+
+### WWDC 视频
+
+| 年份 | 视频 | 说明 |
+|------|------|------|
+| 2023 | [Meet SwiftData](https://developer.apple.com/videos/play/wwdc2023/10187/) | SwiftData 入门 |
+| 2023 | [Build an app with SwiftData](https://developer.apple.com/videos/play/wwdc2023/10154/) | 使用 SwiftData 构建应用 |
+| 2023 | [Dive deeper into SwiftData](https://developer.apple.com/videos/play/wwdc2023/10196/) | 深入 SwiftData（ModelContainer、ModelContext、并发） |
+| 2023 | [Model your schema with SwiftData](https://developer.apple.com/videos/play/wwdc2023/10195/) | Schema 建模 |
+| 2024 | [What's new in SwiftData](https://developer.apple.com/videos/play/wwdc2024/10137/) | SwiftData 新特性（#Unique、#Index、PreviewModifier） |
+| 2024 | [Create a custom data store with SwiftData](https://developer.apple.com/videos/play/wwdc2024/10138/) | 自定义数据存储 |
+| 2024 | [Track model changes with SwiftData history](https://developer.apple.com/videos/play/wwdc2024/10075/) | 数据变更追踪 |
