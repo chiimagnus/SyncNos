@@ -90,74 +90,111 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
     
     // MARK: - 书籍操作
     
-    @MainActor
+    /// 获取所有书籍（在后台线程执行）
     func getAllBooks() async throws -> [CachedWeReadBook] {
         let container = try getModelContainer()
-        let context = container.mainContext
-        let descriptor = FetchDescriptor<CachedWeReadBook>(
-            sortBy: [SortDescriptor(\.title, order: .forward)]
-        )
-        let books = try context.fetch(descriptor)
-        logger.debug("[WeReadCache] Fetched \(books.count) books from cache")
-        return books
+        
+        return try await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            let descriptor = FetchDescriptor<CachedWeReadBook>(
+                sortBy: [SortDescriptor(\.title, order: .forward)]
+            )
+            return try context.fetch(descriptor)
+        }.value
     }
     
-    @MainActor
+    /// 获取指定书籍（在后台线程执行）
     func getBook(bookId: String) async throws -> CachedWeReadBook? {
         let container = try getModelContainer()
-        let context = container.mainContext
         let targetBookId = bookId
-        let predicate = #Predicate<CachedWeReadBook> { book in
-            book.bookId == targetBookId
-        }
-        var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
-        descriptor.fetchLimit = 1
-        let results = try context.fetch(descriptor)
-        return results.first
-    }
-    
-    @MainActor
-    func saveBooks(_ notebooks: [WeReadNotebook]) async throws {
-        let container = try getModelContainer()
-        let context = container.mainContext
         
-        for notebook in notebooks {
-            // 检查是否已存在 - 先获取 bookId 到本地变量
-            let targetBookId = notebook.bookId
+        return try await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
             let predicate = #Predicate<CachedWeReadBook> { book in
                 book.bookId == targetBookId
             }
             var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
             descriptor.fetchLimit = 1
-            let existing = try context.fetch(descriptor).first
-            
-            if let existing {
-                // 更新现有记录
-                existing.title = notebook.title
-                existing.author = notebook.author ?? ""
-                existing.cover = notebook.cover
-                existing.category = notebook.category
-                existing.updatedAt = notebook.updatedTimestamp.map { Date(timeIntervalSince1970: $0) }
-                existing.lastFetchedAt = Date()
-            } else {
-                // 创建新记录
-                let newBook = CachedWeReadBook(from: notebook)
-                newBook.lastFetchedAt = Date()
-                context.insert(newBook)
-            }
-        }
-        
-        try context.save()
-        logger.info("[WeReadCache] Saved \(notebooks.count) books to cache")
+            let results = try context.fetch(descriptor)
+            return results.first
+        }.value
     }
     
-    @MainActor
+    /// 保存书籍列表（在后台线程执行）
+    func saveBooks(_ notebooks: [WeReadNotebook]) async throws {
+        let container = try getModelContainer()
+        let logger = self.logger
+        let notebookCount = notebooks.count
+        
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            
+            for notebook in notebooks {
+                // 检查是否已存在 - 先获取 bookId 到本地变量
+                let targetBookId = notebook.bookId
+                let predicate = #Predicate<CachedWeReadBook> { book in
+                    book.bookId == targetBookId
+                }
+                var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
+                descriptor.fetchLimit = 1
+                let existing = try context.fetch(descriptor).first
+                
+                if let existing {
+                    // 更新现有记录
+                    existing.title = notebook.title
+                    existing.author = notebook.author ?? ""
+                    existing.cover = notebook.cover
+                    existing.category = notebook.category
+                    existing.updatedAt = notebook.updatedTimestamp.map { Date(timeIntervalSince1970: $0) }
+                    existing.lastFetchedAt = Date()
+                } else {
+                    // 创建新记录
+                    let newBook = CachedWeReadBook(from: notebook)
+                    newBook.lastFetchedAt = Date()
+                    context.insert(newBook)
+                }
+            }
+            
+            try context.save()
+            logger.info("[WeReadCache] Saved \(notebookCount) books to cache")
+        }.value
+    }
+    
+    /// 删除书籍（在后台线程执行）
     func deleteBooks(ids: [String]) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
+        let logger = self.logger
+        let idCount = ids.count
         
-        for bookId in ids {
-            let targetBookId = bookId
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            
+            for bookId in ids {
+                let targetBookId = bookId
+                let predicate = #Predicate<CachedWeReadBook> { book in
+                    book.bookId == targetBookId
+                }
+                var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
+                descriptor.fetchLimit = 1
+                
+                if let book = try context.fetch(descriptor).first {
+                    context.delete(book)
+                }
+            }
+            
+            try context.save()
+            logger.info("[WeReadCache] Deleted \(idCount) books from cache")
+        }.value
+    }
+    
+    /// 更新书籍的高亮数量（在后台线程执行）
+    func updateBookHighlightCount(bookId: String, count: Int) async throws {
+        let container = try getModelContainer()
+        let targetBookId = bookId
+        let targetCount = count
+        
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
             let predicate = #Predicate<CachedWeReadBook> { book in
                 book.bookId == targetBookId
             }
@@ -165,231 +202,259 @@ final class WeReadCacheService: WeReadCacheServiceProtocol {
             descriptor.fetchLimit = 1
             
             if let book = try context.fetch(descriptor).first {
-                context.delete(book)
+                book.highlightCount = targetCount
+                try context.save()
             }
-        }
-        
-        try context.save()
-        logger.info("[WeReadCache] Deleted \(ids.count) books from cache")
-    }
-    
-    @MainActor
-    func updateBookHighlightCount(bookId: String, count: Int) async throws {
-        let container = try getModelContainer()
-        let context = container.mainContext
-        let targetBookId = bookId
-        let predicate = #Predicate<CachedWeReadBook> { book in
-            book.bookId == targetBookId
-        }
-        var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
-        descriptor.fetchLimit = 1
-        
-        if let book = try context.fetch(descriptor).first {
-            book.highlightCount = count
-            try context.save()
-        }
+        }.value
     }
     
     // MARK: - 高亮操作
     
-    @MainActor
+    /// 获取指定书籍的高亮（在后台线程执行）
     func getHighlights(bookId: String) async throws -> [CachedWeReadHighlight] {
         let container = try getModelContainer()
-        let context = container.mainContext
         let targetBookId = bookId
-        let predicate = #Predicate<CachedWeReadHighlight> { highlight in
-            highlight.bookId == targetBookId
-        }
-        let descriptor = FetchDescriptor<CachedWeReadHighlight>(
-            predicate: predicate,
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        let highlights = try context.fetch(descriptor)
-        logger.debug("[WeReadCache] Fetched \(highlights.count) highlights for bookId=\(bookId)")
-        return highlights
+        
+        return try await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+                highlight.bookId == targetBookId
+            }
+            let descriptor = FetchDescriptor<CachedWeReadHighlight>(
+                predicate: predicate,
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+            return try context.fetch(descriptor)
+        }.value
     }
     
-    @MainActor
+    /// 保存高亮列表（在后台线程执行）
     func saveHighlights(_ bookmarks: [WeReadBookmark], bookId: String) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
-        
-        // 获取关联的书籍
         let targetBookId = bookId
-        let bookPredicate = #Predicate<CachedWeReadBook> { book in
-            book.bookId == targetBookId
-        }
-        var bookDescriptor = FetchDescriptor<CachedWeReadBook>(predicate: bookPredicate)
-        bookDescriptor.fetchLimit = 1
-        let book = try context.fetch(bookDescriptor).first
+        let logger = self.logger
+        let bookmarkCount = bookmarks.count
         
-        for bookmark in bookmarks {
-            // 检查是否已存在
-            let targetHighlightId = bookmark.highlightId
-            let predicate = #Predicate<CachedWeReadHighlight> { highlight in
-                highlight.highlightId == targetHighlightId
-            }
-            var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            let existing = try context.fetch(descriptor).first
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
             
-            if let existing {
-                // 更新现有记录
-                existing.text = bookmark.text
-                existing.note = bookmark.note
-                existing.chapterTitle = bookmark.chapterTitle
-                existing.colorIndex = bookmark.colorIndex
-                existing.range = bookmark.range
-                existing.reviewContents = bookmark.reviewContents
-            } else {
-                // 创建新记录
-                let newHighlight = CachedWeReadHighlight(from: bookmark)
-                newHighlight.book = book
-                context.insert(newHighlight)
+            // 获取关联的书籍
+            let bookPredicate = #Predicate<CachedWeReadBook> { book in
+                book.bookId == targetBookId
             }
-        }
-        
-        try context.save()
-        logger.info("[WeReadCache] Saved \(bookmarks.count) highlights for bookId=\(bookId)")
+            var bookDescriptor = FetchDescriptor<CachedWeReadBook>(predicate: bookPredicate)
+            bookDescriptor.fetchLimit = 1
+            let book = try context.fetch(bookDescriptor).first
+            
+            for bookmark in bookmarks {
+                // 检查是否已存在
+                let targetHighlightId = bookmark.highlightId
+                let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+                    highlight.highlightId == targetHighlightId
+                }
+                var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
+                descriptor.fetchLimit = 1
+                let existing = try context.fetch(descriptor).first
+                
+                if let existing {
+                    // 更新现有记录
+                    existing.text = bookmark.text
+                    existing.note = bookmark.note
+                    existing.chapterTitle = bookmark.chapterTitle
+                    existing.colorIndex = bookmark.colorIndex
+                    existing.range = bookmark.range
+                    existing.reviewContents = bookmark.reviewContents
+                } else {
+                    // 创建新记录
+                    let newHighlight = CachedWeReadHighlight(from: bookmark)
+                    newHighlight.book = book
+                    context.insert(newHighlight)
+                }
+            }
+            
+            try context.save()
+            logger.info("[WeReadCache] Saved \(bookmarkCount) highlights for bookId=\(targetBookId)")
+        }.value
     }
     
-    @MainActor
+    /// 删除高亮（在后台线程执行）
     func deleteHighlights(ids: [String]) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
+        let logger = self.logger
+        let idCount = ids.count
         
-        for highlightId in ids {
-            let targetHighlightId = highlightId
-            let predicate = #Predicate<CachedWeReadHighlight> { highlight in
-                highlight.highlightId == targetHighlightId
-            }
-            var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
-            descriptor.fetchLimit = 1
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
             
-            if let highlight = try context.fetch(descriptor).first {
-                context.delete(highlight)
+            for highlightId in ids {
+                let targetHighlightId = highlightId
+                let predicate = #Predicate<CachedWeReadHighlight> { highlight in
+                    highlight.highlightId == targetHighlightId
+                }
+                var descriptor = FetchDescriptor<CachedWeReadHighlight>(predicate: predicate)
+                descriptor.fetchLimit = 1
+                
+                if let highlight = try context.fetch(descriptor).first {
+                    context.delete(highlight)
+                }
             }
-        }
-        
-        try context.save()
-        logger.info("[WeReadCache] Deleted \(ids.count) highlights from cache")
+            
+            try context.save()
+            logger.info("[WeReadCache] Deleted \(idCount) highlights from cache")
+        }.value
     }
     
     // MARK: - 同步状态
     
-    @MainActor
+    /// 获取同步状态（在后台线程执行）
     func getSyncState() async throws -> WeReadSyncState {
         let container = try getModelContainer()
-        let context = container.mainContext
-        let targetId = "global"
-        let predicate = #Predicate<WeReadSyncState> { state in
-            state.id == targetId
-        }
-        var descriptor = FetchDescriptor<WeReadSyncState>(predicate: predicate)
-        descriptor.fetchLimit = 1
         
-        if let existing = try context.fetch(descriptor).first {
-            return existing
-        }
-        
-        // 创建默认同步状态
-        let newState = WeReadSyncState()
-        context.insert(newState)
-        try context.save()
-        return newState
+        return try await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            let targetId = "global"
+            let predicate = #Predicate<WeReadSyncState> { state in
+                state.id == targetId
+            }
+            var descriptor = FetchDescriptor<WeReadSyncState>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            
+            if let existing = try context.fetch(descriptor).first {
+                return existing
+            }
+            
+            // 创建默认同步状态
+            let newState = WeReadSyncState()
+            context.insert(newState)
+            try context.save()
+            return newState
+        }.value
     }
     
-    @MainActor
+    /// 更新同步状态（在后台线程执行）
     func updateSyncState(notebookSyncKey: Int?, lastSyncAt: Date?) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
-        let state = try await getSyncState()
         
-        if let key = notebookSyncKey {
-            state.notebookSyncKey = key
-        }
-        if let date = lastSyncAt {
-            state.lastIncrementalSyncAt = date
-        }
-        
-        try context.save()
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            let targetId = "global"
+            let predicate = #Predicate<WeReadSyncState> { state in
+                state.id == targetId
+            }
+            var descriptor = FetchDescriptor<WeReadSyncState>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            
+            let state: WeReadSyncState
+            if let existing = try context.fetch(descriptor).first {
+                state = existing
+            } else {
+                state = WeReadSyncState()
+                context.insert(state)
+            }
+            
+            if let key = notebookSyncKey {
+                state.notebookSyncKey = key
+            }
+            if let date = lastSyncAt {
+                state.lastIncrementalSyncAt = date
+            }
+            
+            try context.save()
+        }.value
     }
     
-    @MainActor
+    /// 获取书籍的 SyncKey（在后台线程执行）
     func getBookSyncKey(bookId: String) async throws -> Int? {
         let book = try await getBook(bookId: bookId)
         return book?.bookmarksSyncKey
     }
     
-    @MainActor
+    /// 更新书籍的 SyncKey（在后台线程执行）
     func updateBookSyncKey(bookId: String, syncKey: Int) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
         let targetBookId = bookId
-        let predicate = #Predicate<CachedWeReadBook> { book in
-            book.bookId == targetBookId
-        }
-        var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
-        descriptor.fetchLimit = 1
+        let targetSyncKey = syncKey
         
-        if let book = try context.fetch(descriptor).first {
-            book.bookmarksSyncKey = syncKey
-            try context.save()
-        }
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            let predicate = #Predicate<CachedWeReadBook> { book in
+                book.bookId == targetBookId
+            }
+            var descriptor = FetchDescriptor<CachedWeReadBook>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            
+            if let book = try context.fetch(descriptor).first {
+                book.bookmarksSyncKey = targetSyncKey
+                try context.save()
+            }
+        }.value
     }
     
     // MARK: - 清理
     
-    @MainActor
+    /// 清除所有缓存（在后台线程执行）
     func clearAllCache() async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
+        let logger = self.logger
         
-        // 删除所有高亮
-        let highlightDescriptor = FetchDescriptor<CachedWeReadHighlight>()
-        let highlights = try context.fetch(highlightDescriptor)
-        for highlight in highlights {
-            context.delete(highlight)
-        }
-        
-        // 删除所有书籍
-        let bookDescriptor = FetchDescriptor<CachedWeReadBook>()
-        let books = try context.fetch(bookDescriptor)
-        for book in books {
-            context.delete(book)
-        }
-        
-        // 删除同步状态
-        let stateDescriptor = FetchDescriptor<WeReadSyncState>()
-        let states = try context.fetch(stateDescriptor)
-        for state in states {
-            context.delete(state)
-        }
-        
-        try context.save()
-        logger.info("[WeReadCache] Cleared all cache data")
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            
+            // 删除所有高亮
+            let highlightDescriptor = FetchDescriptor<CachedWeReadHighlight>()
+            let highlights = try context.fetch(highlightDescriptor)
+            for highlight in highlights {
+                context.delete(highlight)
+            }
+            
+            // 删除所有书籍
+            let bookDescriptor = FetchDescriptor<CachedWeReadBook>()
+            let books = try context.fetch(bookDescriptor)
+            for book in books {
+                context.delete(book)
+            }
+            
+            // 删除同步状态
+            let stateDescriptor = FetchDescriptor<WeReadSyncState>()
+            let states = try context.fetch(stateDescriptor)
+            for state in states {
+                context.delete(state)
+            }
+            
+            try context.save()
+            logger.info("[WeReadCache] Cleared all cache data")
+        }.value
     }
     
     // MARK: - 统计
     
-    @MainActor
+    /// 获取缓存统计（在后台线程执行）
     func getCacheStats() async throws -> WeReadCacheStats {
         let container = try getModelContainer()
-        let context = container.mainContext
         
-        let bookDescriptor = FetchDescriptor<CachedWeReadBook>()
-        let books = try context.fetch(bookDescriptor)
-        
-        let highlightDescriptor = FetchDescriptor<CachedWeReadHighlight>()
-        let highlights = try context.fetch(highlightDescriptor)
-        
-        let state = try await getSyncState()
-        
-        return WeReadCacheStats(
-            bookCount: books.count,
-            highlightCount: highlights.count,
-            lastSyncAt: state.lastIncrementalSyncAt ?? state.lastFullSyncAt
-        )
+        return try await Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            
+            let bookDescriptor = FetchDescriptor<CachedWeReadBook>()
+            let books = try context.fetch(bookDescriptor)
+            
+            let highlightDescriptor = FetchDescriptor<CachedWeReadHighlight>()
+            let highlights = try context.fetch(highlightDescriptor)
+            
+            let targetId = "global"
+            let predicate = #Predicate<WeReadSyncState> { state in
+                state.id == targetId
+            }
+            var stateDescriptor = FetchDescriptor<WeReadSyncState>(predicate: predicate)
+            stateDescriptor.fetchLimit = 1
+            let state = try context.fetch(stateDescriptor).first
+            
+            return WeReadCacheStats(
+                bookCount: books.count,
+                highlightCount: highlights.count,
+                lastSyncAt: state?.lastIncrementalSyncAt ?? state?.lastFullSyncAt
+            )
+        }.value
     }
 }
 

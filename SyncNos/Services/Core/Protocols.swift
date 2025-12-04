@@ -320,8 +320,7 @@ protocol WeReadAPIServiceProtocol: AnyObject {
 }
 
 /// WeRead 本地缓存服务协议
-/// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
-@MainActor
+/// 所有方法内部使用独立的 ModelContext 在后台线程执行，调用方无需关心线程问题
 protocol WeReadCacheServiceProtocol: AnyObject {
     // MARK: - 书籍操作
     
@@ -448,8 +447,7 @@ protocol DedaoAPIServiceProtocol: AnyObject {
 }
 
 /// Dedao 本地数据存储服务协议
-/// 注意：所有方法都需要在 MainActor 上调用，因为 SwiftData 的 ModelContext 不是线程安全的
-@MainActor
+/// 所有方法内部使用独立的 ModelContext 在后台线程执行，调用方无需关心线程问题
 protocol DedaoCacheServiceProtocol: AnyObject {
     // MARK: - 书籍操作
     
