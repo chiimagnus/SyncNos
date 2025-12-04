@@ -2,49 +2,72 @@ import SwiftUI
 import AppKit
 
 struct AboutView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 128
+    
     var body: some View {
-        HStack(alignment: .top, spacing: 24) {
-            // 左侧：App Icon
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 128, height: 128)
-                .cornerRadius(24)
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-            
-            // 右侧：信息区域
-            VStack(alignment: .leading, spacing: 12) {
-                // App 名称
-                Text(appName)
-                    .font(.system(size: 28, weight: .bold))
-                
-                // 版本信息
-                Text("Version \(Bundle.main.appVersion) (\(Bundle.main.appBuild))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                Divider()
-                    .padding(.vertical, 4)
-                
-                // 操作链接
-                VStack(alignment: .leading, spacing: 8) {
-                    AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
-                    AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
-                    AboutLinkButton(symbol: "chevron.left.forwardslash.chevron.right", title: "Source Code", action: openGitHubRepo)
-                    AboutLinkButton(symbol: "doc.text.fill", title: "Privacy Policy", action: openPrivacyPolicy)
-                    AboutLinkButton(symbol: "clock.arrow.circlepath", title: "Changelog", action: openChangelog)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                // 辅助功能大小时使用垂直布局
+                ScrollView {
+                    VStack(spacing: 24) {
+                        aboutContent
+                    }
+                    .padding(32)
                 }
-                
-                Spacer()
-                
-                // 底部信息
-                Text("Made with SwiftUI • macOS 14+")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
+            } else {
+                // 标准大小时使用水平布局
+                HStack(alignment: .top, spacing: 24) {
+                    aboutContent
+                }
+                .padding(32)
             }
         }
-        .padding(32)
-        .frame(width: 450, height: 320)
+        .frame(minWidth: 450, minHeight: 320)
         .navigationTitle("About")
+    }
+    
+    @ViewBuilder
+    private var aboutContent: some View {
+        // App Icon
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .frame(width: iconSize, height: iconSize)
+            .cornerRadius(24)
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+        
+        // 信息区域
+        VStack(alignment: .leading, spacing: 12) {
+            // App 名称 - 使用系统样式，自动支持 Dynamic Type
+            Text(appName)
+                .font(.largeTitle.bold())
+            
+            // 版本信息
+            Text("Version \(Bundle.main.appVersion) (\(Bundle.main.appBuild))")
+                .font(.subheadline) // 系统样式，自动支持 Dynamic Type
+                .foregroundStyle(.secondary)
+            
+            Divider()
+                .padding(.vertical, 4)
+            
+            // 操作链接
+            VStack(alignment: .leading, spacing: 8) {
+                AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
+                AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
+                AboutLinkButton(symbol: "chevron.left.forwardslash.chevron.right", title: "Source Code", action: openGitHubRepo)
+                AboutLinkButton(symbol: "doc.text.fill", title: "Privacy Policy", action: openPrivacyPolicy)
+                AboutLinkButton(symbol: "clock.arrow.circlepath", title: "Changelog", action: openChangelog)
+            }
+            
+            Spacer()
+            
+            // 底部信息
+            Text("Made with SwiftUI • macOS 14+")
+                .font(.footnote) // 系统样式，自动支持 Dynamic Type
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private var appName: String {
@@ -63,11 +86,11 @@ private struct AboutLinkButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.system(size: 12))
+                    .font(.caption) // 使用系统样式，自动支持 Dynamic Type
                     .foregroundStyle(.secondary)
-                    .frame(width: 16)
+                    .frame(minWidth: 16)
                 Text(title)
-                    .font(.callout)
+                    .font(.callout) // 系统样式，自动支持 Dynamic Type
             }
             .contentShape(Rectangle())
         }
