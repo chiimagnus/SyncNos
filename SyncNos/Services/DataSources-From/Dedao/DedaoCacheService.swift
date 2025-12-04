@@ -116,37 +116,42 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         return results.first
     }
     
-    @MainActor
+    /// 保存书籍列表（在后台线程执行）
     func saveBooks(_ ebooks: [DedaoEbook]) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
+        let logger = self.logger
+        let ebookCount = ebooks.count
         
-        for ebook in ebooks {
-            // 检查是否已存在
-            let targetBookId = ebook.effectiveId
-            let predicate = #Predicate<CachedDedaoBook> { book in
-                book.bookId == targetBookId
-            }
-            var descriptor = FetchDescriptor<CachedDedaoBook>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            let existing = try context.fetch(descriptor).first
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
             
-            if let existing {
-                // 更新现有记录
-                existing.title = ebook.title
-                existing.author = ebook.author ?? ""
-                existing.cover = ebook.icon
-                existing.lastFetchedAt = Date()
-            } else {
-                // 创建新记录
-                let newBook = CachedDedaoBook(from: ebook)
-                newBook.lastFetchedAt = Date()
-                context.insert(newBook)
+            for ebook in ebooks {
+                // 检查是否已存在
+                let targetBookId = ebook.effectiveId
+                let predicate = #Predicate<CachedDedaoBook> { book in
+                    book.bookId == targetBookId
+                }
+                var descriptor = FetchDescriptor<CachedDedaoBook>(predicate: predicate)
+                descriptor.fetchLimit = 1
+                let existing = try context.fetch(descriptor).first
+                
+                if let existing {
+                    // 更新现有记录
+                    existing.title = ebook.title
+                    existing.author = ebook.author ?? ""
+                    existing.cover = ebook.icon
+                    existing.lastFetchedAt = Date()
+                } else {
+                    // 创建新记录
+                    let newBook = CachedDedaoBook(from: ebook)
+                    newBook.lastFetchedAt = Date()
+                    context.insert(newBook)
+                }
             }
-        }
-        
-        try context.save()
-        logger.info("[DedaoCache] Saved \(ebooks.count) books to local storage")
+            
+            try context.save()
+            logger.info("[DedaoCache] Saved \(ebookCount) books to local storage")
+        }.value
     }
     
     @MainActor
@@ -171,21 +176,25 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         logger.info("[DedaoCache] Deleted \(ids.count) books from local storage")
     }
     
-    @MainActor
+    /// 更新书籍的高亮数量（在后台线程执行）
     func updateBookHighlightCount(bookId: String, count: Int) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
         let targetBookId = bookId
-        let predicate = #Predicate<CachedDedaoBook> { book in
-            book.bookId == targetBookId
-        }
-        var descriptor = FetchDescriptor<CachedDedaoBook>(predicate: predicate)
-        descriptor.fetchLimit = 1
+        let targetCount = count
         
-        if let book = try context.fetch(descriptor).first {
-            book.highlightCount = count
-            try context.save()
-        }
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            let predicate = #Predicate<CachedDedaoBook> { book in
+                book.bookId == targetBookId
+            }
+            var descriptor = FetchDescriptor<CachedDedaoBook>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            
+            if let book = try context.fetch(descriptor).first {
+                book.highlightCount = targetCount
+                try context.save()
+            }
+        }.value
     }
     
     // MARK: - 高亮操作
@@ -207,40 +216,45 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         return highlights
     }
     
-    @MainActor
+    /// 保存高亮列表（在后台线程执行）
     func saveHighlights(_ notes: [DedaoEbookNote], bookId: String) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
-        
-        // 获取关联的书籍
         let targetBookId = bookId
-        let bookPredicate = #Predicate<CachedDedaoBook> { book in
-            book.bookId == targetBookId
-        }
-        var bookDescriptor = FetchDescriptor<CachedDedaoBook>(predicate: bookPredicate)
-        bookDescriptor.fetchLimit = 1
-        let book = try context.fetch(bookDescriptor).first
+        let logger = self.logger
         
-        // ⚠️ 先删除该书的所有旧高亮（完全替换策略，避免残留错误数据）
-        let highlightPredicate = #Predicate<CachedDedaoHighlight> { highlight in
-            highlight.bookId == targetBookId
-        }
-        let highlightDescriptor = FetchDescriptor<CachedDedaoHighlight>(predicate: highlightPredicate)
-        let existingHighlights = try context.fetch(highlightDescriptor)
-        for highlight in existingHighlights {
-            context.delete(highlight)
-        }
-        
-        // 插入新数据
-        for note in notes {
-            let newHighlight = CachedDedaoHighlight(from: note)
-            newHighlight.bookId = bookId
-            newHighlight.book = book
-            context.insert(newHighlight)
-        }
-        
-        try context.save()
-        logger.info("[DedaoCache] Replaced \(existingHighlights.count) → \(notes.count) highlights for bookId=\(bookId)")
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            
+            // 获取关联的书籍
+            let bookPredicate = #Predicate<CachedDedaoBook> { book in
+                book.bookId == targetBookId
+            }
+            var bookDescriptor = FetchDescriptor<CachedDedaoBook>(predicate: bookPredicate)
+            bookDescriptor.fetchLimit = 1
+            let book = try context.fetch(bookDescriptor).first
+            
+            // ⚠️ 先删除该书的所有旧高亮（完全替换策略，避免残留错误数据）
+            let highlightPredicate = #Predicate<CachedDedaoHighlight> { highlight in
+                highlight.bookId == targetBookId
+            }
+            let highlightDescriptor = FetchDescriptor<CachedDedaoHighlight>(predicate: highlightPredicate)
+            let existingHighlights = try context.fetch(highlightDescriptor)
+            let existingCount = existingHighlights.count
+            for highlight in existingHighlights {
+                context.delete(highlight)
+            }
+            
+            // 插入新数据
+            for note in notes {
+                let newHighlight = CachedDedaoHighlight(from: note)
+                newHighlight.bookId = targetBookId
+                newHighlight.book = book
+                context.insert(newHighlight)
+            }
+            
+            try context.save()
+            logger.info("[DedaoCache] Replaced \(existingCount) → \(notes.count) highlights for bookId=\(targetBookId)")
+        }.value
     }
     
     @MainActor
@@ -289,20 +303,36 @@ final class DedaoCacheService: DedaoCacheServiceProtocol {
         return newState
     }
     
-    @MainActor
+    /// 更新同步状态（在后台线程执行）
     func updateSyncState(lastFullSyncAt: Date?, lastIncrementalSyncAt: Date?) async throws {
         let container = try getModelContainer()
-        let context = container.mainContext
-        let state = try await getSyncState()
         
-        if let date = lastFullSyncAt {
-            state.lastFullSyncAt = date
-        }
-        if let date = lastIncrementalSyncAt {
-            state.lastIncrementalSyncAt = date
-        }
-        
-        try context.save()
+        try await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            let targetId = "global"
+            let predicate = #Predicate<DedaoSyncState> { state in
+                state.id == targetId
+            }
+            var descriptor = FetchDescriptor<DedaoSyncState>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            
+            let state: DedaoSyncState
+            if let existing = try context.fetch(descriptor).first {
+                state = existing
+            } else {
+                state = DedaoSyncState()
+                context.insert(state)
+            }
+            
+            if let date = lastFullSyncAt {
+                state.lastFullSyncAt = date
+            }
+            if let date = lastIncrementalSyncAt {
+                state.lastIncrementalSyncAt = date
+            }
+            
+            try context.save()
+        }.value
     }
     
     // MARK: - 清理
