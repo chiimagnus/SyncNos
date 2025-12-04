@@ -8,6 +8,9 @@ struct WeReadListView: View {
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
+    
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var emptyStateIconSize: CGFloat = 48
 
     var body: some View {
         Group {
@@ -15,7 +18,7 @@ struct WeReadListView: View {
                 // 未登录状态
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
-                        .font(.system(size: 48))
+                        .font(.system(size: emptyStateIconSize))
                         .foregroundColor(.secondary)
                     Text("Not Logged In")
                         .font(.headline)

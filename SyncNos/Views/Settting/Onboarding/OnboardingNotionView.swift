@@ -5,6 +5,11 @@ import SwiftUI
 struct OnboardingNotionView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var notionIconSize: CGFloat = 120
+    @ScaledMetric(relativeTo: .title) private var titleFontSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .title2) private var subtitleFontSize: CGFloat = 24
+    
     var body: some View {
         VStack {
             Spacer()
@@ -12,11 +17,11 @@ struct OnboardingNotionView: View {
             // 中央区域 - Notion 图标 + 标题
             HStack(spacing: 16) {
                 Image(systemName: "n.square") // Notion
-                    .font(.system(size: 120))
+                    .font(.system(size: notionIconSize))
                     .foregroundStyle(Color("OnboardingTextColor"))
             
                 Text("Notion OAuth")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: titleFontSize, weight: .bold))
                     .foregroundStyle(Color("OnboardingTextColor"))
                     .multilineTextAlignment(.leading)
             }
@@ -43,7 +48,7 @@ struct OnboardingNotionView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color("OnboardingButtonColor"))
                     Text("Connected")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: subtitleFontSize, weight: .bold))
                         .foregroundStyle(Color("OnboardingTextColor"))
                 }
                 
@@ -68,7 +73,7 @@ struct OnboardingNotionView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Connect Your Notion")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: subtitleFontSize, weight: .bold))
                     .foregroundStyle(Color("OnboardingTextColor"))
                 
                 Text("We'll create secure databases in your Notion workspace.")
