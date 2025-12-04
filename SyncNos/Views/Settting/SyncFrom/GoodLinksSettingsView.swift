@@ -45,7 +45,7 @@ struct GoodLinksSettingsView: View {
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
                             .foregroundColor(.secondary)
-                            .font(.body.weight(.regular))
+                            .scaledFont(.body)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
