@@ -5,7 +5,6 @@ struct WeReadListView: View {
     @ObservedObject var viewModel: WeReadViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.fontScale) private var fontScale
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -16,10 +15,10 @@ struct WeReadListView: View {
                 // 未登录状态
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
-                        .font(.system(size: 48 * fontScale))
+                        .scaledFont(.largeTitle)
                         .foregroundColor(.secondary)
                     Text("Not Logged In")
-                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                        .scaledFont(.headline, weight: .semibold)
                         .foregroundColor(.secondary)
                     Button {
                         viewModel.navigateToWeReadLogin()
@@ -34,9 +33,9 @@ struct WeReadListView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
-                        .font(.system(size: 26 * fontScale))
+                        .scaledFont(.title)
                     Text(error)
-                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .scaledFont(.body)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -44,9 +43,9 @@ struct WeReadListView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "text.book.closed")
                         .foregroundColor(.secondary)
-                        .font(.system(size: 26 * fontScale))
+                        .scaledFont(.title)
                     Text("No books found")
-                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                 }
             } else {
@@ -55,15 +54,15 @@ struct WeReadListView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(book.title)
-                                    .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                                    .scaledFont(.headline, weight: .semibold)
                                     .lineLimit(2)
                                 if !book.author.isEmpty {
                                     Text(book.author)
-                                        .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScale))
+                                        .scaledFont(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
                                 Text("\(book.highlightCount) highlights")
-                                    .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                    .scaledFont(.caption)
                                     .foregroundColor(.secondary)
                             }
                             Spacer()

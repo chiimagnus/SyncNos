@@ -5,7 +5,6 @@ struct GoodLinksListView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.fontScale) private var fontScale
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -18,9 +17,9 @@ struct GoodLinksListView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
-                        .font(.system(size: 26 * fontScale))
+                        .scaledFont(.title)
                     Text(error)
-                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .scaledFont(.body)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     Button {
@@ -33,9 +32,9 @@ struct GoodLinksListView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "link")
                         .foregroundColor(.secondary)
-                        .font(.system(size: 26 * fontScale))
+                        .scaledFont(.title)
                     Text("No links found")
-                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .scaledFont(.body)
                         .foregroundColor(.secondary)
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
@@ -49,32 +48,32 @@ struct GoodLinksListView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
-                                    .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                                    .scaledFont(.headline, weight: .semibold)
                                     .lineLimit(2)
                                 if let author = link.author, !author.isEmpty {
                                     Text(author)
-                                        .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScale))
+                                        .scaledFont(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
                                 HStack(spacing: 8) {
                                     if let cnt = link.highlightTotal {
                                         Text("\(cnt) highlights")
-                                            .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                            .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                     }
                                     Text(URL(string: link.url)?.host ?? "")
-                                        .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                     if link.starred {
                                         Image(systemName: "star.fill")
                                             .foregroundColor(.yellow)
-                                            .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                            .scaledFont(.caption)
                                     }
                                 }
                                 let tagsText = link.tagsFormatted
                                 if !tagsText.isEmpty {
                                     Text(tagsText)
-                                        .font(.system(size: Font.TextStyle.caption2.basePointSize * fontScale))
+                                        .scaledFont(.caption2)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
                                 }

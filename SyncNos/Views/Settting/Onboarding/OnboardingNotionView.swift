@@ -4,11 +4,10 @@ import SwiftUI
 
 struct OnboardingNotionView: View {
     @ObservedObject var viewModel: OnboardingViewModel
-    @Environment(\.fontScale) private var fontScale
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
-    private var notionIconSize: CGFloat { 120 * fontScale }
-    private var titleFontSize: CGFloat { 28 * fontScale }
-    private var subtitleFontSize: CGFloat { 24 * fontScale }
+    private var notionIconSize: CGFloat { 120 * fontScaleManager.scaleFactor }
+    private var subtitleFontSize: CGFloat { 24 * fontScaleManager.scaleFactor }
     
     var body: some View {
         VStack {
@@ -21,7 +20,7 @@ struct OnboardingNotionView: View {
                     .foregroundStyle(Color("OnboardingTextColor"))
             
                 Text("Notion OAuth")
-                    .font(.system(size: titleFontSize, weight: .bold))
+                    .scaledFont(.largeTitle, weight: .bold)
                     .foregroundStyle(Color("OnboardingTextColor"))
                     .multilineTextAlignment(.leading)
             }
