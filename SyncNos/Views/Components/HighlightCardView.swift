@@ -2,6 +2,8 @@ import SwiftUI
 
 /// 通用的高亮卡片视图
 struct HighlightCardView<AccessoryContent: View>: View {
+    @Environment(\.fontScale) private var fontScale
+    
     let colorMark: Color
     let content: String
     let note: String?
@@ -40,19 +42,18 @@ struct HighlightCardView<AccessoryContent: View>: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // 高亮内容
                     Text(content)
-                        .font(.body)
+                        .scaledFont(.body)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     
                     // 用户笔记（如果有）
                     if let note = note, !note.isEmpty {
                         Text(note)
-                            .font(.callout)
+                            .scaledFont(.callout)
                             .foregroundColor(.primary)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(10)
-                            
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.orange.opacity(0.08))
@@ -61,13 +62,12 @@ struct HighlightCardView<AccessoryContent: View>: View {
                     
                     // 多条想法（如果有，如 weread）
                     if !reviewContents.isEmpty {
-                        ForEach(Array(reviewContents.enumerated()), id: \.offset) { index, reviewContent in
+                        ForEach(Array(reviewContents.enumerated()), id: \.offset) { _, reviewContent in
                             Text(reviewContent)
-                                .font(.callout)
+                                .scaledFont(.callout)
                                 .foregroundColor(.primary)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
-                            
                                 .padding(10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
@@ -81,10 +81,10 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         if let created = createdDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar.badge.plus")
-                                    .font(.caption2)
+                                    .scaledFont(.caption2)
                                     .foregroundColor(.secondary)
                                 Text(created)
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -92,16 +92,15 @@ struct HighlightCardView<AccessoryContent: View>: View {
                         if let modified = modifiedDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar.badge.clock")
-                                    .font(.caption2)
+                                    .scaledFont(.caption2)
                                     .foregroundColor(.secondary)
                                 Text(modified)
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundColor(.secondary)
                             }
                         }
                     }
                 }
-                // .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 12)
                 .padding(.vertical, 12)
                 .padding(.trailing, 12)

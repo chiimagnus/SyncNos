@@ -46,6 +46,7 @@ struct DedaoDetailView: View {
                 bookDetailView(book: book)
             } else {
                 Text("Select a book")
+                    .scaledFont(.body)
                     .foregroundColor(.secondary)
             }
         }
@@ -100,7 +101,7 @@ struct DedaoDetailView: View {
         ) {
             if let url = URL(string: "https://www.dedao.cn/") {
                 Link("Open in Dedao Web", destination: url)
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
             }
         } content: {
             highlightCountLabel(book: book)
@@ -111,15 +112,15 @@ struct DedaoDetailView: View {
     private func highlightCountLabel(book: DedaoBookListItem) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "highlighter")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundColor(.secondary)
             if detailViewModel.totalFilteredCount > 0 {
                 Text("\(detailViewModel.visibleHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
             } else {
                 Text("\(book.highlightCount) highlights")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
             }
         }
@@ -131,9 +132,11 @@ struct DedaoDetailView: View {
     private func highlightsContentView(book: DedaoBookListItem) -> some View {
         if detailViewModel.isLoading {
             ProgressView("Loading...")
+                .scaledFont(.body)
                 .padding(.top)
         } else if detailViewModel.visibleHighlights.isEmpty {
             Text("No highlights found")
+                .scaledFont(.body)
                 .foregroundColor(.secondary)
                 .padding(.top)
         } else {
@@ -179,7 +182,7 @@ struct DedaoDetailView: View {
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.6)
                 Text("Syncing in background...")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(.top, 4)
@@ -193,7 +196,7 @@ struct DedaoDetailView: View {
                 Spacer()
                 ProgressView().scaleEffect(0.8)
                 Text("Loading...")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
             }
@@ -205,7 +208,7 @@ struct DedaoDetailView: View {
                     detailViewModel.loadNextPage()
                 } label: {
                     Text("Load More (\(detailViewModel.totalFilteredCount - detailViewModel.visibleHighlights.count) remaining)")
-                        .font(.caption)
+                        .scaledFont(.caption)
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.accentColor)
@@ -253,14 +256,14 @@ struct DedaoDetailView: View {
             HStack(spacing: 8) {
                 ProgressView().scaleEffect(0.8)
                 Text(externalSyncProgress ?? "Syncing...")
-                    .font(.caption)
+                    .scaledFont(.caption)
             }
             .help("Sync in progress")
         } else if detailViewModel.isSyncing {
             HStack(spacing: 8) {
                 ProgressView().scaleEffect(0.8)
                 Text(detailViewModel.syncProgressText ?? "Syncing...")
-                    .font(.caption)
+                    .scaledFont(.caption)
             }
             .help("Sync in progress")
         } else {

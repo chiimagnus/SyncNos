@@ -56,15 +56,15 @@ struct AppleBooksDetailView: View {
                             ) {
                                 if !book.ibooksURL.isEmpty, let ibooksURL = URL(string: book.ibooksURL) {
                                     Link("Open in Apple Books", destination: ibooksURL)
-                                        .font(.subheadline)
+                                        .scaledFont(.subheadline)
                                 }
                             } content: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "highlighter")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                     Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
@@ -204,9 +204,9 @@ struct AppleBooksDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = externalSyncProgress {
-                            Text(progress).font(.caption)
+                            Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").font(.caption)
+                            Text("Syncing...").scaledFont(.caption)
                         }
                     }
                     .help("Sync in progress")
@@ -214,9 +214,9 @@ struct AppleBooksDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = viewModel.syncProgressText {
-                            Text(progress).font(.caption)
+                            Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").font(.caption)
+                            Text("Syncing...").scaledFont(.caption)
                         }
                     }
                     .help("Sync in progress")

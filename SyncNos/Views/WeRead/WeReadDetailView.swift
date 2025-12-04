@@ -53,21 +53,21 @@ struct WeReadDetailView: View {
                         ) {
                             if let url = URL(string: "https://weread.qq.com/") {
                                 Link("Open in WeRead Web", destination: url)
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                             }
                         } content: {
                             HStack(spacing: 6) {
                                 Image(systemName: "highlighter")
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundColor(.secondary)
                                 // 显示已加载/总数
                                 if detailViewModel.totalFilteredCount > 0 {
                                     Text("\(detailViewModel.visibleHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
                                     Text("\(book.highlightCount) highlights")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
@@ -75,9 +75,11 @@ struct WeReadDetailView: View {
 
                         if detailViewModel.isLoading {
                             ProgressView("Loading...")
+                                .scaledFont(.body)
                                 .padding(.top)
                         } else if detailViewModel.visibleHighlights.isEmpty {
                             Text("No highlights found")
+                                .scaledFont(.body)
                                 .foregroundColor(.secondary)
                                 .padding(.top)
                         } else {
@@ -128,7 +130,7 @@ struct WeReadDetailView: View {
                                     ProgressView()
                                         .scaleEffect(0.8)
                                     Text("Loading...")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                     Spacer()
                                 }
@@ -141,7 +143,7 @@ struct WeReadDetailView: View {
                                         detailViewModel.loadNextPage()
                                     } label: {
                                         Text("Load More (\(detailViewModel.totalFilteredCount - detailViewModel.visibleHighlights.count) remaining)")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                     }
                                     .buttonStyle(.plain)
                                     .foregroundColor(.accentColor)
@@ -158,7 +160,7 @@ struct WeReadDetailView: View {
                                 ProgressView()
                                     .scaleEffect(0.6)
                                 Text("Syncing in background...")
-                                    .font(.caption2)
+                                    .scaledFont(.caption2)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
@@ -200,9 +202,9 @@ struct WeReadDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = externalSyncProgress {
-                            Text(progress).font(.caption)
+                            Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").font(.caption)
+                            Text("Syncing...").scaledFont(.caption)
                         }
                     }
                     .help("Sync in progress")
@@ -211,9 +213,9 @@ struct WeReadDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         if let progress = detailViewModel.syncProgressText {
-                            Text(progress).font(.caption)
+                            Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").font(.caption)
+                            Text("Syncing...").scaledFont(.caption)
                         }
                     }
                     .help("Sync in progress")
