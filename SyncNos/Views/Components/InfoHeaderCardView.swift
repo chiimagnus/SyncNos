@@ -10,6 +10,10 @@ struct SelectionPlaceholderView: View {
     let filteredCount: Int
     /// 全部 item 数量
     let totalCount: Int
+    
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 120
+    @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 56
 
     init(
         title: String,
@@ -43,16 +47,18 @@ struct SelectionPlaceholderView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // App Logo
+                // App Logo - 使用 @ScaledMetric 支持 Dynamic Type
                 Image("HeaderCard")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 120, height: 120)
+                    .frame(width: logoSize, height: logoSize)
 
+                // 标题 - 使用 @ScaledMetric 支持 Dynamic Type
                 Text(title)
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
                     .fontWidth(.compressed)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
                     .foregroundColor(colorForTitle(title))
 
                 if isMultipleSelection, let count {
@@ -61,17 +67,18 @@ struct SelectionPlaceholderView: View {
                     } label: {
                         Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
                     }
+                    .font(.body) // 确保按钮文字支持 Dynamic Type
                     .padding(.bottom, 16)
                 } else {
                     HStack(spacing: 12) {
                         Text("Please select an item")
-                            .font(.title3)
+                            .font(.title3) // 系统样式，自动支持 Dynamic Type
                             .foregroundColor(.secondary)
                         
                         // 显示过滤后/全部数量
                         if totalCount > 0 {
                             Text("\(filteredCount)/\(totalCount)")
-                                .font(.title3.monospacedDigit())
+                                .font(.title3.monospacedDigit()) // 系统样式
                                 .foregroundColor(.secondary.opacity(0.7))
                         }
                     }
@@ -80,7 +87,7 @@ struct SelectionPlaceholderView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Sync Queue")
-                        .font(.title2)
+                        .font(.title2) // 系统样式，自动支持 Dynamic Type
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -16,6 +16,10 @@ struct PayWallView: View {
     @State private var headerIconScale: CGFloat = 1.0  // 图标脉冲放大
     @State private var headerIconShake: CGFloat = 0  // 图标颤抖
     
+    // MARK: - Dynamic Type Support
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+    @ScaledMetric(relativeTo: .title) private var titleFontSize: CGFloat = 24
+    
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -55,20 +59,20 @@ struct PayWallView: View {
             // Welcome 模式：礼物图标 + 摇摆动画
             VStack(spacing: 12) {
                 Image(systemName: "gift.fill")
-                    .font(.system(size: 60))
+                    .font(.system(size: heroIconSize)) // 使用 @ScaledMetric 支持 Dynamic Type
                     .foregroundStyle(.green)
                     .rotationEffect(.degrees(wiggleAngle), anchor: .bottom)
                     .onAppear {
                         startWiggleAnimation()
                     }
                 Text("30-day free trial included")
-                    .font(.headline)
+                    .font(.headline) // 系统样式，自动支持 Dynamic Type
                     .foregroundStyle(Color("OnboardingTextColor"))
             }
         } else {
             // 其他模式：常规图标 + 脉冲动画（紧急提醒时）
             Image(systemName: headerIcon)
-                .font(.system(size: 60))
+                .font(.system(size: heroIconSize)) // 使用 @ScaledMetric 支持 Dynamic Type
                 .foregroundStyle(headerIconColor)
                 .scaleEffect(shouldPulseHeaderIcon ? headerIconScale : 1.0)
                 .offset(x: shouldPulseHeaderIcon ? headerIconShake : 0)
@@ -252,13 +256,14 @@ struct PayWallView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(headerTitle)
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.title2.bold()) // 使用系统样式，自动支持 Dynamic Type
                     .foregroundStyle(Color("OnboardingTextColor"))
                 
                 Text(headerMessage)
-                    .font(.subheadline)
+                    .font(.subheadline) // 系统样式，自动支持 Dynamic Type
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer()
@@ -437,8 +442,13 @@ enum IAPPresentationMode: Equatable {
 
 // MARK: - Previews
 
-#Preview("Welcome") {
+#Preview("Welcome - Default") {
     PayWallView(presentationMode: .welcome)
+}
+
+#Preview("Welcome - Accessibility") {
+    PayWallView(presentationMode: .welcome)
+        .environment(\.dynamicTypeSize, .accessibility3)
 }
 
 #Preview("Trial Reminder - 7 Days") {

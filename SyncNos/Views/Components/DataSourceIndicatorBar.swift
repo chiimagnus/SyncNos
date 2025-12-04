@@ -40,11 +40,11 @@ private struct DataSourceIndicatorItem: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: source.icon)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption2.weight(.medium)) // 使用系统样式，自动支持 Dynamic Type
                 
                 if isActive {
                     Text(source.displayName)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.caption2.weight(.medium)) // 使用系统样式，自动支持 Dynamic Type
                         .lineLimit(1)
                 }
             }
@@ -60,6 +60,10 @@ private struct DataSourceIndicatorItem: View {
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
         .animation(.easeInOut(duration: 0.2), value: isActive)
+        // 添加 Large Content Viewer 支持
+        .accessibilityShowsLargeContentViewer {
+            Label(source.displayName, systemImage: source.icon)
+        }
     }
     
     private var backgroundColor: Color {
