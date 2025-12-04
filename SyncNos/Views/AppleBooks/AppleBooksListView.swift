@@ -5,6 +5,7 @@ struct AppleBooksListView: View {
     @ObservedObject var viewModel: AppleBooksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.fontScale) private var fontScale
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -63,12 +64,18 @@ struct AppleBooksListView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 if book.hasTitle {
-                                    Text(book.bookTitle).font(.headline)
+                                    Text(book.bookTitle)
+                                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
                                 } else {
-                                    Text("No Title").font(.headline).foregroundColor(.orange)
+                                    Text("No Title")
+                                        .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
+                                        .foregroundColor(.orange)
                                 }
-                                Text(book.authorName).font(.subheadline).foregroundColor(.secondary)
-                                Text("\(book.highlightCount) highlights").font(.caption)
+                                Text(book.authorName)
+                                    .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScale))
+                                    .foregroundColor(.secondary)
+                                Text("\(book.highlightCount) highlights")
+                                    .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
                             }
                             Spacer()
                             // Sync status icon
