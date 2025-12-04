@@ -357,22 +357,72 @@ Text("Hello")
 Text("Hello")
     .scaledFont(.headline, weight: .bold)
 
-// ✅ 带设计
+// ✅ 带设计（如等宽字体）
 Text("Hello")
     .scaledFont(.body, weight: .regular, design: .monospaced)
 ```
 
-### 3. 图标大小缩放
+### 3. 两种获取缩放因子的方式
+
+根据使用场景选择合适的方式：
+
+#### 方式一：使用 `@Environment(\.fontScale)`
+
+适用于：
+- 视图已经通过 `.applyFontScale()` 注入了环境值
+- 只需要读取缩放因子，不需要观察变化
+- 用于 `.scaledFont()` 修饰符内部
+
+```swift
+struct MyView: View {
+    @Environment(\.fontScale) private var fontScale
+    
+    var body: some View {
+        // 用于特殊字体（如等宽字体）
+        Text("Code")
+            .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale, design: .monospaced))
+    }
+}
+```
+
+#### 方式二：使用 `@ObservedObject private var fontScaleManager`
+
+适用于：
+- 需要直接访问 `FontScaleManager.shared`
+- 需要用于计算属性（computed properties）
+- 用于图标/布局尺寸缩放
+
+```swift
+struct MyView: View {
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
+    
+    private var iconSize: CGFloat { 40 * fontScaleManager.scaleFactor }
+    
+    var body: some View {
+        Image(systemName: "star")
+            .font(.system(size: iconSize))
+    }
+}
+```
+
+### 4. 图标和布局尺寸缩放
+
+图标和布局元素应该使用 `fontScaleManager.scaleFactor` 进行手动缩放：
 
 ```swift
 @ObservedObject private var fontScaleManager = FontScaleManager.shared
 
-// 图标大小也应该响应缩放
+// 图标大小
 Image(systemName: "books.vertical")
     .font(.system(size: 40 * fontScaleManager.scaleFactor))
+
+// 布局尺寸
+let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
+Image("Logo")
+    .frame(width: logoSize, height: logoSize)
 ```
 
-### 4. 响应式布局
+### 5. 响应式布局
 
 使用 `AdaptiveStack` 在辅助功能字体大小时自动切换布局：
 
@@ -385,7 +435,21 @@ AdaptiveStack(horizontalAlignment: .center, spacing: 16) {
 // 辅助功能字体：垂直排列
 ```
 
-### 5. 避免使用 @ScaledMetric
+或手动检查：
+
+```swift
+@ObservedObject private var fontScaleManager = FontScaleManager.shared
+
+var body: some View {
+    if fontScaleManager.isAccessibilitySize {
+        VStack { content }
+    } else {
+        HStack { content }
+    }
+}
+```
+
+### 6. 避免使用 @ScaledMetric
 
 ```swift
 // ❌ 在 macOS 上不工作
@@ -396,7 +460,7 @@ AdaptiveStack(horizontalAlignment: .center, spacing: 16) {
 let iconSize = 20 * fontScaleManager.scaleFactor
 ```
 
-### 6. 避免使用 DynamicTypeSize
+### 7. 避免使用 DynamicTypeSize
 
 ```swift
 // ❌ 在 macOS 上始终返回 .large
@@ -406,6 +470,18 @@ if dynamicTypeSize.isAccessibilitySize { ... }
 // ✅ 使用 FontScaleManager
 @ObservedObject private var fontScaleManager = FontScaleManager.shared
 if fontScaleManager.isAccessibilitySize { ... }
+```
+
+### 8. 特殊字体（等宽字体等）
+
+对于需要特殊设计的字体（如等宽字体），使用手动计算：
+
+```swift
+@Environment(\.fontScale) private var fontScale
+
+// 等宽字体
+Text("func main()")
+    .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale, design: .monospaced))
 ```
 
 ---
