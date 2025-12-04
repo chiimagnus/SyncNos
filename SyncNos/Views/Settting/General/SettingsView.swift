@@ -3,6 +3,7 @@ import AppKit
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @State private var navigationPath = NavigationPath()
     
     var body: some View {
@@ -10,6 +11,20 @@ struct SettingsView: View {
             List {
                 Section(header: Text("General")) {
                     LanguageView()
+                    
+                    // 字体大小设置
+                    NavigationLink(destination: TextSizeSettingsView()) {
+                        HStack {
+                            Label("Text Size", systemImage: "textformat.size")
+                            Spacer()
+                            Text(FontScaleManager.shared.scaleLevel.shortName)
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.body.weight(.regular))
+                        }
+                    }
+                    .help("Adjust text size throughout the app")
 
                     Toggle(isOn: Binding(
                         get: { loginItemVM.isEnabled },
@@ -189,6 +204,8 @@ struct SettingsView: View {
                 NotificationCenter.default.post(name: Notification.Name("DedaoSettingsShowLoginSheet"), object: nil)
             }
         }
+        // 应用字体缩放到整个视图层级
+        .applyFontScale()
     }
 }
 

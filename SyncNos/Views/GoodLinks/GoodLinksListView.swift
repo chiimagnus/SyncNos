@@ -5,6 +5,7 @@ struct GoodLinksListView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectionIds: Set<String>
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.fontScale) private var fontScale
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -15,8 +16,13 @@ struct GoodLinksListView: View {
                 ProgressView("Loading...")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").foregroundColor(.orange).font(.largeTitle)
-                    Text(error).multilineTextAlignment(.center).padding(.horizontal)
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 26 * fontScale))
+                    Text(error)
+                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
@@ -25,8 +31,12 @@ struct GoodLinksListView: View {
                 }
             } else if viewModel.links.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "link").foregroundColor(.secondary).font(.largeTitle)
-                    Text("No links found").foregroundColor(.secondary)
+                    Image(systemName: "link")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 26 * fontScale))
+                    Text("No links found")
+                        .font(.system(size: Font.TextStyle.body.basePointSize * fontScale))
+                        .foregroundColor(.secondary)
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
@@ -39,22 +49,32 @@ struct GoodLinksListView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(link.title?.isEmpty == false ? link.title! : link.url)
-                                    .font(.headline)
+                                    .font(.system(size: Font.TextStyle.headline.basePointSize * fontScale, weight: .semibold))
                                     .lineLimit(2)
                                 if let author = link.author, !author.isEmpty {
-                                    Text(author).font(.subheadline).foregroundColor(.secondary)
+                                    Text(author)
+                                        .font(.system(size: Font.TextStyle.subheadline.basePointSize * fontScale))
+                                        .foregroundColor(.secondary)
                                 }
                                 HStack(spacing: 8) {
-                                    if let cnt = link.highlightTotal { Text("\(cnt) highlights").font(.caption).foregroundColor(.secondary) }
-                                    Text(URL(string: link.url)?.host ?? "").font(.caption).foregroundColor(.secondary)
+                                    if let cnt = link.highlightTotal {
+                                        Text("\(cnt) highlights")
+                                            .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Text(URL(string: link.url)?.host ?? "")
+                                        .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
+                                        .foregroundColor(.secondary)
                                     if link.starred {
-                                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
+                                        Image(systemName: "star.fill")
+                                            .foregroundColor(.yellow)
+                                            .font(.system(size: Font.TextStyle.caption.basePointSize * fontScale))
                                     }
                                 }
                                 let tagsText = link.tagsFormatted
                                 if !tagsText.isEmpty {
                                     Text(tagsText)
-                                        .font(.caption2)
+                                        .font(.system(size: Font.TextStyle.caption2.basePointSize * fontScale))
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
                                 }
