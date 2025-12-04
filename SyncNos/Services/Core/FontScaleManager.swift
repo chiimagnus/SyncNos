@@ -81,6 +81,26 @@ enum FontScaleLevel: String, CaseIterable, Identifiable {
 // MARK: - Font Scale Manager
 
 /// 字体缩放管理器 - 管理应用内字体大小设置
+/// 
+/// macOS 不支持系统级 Dynamic Type，因此我们使用此管理器实现应用内字体缩放。
+/// 
+/// ## 使用方法
+/// 
+/// ### 1. 在根视图应用缩放
+/// ```swift
+/// RootView()
+///     .applyFontScale()
+/// ```
+/// 
+/// ### 2. 在视图中使用缩放字体
+/// ```swift
+/// // 方式一：使用 .scaledFont() 修饰符
+/// Text("Hello")
+///     .scaledFont(.headline)
+/// 
+/// // 方式二：使用 ScaledText 视图
+/// ScaledText("Hello", style: .headline)
+/// ```
 final class FontScaleManager: ObservableObject {
     static let shared = FontScaleManager()
     
@@ -136,61 +156,10 @@ private struct FontScaleKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// 字体缩放因子
+    /// 字体缩放因子 - 通过 .applyFontScale() 注入到视图层级
     var fontScale: CGFloat {
         get { self[FontScaleKey.self] }
         set { self[FontScaleKey.self] = newValue }
-    }
-}
-
-// MARK: - View Extension
-
-extension View {
-    /// 应用字体缩放因子到视图层级
-    func withFontScale(_ scale: CGFloat) -> some View {
-        self.environment(\.fontScale, scale)
-    }
-    
-    /// 应用 FontScaleManager 的缩放因子
-    func withFontScaleManager(_ manager: FontScaleManager) -> some View {
-        self.environment(\.fontScale, manager.scaleFactor)
-    }
-}
-
-// MARK: - Scaled Font Extension
-
-extension Font {
-    /// 创建支持应用内缩放的字体
-    /// - Parameters:
-    ///   - style: 文本样式
-    ///   - scale: 缩放因子
-    /// - Returns: 缩放后的字体
-    static func scaled(_ style: TextStyle, scale: CGFloat = 1.0) -> Font {
-        let baseSize = style.basePointSize
-        return .system(size: baseSize * scale)
-    }
-    
-    /// 创建支持应用内缩放的字体（带粗细）
-    /// - Parameters:
-    ///   - style: 文本样式
-    ///   - weight: 字体粗细
-    ///   - scale: 缩放因子
-    /// - Returns: 缩放后的字体
-    static func scaled(_ style: TextStyle, weight: Weight, scale: CGFloat = 1.0) -> Font {
-        let baseSize = style.basePointSize
-        return .system(size: baseSize * scale, weight: weight)
-    }
-    
-    /// 创建支持应用内缩放的字体（带设计）
-    /// - Parameters:
-    ///   - style: 文本样式
-    ///   - weight: 字体粗细
-    ///   - design: 字体设计
-    ///   - scale: 缩放因子
-    /// - Returns: 缩放后的字体
-    static func scaled(_ style: TextStyle, weight: Weight, design: Design, scale: CGFloat = 1.0) -> Font {
-        let baseSize = style.basePointSize
-        return .system(size: baseSize * scale, weight: weight, design: design)
     }
 }
 
@@ -216,9 +185,11 @@ extension Font.TextStyle {
     }
 }
 
-// MARK: - ScaledFont View Modifier
+// MARK: - Scaled Font Modifier
 
 /// 应用缩放字体的视图修饰符
+/// 
+/// 自动从环境中读取 fontScale 并应用到字体大小
 struct ScaledFontModifier: ViewModifier {
     @Environment(\.fontScale) private var fontScale
     let style: Font.TextStyle
@@ -245,15 +216,127 @@ struct ScaledFontModifier: ViewModifier {
     }
 }
 
+// MARK: - View Extensions
+
 extension View {
+    /// 应用 FontScaleManager 的缩放因子到整个视图层级
+    /// 
+    /// 应在应用的根视图上调用此方法：
+    /// ```swift
+    /// RootView()
+    ///     .applyFontScale()
+    /// ```
+    func applyFontScale() -> some View {
+        modifier(AppFontScaleModifier())
+    }
+    
     /// 应用支持应用内缩放的字体
-    /// - Parameters:
-    ///   - style: 文本样式
-    ///   - weight: 字体粗细（可选）
-    ///   - design: 字体设计（可选）
-    /// - Returns: 修改后的视图
+    /// 
+    /// ```swift
+    /// Text("Hello")
+    ///     .scaledFont(.headline)
+    /// 
+    /// Text("World")
+    ///     .scaledFont(.body, weight: .bold)
+    /// ```
     func scaledFont(_ style: Font.TextStyle, weight: Font.Weight? = nil, design: Font.Design? = nil) -> some View {
         modifier(ScaledFontModifier(style: style, weight: weight, design: design))
+    }
+}
+
+/// 应用字体缩放到整个视图层级的修饰符
+struct AppFontScaleModifier: ViewModifier {
+    @ObservedObject var fontScaleManager = FontScaleManager.shared
+    
+    func body(content: Content) -> some View {
+        content
+            .environment(\.fontScale, fontScaleManager.scaleFactor)
+    }
+}
+
+// MARK: - ScaledText View
+
+/// 支持应用内缩放的文本视图
+/// 
+/// 使用示例：
+/// ```swift
+/// ScaledText("Hello World", style: .headline)
+/// ScaledText("Bold Text", style: .body, weight: .bold)
+/// ```
+struct ScaledText: View {
+    @Environment(\.fontScale) private var fontScale
+    
+    let text: LocalizedStringKey
+    let style: Font.TextStyle
+    let weight: Font.Weight?
+    let design: Font.Design?
+    
+    init(_ text: LocalizedStringKey, style: Font.TextStyle = .body, weight: Font.Weight? = nil, design: Font.Design? = nil) {
+        self.text = text
+        self.style = style
+        self.weight = weight
+        self.design = design
+    }
+    
+    init(_ text: String, style: Font.TextStyle = .body, weight: Font.Weight? = nil, design: Font.Design? = nil) {
+        self.text = LocalizedStringKey(text)
+        self.style = style
+        self.weight = weight
+        self.design = design
+    }
+    
+    var body: some View {
+        let baseSize = style.basePointSize
+        let scaledSize = baseSize * fontScale
+        
+        if let weight = weight, let design = design {
+            Text(text)
+                .font(.system(size: scaledSize, weight: weight, design: design))
+        } else if let weight = weight {
+            Text(text)
+                .font(.system(size: scaledSize, weight: weight))
+        } else {
+            Text(text)
+                .font(.system(size: scaledSize))
+        }
+    }
+}
+
+// MARK: - Adaptive Stack
+
+/// 响应式布局容器：根据字体缩放级别自动切换水平/垂直布局
+/// 
+/// 当字体缩放达到辅助功能大小时，自动从水平布局切换为垂直布局
+struct AdaptiveStack<Content: View>: View {
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
+    
+    let horizontalAlignment: VerticalAlignment
+    let verticalAlignment: HorizontalAlignment
+    let spacing: CGFloat?
+    let content: Content
+    
+    init(
+        horizontalAlignment: VerticalAlignment = .center,
+        verticalAlignment: HorizontalAlignment = .center,
+        spacing: CGFloat? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.horizontalAlignment = horizontalAlignment
+        self.verticalAlignment = verticalAlignment
+        self.spacing = spacing
+        self.content = content()
+    }
+    
+    var body: some View {
+        if fontScaleManager.isAccessibilitySize {
+            VStack(alignment: verticalAlignment, spacing: spacing) {
+                content
+            }
+        } else {
+            HStack(alignment: horizontalAlignment, spacing: spacing) {
+                content
+            }
+        }
     }
 }
 
@@ -275,3 +358,14 @@ extension View {
     .frame(width: 300)
 }
 
+#Preview("ScaledText") {
+    VStack(alignment: .leading, spacing: 8) {
+        ScaledText("Large Title", style: .largeTitle)
+        ScaledText("Title", style: .title)
+        ScaledText("Headline", style: .headline, weight: .bold)
+        ScaledText("Body", style: .body)
+        ScaledText("Caption", style: .caption)
+    }
+    .padding()
+    .applyFontScale()
+}
