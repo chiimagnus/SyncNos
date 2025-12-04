@@ -1,23 +1,6 @@
 import Foundation
 import SwiftData
 
-// MARK: - WeRead Cache Error
-
-/// WeRead 缓存服务错误
-enum WeReadCacheError: LocalizedError {
-    case modelContainerNotAvailable
-    case modelContainerCreationFailed(Error)
-    
-    var errorDescription: String? {
-        switch self {
-        case .modelContainerNotAvailable:
-            return "WeRead cache storage is not available"
-        case .modelContainerCreationFailed(let error):
-            return "Failed to create WeRead cache storage: \(error.localizedDescription)"
-        }
-    }
-}
-
 // MARK: - WeRead Model Container Factory
 
 /// WeRead ModelContainer 工厂
