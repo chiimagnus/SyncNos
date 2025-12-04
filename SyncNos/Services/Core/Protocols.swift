@@ -447,53 +447,54 @@ protocol DedaoAPIServiceProtocol: AnyObject {
 }
 
 /// Dedao 本地数据存储服务协议
-/// 所有方法内部使用独立的 ModelContext 在后台线程执行，调用方无需关心线程问题
-protocol DedaoCacheServiceProtocol: AnyObject {
+/// 使用 @ModelActor 在后台线程执行所有数据库操作，不阻塞主线程
+/// 注意：由于使用 Actor，所有方法调用都是异步的
+protocol DedaoCacheServiceProtocol: Actor {
     // MARK: - 书籍操作
     
-    /// 获取所有本地存储的书籍
-    func getAllBooks() async throws -> [CachedDedaoBook]
+    /// 获取所有本地存储的书籍（返回 Sendable DTO）
+    func getAllBooks() throws -> [DedaoBookListItem]
     
     /// 获取指定书籍
-    func getBook(bookId: String) async throws -> CachedDedaoBook?
+    func getBook(bookId: String) throws -> CachedDedaoBook?
     
     /// 保存书籍列表
-    func saveBooks(_ ebooks: [DedaoEbook]) async throws
+    func saveBooks(_ ebooks: [DedaoEbook]) throws
     
     /// 删除指定书籍
-    func deleteBooks(ids: [String]) async throws
+    func deleteBooks(ids: [String]) throws
     
     /// 更新书籍的高亮数量
-    func updateBookHighlightCount(bookId: String, count: Int) async throws
+    func updateBookHighlightCount(bookId: String, count: Int) throws
     
     // MARK: - 高亮操作
     
-    /// 获取指定书籍的所有高亮
-    func getHighlights(bookId: String) async throws -> [CachedDedaoHighlight]
+    /// 获取指定书籍的所有高亮（返回 Sendable DTO）
+    func getHighlights(bookId: String) throws -> [DedaoEbookNote]
     
     /// 保存高亮列表
-    func saveHighlights(_ notes: [DedaoEbookNote], bookId: String) async throws
+    func saveHighlights(_ notes: [DedaoEbookNote], bookId: String) throws
     
     /// 删除指定高亮
-    func deleteHighlights(ids: [String]) async throws
+    func deleteHighlights(ids: [String]) throws
     
     // MARK: - 同步状态
     
-    /// 获取全局同步状态
-    func getSyncState() async throws -> DedaoSyncState
+    /// 获取全局同步状态（返回 Sendable 快照）
+    func getSyncState() throws -> DedaoSyncStateSnapshot
     
     /// 更新同步状态
-    func updateSyncState(lastFullSyncAt: Date?, lastIncrementalSyncAt: Date?) async throws
+    func updateSyncState(lastFullSyncAt: Date?, lastIncrementalSyncAt: Date?) throws
     
     // MARK: - 清理
     
     /// 清除所有本地数据
-    func clearAllData() async throws
+    func clearAllData() throws
     
     // MARK: - 统计
     
     /// 获取本地数据统计信息
-    func getDataStats() async throws -> DedaoDataStats
+    func getDataStats() throws -> DedaoDataStats
 }
 
 /// Dedao 本地数据统计
