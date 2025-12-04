@@ -54,7 +54,7 @@ struct IAPView: View {
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
                 }                
             }
-            .font(.caption)
+            .scaledFont(.caption)
 
 #if DEBUG
             Section(header: Text("Debug Actions")) {
@@ -106,10 +106,10 @@ struct IAPView: View {
                 Image(systemName: "checkmark.seal.fill")
                     .foregroundColor(.green)
                 Text(viewModel.purchaseType.displayName)
-                    .font(.headline)
+                    .scaledFont(.headline)
                 Spacer()
                 Text("Active")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.green)
             }
             
@@ -117,10 +117,10 @@ struct IAPView: View {
             if let purchaseDate = viewModel.purchaseDate {
                 HStack {
                     Text("Purchased:")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -129,10 +129,10 @@ struct IAPView: View {
             if viewModel.purchaseType == .annual, let expirationDate = viewModel.expirationDate {
                 HStack {
                     Text("Expires:")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(expirationDate.formatted(date: .abbreviated, time: .standard))
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(expirationDate < Date() ? .red : .secondary)
                 }
             }
@@ -145,25 +145,26 @@ struct IAPView: View {
                 Image(systemName: viewModel.isInTrialPeriod ? "clock.fill" : "exclamationmark.triangle.fill")
                     .foregroundColor(viewModel.isInTrialPeriod ? .blue : .red)
                 Text("Trial Period")
+                    .scaledFont(.body)
                 Spacer()
                 if viewModel.isInTrialPeriod {
                     Text("\(viewModel.trialDaysRemaining) days left")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Expired")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.red)
                 }
             }
             
             if viewModel.isInTrialPeriod {
                 Text("Enjoy full access during your trial period.")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.secondary)
             } else {
                 Text("Purchase to continue using SyncNos.")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
         }
@@ -175,10 +176,10 @@ struct IAPView: View {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundColor(.red)
                 Text("Annual Subscription")
-                    .font(.headline)
+                    .scaledFont(.headline)
                 Spacer()
                 Text("Expired")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
             
@@ -186,10 +187,10 @@ struct IAPView: View {
             if let purchaseDate = viewModel.purchaseDate {
                 HStack {
                     Text("Purchased:")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -198,16 +199,16 @@ struct IAPView: View {
             if let expirationDate = viewModel.expirationDate {
                 HStack {
                     Text("Expired:")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(expirationDate.formatted(date: .abbreviated, time: .standard))
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.red)
                 }
             }
             
             Text("Your subscription has expired. Renew to continue using SyncNos.")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.red)
         }
     }
@@ -219,16 +220,16 @@ struct IAPView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.displayName)
-                    .font(.headline)
+                    .scaledFont(.headline)
                 Text(product.description)
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
                 Text(product.displayPrice)
-                    .font(.headline)
+                    .scaledFont(.headline)
                 Button(action: {
                     loadingPlanID = product.id
                     Task {
@@ -242,7 +243,7 @@ struct IAPView: View {
                             .scaleEffect(0.8, anchor: .center)
                     } else {
                         Text("Purchase")
-                            .font(.caption)
+                            .scaledFont(.caption)
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -256,5 +257,6 @@ struct IAPView: View {
 struct IAPView_Previews: PreviewProvider {
     static var previews: some View {
         IAPView()
+            .applyFontScale()
     }
 }

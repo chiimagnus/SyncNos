@@ -40,33 +40,33 @@ struct AppleAccountView: View {
                                     .foregroundColor(.secondary)
                                 Text("Click the button above to start authorization")
                                     .foregroundColor(.secondary)
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                             }
                         case .processing:
                             HStack(spacing: 8) {
                                 ProgressView()
                                 Text("Requesting authorization...")
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                             }
                         case .succeeded(let user):
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Authorization successful")
-                                    .font(.headline)
-                                if let name = user.fullName, !name.isEmpty { Text("Name: \(name)") }
-                                if let mail = user.email, !mail.isEmpty { Text("Email: \(mail)") }
+                                    .scaledFont(.headline)
+                                if let name = user.fullName, !name.isEmpty { Text("Name: \(name)").scaledFont(.body) }
+                                if let mail = user.email, !mail.isEmpty { Text("Email: \(mail)").scaledFont(.body) }
                                 Text("User Identifier：\(user.userIdentifier)")
-                                    .font(.footnote)
+                                    .scaledFont(.footnote)
                                     .foregroundColor(.secondary)
 #if DEBUG
                                 if let code = user.authorizationCode, !code.isEmpty {
                                     Text("authorization_code：\(code)")
-                                        .font(.footnote)
+                                        .scaledFont(.footnote)
                                         .foregroundColor(.secondary)
                                         .textSelection(.enabled)
                                 }
                                 if let idt = user.identityToken, !idt.isEmpty {
                                     Text("identity_token：\(idt)")
-                                        .font(.footnote)
+                                        .scaledFont(.footnote)
                                         .foregroundColor(.secondary)
                                         .textSelection(.enabled)
                                 }
@@ -76,8 +76,8 @@ struct AppleAccountView: View {
                             }
                         case .failed(let message):
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Authorization failed").font(.headline)
-                                Text(message).foregroundColor(.red).font(.subheadline)
+                                Text("Authorization failed").scaledFont(.headline)
+                                Text(message).foregroundColor(.red).scaledFont(.subheadline)
                                 Button("Retry") { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
@@ -90,38 +90,38 @@ struct AppleAccountView: View {
                 // Account information
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text("Account information").font(.title3).bold()
+                        Text("Account information").scaledFont(.title3, weight: .bold)
                         Spacer()
                         if accountViewModel.isLoading { ProgressView() }
                     }
 
                     if let err = accountViewModel.errorMessage {
-                        Text(err).foregroundColor(.red).font(.footnote)
+                        Text(err).foregroundColor(.red).scaledFont(.footnote)
                     }
 
                     if let p = accountViewModel.profile {
                         GroupBox(label: Text("Basic information")) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("User ID: \(p.userId)")
-                                if let name = p.displayName, !name.isEmpty { Text("Display name: \(name)") }
-                                if let email = p.email, !email.isEmpty { Text("Email: \(email)") }
-                                if let created = p.createdAt { Text("Creation time: \(created)").font(.footnote).foregroundColor(.secondary) }
+                                Text("User ID: \(p.userId)").scaledFont(.body)
+                                if let name = p.displayName, !name.isEmpty { Text("Display name: \(name)").scaledFont(.body) }
+                                if let email = p.email, !email.isEmpty { Text("Email: \(email)").scaledFont(.body) }
+                                if let created = p.createdAt { Text("Creation time: \(created)").scaledFont(.footnote).foregroundColor(.secondary) }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
-                        Text("User information not loaded").foregroundColor(.secondary)
+                        Text("User information not loaded").foregroundColor(.secondary).scaledFont(.body)
                     }
 
                     GroupBox(label: Text("Login methods")) {
                         if accountViewModel.loginMethods.isEmpty {
-                            Text("None").foregroundColor(.secondary)
+                            Text("None").foregroundColor(.secondary).scaledFont(.body)
                         } else {
                             ForEach(Array(accountViewModel.loginMethods.enumerated()), id: \.0) { _, m in
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(m.providerName)").bold()
+                                    Text("\(m.providerName)").bold().scaledFont(.body)
                                     Text("key: \(m.providerKey)")
-                                        .font(.footnote)
+                                        .scaledFont(.footnote)
                                         .foregroundColor(.secondary)
                                 }
                             }
@@ -149,5 +149,6 @@ struct AppleAccountView: View {
 struct AppleAccountView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView { AppleAccountView() }
+            .applyFontScale()
     }
 }

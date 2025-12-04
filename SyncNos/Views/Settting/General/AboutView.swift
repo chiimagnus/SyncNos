@@ -2,14 +2,14 @@ import SwiftUI
 import AppKit
 
 struct AboutView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
+    @Environment(\.fontScale) private var fontScale
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 128
+    private var iconSize: CGFloat { 128 * fontScale }
     
     var body: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
+            if fontScaleManager.isAccessibilitySize {
                 // 辅助功能大小时使用垂直布局
                 ScrollView {
                     VStack(spacing: 24) {
@@ -40,13 +40,13 @@ struct AboutView: View {
         
         // 信息区域
         VStack(alignment: .leading, spacing: 12) {
-            // App 名称 - 使用系统样式，自动支持 Dynamic Type
+            // App 名称
             Text(appName)
-                .font(.largeTitle.bold())
+                .scaledFont(.largeTitle, weight: .bold)
             
             // 版本信息
             Text("Version \(Bundle.main.appVersion) (\(Bundle.main.appBuild))")
-                .font(.subheadline) // 系统样式，自动支持 Dynamic Type
+                .scaledFont(.subheadline)
                 .foregroundStyle(.secondary)
             
             Divider()
@@ -65,7 +65,7 @@ struct AboutView: View {
             
             // 底部信息
             Text("Made with SwiftUI • macOS 14+")
-                .font(.footnote) // 系统样式，自动支持 Dynamic Type
+                .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -86,11 +86,11 @@ private struct AboutLinkButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.caption) // 使用系统样式，自动支持 Dynamic Type
+                    .scaledFont(.caption)
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 16)
                 Text(title)
-                    .font(.callout) // 系统样式，自动支持 Dynamic Type
+                    .scaledFont(.callout)
             }
             .contentShape(Rectangle())
         }

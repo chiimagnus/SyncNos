@@ -6,14 +6,15 @@ import SwiftUI
 struct OnboardingNextButton: View {
     let action: () -> Void
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .title) private var iconSize: CGFloat = 20
-    @ScaledMetric(relativeTo: .title) private var buttonSize: CGFloat = 50
+    @Environment(\.fontScale) private var fontScale
+    
+    private var iconSize: CGFloat { 20 * fontScale }
+    private var buttonSize: CGFloat { 50 * fontScale }
     
     var body: some View {
         Button(action: action) {
             Image(systemName: "arrow.right")
-                .font(.system(size: iconSize, weight: .semibold)) // 使用 @ScaledMetric 支持 Dynamic Type
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: buttonSize, height: buttonSize)
                 .background(Color("OnboardingButtonColor"))
@@ -33,5 +34,5 @@ struct OnboardingNextButton: View {
     OnboardingNextButton { }
         .padding()
         .background(Color("BackgroundColor"))
+        .applyFontScale()
 }
-

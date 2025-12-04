@@ -9,6 +9,7 @@ struct PayWallView: View {
     @StateObject private var viewModel = IAPViewModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.fontScale) private var fontScale
     @State private var loadingPlanID: String? = nil
     
     // 动画状态
@@ -16,9 +17,7 @@ struct PayWallView: View {
     @State private var headerIconScale: CGFloat = 1.0  // 图标脉冲放大
     @State private var headerIconShake: CGFloat = 0  // 图标颤抖
     
-    // MARK: - Dynamic Type Support
-    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
-    @ScaledMetric(relativeTo: .title) private var titleFontSize: CGFloat = 24
+    private var heroIconSize: CGFloat { 60 * fontScale }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -59,20 +58,20 @@ struct PayWallView: View {
             // Welcome 模式：礼物图标 + 摇摆动画
             VStack(spacing: 12) {
                 Image(systemName: "gift.fill")
-                    .font(.system(size: heroIconSize)) // 使用 @ScaledMetric 支持 Dynamic Type
+                    .font(.system(size: heroIconSize))
                     .foregroundStyle(.green)
                     .rotationEffect(.degrees(wiggleAngle), anchor: .bottom)
                     .onAppear {
                         startWiggleAnimation()
                     }
                 Text("30-day free trial included")
-                    .font(.headline) // 系统样式，自动支持 Dynamic Type
+                    .scaledFont(.headline)
                     .foregroundStyle(Color("OnboardingTextColor"))
             }
         } else {
             // 其他模式：常规图标 + 脉冲动画（紧急提醒时）
             Image(systemName: headerIcon)
-                .font(.system(size: heroIconSize)) // 使用 @ScaledMetric 支持 Dynamic Type
+                .font(.system(size: heroIconSize))
                 .foregroundStyle(headerIconColor)
                 .scaleEffect(shouldPulseHeaderIcon ? headerIconScale : 1.0)
                 .offset(x: shouldPulseHeaderIcon ? headerIconShake : 0)
@@ -197,7 +196,7 @@ struct PayWallView: View {
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
         }
-        .font(.caption)
+        .scaledFont(.caption)
         .padding(.top, 16)
     }
     
@@ -216,10 +215,10 @@ struct PayWallView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(product.displayName)
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(Color("OnboardingTextColor"))
                     Text(product.description)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                         .lineLimit(2)
                 }
@@ -230,8 +229,7 @@ struct PayWallView: View {
                         .scaleEffect(0.8, anchor: .center)
                 } else {
                     Text(product.displayPrice)
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                        .scaledFont(.title3, weight: .semibold)
                         .foregroundStyle(Color("OnboardingTextColor"))
                 }
             }
@@ -256,11 +254,11 @@ struct PayWallView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(headerTitle)
-                    .font(.title2.bold()) // 使用系统样式，自动支持 Dynamic Type
+                    .scaledFont(.title2, weight: .bold)
                     .foregroundStyle(Color("OnboardingTextColor"))
                 
                 Text(headerMessage)
-                    .font(.subheadline) // 系统样式，自动支持 Dynamic Type
+                    .scaledFont(.subheadline)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -310,7 +308,7 @@ struct PayWallView: View {
                     }
                 }) {
                     Text("Later")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundColor(.white)
                         .frame(width: 80, height: 44)
                         .background(Color.secondary)
@@ -444,29 +442,30 @@ enum IAPPresentationMode: Equatable {
 
 #Preview("Welcome - Default") {
     PayWallView(presentationMode: .welcome)
-}
-
-#Preview("Welcome - Accessibility") {
-    PayWallView(presentationMode: .welcome)
-        .environment(\.dynamicTypeSize, .accessibility3)
+        .applyFontScale()
 }
 
 #Preview("Trial Reminder - 7 Days") {
     PayWallView(presentationMode: .trialReminder(daysRemaining: 7))
+        .applyFontScale()
 }
 
 #Preview("Trial Reminder - 3 Days") {
     PayWallView(presentationMode: .trialReminder(daysRemaining: 3))
+        .applyFontScale()
 }
 
 #Preview("Trial Reminder - 1 Day") {
     PayWallView(presentationMode: .trialReminder(daysRemaining: 1))
+        .applyFontScale()
 }
 
 #Preview("Trial Expired") {
     PayWallView(presentationMode: .trialExpired)
+        .applyFontScale()
 }
 
 #Preview("Subscription Expired") {
     PayWallView(presentationMode: .subscriptionExpired)
+        .applyFontScale()
 }
