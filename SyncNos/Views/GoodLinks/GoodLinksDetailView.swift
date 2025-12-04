@@ -49,7 +49,7 @@ struct GoodLinksDetailView: View {
                             ) {
                                 if let url = URL(string: link.openInGoodLinksURLString) {
                                     Link("Open in GoodLinks", destination: url)
-                                        .font(.subheadline)
+                                        .scaledFont(.subheadline)
                                         .foregroundColor(.blue)
                                 }
                             } content: {
@@ -58,13 +58,13 @@ struct GoodLinksDetailView: View {
                                     HStack(spacing: 8) {
                                         if link.starred {
                                             Label("Favorited", systemImage: "star.fill")
-                                                .font(.caption)
+                                                .scaledFont(.caption)
                                                 .foregroundColor(.yellow)
                                         }
                                         let tagsText = link.tagsFormatted
                                         if !tagsText.isEmpty {
                                             Label(tagsText, systemImage: "tag")
-                                                .font(.caption)
+                                                .scaledFont(.caption)
                                                 .foregroundColor(.secondary)
                                                 .lineLimit(1)
                                         }
@@ -72,14 +72,13 @@ struct GoodLinksDetailView: View {
                                     // URL 与原始URL
                                     HStack(spacing: 6) {
                                         Image(systemName: "link")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                         Text("URL")
-                                            .font(.caption)
+                                            .scaledFont(.caption, weight: .medium)
                                             .foregroundColor(.secondary)
-                                            .fontWeight(.medium)
                                         Text(link.url)
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundColor(.blue)
                                             .textSelection(.enabled)
                                             .lineLimit(3)                                        
@@ -88,14 +87,13 @@ struct GoodLinksDetailView: View {
                                     if let originalURL = link.originalURL, !originalURL.isEmpty, originalURL != link.url {
                                         HStack(spacing: 6) {
                                             Image(systemName: "arrow.turn.up.left")
-                                                .font(.caption)
+                                                .scaledFont(.caption)
                                                 .foregroundColor(.secondary)
                                             Text("Original URL")
-                                                .font(.caption)
+                                                .scaledFont(.caption, weight: .medium)
                                                 .foregroundColor(.secondary)
-                                                .fontWeight(.medium)
                                             Text(originalURL)
-                                                .font(.caption)
+                                                .scaledFont(.caption)
                                                 .foregroundColor(.blue)
                                                 .textSelection(.enabled)
                                                 .lineLimit(2)
@@ -107,15 +105,14 @@ struct GoodLinksDetailView: View {
                                         VStack(alignment: .leading, spacing: 4) {
                                             HStack(spacing: 6) {
                                                 Image(systemName: "doc.text")
-                                                    .font(.caption)
+                                                    .scaledFont(.caption)
                                                     .foregroundColor(.secondary)
                                                 Text("Summary")
-                                                    .font(.caption)
+                                                    .scaledFont(.caption, weight: .medium)
                                                     .foregroundColor(.secondary)
-                                                    .fontWeight(.medium)
                                             }
                                             Text(summary)
-                                                .font(.body)
+                                                .scaledFont(.body)
                                                 .foregroundColor(.primary)
                                                 .textSelection(.enabled)
                                                 .fixedSize(horizontal: false, vertical: true)
@@ -162,16 +159,16 @@ struct GoodLinksDetailView: View {
 
                             HStack(spacing: 6) {
                                 Image(systemName: "quote.opening")
-                                    .font(.headline)
+                                    .scaledFont(.headline)
                                     .foregroundColor(.secondary)
 
                                 Text("Highlights")
-                                    .font(.headline)
+                                    .scaledFont(.headline)
                                     .foregroundColor(.primary)
 
                                 if !filteredHighlights.isEmpty {
                                     Text("\(filteredHighlights.count) highlights")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 }
 
@@ -184,7 +181,7 @@ struct GoodLinksDetailView: View {
                                 if viewModel.totalFilteredHighlightCount > 0 {
                                     HStack {
                                         Text("\(filteredHighlights.count)/\(viewModel.totalFilteredHighlightCount) highlights")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                         Spacer()
                                     }
@@ -248,7 +245,7 @@ struct GoodLinksDetailView: View {
                                         ProgressView()
                                             .scaleEffect(0.8)
                                         Text("Loading...")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                         Spacer()
                                     }
@@ -260,7 +257,7 @@ struct GoodLinksDetailView: View {
                                             viewModel.loadNextHighlightPage()
                                         } label: {
                                             Text("Load More (\(viewModel.totalFilteredHighlightCount - filteredHighlights.count) remaining)")
-                                                .font(.caption)
+                                                .scaledFont(.caption)
                                         }
                                         .buttonStyle(.plain)
                                         .foregroundColor(.accentColor)
@@ -271,7 +268,7 @@ struct GoodLinksDetailView: View {
                             } else {
                                 // 空状态提示
                                 Text("No highlights found")
-                                    .font(.body)
+                                    .scaledFont(.body)
                                     .foregroundColor(.secondary)
                                     .padding()
                             }
@@ -352,9 +349,9 @@ struct GoodLinksDetailView: View {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
                                 if let progress = externalSyncProgress {
-                                    Text(progress).font(.caption)
+                                    Text(progress).scaledFont(.caption)
                                 } else {
-                                    Text("Syncing...").font(.caption)
+                                    Text("Syncing...").scaledFont(.caption)
                                 }
                             }
                             .help("Sync in progress")
@@ -362,9 +359,9 @@ struct GoodLinksDetailView: View {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
                                 if let progress = viewModel.syncProgressText {
-                                    Text(progress).font(.caption)
+                                    Text(progress).scaledFont(.caption)
                                 } else {
-                                    Text("Syncing...").font(.caption)
+                                    Text("Syncing...").scaledFont(.caption)
                                 }
                             }
                             .help("Sync in progress")
