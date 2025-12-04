@@ -256,11 +256,11 @@ final class WeReadDetailViewModel: ObservableObject {
         visibleHighlights = []
         currentPageCount = 0
         
-        // 1. 先从缓存加载
+        // 1. 先从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
         do {
             let cached = try await cacheService.getHighlights(bookId: bookId)
             if !cached.isEmpty {
-                allBookmarks = cached.map { WeReadBookmark(from: $0) }
+                allBookmarks = cached
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false
@@ -285,9 +285,8 @@ final class WeReadDetailViewModel: ObservableObject {
                 logger.info("[WeReadDetail] No changes for bookId=\(bookId)")
             case .updated(let added, let removed):
                 logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
-                // 重新从缓存加载
-                let updated = try await cacheService.getHighlights(bookId: bookId)
-                allBookmarks = updated.map { WeReadBookmark(from: $0) }
+                // 重新从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
+                allBookmarks = try await cacheService.getHighlights(bookId: bookId)
                 applyFiltersAndSort()
                 resetPagination()
             case .fullSyncRequired:
@@ -341,10 +340,10 @@ final class WeReadDetailViewModel: ObservableObject {
         
         isLoading = true
         
-        // 清除该书的缓存高亮
+        // 清除该书的缓存高亮（getHighlights 直接返回 [WeReadBookmark]）
         do {
             let highlights = try await cacheService.getHighlights(bookId: bookId)
-            let ids = highlights.map { $0.highlightId }
+            let ids = highlights.map(\.highlightId)
             if !ids.isEmpty {
                 try await cacheService.deleteHighlights(ids: ids)
             }

@@ -161,9 +161,17 @@ class DIContainer {
     
     var weReadCacheService: WeReadCacheServiceProtocol {
         if _weReadCacheService == nil {
-            // WeReadCacheService 内部管理 ModelContainer，初始化不会失败
-            // 与 Apple Books 的 DatabaseService 设计一致
-            _weReadCacheService = WeReadCacheService(logger: loggerService)
+            // WeReadCacheService 使用 @ModelActor，需要传入 ModelContainer
+            // 如果创建失败，会在首次使用时抛出错误
+            do {
+                let container = try WeReadModelContainerFactory.createContainer()
+                _weReadCacheService = WeReadCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] WeRead ModelContainer created successfully")
+            } catch {
+                loggerService.error("[DIContainer] Failed to create WeRead ModelContainer: \(error.localizedDescription)")
+                // 创建一个带有错误的占位服务（实际使用时会抛出错误）
+                fatalError("Failed to create WeRead ModelContainer: \(error.localizedDescription)")
+            }
         }
         return _weReadCacheService!
     }
