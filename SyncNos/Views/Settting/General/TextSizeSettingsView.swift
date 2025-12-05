@@ -17,8 +17,6 @@ struct TextSizeSettingsView: View {
             // 标题和说明
             headerSection
             
-            Divider()
-            
             // 滑块控制
             sliderSection
             
@@ -32,6 +30,7 @@ struct TextSizeSettingsView: View {
         }
         .padding()
         .frame(minWidth: 400, maxWidth: 500)
+        .navigationTitle("Text Size")
         // 同步外部变化（如通过快捷键修改）
         .onChange(of: fontScaleManager.scaleLevel) { _, newLevel in
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -44,9 +43,6 @@ struct TextSizeSettingsView: View {
     
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Text Size")
-                .scaledFont(.title2, weight: .semibold)
-            
             Text("Adjust the text size for the app. This setting affects all text throughout the application.")
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
@@ -57,15 +53,6 @@ struct TextSizeSettingsView: View {
     
     private var sliderSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Size")
-                    .scaledFont(.headline)
-                Spacer()
-                Text(fontScaleManager.scaleLevel.displayName)
-                    .scaledFont(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
             HStack(spacing: 8) {
                 // 小字体图标
                 Image(systemName: "textformat.size.smaller")
@@ -89,7 +76,10 @@ struct TextSizeSettingsView: View {
             }
             
             // 刻度标签
-            HStack {
+            HStack(spacing: 8) {
+                Image(systemName: "textformat.size.smaller")
+                    .scaledFont(.caption)
+                    .opacity(0)
                 ForEach(Array(FontScaleLevel.allCases.enumerated()), id: \.element.id) { index, level in
                     if index > 0 {
                         Spacer()
@@ -98,6 +88,9 @@ struct TextSizeSettingsView: View {
                         .scaledFont(.caption2)
                         .foregroundColor(fontScaleManager.scaleLevel == level ? .primary : .secondary)
                 }
+                Image(systemName: "textformat.size.larger")
+                    .scaledFont(.body)
+                    .opacity(0)
             }
         }
     }
