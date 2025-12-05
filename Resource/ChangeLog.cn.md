@@ -1,5 +1,18 @@
 # 更新日志
 
+## v0.9.5 2025年12月5日
+
+*新增功能*
+
+- 动态字体：引入 FontScaleManager/ScaledText/AdaptiveStack，全局支持 Dynamic Type；MainListView、SwipeableDataSourceContainer、Dedao/WeRead 列表、OnboardingNotionView 等完成适配；TextSizeSettingsView 添加快捷键与上下级切换
+- 同步队列：SelectionPlaceholderView 支持折叠控制，SyncQueueView 失败任务交互优化
+
+*功能改进*
+
+- 缓存与性能：Dedao/WeRead 缓存迁移到后台/同步化并使用 Sendable，提升性能与类型安全
+- 颜色体系：SyncQueueView、InfoHeaderCardView、SelectionPlaceholderView 等统一命名色并完善 Dedao 映射
+- 本地化一致性：标准化各源提示与帮助文本，修正 Dedao 源名称，精简字体相关实现
+
 ## v0.8.10 2025年12月3日
 
 *新增功能*

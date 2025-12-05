@@ -1,5 +1,20 @@
 [ChangeLog-Chinese Version 中文版更新日志](ChangeLog.cn.md)
 
+## v0.9.5 December 5, 2025
+
+*Added*
+
+- Dynamic Type Support: Implemented FontScaleManager, ScaledText, and AdaptiveStack for app-wide text scaling
+- Text Size Settings: Added keyboard shortcuts and next/previous level switching in TextSizeSettingsView
+- Collapsible Sync Queue: SelectionPlaceholderView now supports collapsing the queue for cleaner UI
+
+*Changed*
+
+- Scaling Coverage: MainListView, SwipeableDataSourceContainer, Dedao/WeRead lists, and OnboardingNotionView now respect Dynamic Type
+- Sync Queue UX: Improved failure interaction in SyncQueueView
+- Cache Architecture: Moved Dedao/WeRead caches to background/synchronous flows with Sendable types for better throughput and thread safety
+- Color System: SyncQueueView, InfoHeaderCardView, SelectionPlaceholderView now use named colors; refined Dedao color mapping
+
 ## v0.8.10 December 3, 2025
 
 - Improved sync stability for WeRead and Dedao with request rate limiting
