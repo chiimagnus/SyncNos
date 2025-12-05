@@ -37,10 +37,10 @@ enum ContentSource: String, Codable, CaseIterable {
     /// 数据源强调色
     var accentColor: Color {
         switch self {
-        case .appleBooks: return .orange
-        case .goodLinks: return .red
-        case .weRead: return .blue
-        case .dedao: return Color(red: 0xFF / 255, green: 0x6B / 255, blue: 0x00 / 255) // #FF6B00
+        case .appleBooks: return Color("BrandAppleBooks")
+        case .goodLinks: return Color("BrandGoodLinks")
+        case .weRead: return Color("BrandWeRead")
+        case .dedao: return Color("BrandDedao")
         }
     }
     

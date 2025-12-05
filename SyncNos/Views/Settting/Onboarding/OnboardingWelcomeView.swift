@@ -22,9 +22,9 @@ struct OnboardingWelcomeView: View {
                     .frame(width: logoSize, height: logoSize)
                 
                 // Satellite Icons
-                satelliteIcon("book.fill", color: .orange, angle: -90) // Apple Books
-                satelliteIcon("bookmark.fill", color: .red, angle: 30) // GoodLinks
-                satelliteIcon("text.book.closed.fill", color: .blue, angle: 150) // WeRead
+                satelliteIcon("book.fill", color: Color("BrandAppleBooks"), angle: -90) // Apple Books
+                satelliteIcon("bookmark.fill", color: Color("BrandGoodLinks"), angle: 30) // GoodLinks
+                satelliteIcon("text.book.closed.fill", color: Color("BrandWeRead"), angle: 150) // WeRead
             }
             
             // 底部区域 - 文字 + 箭头按钮
