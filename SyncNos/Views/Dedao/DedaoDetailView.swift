@@ -30,9 +30,6 @@ struct DedaoDetailView: View {
         listViewModel.displayBooks.first { $0.bookId == (selectedBookId ?? "") } ?? listViewModel.displayBooks.first
     }
 
-    /// 得到品牌色 #FF6B00
-    private let dedaoColor = Color(red: 255/255, green: 107/255, blue: 0/255)
-
     var body: some View {
         mainContent
     }
@@ -149,7 +146,7 @@ struct DedaoDetailView: View {
         WaterfallLayout(minColumnWidth: 280, spacing: 12, overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil) {
             ForEach(detailViewModel.visibleHighlights) { h in
                 HighlightCardView(
-                    colorMark: dedaoColor,
+                    colorMark: Color("BrandDedao"),
                     content: h.text,
                     note: h.note,
                     reviewContents: [],

@@ -209,8 +209,8 @@ struct SyncQueueView: View {
                 .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .foregroundStyle(Color(red: 255/255, green: 107/255, blue: 0/255))  // #FF6B00
-                .background(Color(red: 255/255, green: 107/255, blue: 0/255).opacity(0.14), in: Capsule())
+                .foregroundStyle(Color("BrandDedao"))
+                .background(Color("BrandDedao").opacity(0.14), in: Capsule())
         }
     }
     
