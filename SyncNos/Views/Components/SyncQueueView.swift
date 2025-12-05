@@ -72,12 +72,10 @@ struct SyncQueueView: View {
             Divider()
                 .padding(.horizontal, 12)
 
-            // Failed Tasks Section
+            // Failed Tasks Section (统一折叠)
             VStack(alignment: .leading, spacing: 8) {
                 Button {
-                    if !failedTasks.isEmpty {
-                        isFailedExpanded.toggle()
-                    }
+                    isFailedExpanded.toggle()
                 } label: {
                     HStack {
                         Image(systemName: isFailedExpanded ? "chevron.down" : "chevron.right")
@@ -97,17 +95,19 @@ struct SyncQueueView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12)
 
-                if failedTasks.isEmpty {
-                    Text("No failed tasks")
-                        .scaledFont(.body)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                } else if isFailedExpanded {
-                    VStack(spacing: 8) {
-                        ForEach(failedTasks) { task in
-                            taskRow(task)
-                                .padding(.horizontal, 12)
+                if isFailedExpanded {
+                    if failedTasks.isEmpty {
+                        Text("No failed tasks")
+                            .scaledFont(.body)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(failedTasks) { task in
+                                taskRow(task)
+                                    .padding(.horizontal, 12)
+                            }
                         }
                     }
                 }
