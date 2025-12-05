@@ -31,13 +31,13 @@ struct SelectionPlaceholderView: View {
 
     private func colorForTitle(_ title: String) -> Color {
         switch title.lowercased() {
-        case let t where t.contains("apple"): // #FE9509, 十六进制写法
+        case let t where t.contains("apple"): // LogoColor - Apple Books
             return Color("BrandAppleBooks")
-        case let t where t.contains("goodlinks"): // #EA3558
+        case let t where t.contains("goodlinks"): // LogoColor - GoodLinks
             return Color("BrandGoodLinks")
-        case let t where t.contains("weread"): // #30ACFE
+        case let t where t.contains("weread"): // LogoColor - WeRead
             return Color("BrandWeRead")
-        case let t where t.contains("dedao"): // #FF6B00
+        case let t where t.contains("dedao"): // LogoColor - Dedao
             return Color("BrandDedao")
         default:
             return .primary
