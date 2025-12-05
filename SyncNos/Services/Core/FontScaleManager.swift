@@ -76,6 +76,26 @@ enum FontScaleLevel: String, CaseIterable, Identifiable {
     var index: Int {
         FontScaleLevel.allCases.firstIndex(of: self) ?? 2
     }
+    
+    /// 下一个更大的级别（如果已是最大则返回 nil）
+    var next: FontScaleLevel? {
+        let allCases = FontScaleLevel.allCases
+        guard let currentIndex = allCases.firstIndex(of: self),
+              currentIndex + 1 < allCases.count else {
+            return nil
+        }
+        return allCases[currentIndex + 1]
+    }
+    
+    /// 上一个更小的级别（如果已是最小则返回 nil）
+    var previous: FontScaleLevel? {
+        let allCases = FontScaleLevel.allCases
+        guard let currentIndex = allCases.firstIndex(of: self),
+              currentIndex > 0 else {
+            return nil
+        }
+        return allCases[currentIndex - 1]
+    }
 }
 
 // MARK: - Font Scale Manager
@@ -139,6 +159,39 @@ final class FontScaleManager: ObservableObject {
     /// 重置为默认值
     func reset() {
         scaleLevel = .medium
+    }
+    
+    /// 增大字体（切换到下一个更大的级别）
+    /// - Returns: 是否成功增大（如果已是最大则返回 false）
+    @discardableResult
+    func increaseSize() -> Bool {
+        guard let next = scaleLevel.next else { return false }
+        scaleLevel = next
+        return true
+    }
+    
+    /// 减小字体（切换到下一个更小的级别）
+    /// - Returns: 是否成功减小（如果已是最小则返回 false）
+    @discardableResult
+    func decreaseSize() -> Bool {
+        guard let previous = scaleLevel.previous else { return false }
+        scaleLevel = previous
+        return true
+    }
+    
+    /// 是否可以增大字体
+    var canIncreaseSize: Bool {
+        scaleLevel.next != nil
+    }
+    
+    /// 是否可以减小字体
+    var canDecreaseSize: Bool {
+        scaleLevel.previous != nil
+    }
+    
+    /// 是否为默认大小
+    var isDefaultSize: Bool {
+        scaleLevel == .medium
     }
 }
 

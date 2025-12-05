@@ -49,7 +49,15 @@ alwaysApply: false
    - 预览中使用 `.applyFontScale()` 以保持一致效果。  
    - 手动调节：`TextSizeSettingsView`（滑块基于 `scaleLevel`）。
 
-## 参考
-- 实现文件：`Services/Core/FontScaleManager.swift`
+## 快捷键
+- **⌘+** 放大字体（Increase Text Size）
+- **⌘-** 缩小字体（Decrease Text Size）
+- **⌘0** 重置字体（Reset Text Size）
+
+快捷键实现位于 `Views/Settting/Commands/ViewCommands.swift`，调用 `FontScaleManager` 的 `increaseSize()`、`decreaseSize()`、`reset()` 方法。
+
+## 参考文件
+- 核心实现：`SyncNos/Services/Core/FontScaleManager.swift`
+- 菜单命令：`SyncNos/Views/Settting/Commands/ViewCommands.swift`
+- 设置界面：`SyncNos/Views/Settting/General/TextSizeSettingsView.swift`
 - 视图覆盖示例：列表/详情/设置/Onboarding/IAP 等均已使用 `.scaledFont()`
-- 技术文档：`docs/macOS_Dynamic_Font_Technical_Guide.md`
