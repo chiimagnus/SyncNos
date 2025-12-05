@@ -19,11 +19,6 @@ struct TextSizeSettingsView: View {
             
             Divider()
             
-            // 预览区域
-            previewSection
-            
-            Divider()
-            
             // 滑块控制
             sliderSection
             
@@ -56,49 +51,6 @@ struct TextSizeSettingsView: View {
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
         }
-    }
-    
-    // MARK: - Preview Section
-    
-    private var previewSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Preview")
-                .scaledFont(.headline)
-                .foregroundColor(.secondary)
-            
-            previewCard
-        }
-    }
-    
-    private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Book Title")
-                        .scaledFont(.headline, weight: .semibold)
-                    Text("Author Name")
-                        .scaledFont(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text("42 highlights")
-                        .scaledFont(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .font(.system(size: Font.TextStyle.body.basePointSize * fontScaleManager.scaleFactor))
-            }
-            
-            Divider()
-            
-            Text("This is a sample highlight text that demonstrates how the text size setting affects the reading experience in the app.")
-                .scaledFont(.body)
-                .lineSpacing(4 * fontScaleManager.scaleFactor)
-        }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(8)
-        .animation(.easeInOut(duration: 0.2), value: fontScaleManager.scaleLevel)
     }
     
     // MARK: - Slider Section
