@@ -40,7 +40,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .appleBooks: return .orange
         case .goodLinks: return .red
         case .weRead: return .blue
-        case .dedao: return .orange
+        case .dedao: return Color(red: 0xFF / 255, green: 0x6B / 255, blue: 0x00 / 255) // #FF6B00
         }
     }
     
