@@ -37,6 +37,8 @@ struct SelectionPlaceholderView: View {
             return Color(red: 0xEA / 255, green: 0x35 / 255, blue: 0x58 / 255)
         case let t where t.contains("weread"): // #30ACFE
             return Color(red: 0x30 / 255, green: 0xAC / 255, blue: 0xFE / 255)
+        case let t where t.contains("dedao"): // #FF6B00
+            return Color(red: 0xFF / 255, green: 0x6B / 255, blue: 0x00 / 255)
         default:
             return .primary
         }
