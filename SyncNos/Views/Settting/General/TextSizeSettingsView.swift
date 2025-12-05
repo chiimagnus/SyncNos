@@ -178,7 +178,7 @@ struct TextSizeSettingsView: View {
     private var resetButton: some View {
         HStack {
             Spacer()
-            Button("Reset to Default") {
+            Button("Reset") {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     fontScaleManager.reset()
                     selectedIndex = Double(fontScaleManager.scaleLevel.index)
