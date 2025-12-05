@@ -27,6 +27,9 @@ struct TextSizeSettingsView: View {
             // 滑块控制
             sliderSection
             
+            // 快捷键提示
+            shortcutHint
+            
             // 重置按钮
             resetButton
             
@@ -34,6 +37,12 @@ struct TextSizeSettingsView: View {
         }
         .padding()
         .frame(minWidth: 400, maxWidth: 500)
+        // 同步外部变化（如通过快捷键修改）
+        .onChange(of: fontScaleManager.scaleLevel) { _, newLevel in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedIndex = Double(newLevel.index)
+            }
+        }
     }
     
     // MARK: - Header Section
@@ -77,7 +86,7 @@ struct TextSizeSettingsView: View {
                 Spacer()
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                    .scaledFont(.body)
+                    .font(.system(size: Font.TextStyle.body.basePointSize * fontScaleManager.scaleFactor))
             }
             
             Divider()
@@ -89,6 +98,7 @@ struct TextSizeSettingsView: View {
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
+        .animation(.easeInOut(duration: 0.2), value: fontScaleManager.scaleLevel)
     }
     
     // MARK: - Slider Section
@@ -140,19 +150,42 @@ struct TextSizeSettingsView: View {
         }
     }
     
+    // MARK: - Shortcut Hint
+    
+    private var shortcutHint: some View {
+        HStack(spacing: 16) {
+            shortcutItem(key: "⌘+", label: "Increase")
+            shortcutItem(key: "⌘-", label: "Decrease")
+            shortcutItem(key: "⌘0", label: "Reset")
+        }
+        .scaledFont(.caption)
+        .foregroundColor(.secondary)
+    }
+    
+    private func shortcutItem(key: String, label: LocalizedStringKey) -> some View {
+        HStack(spacing: 4) {
+            Text(key)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color(NSColor.tertiaryLabelColor).opacity(0.2))
+                .cornerRadius(4)
+            Text(label)
+        }
+    }
+    
     // MARK: - Reset Button
     
     private var resetButton: some View {
         HStack {
             Spacer()
             Button("Reset to Default") {
-                withAnimation {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     fontScaleManager.reset()
                     selectedIndex = Double(fontScaleManager.scaleLevel.index)
                 }
             }
             .buttonStyle(.bordered)
-            .disabled(fontScaleManager.scaleLevel == .medium)
+            .disabled(fontScaleManager.isDefaultSize)
         }
     }
 }
