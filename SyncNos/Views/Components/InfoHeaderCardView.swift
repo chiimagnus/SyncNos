@@ -1,8 +1,15 @@
 import SwiftUI
 
+/// 会话级的 Sync Queue 折叠状态（随应用重启重置）
+private final class SyncQueueCollapseStore: ObservableObject {
+    static let shared = SyncQueueCollapseStore()
+    @Published var isCollapsed: Bool = true
+}
+
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
 struct SelectionPlaceholderView: View {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
+    @StateObject private var syncQueueCollapseStore = SyncQueueCollapseStore.shared
     
     let title: String
     let count: Int?
@@ -45,60 +52,78 @@ struct SelectionPlaceholderView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // App Logo - 使用 fontScaleManager 进行缩放
-                let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
-                Image("HeaderCard")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: logoSize, height: logoSize)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 24) {
+                    // App Logo - 使用 fontScaleManager 进行缩放
+                    let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
+                    Image("HeaderCard")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: logoSize, height: logoSize)
 
-                // 标题 - 使用 fontScaleManager 进行缩放
-                let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
-                Text(title)
-                    .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
-                    .fontWidth(.compressed)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .foregroundColor(colorForTitle(title))
+                    // 标题 - 使用 fontScaleManager 进行缩放
+                    let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
+                    Text(title)
+                        .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
+                        .fontWidth(.compressed)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .foregroundColor(colorForTitle(title))
 
-                if isMultipleSelection, let count {
-                    Button {
-                        onSyncSelected?()
-                    } label: {
-                        Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .scaledFont(.body)
-                    .padding(.bottom, 16)
-                } else {
-                    HStack(spacing: 12) {
-                        Text("Please select an item")
-                            .scaledFont(.title3)
-                            .foregroundColor(.secondary)
-                        
-                        // 显示过滤后/全部数量
-                        if totalCount > 0 {
-                            Text("\(filteredCount)/\(totalCount)")
+                    if isMultipleSelection, let count {
+                        Button {
+                            onSyncSelected?()
+                        } label: {
+                            Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .scaledFont(.body)
+                        .padding(.bottom, 16)
+                    } else {
+                        HStack(spacing: 12) {
+                            Text("Please select an item")
                                 .scaledFont(.title3)
-                                .monospacedDigit()
-                                .foregroundColor(.secondary.opacity(0.7))
+                                .foregroundColor(.secondary)
+                            
+                            // 显示过滤后/全部数量
+                            if totalCount > 0 {
+                                Text("\(filteredCount)/\(totalCount)")
+                                    .scaledFont(.title3)
+                                    .monospacedDigit()
+                                    .foregroundColor(.secondary.opacity(0.7))
+                            }
+                        }
+                        .padding(.bottom, 16)
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                syncQueueCollapseStore.isCollapsed.toggle()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: syncQueueCollapseStore.isCollapsed ? "chevron.right" : "chevron.down")
+                                    .foregroundStyle(.secondary)
+                                Text("Sync Queue")
+                                    .scaledFont(.title2, weight: .semibold)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        // 关键：无论空态或多选，均保留同一位置的 SyncQueueView，避免重新订阅
+                        if !syncQueueCollapseStore.isCollapsed {
+                            SyncQueueView()
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.bottom, 16)
                 }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Sync Queue")
-                        .scaledFont(.title2, weight: .semibold)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // 关键：无论空态或多选，均保留同一位置的 SyncQueueView，避免重新订阅
-                    SyncQueueView()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
+                .padding()
             }
-            .padding()
         }
     }
 }
