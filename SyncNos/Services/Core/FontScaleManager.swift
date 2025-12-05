@@ -28,19 +28,6 @@ enum FontScaleLevel: String, CaseIterable, Identifiable {
         }
     }
     
-    /// 显示名称
-    var displayName: LocalizedStringKey {
-        switch self {
-        case .extraSmall: return "Extra Small"
-        case .small: return "Small"
-        case .medium: return "Medium (Default)"
-        case .large: return "Large"
-        case .extraLarge: return "Extra Large"
-        case .accessibility1: return "Accessibility Large"
-        case .accessibility2: return "Accessibility Extra Large"
-        }
-    }
-    
     /// 短名称（用于滑块标签）
     var shortName: String {
         switch self {
@@ -394,22 +381,6 @@ struct AdaptiveStack<Content: View>: View {
 }
 
 // MARK: - Preview
-
-#Preview("Font Scale Levels") {
-    VStack(alignment: .leading, spacing: 16) {
-        ForEach(FontScaleLevel.allCases) { level in
-            HStack {
-                Text(level.displayName)
-                    .font(.system(size: 13 * level.scaleFactor))
-                Spacer()
-                Text("\(Int(level.scaleFactor * 100))%")
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    .padding()
-    .frame(width: 300)
-}
 
 #Preview("ScaledText") {
     VStack(alignment: .leading, spacing: 8) {
