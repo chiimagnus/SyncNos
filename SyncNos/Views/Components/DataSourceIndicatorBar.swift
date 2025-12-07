@@ -20,11 +20,7 @@ struct DataSourceIndicatorBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-        )
+        .glassCapsuleBackground()
     }
 }
 
@@ -73,6 +69,27 @@ private struct DataSourceIndicatorItem: View {
             return Color.primary.opacity(0.08)
         }
         return Color.clear
+    }
+}
+
+// MARK: - Glass Helpers
+
+private extension View {
+    /// 玻璃态 Capsule 背景，macOS 26 起使用 Liquid Glass，旧系统回退为 ultraThinMaterial
+    @ViewBuilder
+    func glassCapsuleBackground() -> some View {
+        if #available(macOS 26.0, *) {
+            background {
+                Capsule()
+                    .glassEffect()
+            }
+        } else {
+            background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            )
+        }
     }
 }
 
