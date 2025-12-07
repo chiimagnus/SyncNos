@@ -66,13 +66,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                     // 右侧：Filter 按钮
                     filterMenu()
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                        )
+                        .padding(8)
+                        .glassCapsuleBackground()
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
