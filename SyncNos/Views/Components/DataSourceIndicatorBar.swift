@@ -81,7 +81,7 @@ private extension View {
         if #available(macOS 26.0, *) {
             background {
                 Capsule()
-                    .glassEffect()
+                    .glassEffect(.clear)
             }
         } else {
             background(
