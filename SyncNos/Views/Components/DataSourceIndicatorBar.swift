@@ -74,14 +74,14 @@ private struct DataSourceIndicatorItem: View {
 
 // MARK: - Glass Helpers
 
-private extension View {
+extension View {
     /// 玻璃态 Capsule 背景，macOS 26 起使用 Liquid Glass，旧系统回退为 ultraThinMaterial
     @ViewBuilder
     func glassCapsuleBackground() -> some View {
         if #available(macOS 26.0, *) {
             background {
                 Capsule()
-                    .glassEffect(.clear)
+                    .glassEffect(.regular)
             }
         } else {
             background(
