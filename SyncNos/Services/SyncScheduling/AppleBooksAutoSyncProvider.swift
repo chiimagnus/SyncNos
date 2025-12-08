@@ -143,24 +143,25 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         }
         if eligibleIds.isEmpty { return }
 
-        // 在队列中入队（queued），以便 SyncQueueView 正确展示 AutoSync 任务
-        do {
-            var items: [[String: Any]] = []
-            items.reserveCapacity(eligibleIds.count)
-            for id in eligibleIds {
-                let meta = bookMeta[id]
-                let title = (meta?.title.isEmpty == false) ? meta!.title : id
-                let subtitle = meta?.author ?? ""
-                items.append(["id": id, "title": title, "subtitle": subtitle])
-            }
-            if !items.isEmpty {
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncTasksEnqueued"),
-                    object: nil,
-                    userInfo: ["source": "appleBooks", "items": items]
-                )
-            }
+        // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let enqueueItems = eligibleIds.map { id -> SyncEnqueueItem in
+            let meta = bookMeta[id]
+            let title = (meta?.title.isEmpty == false) ? meta!.title : id
+            let subtitle = meta?.author ?? ""
+            return SyncEnqueueItem(id: id, title: title, subtitle: subtitle)
         }
+        
+        let acceptedIds = await MainActor.run {
+            DIContainer.shared.syncQueueStore.enqueue(source: .appleBooks, items: enqueueItems)
+        }
+        
+        guard !acceptedIds.isEmpty else {
+            logger.info("AutoSync[AppleBooks]: no tasks accepted by SyncQueueStore")
+            return
+        }
+        
+        // 过滤出被接受的书籍 ID
+        let acceptedIdList = eligibleIds.filter { acceptedIds.contains($0) }
 
         // 局部引用，避免在并发闭包中强捕获 self 成员
         let logger = self.logger
@@ -172,8 +173,8 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         var nextIndex = 0
         await withTaskGroup(of: Void.self) { group in
             func addTaskIfPossible() {
-                guard nextIndex < eligibleIds.count else { return }
-                let id = eligibleIds[nextIndex]; nextIndex += 1
+                guard nextIndex < acceptedIdList.count else { return }
+                let id = acceptedIdList[nextIndex]; nextIndex += 1
                 let meta = bookMeta[id]
                 let title = meta?.title ?? id
                 let author = meta?.author ?? ""
@@ -225,7 +226,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             }
 
             // 初始填充任务
-            for _ in 0..<min(maxConcurrentBooks, eligibleIds.count) { addTaskIfPossible() }
+            for _ in 0..<min(maxConcurrentBooks, acceptedIdList.count) { addTaskIfPossible() }
             // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
             while await group.next() != nil { addTaskIfPossible() }
         }

@@ -14,6 +14,19 @@ enum SyncTaskState: String, Codable, Sendable {
     case failed
 }
 
+/// 同步任务入队项（用于 SyncQueueStore.enqueue）
+struct SyncEnqueueItem: Sendable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    
+    init(id: String, title: String, subtitle: String? = nil) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+    }
+}
+
 struct SyncQueueTask: Identifiable, Equatable, Sendable {
     let id: String
     let rawId: String

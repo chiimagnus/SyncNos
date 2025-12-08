@@ -348,31 +348,26 @@ extension GoodLinksViewModel {
             return
         }
         
-        // 过滤掉已经在同步中的任务，防止重复触发
-        let idsToSync = linkIds.subtracting(syncingLinkIds)
-        guard !idsToSync.isEmpty else {
-            logger.debug("[GoodLinks] All selected links are already syncing, skip")
+        // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let syncQueueStore = DIContainer.shared.syncQueueStore
+        let enqueueItems = linkIds.compactMap { id -> SyncEnqueueItem? in
+            guard let link = displayLinks.first(where: { $0.id == id }) else { return nil }
+            let title = (link.title?.isEmpty == false ? link.title! : link.url)
+            return SyncEnqueueItem(id: id, title: title, subtitle: link.author)
+        }
+        
+        let acceptedIds = syncQueueStore.enqueue(source: .goodLinks, items: enqueueItems)
+        guard !acceptedIds.isEmpty else {
+            logger.debug("[GoodLinks] No tasks accepted by SyncQueueStore, skip")
             return
         }
         
-        // 立即将任务标记为同步中，防止快捷键连续触发时重复入队
-        // 注意：这必须在 Task 启动之前同步执行
-        for id in idsToSync {
+        // 更新本地 UI 状态
+        for id in acceptedIds {
             syncingLinkIds.insert(id)
         }
         
         let dbPath = service.resolveDatabasePath()
-        
-        // 入队通知
-        let items: [[String: Any]] = idsToSync.compactMap { id in
-            guard let link = displayLinks.first(where: { $0.id == id }) else { return nil }
-            let title = (link.title?.isEmpty == false ? link.title! : link.url)
-            return ["id": id, "title": title, "subtitle": link.author ?? ""]
-        }
-        if !items.isEmpty {
-            NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
-        }
-        
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncService = self.syncService
@@ -395,7 +390,7 @@ extension GoodLinksViewModel {
             }
             
             await withTaskGroup(of: Void.self) { group in
-                for id in idsToSync {
+                for id in acceptedIds {
                     guard let link = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
