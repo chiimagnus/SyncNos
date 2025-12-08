@@ -63,7 +63,30 @@ class NotionRequestHelper {
             } else {
                 await Self.writeLimiter.acquire()
             }
-            let (data, response) = try await URLSession.shared.data(for: request)
+
+            let (data, response): (Data, URLResponse)
+            do {
+                (data, response) = try await URLSession.shared.data(for: request)
+            } catch let networkError {
+                // 网络请求失败，提供详细的错误信息
+                let requestDetails = """
+                Request failed: \(method) \(url.absoluteString)
+                Attempt: \(attempt)/\(maxAttempts)
+                Body size: \(request.httpBody?.count ?? 0) bytes
+                Timeout: \(request.timeoutInterval)s
+                Network error: \(networkError.localizedDescription)
+                """
+                logger.warning("[NotionAPI] \(requestDetails)")
+                throw NSError(
+                    domain: "NotionService",
+                    code: -1001, // NSURLErrorTimedOut equivalent
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Network request failed: \(networkError.localizedDescription)",
+                        "RequestDetails": requestDetails
+                    ]
+                )
+            }
+
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
                 // Try Retry-After header first
                 if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"), let seconds = Double(retryAfter) {
@@ -82,7 +105,28 @@ class NotionRequestHelper {
                 conflictBackoff = min(conflictBackoff * 2, 8_000)
                 continue
             }
-            try Self.ensureSuccess(response: response, data: data)
+
+            do {
+                try Self.ensureSuccess(response: response, data: data)
+            } catch let httpError as NSError {
+                // HTTP 错误，提供详细的请求信息
+                let requestDetails = """
+                HTTP \(httpError.code): \(method) \(url.absoluteString)
+                Attempt: \(attempt)/\(maxAttempts)
+                Body size: \(request.httpBody?.count ?? 0) bytes
+                Response: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "No response body")
+                """
+                logger.warning("[NotionAPI] \(requestDetails)")
+                throw NSError(
+                    domain: httpError.domain,
+                    code: httpError.code,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: httpError.localizedDescription,
+                        "RequestDetails": requestDetails
+                    ]
+                )
+            }
+
             return data
         }
     }
@@ -111,7 +155,30 @@ class NotionRequestHelper {
             } else {
                 await Self.writeLimiter.acquire()
             }
-            let (data, response) = try await URLSession.shared.data(for: request)
+
+            let (data, response): (Data, URLResponse)
+            do {
+                (data, response) = try await URLSession.shared.data(for: request)
+            } catch let networkError {
+                // 网络请求失败，提供详细的错误信息
+                let requestDetails = """
+                Request failed: \(method) \(url.absoluteString)
+                Attempt: \(attempt)/\(maxAttempts)
+                Body size: \(request.httpBody?.count ?? 0) bytes
+                Timeout: \(request.timeoutInterval)s
+                Network error: \(networkError.localizedDescription)
+                """
+                logger.warning("[NotionAPI] \(requestDetails)")
+                throw NSError(
+                    domain: "NotionService",
+                    code: -1001, // NSURLErrorTimedOut equivalent
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Network request failed: \(networkError.localizedDescription)",
+                        "RequestDetails": requestDetails
+                    ]
+                )
+            }
+
             if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < maxAttempts {
                 if let retryAfter = http.value(forHTTPHeaderField: "Retry-After"), let seconds = Double(retryAfter) {
                     let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
@@ -128,7 +195,28 @@ class NotionRequestHelper {
                 conflictBackoff = min(conflictBackoff * 2, 8_000)
                 continue
             }
-            try Self.ensureSuccess(response: response, data: data)
+
+            do {
+                try Self.ensureSuccess(response: response, data: data)
+            } catch let httpError as NSError {
+                // HTTP 错误，提供详细的请求信息
+                let requestDetails = """
+                HTTP \(httpError.code): \(method) \(url.absoluteString)
+                Attempt: \(attempt)/\(maxAttempts)
+                Body size: \(request.httpBody?.count ?? 0) bytes
+                Response: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "No response body")
+                """
+                logger.warning("[NotionAPI] \(requestDetails)")
+                throw NSError(
+                    domain: httpError.domain,
+                    code: httpError.code,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: httpError.localizedDescription,
+                        "RequestDetails": requestDetails
+                    ]
+                )
+            }
+
             return data
         }
     }

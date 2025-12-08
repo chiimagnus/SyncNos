@@ -34,10 +34,19 @@ final class NotionSyncEngine {
         source: NotionSyncSourceProtocol,
         progress: @escaping (String) -> Void
     ) async throws {
-        let lastSync = timestampStore.getLastSyncTime(for: source.syncItem.itemId)
+        let item = source.syncItem
+        logger.info("[SmartSync] Starting sync for \(source.sourceKey)[\(item.itemId)]: \(item.title)")
+
+        let lastSync = timestampStore.getLastSyncTime(for: item.itemId)
         let incremental = lastSync != nil
-        
-        try await sync(source: source, incremental: incremental, progress: progress)
+
+        do {
+            try await sync(source: source, incremental: incremental, progress: progress)
+            logger.info("[SmartSync] Successfully completed sync for \(source.sourceKey)[\(item.itemId)]")
+        } catch {
+            logger.error("[SmartSync] Failed sync for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     /// 同步数据源到 Notion
@@ -75,7 +84,7 @@ final class NotionSyncEngine {
         progress: @escaping (String) -> Void
     ) async throws {
         let item = source.syncItem
-        
+
         // 1. 校验 Notion 配置
         guard let parentPageId = notionConfig.notionPageId else {
             throw NSError(
@@ -91,69 +100,124 @@ final class NotionSyncEngine {
                 userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please authorize Notion first.", comment: "")]
             )
         }
-        
+
         // 2. 确保数据库存在
+        do {
+            let databaseId = try await ensureDatabaseExists(
+                title: source.databaseTitle,
+                parentPageId: parentPageId,
+                sourceKey: source.sourceKey
+            )
+            logger.debug("[SmartSync] Using database \(databaseId) for \(source.sourceKey)")
+        } catch {
+            logger.error("[SmartSync] Failed to ensure database exists for \(source.sourceKey): \(error.localizedDescription)")
+            throw error
+        }
+
         let databaseId = try await ensureDatabaseExists(
             title: source.databaseTitle,
             parentPageId: parentPageId,
             sourceKey: source.sourceKey
         )
-        
+
         // 3. 确保数据库属性
-        var propertyDefinitions = basePropertyDefinitions
-        propertyDefinitions.merge(source.additionalPropertyDefinitions) { _, new in new }
-        try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: propertyDefinitions)
-        
+        do {
+            var propertyDefinitions = basePropertyDefinitions
+            propertyDefinitions.merge(source.additionalPropertyDefinitions) { _, new in new }
+            try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: propertyDefinitions)
+        } catch {
+            logger.error("[SmartSync] Failed to ensure database properties for \(source.sourceKey)[\(databaseId)]: \(error.localizedDescription)")
+            throw error
+        }
+
         // 4. 确保页面存在
-        let ensured = try await notionService.ensureBookPageInDatabase(
-            databaseId: databaseId,
-            bookTitle: item.title,
-            author: item.author,
-            assetId: item.itemId,
-            urlString: item.url,
-            header: item.source == .goodLinks ? nil : "Highlights"
-        )
+        let ensured: (id: String, created: Bool)
+        do {
+            ensured = try await notionService.ensureBookPageInDatabase(
+                databaseId: databaseId,
+                bookTitle: item.title,
+                author: item.author,
+                assetId: item.itemId,
+                urlString: item.url,
+                header: item.source == .goodLinks ? nil : "Highlights"
+            )
+        } catch {
+            logger.error("[SmartSync] Failed to ensure page for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            throw error
+        }
+
         let pageId = ensured.id
         let created = ensured.created
-        
+
         // 5. 更新额外页面属性
         let additionalProps = source.additionalPageProperties()
         if !additionalProps.isEmpty {
-            try await notionService.updatePageProperties(pageId: pageId, properties: additionalProps)
+            do {
+                try await notionService.updatePageProperties(pageId: pageId, properties: additionalProps)
+            } catch {
+                logger.error("[SmartSync] Failed to update page properties for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                throw error
+            }
         }
-        
+
         // 6. 获取高亮数据
         progress(NSLocalizedString("Fetching highlights...", comment: ""))
-        let highlights = try await source.fetchHighlights()
-        
+        let highlights: [UnifiedHighlight]
+        do {
+            highlights = try await source.fetchHighlights()
+            logger.debug("[SmartSync] Fetched \(highlights.count) highlights for \(source.sourceKey)[\(item.itemId)]")
+        } catch {
+            logger.error("[SmartSync] Failed to fetch highlights for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            throw error
+        }
+
         // 7. 执行同步（如果有高亮）
         if !highlights.isEmpty {
             if created {
                 // 新创建的页面：直接追加所有高亮
-                try await appendAllHighlights(
-                    pageId: pageId,
-                    highlights: highlights,
-                    item: item,
-                    source: source,
-                    progress: progress
-                )
+                do {
+                    try await appendAllHighlights(
+                        pageId: pageId,
+                        highlights: highlights,
+                        item: item,
+                        source: source,
+                        progress: progress
+                    )
+                    logger.debug("[SmartSync] Appended \(highlights.count) highlights to new page for \(source.sourceKey)[\(item.itemId)]")
+                } catch {
+                    logger.error("[SmartSync] Failed to append highlights to new page for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                    throw error
+                }
             } else {
                 // 已存在的页面：增量更新
-                try await syncExistingPage(
-                    pageId: pageId,
-                    highlights: highlights,
-                    item: item,
-                    source: source,
-                    incremental: incremental,
-                    progress: progress
-                )
+                do {
+                    try await syncExistingPage(
+                        pageId: pageId,
+                        highlights: highlights,
+                        item: item,
+                        source: source,
+                        incremental: incremental,
+                        progress: progress
+                    )
+                    logger.debug("[SmartSync] Updated existing page with \(highlights.count) highlights for \(source.sourceKey)[\(item.itemId)]")
+                } catch {
+                    logger.error("[SmartSync] Failed to sync existing page for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                    throw error
+                }
             }
         } else {
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
+            logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey)[\(item.itemId)]")
         }
-        
+
         // 8. 更新计数和时间戳（无论是否有高亮都要更新）
-        try await updateCountAndTimestamp(pageId: pageId, count: highlights.count, itemId: item.itemId)
+        do {
+            try await updateCountAndTimestamp(pageId: pageId, count: highlights.count, itemId: item.itemId)
+            logger.debug("[SmartSync] Updated count and timestamp for \(source.sourceKey)[\(item.itemId)]")
+        } catch {
+            logger.error("[SmartSync] Failed to update count and timestamp for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+            throw error
+        }
     }
     
     // MARK: - Per-Book Database Strategy
