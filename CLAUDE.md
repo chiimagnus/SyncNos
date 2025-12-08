@@ -15,7 +15,7 @@
   - **每本书独立模式**：每本书/文章有独立的数据库
 - ✅ **同步队列管理**：实时同步进度显示，任务排队和状态跟踪
 - ✅ **高亮颜色管理**：支持 Apple Books、GoodLinks 和 WeRead 的颜色标签同步
-- ✅ **自动后台同步**：可配置时间间隔，支持按来源独立启用/禁用
+- ✅ **智能增量自动同步**：每 5 分钟检查一次，只同步有变更的内容，支持按来源独立启用/禁用
 - ✅ **Apple Sign In 认证**：通过 FastAPI 后端安全认证，支持 OAuth 授权
 - ✅ **应用内购买系统**：30天试用期，统一付费墙界面，调试工具支持
 - ✅ **国际化支持**：16 种语言（英、中、丹麦、荷兰、芬兰、法、德、印尼、日、韩、巴西葡、俄、西、瑞典、泰、越南）
@@ -345,12 +345,12 @@ DIContainer.shared.dedaoCacheService
   - 支持离线访问
 
 **8. 通用同步调度** (Services/SyncScheduling/)
-- `AutoSyncService`: 后台同步调度器（定时触发各数据源同步）
+- `AutoSyncService`: 后台同步调度器（每 5 分钟触发智能增量同步）
 - `AutoSyncSourceProvider`: 自动同步协议
-- `AppleBooksAutoSyncProvider`: Apple Books 自动同步实现
-- `GoodLinksAutoSyncProvider`: GoodLinks 自动同步实现
-- `WeReadAutoSyncProvider`: WeRead 自动同步实现
-- `DedaoAutoSyncProvider`: Dedao 自动同步实现
+- `AppleBooksAutoSyncProvider`: Apple Books 智能增量同步（基于 `maxModifiedDate`）
+- `GoodLinksAutoSyncProvider`: GoodLinks 智能增量同步（基于 `modifiedAt`）
+- `WeReadAutoSyncProvider`: WeRead 智能增量同步（基于 `updatedAt`）
+- `DedaoAutoSyncProvider`: Dedao 智能增量同步（基于本地缓存 `maxHighlightUpdatedAt`）
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
@@ -532,6 +532,17 @@ swift package update
 ```
 
 ## 最新重要更新
+
+### 智能增量自动同步
+- **5 分钟检查间隔**：替代原来的 24 小时全量同步
+- **基于内容变更判断**：比较「最新修改时间」与「上次同步时间」，只同步有变化的内容
+- **各数据源实现**：
+  - Apple Books：基于 `maxModifiedDate`（高亮修改时间）
+  - GoodLinks：基于 `modifiedAt`（文章修改时间）
+  - WeRead：基于 `updatedAt`（API 返回的更新时间）
+  - Dedao：基于本地缓存计算的 `maxHighlightUpdatedAt`
+- **节省 Notion API**：无变更的内容直接跳过，大幅减少 API 调用
+- **近实时同步体验**：新增笔记后最多 5 分钟自动同步到 Notion
 
 ### 同步架构重构
 - **统一同步引擎**：引入 `NotionSyncEngine` + 适配器模式

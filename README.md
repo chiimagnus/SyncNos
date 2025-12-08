@@ -48,7 +48,7 @@
 - **Incremental Sync**: Timestamp-based intelligent incremental updates
 
 ### Advanced Features
-- **Auto Sync**: Configurable background scheduled sync
+- **Smart Auto Sync**: Intelligent incremental sync every 5 minutes, only syncing changed content
 - **Real-time Status**: Real-time display of sync progress
 - **Error Retry**: Intelligent error retry mechanism
 - **Apple Sign In**: Secure Apple ID authentication integration
