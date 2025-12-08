@@ -5,6 +5,9 @@ struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
     @Environment(\.openWindow) private var openWindow
+    
+    // Detail ViewModel - 管理高亮数据
+    @StateObject private var detailViewModel = GoodLinksDetailViewModel()
 
     // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
     @State private var measuredLayoutWidth: CGFloat = 0
@@ -20,9 +23,9 @@ struct GoodLinksDetailView: View {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
     }
 
-    /// 使用分页后的高亮（而非全部）
+    /// 使用分页后的高亮
     private var filteredHighlights: [GoodLinksHighlightRow] {
-        viewModel.visibleHighlights
+        detailViewModel.visibleHighlights
     }
 
     var body: some View {
@@ -44,7 +47,7 @@ struct GoodLinksDetailView: View {
                                 timestamps: TimestampInfo(
                                     addedAt: link.addedAt > 0 ? Date(timeIntervalSince1970: link.addedAt) : nil,
                                     modifiedAt: link.modifiedAt > 0 ? Date(timeIntervalSince1970: link.modifiedAt) : nil,
-                                    lastSyncAt: viewModel.lastSync(for: link.id)
+                                    lastSyncAt: detailViewModel.lastSync(for: link.id)
                                 )
                             ) {
                                 if let url = URL(string: link.openInGoodLinksURLString) {
@@ -124,7 +127,7 @@ struct GoodLinksDetailView: View {
                         }
                         
                         // 全文内容
-                        if let contentRow = viewModel.contentByLinkId[linkId], 
+                        if let contentRow = detailViewModel.content, 
                            let fullText = contentRow.content, 
                            !fullText.isEmpty {
                             ArticleContentCardView(
@@ -178,9 +181,9 @@ struct GoodLinksDetailView: View {
 
                             if !filteredHighlights.isEmpty {
                                 // 显示已加载/总数
-                                if viewModel.totalFilteredHighlightCount > 0 {
+                                if detailViewModel.totalFilteredCount > 0 {
                                     HStack {
-                                        Text("\(filteredHighlights.count)/\(viewModel.totalFilteredHighlightCount) highlights")
+                                        Text("\(filteredHighlights.count)/\(detailViewModel.totalFilteredCount) highlights")
                                             .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                         Spacer()
@@ -211,7 +214,7 @@ struct GoodLinksDetailView: View {
                                         }
                                         .onAppear {
                                             // 滚动加载更多
-                                            viewModel.loadMoreHighlightsIfNeeded(currentItem: item)
+                                            detailViewModel.loadMoreIfNeeded(currentItem: item)
                                         }
                                     }
                                 }
@@ -239,7 +242,7 @@ struct GoodLinksDetailView: View {
                                 )
                                 
                                 // 加载更多 UI
-                                if viewModel.isLoadingMoreHighlights {
+                                if detailViewModel.isLoadingMore {
                                     HStack {
                                         Spacer()
                                         ProgressView()
@@ -250,13 +253,13 @@ struct GoodLinksDetailView: View {
                                         Spacer()
                                     }
                                     .padding()
-                                } else if viewModel.canLoadMoreHighlights {
+                                } else if detailViewModel.canLoadMore {
                                     HStack {
                                         Spacer()
                                         Button {
-                                            viewModel.loadNextHighlightPage()
+                                            detailViewModel.loadNextPage()
                                         } label: {
-                                            Text("Load More (\(viewModel.totalFilteredHighlightCount - filteredHighlights.count) remaining)")
+                                            Text("Load More (\(detailViewModel.totalFilteredCount - filteredHighlights.count) remaining)")
                                                 .scaledFont(.caption)
                                         }
                                         .buttonStyle(.plain)
@@ -274,7 +277,6 @@ struct GoodLinksDetailView: View {
                             }
                         }
                         }
-                        // .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
                     }
                     // when the article collapses, ensure we scroll to top to avoid empty space
@@ -294,21 +296,19 @@ struct GoodLinksDetailView: View {
                 }
                 .onAppear {
                     Task {
-                        await viewModel.loadHighlights(for: linkId)
-                        await viewModel.loadContent(for: linkId)
-                        // 初始化分页
-                        viewModel.initializeHighlightPagination(for: linkId)
+                        await detailViewModel.loadHighlights(for: linkId)
+                        await detailViewModel.loadContent(for: linkId)
                     }
                     if let id = selectedLinkId, viewModel.syncingLinkIds.contains(id) {
                         externalIsSyncing = true
                     }
                 }
                 .onChange(of: linkId) { _, newLinkId in
+                    // 清空并重新加载
+                    detailViewModel.clear()
                     Task {
-                        await viewModel.loadHighlights(for: newLinkId)
-                        await viewModel.loadContent(for: newLinkId)
-                        // 初始化分页
-                        viewModel.initializeHighlightPagination(for: newLinkId)
+                        await detailViewModel.loadHighlights(for: newLinkId)
+                        await detailViewModel.loadContent(for: newLinkId)
                     }
                     if let id = selectedLinkId {
                         externalIsSyncing = viewModel.syncingLinkIds.contains(id)
@@ -323,18 +323,18 @@ struct GoodLinksDetailView: View {
                     // 中间区域：Filter 控件
                     ToolbarItem(placement: .automatic) {
                         FiltetSortBar(
-                            noteFilter: $viewModel.highlightNoteFilter,
-                            selectedStyles: $viewModel.highlightSelectedStyles,
+                            noteFilter: $detailViewModel.noteFilter,
+                            selectedStyles: $detailViewModel.selectedStyles,
                             colorTheme: .goodLinks,
-                            sortField: viewModel.highlightSortField,
-                            isAscending: viewModel.highlightIsAscending,
+                            sortField: detailViewModel.sortField,
+                            isAscending: detailViewModel.isAscending,
                             onSortFieldChanged: { field in
-                                viewModel.highlightSortField = field
-                                viewModel.reapplyHighlightFilters()
+                                detailViewModel.sortField = field
+                                detailViewModel.reapplyFilters()
                             },
                             onAscendingChanged: { ascending in
-                                viewModel.highlightIsAscending = ascending
-                                viewModel.reapplyHighlightFilters()
+                                detailViewModel.isAscending = ascending
+                                detailViewModel.reapplyFilters()
                             }
                         )
                     }
@@ -355,10 +355,10 @@ struct GoodLinksDetailView: View {
                                 }
                             }
                             .help("Sync in progress")
-                        } else if viewModel.isSyncing {
+                        } else if detailViewModel.isSyncing {
                             HStack(spacing: 8) {
                                 ProgressView().scaleEffect(0.8)
-                                if let progress = viewModel.syncProgressText {
+                                if let progress = detailViewModel.syncProgressText {
                                     Text(progress).scaledFont(.caption)
                                 } else {
                                     Text("Syncing...").scaledFont(.caption)
@@ -369,7 +369,7 @@ struct GoodLinksDetailView: View {
                             if let link = viewModel.links.first(where: { $0.id == linkId }) {
                                 Button {
                                     Task {
-                                        viewModel.syncSmart(link: link)
+                                        detailViewModel.syncSmart(link: link)
                                     }
                                 } label: {
                                     Label("Sync", systemImage: "arrow.triangle.2.circlepath")
@@ -384,11 +384,10 @@ struct GoodLinksDetailView: View {
         .frame(minWidth: 400, idealWidth: 600)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
+                detailViewModel.clear()
                 Task {
-                    await viewModel.loadHighlights(for: linkId)
-                    await viewModel.loadContent(for: linkId)
-                    // 重新初始化分页
-                    viewModel.initializeHighlightPagination(for: linkId)
+                    await detailViewModel.loadHighlights(for: linkId)
+                    await detailViewModel.loadContent(for: linkId)
                 }
             }
         }
@@ -397,8 +396,7 @@ struct GoodLinksDetailView: View {
         } message: {
             Text(syncErrorMessage)
         }
-        // Notion 配置弹窗已移至 MainListView 统一处理
-        .onChange(of: viewModel.syncMessage) { _, newMessage in
+        .onChange(of: detailViewModel.syncMessage) { _, newMessage in
             if let message = newMessage {
                 let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
                 let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
@@ -413,17 +411,15 @@ struct GoodLinksDetailView: View {
             externalIsSyncing = false
             externalSyncProgress = nil
         }
-        .onChange(of: viewModel.highlightsByLinkId) { _, _ in
-            // 高亮加载完成后，重新初始化分页
-            if let linkId = selectedLinkId, !linkId.isEmpty {
-                viewModel.initializeHighlightPagination(for: linkId)
-            }
+        .onChange(of: detailViewModel.highlights) { _, _ in
+            // 高亮加载完成后，重新应用筛选
+            detailViewModel.reapplyFilters()
         }
-        .onChange(of: viewModel.highlightNoteFilter) { _, _ in
-            viewModel.reapplyHighlightFilters()
+        .onChange(of: detailViewModel.noteFilter) { _, _ in
+            detailViewModel.reapplyFilters()
         }
-        .onChange(of: viewModel.highlightSelectedStyles) { _, _ in
-            viewModel.reapplyHighlightFilters()
+        .onChange(of: detailViewModel.selectedStyles) { _, _ in
+            detailViewModel.reapplyFilters()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
@@ -442,7 +438,7 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .onChange(of: viewModel.errorMessage) { _, newError in
+        .onChange(of: detailViewModel.errorMessage) { _, newError in
             if let err = newError, !err.isEmpty {
                 syncErrorMessage = err
                 showingSyncError = true

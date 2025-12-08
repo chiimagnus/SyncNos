@@ -4,134 +4,124 @@ import Combine
 // Localized notification name definitions to avoid stringly-typed usage
 private enum GLNotifications {
     static let goodLinksFilterChanged = Notification.Name("GoodLinksFilterChanged")
-    static let highlightSortChanged = Notification.Name("HighlightSortChanged")
-    static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
     static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
     static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
 }
 
+// MARK: - GoodLinksViewModel (List)
+
+/// GoodLinks 列表 ViewModel
+/// 管理 links 列表的加载、排序、筛选、分页、批量同步
 @MainActor
 final class GoodLinksViewModel: ObservableObject {
-    // Centralized UserDefaults keys
+    // MARK: - UserDefaults Keys
+    
     private enum Keys {
         static let sortKey = "goodlinks_sort_key"
         static let sortAscending = "goodlinks_sort_ascending"
         static let showStarredOnly = "goodlinks_show_starred_only"
         static let searchText = "goodlinks_search_text"
-
-        static let hlNoteFilter = "goodlinks_highlight_note_filter"
-        static let hlSelectedStyles = "goodlinks_highlight_selected_styles"
-        static let hlSortField = "goodlinks_highlight_sort_field"
-        static let hlSortAscending = "goodlinks_highlight_sort_ascending"
-
-        // Global highlight menu keys
-        static let globalHasNotes = "highlight_has_notes"
-        static let globalSelectedStyles = "highlight_selected_styles"
-        static let globalSelectedMask = "highlight_selected_mask"
-        static let globalSortField = "highlight_sort_field"
-        static let globalSortAscending = "highlight_sort_ascending"
     }
+    
+    // MARK: - Published Properties (List)
+    
     @Published var links: [GoodLinksLinkRow] = []
-    // 后台计算产物：用于列表渲染的派生结果
     @Published var displayLinks: [GoodLinksLinkRow] = []
-    @Published var highlightsByLinkId: [String: [GoodLinksHighlightRow]] = [:]
-    @Published var contentByLinkId: [String: GoodLinksContentRow] = [:]
+    @Published var visibleLinks: [GoodLinksLinkRow] = []
+    
     @Published var isLoading: Bool = false
-    // 列表派生计算状态：用于切换瞬间显示“加载中”并避免主线程渲染巨大 List
     @Published var isComputingList: Bool = false
     @Published var errorMessage: String?
-    @Published var isSyncing: Bool = false
-    @Published var syncMessage: String?
-    @Published var syncProgressText: String?
-    // UI Sync State per-link
-    @Published var syncingLinkIds: Set<String> = []
-    @Published var syncedLinkIds: Set<String> = []
-
-    // Sorting & Filtering state (persisted)
+    
+    // MARK: - Sort & Filter Properties
+    
     @Published var sortKey: GoodLinksSortKey = .modified
     @Published var sortAscending: Bool = false
     @Published var showStarredOnly: Bool = false
     @Published var searchText: String = ""
-
-    // Highlight detail filtering & sorting state (for detail view)
-    @Published var highlightNoteFilter: NoteFilter = false
-    @Published var highlightSelectedStyles: Set<Int> = []
-    @Published var highlightSortField: HighlightSortField = .created
     
-    // 分页属性
-    @Published var visibleHighlights: [GoodLinksHighlightRow] = []
-    @Published var isLoadingMoreHighlights: Bool = false
-    private let highlightPageSize: Int = 50
-    private var currentHighlightPage: Int = 0
-    private var currentHighlightLinkId: String?
-    private var allFilteredHighlights: [GoodLinksHighlightRow] = []
-    @Published var highlightIsAscending: Bool = false
-    /// 当前用于列表渲染的子集（支持分页/增量加载）
-    @Published var visibleLinks: [GoodLinksLinkRow] = []
-
+    // MARK: - Sync State
+    
+    @Published var syncingLinkIds: Set<String> = []
+    @Published var syncedLinkIds: Set<String> = []
+    
+    // MARK: - Pagination
+    
+    private let pageSize: Int = 80
+    private var currentPageSize: Int = 0
+    
+    // MARK: - Dependencies
+    
     private let service: GoodLinksDatabaseServiceExposed
     private let syncService: GoodLinksSyncServiceProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let notionConfig: NotionConfigStoreProtocol
+    
     private var cancellables: Set<AnyCancellable> = []
     private let computeQueue = DispatchQueue(label: "GoodLinksViewModel.compute", qos: .userInitiated)
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
-
-    /// GoodLinks 列表分页大小：初次加载与后续每次增量追加的数量
-    private let pageSize: Int = 80
-    /// 当前已向 UI 暴露的列表长度
-    private var currentPageSize: Int = 0
-
-    init(service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-         syncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
-         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
-         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
+    
+    // MARK: - Initialization
+    
+    init(
+        service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+        syncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+        syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
+    ) {
         self.service = service
         self.syncService = syncService
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
-        subscribeSyncStatusNotifications()
-        if let raw = UserDefaults.standard.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) { self.sortKey = k }
+        
+        loadUserDefaults()
+        setupNotificationSubscriptions()
+        setupCombinePipelines()
+        setupPersistenceSubscriptions()
+    }
+    
+    // MARK: - Setup
+    
+    private func loadUserDefaults() {
+        if let raw = UserDefaults.standard.string(forKey: Keys.sortKey), let k = GoodLinksSortKey(rawValue: raw) {
+            self.sortKey = k
+        }
         self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? false
         self.showStarredOnly = UserDefaults.standard.object(forKey: Keys.showStarredOnly) as? Bool ?? false
         self.searchText = UserDefaults.standard.string(forKey: Keys.searchText) ?? ""
-
-        // Load highlight detail filter/sort settings (GoodLinks-specific defaults)
-        self.highlightNoteFilter = UserDefaults.standard.bool(forKey: Keys.hlNoteFilter)
-        if let savedStyles = UserDefaults.standard.array(forKey: Keys.hlSelectedStyles) as? [Int] {
-            self.highlightSelectedStyles = Set(savedStyles)
-        }
-        if let savedSortFieldRaw = UserDefaults.standard.string(forKey: Keys.hlSortField),
-           let sortField = HighlightSortField(rawValue: savedSortFieldRaw) {
-            self.highlightSortField = sortField
-        }
-        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.hlSortAscending) as? Bool ?? false
-
-        // Overlay with global highlight menu state when present (ensures menu and view stay in sync)
-        if let globalSortRaw = UserDefaults.standard.string(forKey: Keys.globalSortField),
-           let globalSortField = HighlightSortField(rawValue: globalSortRaw) {
-            self.highlightSortField = globalSortField
-        }
-        self.highlightIsAscending = UserDefaults.standard.object(forKey: Keys.globalSortAscending) as? Bool ?? self.highlightIsAscending
-        self.highlightNoteFilter = UserDefaults.standard.object(forKey: Keys.globalHasNotes) as? Bool ?? self.highlightNoteFilter
-        if let globalStyles = UserDefaults.standard.array(forKey: Keys.globalSelectedStyles) as? [Int] {
-            self.highlightSelectedStyles = Set(globalStyles)
-        }
-        // Initialize mask to reflect current selection for App menu checkmarks
-        do {
-            let arr = Array(self.highlightSelectedStyles).sorted()
-            if arr.isEmpty {
-                UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
-            } else {
-                var mask = 0
-                for i in arr { mask |= (1 << i) }
-                UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
+    }
+    
+    private func setupNotificationSubscriptions() {
+        // 订阅同步状态通知
+        NotificationCenter.default.publisher(for: GLNotifications.syncBookStatusChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                // Ignore notifications emitted by AutoSyncService (object == nil)
+                if notification.object == nil { return }
+                if let sender = notification.object as? GoodLinksViewModel, sender === self {
+                    return
+                }
+                guard let info = notification.userInfo as? [String: Any],
+                      let bookId = info["bookId"] as? String,
+                      let status = info["status"] as? String else { return }
+                switch status {
+                case "started":
+                    self.syncingLinkIds.insert(bookId)
+                case "succeeded":
+                    self.syncingLinkIds.remove(bookId)
+                    self.syncedLinkIds.insert(bookId)
+                case "failed":
+                    self.syncingLinkIds.remove(bookId)
+                default:
+                    break
+                }
             }
-        }
-
+            .store(in: &cancellables)
+        
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: GLNotifications.goodLinksFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
@@ -149,45 +139,16 @@ final class GoodLinksViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-
-        // Subscribe to global highlight sort changes from AppCommands
-        NotificationCenter.default.publisher(for: GLNotifications.highlightSortChanged)
-            .compactMap { $0.userInfo as? [String: Any] }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] userInfo in
-                guard let self else { return }
-                if let keyRaw = userInfo["sortKey"] as? String, let k = HighlightSortField(rawValue: keyRaw) {
-                    self.highlightSortField = k
-                }
-                if let asc = userInfo["sortAscending"] as? Bool {
-                    self.highlightIsAscending = asc
-                }
-            }
-            .store(in: &cancellables)
-
-        // Subscribe to global highlight filter changes from AppCommands
-        NotificationCenter.default.publisher(for: GLNotifications.highlightFilterChanged)
-            .compactMap { $0.userInfo as? [String: Any] }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] userInfo in
-                guard let self else { return }
-                if let hasNotes = userInfo["hasNotes"] as? Bool {
-                    self.highlightNoteFilter = hasNotes
-                }
-                if let styles = userInfo["selectedStyles"] as? [Int] {
-                    self.highlightSelectedStyles = Set(styles)
-                }
-            }
-            .store(in: &cancellables)
-
+    }
+    
+    private func setupCombinePipelines() {
         // Combine 管道：在后台队列计算派生的 displayLinks，主线程发布结果
         let debouncedSearch = $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .removeDuplicates()
-
+        
         Publishers.CombineLatest4($links, $sortKey, $sortAscending, $showStarredOnly)
             .combineLatest(debouncedSearch, recomputeTrigger)
-            // 在后台队列进行 filter/sort/tags 解析等重计算，避免在主线程上做大量排序和字符串匹配
             .receive(on: computeQueue)
             .map { tuple -> [GoodLinksLinkRow] in
                 let (combined, searchText, _) = tuple
@@ -198,10 +159,9 @@ final class GoodLinksViewModel: ObservableObject {
                     sortAscending: sortAscending,
                     showStarredOnly: showStarredOnly,
                     searchText: searchText,
-                    syncTimestampStore: syncTimestampStore
+                    syncTimestampStore: self.syncTimestampStore
                 )
             }
-            // 发布结果前，在主线程上驱动 UI 更新
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newDisplay in
                 guard let self else { return }
@@ -210,8 +170,9 @@ final class GoodLinksViewModel: ObservableObject {
                 self.resetVisibleLinks()
             }
             .store(in: &cancellables)
-
-        // Debounced persistence for GoodLinks preferences
+    }
+    
+    private func setupPersistenceSubscriptions() {
         $sortKey
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
@@ -219,7 +180,7 @@ final class GoodLinksViewModel: ObservableObject {
                 UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
             }
             .store(in: &cancellables)
-
+        
         $sortAscending
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
@@ -227,7 +188,7 @@ final class GoodLinksViewModel: ObservableObject {
                 UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
             }
             .store(in: &cancellables)
-
+        
         $showStarredOnly
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
@@ -235,7 +196,7 @@ final class GoodLinksViewModel: ObservableObject {
                 UserDefaults.standard.set(newValue, forKey: Keys.showStarredOnly)
             }
             .store(in: &cancellables)
-
+        
         $searchText
             .removeDuplicates()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
@@ -243,57 +204,14 @@ final class GoodLinksViewModel: ObservableObject {
                 UserDefaults.standard.set(newValue, forKey: Keys.searchText)
             }
             .store(in: &cancellables)
-
-        $highlightNoteFilter
-            .removeDuplicates()
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
-            .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: Keys.hlNoteFilter)
-                UserDefaults.standard.set(newValue, forKey: Keys.globalHasNotes)
-            }
-            .store(in: &cancellables)
-
-        $highlightSelectedStyles
-            .map { Array($0).sorted() }
-            .removeDuplicates()
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
-            .sink { arr in
-                UserDefaults.standard.set(arr, forKey: Keys.hlSelectedStyles)
-                UserDefaults.standard.set(arr, forKey: Keys.globalSelectedStyles)
-                // Maintain a compact mask for App menu binding
-                if arr.isEmpty {
-                    UserDefaults.standard.set(0, forKey: Keys.globalSelectedMask)
-                } else {
-                    var mask = 0
-                    for i in arr { mask |= (1 << i) }
-                    UserDefaults.standard.set(mask, forKey: Keys.globalSelectedMask)
-                }
-            }
-            .store(in: &cancellables)
-
-        $highlightSortField
-            .removeDuplicates()
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
-            .sink { newValue in
-                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.hlSortField)
-                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.globalSortField)
-            }
-            .store(in: &cancellables)
-
-        $highlightIsAscending
-            .removeDuplicates()
-            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
-            .sink { newValue in
-                UserDefaults.standard.set(newValue, forKey: Keys.hlSortAscending)
-                UserDefaults.standard.set(newValue, forKey: Keys.globalSortAscending)
-            }
-            .store(in: &cancellables)
     }
-
+    
+    // MARK: - Data Loading
+    
     func loadRecentLinks(limit: Int = 0) async {
         isLoading = true
         errorMessage = nil
-
+        
         let serviceForTask = service
         let loggerForTask = logger
         do {
@@ -316,14 +234,17 @@ final class GoodLinksViewModel: ObservableObject {
             }
         }
     }
-
-    // 后台计算函数（纯函数，无 UI 依赖）
-    private static func buildDisplayLinks(links: [GoodLinksLinkRow],
-                                          sortKey: GoodLinksSortKey,
-                                          sortAscending: Bool,
-                                          showStarredOnly: Bool,
-                                          searchText: String,
-                                          syncTimestampStore: SyncTimestampStoreProtocol) -> [GoodLinksLinkRow] {
+    
+    // MARK: - Display Links Computation
+    
+    private static func buildDisplayLinks(
+        links: [GoodLinksLinkRow],
+        sortKey: GoodLinksSortKey,
+        sortAscending: Bool,
+        showStarredOnly: Bool,
+        searchText: String,
+        syncTimestampStore: SyncTimestampStoreProtocol
+    ) -> [GoodLinksLinkRow] {
         var arr = links
         if showStarredOnly {
             arr = arr.filter { $0.starred }
@@ -335,18 +256,17 @@ final class GoodLinksViewModel: ObservableObject {
                 let inTitle = (link.title ?? "").lowercased().contains(key)
                 let inAuthor = (link.author ?? "").lowercased().contains(key)
                 let inURL = link.url.lowercased().contains(key)
-                // tagsFormatted 解析可能较重，放在后台队列中执行
                 let inTags = link.tagsFormatted.lowercased().contains(key)
                 return inTitle || inAuthor || inURL || inTags
             }
         }
-
-        // 预取 lastSync 映射，避免比较器中频繁读取
+        
+        // 预取 lastSync 映射
         var lastSyncCache: [String: Date?] = [:]
         if sortKey == .lastSync {
             lastSyncCache = Dictionary(uniqueKeysWithValues: arr.map { ($0.id, syncTimestampStore.getLastSyncTime(for: $0.id)) })
         }
-
+        
         arr.sort { a, b in
             switch sortKey {
             case .title:
@@ -377,15 +297,14 @@ final class GoodLinksViewModel: ObservableObject {
         }
         return arr
     }
-
-    // 主动触发一次派生重算（供视图 onAppear/切换场景调用）
+    
+    // MARK: - Pagination
+    
     func triggerRecompute() {
-        // 切换或条件变化时，先进入计算态，避免长列表直接闪现
         isComputingList = true
         recomputeTrigger.send(())
     }
-
-    /// 重置当前可见列表为第一页
+    
     private func resetVisibleLinks() {
         currentPageSize = min(pageSize, displayLinks.count)
         if currentPageSize == 0 {
@@ -394,159 +313,34 @@ final class GoodLinksViewModel: ObservableObject {
             visibleLinks = Array(displayLinks.prefix(currentPageSize))
         }
     }
-
-    /// 在行即将出现在视图中时调用，判断是否需要向后追加一页数据
+    
     func loadMoreIfNeeded(currentItem: GoodLinksLinkRow) {
         guard let index = visibleLinks.firstIndex(where: { $0.id == currentItem.id }) else { return }
-        // 当靠近当前已加载列表尾部 10 个元素时触发下一页加载
         let threshold = max(visibleLinks.count - 10, 0)
         guard index >= threshold else { return }
-
+        
         let newSize = min(currentPageSize + pageSize, displayLinks.count)
         guard newSize > currentPageSize else { return }
-
+        
         currentPageSize = newSize
         visibleLinks = Array(displayLinks.prefix(currentPageSize))
     }
-
-
-    func loadHighlights(for linkId: String, limit: Int = 500, offset: Int = 0) async {
-        let serviceForTask = service
-        let loggerForTask = logger
-        do {
-            let rows = try await Task.detached(priority: .userInitiated) { () throws -> [GoodLinksHighlightRow] in
-                loggerForTask.info("[GoodLinks] 开始加载高亮，linkId=\(linkId)")
-                let dbPath = serviceForTask.resolveDatabasePath()
-                loggerForTask.info("[GoodLinks] 数据库路径: \(dbPath)")
-                return try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: limit, offset: offset)
-            }.value
-            await MainActor.run {
-                self.highlightsByLinkId[linkId] = rows
-                loggerForTask.info("[GoodLinks] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
-            }
-        } catch {
-            let desc = error.localizedDescription
-            await MainActor.run {
-                loggerForTask.error("[GoodLinks] loadHighlights error: \(desc)")
-                self.errorMessage = desc
-            }
-        }
-    }
     
-    func loadContent(for linkId: String) async {
-        let serviceForTask = service
-        let loggerForTask = logger
-        do {
-            let content = try await Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
-                loggerForTask.info("[GoodLinks] 开始加载全文内容，linkId=\(linkId)")
-                let dbPath = serviceForTask.resolveDatabasePath()
-                return try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
-            }.value
-            await MainActor.run {
-                if let content {
-                    self.contentByLinkId[linkId] = content
-                    loggerForTask.info("[GoodLinks] 加载到全文内容，linkId=\(linkId), wordCount=\(content.wordCount)")
-                } else {
-                    loggerForTask.info("[GoodLinks] 该链接无全文内容，linkId=\(linkId)")
-                }
-            }
-        } catch {
-            let desc = error.localizedDescription
-            await MainActor.run {
-                loggerForTask.error("[GoodLinks] loadContent error: \(desc)")
-                self.errorMessage = desc
-            }
-        }
-    }
-
-    // 供视图层查询上次同步时间，避免直接访问单例
+    // MARK: - Helpers
+    
     func lastSync(for linkId: String) -> Date? {
         syncTimestampStore.getLastSyncTime(for: linkId)
     }
-
-    // MARK: - Notion Sync (GoodLinks)
-    /// 智能同步当前 GoodLinks 链接的高亮到 Notion（仅追加新条目，实际同步逻辑委托给 `GoodLinksSyncService`）
-    func syncSmart(link: GoodLinksLinkRow, pageSize: Int = NotionSyncConfig.goodLinksPageSize) {
-        if isSyncing { return }
-        guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
-            return
-        }
-        syncMessage = nil
-        syncProgressText = nil
-        isSyncing = true
-        // Mark UI state for this link immediately
-        syncingLinkIds.insert(link.id)
-
-        Task {
-            defer { Task { @MainActor in self.isSyncing = false } }
-            let limiter = DIContainer.shared.syncConcurrencyLimiter
-            await limiter.withPermit {
-                // 发布开始通知（获得许可后）
-                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "started"])
-                do {
-                    let dbPath = self.service.resolveDatabasePath()
-                    try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
-                        Task { @MainActor in self?.syncProgressText = progressText }
-                    }
-                    await MainActor.run {
-                        self.syncMessage = String(localized: "Sync completed")
-                        self.syncProgressText = nil
-                        // 发布完成通知
-                        NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "succeeded"])
-                        // Update UI state directly
-                        self.syncingLinkIds.remove(link.id)
-                        self.syncedLinkIds.insert(link.id)
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    logger.error("[GoodLinks] syncSmart error: \(desc)")
-                    await MainActor.run {
-                        self.errorMessage = desc
-                        self.syncProgressText = nil
-                        // 发布失败通知
-                        NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": link.id, "status": "failed"])
-                        // Update UI state directly
-                        self.syncingLinkIds.remove(link.id)
-                    }
-                }
-            }
-        }
-    }
-
-    private func subscribeSyncStatusNotifications() {
-        NotificationCenter.default.publisher(for: GLNotifications.syncBookStatusChanged)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] notification in
-                guard let self else { return }
-                // Ignore notifications emitted by AutoSyncService (object == nil)
-                if notification.object == nil { return }
-                if let sender = notification.object as? GoodLinksViewModel, sender === self {
-                    // Ignore self-emitted to prevent duplicate UI state
-                    return
-                }
-                guard let info = notification.userInfo as? [String: Any],
-                      let bookId = info["bookId"] as? String,
-                      let status = info["status"] as? String else { return }
-                switch status {
-                case "started":
-                    self.syncingLinkIds.insert(bookId)
-                case "succeeded":
-                    self.syncingLinkIds.remove(bookId)
-                    self.syncedLinkIds.insert(bookId)
-                case "failed":
-                    self.syncingLinkIds.remove(bookId)
-                default:
-                    break
-                }
-            }
-            .store(in: &cancellables)
+    
+    private func checkNotionConfig() -> Bool {
+        notionConfig.isConfigured
     }
 }
 
-// MARK: - Batch Sync (GoodLinks)
+// MARK: - Batch Sync
+
 extension GoodLinksViewModel {
-    /// 批量同步所选 GoodLinks 到 Notion，使用并发限流（默认 10 并发）
+    /// 批量同步所选 GoodLinks 到 Notion
     func batchSync(linkIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !linkIds.isEmpty else { return }
         guard checkNotionConfig() else {
@@ -562,8 +356,8 @@ extension GoodLinksViewModel {
         }
         
         let dbPath = service.resolveDatabasePath()
-
-        // 配置检查通过后，才发送入队通知（只入队未在同步中的）
+        
+        // 入队通知
         let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let link = displayLinks.first(where: { $0.id == id }) else { return nil }
             let title = (link.title?.isEmpty == false ? link.title! : link.url)
@@ -572,19 +366,19 @@ extension GoodLinksViewModel {
         if !items.isEmpty {
             NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "goodLinks", "items": items])
         }
-
+        
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncService = self.syncService
         let notionConfig = DIContainer.shared.notionConfigStore
         let notionService = DIContainer.shared.notionService
-
+        
         Task {
-            // 预先 resolve/ensure 一次 GoodLinks databaseId，避免首次并发创建多个数据库
+            // 预先 resolve/ensure 一次 GoodLinks databaseId
             do {
                 if let parentPageId = notionConfig.notionPageId {
                     if let persisted = notionConfig.databaseIdForSource("goodLinks") {
-                        _ = await notionService.databaseExists(databaseId: persisted) // 仅验证，不清理
+                        _ = await notionService.databaseExists(databaseId: persisted)
                     } else {
                         let id = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
                         notionConfig.setDatabaseId(id, forSource: "goodLinks")
@@ -593,13 +387,13 @@ extension GoodLinksViewModel {
             } catch {
                 await MainActor.run { self.logger.error("[GoodLinks] pre-resolve databaseId failed: \(error.localizedDescription)") }
             }
+            
             await withTaskGroup(of: Void.self) { group in
                 for id in idsToSync {
                     guard let link = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            // Update local UI state and post started
                             await MainActor.run {
                                 _ = self.syncingLinkIds.insert(id)
                                 NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
@@ -619,8 +413,6 @@ extension GoodLinksViewModel {
                                 await MainActor.run {
                                     self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingLinkIds.remove(id)
-                                }
-                                await MainActor.run {
                                     NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])
                                 }
                             }
@@ -630,121 +422,5 @@ extension GoodLinksViewModel {
                 await group.waitForAll()
             }
         }
-    }
-    
-    // MARK: - Configuration Validation
-    private func checkNotionConfig() -> Bool {
-        return notionConfig.isConfigured
-    }
-}
-
-// MARK: - Highlight Detail Filtering & Sorting
-extension GoodLinksViewModel {
-    /// Get filtered and sorted highlights for a specific link
-    func getFilteredHighlights(for linkId: String) -> [GoodLinksHighlightRow] {
-        guard let sourceHighlights = highlightsByLinkId[linkId] else { return [] }
-
-        var filtered = sourceHighlights
-
-        // Apply note filter
-        if highlightNoteFilter {
-            filtered = filtered.filter { $0.note != nil && !$0.note!.isEmpty }
-        }
-
-        // Apply color filter
-        if !highlightSelectedStyles.isEmpty {
-            filtered = filtered.filter { highlight in
-                guard let color = highlight.color else { return false }
-                return highlightSelectedStyles.contains(color)
-            }
-        }
-
-        // Apply sorting (GoodLinks only has 'time' field, so created/modified use the same logic)
-        filtered = filtered.sorted { lhs, rhs in
-            switch highlightSortField {
-            case .created:
-                if highlightIsAscending {
-                    return lhs.time < rhs.time
-                } else {
-                    return lhs.time > rhs.time
-                }
-            case .modified:
-                if highlightIsAscending {
-                    return lhs.time < rhs.time
-                } else {
-                    return lhs.time > rhs.time
-                }
-            }
-        }
-
-        return filtered
-    }
-    
-    // MARK: - Highlight Pagination
-    
-    /// 总高亮数量（筛选后）
-    var totalFilteredHighlightCount: Int {
-        allFilteredHighlights.count
-    }
-    
-    /// 是否还有更多高亮可加载
-    var canLoadMoreHighlights: Bool {
-        visibleHighlights.count < allFilteredHighlights.count
-    }
-    
-    /// 初始化高亮分页（切换 link 时调用）
-    func initializeHighlightPagination(for linkId: String) {
-        currentHighlightLinkId = linkId
-        allFilteredHighlights = getFilteredHighlights(for: linkId)
-        currentHighlightPage = 1
-        let endIndex = min(highlightPageSize, allFilteredHighlights.count)
-        visibleHighlights = Array(allFilteredHighlights.prefix(endIndex))
-    }
-    
-    /// 重新应用筛选和排序（筛选条件变化时调用）
-    func reapplyHighlightFilters() {
-        guard let linkId = currentHighlightLinkId else { return }
-        allFilteredHighlights = getFilteredHighlights(for: linkId)
-        currentHighlightPage = 1
-        let endIndex = min(highlightPageSize, allFilteredHighlights.count)
-        visibleHighlights = Array(allFilteredHighlights.prefix(endIndex))
-    }
-    
-    /// 加载更多高亮
-    func loadMoreHighlightsIfNeeded(currentItem: GoodLinksHighlightRow) {
-        guard let index = visibleHighlights.firstIndex(where: { $0.id == currentItem.id }) else { return }
-        
-        // 当滚动到倒数第 10 项时，加载更多
-        let threshold = max(visibleHighlights.count - 10, 0)
-        guard index >= threshold else { return }
-        
-        loadNextHighlightPage()
-    }
-    
-    /// 加载下一页高亮
-    func loadNextHighlightPage() {
-        guard canLoadMoreHighlights, !isLoadingMoreHighlights else { return }
-        
-        isLoadingMoreHighlights = true
-        
-        let startIndex = currentHighlightPage * highlightPageSize
-        let endIndex = min(startIndex + highlightPageSize, allFilteredHighlights.count)
-        
-        guard startIndex < endIndex else {
-            isLoadingMoreHighlights = false
-            return
-        }
-        
-        let nextPage = Array(allFilteredHighlights[startIndex..<endIndex])
-        visibleHighlights.append(contentsOf: nextPage)
-        currentHighlightPage += 1
-        
-        isLoadingMoreHighlights = false
-    }
-
-    /// Reset highlight filters to default
-    func resetHighlightFilters() {
-        highlightNoteFilter = false
-        highlightSelectedStyles = []
     }
 }
