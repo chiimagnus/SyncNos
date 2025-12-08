@@ -1,10 +1,10 @@
 import Foundation
 
-/// Dedao 自动同步提供者，实现基于 API 的批量增量同步逻辑
+/// Dedao 自动同步提供者，实现基于本地缓存的智能增量同步逻辑
+/// 通过比较「高亮修改时间」与「上次同步时间」判断是否需要同步
 final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     let id: SyncSource = .dedao
     let autoSyncUserDefaultsKey: String = "autoSync.dedao"
-    let intervalSeconds: TimeInterval
     
     private let logger: LoggerServiceProtocol
     private let apiService: DedaoAPIServiceProtocol
@@ -17,7 +17,6 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     private var isSyncing: Bool = false
     
     init(
-        intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
         authService: DedaoAuthServiceProtocol = DIContainer.shared.dedaoAuthService,
@@ -26,7 +25,6 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
-        self.intervalSeconds = intervalSeconds
         self.logger = logger
         self.apiService = apiService
         self.authService = authService
@@ -78,43 +76,48 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     }
     
     private func syncAllBooksSmart() async throws {
-        // 1. 获取所有电子书
-        let ebooks = try await apiService.fetchAllEbooks()
-        
-        if ebooks.isEmpty {
-            logger.info("AutoSync[Dedao]: no ebooks found")
-            return
-        }
-        
-        // 2. 转换为 DedaoBookListItem
-        let books: [DedaoBookListItem] = ebooks.map { ebook in
-            DedaoBookListItem(from: ebook)
-        }
+        // 1. 从本地缓存获取所有书籍（不调用 API，使用缓存判断变更）
+        let books = try await cacheService.getAllBooks()
         
         if books.isEmpty {
-            logger.info("AutoSync[Dedao]: no books found")
+            logger.info("AutoSync[Dedao]: no books in local cache")
             return
         }
         
-        // 3. 预过滤近 intervalSeconds 内已同步过的书籍
-        let now = Date()
+        // 2. 获取所有书籍的最新高亮修改时间（批量查询，高效）
+        let maxUpdatedAtMap = try await cacheService.getAllBooksMaxHighlightUpdatedAt()
+        
+        // 3. 智能增量过滤：只同步有变更的书籍
         var eligibleBooks: [DedaoBookListItem] = []
         for book in books {
-            if let last = syncTimestampStore.getLastSyncTime(for: book.bookId),
-               now.timeIntervalSince(last) < intervalSeconds {
-                logger.info("AutoSync[Dedao] skipped for \(book.bookId): recent sync")
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
-                    object: nil,
-                    userInfo: ["bookId": book.bookId, "status": "skipped"]
-                )
+            let lastSyncTime = syncTimestampStore.getLastSyncTime(for: book.bookId)
+            let maxHighlightUpdatedAt = maxUpdatedAtMap[book.bookId]
+            
+            // 情况 1：从未同步过 → 需要同步（首次）
+            if lastSyncTime == nil {
+                logger.info("AutoSync[Dedao][\(book.bookId)]: first sync (never synced before)")
+                eligibleBooks.append(book)
                 continue
             }
-            eligibleBooks.append(book)
+            
+            // 情况 2：书籍有变更（最新高亮修改时间 > 上次同步时间）→ 需要同步
+            if let maxUpdated = maxHighlightUpdatedAt, maxUpdated > lastSyncTime! {
+                logger.info("AutoSync[Dedao][\(book.bookId)]: changes detected (maxUpdated: \(maxUpdated), lastSync: \(lastSyncTime!))")
+                eligibleBooks.append(book)
+                continue
+            }
+            
+            // 情况 3：书籍无变更 → 跳过
+            logger.debug("AutoSync[Dedao] skipped for \(book.bookId): no changes since last sync")
+            NotificationCenter.default.post(
+                name: Notification.Name("SyncBookStatusChanged"),
+                object: nil,
+                userInfo: ["bookId": book.bookId, "status": "skipped"]
+            )
         }
         
         if eligibleBooks.isEmpty {
-            logger.info("AutoSync[Dedao]: all books recently synced")
+            logger.info("AutoSync[Dedao]: no books need syncing (all up to date)")
             return
         }
         
