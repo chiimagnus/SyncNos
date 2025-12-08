@@ -512,6 +512,14 @@ protocol DedaoCacheServiceProtocol: Actor {
     
     /// 获取本地数据统计信息
     func getDataStats() throws -> DedaoDataStats
+    
+    // MARK: - 智能增量同步
+    
+    /// 获取指定书籍的最新高亮修改时间（用于智能增量同步判断）
+    func getMaxHighlightUpdatedAt(bookId: String) throws -> Date?
+    
+    /// 批量获取所有书籍的最新高亮修改时间（用于智能增量同步判断）
+    func getAllBooksMaxHighlightUpdatedAt() throws -> [String: Date]
 }
 
 /// Dedao 本地数据统计

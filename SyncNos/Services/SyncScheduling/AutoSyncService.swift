@@ -57,14 +57,15 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     private var timerCancellable: AnyCancellable?
     private var notificationCancellable: AnyCancellable?
 
-    /// 全局自动同步间隔（目前固定为 24 小时，后续可做成设置项）
+    /// 全局自动同步间隔（智能增量同步：检查一次，只同步有变更的内容）
+    /// TODO: 测试完成后改回 5 * 60（5 分钟）
     private let intervalSeconds: TimeInterval
 
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         providers: [SyncSource: AutoSyncSourceProvider]? = nil,
-        intervalSeconds: TimeInterval = 24 * 60 * 60
+        intervalSeconds: TimeInterval = 30  // 30 秒（测试用）
     ) {
         self.logger = logger
         self.notionConfig = notionConfig
@@ -73,10 +74,10 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         if let providers {
             self.providers = providers
         } else {
-            let apple = AppleBooksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
-            let goodLinks = GoodLinksAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
-            let weRead = WeReadAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
-            let dedao = DedaoAutoSyncProvider(intervalSeconds: intervalSeconds, logger: logger)
+            let apple = AppleBooksAutoSyncProvider(logger: logger)
+            let goodLinks = GoodLinksAutoSyncProvider(logger: logger)
+            let weRead = WeReadAutoSyncProvider(logger: logger)
+            let dedao = DedaoAutoSyncProvider(logger: logger)
             self.providers = [
                 .appleBooks: apple,
                 .goodLinks: goodLinks,

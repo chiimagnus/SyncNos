@@ -1,10 +1,10 @@
 import Foundation
 
-/// Apple Books 自动同步提供者，实现基于数据库的批量增量同步逻辑
+/// Apple Books 自动同步提供者，实现基于数据库的智能增量同步逻辑
+/// 通过比较「高亮修改时间」与「上次同步时间」判断是否需要同步
 final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
     let id: SyncSource = .appleBooks
     let autoSyncUserDefaultsKey: String = "autoSync.appleBooks"
-    let intervalSeconds: TimeInterval
 
     private let logger: LoggerServiceProtocol
     private let databaseService: DatabaseServiceProtocol
@@ -16,7 +16,6 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
     private var isSyncing: Bool = false
 
     init(
-        intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
@@ -24,7 +23,6 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         bookmarkStore: BookmarkStoreProtocol = DIContainer.shared.bookmarkStore
     ) {
-        self.intervalSeconds = intervalSeconds
         self.logger = logger
         self.databaseService = databaseService
         self.syncEngine = syncEngine
@@ -107,9 +105,10 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         let handle = try databaseService.openReadOnlyDatabase(dbPath: annotationDBPath)
         defer { databaseService.close(handle) }
 
-        // 取出有高亮的所有书籍 assetId（稳定排序，避免边界项被跳过）
-        let counts = try databaseService.fetchHighlightCountsByAsset(db: handle)
-        let assetIds = counts.map { $0.assetId }.sorted()
+        // 获取每本书的高亮统计信息（包含 maxModifiedDate）
+        let stats = try databaseService.fetchHighlightStatsByAsset(db: handle)
+        let statsDict = Dictionary(uniqueKeysWithValues: stats.map { ($0.assetId, $0) })
+        let assetIds = stats.map { $0.assetId }.sorted()
         if assetIds.isEmpty { return }
 
         // 构造资产到书名/作者映射
@@ -125,23 +124,38 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         // 并发上限（书本级并行数）
         let maxConcurrentBooks = NotionSyncConfig.batchConcurrency
 
-        // 预过滤近 intervalSeconds 内已同步过的书籍，并即时发送跳过通知
-        let now = Date()
+        // 智能增量过滤：只同步有变更的书籍
         var eligibleIds: [String] = []
         for id in assetIds {
-            if let last = syncTimestampStore.getLastSyncTime(for: id),
-               now.timeIntervalSince(last) < intervalSeconds {
-                logger.info("AutoSync skipped for \(id): recent sync")
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
-                    object: nil,
-                    userInfo: ["bookId": id, "status": "skipped"]
-                )
+            let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
+            let bookStats = statsDict[id]
+            
+            // 情况 1：从未同步过 → 需要同步（首次）
+            if lastSyncTime == nil {
+                logger.info("AutoSync[\(id)]: first sync (never synced before)")
+                eligibleIds.append(id)
                 continue
             }
-            eligibleIds.append(id)
+            
+            // 情况 2：书籍有变更（最新修改时间 > 上次同步时间）→ 需要同步
+            if let maxModified = bookStats?.maxModifiedDate, maxModified > lastSyncTime! {
+                logger.info("AutoSync[\(id)]: changes detected (modified: \(maxModified), lastSync: \(lastSyncTime!))")
+                eligibleIds.append(id)
+                continue
+            }
+            
+            // 情况 3：书籍无变更 → 跳过
+            logger.debug("AutoSync skipped for \(id): no changes since last sync")
+            NotificationCenter.default.post(
+                name: Notification.Name("SyncBookStatusChanged"),
+                object: nil,
+                userInfo: ["bookId": id, "status": "skipped"]
+            )
         }
-        if eligibleIds.isEmpty { return }
+        if eligibleIds.isEmpty {
+            logger.info("AutoSync[AppleBooks]: no books need syncing (all up to date)")
+            return
+        }
 
         // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
         let enqueueItems = eligibleIds.map { id -> SyncEnqueueItem in

@@ -307,4 +307,41 @@ actor DedaoCacheService: DedaoCacheServiceProtocol {
             lastSyncAt: state?.lastIncrementalSyncAt ?? state?.lastFullSyncAt
         )
     }
+    
+    // MARK: - 智能增量同步
+    
+    /// 获取指定书籍的最新高亮修改时间（用于智能增量同步判断）
+    func getMaxHighlightUpdatedAt(bookId: String) throws -> Date? {
+        let targetBookId = bookId
+        let predicate = #Predicate<CachedDedaoHighlight> { highlight in
+            highlight.bookId == targetBookId
+        }
+        let descriptor = FetchDescriptor<CachedDedaoHighlight>(predicate: predicate)
+        let highlights = try modelContext.fetch(descriptor)
+        
+        // 返回所有高亮中最新的 updatedAt
+        return highlights.compactMap { $0.updatedAt }.max()
+    }
+    
+    /// 批量获取所有书籍的最新高亮修改时间（用于智能增量同步判断）
+    func getAllBooksMaxHighlightUpdatedAt() throws -> [String: Date] {
+        let descriptor = FetchDescriptor<CachedDedaoHighlight>()
+        let highlights = try modelContext.fetch(descriptor)
+        
+        // 按 bookId 分组，找出每本书的最新 updatedAt
+        var result: [String: Date] = [:]
+        for highlight in highlights {
+            guard let updatedAt = highlight.updatedAt else { continue }
+            if let existing = result[highlight.bookId] {
+                if updatedAt > existing {
+                    result[highlight.bookId] = updatedAt
+                }
+            } else {
+                result[highlight.bookId] = updatedAt
+            }
+        }
+        
+        logger.debug("[DedaoCache] Calculated maxHighlightUpdatedAt for \(result.count) books")
+        return result
+    }
 }

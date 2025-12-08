@@ -1,10 +1,10 @@
 import Foundation
 
-/// WeRead 自动同步提供者，实现基于 API 的批量增量同步逻辑
+/// WeRead 自动同步提供者，实现基于 API 的智能增量同步逻辑
+/// 通过比较「书籍更新时间」与「上次同步时间」判断是否需要同步
 final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
     let id: SyncSource = .weRead
     let autoSyncUserDefaultsKey: String = "autoSync.weRead"
-    let intervalSeconds: TimeInterval
 
     private let logger: LoggerServiceProtocol
     private let apiService: WeReadAPIServiceProtocol
@@ -16,7 +16,6 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
     private var isSyncing: Bool = false
 
     init(
-        intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
@@ -24,7 +23,6 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
-        self.intervalSeconds = intervalSeconds
         self.logger = logger
         self.apiService = apiService
         self.authService = authService
@@ -93,25 +91,36 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
             return
         }
 
-        // 3. 预过滤近 intervalSeconds 内已同步过的书籍
-        let now = Date()
+        // 3. 智能增量过滤：只同步有变更的书籍
         var eligibleBooks: [WeReadBookListItem] = []
         for book in books {
-            if let last = syncTimestampStore.getLastSyncTime(for: book.bookId),
-               now.timeIntervalSince(last) < intervalSeconds {
-                logger.info("AutoSync[WeRead] skipped for \(book.bookId): recent sync")
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
-                    object: nil,
-                    userInfo: ["bookId": book.bookId, "status": "skipped"]
-                )
+            let lastSyncTime = syncTimestampStore.getLastSyncTime(for: book.bookId)
+            
+            // 情况 1：从未同步过 → 需要同步（首次）
+            if lastSyncTime == nil {
+                logger.info("AutoSync[WeRead][\(book.bookId)]: first sync (never synced before)")
+                eligibleBooks.append(book)
                 continue
             }
-            eligibleBooks.append(book)
+            
+            // 情况 2：书籍有变更（updatedAt > 上次同步时间）→ 需要同步
+            if let updatedAt = book.updatedAt, updatedAt > lastSyncTime! {
+                logger.info("AutoSync[WeRead][\(book.bookId)]: changes detected (updated: \(updatedAt), lastSync: \(lastSyncTime!))")
+                eligibleBooks.append(book)
+                continue
+            }
+            
+            // 情况 3：书籍无变更 → 跳过
+            logger.debug("AutoSync[WeRead] skipped for \(book.bookId): no changes since last sync")
+            NotificationCenter.default.post(
+                name: Notification.Name("SyncBookStatusChanged"),
+                object: nil,
+                userInfo: ["bookId": book.bookId, "status": "skipped"]
+            )
         }
 
         if eligibleBooks.isEmpty {
-            logger.info("AutoSync[WeRead]: all books recently synced")
+            logger.info("AutoSync[WeRead]: no books need syncing (all up to date)")
             return
         }
 
