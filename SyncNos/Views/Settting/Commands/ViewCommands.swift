@@ -31,7 +31,7 @@ struct ViewCommands: Commands {
     }
 
     private var enabledContentSources: [ContentSource] {
-        ContentSource.allCases.filter { isDataSourceEnabled($0) }
+        ContentSource.orderedEnabledSources(isEnabled: isDataSourceEnabled)
     }
 
     private func isDataSourceEnabled(_ source: ContentSource) -> Bool {

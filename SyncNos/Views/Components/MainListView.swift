@@ -57,9 +57,9 @@ struct MainListView: View {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
     }
 
-    /// 当前启用的数据源集合（由用户在 Onboarding/Settings 中控制）
+    /// 当前启用的数据源集合（按用户自定义顺序排列）
     private var enabledContentSources: [ContentSource] {
-        ContentSource.allCases.filter { isSourceEnabled($0) }
+        ContentSource.orderedEnabledSources(isEnabled: isSourceEnabled)
     }
 
     private func isSourceEnabled(_ source: ContentSource) -> Bool {
@@ -111,6 +111,8 @@ struct MainListView: View {
                     contentSourceRawValue = source.rawValue
                 }
             }
+            // 注意：数据源顺序变化（拖拽排序）由 DataSourceIndicatorBar 直接更新 ViewModel，
+            // 不需要在这里监听 orderChangedNotification，避免重复更新
     }
     
     // MARK: - Private Methods
