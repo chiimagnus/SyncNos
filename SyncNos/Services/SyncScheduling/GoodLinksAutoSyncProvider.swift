@@ -1,10 +1,10 @@
 import Foundation
 
-/// GoodLinks 自动同步提供者，实现基于本地数据库的批量增量同步逻辑
+/// GoodLinks 自动同步提供者，实现基于本地数据库的智能增量同步逻辑
+/// 通过比较「文章修改时间」与「上次同步时间」判断是否需要同步
 final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
     let id: SyncSource = .goodLinks
     let autoSyncUserDefaultsKey: String = "autoSync.goodLinks"
-    let intervalSeconds: TimeInterval
 
     private let logger: LoggerServiceProtocol
     private let goodLinksDatabaseService: GoodLinksDatabaseServiceExposed
@@ -14,13 +14,11 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
     private var isSyncing: Bool = false
 
     init(
-        intervalSeconds: TimeInterval = 24 * 60 * 60,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         goodLinksDatabaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
         goodLinksSyncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
-        self.intervalSeconds = intervalSeconds
         self.logger = logger
         self.goodLinksDatabaseService = goodLinksDatabaseService
         self.goodLinksSyncService = goodLinksSyncService
@@ -87,23 +85,41 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         // 并发上限（链接级并行数）
         let maxConcurrentLinks = NotionSyncConfig.batchConcurrency
 
-        // intervalSeconds 时间内已同步过则跳过
-        let now = Date()
+        // 智能增量过滤：只同步有变更的文章
         var eligibleIds: [String] = []
         for id in linkIds {
-            if let last = syncTimestampStore.getLastSyncTime(for: id),
-               now.timeIntervalSince(last) < intervalSeconds {
-                logger.info("AutoSync skipped for GoodLinks[\(id)]: recent sync")
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
-                    object: nil,
-                    userInfo: ["bookId": id, "status": "skipped"]
-                )
+            let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
+            let linkInfo = linkMeta[id]
+            
+            // 情况 1：从未同步过 → 需要同步（首次）
+            if lastSyncTime == nil {
+                logger.info("AutoSync[GoodLinks][\(id)]: first sync (never synced before)")
+                eligibleIds.append(id)
                 continue
             }
-            eligibleIds.append(id)
+            
+            // 情况 2：文章有变更（modifiedAt > 上次同步时间）→ 需要同步
+            if let modifiedAt = linkInfo?.modifiedAt, modifiedAt > 0 {
+                let modifiedDate = Date(timeIntervalSince1970: modifiedAt)
+                if modifiedDate > lastSyncTime! {
+                    logger.info("AutoSync[GoodLinks][\(id)]: changes detected (modified: \(modifiedDate), lastSync: \(lastSyncTime!))")
+                    eligibleIds.append(id)
+                    continue
+                }
+            }
+            
+            // 情况 3：文章无变更 → 跳过
+            logger.debug("AutoSync skipped for GoodLinks[\(id)]: no changes since last sync")
+            NotificationCenter.default.post(
+                name: Notification.Name("SyncBookStatusChanged"),
+                object: nil,
+                userInfo: ["bookId": id, "status": "skipped"]
+            )
         }
-        if eligibleIds.isEmpty { return }
+        if eligibleIds.isEmpty {
+            logger.info("AutoSync[GoodLinks]: no links need syncing (all up to date)")
+            return
+        }
 
         // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
         let enqueueItems = eligibleIds.map { id -> SyncEnqueueItem in
