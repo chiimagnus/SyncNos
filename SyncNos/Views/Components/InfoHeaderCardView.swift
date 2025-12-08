@@ -1,9 +1,26 @@
 import SwiftUI
+import Combine
 
 /// 会话级的 Sync Queue 折叠状态（随应用重启重置）
+/// 当有任务入队时自动展开
 private final class SyncQueueCollapseStore: ObservableObject {
     static let shared = SyncQueueCollapseStore()
     @Published var isCollapsed: Bool = true
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        // 监听任务入队通知，自动展开
+        NotificationCenter.default.publisher(for: Notification.Name("SyncTasksEnqueued"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.isCollapsed else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    self.isCollapsed = false
+                }
+            }
+            .store(in: &cancellables)
+    }
 }
 
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
