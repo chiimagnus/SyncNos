@@ -104,12 +104,6 @@ struct ViewCommands: Commands {
             }
             .keyboardShortcut("\\", modifiers: .command)
 
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
-            }
-            .keyboardShortcut("r", modifiers: .command)
-            Divider()
-
             // 数据源切换：上一个/下一个（⌘+← / ⌘+→）- 循环切换
             Button("Previous Data Source") {
                 switchToPreviousDataSource()
