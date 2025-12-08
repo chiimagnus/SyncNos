@@ -95,7 +95,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
     func start() {
         guard timerCancellable == nil else { return }
-        logger.info("AutoSyncService starting…")
+        logger.info("[SmartSync] AutoSyncService starting…")
 
         // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books、GoodLinks、WeRead）
         notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
@@ -118,12 +118,12 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     func stop() {
         timerCancellable?.cancel(); timerCancellable = nil
         notificationCancellable?.cancel(); notificationCancellable = nil
-        logger.info("AutoSyncService stopped")
+        logger.info("[SmartSync] AutoSyncService stopped")
     }
 
     func triggerSyncNow() {
         guard notionConfig.isConfigured else {
-            logger.warning("AutoSync skipped: Notion not configured")
+            logger.warning("[SmartSync] skipped: Notion not configured")
             return
         }
         for provider in providers.values {

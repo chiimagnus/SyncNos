@@ -59,7 +59,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         guard enabled else { return }
 
         guard let root = booksRootPath else {
-            logger.warning("AutoSync skipped: Apple Books root not selected")
+            logger.warning("[SmartSync] AppleBooks skipped: root not selected")
             return
         }
 
@@ -67,24 +67,24 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         let booksDir = (root as NSString).appendingPathComponent("BKLibrary")
 
         guard let annotationDB = latestSQLiteFile(in: annotationDir) else {
-            logger.warning("AutoSync skipped: annotation DB not found")
+            logger.warning("[SmartSync] AppleBooks skipped: annotation DB not found")
             return
         }
         let booksDB = latestSQLiteFile(in: booksDir)
 
         isSyncing = true
-        logger.info("AutoSync[AppleBooks]: start syncSmart for all books")
+        logger.info("[SmartSync] AppleBooks: starting check for all books")
 
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             defer {
                 self.isSyncing = false
-                self.logger.info("AutoSync[AppleBooks]: finished")
+                self.logger.info("[SmartSync] AppleBooks: finished")
             }
             do {
                 try await self.syncAllBooksSmart(annotationDBPath: annotationDB, booksDBPath: booksDB)
             } catch {
-                self.logger.error("AutoSync[AppleBooks] error: \(error.localizedDescription)")
+                self.logger.error("[SmartSync] AppleBooks error: \(error.localizedDescription)")
             }
         }
     }
@@ -132,20 +132,20 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("AutoSync[\(id)]: first sync (never synced before)")
+                logger.info("[SmartSync] AppleBooks[\(id)]: first sync (never synced)")
                 eligibleIds.append(id)
                 continue
             }
             
             // 情况 2：书籍有变更（最新修改时间 > 上次同步时间）→ 需要同步
             if let maxModified = bookStats?.maxModifiedDate, maxModified > lastSyncTime! {
-                logger.info("AutoSync[\(id)]: changes detected (modified: \(maxModified), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] AppleBooks[\(id)]: changes detected (modified: \(maxModified), lastSync: \(lastSyncTime!))")
                 eligibleIds.append(id)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("AutoSync skipped for \(id): no changes since last sync")
+            logger.debug("[SmartSync] AppleBooks[\(id)]: skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -153,7 +153,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             )
         }
         if eligibleIds.isEmpty {
-            logger.info("AutoSync[AppleBooks]: no books need syncing (all up to date)")
+            logger.info("[SmartSync] AppleBooks: all books up to date, nothing to sync")
             return
         }
 
@@ -170,7 +170,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         }
         
         guard !acceptedIds.isEmpty else {
-            logger.info("AutoSync[AppleBooks]: no tasks accepted by SyncQueueStore")
+            logger.info("[SmartSync] AppleBooks: no tasks accepted (all in cooldown)")
             return
         }
         
@@ -216,7 +216,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                         do {
                             let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
                             try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("AutoSync progress[\(id)]: \(progress)")
+                                logger.debug("[SmartSync] AppleBooks[\(id)] progress: \(progress)")
                             }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
@@ -224,7 +224,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("AutoSync failed for \(id): \(error.localizedDescription)")
+                            logger.error("[SmartSync] AppleBooks[\(id)] failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,

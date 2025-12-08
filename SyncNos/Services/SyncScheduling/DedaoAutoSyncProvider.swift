@@ -54,23 +54,23 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         
         // 检查 Dedao 是否已登录
         guard authService.isLoggedIn else {
-            logger.warning("AutoSync[Dedao] skipped: not logged in")
+            logger.warning("[SmartSync] Dedao skipped: not logged in")
             return
         }
         
         isSyncing = true
-        logger.info("AutoSync[Dedao]: start syncSmart for all books")
+        logger.info("[SmartSync] Dedao: starting check for all books")
         
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             defer {
                 self.isSyncing = false
-                self.logger.info("AutoSync[Dedao]: finished")
+                self.logger.info("[SmartSync] Dedao: finished")
             }
             do {
                 try await self.syncAllBooksSmart()
             } catch {
-                self.logger.error("AutoSync[Dedao] error: \(error.localizedDescription)")
+                self.logger.error("[SmartSync] Dedao error: \(error.localizedDescription)")
             }
         }
     }
@@ -80,7 +80,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         let books = try await cacheService.getAllBooks()
         
         if books.isEmpty {
-            logger.info("AutoSync[Dedao]: no books in local cache")
+            logger.info("[SmartSync] Dedao: no books in local cache")
             return
         }
         
@@ -95,20 +95,20 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("AutoSync[Dedao][\(book.bookId)]: first sync (never synced before)")
+                logger.info("[SmartSync] Dedao[\(book.bookId)]: first sync (never synced)")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 2：书籍有变更（最新高亮修改时间 > 上次同步时间）→ 需要同步
             if let maxUpdated = maxHighlightUpdatedAt, maxUpdated > lastSyncTime! {
-                logger.info("AutoSync[Dedao][\(book.bookId)]: changes detected (maxUpdated: \(maxUpdated), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] Dedao[\(book.bookId)]: changes detected (maxUpdated: \(maxUpdated), lastSync: \(lastSyncTime!))")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("AutoSync[Dedao] skipped for \(book.bookId): no changes since last sync")
+            logger.debug("[SmartSync] Dedao[\(book.bookId)]: skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -117,7 +117,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         }
         
         if eligibleBooks.isEmpty {
-            logger.info("AutoSync[Dedao]: no books need syncing (all up to date)")
+            logger.info("[SmartSync] Dedao: all books up to date, nothing to sync")
             return
         }
         
@@ -131,7 +131,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         }
         
         guard !acceptedIds.isEmpty else {
-            logger.info("AutoSync[Dedao]: no tasks accepted by SyncQueueStore")
+            logger.info("[SmartSync] Dedao: no tasks accepted (all in cooldown)")
             return
         }
         
@@ -171,7 +171,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                                 cacheService: cacheService
                             )
                             try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("AutoSync[Dedao] progress[\(book.bookId)]: \(progress)")
+                                logger.debug("[SmartSync] Dedao[\(book.bookId)] progress: \(progress)")
                             }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
@@ -179,7 +179,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("AutoSync[Dedao] failed for \(book.bookId): \(error.localizedDescription)")
+                            logger.error("[SmartSync] Dedao[\(book.bookId)] failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,

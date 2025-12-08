@@ -46,24 +46,24 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         // 解析 GoodLinks DB 路径（会自动处理安全范围访问）
         let dbPath = goodLinksDatabaseService.resolveDatabasePath()
         guard FileManager.default.fileExists(atPath: dbPath) else {
-            logger.warning("AutoSync skipped: GoodLinks DB not found at \(dbPath)")
+            logger.warning("[SmartSync] GoodLinks skipped: DB not found at \(dbPath)")
             return
         }
 
         isSyncing = true
-        logger.info("AutoSync[GoodLinks]: start sync for eligible links")
+        logger.info("[SmartSync] GoodLinks: starting check for all links")
 
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             defer {
                 self.isSyncing = false
                 GoodLinksBookmarkStore.shared.stopAccessingIfNeeded()
-                self.logger.info("AutoSync[GoodLinks]: finished")
+                self.logger.info("[SmartSync] GoodLinks: finished")
             }
             do {
                 try await self.syncAllGoodLinksSmart(dbPath: dbPath)
             } catch {
-                self.logger.error("AutoSync[GoodLinks] error: \(error.localizedDescription)")
+                self.logger.error("[SmartSync] GoodLinks error: \(error.localizedDescription)")
             }
         }
     }
@@ -93,7 +93,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("AutoSync[GoodLinks][\(id)]: first sync (never synced before)")
+                logger.info("[SmartSync] GoodLinks[\(id)]: first sync (never synced)")
                 eligibleIds.append(id)
                 continue
             }
@@ -102,14 +102,14 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             if let modifiedAt = linkInfo?.modifiedAt, modifiedAt > 0 {
                 let modifiedDate = Date(timeIntervalSince1970: modifiedAt)
                 if modifiedDate > lastSyncTime! {
-                    logger.info("AutoSync[GoodLinks][\(id)]: changes detected (modified: \(modifiedDate), lastSync: \(lastSyncTime!))")
+                    logger.info("[SmartSync] GoodLinks[\(id)]: changes detected (modified: \(modifiedDate), lastSync: \(lastSyncTime!))")
                     eligibleIds.append(id)
                     continue
                 }
             }
             
             // 情况 3：文章无变更 → 跳过
-            logger.debug("AutoSync skipped for GoodLinks[\(id)]: no changes since last sync")
+            logger.debug("[SmartSync] GoodLinks[\(id)]: skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -117,7 +117,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             )
         }
         if eligibleIds.isEmpty {
-            logger.info("AutoSync[GoodLinks]: no links need syncing (all up to date)")
+            logger.info("[SmartSync] GoodLinks: all links up to date, nothing to sync")
             return
         }
 
@@ -134,7 +134,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         }
         
         guard !acceptedIds.isEmpty else {
-            logger.info("AutoSync[GoodLinks]: no tasks accepted by SyncQueueStore")
+            logger.info("[SmartSync] GoodLinks: no tasks accepted (all in cooldown)")
             return
         }
         
@@ -192,7 +192,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
                         } catch {
-                            self.logger.error("AutoSync[GoodLinks] failed for \(id): \(error.localizedDescription)")
+                            self.logger.error("[SmartSync] GoodLinks[\(id)] failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
