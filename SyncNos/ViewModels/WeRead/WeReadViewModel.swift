@@ -362,6 +362,12 @@ final class WeReadViewModel: ObservableObject {
             return
         }
 
+        // 立即将任务标记为同步中，防止快捷键连续触发时重复入队
+        // 注意：这必须在 Task 启动之前同步执行
+        for id in idsToSync {
+            syncingBookIds.insert(id)
+        }
+        
         // 入队任务（只入队未在同步中的）
         let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
@@ -388,8 +394,8 @@ final class WeReadViewModel: ObservableObject {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
+                            // 发送开始通知（syncingBookIds 已在外部同步设置）
                             await MainActor.run {
-                                _ = self.syncingBookIds.insert(id)
                                 NotificationCenter.default.post(
                                     name: Notification.Name("SyncBookStatusChanged"),
                                     object: self,

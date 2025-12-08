@@ -441,6 +441,12 @@ extension AppleBooksViewModel {
             return
         }
 
+        // 立即将任务标记为同步中，防止快捷键连续触发时重复入队
+        // 注意：这必须在 Task 启动之前同步执行
+        for id in idsToSync {
+            syncingBookIds.insert(id)
+        }
+        
         // 配置检查通过后，才发送入队通知（只入队未在同步中的）
         let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
