@@ -354,9 +354,16 @@ final class WeReadViewModel: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
+        
+        // 过滤掉已经在同步中的任务，防止重复触发
+        let idsToSync = bookIds.subtracting(syncingBookIds)
+        guard !idsToSync.isEmpty else {
+            logger.debug("[WeRead] All selected books are already syncing, skip")
+            return
+        }
 
-        // 入队任务
-        let items: [[String: Any]] = bookIds.compactMap { id in
+        // 入队任务（只入队未在同步中的）
+        let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
             return ["id": id, "title": b.title, "subtitle": b.author]
         }
@@ -368,7 +375,7 @@ final class WeReadViewModel: ObservableObject {
             )
         }
 
-        let ids = Array(bookIds)
+        let ids = Array(idsToSync)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine

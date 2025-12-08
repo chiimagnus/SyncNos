@@ -433,9 +433,16 @@ extension AppleBooksViewModel {
             logger.warning("[AppleBooks] annotationDatabasePath is nil; skip batchSync")
             return
         }
+        
+        // 过滤掉已经在同步中的任务，防止重复触发
+        let idsToSync = bookIds.subtracting(syncingBookIds)
+        guard !idsToSync.isEmpty else {
+            logger.debug("[AppleBooks] All selected books are already syncing, skip")
+            return
+        }
 
-        // 配置检查通过后，才发送入队通知（从 View 层移除到此）
-        let items: [[String: Any]] = bookIds.compactMap { id in
+        // 配置检查通过后，才发送入队通知（只入队未在同步中的）
+        let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
             return ["id": id, "title": b.bookTitle, "subtitle": b.authorName]
         }
@@ -443,7 +450,7 @@ extension AppleBooksViewModel {
             NotificationCenter.default.post(name: Notification.Name("SyncTasksEnqueued"), object: nil, userInfo: ["source": "appleBooks", "items": items])
         }
 
-        let ids = Array(bookIds)
+        let ids = Array(idsToSync)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
