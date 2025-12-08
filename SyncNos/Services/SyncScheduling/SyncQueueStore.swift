@@ -22,14 +22,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     init(notificationCenter: NotificationCenter = .default) {
         self.notificationCenter = notificationCenter
 
-        // 入队事件
-        notificationCenter.publisher(for: Notification.Name("SyncTasksEnqueued"))
-            .compactMap { $0.userInfo as? [String: Any] }
-            .sink { [weak self] info in
-                guard let self else { return }
-                self.handleEnqueue(info: info)
-            }
-            .store(in: &cancellables)
+        // 注意：入队现在通过 enqueue() 方法直接调用，不再监听 SyncTasksEnqueued 通知
 
         // 运行状态事件（started/succeeded/failed）
         notificationCenter.publisher(for: Notification.Name("SyncBookStatusChanged"))
@@ -60,56 +53,79 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
-
-    // MARK: - Private
-    private func handleEnqueue(info: [String: Any]) {
-        guard let sourceRaw = info["source"] as? String,
-              let source = SyncSource(rawValue: sourceRaw),
-              let items = info["items"] as? [[String: Any]] else { return }
-
-        var changed = false
-        var skippedDueToCooldown: [String] = []
+    
+    // MARK: - 入队 API（方案 2：单一真相源）
+    
+    /// 将任务入队，自动处理去重和冷却检查
+    /// - Parameters:
+    ///   - source: 数据源类型
+    ///   - items: 待入队的任务列表
+    /// - Returns: 实际被接受入队的任务 ID 集合
+    @MainActor
+    func enqueue(source: SyncSource, items: [SyncEnqueueItem]) -> Set<String> {
+        var acceptedIds: Set<String> = []
         
         stateQueue.sync {
-            // 新任务入队 → 取消任何待执行的清理
             cancelScheduledCleanup_locked()
             let now = Date()
             
-            for dict in items {
-                guard let rawId = dict["id"] as? String,
-                      let title = dict["title"] as? String else { continue }
-                let subtitle = dict["subtitle"] as? String
-                let temp = SyncQueueTask(rawId: rawId, source: source, title: title, subtitle: subtitle, state: .queued)
+            for item in items {
+                let taskId = "\(source.rawValue):\(item.id)"
                 
-                // 检查是否在冷却期内
-                if let failedAt = failedTaskTimestamps[temp.id] {
-                    let elapsed = now.timeIntervalSince(failedAt)
-                    if elapsed < failedTaskCooldownSeconds {
-                        // 仍在冷却期，跳过入队
-                        skippedDueToCooldown.append(title)
-                        continue
-                    } else {
-                        // 冷却期已过，清除记录
-                        failedTaskTimestamps.removeValue(forKey: temp.id)
-                    }
+                // 检查冷却期
+                if let failedAt = failedTaskTimestamps[taskId],
+                   now.timeIntervalSince(failedAt) < failedTaskCooldownSeconds {
+                    continue
                 }
                 
-                if tasksById[temp.id] == nil {
-                    tasksById[temp.id] = temp
-                    enqueuedOrder.append(temp.id)
-                    changed = true
-                } // 已存在则忽略，等待延迟清理完成后再入队
+                // 检查是否已存在（去重）
+                if tasksById[taskId] != nil {
+                    continue
+                }
+                
+                // 入队
+                let task = SyncQueueTask(
+                    rawId: item.id,
+                    source: source,
+                    title: item.title,
+                    subtitle: item.subtitle,
+                    state: .queued
+                )
+                tasksById[taskId] = task
+                enqueuedOrder.append(taskId)
+                acceptedIds.insert(item.id)
             }
         }
         
-        // 记录被跳过的任务（调试用）
-        if !skippedDueToCooldown.isEmpty {
-            print("[SyncQueueStore] Skipped \(skippedDueToCooldown.count) tasks due to cooldown: \(skippedDueToCooldown.joined(separator: ", "))")
+        if !acceptedIds.isEmpty {
+            publish()
         }
         
-        if changed { publish() }
+        return acceptedIds
+    }
+    
+    /// 检查任务是否正在处理（queued 或 running）
+    func isTaskActive(source: SyncSource, rawId: String) -> Bool {
+        let taskId = "\(source.rawValue):\(rawId)"
+        return stateQueue.sync {
+            guard let task = tasksById[taskId] else { return false }
+            return task.state == .queued || task.state == .running
+        }
+    }
+    
+    /// 批量检查，返回正在处理的任务 ID
+    func activeTaskIds(source: SyncSource, rawIds: Set<String>) -> Set<String> {
+        stateQueue.sync {
+            rawIds.filter { rawId in
+                let taskId = "\(source.rawValue):\(rawId)"
+                guard let task = tasksById[taskId] else { return false }
+                return task.state == .queued || task.state == .running
+            }
+        }
     }
 
+    // MARK: - Private (通知处理)
+    
     private func handleStatusChanged(info: [String: Any]) {
         guard let rawId = info["bookId"] as? String,
               let status = info["status"] as? String else { return }

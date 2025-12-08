@@ -105,31 +105,32 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         }
         if eligibleIds.isEmpty { return }
 
-        // 入队队列，便于 UI 展示
-        do {
-            var items: [[String: Any]] = []
-            items.reserveCapacity(eligibleIds.count)
-            for id in eligibleIds {
-                let meta = linkMeta[id]
-                let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
-                let subtitle = meta?.author ?? ""
-                items.append(["id": id, "title": title, "subtitle": subtitle])
-            }
-            if !items.isEmpty {
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncTasksEnqueued"),
-                    object: nil,
-                    userInfo: ["source": "goodLinks", "items": items]
-                )
-            }
+        // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let enqueueItems = eligibleIds.map { id -> SyncEnqueueItem in
+            let meta = linkMeta[id]
+            let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
+            let subtitle = meta?.author ?? ""
+            return SyncEnqueueItem(id: id, title: title, subtitle: subtitle)
         }
+        
+        let acceptedIds = await MainActor.run {
+            DIContainer.shared.syncQueueStore.enqueue(source: .goodLinks, items: enqueueItems)
+        }
+        
+        guard !acceptedIds.isEmpty else {
+            logger.info("AutoSync[GoodLinks]: no tasks accepted by SyncQueueStore")
+            return
+        }
+        
+        // 过滤出被接受的链接 ID
+        let acceptedIdList = eligibleIds.filter { acceptedIds.contains($0) }
 
         // 控制并发同步
         var nextIndex = 0
         await withTaskGroup(of: Void.self) { group in
             func addTaskIfPossible() {
-                guard nextIndex < eligibleIds.count else { return }
-                let id = eligibleIds[nextIndex]; nextIndex += 1
+                guard nextIndex < acceptedIdList.count else { return }
+                let id = acceptedIdList[nextIndex]; nextIndex += 1
                 let meta = linkMeta[id]
                 let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
                 let author = meta?.author ?? ""
@@ -186,7 +187,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                 }
             }
 
-            for _ in 0..<min(maxConcurrentLinks, eligibleIds.count) { addTaskIfPossible() }
+            for _ in 0..<min(maxConcurrentLinks, acceptedIdList.count) { addTaskIfPossible() }
             while await group.next() != nil { addTaskIfPossible() }
         }
     }

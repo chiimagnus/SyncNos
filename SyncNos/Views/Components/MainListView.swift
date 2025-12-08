@@ -644,8 +644,8 @@ struct MainListView: View {
     }
     
     // MARK: - Sync Methods
-    // 注意：SyncTasksEnqueued 通知由各 ViewModel 的 batchSync() 方法统一发送，
-    // 此处不应重复发送，遵循唯一入口原则。
+    // 注意：任务入队由各 ViewModel 的 batchSync() 方法通过 SyncQueueStore.enqueue() 统一处理，
+    // 此处不应直接操作 SyncQueueStore，遵循唯一入口原则。
     
     private func syncSelectedAppleBooks() {
         appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)

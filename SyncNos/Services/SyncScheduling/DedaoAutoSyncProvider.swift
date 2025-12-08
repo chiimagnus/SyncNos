@@ -118,25 +118,22 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
             return
         }
         
-        // 4. 入队通知（供 SyncQueueView 显示）
-        do {
-            var items: [[String: Any]] = []
-            items.reserveCapacity(eligibleBooks.count)
-            for book in eligibleBooks {
-                items.append([
-                    "id": book.bookId,
-                    "title": book.title,
-                    "subtitle": book.author
-                ])
-            }
-            if !items.isEmpty {
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncTasksEnqueued"),
-                    object: nil,
-                    userInfo: ["source": "dedao", "items": items]
-                )
-            }
+        // 4. 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let enqueueItems = eligibleBooks.map { book in
+            SyncEnqueueItem(id: book.bookId, title: book.title, subtitle: book.author)
         }
+        
+        let acceptedIds = await MainActor.run {
+            DIContainer.shared.syncQueueStore.enqueue(source: .dedao, items: enqueueItems)
+        }
+        
+        guard !acceptedIds.isEmpty else {
+            logger.info("AutoSync[Dedao]: no tasks accepted by SyncQueueStore")
+            return
+        }
+        
+        // 过滤出被接受的书籍
+        let acceptedBooks = eligibleBooks.filter { acceptedIds.contains($0.bookId) }
         
         // 5. 并发同步
         let maxConcurrentBooks = NotionSyncConfig.batchConcurrency
@@ -148,8 +145,8 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         var nextIndex = 0
         await withTaskGroup(of: Void.self) { group in
             func addTaskIfPossible() {
-                guard nextIndex < eligibleBooks.count else { return }
-                let book = eligibleBooks[nextIndex]
+                guard nextIndex < acceptedBooks.count else { return }
+                let book = acceptedBooks[nextIndex]
                 nextIndex += 1
                 
                 group.addTask {
@@ -195,7 +192,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
             }
             
             // 初始填充任务
-            for _ in 0..<min(maxConcurrentBooks, eligibleBooks.count) {
+            for _ in 0..<min(maxConcurrentBooks, acceptedBooks.count) {
                 addTaskIfPossible()
             }
             // 滑动补位
