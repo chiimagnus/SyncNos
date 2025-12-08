@@ -99,7 +99,7 @@ private struct DataSourceDropDelegate: DropDelegate {
     /// 保存新的数据源顺序
     private func saveNewOrder(_ enabledOrder: [ContentSource]) {
         // 获取当前完整的自定义顺序
-        var fullOrder = ContentSource.customOrder
+        let fullOrder = ContentSource.customOrder
         
         // 根据新的启用顺序重新排列
         // 思路：将启用的数据源按新顺序排列，未启用的保持原位置
