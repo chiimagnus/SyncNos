@@ -343,33 +343,25 @@ final class DedaoViewModel: ObservableObject {
             return
         }
         
-        // 过滤掉已经在同步中的任务，防止重复触发
-        let idsToSync = bookIds.subtracting(syncingBookIds)
-        guard !idsToSync.isEmpty else {
-            logger.debug("[Dedao] All selected books are already syncing, skip")
+        // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let syncQueueStore = DIContainer.shared.syncQueueStore
+        let enqueueItems = bookIds.compactMap { id -> SyncEnqueueItem? in
+            guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
+            return SyncEnqueueItem(id: id, title: b.title, subtitle: b.author)
+        }
+        
+        let acceptedIds = syncQueueStore.enqueue(source: .dedao, items: enqueueItems)
+        guard !acceptedIds.isEmpty else {
+            logger.debug("[Dedao] No tasks accepted by SyncQueueStore, skip")
             return
         }
         
-        // 立即将任务标记为同步中，防止快捷键连续触发时重复入队
-        // 注意：这必须在 Task 启动之前同步执行
-        for id in idsToSync {
+        // 更新本地 UI 状态
+        for id in acceptedIds {
             syncingBookIds.insert(id)
         }
         
-        // 入队任务（只入队未在同步中的）
-        let items: [[String: Any]] = idsToSync.compactMap { id in
-            guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return ["id": id, "title": b.title, "subtitle": b.author]
-        }
-        if !items.isEmpty {
-            NotificationCenter.default.post(
-                name: Notification.Name("SyncTasksEnqueued"),
-                object: nil,
-                userInfo: ["source": "dedao", "items": items]
-            )
-        }
-        
-        let ids = Array(idsToSync)
+        let ids = Array(acceptedIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine

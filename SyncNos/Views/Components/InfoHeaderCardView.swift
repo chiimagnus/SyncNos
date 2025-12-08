@@ -8,16 +8,22 @@ private final class SyncQueueCollapseStore: ObservableObject {
     @Published var isCollapsed: Bool = true
     
     private var cancellables = Set<AnyCancellable>()
+    private var previousTaskCount: Int = 0
     
     init() {
-        // 监听任务入队通知，自动展开
-        NotificationCenter.default.publisher(for: Notification.Name("SyncTasksEnqueued"))
+        // 监听 SyncQueueStore 的任务变化，当有新任务入队时自动展开
+        DIContainer.shared.syncQueueStore.tasksPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self, self.isCollapsed else { return }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    self.isCollapsed = false
+            .sink { [weak self] tasks in
+                guard let self else { return }
+                let currentCount = tasks.count
+                // 只有当任务数量增加时才展开（表示有新任务入队）
+                if currentCount > self.previousTaskCount && self.isCollapsed {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        self.isCollapsed = false
+                    }
                 }
+                self.previousTaskCount = currentCount
             }
             .store(in: &cancellables)
     }

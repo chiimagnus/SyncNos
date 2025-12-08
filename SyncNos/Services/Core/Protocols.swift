@@ -398,6 +398,22 @@ protocol SyncQueueStoreProtocol: AnyObject {
     var snapshot: [SyncQueueTask] { get }
     /// 任务流（主线程交付）
     var tasksPublisher: AnyPublisher<[SyncQueueTask], Never> { get }
+    
+    // MARK: - 入队 API（方案 2：单一真相源）
+    
+    /// 将任务入队，自动处理去重和冷却检查
+    /// - Parameters:
+    ///   - source: 数据源类型
+    ///   - items: 待入队的任务列表
+    /// - Returns: 实际被接受入队的任务 ID 集合
+    @MainActor
+    func enqueue(source: SyncSource, items: [SyncEnqueueItem]) -> Set<String>
+    
+    /// 检查任务是否正在处理（queued 或 running）
+    func isTaskActive(source: SyncSource, rawId: String) -> Bool
+    
+    /// 批量检查，返回正在处理的任务 ID
+    func activeTaskIds(source: SyncSource, rawIds: Set<String>) -> Set<String>
 }
 
 // MARK: - Dedao Auth & Data Protocols
