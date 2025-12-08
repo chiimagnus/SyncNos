@@ -24,7 +24,7 @@ struct HelpCommands: Commands {
             Button("Show Logs", systemImage: "doc.text.magnifyingglass") {
                 openWindow(id: "log")
             }
-            .keyboardShortcut("l", modifiers: .command)
+            .keyboardShortcut("l", modifiers: [.command, .shift])
         }
     }
 
