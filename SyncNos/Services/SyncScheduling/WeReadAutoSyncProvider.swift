@@ -51,23 +51,23 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
 
         // 检查 WeRead 是否已登录
         guard authService.isLoggedIn else {
-            logger.warning("AutoSync[WeRead] skipped: not logged in")
+            logger.warning("[SmartSync] WeRead skipped: not logged in")
             return
         }
 
         isSyncing = true
-        logger.info("AutoSync[WeRead]: start syncSmart for all books")
+        logger.info("[SmartSync] WeRead: starting check for all books")
 
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             defer {
                 self.isSyncing = false
-                self.logger.info("AutoSync[WeRead]: finished")
+                self.logger.info("[SmartSync] WeRead: finished")
             }
             do {
                 try await self.syncAllBooksSmart()
             } catch {
-                self.logger.error("AutoSync[WeRead] error: \(error.localizedDescription)")
+                self.logger.error("[SmartSync] WeRead error: \(error.localizedDescription)")
             }
         }
     }
@@ -77,7 +77,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         let notebooks = try await apiService.fetchNotebooks()
         
         if notebooks.isEmpty {
-            logger.info("AutoSync[WeRead]: no notebooks found")
+            logger.info("[SmartSync] WeRead: no notebooks found")
             return
         }
 
@@ -87,7 +87,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         }
 
         if books.isEmpty {
-            logger.info("AutoSync[WeRead]: no books with notes found")
+            logger.info("[SmartSync] WeRead: no books with notes found")
             return
         }
 
@@ -98,20 +98,20 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("AutoSync[WeRead][\(book.bookId)]: first sync (never synced before)")
+                logger.info("[SmartSync] WeRead[\(book.bookId)]: first sync (never synced)")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 2：书籍有变更（updatedAt > 上次同步时间）→ 需要同步
             if let updatedAt = book.updatedAt, updatedAt > lastSyncTime! {
-                logger.info("AutoSync[WeRead][\(book.bookId)]: changes detected (updated: \(updatedAt), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] WeRead[\(book.bookId)]: changes detected (updated: \(updatedAt), lastSync: \(lastSyncTime!))")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("AutoSync[WeRead] skipped for \(book.bookId): no changes since last sync")
+            logger.debug("[SmartSync] WeRead[\(book.bookId)]: skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -120,7 +120,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         }
 
         if eligibleBooks.isEmpty {
-            logger.info("AutoSync[WeRead]: no books need syncing (all up to date)")
+            logger.info("[SmartSync] WeRead: all books up to date, nothing to sync")
             return
         }
 
@@ -134,7 +134,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         }
         
         guard !acceptedIds.isEmpty else {
-            logger.info("AutoSync[WeRead]: no tasks accepted by SyncQueueStore")
+            logger.info("[SmartSync] WeRead: no tasks accepted (all in cooldown)")
             return
         }
         
@@ -172,7 +172,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                                 apiService: apiService
                             )
                             try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("AutoSync[WeRead] progress[\(book.bookId)]: \(progress)")
+                                logger.debug("[SmartSync] WeRead[\(book.bookId)] progress: \(progress)")
                             }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
@@ -180,7 +180,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("AutoSync[WeRead] failed for \(book.bookId): \(error.localizedDescription)")
+                            logger.error("[SmartSync] WeRead[\(book.bookId)] failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
