@@ -62,10 +62,19 @@ final class DataSourceSwitchViewModel: ObservableObject {
     }
     
     /// 更新启用的数据源列表（由外部显式传入当前启用的数据源集合）
-    /// - Parameter sources: 当前启用的数据源列表，顺序应与 `ContentSource.allCases` 保持一致
+    /// - Parameter sources: 当前启用的数据源列表，顺序按用户自定义顺序排列
     func updateEnabledDataSources(_ sources: [ContentSource]) {
+        // 记录当前活动的数据源，以便更新后保持不变
+        let currentSource = currentDataSource
+        
         enabledDataSources = sources
-        ensureValidActiveIndex()
+        
+        // 尝试恢复到之前活动的数据源
+        if let source = currentSource, let newIndex = sources.firstIndex(of: source) {
+            activeIndex = newIndex
+        } else {
+            ensureValidActiveIndex()
+        }
     }
     
     /// 触发触觉反馈
