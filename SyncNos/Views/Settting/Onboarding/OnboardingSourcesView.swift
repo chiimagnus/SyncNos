@@ -62,21 +62,21 @@ struct OnboardingSourcesView: View {
     @ViewBuilder
     private var sourceCards: some View {
         SourceCard(
-            icon: "book.fill",
+            icon: "books",
             color: .orange,
             title: "Apple Books",
             isOn: $viewModel.appleBooksEnabled
         )
         
         SourceCard(
-            icon: "bookmark.fill",
+            icon: "bookmark",
             color: .red,
             title: "GoodLinks",
             isOn: $viewModel.goodLinksEnabled
         )
         
         SourceCard(
-            icon: "text.book.closed.fill",
+            icon: "w.square",
             color: .blue,
             title: "WeRead",
             isOn: $viewModel.weReadEnabled
