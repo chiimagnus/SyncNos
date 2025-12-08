@@ -553,10 +553,18 @@ extension GoodLinksViewModel {
             NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
             return
         }
+        
+        // 过滤掉已经在同步中的任务，防止重复触发
+        let idsToSync = linkIds.subtracting(syncingLinkIds)
+        guard !idsToSync.isEmpty else {
+            logger.debug("[GoodLinks] All selected links are already syncing, skip")
+            return
+        }
+        
         let dbPath = service.resolveDatabasePath()
 
-        // 配置检查通过后，才发送入队通知（从 View 层移除到此）
-        let items: [[String: Any]] = linkIds.compactMap { id in
+        // 配置检查通过后，才发送入队通知（只入队未在同步中的）
+        let items: [[String: Any]] = idsToSync.compactMap { id in
             guard let link = displayLinks.first(where: { $0.id == id }) else { return nil }
             let title = (link.title?.isEmpty == false ? link.title! : link.url)
             return ["id": id, "title": title, "subtitle": link.author ?? ""]
@@ -586,7 +594,7 @@ extension GoodLinksViewModel {
                 await MainActor.run { self.logger.error("[GoodLinks] pre-resolve databaseId failed: \(error.localizedDescription)") }
             }
             await withTaskGroup(of: Void.self) { group in
-                for id in linkIds {
+                for id in idsToSync {
                     guard let link = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
