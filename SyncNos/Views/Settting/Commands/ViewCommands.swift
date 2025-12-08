@@ -168,13 +168,13 @@ struct ViewCommands: Commands {
 
             if isDataSourceEnabled(.dedao) {
                 if let key = shortcutKey(for: .dedao) {
-                    Button("Dedao", systemImage: "book.closed") {
+                    Button("Dedao", systemImage: "d.square") {
                         contentSourceRawValue = ContentSource.dedao.rawValue
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .dedao)
                 } else {
-                    Button("Dedao", systemImage: "book.closed") {
+                    Button("Dedao", systemImage: "d.square") {
                         contentSourceRawValue = ContentSource.dedao.rawValue
                     }
                     .disabled(currentSource == .dedao)
@@ -186,7 +186,7 @@ struct ViewCommands: Commands {
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
             if currentSource == .appleBooks {
                 // Apple Books 的排序和筛选菜单
-                Menu("Books", systemImage: "book.closed") {
+                Menu("Books") {
                     Section("Sort") {
                         ForEach(BookListSortKey.allCases, id: \.self) { k in
                             Button {
@@ -230,7 +230,7 @@ struct ViewCommands: Commands {
                 }
             } else if currentSource == .goodLinks {
                 // GoodLinks 的排序和筛选菜单
-                Menu("Articles", systemImage: "doc.text") {
+                Menu("Articles") {
                     Section("Sort") {
                         ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
                             Button {
@@ -274,7 +274,7 @@ struct ViewCommands: Commands {
                 }
             } else if currentSource == .weRead {
                 // WeRead 的排序和筛选菜单
-                Menu("Books", systemImage: "book.closed") {
+                Menu("Books") {
                     Section("Sort") {
                         // WeRead 只支持 title, highlightCount, lastSync
                         let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
@@ -307,7 +307,7 @@ struct ViewCommands: Commands {
                 }
             } else if currentSource == .dedao {
                 // Dedao 的排序菜单（与 WeRead 类似，只支持 title, highlightCount, lastSync）
-                Menu("Books", systemImage: "book.closed") {
+                Menu("Books") {
                     Section("Sort") {
                         let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
                         ForEach(availableKeys, id: \.self) { k in
@@ -340,7 +340,7 @@ struct ViewCommands: Commands {
             }
 
             // Highlight 菜单 - 全局高亮排序和筛选
-            Menu("Highlights", systemImage: "highlighter") {
+            Menu("Highlights") {
                 Section("Sort") {
                     ForEach(HighlightSortField.allCases, id: \.self) { k in
                         Button {

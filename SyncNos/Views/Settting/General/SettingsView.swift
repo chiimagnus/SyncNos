@@ -133,7 +133,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: DedaoSettingsView()) {
                         HStack {
-                            Label("Dedao", systemImage: "book.closed")
+                            Label("Dedao", systemImage: "d.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
