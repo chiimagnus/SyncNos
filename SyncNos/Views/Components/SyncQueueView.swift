@@ -198,14 +198,14 @@ struct SyncQueueView: View {
                 .foregroundStyle(Color("BrandGoodLinks"))
                 .background(Color("BrandGoodLinks").opacity(0.12), in: Capsule())
         case .weRead:
-            Label("WeRead", systemImage: "text.book.closed")
+            Label("WeRead", systemImage: "w.square")
                 .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .foregroundStyle(Color("BrandWeRead"))
                 .background(Color("BrandWeRead").opacity(0.14), in: Capsule())
         case .dedao:
-            Label("Dedao", systemImage: "books.vertical")
+            Label("Dedao", systemImage: "d.square")
                 .scaledFont(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

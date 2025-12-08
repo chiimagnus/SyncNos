@@ -153,13 +153,13 @@ struct ViewCommands: Commands {
 
             if isDataSourceEnabled(.weRead) {
                 if let key = shortcutKey(for: .weRead) {
-                    Button("WeRead", systemImage: "text.book.closed") {
+                    Button("WeRead", systemImage: "w.square") {
                         contentSourceRawValue = ContentSource.weRead.rawValue
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .weRead)
                 } else {
-                    Button("WeRead", systemImage: "text.book.closed") {
+                    Button("WeRead", systemImage: "w.square") {
                         contentSourceRawValue = ContentSource.weRead.rawValue
                     }
                     .disabled(currentSource == .weRead)

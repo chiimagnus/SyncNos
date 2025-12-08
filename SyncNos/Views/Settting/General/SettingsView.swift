@@ -122,7 +122,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: WeReadSettingsView()) {
                         HStack {
-                            Label("WeRead", systemImage: "text.book.closed")
+                            Label("WeRead", systemImage: "w.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")

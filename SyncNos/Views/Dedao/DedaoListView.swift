@@ -48,7 +48,7 @@ struct DedaoListView: View {
                 }
             } else if viewModel.books.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "text.book.closed")
+                    Image(systemName: "d.square")
                         .foregroundColor(.secondary)
                         .scaledFont(.title)
                     Text("No books found")
