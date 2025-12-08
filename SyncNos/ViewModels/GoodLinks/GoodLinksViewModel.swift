@@ -355,6 +355,12 @@ extension GoodLinksViewModel {
             return
         }
         
+        // 立即将任务标记为同步中，防止快捷键连续触发时重复入队
+        // 注意：这必须在 Task 启动之前同步执行
+        for id in idsToSync {
+            syncingLinkIds.insert(id)
+        }
+        
         let dbPath = service.resolveDatabasePath()
         
         // 入队通知
@@ -394,8 +400,8 @@ extension GoodLinksViewModel {
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
+                            // 发送开始通知（syncingLinkIds 已在外部同步设置）
                             await MainActor.run {
-                                _ = self.syncingLinkIds.insert(id)
                                 NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
                             }
                             do {
