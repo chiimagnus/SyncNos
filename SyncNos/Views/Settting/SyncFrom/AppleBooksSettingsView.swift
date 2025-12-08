@@ -45,12 +45,12 @@ struct AppleBooksSettingsView: View {
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
-                    Text("Auto Sync (24 hours)")
+                    Text("Smart Auto Sync")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Enable automatic sync for Apple Books")
+                .help("Sync every 5 minutes, only changed content")
                 .onChange(of: viewModel.autoSync) { _, _ in
                     viewModel.save()
                 }
