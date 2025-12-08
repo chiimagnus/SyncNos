@@ -48,6 +48,42 @@ enum ContentSource: String, Codable, CaseIterable {
     var enabledKey: String {
         "datasource.\(rawValue).enabled"
     }
+    
+    // MARK: - Custom Order
+    
+    /// UserDefaults 键：数据源自定义顺序
+    static let orderKey = "datasource.customOrder"
+    
+    /// 数据源顺序变化通知
+    static let orderChangedNotification = Notification.Name("ContentSourceOrderChanged")
+    
+    /// 获取用户自定义的数据源顺序（如果没有自定义，返回默认顺序）
+    static var customOrder: [ContentSource] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: orderKey),
+                  let rawValues = try? JSONDecoder().decode([String].self, from: data) else {
+                return ContentSource.allCases.map { $0 }
+            }
+            // 从存储的 rawValue 数组恢复 ContentSource 数组
+            let stored = rawValues.compactMap { ContentSource(rawValue: $0) }
+            // 确保所有数据源都包含在内（处理新增数据源的情况）
+            let missing = ContentSource.allCases.filter { !stored.contains($0) }
+            return stored + missing
+        }
+        set {
+            let rawValues = newValue.map { $0.rawValue }
+            if let data = try? JSONEncoder().encode(rawValues) {
+                UserDefaults.standard.set(data, forKey: orderKey)
+                // 发送通知，通知其他组件顺序已变化
+                NotificationCenter.default.post(name: orderChangedNotification, object: nil)
+            }
+        }
+    }
+    
+    /// 按自定义顺序过滤已启用的数据源
+    static func orderedEnabledSources(isEnabled: (ContentSource) -> Bool) -> [ContentSource] {
+        customOrder.filter { isEnabled($0) }
+    }
 }
 
 struct Highlight: Codable {
