@@ -22,7 +22,7 @@ enum ContentSource: String, Codable, CaseIterable {
     /// 数据源图标 (SF Symbol)
     var icon: String {
         switch self {
-        case .appleBooks: return "books"
+        case .appleBooks: return "book"
         case .goodLinks: return "bookmark"
         case .weRead: return "w.square"
         case .dedao: return "d.square"
