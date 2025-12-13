@@ -24,6 +24,7 @@
 		D834FF742EC23394008EE9FB /* Exceptions for "Resource" folder in "SyncNos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				.env,
 				architecture.svg,
 				ChangeLog.cn.md,
 				ChangeLog.md,
