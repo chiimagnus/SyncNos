@@ -1,0 +1,122 @@
+[
+    {
+        "version": "0.9.5",
+        "new": [
+            {
+                "icon": "textformat.size",
+                "title": "Dynamic Font",
+                "subtitle": "Global Dynamic Type Support",
+                "body": "FontScaleManager, ScaledText, AdaptiveStack for accessibility-friendly text scaling."
+            },
+            {
+                "icon": "list.bullet.rectangle",
+                "title": "Sync Queue",
+                "subtitle": "Enhanced Task Management",
+                "body": "SelectionPlaceholderView collapse control, SyncQueueView failed task interaction improvements."
+            },
+            {
+                "icon": "bolt.fill",
+                "title": "Performance",
+                "subtitle": "Cache & Concurrency",
+                "body": "Dedao/WeRead cache migrated to background with Sendable support for improved type safety."
+            }
+        ]
+    },
+    {
+        "version": "0.8.10",
+        "new": [
+            {
+                "icon": "speedometer",
+                "title": "Rate Limiting",
+                "subtitle": "API Request Control",
+                "body": "Implemented API rate limiting and retry mechanism for WeRead and Dedao."
+            }
+        ]
+    },
+    {
+        "version": "0.8.8.1",
+        "new": [
+            {
+                "icon": "books.vertical",
+                "title": "Dedao Integration",
+                "subtitle": "iGet Ebook Support",
+                "body": "Complete Dedao ebook support: WebView login, token bucket rate limiting, local cache."
+            },
+            {
+                "icon": "magnifyingglass",
+                "title": "Log Search",
+                "subtitle": "Enhanced Debugging",
+                "body": "LogWindow now supports search in messages, filenames, and function names."
+            }
+        ]
+    },
+    {
+        "version": "0.8.0",
+        "new": [
+            {
+                "icon": "gift.fill",
+                "title": "30-Day Trial",
+                "subtitle": "Try Before You Buy",
+                "body": "Enjoy full access to all features for 30 days before deciding to purchase."
+            },
+            {
+                "icon": "creditcard",
+                "title": "IAP System",
+                "subtitle": "In-App Purchases",
+                "body": "Annual subscription with subscription status polling and app lifecycle refresh."
+            }
+        ]
+    },
+    {
+        "version": "0.7.0",
+        "new": [
+            {
+                "icon": "book.pages",
+                "title": "WeRead",
+                "subtitle": "WeChat Reading Integration",
+                "body": "Complete WeRead support with authentication, data sync, and highlight colors."
+            },
+            {
+                "icon": "arrow.triangle.2.circlepath",
+                "title": "Auto Sync",
+                "subtitle": "Background Synchronization",
+                "body": "WeRead added to auto sync service providers for seamless updates."
+            }
+        ]
+    },
+    {
+        "version": "0.6.0",
+        "new": [
+            {
+                "icon": "power",
+                "title": "Open at Login",
+                "subtitle": "Launch on Startup",
+                "body": "SyncNos can now automatically launch when you log in to your Mac."
+            }
+        ]
+    },
+    {
+        "version": "0.5.0",
+        "new": [
+            {
+                "icon": "link",
+                "title": "GoodLinks",
+                "subtitle": "Article Highlights",
+                "body": "Sync your GoodLinks articles and highlights to Notion databases."
+            },
+            {
+                "icon": "book.closed",
+                "title": "Apple Books",
+                "subtitle": "Reading Notes Sync",
+                "body": "Sync highlights and notes from Apple Books to Notion with color support."
+            },
+            {
+                "icon": "square.grid.2x2",
+                "title": "Notion Integration",
+                "subtitle": "OAuth Authentication",
+                "body": "Secure Notion connection with OAuth for seamless database access."
+            }
+        ]
+    }
+]
+
