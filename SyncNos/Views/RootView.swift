@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// 根视图：管理 Onboarding、PayWall 和 MainListView 的切换
+/// 根视图：管理 Onboarding、PayWall、WhatsNew 和 MainListView 的切换
 /// 确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用（如文件夹授权弹窗）
 struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var iapPresentationMode: IAPPresentationMode? = nil
+    @State private var showWhatsNew: Bool = false
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
     private var iapService: IAPServiceProtocol {
@@ -27,14 +28,23 @@ struct RootView: View {
                     }
                 )
                 .transition(.opacity)
+            } else if showWhatsNew {
+                // Step 3: What's New（版本更新时显示）
+                WhatsNewView(onFinish: {
+                    withAnimation(.spring()) {
+                        showWhatsNew = false
+                    }
+                })
+                .transition(.opacity)
             } else {
-                // Step 3: MainListView（正常使用）
+                // Step 4: MainListView（正常使用）
                 MainListView()
                     .transition(.opacity)
             }
         }
         .animation(.spring(), value: hasCompletedOnboarding)
         .animation(.spring(), value: iapPresentationMode != nil)
+        .animation(.spring(), value: showWhatsNew)
         .onAppear {
             // 只有在完成引导后才检查 PayWall 状态
             if hasCompletedOnboarding {
@@ -68,6 +78,7 @@ struct RootView: View {
         if iapService.hasPurchased {
             logger.debug("User has purchased, hiding paywall")
             iapPresentationMode = nil
+            checkWhatsNew()
             return
         }
         
@@ -99,9 +110,23 @@ struct RootView: View {
             return
         }
         
-        // 其他情况不显示付费墙
+        // 其他情况不显示付费墙，检查 What's New
         logger.debug("No paywall needed, hiding")
         iapPresentationMode = nil
+        checkWhatsNew()
+    }
+    
+    // MARK: - What's New Check
+    
+    private func checkWhatsNew() {
+        // 只在 PayWall 不显示时检查 What's New
+        guard iapPresentationMode == nil else { return }
+        
+        if WhatsNewViewModel.shouldShowWhatsNew() {
+            let logger = DIContainer.shared.loggerService
+            logger.info("[WhatsNew] New version detected, showing What's New")
+            showWhatsNew = true
+        }
     }
 }
 
