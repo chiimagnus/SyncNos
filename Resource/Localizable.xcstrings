@@ -21969,7 +21969,7 @@
             "value" : "Intelligente automatische Synchronisierung"
           }
         },
-        "es" : {
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sincronización automática inteligente"
@@ -23367,7 +23367,7 @@
             "value" : "Alle 5 Minuten synchronisieren, nur geänderte Inhalte"
           }
         },
-        "es" : {
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sincronizar cada 5 minutos, solo contenido modificado"
