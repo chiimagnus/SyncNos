@@ -292,32 +292,52 @@ struct MainListView: View {
         let logger = DIContainer.shared.loggerService
         
         Task {
-            // 根据当前数据源获取选中的 ID 和 sourceKey
+            // 根据当前数据源获取选中的 ID、书名和 sourceKey
             let sourceKey: String
-            let selectedIds: [String]
+            let selectedItems: [(id: String, title: String)]
             
             switch contentSource {
             case .appleBooks:
                 sourceKey = "appleBooks"
-                selectedIds = Array(selectedBookIds)
+                selectedItems = selectedBookIds.compactMap { id in
+                    if let book = appleBooksVM.books.first(where: { $0.bookId == id }) {
+                        return (id: id, title: book.bookTitle)
+                    }
+                    return nil
+                }
             case .goodLinks:
                 sourceKey = "goodLinks"
-                selectedIds = Array(selectedLinkIds)
+                selectedItems = selectedLinkIds.compactMap { id in
+                    if let link = goodLinksVM.links.first(where: { $0.id == id }) {
+                        return (id: id, title: link.title)
+                    }
+                    return nil
+                }
             case .weRead:
                 sourceKey = "weRead"
-                selectedIds = Array(selectedWeReadBookIds)
+                selectedItems = selectedWeReadBookIds.compactMap { id in
+                    if let book = weReadVM.books.first(where: { $0.bookId == id }) {
+                        return (id: id, title: book.title)
+                    }
+                    return nil
+                }
             case .dedao:
                 sourceKey = "dedao"
-                selectedIds = Array(selectedDedaoBookIds)
+                selectedItems = selectedDedaoBookIds.compactMap { id in
+                    if let book = dedaoVM.books.first(where: { $0.bookId == id }) {
+                        return (id: id, title: book.title)
+                    }
+                    return nil
+                }
             }
             
             // 清除每个选中项的本地记录
-            for bookId in selectedIds {
+            for item in selectedItems {
                 do {
-                    try await syncedHighlightStore.clearRecords(sourceKey: sourceKey, bookId: bookId)
-                    logger.info("[FullResync] Cleared local records for \(sourceKey):\(bookId)")
+                    try await syncedHighlightStore.clearRecords(sourceKey: sourceKey, bookId: item.id)
+                    logger.info("[FullResync] Cleared local records for \"\(item.title)\"")
                 } catch {
-                    logger.error("[FullResync] Failed to clear records for \(sourceKey):\(bookId): \(error.localizedDescription)")
+                    logger.error("[FullResync] Failed to clear records for \"\(item.title)\": \(error.localizedDescription)")
                 }
             }
             
