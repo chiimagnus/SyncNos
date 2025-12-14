@@ -29,6 +29,7 @@
 				ChangeLog.cn.md,
 				ChangeLog.md,
 				image.png,
+				SyncNos.storekit,
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
