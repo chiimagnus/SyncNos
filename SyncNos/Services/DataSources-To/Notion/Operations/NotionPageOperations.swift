@@ -54,6 +54,23 @@ class NotionPageOperations {
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
         _ = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
     }
+    
+    /// 追加 blocks 并返回新创建的 block IDs
+    /// Notion API 的响应会包含新创建的 block 对象列表
+    func appendBlocksAndGetIds(pageId: String, children: [[String: Any]]) async throws -> [String] {
+        let data = try await requestHelper.performRequest(path: "blocks/\(pageId)/children", method: "PATCH", body: ["children": children])
+        
+        // 解析响应获取 block IDs
+        struct AppendBlocksResponse: Decodable {
+            struct Block: Decodable {
+                let id: String
+            }
+            let results: [Block]
+        }
+        
+        let response = try JSONDecoder().decode(AppendBlocksResponse.self, from: data)
+        return response.results.map { $0.id }
+    }
 
     /// Append children in batches. Simpler and deterministic (no retry/trim fallback).
     func appendChildren(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize) async throws {
@@ -64,6 +81,20 @@ class NotionPageOperations {
             try await appendBlocks(pageId: pageId, children: slice)
             index = end
         }
+    }
+    
+    /// 追加 children 并返回所有新创建的 block IDs（分批处理）
+    func appendChildrenAndGetIds(pageId: String, children: [[String: Any]], batchSize: Int = NotionSyncConfig.defaultAppendBatchSize) async throws -> [String] {
+        var allBlockIds: [String] = []
+        var index = 0
+        while index < children.count {
+            let end = min(index + batchSize, children.count)
+            let slice = Array(children[index..<end])
+            let blockIds = try await appendBlocksAndGetIds(pageId: pageId, children: slice)
+            allBlockIds.append(contentsOf: blockIds)
+            index = end
+        }
+        return allBlockIds
     }
 
     func replacePageChildren(pageId: String, with children: [[String: Any]]) async throws {

@@ -53,6 +53,10 @@ struct SyncNosApp: App {
         // 初始化 WeRead 缓存服务（预热 SwiftData ModelContainer）
         _ = DIContainer.shared.weReadCacheService
         DIContainer.shared.loggerService.info("WeRead cache service initialized")
+        
+        // 初始化已同步高亮记录存储（用于避免遍历 Notion children）
+        _ = DIContainer.shared.syncedHighlightStore
+        DIContainer.shared.loggerService.info("SyncedHighlightStore initialized")
     }
 
     var body: some Scene {

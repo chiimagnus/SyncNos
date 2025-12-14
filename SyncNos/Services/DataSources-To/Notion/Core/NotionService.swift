@@ -169,6 +169,14 @@ final class NotionService: NotionServiceProtocol {
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws {
         try await pageOps.appendBlocks(pageId: pageId, children: children)
     }
+    
+    func appendBlocksAndGetIds(pageId: String, children: [[String: Any]]) async throws -> [String] {
+        return try await pageOps.appendBlocksAndGetIds(pageId: pageId, children: children)
+    }
+    
+    func appendChildrenAndGetIds(pageId: String, children: [[String: Any]], batchSize: Int) async throws -> [String] {
+        return try await pageOps.appendChildrenAndGetIds(pageId: pageId, children: children, batchSize: batchSize)
+    }
 
     func updatePageHighlightCount(pageId: String, count: Int) async throws {
         try await pageOps.updatePageHighlightCount(pageId: pageId, count: count)

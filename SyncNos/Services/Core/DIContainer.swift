@@ -33,6 +33,8 @@ class DIContainer {
     // Sync Engine
     private var _notionSyncEngine: NotionSyncEngine?
     private var _goodLinksSyncService: GoodLinksSyncServiceProtocol?
+    // Synced Highlight Store
+    private var _syncedHighlightStore: SyncedHighlightStoreProtocol?
     // Environment
     private var _environmentDetector: EnvironmentDetectorProtocol?
 
@@ -212,6 +214,22 @@ class DIContainer {
         return _dedaoCacheService!
     }
     
+    // MARK: - Synced Highlight Store
+    
+    var syncedHighlightStore: SyncedHighlightStoreProtocol {
+        if _syncedHighlightStore == nil {
+            do {
+                let container = try SyncedHighlightModelContainerFactory.createContainer()
+                _syncedHighlightStore = SyncedHighlightStore(modelContainer: container)
+                loggerService.info("[DIContainer] SyncedHighlightStore initialized with ModelContainer")
+            } catch {
+                loggerService.error("[DIContainer] Failed to create SyncedHighlight ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create SyncedHighlight ModelContainer: \(error.localizedDescription)")
+            }
+        }
+        return _syncedHighlightStore!
+    }
+    
     // MARK: - Sync Engine
     
     var notionSyncEngine: NotionSyncEngine {
@@ -220,7 +238,8 @@ class DIContainer {
                 notionService: notionService,
                 notionConfig: notionConfigStore,
                 logger: loggerService,
-                timestampStore: syncTimestampStore
+                timestampStore: syncTimestampStore,
+                syncedHighlightStore: syncedHighlightStore
             )
         }
         return _notionSyncEngine!
@@ -327,6 +346,10 @@ class DIContainer {
     
     func register(goodLinksSyncService: GoodLinksSyncServiceProtocol) {
         self._goodLinksSyncService = goodLinksSyncService
+    }
+    
+    func register(syncedHighlightStore: SyncedHighlightStoreProtocol) {
+        self._syncedHighlightStore = syncedHighlightStore
     }
 
     func register(environmentDetector: EnvironmentDetectorProtocol) {
