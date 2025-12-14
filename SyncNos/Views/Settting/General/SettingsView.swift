@@ -65,19 +65,6 @@ struct SettingsView: View {
                         }
                     }
                     .help("Manage Apple sign-in and account info")
-
-                    // 同步记录调试视图
-                    NavigationLink(destination: SyncedHighlightDebugView()) {
-                        HStack {
-                            Label("Synced Records", systemImage: "externaldrive.badge.checkmark")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
-                        }
-                    }
-                    .help("View local UUID → Notion Block ID mappings")
 #endif
 
                     NavigationLink(destination: IAPView()) {
