@@ -66,6 +66,14 @@ class NotionQueryOperations {
 
     /// 收集 UUID -> (blockId, token) 映射，其中 token 来自父块 rich_text 第二行的 `modified:` 值
     func collectExistingUUIDMapWithToken(fromPageId pageId: String) async throws -> [String: (blockId: String, token: String?)] {
+        return try await collectExistingUUIDMapWithToken(fromPageId: pageId) { _ in }
+    }
+    
+    /// 收集 UUID -> (blockId, token) 映射，带进度回调
+    /// - Parameters:
+    ///   - pageId: Notion 页面 ID
+    ///   - progress: 每批获取后回调，参数为当前已收集的数量
+    func collectExistingUUIDMapWithToken(fromPageId pageId: String, progress: @escaping (Int) -> Void) async throws -> [String: (blockId: String, token: String?)] {
         var collected: [String: (blockId: String, token: String?)] = [:]
         var startCursor: String? = nil
         repeat {
@@ -108,6 +116,8 @@ class NotionQueryOperations {
                 collected[uuid] = (block.id, token)
             }
             startCursor = decoded.has_more ? decoded.next_cursor : nil
+            // 每批获取后报告进度
+            progress(collected.count)
         } while startCursor != nil
         return collected
     }

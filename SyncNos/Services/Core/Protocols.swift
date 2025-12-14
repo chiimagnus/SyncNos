@@ -157,6 +157,7 @@ protocol NotionServiceProtocol: AnyObject {
     func ensureBookPageInDatabase(databaseId: String, bookTitle: String, author: String, assetId: String, urlString: String?, header: String?) async throws -> (id: String, created: Bool)
     func collectExistingUUIDs(fromPageId pageId: String) async throws -> Set<String>
     func collectExistingUUIDMapWithToken(fromPageId pageId: String) async throws -> [String: (blockId: String, token: String?)]
+    func collectExistingUUIDMapWithToken(fromPageId pageId: String, progress: @escaping (Int) -> Void) async throws -> [String: (blockId: String, token: String?)]
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
     func updatePageHighlightCount(pageId: String, count: Int) async throws
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws

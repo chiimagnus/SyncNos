@@ -157,6 +157,10 @@ final class NotionService: NotionServiceProtocol {
     func collectExistingUUIDMapWithToken(fromPageId pageId: String) async throws -> [String: (blockId: String, token: String?)] {
         return try await queryOps.collectExistingUUIDMapWithToken(fromPageId: pageId)
     }
+    
+    func collectExistingUUIDMapWithToken(fromPageId pageId: String, progress: @escaping (Int) -> Void) async throws -> [String: (blockId: String, token: String?)] {
+        return try await queryOps.collectExistingUUIDMapWithToken(fromPageId: pageId, progress: progress)
+    }
 
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws {
         try await highlightOps.appendHighlightBullets(pageId: pageId, bookId: bookId, highlights: highlights)
