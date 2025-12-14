@@ -472,7 +472,10 @@ final class NotionSyncEngine {
     ) async throws {
         // 收集现有 UUID 映射（这一步可能很慢，特别是大量笔记时）
         progress(NSLocalizedString("Collecting existing highlights from Notion...", comment: ""))
-        let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId)
+        let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId) { fetchedCount in
+            // 每批获取后更新进度（直接调用，不需要 MainActor）
+            progress(String(format: NSLocalizedString("Collecting from Notion... %lld found", comment: ""), fetchedCount))
+        }
         let lastSync = incremental ? timestampStore.getLastSyncTime(for: item.itemId) : nil
         
         progress(String(format: NSLocalizedString("Found %lld existing highlights, comparing...", comment: ""), existingMapWithToken.count))
