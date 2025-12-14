@@ -247,6 +247,10 @@ struct MainListView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
                 syncSelectedForCurrentSource()
             }
+            // 监听完整重新同步通知
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("FullResyncSelectedRequested")).receive(on: DispatchQueue.main)) { _ in
+                fullResyncSelectedForCurrentSource()
+            }
             // 监听刷新请求通知
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
                 refreshCurrentSource()
@@ -279,6 +283,48 @@ struct MainListView: View {
             weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .dedao:
             dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+        }
+    }
+    
+    /// 完整重新同步：清除本地 UUID 记录，然后触发同步
+    private func fullResyncSelectedForCurrentSource() {
+        let syncedHighlightStore = DIContainer.shared.syncedHighlightStore
+        let logger = DIContainer.shared.loggerService
+        
+        Task {
+            // 根据当前数据源获取选中的 ID 和 sourceKey
+            let sourceKey: String
+            let selectedIds: [String]
+            
+            switch contentSource {
+            case .appleBooks:
+                sourceKey = "appleBooks"
+                selectedIds = Array(selectedBookIds)
+            case .goodLinks:
+                sourceKey = "goodLinks"
+                selectedIds = Array(selectedLinkIds)
+            case .weRead:
+                sourceKey = "weRead"
+                selectedIds = Array(selectedWeReadBookIds)
+            case .dedao:
+                sourceKey = "dedao"
+                selectedIds = Array(selectedDedaoBookIds)
+            }
+            
+            // 清除每个选中项的本地记录
+            for bookId in selectedIds {
+                do {
+                    try await syncedHighlightStore.clearRecords(sourceKey: sourceKey, bookId: bookId)
+                    logger.info("[FullResync] Cleared local records for \(sourceKey):\(bookId)")
+                } catch {
+                    logger.error("[FullResync] Failed to clear records for \(sourceKey):\(bookId): \(error.localizedDescription)")
+                }
+            }
+            
+            // 触发同步（现在会从 Notion 重新获取）
+            await MainActor.run {
+                syncSelectedForCurrentSource()
+            }
         }
     }
     

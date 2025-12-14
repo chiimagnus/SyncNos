@@ -14,6 +14,12 @@ struct FileCommands: Commands {
                 NotificationCenter.default.post(name: Notification.Name("SyncSelectedToNotionRequested"), object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .option])
+            
+            Divider()
+            
+            Button("Full Resync Selected", systemImage: "arrow.counterclockwise.circle") {
+                NotificationCenter.default.post(name: Notification.Name("FullResyncSelectedRequested"), object: nil)
+            }
         }
     }
 }
