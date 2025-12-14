@@ -10,6 +10,7 @@ final class NotionSyncEngine {
     private let notionConfig: NotionConfigStoreProtocol
     private let logger: LoggerServiceProtocol
     private let timestampStore: SyncTimestampStoreProtocol
+    private let syncedHighlightStore: SyncedHighlightStoreProtocol
     private let helperMethods: NotionHelperMethods
     
     // MARK: - Initialization
@@ -18,12 +19,14 @@ final class NotionSyncEngine {
         notionService: NotionServiceProtocol = DIContainer.shared.notionService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-        timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
+        timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
+        syncedHighlightStore: SyncedHighlightStoreProtocol = DIContainer.shared.syncedHighlightStore
     ) {
         self.notionService = notionService
         self.notionConfig = notionConfig
         self.logger = logger
         self.timestampStore = timestampStore
+        self.syncedHighlightStore = syncedHighlightStore
         self.helperMethods = NotionHelperMethods()
     }
     
@@ -408,6 +411,7 @@ final class NotionSyncEngine {
     }
     
     /// 追加所有高亮（新页面）
+    /// 同时保存已同步的 UUID 和 block IDs 到本地记录
     private func appendAllHighlights(
         pageId: String,
         highlights: [UnifiedHighlight],
@@ -418,11 +422,13 @@ final class NotionSyncEngine {
         let total = highlights.count
         progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), total))
         
-        var children: [[String: Any]] = []
+        var headerChildren: [[String: Any]] = []
+        var highlightChildren: [[String: Any]] = []
+        var highlightMeta: [(uuid: String, contentHash: String)] = []
         
         // GoodLinks 特殊处理：添加 Highlights 标题
         if item.source == .goodLinks {
-            children.append([
+            headerChildren.append([
                 "object": "block",
                 "heading_2": [
                     "rich_text": [["text": ["content": "Highlights"]]]
@@ -430,7 +436,7 @@ final class NotionSyncEngine {
             ])
         }
         
-        // 构建高亮块
+        // 构建高亮块并记录元数据
         for h in highlights {
             let highlightRow = h.toHighlightRow(assetId: item.itemId)
             let block = helperMethods.buildBulletedListItemBlock(
@@ -439,19 +445,36 @@ final class NotionSyncEngine {
                 maxTextLength: NotionSyncConfig.maxTextLengthPrimary,
                 source: source.sourceKey
             )
-            children.append(block)
+            highlightChildren.append(block)
+            
+            // 记录 uuid 和 contentHash
+            let contentHash = helperMethods.computeModifiedToken(for: highlightRow, source: source.sourceKey)
+            highlightMeta.append((uuid: h.uuid, contentHash: contentHash))
         }
         
-        // 逐批追加并报告进度
+        // 先追加 header（如果有）
+        if !headerChildren.isEmpty {
+            try await notionService.appendBlocks(pageId: pageId, children: headerChildren)
+        }
+        
+        // 逐批追加高亮并获取 block IDs
         let batchSize = NotionSyncConfig.defaultAppendBatchSize
         var appended = 0
         var index = 0
+        var newRecords: [(uuid: String, notionBlockId: String, contentHash: String)] = []
         
-        while index < children.count {
-            let end = min(index + batchSize, children.count)
-            let slice = Array(children[index..<end])
+        while index < highlightChildren.count {
+            let end = min(index + batchSize, highlightChildren.count)
+            let slice = Array(highlightChildren[index..<end])
+            let metaSlice = Array(highlightMeta[index..<end])
             
-            try await notionService.appendBlocks(pageId: pageId, children: slice)
+            // 追加并获取 block IDs
+            let blockIds = try await notionService.appendBlocksAndGetIds(pageId: pageId, children: slice)
+            
+            // 记录 UUID -> blockId 映射
+            for (meta, blockId) in zip(metaSlice, blockIds) {
+                newRecords.append((uuid: meta.uuid, notionBlockId: blockId, contentHash: meta.contentHash))
+            }
             
             appended += slice.count
             let percent = Int(Double(appended) / Double(total) * 100)
@@ -459,9 +482,21 @@ final class NotionSyncEngine {
             
             index = end
         }
+        
+        // 保存到本地记录
+        if !newRecords.isEmpty {
+            do {
+                try await syncedHighlightStore.saveRecords(newRecords, sourceKey: source.sourceKey, bookId: item.itemId)
+                logger.debug("[SyncEngine] Saved \(newRecords.count) synced highlight records for \(source.sourceKey):\(item.itemId)")
+            } catch {
+                // 保存失败不应该阻止同步完成，只记录警告
+                logger.warning("[SyncEngine] Failed to save synced highlight records: \(error.localizedDescription)")
+            }
+        }
     }
     
     /// 同步已存在的页面（增量更新）
+    /// 优先使用本地记录避免遍历 Notion children
     private func syncExistingPage(
         pageId: String,
         highlights: [UnifiedHighlight],
@@ -470,35 +505,57 @@ final class NotionSyncEngine {
         incremental: Bool,
         progress: @escaping (String) -> Void
     ) async throws {
-        // 收集现有 UUID 映射（这一步可能很慢，特别是大量笔记时）
-        progress(NSLocalizedString("Collecting existing highlights from Notion...", comment: ""))
-        let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId) { fetchedCount in
-            // 每批获取后更新进度（直接调用，不需要 MainActor）
-            progress(String(format: NSLocalizedString("Collecting from Notion... %lld found", comment: ""), fetchedCount))
+        // 尝试从本地获取已同步记录
+        progress(NSLocalizedString("Loading local sync records...", comment: ""))
+        let localRecords = try await syncedHighlightStore.getRecords(sourceKey: source.sourceKey, bookId: item.itemId)
+        
+        // 判断是否可以使用本地记录
+        let useLocalRecords = !localRecords.isEmpty
+        
+        var existingMap: [String: (blockId: String, contentHash: String?)] = [:]
+        
+        if useLocalRecords {
+            // 使用本地记录（快速路径）
+            progress(String(format: NSLocalizedString("Using %lld local sync records...", comment: ""), localRecords.count))
+            for record in localRecords {
+                existingMap[record.uuid] = (blockId: record.notionBlockId, contentHash: record.contentHash)
+            }
+            logger.debug("[SyncEngine] Using local records: \(localRecords.count) for \(source.sourceKey):\(item.itemId)")
+        } else {
+            // 回退到 Notion 查询（首次同步或本地记录为空）
+            progress(NSLocalizedString("Collecting existing highlights from Notion...", comment: ""))
+            let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId) { fetchedCount in
+                progress(String(format: NSLocalizedString("Collecting from Notion... %lld found", comment: ""), fetchedCount))
+            }
+            for (uuid, value) in existingMapWithToken {
+                existingMap[uuid] = (blockId: value.blockId, contentHash: value.token)
+            }
+            logger.debug("[SyncEngine] Collected from Notion: \(existingMapWithToken.count) for \(source.sourceKey):\(item.itemId)")
         }
+        
         let lastSync = incremental ? timestampStore.getLastSyncTime(for: item.itemId) : nil
         
-        progress(String(format: NSLocalizedString("Found %lld existing highlights, comparing...", comment: ""), existingMapWithToken.count))
+        progress(String(format: NSLocalizedString("Found %lld existing highlights, comparing...", comment: ""), existingMap.count))
         
-        var toUpdate: [(String, HighlightRow)] = []
-        var toAppend: [HighlightRow] = []
+        var toUpdate: [(blockId: String, highlight: HighlightRow, uuid: String, newContentHash: String)] = []
+        var toAppend: [(highlight: HighlightRow, uuid: String, contentHash: String)] = []
         
         for h in highlights {
             let highlightRow = h.toHighlightRow(assetId: item.itemId)
+            let localContentHash = helperMethods.computeModifiedToken(for: highlightRow, source: source.sourceKey)
             
-            if let existing = existingMapWithToken[h.uuid] {
+            if let existing = existingMap[h.uuid] {
                 // 检查是否需要更新
                 if let last = lastSync, let modified = h.dateModified, modified < last {
                     continue
                 }
-                let localToken = helperMethods.computeModifiedToken(for: highlightRow, source: source.sourceKey)
-                if let remoteToken = existing.token, remoteToken == localToken {
+                if let remoteHash = existing.contentHash, remoteHash == localContentHash {
                     // 相同，跳过
                     continue
                 }
-                toUpdate.append((existing.blockId, highlightRow))
+                toUpdate.append((blockId: existing.blockId, highlight: highlightRow, uuid: h.uuid, newContentHash: localContentHash))
             } else {
-                toAppend.append(highlightRow)
+                toAppend.append((highlight: highlightRow, uuid: h.uuid, contentHash: localContentHash))
             }
         }
         
@@ -509,13 +566,28 @@ final class NotionSyncEngine {
         // 执行更新
         if !toUpdate.isEmpty {
             progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
-            for (blockId, h) in toUpdate {
+            for updateItem in toUpdate {
                 try await notionService.updateBlockContent(
-                    blockId: blockId,
-                    highlight: h,
+                    blockId: updateItem.blockId,
+                    highlight: updateItem.highlight,
                     bookId: item.itemId,
                     source: source.sourceKey
                 )
+                
+                // 更新本地记录的 contentHash
+                if useLocalRecords {
+                    do {
+                        try await syncedHighlightStore.updateContentHash(
+                            sourceKey: source.sourceKey,
+                            bookId: item.itemId,
+                            uuid: updateItem.uuid,
+                            newContentHash: updateItem.newContentHash
+                        )
+                    } catch {
+                        logger.warning("[SyncEngine] Failed to update local record: \(error.localizedDescription)")
+                    }
+                }
+                
                 completed += 1
                 if completed % 10 == 0 || completed == toUpdate.count {
                     let percent = Int(Double(completed) / Double(totalOperations) * 100)
@@ -528,9 +600,9 @@ final class NotionSyncEngine {
         if !toAppend.isEmpty {
             progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
             var children: [[String: Any]] = []
-            for h in toAppend {
+            for appendItem in toAppend {
                 let block = helperMethods.buildBulletedListItemBlock(
-                    for: h,
+                    for: appendItem.highlight,
                     bookId: item.itemId,
                     maxTextLength: NotionSyncConfig.maxTextLengthPrimary,
                     source: source.sourceKey
@@ -538,20 +610,54 @@ final class NotionSyncEngine {
                 children.append(block)
             }
             
-            // 逐批追加并报告进度
+            // 逐批追加并获取 block IDs
             let batchSize = NotionSyncConfig.defaultAppendBatchSize
             var index = 0
+            var newRecords: [(uuid: String, notionBlockId: String, contentHash: String)] = []
+            
             while index < children.count {
                 let end = min(index + batchSize, children.count)
                 let slice = Array(children[index..<end])
+                let metaSlice = Array(toAppend[index..<end])
                 
-                try await notionService.appendBlocks(pageId: pageId, children: slice)
+                // 追加并获取 block IDs
+                let blockIds = try await notionService.appendBlocksAndGetIds(pageId: pageId, children: slice)
+                
+                // 记录 UUID -> blockId 映射
+                for (meta, blockId) in zip(metaSlice, blockIds) {
+                    newRecords.append((uuid: meta.uuid, notionBlockId: blockId, contentHash: meta.contentHash))
+                }
                 
                 completed += slice.count
                 let percent = Int(Double(completed) / Double(totalOperations) * 100)
                 progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
                 
                 index = end
+            }
+            
+            // 保存新追加的记录到本地
+            if !newRecords.isEmpty {
+                do {
+                    try await syncedHighlightStore.saveRecords(newRecords, sourceKey: source.sourceKey, bookId: item.itemId)
+                    logger.debug("[SyncEngine] Saved \(newRecords.count) new synced highlight records for \(source.sourceKey):\(item.itemId)")
+                } catch {
+                    logger.warning("[SyncEngine] Failed to save synced highlight records: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // 如果是从 Notion 回退查询的，需要初始化本地记录
+        if !useLocalRecords && !existingMap.isEmpty {
+            // 保存从 Notion 获取的现有记录到本地
+            var existingRecords: [(uuid: String, notionBlockId: String, contentHash: String)] = []
+            for (uuid, value) in existingMap {
+                existingRecords.append((uuid: uuid, notionBlockId: value.blockId, contentHash: value.contentHash ?? ""))
+            }
+            do {
+                try await syncedHighlightStore.saveRecords(existingRecords, sourceKey: source.sourceKey, bookId: item.itemId)
+                logger.info("[SyncEngine] Initialized local records from Notion: \(existingRecords.count) for \(source.sourceKey):\(item.itemId)")
+            } catch {
+                logger.warning("[SyncEngine] Failed to initialize local records: \(error.localizedDescription)")
             }
         }
     }
