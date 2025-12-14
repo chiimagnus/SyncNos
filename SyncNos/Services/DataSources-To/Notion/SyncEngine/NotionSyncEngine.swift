@@ -176,6 +176,8 @@ final class NotionSyncEngine {
         let highlights: [UnifiedHighlight]
         do {
             highlights = try await source.fetchHighlights()
+            // 获取完成后立即显示数量
+            progress(String(format: NSLocalizedString("Fetched %lld highlights, preparing...", comment: ""), highlights.count))
             logger.debug("[SmartSync] Fetched \(highlights.count) highlights for \(source.sourceKey): \(itemLabel)")
         } catch {
             logger.error("[SmartSync] Failed to fetch highlights for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
@@ -468,11 +470,12 @@ final class NotionSyncEngine {
         incremental: Bool,
         progress: @escaping (String) -> Void
     ) async throws {
-        // 收集现有 UUID 映射
+        // 收集现有 UUID 映射（这一步可能很慢，特别是大量笔记时）
+        progress(NSLocalizedString("Collecting existing highlights from Notion...", comment: ""))
         let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId)
         let lastSync = incremental ? timestampStore.getLastSyncTime(for: item.itemId) : nil
         
-        progress(NSLocalizedString("Scanning local highlights...", comment: ""))
+        progress(String(format: NSLocalizedString("Found %lld existing highlights, comparing...", comment: ""), existingMapWithToken.count))
         
         var toUpdate: [(String, HighlightRow)] = []
         var toAppend: [HighlightRow] = []
