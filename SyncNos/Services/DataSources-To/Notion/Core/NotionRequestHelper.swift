@@ -45,6 +45,7 @@ class NotionRequestHelper {
         let url = apiBase.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.timeoutInterval = NotionSyncConfig.requestTimeoutSeconds
         addCommonHeaders(to: &request, key: key)
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
@@ -138,6 +139,7 @@ class NotionRequestHelper {
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.timeoutInterval = NotionSyncConfig.requestTimeoutSeconds
         addCommonHeaders(to: &request, key: key)
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
