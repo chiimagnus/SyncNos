@@ -175,12 +175,10 @@ final class NotionSyncEngine {
         }
 
         // 6. 获取高亮数据
-        progress(NSLocalizedString("Fetching highlights...", comment: ""))
+        progress(NSLocalizedString("Preparing...", comment: ""))
         let highlights: [UnifiedHighlight]
         do {
             highlights = try await source.fetchHighlights()
-            // 获取完成后立即显示数量
-            progress(String(format: NSLocalizedString("Fetched %lld highlights, preparing...", comment: ""), highlights.count))
             logger.debug("[SmartSync] Fetched \(highlights.count) highlights for \(source.sourceKey): \(itemLabel)")
         } catch {
             logger.error("[SmartSync] Failed to fetch highlights for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
@@ -433,7 +431,6 @@ final class NotionSyncEngine {
         progress: @escaping (String) -> Void
     ) async throws {
         let total = highlights.count
-        progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), total))
         
         var headerChildren: [[String: Any]] = []
         var highlightChildren: [[String: Any]] = []
@@ -518,37 +515,36 @@ final class NotionSyncEngine {
         incremental: Bool,
         progress: @escaping (String) -> Void
     ) async throws {
-        // 尝试从本地获取已同步记录
-        progress(NSLocalizedString("Loading local sync records...", comment: ""))
+        // 尝试从本地获取已同步记录（不显示进度，只记录日志）
         let localRecords = try await syncedHighlightStore.getRecords(sourceKey: source.sourceKey, bookId: item.itemId)
-        
-        // 判断是否可以使用本地记录
         let useLocalRecords = !localRecords.isEmpty
+        
+        logger.info("[SyncEngine] Sync existing page: \(source.sourceKey):\(item.itemId) (\(item.title)), localRecords=\(localRecords.count), useLocalRecords=\(useLocalRecords)")
         
         var existingMap: [String: (blockId: String, contentHash: String?)] = [:]
         
         if useLocalRecords {
-            // 使用本地记录（快速路径）
-            progress(String(format: NSLocalizedString("Using %lld local sync records...", comment: ""), localRecords.count))
+            // 使用本地记录（快速路径）- 不显示进度
             for record in localRecords {
                 existingMap[record.uuid] = (blockId: record.notionBlockId, contentHash: record.contentHash)
             }
-            logger.debug("[SyncEngine] Using local records: \(localRecords.count) for \(source.sourceKey):\(item.itemId)")
+            logger.info("[SyncEngine] Using local records: \(localRecords.count) for \"\(item.title)\"")
         } else {
             // 回退到 Notion 查询（首次同步或本地记录为空）
-            progress(NSLocalizedString("Collecting existing highlights from Notion...", comment: ""))
+            progress(NSLocalizedString("Fetching from Notion...", comment: ""))
+            logger.info("[SyncEngine] No local records, fetching from Notion for \"\(item.title)\"...")
             let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId) { fetchedCount in
-                progress(String(format: NSLocalizedString("Collecting from Notion... %lld found", comment: ""), fetchedCount))
+                progress(String(format: NSLocalizedString("Fetching... %lld found", comment: ""), fetchedCount))
             }
             for (uuid, value) in existingMapWithToken {
                 existingMap[uuid] = (blockId: value.blockId, contentHash: value.token)
             }
-            logger.debug("[SyncEngine] Collected from Notion: \(existingMapWithToken.count) for \(source.sourceKey):\(item.itemId)")
+            logger.info("[SyncEngine] Collected from Notion: \(existingMapWithToken.count) for \"\(item.title)\"")
         }
         
         let lastSync = incremental ? timestampStore.getLastSyncTime(for: item.itemId) : nil
         
-        progress(String(format: NSLocalizedString("Found %lld existing highlights, comparing...", comment: ""), existingMap.count))
+        // 比较阶段不显示进度，直接进行比较
         
         var toUpdate: [(blockId: String, highlight: HighlightRow, uuid: String, newContentHash: String)] = []
         var toAppend: [(highlight: HighlightRow, uuid: String, contentHash: String)] = []
@@ -576,9 +572,14 @@ final class NotionSyncEngine {
         let totalOperations = toUpdate.count + toAppend.count
         var completed = 0
         
+        // 如果没有任何操作，显示无变更
+        if totalOperations == 0 {
+            progress(NSLocalizedString("No changes", comment: ""))
+            logger.info("[SyncEngine] No changes for \"\(item.title)\"")
+        }
+        
         // 执行更新
         if !toUpdate.isEmpty {
-            progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
             for updateItem in toUpdate {
                 try await notionService.updateBlockContent(
                     blockId: updateItem.blockId,
@@ -602,16 +603,13 @@ final class NotionSyncEngine {
                 }
                 
                 completed += 1
-                if completed % 10 == 0 || completed == toUpdate.count {
-                    let percent = Int(Double(completed) / Double(totalOperations) * 100)
-                    progress(String(format: NSLocalizedString("Updating... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
-                }
+                let percent = Int(Double(completed) / Double(totalOperations) * 100)
+                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
             }
         }
         
         // 追加新高亮
         if !toAppend.isEmpty {
-            progress(String(format: NSLocalizedString("Appending %lld new highlights...", comment: ""), toAppend.count))
             var children: [[String: Any]] = []
             for appendItem in toAppend {
                 let block = helperMethods.buildBulletedListItemBlock(
