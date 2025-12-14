@@ -129,23 +129,25 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
         for id in assetIds {
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
             let bookStats = statsDict[id]
+            let meta = bookMeta[id]
+            let bookLabel = formatBookLabel(title: meta?.title, author: meta?.author, fallbackId: id)
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("[SmartSync] AppleBooks[\(id)]: first sync (never synced)")
+                logger.info("[SmartSync] AppleBooks: \(bookLabel) - first sync (never synced)")
                 eligibleIds.append(id)
                 continue
             }
             
             // 情况 2：书籍有变更（最新修改时间 > 上次同步时间）→ 需要同步
             if let maxModified = bookStats?.maxModifiedDate, maxModified > lastSyncTime! {
-                logger.info("[SmartSync] AppleBooks[\(id)]: changes detected (modified: \(maxModified), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] AppleBooks: \(bookLabel) - changes detected")
                 eligibleIds.append(id)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("[SmartSync] AppleBooks[\(id)]: skipped (no changes)")
+            logger.debug("[SmartSync] AppleBooks: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -215,16 +217,15 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                         )
                         do {
                             let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
-                            try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("[SmartSync] AppleBooks[\(id)] progress: \(progress)")
-                            }
+                            try await syncEngine.syncSmart(source: adapter) { _ in }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("[SmartSync] AppleBooks[\(id)] failed: \(error.localizedDescription)")
+                            let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
+                            logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
@@ -243,6 +244,16 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             for _ in 0..<min(maxConcurrentBooks, acceptedIdList.count) { addTaskIfPossible() }
             // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
             while await group.next() != nil { addTaskIfPossible() }
+        }
+    }
+    
+    /// 格式化书籍标签用于日志显示
+    private func formatBookLabel(title: String?, author: String?, fallbackId: String) -> String {
+        let displayTitle = (title?.isEmpty == false) ? title! : fallbackId
+        if let author = author, !author.isEmpty {
+            return "《\(displayTitle)》(\(author))"
+        } else {
+            return "《\(displayTitle)》"
         }
     }
 }

@@ -35,17 +35,27 @@ final class NotionSyncEngine {
         progress: @escaping (String) -> Void
     ) async throws {
         let item = source.syncItem
-        logger.info("[SmartSync] Starting sync for \(source.sourceKey)[\(item.itemId)]: \(item.title)")
+        let itemLabel = formatItemLabel(item)
+        logger.info("[SmartSync] Starting sync for \(source.sourceKey): \(itemLabel)")
 
         let lastSync = timestampStore.getLastSyncTime(for: item.itemId)
         let incremental = lastSync != nil
 
         do {
             try await sync(source: source, incremental: incremental, progress: progress)
-            logger.info("[SmartSync] Successfully completed sync for \(source.sourceKey)[\(item.itemId)]")
+            logger.info("[SmartSync] Successfully completed sync for \(source.sourceKey): \(itemLabel)")
         } catch {
-            logger.error("[SmartSync] Failed sync for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            logger.error("[SmartSync] Failed sync for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
             throw error
+        }
+    }
+    
+    /// 格式化书籍/文章标签用于日志显示
+    private func formatItemLabel(_ item: UnifiedSyncItem) -> String {
+        if item.author.isEmpty {
+            return "《\(item.title)》"
+        } else {
+            return "《\(item.title)》(\(item.author))"
         }
     }
     
@@ -84,6 +94,7 @@ final class NotionSyncEngine {
         progress: @escaping (String) -> Void
     ) async throws {
         let item = source.syncItem
+        let itemLabel = formatItemLabel(item)
 
         // 1. 校验 Notion 配置
         guard let parentPageId = notionConfig.notionPageId else {
@@ -126,7 +137,7 @@ final class NotionSyncEngine {
             propertyDefinitions.merge(source.additionalPropertyDefinitions) { _, new in new }
             try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: propertyDefinitions)
         } catch {
-            logger.error("[SmartSync] Failed to ensure database properties for \(source.sourceKey)[\(databaseId)]: \(error.localizedDescription)")
+            logger.error("[SmartSync] Failed to ensure database properties for \(source.sourceKey): \(error.localizedDescription)")
             throw error
         }
 
@@ -142,7 +153,7 @@ final class NotionSyncEngine {
                 header: item.source == .goodLinks ? nil : "Highlights"
             )
         } catch {
-            logger.error("[SmartSync] Failed to ensure page for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            logger.error("[SmartSync] Failed to ensure page for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
             throw error
         }
 
@@ -155,7 +166,7 @@ final class NotionSyncEngine {
             do {
                 try await notionService.updatePageProperties(pageId: pageId, properties: additionalProps)
             } catch {
-                logger.error("[SmartSync] Failed to update page properties for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                logger.error("[SmartSync] Failed to update page properties for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
                 throw error
             }
         }
@@ -165,9 +176,9 @@ final class NotionSyncEngine {
         let highlights: [UnifiedHighlight]
         do {
             highlights = try await source.fetchHighlights()
-            logger.debug("[SmartSync] Fetched \(highlights.count) highlights for \(source.sourceKey)[\(item.itemId)]")
+            logger.debug("[SmartSync] Fetched \(highlights.count) highlights for \(source.sourceKey): \(itemLabel)")
         } catch {
-            logger.error("[SmartSync] Failed to fetch highlights for \(source.sourceKey)[\(item.itemId)]: \(error.localizedDescription)")
+            logger.error("[SmartSync] Failed to fetch highlights for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
             throw error
         }
 
@@ -183,9 +194,9 @@ final class NotionSyncEngine {
                         source: source,
                         progress: progress
                     )
-                    logger.debug("[SmartSync] Appended \(highlights.count) highlights to new page for \(source.sourceKey)[\(item.itemId)]")
+                    logger.debug("[SmartSync] Appended \(highlights.count) highlights to new page for \(source.sourceKey): \(itemLabel)")
                 } catch {
-                    logger.error("[SmartSync] Failed to append highlights to new page for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                    logger.error("[SmartSync] Failed to append highlights to new page for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
                     throw error
                 }
             } else {
@@ -199,23 +210,23 @@ final class NotionSyncEngine {
                         incremental: incremental,
                         progress: progress
                     )
-                    logger.debug("[SmartSync] Updated existing page with \(highlights.count) highlights for \(source.sourceKey)[\(item.itemId)]")
+                    logger.debug("[SmartSync] Updated existing page with \(highlights.count) highlights for \(source.sourceKey): \(itemLabel)")
                 } catch {
-                    logger.error("[SmartSync] Failed to sync existing page for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+                    logger.error("[SmartSync] Failed to sync existing page for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
                     throw error
                 }
             }
         } else {
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
-            logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey)[\(item.itemId)]")
+            logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey): \(itemLabel)")
         }
 
         // 8. 更新计数和时间戳（无论是否有高亮都要更新）
         do {
             try await updateCountAndTimestamp(pageId: pageId, count: highlights.count, itemId: item.itemId)
-            logger.debug("[SmartSync] Updated count and timestamp for \(source.sourceKey)[\(item.itemId)]")
+            logger.debug("[SmartSync] Updated count and timestamp for \(source.sourceKey): \(itemLabel)")
         } catch {
-            logger.error("[SmartSync] Failed to update count and timestamp for \(source.sourceKey)[\(item.itemId)] page \(pageId): \(error.localizedDescription)")
+            logger.error("[SmartSync] Failed to update count and timestamp for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
             throw error
         }
     }
