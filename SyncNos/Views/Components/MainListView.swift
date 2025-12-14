@@ -309,7 +309,7 @@ struct MainListView: View {
                 sourceKey = "goodLinks"
                 selectedItems = selectedLinkIds.compactMap { id in
                     if let link = goodLinksVM.links.first(where: { $0.id == id }) {
-                        return (id: id, title: link.title)
+                        return (id: id, title: link.title ?? "Unknown")
                     }
                     return nil
                 }
