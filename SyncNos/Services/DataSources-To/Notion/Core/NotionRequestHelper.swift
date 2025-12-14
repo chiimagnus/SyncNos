@@ -78,6 +78,21 @@ class NotionRequestHelper {
                 Network error: \(networkError.localizedDescription)
                 """
                 logger.warning("[NotionAPI] \(requestDetails)")
+                
+                // 网络超时或连接失败时重试
+                let nsError = networkError as NSError
+                let isRetryableError = nsError.code == NSURLErrorTimedOut || 
+                                       nsError.code == NSURLErrorNetworkConnectionLost ||
+                                       nsError.code == NSURLErrorNotConnectedToInternet
+                
+                if isRetryableError && attempt < maxAttempts {
+                    logger.info("[NotionAPI] Retrying after network error (attempt \(attempt)/\(maxAttempts))...")
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
+                    backoffMillis = min(backoffMillis * 2, 32_000)
+                    continue
+                }
+                
                 throw NSError(
                     domain: "NotionService",
                     code: -1001, // NSURLErrorTimedOut equivalent
@@ -171,6 +186,21 @@ class NotionRequestHelper {
                 Network error: \(networkError.localizedDescription)
                 """
                 logger.warning("[NotionAPI] \(requestDetails)")
+                
+                // 网络超时或连接失败时重试
+                let nsError = networkError as NSError
+                let isRetryableError = nsError.code == NSURLErrorTimedOut || 
+                                       nsError.code == NSURLErrorNetworkConnectionLost ||
+                                       nsError.code == NSURLErrorNotConnectedToInternet
+                
+                if isRetryableError && attempt < maxAttempts {
+                    logger.info("[NotionAPI] Retrying after network error (attempt \(attempt)/\(maxAttempts))...")
+                    let jitterNs = UInt64.random(in: 0...(NotionSyncConfig.retryJitterMs * 1_000_000))
+                    try await Task.sleep(nanoseconds: backoffMillis * 1_000_000 + jitterNs)
+                    backoffMillis = min(backoffMillis * 2, 32_000)
+                    continue
+                }
+                
                 throw NSError(
                     domain: "NotionService",
                     code: -1001, // NSURLErrorTimedOut equivalent
