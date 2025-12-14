@@ -53,7 +53,7 @@ final class GoodLinksViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
-    private let syncService: GoodLinksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let notionConfig: NotionConfigStoreProtocol
@@ -66,13 +66,13 @@ final class GoodLinksViewModel: ObservableObject {
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        syncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.service = service
-        self.syncService = syncService
+        self.syncEngine = syncEngine
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
@@ -370,37 +370,28 @@ extension GoodLinksViewModel {
         let dbPath = service.resolveDatabasePath()
         let itemsById = Dictionary(uniqueKeysWithValues: links.map { ($0.id, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
-        let syncService = self.syncService
-        let notionConfig = DIContainer.shared.notionConfigStore
-        let notionService = DIContainer.shared.notionService
+        let syncEngine = self.syncEngine
+        let goodLinksService = self.service
         
         Task {
-            // 预先 resolve/ensure 一次 GoodLinks databaseId
-            do {
-                if let parentPageId = notionConfig.notionPageId {
-                    if let persisted = notionConfig.databaseIdForSource("goodLinks") {
-                        _ = await notionService.databaseExists(databaseId: persisted)
-                    } else {
-                        let id = try await notionService.ensureDatabaseIdForSource(title: "SyncNos-GoodLinks", parentPageId: parentPageId, sourceKey: "goodLinks")
-                        notionConfig.setDatabaseId(id, forSource: "goodLinks")
-                    }
-                }
-            } catch {
-                await MainActor.run { self.logger.error("[GoodLinks] pre-resolve databaseId failed: \(error.localizedDescription)") }
-            }
-            
             await withTaskGroup(of: Void.self) { group in
                 for id in acceptedIds {
                     guard let link = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
                         await limiter.withPermit {
-                            // 发送开始通知（syncingLinkIds 已在外部同步设置）
+                            // 发送开始通知
                             await MainActor.run {
                                 NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
                             }
                             do {
-                                try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: NotionSyncConfig.goodLinksPageSize) { progress in
+                                // 创建适配器并使用统一同步引擎
+                                let adapter = try GoodLinksNotionAdapter.create(
+                                    link: link,
+                                    dbPath: dbPath,
+                                    databaseService: goodLinksService
+                                )
+                                try await syncEngine.syncSmart(source: adapter) { progress in
                                     Task { @MainActor in
                                         NotificationCenter.default.post(name: GLNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                     }

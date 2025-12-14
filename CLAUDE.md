@@ -95,7 +95,7 @@ SyncNos/
 │   │   ├── AppleBooksDetailViewModel.swift   # 使用 NotionSyncEngine + Adapter
 │   │   └── AppleBooksSettingsViewModel.swift
 │   ├── GoodLinks/
-│   │   ├── GoodLinksViewModel.swift          # 使用 GoodLinksSyncService
+│   │   ├── GoodLinksViewModel.swift          # 使用 NotionSyncEngine + Adapter
 │   │   └── GoodLinksSettingsViewModel.swift
 │   ├── WeRead/
 │   │   ├── WeReadViewModel.swift             # 使用 NotionSyncEngine + Adapter
@@ -261,7 +261,6 @@ SyncNos/
 DIContainer.shared.notionService
 DIContainer.shared.notionSyncEngine      // 统一同步引擎
 DIContainer.shared.databaseService
-DIContainer.shared.goodLinksSyncService
 DIContainer.shared.autoSyncService
 DIContainer.shared.syncTimestampStore
 
