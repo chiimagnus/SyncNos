@@ -95,23 +95,24 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         var eligibleBooks: [WeReadBookListItem] = []
         for book in books {
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: book.bookId)
+            let bookLabel = formatBookLabel(title: book.title, author: book.author)
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("[SmartSync] WeRead[\(book.bookId)]: first sync (never synced)")
+                logger.info("[SmartSync] WeRead: \(bookLabel) - first sync (never synced)")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 2：书籍有变更（updatedAt > 上次同步时间）→ 需要同步
             if let updatedAt = book.updatedAt, updatedAt > lastSyncTime! {
-                logger.info("[SmartSync] WeRead[\(book.bookId)]: changes detected (updated: \(updatedAt), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] WeRead: \(bookLabel) - changes detected")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("[SmartSync] WeRead[\(book.bookId)]: skipped (no changes)")
+            logger.debug("[SmartSync] WeRead: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -171,16 +172,15 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                                 book: book,
                                 apiService: apiService
                             )
-                            try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("[SmartSync] WeRead[\(book.bookId)] progress: \(progress)")
-                            }
+                            try await syncEngine.syncSmart(source: adapter) { _ in }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("[SmartSync] WeRead[\(book.bookId)] failed: \(error.localizedDescription)")
+                            let bookLabel = self.formatBookLabel(title: book.title, author: book.author)
+                            logger.error("[SmartSync] WeRead: \(bookLabel) - failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
@@ -203,6 +203,15 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
             while await group.next() != nil {
                 addTaskIfPossible()
             }
+        }
+    }
+    
+    /// 格式化书籍标签用于日志显示
+    private func formatBookLabel(title: String, author: String) -> String {
+        if author.isEmpty {
+            return "《\(title)》"
+        } else {
+            return "《\(title)》(\(author))"
         }
     }
 }

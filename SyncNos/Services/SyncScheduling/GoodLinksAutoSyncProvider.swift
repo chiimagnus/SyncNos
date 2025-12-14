@@ -90,10 +90,11 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
         for id in linkIds {
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
             let linkInfo = linkMeta[id]
+            let articleLabel = formatArticleLabel(title: linkInfo?.title, author: linkInfo?.author, fallbackId: id)
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("[SmartSync] GoodLinks[\(id)]: first sync (never synced)")
+                logger.info("[SmartSync] GoodLinks: \(articleLabel) - first sync (never synced)")
                 eligibleIds.append(id)
                 continue
             }
@@ -102,14 +103,14 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             if let modifiedAt = linkInfo?.modifiedAt, modifiedAt > 0 {
                 let modifiedDate = Date(timeIntervalSince1970: modifiedAt)
                 if modifiedDate > lastSyncTime! {
-                    logger.info("[SmartSync] GoodLinks[\(id)]: changes detected (modified: \(modifiedDate), lastSync: \(lastSyncTime!))")
+                    logger.info("[SmartSync] GoodLinks: \(articleLabel) - changes detected")
                     eligibleIds.append(id)
                     continue
                 }
             }
             
             // 情况 3：文章无变更 → 跳过
-            logger.debug("[SmartSync] GoodLinks[\(id)]: skipped (no changes)")
+            logger.debug("[SmartSync] GoodLinks: \(articleLabel) - skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -192,7 +193,8 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
                         } catch {
-                            self.logger.error("[SmartSync] GoodLinks[\(id)] failed: \(error.localizedDescription)")
+                            let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
+                            self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
@@ -205,6 +207,16 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
 
             for _ in 0..<min(maxConcurrentLinks, acceptedIdList.count) { addTaskIfPossible() }
             while await group.next() != nil { addTaskIfPossible() }
+        }
+    }
+    
+    /// 格式化文章标签用于日志显示
+    private func formatArticleLabel(title: String?, author: String?, fallbackId: String) -> String {
+        let displayTitle = (title?.isEmpty == false) ? title! : fallbackId
+        if let author = author, !author.isEmpty {
+            return "「\(displayTitle)」(\(author))"
+        } else {
+            return "「\(displayTitle)」"
         }
     }
 }
