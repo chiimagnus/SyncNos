@@ -413,7 +413,8 @@ final class NotionSyncEngine {
         source: NotionSyncSourceProtocol,
         progress: @escaping (String) -> Void
     ) async throws {
-        progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), highlights.count))
+        let total = highlights.count
+        progress(String(format: NSLocalizedString("Adding %lld highlights...", comment: ""), total))
         
         var children: [[String: Any]] = []
         
@@ -439,11 +440,23 @@ final class NotionSyncEngine {
             children.append(block)
         }
         
-        try await notionService.appendChildren(
-            pageId: pageId,
-            children: children,
-            batchSize: NotionSyncConfig.defaultAppendBatchSize
-        )
+        // 逐批追加并报告进度
+        let batchSize = NotionSyncConfig.defaultAppendBatchSize
+        var appended = 0
+        var index = 0
+        
+        while index < children.count {
+            let end = min(index + batchSize, children.count)
+            let slice = Array(children[index..<end])
+            
+            try await notionService.appendBlocks(pageId: pageId, children: slice)
+            
+            appended += slice.count
+            let percent = Int(Double(appended) / Double(total) * 100)
+            progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), appended, total, percent))
+            
+            index = end
+        }
     }
     
     /// 同步已存在的页面（增量更新）
@@ -483,6 +496,10 @@ final class NotionSyncEngine {
             }
         }
         
+        // 计算总操作数
+        let totalOperations = toUpdate.count + toAppend.count
+        var completed = 0
+        
         // 执行更新
         if !toUpdate.isEmpty {
             progress(String(format: NSLocalizedString("Updating %lld existing highlights...", comment: ""), toUpdate.count))
@@ -493,6 +510,11 @@ final class NotionSyncEngine {
                     bookId: item.itemId,
                     source: source.sourceKey
                 )
+                completed += 1
+                if completed % 10 == 0 || completed == toUpdate.count {
+                    let percent = Int(Double(completed) / Double(totalOperations) * 100)
+                    progress(String(format: NSLocalizedString("Updating... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
+                }
             }
         }
         
@@ -509,11 +531,22 @@ final class NotionSyncEngine {
                 )
                 children.append(block)
             }
-            try await notionService.appendChildren(
-                pageId: pageId,
-                children: children,
-                batchSize: NotionSyncConfig.defaultAppendBatchSize
-            )
+            
+            // 逐批追加并报告进度
+            let batchSize = NotionSyncConfig.defaultAppendBatchSize
+            var index = 0
+            while index < children.count {
+                let end = min(index + batchSize, children.count)
+                let slice = Array(children[index..<end])
+                
+                try await notionService.appendBlocks(pageId: pageId, children: slice)
+                
+                completed += slice.count
+                let percent = Int(Double(completed) / Double(totalOperations) * 100)
+                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
+                
+                index = end
+            }
         }
     }
     
