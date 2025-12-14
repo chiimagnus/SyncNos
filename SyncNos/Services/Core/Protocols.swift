@@ -161,6 +161,8 @@ protocol NotionServiceProtocol: AnyObject {
     func appendHighlightBullets(pageId: String, bookId: String, highlights: [HighlightRow]) async throws
     func updatePageHighlightCount(pageId: String, count: Int) async throws
     func appendBlocks(pageId: String, children: [[String: Any]]) async throws
+    func appendBlocksAndGetIds(pageId: String, children: [[String: Any]]) async throws -> [String]
+    func appendChildrenAndGetIds(pageId: String, children: [[String: Any]], batchSize: Int) async throws -> [String]
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String, source: String) async throws
     // Generic property/schema helpers
     func ensureDatabaseProperties(databaseId: String, definitions: [String: Any]) async throws
