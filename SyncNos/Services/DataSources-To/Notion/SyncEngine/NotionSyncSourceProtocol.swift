@@ -53,6 +53,13 @@ protocol NotionSyncSourceProtocol {
     /// 例如 GoodLinks 需要设置 Tags、Starred 等
     func additionalPageProperties() -> [String: Any]
     
+    // MARK: - Page Content Hooks (Optional)
+    
+    /// 首次创建页面时的头部内容（可选）
+    /// 返回在 "Highlights" 标题之前追加的 Notion blocks
+    /// 例如 GoodLinks 需要添加 "Article" 标题和文章内容
+    func headerContentForNewPage() -> [[String: Any]]
+    
     // MARK: - Strategy Support (Optional)
     
     /// 支持的同步策略（默认只支持 singleDatabase）
@@ -84,6 +91,11 @@ extension NotionSyncSourceProtocol {
     /// 默认无额外页面属性
     func additionalPageProperties() -> [String: Any] {
         [:]
+    }
+    
+    /// 默认无头部内容
+    func headerContentForNewPage() -> [[String: Any]] {
+        []
     }
 }
 

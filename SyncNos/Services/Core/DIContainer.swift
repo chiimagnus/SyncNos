@@ -32,7 +32,6 @@ class DIContainer {
     private var _dedaoCacheService: DedaoCacheServiceProtocol?
     // Sync Engine
     private var _notionSyncEngine: NotionSyncEngine?
-    private var _goodLinksSyncService: GoodLinksSyncServiceProtocol?
     // Synced Highlight Store
     private var _syncedHighlightStore: SyncedHighlightStoreProtocol?
     // Environment
@@ -244,20 +243,6 @@ class DIContainer {
         }
         return _notionSyncEngine!
     }
-    
-    var goodLinksSyncService: GoodLinksSyncServiceProtocol {
-        if _goodLinksSyncService == nil {
-            _goodLinksSyncService = GoodLinksSyncService(
-                syncEngine: notionSyncEngine,
-                notionService: notionService,
-                notionConfig: notionConfigStore,
-                databaseService: goodLinksService,
-                logger: loggerService,
-                timestampStore: syncTimestampStore
-            )
-        }
-        return _goodLinksSyncService!
-    }
 
     var environmentDetector: EnvironmentDetectorProtocol {
         if _environmentDetector == nil {
@@ -342,10 +327,6 @@ class DIContainer {
     
     func register(notionSyncEngine: NotionSyncEngine) {
         self._notionSyncEngine = notionSyncEngine
-    }
-    
-    func register(goodLinksSyncService: GoodLinksSyncServiceProtocol) {
-        self._goodLinksSyncService = goodLinksSyncService
     }
     
     func register(syncedHighlightStore: SyncedHighlightStoreProtocol) {

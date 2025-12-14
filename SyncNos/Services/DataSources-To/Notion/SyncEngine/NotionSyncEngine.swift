@@ -190,8 +190,21 @@ final class NotionSyncEngine {
         // 7. 执行同步（如果有高亮）
         if !highlights.isEmpty {
             if created {
-                // 新创建的页面：直接追加所有高亮
+                // 新创建的页面：首先追加头部内容（如 GoodLinks 的 Article），然后追加高亮
                 do {
+                    // 追加头部内容（如果有）
+                    let headerContent = source.headerContentForNewPage()
+                    if !headerContent.isEmpty {
+                        progress(NSLocalizedString("Adding article content...", comment: ""))
+                        try await notionService.appendChildren(
+                            pageId: pageId,
+                            children: headerContent,
+                            batchSize: NotionSyncConfig.defaultAppendBatchSize
+                        )
+                        logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
+                    }
+                    
+                    // 追加高亮
                     try await appendAllHighlights(
                         pageId: pageId,
                         highlights: highlights,

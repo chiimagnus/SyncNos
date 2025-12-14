@@ -8,7 +8,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
 
     private let logger: LoggerServiceProtocol
     private let goodLinksDatabaseService: GoodLinksDatabaseServiceExposed
-    private let goodLinksSyncService: GoodLinksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let syncTimestampStore: SyncTimestampStoreProtocol
 
     private var isSyncing: Bool = false
@@ -16,12 +16,12 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         goodLinksDatabaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        goodLinksSyncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.logger = logger
         self.goodLinksDatabaseService = goodLinksDatabaseService
-        self.goodLinksSyncService = goodLinksSyncService
+        self.syncEngine = syncEngine
         self.syncTimestampStore = syncTimestampStore
     }
 
@@ -176,11 +176,13 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                             userInfo: ["bookId": id, "status": "started"]
                         )
                         do {
-                            try await self.goodLinksSyncService.syncHighlights(
-                                for: row,
+                            // 创建适配器并使用统一同步引擎
+                            let adapter = try GoodLinksNotionAdapter.create(
+                                link: row,
                                 dbPath: dbPath,
-                                pageSize: NotionSyncConfig.goodLinksPageSize
-                            ) { progress in
+                                databaseService: self.goodLinksDatabaseService
+                            )
+                            try await self.syncEngine.syncSmart(source: adapter) { progress in
                                 NotificationCenter.default.post(
                                     name: Notification.Name("SyncProgressUpdated"),
                                     object: nil,
