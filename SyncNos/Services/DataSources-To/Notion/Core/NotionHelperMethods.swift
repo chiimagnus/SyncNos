@@ -43,22 +43,21 @@ class NotionHelperMethods {
     // MARK: - Unified header helpers
 
     /// Compute modified token for header second line.
-    /// - Apple Books: use modified time if present; otherwise fall back to hash.
-    /// - GoodLinks: always use hash (since source has no modified time).
+    /// 统一使用内容 hash 确保任何内容变更都能被检测到。
+    /// Hash 包含：text, note, style, dateAdded, location, modified
     func computeModifiedToken(for highlight: HighlightRow, source: String) -> String {
-        if source == "appleBooks", let m = highlight.modified {
-            return notionSystemTimeZoneIsoDateFormatter.string(from: m)
-        }
-        // Hash-based token
+        // Hash-based token - 统一所有数据源使用 hash
         let styleNameValue: String = {
             if let s = highlight.style { return styleName(for: s, source: source) }
             return ""
         }()
         let added = highlight.dateAdded.map { notionSystemTimeZoneIsoDateFormatter.string(from: $0) } ?? ""
+        let modified = highlight.modified.map { notionSystemTimeZoneIsoDateFormatter.string(from: $0) } ?? ""
         let location = highlight.location ?? ""
         let normalizedText = highlight.text.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedNote = (highlight.note ?? "").replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        let payload = [normalizedText, normalizedNote, styleNameValue, added, location].joined(separator: "\n")
+        // 将所有可变内容组合成 payload
+        let payload = [normalizedText, normalizedNote, styleNameValue, added, modified, location].joined(separator: "\n")
         let digest = SHA256.hash(data: payload.data(using: .utf8) ?? Data())
         let fullHex = digest.compactMap { String(format: "%02x", $0) }.joined()
         let short = String(fullHex.prefix(16))
