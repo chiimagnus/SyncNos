@@ -78,6 +78,7 @@ struct SyncNosApp: App {
         // 日志窗口（单实例）
         Window("Logs", id: "log") {
             LogWindow()
+                .applyFontScale()
         }
         .windowResizability(.contentSize)
         
