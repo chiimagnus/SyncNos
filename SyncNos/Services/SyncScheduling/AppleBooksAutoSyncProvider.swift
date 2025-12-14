@@ -217,7 +217,13 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                         )
                         do {
                             let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
-                            try await syncEngine.syncSmart(source: adapter) { _ in }
+                            try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncProgressUpdated"),
+                                    object: nil,
+                                    userInfo: ["bookId": id, "progress": progressMessage]
+                                )
+                            }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,

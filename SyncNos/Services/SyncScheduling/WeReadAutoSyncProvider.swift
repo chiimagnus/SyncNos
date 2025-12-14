@@ -172,7 +172,13 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                                 book: book,
                                 apiService: apiService
                             )
-                            try await syncEngine.syncSmart(source: adapter) { _ in }
+                            try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncProgressUpdated"),
+                                    object: nil,
+                                    userInfo: ["bookId": book.bookId, "progress": progressMessage]
+                                )
+                            }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
