@@ -112,11 +112,30 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         return properties
     }
     
-    // MARK: - GoodLinks Specific
+    // MARK: - Header Content Hook
     
-    /// 获取文章内容（用于首次创建页面时添加）
-    func getArticleContent() -> String? {
-        contentRow?.content
+    /// 首次创建页面时的头部内容
+    /// GoodLinks 需要在高亮之前添加 "Article" 标题和文章内容
+    func headerContentForNewPage() -> [[String: Any]] {
+        let helperMethods = NotionHelperMethods()
+        var children: [[String: Any]] = []
+        
+        // 添加 "Article" 标题
+        children.append([
+            "object": "block",
+            "heading_2": [
+                "rich_text": [["text": ["content": "Article"]]]
+            ]
+        ])
+        
+        // 添加文章内容（如果有）
+        if let contentText = contentRow?.content,
+           !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let paragraphs = helperMethods.buildParagraphBlocks(from: contentText)
+            children.append(contentsOf: paragraphs)
+        }
+        
+        return children
     }
 }
 

@@ -84,7 +84,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
-    private let syncService: GoodLinksSyncServiceProtocol
+    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     private let notionConfig: NotionConfigStoreProtocol
@@ -96,13 +96,13 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        syncService: GoodLinksSyncServiceProtocol = DIContainer.shared.goodLinksSyncService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.service = service
-        self.syncService = syncService
+        self.syncEngine = syncEngine
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
@@ -412,7 +412,12 @@ final class GoodLinksDetailViewModel: ObservableObject {
                 
                 do {
                     let dbPath = self.service.resolveDatabasePath()
-                    try await syncService.syncHighlights(for: link, dbPath: dbPath, pageSize: pageSize) { [weak self] progressText in
+                    let adapter = try GoodLinksNotionAdapter.create(
+                        link: link,
+                        dbPath: dbPath,
+                        databaseService: self.service
+                    )
+                    try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
                         Task { @MainActor in self?.syncProgressText = progressText }
                     }
                     
