@@ -13,7 +13,8 @@ enum NotionSyncConfig {
     static let goodLinksPageSize: Int = 100
 
     /// 追加 children 时的默认批次大小
-    static let defaultAppendBatchSize: Int = 100
+    /// 减小到 50 可以降低单次 API 调用的负载，减少超时风险
+    static let defaultAppendBatchSize: Int = 50
 
     // MARK: - Text trimming
     /// 构建 Notion rich_text 时的首选最大文本长度（与上方裁剪阈值保持一致）
@@ -50,4 +51,9 @@ enum NotionSyncConfig {
     static let retryConflictBaseBackoffMs: UInt64 = 300
     /// 409 退避抖动（毫秒）
     static let retryConflictJitterMs: UInt64 = 200
+    
+    // MARK: - Timeout
+    /// Notion API 请求超时时间（秒）
+    /// 对于大量数据的同步（如 6000 条笔记），需要更长的超时时间
+    static let requestTimeoutSeconds: TimeInterval = 120
 }
