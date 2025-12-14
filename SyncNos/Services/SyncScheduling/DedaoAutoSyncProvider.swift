@@ -92,23 +92,24 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         for book in books {
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: book.bookId)
             let maxHighlightUpdatedAt = maxUpdatedAtMap[book.bookId]
+            let bookLabel = formatBookLabel(title: book.title, author: book.author)
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
-                logger.info("[SmartSync] Dedao[\(book.bookId)]: first sync (never synced)")
+                logger.info("[SmartSync] Dedao: \(bookLabel) - first sync (never synced)")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 2：书籍有变更（最新高亮修改时间 > 上次同步时间）→ 需要同步
             if let maxUpdated = maxHighlightUpdatedAt, maxUpdated > lastSyncTime! {
-                logger.info("[SmartSync] Dedao[\(book.bookId)]: changes detected (maxUpdated: \(maxUpdated), lastSync: \(lastSyncTime!))")
+                logger.info("[SmartSync] Dedao: \(bookLabel) - changes detected")
                 eligibleBooks.append(book)
                 continue
             }
             
             // 情况 3：书籍无变更 → 跳过
-            logger.debug("[SmartSync] Dedao[\(book.bookId)]: skipped (no changes)")
+            logger.debug("[SmartSync] Dedao: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
                 name: Notification.Name("SyncBookStatusChanged"),
                 object: nil,
@@ -170,16 +171,15 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                                 apiService: apiService,
                                 cacheService: cacheService
                             )
-                            try await syncEngine.syncSmart(source: adapter) { progress in
-                                logger.debug("[SmartSync] Dedao[\(book.bookId)] progress: \(progress)")
-                            }
+                            try await syncEngine.syncSmart(source: adapter) { _ in }
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
                         } catch {
-                            logger.error("[SmartSync] Dedao[\(book.bookId)] failed: \(error.localizedDescription)")
+                            let bookLabel = self.formatBookLabel(title: book.title, author: book.author)
+                            logger.error("[SmartSync] Dedao: \(bookLabel) - failed: \(error.localizedDescription)")
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
@@ -202,6 +202,15 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
             while await group.next() != nil {
                 addTaskIfPossible()
             }
+        }
+    }
+    
+    /// 格式化书籍标签用于日志显示
+    private func formatBookLabel(title: String, author: String) -> String {
+        if author.isEmpty {
+            return "《\(title)》"
+        } else {
+            return "《\(title)》(\(author))"
         }
     }
 }
