@@ -121,16 +121,22 @@ SyncNos/
 │   │   └── SyncQueueViewModel.swift
 │   └── LogViewModel.swift
 ├── Models/                       # 数据模型
-│   ├── Models.swift              # BookRow, Highlight, HighlightRow 等核心模型
-│   ├── UnifiedHighlight.swift    # 统一高亮模型（用于 SyncEngine）
-│   ├── AccountModels.swift       # 账户相关模型
-│   ├── HighlightColorScheme.swift # 高亮颜色管理
-│   ├── SyncQueueModels.swift     # 同步队列模型
-│   ├── GoodLinksModels.swift     # GoodLinks 数据模型
-│   ├── WeReadModels.swift        # 微信读书 API DTO 模型
-│   ├── WeReadCacheModels.swift   # 微信读书 SwiftData 缓存模型
-│   ├── DedaoModels.swift         # 得到 API DTO 模型
-│   └── DedaoCacheModels.swift    # 得到 SwiftData 缓存模型
+│   ├── Core/                     # 核心通用模型
+│   │   ├── Models.swift          # BookRow, Highlight, HighlightRow 等
+│   │   ├── UnifiedHighlight.swift # 统一高亮模型（用于 SyncEngine）
+│   │   └── HighlightColorScheme.swift # 高亮颜色管理
+│   ├── Account/                  # 账户相关模型
+│   │   ├── AccountModels.swift   # 认证令牌、登录方法、账户配置
+│   │   └── IAPDebugModels.swift  # IAP 调试模型
+│   ├── Sync/                     # 同步相关模型
+│   │   ├── SyncQueueModels.swift # 同步队列任务模型
+│   │   └── SyncedHighlightRecord.swift # 已同步高亮记录（本地 UUID 记录）
+│   ├── WeRead/                   # 微信读书模型
+│   │   ├── WeReadModels.swift    # API DTO 模型
+│   │   └── WeReadCacheModels.swift # SwiftData 缓存模型
+│   └── Dedao/                    # 得到模型
+│       ├── DedaoModels.swift     # API DTO 模型
+│       └── DedaoCacheModels.swift # SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -366,32 +372,35 @@ DIContainer.shared.dedaoCacheService
 
 ### 数据模型
 
-**核心模型**（Models/）：
+**核心模型**（Models/Core/）：
 - `HighlightRow`: 带关联书籍 ID 的高亮（用于内部处理）
 - `UnifiedHighlight`: 统一高亮模型（用于 SyncEngine，跨数据源通用）
 - `BookListItem`: 书籍元数据
-- `SyncQueueTask`: 同步任务实体
 - `HighlightColorScheme`: 高亮颜色方案管理
 
-**WeRead 模型**（Models/WeReadModels.swift）：
+**账户模型**（Models/Account/）：
+- `AccountModels`: 认证令牌、登录方法、账户配置
+- `IAPDebugModels`: IAP 购买类型、调试信息、错误类型
+
+**同步模型**（Models/Sync/）：
+- `SyncQueueTask`: 同步任务实体
+- `SyncedHighlightRecord`: 已同步高亮记录（本地 UUID → blockId 映射）
+
+**WeRead 模型**（Models/WeRead/）：
 - `WeReadBookListItem`: UI 列表展示模型
 - `WeReadNotebook`: 书籍列表响应模型（API DTO）
 - `WeReadBookInfo`: 书籍详细信息模型
 - `WeReadBookmark`: 书签/高亮数据模型
-
-**WeRead 缓存模型**（Models/WeReadCacheModels.swift）：
 - `CachedWeReadBook`: SwiftData 缓存的书籍
 - `CachedWeReadHighlight`: SwiftData 缓存的高亮
 - `WeReadSyncState`: 同步状态（syncKey、lastSyncAt）
 
-**Dedao 模型**（Models/DedaoModels.swift）：
+**Dedao 模型**（Models/Dedao/）：
 - `DedaoEbook`: 电子书 API DTO（支持 enid 和 id 双重标识）
 - `DedaoEbookNote`: 电子书笔记（兼容标准格式和混合格式两种 API 响应）
 - `DedaoBookListItem`: UI 列表展示模型
 - `DedaoUserInfo`: 用户信息模型
 - `DedaoQRCodeResponse`: 二维码登录响应
-
-**Dedao 缓存模型**（Models/DedaoCacheModels.swift）：
 - `CachedDedaoBook`: SwiftData 缓存的书籍
 - `CachedDedaoHighlight`: SwiftData 缓存的高亮
 - `DedaoSyncState`: 全局同步状态
