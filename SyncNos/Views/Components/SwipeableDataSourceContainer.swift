@@ -75,6 +75,22 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         }
         // 根据当前活动的 DataSource 设置 SelectionCommands
         .focusedSceneValue(\.selectionCommands, currentSelectionCommands)
+        // 追踪容器的 frame 和窗口，用于限制滑动手势的响应区域
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        updateContainerFrame(geometry: geometry)
+                    }
+                    .onChange(of: geometry.frame(in: .global)) { _, newFrame in
+                        swipeHandler.containerFrame = newFrame
+                    }
+            }
+        }
+        .background(WindowAccessor(window: Binding(
+            get: { swipeHandler.containerWindow },
+            set: { swipeHandler.containerWindow = $0 }
+        )))
         // 监听触控板滑动事件
         .onAppear {
             swipeHandler.onSwipeLeft = { [weak viewModel] in
@@ -98,6 +114,11 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         .onDisappear {
             swipeHandler.stopListening()
         }
+    }
+    
+    /// 更新容器 frame
+    private func updateContainerFrame(geometry: GeometryProxy) {
+        swipeHandler.containerFrame = geometry.frame(in: .global)
     }
     
     // MARK: - Computed Properties
@@ -232,6 +253,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
 
 /// 触控板双指水平滑动监听器
 /// 监听 macOS 的 swipe 手势事件（类似 Safari 前进/后退）
+/// 只在指定的容器视图区域内响应滑动事件
 final class TrackpadSwipeHandler: ObservableObject {
     
     /// 向左滑动回调（切换到下一个）
@@ -239,6 +261,12 @@ final class TrackpadSwipeHandler: ObservableObject {
     
     /// 向右滑动回调（切换到上一个）
     var onSwipeRight: (() -> Void)?
+    
+    /// 容器视图的 frame（用于检测事件是否在容器内）
+    @Published var containerFrame: CGRect = .zero
+    
+    /// 容器视图所在的窗口（用于坐标转换）
+    weak var containerWindow: NSWindow?
     
     private var scrollEventMonitor: Any?
     
@@ -283,6 +311,12 @@ final class TrackpadSwipeHandler: ObservableObject {
     private func handleScrollEvent(_ event: NSEvent) {
         // 只处理触控板事件（phase 不为 .none 表示是触控板）
         guard event.phase != [] || event.momentumPhase != [] else { return }
+        
+        // 检查事件是否发生在容器区域内
+        guard isEventInsideContainer(event) else {
+            resetScrollState()
+            return
+        }
         
         let deltaX = event.scrollingDeltaX
         let deltaY = event.scrollingDeltaY
@@ -333,10 +367,73 @@ final class TrackpadSwipeHandler: ObservableObject {
         }
     }
     
+    /// 检查事件是否发生在容器区域内
+    private func isEventInsideContainer(_ event: NSEvent) -> Bool {
+        // 确保容器 frame 有效
+        guard containerFrame.width > 0, containerFrame.height > 0 else {
+            return false
+        }
+        
+        // 获取事件发生的窗口
+        guard let eventWindow = event.window else {
+            return false
+        }
+        
+        // 确保事件来自同一个窗口
+        guard eventWindow == containerWindow else {
+            return false
+        }
+        
+        // 获取事件在窗口中的位置（窗口坐标系，原点在左下角）
+        let locationInWindow = event.locationInWindow
+        
+        // 将 containerFrame（SwiftUI 坐标系，原点在左上角）转换为窗口坐标系
+        // SwiftUI 的 frame 是相对于窗口内容区域的，原点在左上角
+        // NSEvent 的 locationInWindow 原点在左下角
+        guard let contentView = eventWindow.contentView else {
+            return false
+        }
+        
+        let contentHeight = contentView.bounds.height
+        
+        // 转换 Y 坐标：SwiftUI 的 minY 是从顶部算起，NSEvent 的 Y 是从底部算起
+        let containerInWindowCoords = CGRect(
+            x: containerFrame.minX,
+            y: contentHeight - containerFrame.maxY,
+            width: containerFrame.width,
+            height: containerFrame.height
+        )
+        
+        return containerInWindowCoords.contains(locationInWindow)
+    }
+    
     private func resetScrollState() {
         accumulatedScrollX = 0
         scrollStartTime = nil
         hasTriggered = false
+    }
+}
+
+// MARK: - Window Accessor
+
+/// 用于获取 SwiftUI 视图所在窗口的辅助视图
+private struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            self.window = view.window
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if self.window != nsView.window {
+                self.window = nsView.window
+            }
+        }
     }
 }
 
