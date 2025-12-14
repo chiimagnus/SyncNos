@@ -9,7 +9,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     private var tasksById: [String: SyncQueueTask] = [:]
     private var enqueuedOrder: [String] = []
     private var cleanupWorkItem: DispatchWorkItem?
-    private let cleanupDelaySeconds: TimeInterval = 5 * 60
+    private let cleanupDelaySeconds: TimeInterval = 10 * 60
     
     // MARK: - 失败任务冷却机制
     /// 失败任务的冷却时间（秒）
