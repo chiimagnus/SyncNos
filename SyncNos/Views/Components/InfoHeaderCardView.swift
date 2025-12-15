@@ -97,78 +97,78 @@ struct SelectionPlaceholderView: View {
     private var isMultipleSelection: Bool { count ?? 0 > 0 && onSyncSelected != nil }
 
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView {
-                VStack(spacing: 24) {
-                    // App Logo
-                    let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
-                    Image("HeaderCard")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: logoSize, height: logoSize)
+        ScrollView {
+            VStack(spacing: 24) {
+                // App Logo
+                let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
+                Image("HeaderCard")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: logoSize, height: logoSize)
 
-                    // 标题 - 直接使用 ContentSource 的属性
-                    let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
-                    Text(source.title)
-                        .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
-                        .fontWidth(.compressed)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                        .foregroundColor(source.accentColor)
+                // 标题 - 直接使用 ContentSource 的属性
+                let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
+                Text(source.title)
+                    .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
+                    .fontWidth(.compressed)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .foregroundColor(source.accentColor)
 
-                    if isMultipleSelection, let count {
-                        Button {
-                            onSyncSelected?()
-                        } label: {
-                            Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
-                        }
-                        .scaledFont(.body)
-                        .padding(.bottom, 16)
-                    } else {
-                        HStack(spacing: 12) {
-                            Text("Please select an item")
-                                .scaledFont(.title3)
-                                .foregroundColor(.secondary)
-                            
-                            if totalCount > 0 {
-                                Text("\(filteredCount)/\(totalCount)")
-                                    .scaledFont(.title3)
-                                    .monospacedDigit()
-                                    .foregroundColor(.secondary.opacity(0.7))
-                            }
-                        }
-                        .padding(.bottom, 16)
+                if isMultipleSelection, let count {
+                    Button {
+                        onSyncSelected?()
+                    } label: {
+                        Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
                     }
-
-                    // Sync Queue 区块
-                    VStack(alignment: .leading, spacing: 12) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                syncQueueCollapseStore.isCollapsed.toggle()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: syncQueueCollapseStore.isCollapsed ? "chevron.right" : "chevron.down")
-                                    .foregroundStyle(.secondary)
-                                Text("Sync Queue")
-                                    .scaledFont(.title2, weight: .semibold)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
+                    .scaledFont(.body)
+                    .padding(.bottom, 16)
+                } else {
+                    HStack(spacing: 12) {
+                        Text("Please select an item")
+                            .scaledFont(.title3)
+                            .foregroundColor(.secondary)
+                        
+                        if totalCount > 0 {
+                            Text("\(filteredCount)/\(totalCount)")
+                                .scaledFont(.title3)
+                                .monospacedDigit()
+                                .foregroundColor(.secondary.opacity(0.7))
                         }
-                        .buttonStyle(.plain)
+                    }
+                    .padding(.bottom, 16)
+                }
 
-                        if !syncQueueCollapseStore.isCollapsed {
-                            SyncQueueView()
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                // Sync Queue 区块
+                VStack(alignment: .leading, spacing: 12) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            syncQueueCollapseStore.isCollapsed.toggle()
                         }
+                    } label: {
+                        HStack {
+                            Image(systemName: syncQueueCollapseStore.isCollapsed ? "chevron.right" : "chevron.down")
+                                .foregroundStyle(.secondary)
+                            Text("Sync Queue")
+                                .scaledFont(.title2, weight: .semibold)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if !syncQueueCollapseStore.isCollapsed {
+                        SyncQueueView()
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
-                .padding()
             }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .containerRelativeFrame(.vertical, alignment: .center)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 }
 
