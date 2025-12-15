@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 
+// MARK: - SyncQueueCollapseStore
+
 /// 会话级的 Sync Queue 折叠状态（随应用重启重置）
 /// 当有任务入队时自动展开
 private final class SyncQueueCollapseStore: ObservableObject {
@@ -11,13 +13,11 @@ private final class SyncQueueCollapseStore: ObservableObject {
     private var previousTaskCount: Int = 0
     
     init() {
-        // 监听 SyncQueueStore 的任务变化，当有新任务入队时自动展开
         DIContainer.shared.syncQueueStore.tasksPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] tasks in
                 guard let self else { return }
                 let currentCount = tasks.count
-                // 只有当任务数量增加时才展开（表示有新任务入队）
                 if currentCount > self.previousTaskCount && self.isCollapsed {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         self.isCollapsed = false
@@ -29,28 +29,65 @@ private final class SyncQueueCollapseStore: ObservableObject {
     }
 }
 
+// MARK: - TimestampInfo
+
+/// 时间戳信息结构
+struct TimestampInfo {
+    let addedAt: Date?
+    let modifiedAt: Date?
+    let lastSyncAt: Date?
+    
+    var hasAnyTimestamp: Bool {
+        addedAt != nil || modifiedAt != nil || lastSyncAt != nil
+    }
+}
+
+// MARK: - TimestampItemView
+
+/// 单个时间戳显示项
+struct TimestampItemView: View {
+    let label: LocalizedStringKey
+    let date: Date
+    
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .short
+        f.timeStyle = .short
+        return f
+    }()
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .scaledFont(.caption2)
+                .foregroundColor(.secondary)
+            Text(Self.dateFormatter.string(from: date))
+                .scaledFont(.caption)
+        }
+    }
+}
+
+// MARK: - SelectionPlaceholderView
+
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
 struct SelectionPlaceholderView: View {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @StateObject private var syncQueueCollapseStore = SyncQueueCollapseStore.shared
     
-    let title: String
+    let source: ContentSource
     let count: Int?
-    let onSyncSelected: (() -> Void)?
-    
-    /// 过滤后的 item 数量
     let filteredCount: Int
-    /// 全部 item 数量
     let totalCount: Int
+    let onSyncSelected: (() -> Void)?
 
     init(
-        title: String,
+        source: ContentSource,
         count: Int? = nil,
         filteredCount: Int = 0,
         totalCount: Int = 0,
         onSyncSelected: (() -> Void)? = nil
     ) {
-        self.title = title
+        self.source = source
         self.count = count
         self.filteredCount = filteredCount
         self.totalCount = totalCount
@@ -59,40 +96,25 @@ struct SelectionPlaceholderView: View {
 
     private var isMultipleSelection: Bool { count ?? 0 > 0 && onSyncSelected != nil }
 
-    private func colorForTitle(_ title: String) -> Color {
-        switch title.lowercased() {
-        case let t where t.contains("apple"): // LogoColor - Apple Books
-            return Color("BrandAppleBooks")
-        case let t where t.contains("goodlinks"): // LogoColor - GoodLinks
-            return Color("BrandGoodLinks")
-        case let t where t.contains("weread"): // LogoColor - WeRead
-            return Color("BrandWeRead")
-        case let t where t.contains("dedao"): // LogoColor - Dedao
-            return Color("BrandDedao")
-        default:
-            return .primary
-        }
-    }
-
     var body: some View {
         GeometryReader { proxy in
             ScrollView {
                 VStack(spacing: 24) {
-                    // App Logo - 使用 fontScaleManager 进行缩放
+                    // App Logo
                     let logoSize: CGFloat = 120 * fontScaleManager.scaleFactor
                     Image("HeaderCard")
                         .resizable()
                         .scaledToFit()
                         .frame(width: logoSize, height: logoSize)
 
-                    // 标题 - 使用 fontScaleManager 进行缩放
+                    // 标题 - 直接使用 ContentSource 的属性
                     let titleFontSize: CGFloat = 56 * fontScaleManager.scaleFactor
-                    Text(title)
+                    Text(source.title)
                         .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
                         .fontWidth(.compressed)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
-                        .foregroundColor(colorForTitle(title))
+                        .foregroundColor(source.accentColor)
 
                     if isMultipleSelection, let count {
                         Button {
@@ -108,7 +130,6 @@ struct SelectionPlaceholderView: View {
                                 .scaledFont(.title3)
                                 .foregroundColor(.secondary)
                             
-                            // 显示过滤后/全部数量
                             if totalCount > 0 {
                                 Text("\(filteredCount)/\(totalCount)")
                                     .scaledFont(.title3)
@@ -119,6 +140,7 @@ struct SelectionPlaceholderView: View {
                         .padding(.bottom, 16)
                     }
 
+                    // Sync Queue 区块
                     VStack(alignment: .leading, spacing: 12) {
                         Button {
                             withAnimation(.easeInOut(duration: 0.18)) {
@@ -137,7 +159,6 @@ struct SelectionPlaceholderView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // 关键：无论空态或多选，均保留同一位置的 SyncQueueView，避免重新订阅
                         if !syncQueueCollapseStore.isCollapsed {
                             SyncQueueView()
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -151,24 +172,7 @@ struct SelectionPlaceholderView: View {
     }
 }
 
-/// 时间戳信息结构
-struct TimestampInfo {
-    let addedAt: Date?
-    let modifiedAt: Date?
-    let lastSyncAt: Date?
-    
-    var hasAnyTimestamp: Bool {
-        addedAt != nil || modifiedAt != nil || lastSyncAt != nil
-    }
-}
-
-/// 全局日期格式化器（避免泛型类型中的静态属性问题）
-private let infoHeaderDateFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateStyle = .short
-    f.timeStyle = .short
-    return f
-}()
+// MARK: - InfoHeaderCardView
 
 /// 通用的头部信息卡片，半透明背景，左右结构可扩展
 struct InfoHeaderCardView<Content: View, Trailing: View>: View {
@@ -214,37 +218,19 @@ struct InfoHeaderCardView<Content: View, Trailing: View>: View {
 
             content()
             
-            // 时间戳信息
+            // 时间戳信息 - 使用 TimestampItemView 消除重复
             if let timestamps = timestamps, timestamps.hasAnyTimestamp {
                 Divider()
                 
                 HStack(spacing: 16) {
                     if let addedAt = timestamps.addedAt {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Added Time")
-                                .scaledFont(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(infoHeaderDateFormatter.string(from: addedAt))
-                                .scaledFont(.caption)
-                        }
+                        TimestampItemView(label: "Added Time", date: addedAt)
                     }
                     if let modifiedAt = timestamps.modifiedAt {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Modified Time")
-                                .scaledFont(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(infoHeaderDateFormatter.string(from: modifiedAt))
-                                .scaledFont(.caption)
-                        }
+                        TimestampItemView(label: "Modified Time", date: modifiedAt)
                     }
                     if let lastSyncAt = timestamps.lastSyncAt {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Last Sync Time")
-                                .scaledFont(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(infoHeaderDateFormatter.string(from: lastSyncAt))
-                                .scaledFont(.caption)
-                        }
+                        TimestampItemView(label: "Last Sync Time", date: lastSyncAt)
                     }
                 }
             }

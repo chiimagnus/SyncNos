@@ -645,7 +645,7 @@ struct MainListView: View {
             AppleBooksDetailView(viewModelList: appleBooksVM, selectedBookId: singleBookBinding)
         } else {
             SelectionPlaceholderView(
-                title: contentSource.title,
+                source: contentSource,
                 count: selectedBookIds.isEmpty ? nil : selectedBookIds.count,
                 filteredCount: appleBooksVM.displayBooks.count,
                 totalCount: appleBooksVM.books.count,
@@ -664,7 +664,7 @@ struct MainListView: View {
             GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
         } else {
             SelectionPlaceholderView(
-                title: contentSource.title,
+                source: contentSource,
                 count: selectedLinkIds.isEmpty ? nil : selectedLinkIds.count,
                 filteredCount: goodLinksVM.displayLinks.count,
                 totalCount: goodLinksVM.links.count,
@@ -683,7 +683,7 @@ struct MainListView: View {
             WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
         } else {
             SelectionPlaceholderView(
-                title: contentSource.title,
+                source: contentSource,
                 count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
                 filteredCount: weReadVM.displayBooks.count,
                 totalCount: weReadVM.books.count,
@@ -702,7 +702,7 @@ struct MainListView: View {
             DedaoDetailView(listViewModel: dedaoVM, selectedBookId: singleDedaoBookBinding)
         } else {
             SelectionPlaceholderView(
-                title: contentSource.title,
+                source: contentSource,
                 count: selectedDedaoBookIds.isEmpty ? nil : selectedDedaoBookIds.count,
                 filteredCount: dedaoVM.displayBooks.count,
                 totalCount: dedaoVM.books.count,

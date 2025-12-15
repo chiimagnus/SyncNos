@@ -1,10 +1,51 @@
 import Foundation
+import SwiftUI
 
 enum SyncSource: String, Codable, CaseIterable, Sendable {
     case appleBooks
     case goodLinks
     case weRead
     case dedao
+    
+    /// 显示名称
+    var displayName: String {
+        switch self {
+        case .appleBooks: return "Apple Books"
+        case .goodLinks: return "GoodLinks"
+        case .weRead: return "WeRead"
+        case .dedao: return "Dedao"
+        }
+    }
+    
+    /// SF Symbol 图标
+    var iconName: String {
+        switch self {
+        case .appleBooks: return "book"
+        case .goodLinks: return "bookmark"
+        case .weRead: return "w.square"
+        case .dedao: return "d.square"
+        }
+    }
+    
+    /// 品牌颜色
+    var brandColor: Color {
+        switch self {
+        case .appleBooks: return Color("BrandAppleBooks")
+        case .goodLinks: return Color("BrandGoodLinks")
+        case .weRead: return Color("BrandWeRead")
+        case .dedao: return Color("BrandDedao")
+        }
+    }
+    
+    /// 品牌颜色背景透明度
+    var brandBackgroundOpacity: Double {
+        switch self {
+        case .appleBooks: return 0.18
+        case .goodLinks: return 0.12
+        case .weRead: return 0.14
+        case .dedao: return 0.14
+        }
+    }
 }  
 
 enum SyncTaskState: String, Codable, Sendable {
