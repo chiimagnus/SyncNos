@@ -4,6 +4,8 @@ import AppKit
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
+    /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
+    var onScrollViewResolved: (NSScrollView) -> Void
     @Environment(\.openWindow) private var openWindow
     
     // Detail ViewModel - 管理高亮数据
@@ -38,6 +40,11 @@ struct GoodLinksDetailView: View {
                             Color.clear
                                 .frame(height: 0)
                                 .id("goodlinksDetailTop")
+                                .background(
+                                    EnclosingScrollViewReader { scrollView in
+                                        onScrollViewResolved(scrollView)
+                                    }
+                                )
                         if let link = viewModel.links.first(where: { $0.id == linkId }) {
                             // 文章信息卡片 - 使用统一卡片
                             InfoHeaderCardView(

@@ -1,8 +1,11 @@
 import SwiftUI
+import AppKit
 
 struct WeReadDetailView: View {
     @ObservedObject var listViewModel: WeReadViewModel
     @Binding var selectedBookId: String?
+    /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
+    var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var detailViewModel = WeReadDetailViewModel()
     @Environment(\.openWindow) private var openWindow
     
@@ -42,6 +45,15 @@ struct WeReadDetailView: View {
             if let book = selectedBook {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        // Top anchor used for programmatic scrolling when content changes
+                        Color.clear
+                            .frame(height: 0)
+                            .id("weReadDetailTop")
+                            .background(
+                                EnclosingScrollViewReader { scrollView in
+                                    onScrollViewResolved(scrollView)
+                                }
+                            )
                         InfoHeaderCardView(
                             title: book.title,
                             subtitle: book.author.isEmpty ? nil : book.author,
