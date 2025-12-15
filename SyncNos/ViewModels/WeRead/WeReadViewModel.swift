@@ -415,15 +415,14 @@ final class WeReadViewModel: ObservableObject {
                                     )
                                 }
                             } catch {
+                                let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
                                     self.logger.error("[WeRead] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingBookIds.remove(id)
-                                }
-                                await MainActor.run {
                                     NotificationCenter.default.post(
                                         name: Notification.Name("SyncBookStatusChanged"),
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "failed"]
+                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                                     )
                                 }
                             }

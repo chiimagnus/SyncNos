@@ -433,13 +433,14 @@ final class GoodLinksDetailViewModel: ObservableObject {
                 } catch {
                     let desc = error.localizedDescription
                     logger.error("[GoodLinksDetail] syncSmart error: \(desc)")
+                    let errorInfo = SyncErrorInfo.from(error)
                     await MainActor.run {
                         self.errorMessage = desc
                         self.syncProgressText = nil
                         NotificationCenter.default.post(
                             name: Notifications.syncBookStatusChanged,
                             object: self,
-                            userInfo: ["bookId": link.id, "status": "failed"]
+                            userInfo: ["bookId": link.id, "status": "failed", "errorInfo": errorInfo]
                         )
                     }
                 }
