@@ -329,6 +329,30 @@ struct MainListView: View {
                     return nil
                 }
                 return event
+            case 115: // Home (Fn+←)
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetailToTop()
+                    return nil
+                }
+                return event
+            case 119: // End (Fn+→)
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetailToBottom()
+                    return nil
+                }
+                return event
+            case 116: // Page Up (Fn+↑)
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetailByPage(up: true)
+                    return nil
+                }
+                return event
+            case 121: // Page Down (Fn+↓)
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetailByPage(up: false)
+                    return nil
+                }
+                return event
             default:
                 return event
             }
@@ -368,6 +392,48 @@ struct MainListView: View {
         let effectiveDelta = (documentView.isFlipped ? delta : -delta)
         
         let clipView = scrollView.contentView
+        var newOrigin = clipView.bounds.origin
+        newOrigin.y += effectiveDelta
+        
+        let maxY = max(0, documentView.bounds.height - clipView.bounds.height)
+        newOrigin.y = min(max(newOrigin.y, 0), maxY)
+        
+        clipView.scroll(to: newOrigin)
+        scrollView.reflectScrolledClipView(clipView)
+    }
+    
+    /// 滚动到顶部 (Home)
+    private func scrollCurrentDetailToTop() {
+        guard let scrollView = currentDetailScrollView else { return }
+        let clipView = scrollView.contentView
+        clipView.scroll(to: NSPoint(x: 0, y: 0))
+        scrollView.reflectScrolledClipView(clipView)
+    }
+    
+    /// 滚动到底部 (End)
+    private func scrollCurrentDetailToBottom() {
+        guard let scrollView = currentDetailScrollView else { return }
+        guard let documentView = scrollView.documentView else { return }
+        
+        let clipView = scrollView.contentView
+        let maxY = max(0, documentView.bounds.height - clipView.bounds.height)
+        clipView.scroll(to: NSPoint(x: 0, y: maxY))
+        scrollView.reflectScrolledClipView(clipView)
+    }
+    
+    /// 按页滚动 (Page Up / Page Down)
+    private func scrollCurrentDetailByPage(up: Bool) {
+        guard let scrollView = currentDetailScrollView else { return }
+        guard let documentView = scrollView.documentView else { return }
+        
+        let clipView = scrollView.contentView
+        // 页滚动量为可见区域高度的 90%，留一点重叠便于阅读连贯
+        let pageHeight = clipView.bounds.height * 0.9
+        let delta = up ? -pageHeight : pageHeight
+        
+        // flipped 坐标系下，y 增大表示向下
+        let effectiveDelta = (documentView.isFlipped ? delta : -delta)
+        
         var newOrigin = clipView.bounds.origin
         newOrigin.y += effectiveDelta
         
