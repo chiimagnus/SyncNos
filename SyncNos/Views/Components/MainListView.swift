@@ -44,6 +44,8 @@ struct MainListView: View {
     @State private var mainWindow: NSWindow?
     /// 键盘事件监听器
     @State private var keyDownMonitor: Any?
+    /// 鼠标点击事件监听器（用于同步焦点状态）
+    @State private var mouseDownMonitor: Any?
     
     // MARK: - App Storage
     
@@ -174,11 +176,13 @@ struct MainListView: View {
                 detailColumn
             }
             .onChange(of: contentSourceRawValue) { _, _ in
-                // 切换数据源时重置选择
+                // 切换数据源时重置选择和焦点状态
                 selectedBookIds.removeAll()
                 selectedLinkIds.removeAll()
                 selectedWeReadBookIds.removeAll()
                 selectedDedaoBookIds.removeAll()
+                keyboardNavigationTarget = .list
+                currentDetailScrollView = nil
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
                 guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
@@ -383,12 +387,58 @@ struct MainListView: View {
                 return event
             }
         }
+        
+        // 监听鼠标点击，同步焦点状态
+        startMouseDownMonitorIfNeeded()
+    }
+    
+    private func startMouseDownMonitorIfNeeded() {
+        guard mouseDownMonitor == nil else { return }
+        
+        mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+            // 只处理 MainListView 所在窗口的事件
+            guard let window = self.mainWindow, event.window === window else {
+                return event
+            }
+            
+            // 延迟检查焦点，因为点击后焦点可能还没有切换
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.syncNavigationTargetWithFocus()
+            }
+            
+            return event
+        }
+    }
+    
+    /// 根据当前 firstResponder 同步 keyboardNavigationTarget 状态
+    private func syncNavigationTargetWithFocus() {
+        guard let window = mainWindow else { return }
+        guard let firstResponder = window.firstResponder else { return }
+        
+        // 检查 firstResponder 是否在 Detail 的 ScrollView 中
+        if let detailScrollView = currentDetailScrollView {
+            var responder: NSResponder? = firstResponder
+            while let r = responder {
+                if r === detailScrollView || r === detailScrollView.contentView {
+                    keyboardNavigationTarget = .detail
+                    return
+                }
+                responder = r.nextResponder
+            }
+        }
+        
+        // 否则认为焦点在 List
+        keyboardNavigationTarget = .list
     }
     
     private func stopKeyboardMonitorIfNeeded() {
         if let monitor = keyDownMonitor {
             NSEvent.removeMonitor(monitor)
             keyDownMonitor = nil
+        }
+        if let monitor = mouseDownMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseDownMonitor = nil
         }
     }
     
