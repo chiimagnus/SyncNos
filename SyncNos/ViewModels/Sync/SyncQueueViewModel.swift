@@ -6,11 +6,14 @@ final class SyncQueueViewModel: ObservableObject {
     @Published var runningTasks: [SyncQueueTask] = []
     @Published var queuedTasks: [SyncQueueTask] = []
     @Published var failedTasks: [SyncQueueTask] = []
+    @Published var cancelledTasks: [SyncQueueTask] = []
 
     /// 等待队列任务总数（包含未在 UI 中展示的部分）
     @Published var queuedTotalCount: Int = 0
     /// 失败任务总数（包含未在 UI 中展示的部分）
     @Published var failedTotalCount: Int = 0
+    /// 已取消任务总数
+    @Published var cancelledTotalCount: Int = 0
 
     /// 等待队列在 UI 中最多展示的任务数量（完整数据仍保存在 `SyncQueueStore` 中）
     private let maxQueuedDisplayCount: Int = 5
@@ -18,6 +21,12 @@ final class SyncQueueViewModel: ObservableObject {
     private let maxFailedDisplayCount: Int = 5
 
     var concurrencyLimit: Int { NotionSyncConfig.batchConcurrency }
+    
+    /// 是否有等待中的任务可以取消
+    var hasQueuedTasks: Bool { queuedTotalCount > 0 }
+    
+    /// 是否有已完成的任务可以清除
+    var hasCompletedTasks: Bool { failedTotalCount > 0 || cancelledTotalCount > 0 }
 
     private let store: SyncQueueStoreProtocol
     private var cancellables: Set<AnyCancellable> = []
@@ -27,8 +36,10 @@ final class SyncQueueViewModel: ObservableObject {
         var running: [SyncQueueTask]
         var queued: [SyncQueueTask]
         var failed: [SyncQueueTask]
+        var cancelled: [SyncQueueTask]
         var queuedTotal: Int
         var failedTotal: Int
+        var cancelledTotal: Int
     }
 
     private func groupTasks(_ tasks: [SyncQueueTask]) -> TaskGroups {
@@ -37,15 +48,19 @@ final class SyncQueueViewModel: ObservableObject {
         // 等待与失败任务只截取前 N 项，避免 ForEach 渲染上千条导致卡顿
         let queuedAll = tasks.filter { $0.state == .queued }
         let failedAll = tasks.filter { $0.state == .failed }
+        let cancelledAll = tasks.filter { $0.state == .cancelled }
         let queued = Array(queuedAll.prefix(maxQueuedDisplayCount))
         // 失败任务保持完整列表，默认在 UI 中折叠，只有在用户展开时才渲染
         let failed = failedAll
+        let cancelled = cancelledAll
         return TaskGroups(
             running: running,
             queued: queued,
             failed: failed,
+            cancelled: cancelled,
             queuedTotal: queuedAll.count,
-            failedTotal: failedAll.count
+            failedTotal: failedAll.count,
+            cancelledTotal: cancelledAll.count
         )
     }
 
@@ -58,7 +73,7 @@ final class SyncQueueViewModel: ObservableObject {
             .throttle(for: .milliseconds(120), scheduler: DispatchQueue.main, latest: true)
             .map { [weak self] tasks -> TaskGroups in
                 guard let self else {
-                    return TaskGroups(running: [], queued: [], failed: [], queuedTotal: 0, failedTotal: 0)
+                    return TaskGroups(running: [], queued: [], failed: [], cancelled: [], queuedTotal: 0, failedTotal: 0, cancelledTotal: 0)
                 }
                 return self.groupTasks(tasks)
             }
@@ -68,9 +83,33 @@ final class SyncQueueViewModel: ObservableObject {
                 self?.runningTasks = groups.running
                 self?.queuedTasks = groups.queued
                 self?.failedTasks = groups.failed
+                self?.cancelledTasks = groups.cancelled
                 self?.queuedTotalCount = groups.queuedTotal
                 self?.failedTotalCount = groups.failedTotal
+                self?.cancelledTotalCount = groups.cancelledTotal
             }
             .store(in: &cancellables)
+    }
+    
+    // MARK: - 取消操作
+    
+    /// 取消单个等待中的任务
+    func cancelTask(_ task: SyncQueueTask) {
+        store.cancelTask(source: task.source, rawId: task.rawId)
+    }
+    
+    /// 取消所有等待中的任务
+    func cancelAllQueued() {
+        store.cancelAllQueued(source: nil)
+    }
+    
+    /// 取消指定来源的所有等待任务
+    func cancelAllQueued(source: SyncSource) {
+        store.cancelAllQueued(source: source)
+    }
+    
+    /// 清除所有已完成的任务（succeeded/failed/cancelled）
+    func clearCompleted() {
+        store.clearCompleted()
     }
 }
