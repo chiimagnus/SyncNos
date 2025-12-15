@@ -232,10 +232,11 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                         } catch {
                             let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
                             logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
+                            let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "failed"]
+                                userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                         NotificationCenter.default.post(

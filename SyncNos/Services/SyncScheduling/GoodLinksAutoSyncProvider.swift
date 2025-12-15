@@ -197,10 +197,11 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                         } catch {
                             let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
                             self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
+                            let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "failed"]
+                                userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                     }
