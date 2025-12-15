@@ -294,9 +294,35 @@ struct MainListView: View {
                 return event
             }
             
-            // 不拦截带 Command/Option/Control 的组合键（例如 Cmd+←/→ 已用于切换数据源）
+            // 检查修饰键
             let modifiers = event.modifierFlags
-            if modifiers.contains(.command) || modifiers.contains(.option) || modifiers.contains(.control) {
+            let hasCommand = modifiers.contains(.command)
+            let hasOption = modifiers.contains(.option)
+            let hasControl = modifiers.contains(.control)
+            
+            // Cmd+↑/↓ 用于 Detail 滚动到顶部/底部
+            if hasCommand && !hasOption && !hasControl {
+                switch event.keyCode {
+                case 126: // Cmd+↑ 滚动到顶部
+                    if self.keyboardNavigationTarget == .detail {
+                        self.scrollCurrentDetailToTop()
+                        return nil
+                    }
+                    return event
+                case 125: // Cmd+↓ 滚动到底部
+                    if self.keyboardNavigationTarget == .detail {
+                        self.scrollCurrentDetailToBottom()
+                        return nil
+                    }
+                    return event
+                default:
+                    // 其他 Cmd 组合键（如 Cmd+←/→ 切换数据源）不拦截
+                    return event
+                }
+            }
+            
+            // 不拦截带 Option/Control 的组合键
+            if hasOption || hasControl {
                 return event
             }
             
