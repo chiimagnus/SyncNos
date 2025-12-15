@@ -402,10 +402,11 @@ extension GoodLinksViewModel {
                                     NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
                                 }
                             } catch {
+                                let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
                                     self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingLinkIds.remove(id)
-                                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])
+                                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo])
                                 }
                             }
                         }

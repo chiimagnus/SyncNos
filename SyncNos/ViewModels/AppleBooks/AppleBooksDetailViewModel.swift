@@ -358,11 +358,16 @@ final class AppleBooksDetailViewModel: ObservableObject {
                         NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
                     }
                 } catch {
+                    let errorInfo = SyncErrorInfo.from(error)
                     await MainActor.run {
                         self.errorMessage = error.localizedDescription
                         self.syncProgressText = nil
                         self.isSyncing = false
-                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "failed"])                
+                        NotificationCenter.default.post(
+                            name: Notification.Name("SyncBookStatusChanged"),
+                            object: nil,
+                            userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
+                        )
                     }
                 }
             }

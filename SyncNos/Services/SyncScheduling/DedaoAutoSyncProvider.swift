@@ -186,10 +186,11 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                         } catch {
                             let bookLabel = self.formatBookLabel(title: book.title, author: book.author)
                             logger.error("[SmartSync] Dedao: \(bookLabel) - failed: \(error.localizedDescription)")
+                            let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
                                 name: Notification.Name("SyncBookStatusChanged"),
                                 object: nil,
-                                userInfo: ["bookId": book.bookId, "status": "failed"]
+                                userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                         NotificationCenter.default.post(

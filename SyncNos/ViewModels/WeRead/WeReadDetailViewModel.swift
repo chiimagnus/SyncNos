@@ -444,6 +444,7 @@ final class WeReadDetailViewModel: ObservableObject {
                     }
                 } catch {
                     let desc = error.localizedDescription
+                    let errorInfo = SyncErrorInfo.from(error)
                     await MainActor.run {
                         self.logger.error("[WeReadDetail] syncSmart error: \(desc)")
                         self.isSyncing = false
@@ -452,7 +453,7 @@ final class WeReadDetailViewModel: ObservableObject {
                         NotificationCenter.default.post(
                             name: Notification.Name("SyncBookStatusChanged"),
                             object: self,
-                            userInfo: ["bookId": book.bookId, "status": "failed"]
+                            userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
                         )
                     }
                 }

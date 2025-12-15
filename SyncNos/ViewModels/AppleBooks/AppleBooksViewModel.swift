@@ -483,12 +483,15 @@ extension AppleBooksViewModel {
                                     NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
                                 }
                             } catch {
+                                let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
                                     self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     self.syncingBookIds.remove(id)
-                                }
-                                await MainActor.run {
-                                    NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed"])
+                                    NotificationCenter.default.post(
+                                        name: ABVMNotifications.syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                    )
                                 }
                             }
                         }
