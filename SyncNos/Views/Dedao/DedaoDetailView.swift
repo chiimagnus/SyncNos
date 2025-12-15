@@ -1,8 +1,11 @@
 import SwiftUI
+import AppKit
 
 struct DedaoDetailView: View {
     @ObservedObject var listViewModel: DedaoViewModel
     @Binding var selectedBookId: String?
+    /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
+    var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var detailViewModel = DedaoDetailViewModel()
     @Environment(\.openWindow) private var openWindow
     
@@ -53,6 +56,15 @@ struct DedaoDetailView: View {
     private func bookDetailView(book: DedaoBookListItem) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // Top anchor used for programmatic scrolling when content changes
+                Color.clear
+                    .frame(height: 0)
+                    .id("dedaoDetailTop")
+                    .background(
+                        EnclosingScrollViewReader { scrollView in
+                            onScrollViewResolved(scrollView)
+                        }
+                    )
                 bookHeaderView(book: book)
                 highlightsContentView(book: book)
                 backgroundSyncIndicator

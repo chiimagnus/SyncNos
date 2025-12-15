@@ -4,6 +4,8 @@ import AppKit
 struct AppleBooksDetailView: View {
     @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
+    /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
+    var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var viewModel = AppleBooksDetailViewModel()
     @State private var isSyncing = false
     @Environment(\.openWindow) private var openWindow
@@ -43,6 +45,11 @@ struct AppleBooksDetailView: View {
                             Color.clear
                                 .frame(height: 0)
                                 .id("appleBooksDetailTop")
+                                .background(
+                                    EnclosingScrollViewReader { scrollView in
+                                        onScrollViewResolved(scrollView)
+                                    }
+                                )
                             // Book header using unified card
                             InfoHeaderCardView(
                                 title: book.hasTitle ? book.bookTitle : "No Title",
@@ -287,6 +294,10 @@ struct AppleBooksDetailView_Previews: PreviewProvider {
         
         // Preview for new initializer
         let listVM = AppleBooksViewModel()
-        return AppleBooksDetailView(viewModelList: listVM, selectedBookId: .constant(sampleBook.bookId))
+        return AppleBooksDetailView(
+            viewModelList: listVM,
+            selectedBookId: .constant(sampleBook.bookId),
+            onScrollViewResolved: { _ in }
+        )
     }
 }
