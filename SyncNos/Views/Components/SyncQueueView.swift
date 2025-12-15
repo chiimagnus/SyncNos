@@ -12,47 +12,7 @@ struct SyncSourceBadge: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .foregroundStyle(source.brandColor)
-            .background(source.brandColor.opacity(source.backgroundOpacity), in: Capsule())
-    }
-}
-
-// MARK: - SyncSource Extension
-
-private extension SyncSource {
-    var displayName: String {
-        switch self {
-        case .appleBooks: return "Apple Books"
-        case .goodLinks: return "GoodLinks"
-        case .weRead: return "WeRead"
-        case .dedao: return "Dedao"
-        }
-    }
-    
-    var iconName: String {
-        switch self {
-        case .appleBooks: return "book"
-        case .goodLinks: return "bookmark"
-        case .weRead: return "w.square"
-        case .dedao: return "d.square"
-        }
-    }
-    
-    var brandColor: Color {
-        switch self {
-        case .appleBooks: return Color("BrandAppleBooks")
-        case .goodLinks: return Color("BrandGoodLinks")
-        case .weRead: return Color("BrandWeRead")
-        case .dedao: return Color("BrandDedao")
-        }
-    }
-    
-    var backgroundOpacity: Double {
-        switch self {
-        case .appleBooks: return 0.18
-        case .goodLinks: return 0.12
-        case .weRead: return 0.14
-        case .dedao: return 0.14
-        }
+            .background(source.brandColor.opacity(source.brandBackgroundOpacity), in: Capsule())
     }
 }
 
