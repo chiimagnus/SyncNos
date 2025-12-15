@@ -123,12 +123,108 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             }
         }
     }
+    
+    // MARK: - 取消任务 API
+    
+    /// 取消单个等待中的任务
+    /// - Parameters:
+    ///   - source: 数据源类型
+    ///   - rawId: 任务原始 ID
+    /// - Returns: 是否成功取消
+    @discardableResult
+    func cancelTask(source: SyncSource, rawId: String) -> Bool {
+        let taskId = "\(source.rawValue):\(rawId)"
+        var cancelled = false
+        
+        stateQueue.sync {
+            guard var task = tasksById[taskId] else { return }
+            
+            // 只能取消 queued 状态的任务
+            // running 状态的任务需要通过 Task cancellation 机制
+            if task.state == .queued {
+                task.state = .cancelled
+                tasksById[taskId] = task
+                cancelled = true
+            }
+        }
+        
+        if cancelled {
+            publish()
+            // 发送取消通知，以便 SyncActivityMonitor 等组件感知
+            notificationCenter.post(
+                name: Notification.Name("SyncBookStatusChanged"),
+                object: nil,
+                userInfo: ["bookId": rawId, "status": "cancelled"]
+            )
+        }
+        
+        return cancelled
+    }
+    
+    /// 取消所有等待中的任务（指定来源）
+    /// - Parameter source: 数据源类型，nil 表示所有来源
+    /// - Returns: 取消的任务数量
+    @discardableResult
+    func cancelAllQueued(source: SyncSource? = nil) -> Int {
+        var cancelledCount = 0
+        var cancelledRawIds: [String] = []
+        
+        stateQueue.sync {
+            for key in enqueuedOrder {
+                guard var task = tasksById[key] else { continue }
+                
+                // 过滤来源
+                if let source, task.source != source { continue }
+                
+                // 只取消 queued 状态的任务
+                if task.state == .queued {
+                    task.state = .cancelled
+                    tasksById[key] = task
+                    cancelledCount += 1
+                    cancelledRawIds.append(task.rawId)
+                }
+            }
+        }
+        
+        if cancelledCount > 0 {
+            publish()
+            // 批量发送取消通知
+            for rawId in cancelledRawIds {
+                notificationCenter.post(
+                    name: Notification.Name("SyncBookStatusChanged"),
+                    object: nil,
+                    userInfo: ["bookId": rawId, "status": "cancelled"]
+                )
+            }
+        }
+        
+        return cancelledCount
+    }
+    
+    /// 清除所有已完成的任务（succeeded/failed/cancelled）
+    func clearCompleted() {
+        stateQueue.sync {
+            let toRemove = enqueuedOrder.filter { key in
+                guard let task = tasksById[key] else { return true }
+                return task.state == .succeeded || task.state == .failed || task.state == .cancelled
+            }
+            for key in toRemove {
+                tasksById.removeValue(forKey: key)
+                failedTaskTimestamps.removeValue(forKey: key)
+            }
+            enqueuedOrder.removeAll { toRemove.contains($0) }
+        }
+        publish()
+    }
 
     // MARK: - Private (通知处理)
     
     private func handleStatusChanged(info: [String: Any]) {
         guard let rawId = info["bookId"] as? String,
               let status = info["status"] as? String else { return }
+        
+        // 提取错误信息（如果有）
+        let errorInfo = info["errorInfo"] as? SyncErrorInfo
 
         var changed = false
         var matchedCount = 0
@@ -139,15 +235,32 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                 guard var t = tasksById[key], t.rawId == rawId else { continue }
                 matchedCount += 1
                 switch status {
-                case "started": t.state = .running
+                case "started":
+                    t.state = .running
+                    // 清除之前可能残留的错误信息
+                    t.errorType = nil
+                    t.errorMessage = nil
+                    t.errorDetails = nil
                 case "succeeded":
                     t.state = .succeeded
                     // 成功时清除冷却记录（如果有）
                     failedTaskTimestamps.removeValue(forKey: key)
+                    // 清除错误信息
+                    t.errorType = nil
+                    t.errorMessage = nil
+                    t.errorDetails = nil
                 case "failed":
                     t.state = .failed
                     // 记录失败时间，启动冷却机制
                     failedTaskTimestamps[key] = now
+                    // 记录错误信息
+                    if let errorInfo {
+                        t.errorType = errorInfo.type
+                        t.errorMessage = errorInfo.message
+                        t.errorDetails = errorInfo.details
+                    }
+                case "cancelled":
+                    t.state = .cancelled
                 default: break
                 }
                 tasksById[key] = t

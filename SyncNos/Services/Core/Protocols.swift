@@ -417,6 +417,25 @@ protocol SyncQueueStoreProtocol: AnyObject {
     
     /// 批量检查，返回正在处理的任务 ID
     func activeTaskIds(source: SyncSource, rawIds: Set<String>) -> Set<String>
+    
+    // MARK: - 取消任务 API
+    
+    /// 取消单个等待中的任务
+    /// - Parameters:
+    ///   - source: 数据源类型
+    ///   - rawId: 任务原始 ID
+    /// - Returns: 是否成功取消
+    @discardableResult
+    func cancelTask(source: SyncSource, rawId: String) -> Bool
+    
+    /// 取消所有等待中的任务（指定来源）
+    /// - Parameter source: 数据源类型，nil 表示所有来源
+    /// - Returns: 取消的任务数量
+    @discardableResult
+    func cancelAllQueued(source: SyncSource?) -> Int
+    
+    /// 清除所有已完成的任务（succeeded/failed/cancelled）
+    func clearCompleted()
 }
 
 // MARK: - Dedao Auth & Data Protocols
