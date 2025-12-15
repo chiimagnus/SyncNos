@@ -1,6 +1,12 @@
 import SwiftUI
 import AppKit
 
+/// 键盘导航目标：当前焦点在 List 还是 Detail
+private enum KeyboardNavigationTarget {
+    case list
+    case detail
+}
+
 struct MainListView: View {
     // MARK: - State Objects
     
@@ -25,6 +31,19 @@ struct MainListView: View {
     @State private var showSessionExpiredAlert: Bool = false
     @State private var sessionExpiredSource: ContentSource = .weRead
     @State private var sessionExpiredReason: String = ""
+    
+    // MARK: - Keyboard Navigation State
+    
+    /// 当前键盘导航目标（List 或 Detail）
+    @State private var keyboardNavigationTarget: KeyboardNavigationTarget = .list
+    /// 当前 Detail 视图的 NSScrollView（用于键盘滚动）
+    @State private var currentDetailScrollView: NSScrollView?
+    /// 保存进入 Detail 前的 firstResponder，用于返回时恢复
+    @State private var savedMasterFirstResponder: NSResponder?
+    /// 当前窗口引用（用于过滤键盘事件）
+    @State private var mainWindow: NSWindow?
+    /// 键盘事件监听器
+    @State private var keyDownMonitor: Any?
     
     // MARK: - App Storage
     
@@ -79,11 +98,17 @@ struct MainListView: View {
     
     var body: some View {
         mainContent
+            .background(WindowReader(window: $mainWindow))
             .onAppear {
                 // 根据当前启用的数据源初始化滑动容器
                 updateDataSourceSwitchViewModel()
                 // 同步滑动容器与菜单状态
                 syncSwipeViewModelWithContentSource()
+                // 启动键盘监听
+                startKeyboardMonitorIfNeeded()
+            }
+            .onDisappear {
+                stopKeyboardMonitorIfNeeded()
             }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
@@ -255,6 +280,135 @@ struct MainListView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
                 refreshCurrentSource()
             }
+        }
+    }
+    
+    // MARK: - Keyboard Monitor
+    
+    private func startKeyboardMonitorIfNeeded() {
+        guard keyDownMonitor == nil else { return }
+        
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 只处理 MainListView 所在窗口的事件，避免影响 Settings 等其它窗口
+            guard let window = self.mainWindow, event.window === window else {
+                return event
+            }
+            
+            // 不拦截带 Command/Option/Control 的组合键（例如 Cmd+←/→ 已用于切换数据源）
+            let modifiers = event.modifierFlags
+            if modifiers.contains(.command) || modifiers.contains(.option) || modifiers.contains(.control) {
+                return event
+            }
+            
+            switch event.keyCode {
+            case 123: // ←
+                if self.keyboardNavigationTarget == .detail {
+                    self.keyboardNavigationTarget = .list
+                    self.focusBackToMaster(window: window)
+                    return nil
+                }
+                return event
+            case 124: // →
+                if self.keyboardNavigationTarget == .list, self.hasSingleSelectionForCurrentSource() {
+                    // 保存进入 Detail 前的真实焦点（通常是当前 List），用于返回时恢复
+                    self.savedMasterFirstResponder = window.firstResponder
+                    self.keyboardNavigationTarget = .detail
+                    self.focusDetailScrollViewIfPossible(window: window)
+                    return nil
+                }
+                return event
+            case 126: // ↑
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetail(byLines: -1)
+                    return nil
+                }
+                return event
+            case 125: // ↓
+                if self.keyboardNavigationTarget == .detail {
+                    self.scrollCurrentDetail(byLines: 1)
+                    return nil
+                }
+                return event
+            default:
+                return event
+            }
+        }
+    }
+    
+    private func stopKeyboardMonitorIfNeeded() {
+        if let monitor = keyDownMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyDownMonitor = nil
+        }
+    }
+    
+    private func hasSingleSelectionForCurrentSource() -> Bool {
+        switch contentSource {
+        case .appleBooks:
+            return selectedBookIds.count == 1
+        case .goodLinks:
+            return selectedLinkIds.count == 1
+        case .weRead:
+            return selectedWeReadBookIds.count == 1
+        case .dedao:
+            return selectedDedaoBookIds.count == 1
+        }
+    }
+    
+    private func scrollCurrentDetail(byLines lines: Int) {
+        guard let scrollView = currentDetailScrollView else { return }
+        guard let documentView = scrollView.documentView else { return }
+        
+        // 基于 "一行" 的滚动步长（同时考虑动态字体缩放）
+        let baseStep: CGFloat = 56
+        let step = baseStep * fontScaleManager.scaleFactor
+        let delta = CGFloat(lines) * step
+        
+        // flipped 坐标系下，y 增大表示向下
+        let effectiveDelta = (documentView.isFlipped ? delta : -delta)
+        
+        let clipView = scrollView.contentView
+        var newOrigin = clipView.bounds.origin
+        newOrigin.y += effectiveDelta
+        
+        let maxY = max(0, documentView.bounds.height - clipView.bounds.height)
+        newOrigin.y = min(max(newOrigin.y, 0), maxY)
+        
+        clipView.scroll(to: newOrigin)
+        scrollView.reflectScrolledClipView(clipView)
+    }
+    
+    // MARK: - Focus Helpers
+    
+    private func focusDetailScrollViewIfPossible(window: NSWindow) {
+        guard let scrollView = currentDetailScrollView else { return }
+        DispatchQueue.main.async {
+            // 让 Detail 真正成为 first responder，List 的选中高亮会变为非激活（灰色）
+            _ = window.makeFirstResponder(scrollView.contentView)
+        }
+    }
+    
+    private func focusBackToMaster(window: NSWindow) {
+        let responder = savedMasterFirstResponder
+        DispatchQueue.main.async {
+            if let responder, window.makeFirstResponder(responder) {
+                return
+            }
+            // 兜底：触发当前数据源 List 再次请求焦点（保留现有机制，避免焦点丢失导致 ↑↓ 不再选中 List）
+            NotificationCenter.default.post(name: self.focusNotificationName(for: self.contentSource), object: nil)
+        }
+    }
+    
+    private func focusNotificationName(for source: ContentSource) -> Notification.Name {
+        switch source {
+        case .appleBooks:
+            return Notification.Name("DataSourceSwitchedToAppleBooks")
+        case .goodLinks:
+            return Notification.Name("DataSourceSwitchedToGoodLinks")
+        case .weRead:
+            return Notification.Name("DataSourceSwitchedToWeRead")
+        case .dedao:
+            return Notification.Name("DataSourceSwitchedToDedao")
         }
     }
     
@@ -642,7 +796,13 @@ struct MainListView: View {
                 get: { selectedBookIds.first },
                 set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
             )
-            AppleBooksDetailView(viewModelList: appleBooksVM, selectedBookId: singleBookBinding)
+            AppleBooksDetailView(
+                viewModelList: appleBooksVM,
+                selectedBookId: singleBookBinding,
+                onScrollViewResolved: { scrollView in
+                    currentDetailScrollView = scrollView
+                }
+            )
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
@@ -661,7 +821,13 @@ struct MainListView: View {
                 get: { selectedLinkIds.first },
                 set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
             )
-            GoodLinksDetailView(viewModel: goodLinksVM, selectedLinkId: singleLinkBinding)
+            GoodLinksDetailView(
+                viewModel: goodLinksVM,
+                selectedLinkId: singleLinkBinding,
+                onScrollViewResolved: { scrollView in
+                    currentDetailScrollView = scrollView
+                }
+            )
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
@@ -680,7 +846,13 @@ struct MainListView: View {
                 get: { selectedWeReadBookIds.first },
                 set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
             )
-            WeReadDetailView(listViewModel: weReadVM, selectedBookId: singleWeReadBinding)
+            WeReadDetailView(
+                listViewModel: weReadVM,
+                selectedBookId: singleWeReadBinding,
+                onScrollViewResolved: { scrollView in
+                    currentDetailScrollView = scrollView
+                }
+            )
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
@@ -699,7 +871,13 @@ struct MainListView: View {
                 get: { selectedDedaoBookIds.first },
                 set: { new in selectedDedaoBookIds = new.map { Set([$0]) } ?? [] }
             )
-            DedaoDetailView(listViewModel: dedaoVM, selectedBookId: singleDedaoBookBinding)
+            DedaoDetailView(
+                listViewModel: dedaoVM,
+                selectedBookId: singleDedaoBookBinding,
+                onScrollViewResolved: { scrollView in
+                    currentDetailScrollView = scrollView
+                }
+            )
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
