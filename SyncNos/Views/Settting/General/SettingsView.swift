@@ -141,6 +141,17 @@ struct SettingsView: View {
                                 .scaledFont(.caption)
                         }
                     }
+                    
+                    NavigationLink(destination: OCRSettingsView()) {
+                        HStack {
+                            Label("WeChat OCR", systemImage: "text.viewfinder")
+                                .scaledFont(.body)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .scaledFont(.caption)
+                        }
+                    }
 
 #if DEBUG
                     NavigationLink(destination: EmptyView()) {
