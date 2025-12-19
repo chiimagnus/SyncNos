@@ -36,6 +36,9 @@ class DIContainer {
     private var _syncedHighlightStore: SyncedHighlightStoreProtocol?
     // Environment
     private var _environmentDetector: EnvironmentDetectorProtocol?
+    // OCR
+    private var _ocrConfigStore: OCRConfigStoreProtocol?
+    private var _ocrAPIService: OCRAPIServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -250,6 +253,25 @@ class DIContainer {
         }
         return _environmentDetector!
     }
+    
+    // MARK: - OCR Services
+    
+    var ocrConfigStore: OCRConfigStoreProtocol {
+        if _ocrConfigStore == nil {
+            _ocrConfigStore = OCRConfigStore.shared
+        }
+        return _ocrConfigStore!
+    }
+    
+    var ocrAPIService: OCRAPIServiceProtocol {
+        if _ocrAPIService == nil {
+            _ocrAPIService = OCRAPIService(
+                configStore: ocrConfigStore,
+                logger: loggerService
+            )
+        }
+        return _ocrAPIService!
+    }
 
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
@@ -347,5 +369,13 @@ class DIContainer {
     
     func register(dedaoCacheService: DedaoCacheServiceProtocol) {
         self._dedaoCacheService = dedaoCacheService
+    }
+    
+    func register(ocrConfigStore: OCRConfigStoreProtocol) {
+        self._ocrConfigStore = ocrConfigStore
+    }
+    
+    func register(ocrAPIService: OCRAPIServiceProtocol) {
+        self._ocrAPIService = ocrAPIService
     }
 }
