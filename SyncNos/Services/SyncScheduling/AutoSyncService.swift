@@ -65,7 +65,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         providers: [SyncSource: AutoSyncSourceProvider]? = nil,
-        intervalSeconds: TimeInterval = 30  // 30 秒（测试用）
+        intervalSeconds: TimeInterval = 5 * 60  // 5分钟
     ) {
         self.logger = logger
         self.notionConfig = notionConfig
