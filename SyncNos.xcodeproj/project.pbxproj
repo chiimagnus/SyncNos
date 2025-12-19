@@ -137,7 +137,6 @@
 				ko,
 				"pt-BR",
 				ru,
-				"es-ES",
 				da,
 				fi,
 				nl,
