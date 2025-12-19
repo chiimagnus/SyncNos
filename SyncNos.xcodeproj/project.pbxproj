@@ -26,7 +26,6 @@
 			membershipExceptions = (
 				.env,
 				architecture.svg,
-				ChangeLog.cn.md,
 				ChangeLog.md,
 				image.png,
 				SyncNos.storekit,
