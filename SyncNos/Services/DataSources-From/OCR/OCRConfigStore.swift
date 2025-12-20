@@ -1,110 +1,88 @@
 import Foundation
-import Security
 
-// MARK: - OCR Config Store Protocol
+// MARK: - OCR Provider
 
-protocol OCRConfigStoreProtocol {
+enum OCRProvider: String, CaseIterable, Identifiable {
+    case deepseekOCR = "DeepSeek-OCR"
+    case paddleOCR = "PaddleOCR"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .deepseekOCR: return "DeepSeek-OCR (硅基流动)"
+        case .paddleOCR: return "PaddleOCR (百度 AI Studio)"
+        }
+    }
+}
+
+// MARK: - Protocol
+
+protocol OCRConfigStoreProtocol: AnyObject {
+    var provider: OCRProvider { get set }
     var apiKey: String? { get set }
+    var paddleApiKey: String? { get set }
     var isConfigured: Bool { get }
 }
 
-// MARK: - OCR Config Store
+// MARK: - Config Store
 
-/// OCR 配置存储（硅基流动 DeepSeek-OCR）
-/// 使用 Keychain 安全存储 API Key
-final class OCRConfigStore: OCRConfigStoreProtocol {
+final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     static let shared = OCRConfigStore()
     
-    // MARK: - Constants
+    // MARK: - DeepSeek-OCR Constants
     
-    /// 硅基流动 API 端点
     static let baseURL = "https://api.siliconflow.cn/v1"
-    
-    /// DeepSeek-OCR 模型名称
     static let model = "deepseek-ai/DeepSeek-OCR"
     
-    // MARK: - Keys
-    private enum Keys {
-        static let keychainService = "com.syncnos.ocr.siliconflow"
-        static let keychainAccount = "apiKey"
+    // MARK: - PaddleOCR Constants (待确认)
+    
+    static let paddleBaseURL = "https://www.paddleocr.com/api/v1"
+    static let paddleModel = "PP-OCRv5"
+    
+    // MARK: - Published Properties
+    
+    @Published var provider: OCRProvider {
+        didSet { save(provider.rawValue, forKey: .provider) }
     }
     
-    // MARK: - Properties
-    
-    var apiKey: String? {
-        get {
-            return retrieveAPIKeyFromKeychain()
-        }
-        set {
-            if let key = newValue, !key.isEmpty {
-                saveAPIKeyToKeychain(key)
-            } else {
-                deleteAPIKeyFromKeychain()
-            }
-        }
+    @Published var apiKey: String? {
+        didSet { save(apiKey, forKey: .deepseekApiKey) }
     }
+    
+    @Published var paddleApiKey: String? {
+        didSet { save(paddleApiKey, forKey: .paddleApiKey) }
+    }
+    
+    // MARK: - Computed Properties
     
     var isConfigured: Bool {
-        guard let key = apiKey, !key.isEmpty else {
-            return false
+        switch provider {
+        case .deepseekOCR:
+            return apiKey != nil && !apiKey!.isEmpty
+        case .paddleOCR:
+            return paddleApiKey != nil && !paddleApiKey!.isEmpty
         }
-        return true
     }
     
     // MARK: - Init
     
-    private init() {}
-    
-    // MARK: - Keychain Operations
-    
-    private func saveAPIKeyToKeychain(_ apiKey: String) {
-        // 先删除旧的
-        deleteAPIKeyFromKeychain()
-        
-        guard let data = apiKey.data(using: .utf8) else { return }
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Keys.keychainService,
-            kSecAttrAccount as String: Keys.keychainAccount,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        if status != errSecSuccess {
-            print("[OCRConfigStore] Failed to save API key to Keychain: \(status)")
-        }
+    private init() {
+        let providerRaw = UserDefaults.standard.string(forKey: Keys.provider.rawValue)
+        self.provider = OCRProvider(rawValue: providerRaw ?? "") ?? .deepseekOCR
+        self.apiKey = UserDefaults.standard.string(forKey: Keys.deepseekApiKey.rawValue)
+        self.paddleApiKey = UserDefaults.standard.string(forKey: Keys.paddleApiKey.rawValue)
     }
     
-    private func retrieveAPIKeyFromKeychain() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Keys.keychainService,
-            kSecAttrAccount as String: Keys.keychainAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let apiKey = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-        
-        return apiKey
+    // MARK: - Keys
+    
+    private enum Keys: String {
+        case provider = "ocr_provider"
+        case deepseekApiKey = "ocr_deepseek_api_key"
+        case paddleApiKey = "ocr_paddle_api_key"
     }
     
-    private func deleteAPIKeyFromKeychain() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Keys.keychainService,
-            kSecAttrAccount as String: Keys.keychainAccount
-        ]
-        
-        SecItemDelete(query as CFDictionary)
+    private func save(_ value: String?, forKey key: Keys) {
+        UserDefaults.standard.set(value, forKey: key.rawValue)
     }
 }
