@@ -29,7 +29,6 @@ struct MainListView: View {
     
     @State private var showNewConversationAlert: Bool = false
     @State private var newConversationName: String = ""
-    @State private var newConversationIsGroup: Bool = false
     
     // MARK: - Centralized Alert State
     
@@ -246,23 +245,22 @@ struct MainListView: View {
             // MARK: - WeChat Chat New Conversation Alert
             .alert("新建对话", isPresented: $showNewConversationAlert) {
                 TextField("联系人/群聊名称", text: $newConversationName)
-                Toggle("群聊", isOn: $newConversationIsGroup)
                 Button("创建") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                    // 通过名称是否包含"群"字自动判断是否是群聊
+                    let isGroup = newConversationName.contains("群")
                     let contactId = wechatChatVM.createConversation(
                         name: newConversationName.trimmingCharacters(in: .whitespaces),
-                        isGroup: newConversationIsGroup
+                        isGroup: isGroup
                     )
                     selectedWechatContactIds = [contactId.uuidString]
                     newConversationName = ""
-                    newConversationIsGroup = false
                 }
                 Button("取消", role: .cancel) {
                     newConversationName = ""
-                    newConversationIsGroup = false
                 }
             } message: {
-                Text("输入联系人或群聊名称")
+                Text("输入联系人或群聊名称（名称包含\"群\"将自动标记为群聊）")
             }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗

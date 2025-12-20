@@ -271,19 +271,3 @@ final class WechatChatViewModel: ObservableObject {
     }
 }
 
-// MARK: - Parser Helper Extension
-
-extension WechatOCRParser {
-    func isLikelyTimestamp(_ text: String) -> Bool {
-        let patterns = [
-            #"^\d{1,2}:\d{2}$"#,
-            #"^\d{1,2}月\d{1,2}日"#
-        ]
-        for pattern in patterns {
-            if text.range(of: pattern, options: .regularExpression) != nil {
-                return true
-            }
-        }
-        return false
-    }
-}
