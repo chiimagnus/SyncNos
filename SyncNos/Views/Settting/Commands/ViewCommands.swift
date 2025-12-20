@@ -184,6 +184,21 @@ struct ViewCommands: Commands {
                 }
             }
 
+            if isDataSourceEnabled(.wechatChat) {
+                if let key = shortcutKey(for: .wechatChat) {
+                    Button("微信聊天", systemImage: "message.fill") {
+                        contentSourceRawValue = ContentSource.wechatChat.rawValue
+                    }
+                    .keyboardShortcut(key, modifiers: .command)
+                    .disabled(currentSource == .wechatChat)
+                } else {
+                    Button("微信聊天", systemImage: "message.fill") {
+                        contentSourceRawValue = ContentSource.wechatChat.rawValue
+                    }
+                    .disabled(currentSource == .wechatChat)
+                }
+            }
+
             Divider()
 
             // 全局 Filter 菜单（按当前 contentSource 切换显示内容） — 展平为一级命令
