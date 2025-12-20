@@ -9,11 +9,12 @@ final class WechatOCRParser {
     
     // MARK: - Constants
     
-    /// 左侧消息阈值：消息起始 x < 25% 图片宽度 → 对方消息
-    private let leftMessageThreshold: CGFloat = 0.25
+    /// 左侧消息阈值：消息起始 x < 15% 图片宽度 → 对方消息（头像约50px，图片宽度约500-1000px）
+    private let leftMinXThreshold: CGFloat = 0.15
     
-    /// 右侧消息阈值：消息结束 x > 75% 图片宽度 → 我的消息
-    private let rightMessageThreshold: CGFloat = 0.75
+    /// 右侧消息阈值：消息起始 x > 50% 图片宽度 且 结束 x > 85% → 我的消息
+    private let rightMinXThreshold: CGFloat = 0.50
+    private let rightMaxXThreshold: CGFloat = 0.85
     
     /// 发送者昵称与消息的最大间距（像素）
     private let senderNameMaxGap: CGFloat = 60
@@ -156,32 +157,39 @@ final class WechatOCRParser {
             return .system
         }
         
-        // 3. 判断消息方向
+        // 3. 计算相对位置
         let relativeMinX = block.bbox.minX / imageWidth
         let relativeMaxX = block.bbox.maxX / imageWidth
         
         // 4. 可能是发送者昵称的特征：
         //    - 短文本（< 20 字符）
-        //    - 在左侧
+        //    - 在左侧（minX < 15%）
         //    - 不是时间戳/系统消息
-        if text.count < 20 && relativeMinX < leftMessageThreshold {
-            // 进一步检查：昵称通常是单行、不包含标点、较短
+        if text.count < 20 && relativeMinX < leftMinXThreshold {
             if isLikelySenderName(text) {
                 return .senderName
             }
         }
         
-        // 5. 判断消息方向
-        if relativeMinX < leftMessageThreshold {
-            return .message(isFromMe: false)  // 左侧 = 对方消息
-        }
-        if relativeMaxX > rightMessageThreshold {
-            return .message(isFromMe: true)   // 右侧 = 我的消息
+        // 5. 判断消息方向 - 核心逻辑
+        //    微信布局特点：
+        //    - 对方消息：头像在左侧，气泡紧挨头像 → minX 很小（< 15%）
+        //    - 我的消息：头像在右侧，气泡紧挨头像 → minX 很大（> 50%）且 maxX 接近右边（> 85%）
+        //    - 长消息：即使对方发的长消息，maxX 可能很大，但 minX 仍然很小
+        
+        // 如果 minX 很小，说明气泡从左侧开始 → 对方消息
+        if relativeMinX < leftMinXThreshold {
+            return .message(isFromMe: false)
         }
         
-        // 6. 中间地带：使用中心点判断
-        let centerX = block.bbox.midX / imageWidth
-        return .message(isFromMe: centerX > 0.55)
+        // 如果 minX 很大（>50%）且 maxX 接近右边界（>85%）→ 我的消息
+        if relativeMinX > rightMinXThreshold && relativeMaxX > rightMaxXThreshold {
+            return .message(isFromMe: true)
+        }
+        
+        // 6. 中间地带（可能是居中的消息卡片、链接等）
+        //    使用 minX 作为主要判断依据：minX < 30% 视为对方，否则视为我的
+        return .message(isFromMe: relativeMinX > 0.30)
     }
     
     /// 判断是否可能是发送者昵称
