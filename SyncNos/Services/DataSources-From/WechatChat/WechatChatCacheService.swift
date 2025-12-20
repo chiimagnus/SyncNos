@@ -132,7 +132,6 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         if let existing {
             // 更新现有记录
             existing.name = contact.name
-            existing.isGroup = contact.isGroup
             existing.updatedAt = Date()
         } else {
             // 创建新记录

@@ -79,11 +79,11 @@ final class WechatChatViewModel: ObservableObject {
     }
     
     /// 创建新对话（用户手动输入名称）
-    /// - Parameter name: 联系人/群聊名称
+    /// - Parameter name: 联系人名称
     /// - Returns: 新创建的联系人 ID
     @discardableResult
-    func createConversation(name: String, isGroup: Bool = false) -> UUID {
-        let contact = WechatContact(name: name, isGroup: isGroup)
+    func createConversation(name: String) -> UUID {
+        let contact = WechatContact(name: name)
         let conversation = WechatConversation(contact: contact, screenshots: [])
         conversations[contact.id] = conversation
         updateContactsList()
@@ -184,8 +184,7 @@ final class WechatChatViewModel: ObservableObject {
             name: newName,
             lastMessage: oldContact.lastMessage,
             lastMessageTime: oldContact.lastMessageTime,
-            messageCount: oldContact.messageCount,
-            isGroup: oldContact.isGroup
+            messageCount: oldContact.messageCount
         )
         conversation = WechatConversation(contact: newContact, screenshots: conversation.screenshots)
         conversations[contactId] = conversation
