@@ -1,31 +1,51 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// OCR 设置视图（硅基流动 DeepSeek-OCR）
+/// OCR 设置视图
 struct OCRSettingsView: View {
     @StateObject private var viewModel = OCRSettingsViewModel()
     
     var body: some View {
         Form {
+            // MARK: - Provider 选择
+            Section {
+                Picker("OCR 服务", selection: $viewModel.provider) {
+                    ForEach(OCRProvider.allCases) { provider in
+                        Text(provider.displayName).tag(provider)
+                    }
+                }
+                .pickerStyle(.menu)
+            } header: {
+                Text("OCR 服务提供商")
+            }
+            
             // MARK: - API Key 配置
             Section {
-                SecureField("硅基流动 API Key", text: $viewModel.apiKey)
-                    .textFieldStyle(.roundedBorder)
+                if viewModel.provider == .deepseekOCR {
+                    SecureField("硅基流动 API Key", text: $viewModel.deepseekApiKey)
+                        .textFieldStyle(.roundedBorder)
+                    
+                    Link("获取 API Key", destination: URL(string: "https://cloud.siliconflow.cn")!)
+                        .font(.caption)
+                } else {
+                    SecureField("百度 AI Studio API Key", text: $viewModel.paddleApiKey)
+                        .textFieldStyle(.roundedBorder)
+                    
+                    Link("获取 API Key", destination: URL(string: "https://www.paddleocr.com")!)
+                        .font(.caption)
+                }
                 
                 HStack {
                     Button("测试连接") {
                         Task { await viewModel.testConnection() }
                     }
-                    .disabled(viewModel.apiKey.isEmpty || viewModel.isTesting)
+                    .disabled(!viewModel.isConfigured || viewModel.isTesting)
                     
                     if viewModel.isTesting {
                         ProgressView().scaleEffect(0.8)
                     }
                     
                     Spacer()
-                    
-                    Link("获取 API Key", destination: URL(string: "https://cloud.siliconflow.cn")!)
-                        .font(.caption)
                 }
                 
                 if let result = viewModel.testResult {
@@ -34,22 +54,18 @@ struct OCRSettingsView: View {
                         .font(.caption)
                 }
             } header: {
-                Text("硅基流动 API 配置")
+                Text("API 配置")
             } footer: {
-                Text("模型: deepseek-ai/DeepSeek-OCR")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if viewModel.provider == .deepseekOCR {
+                    Text("模型: deepseek-ai/DeepSeek-OCR")
+                } else {
+                    Text("模型: PP-OCRv5 (通用 OCR)")
+                }
             }
             
             // MARK: - 测试识别
             Section {
-                Picker("识别模式", selection: $viewModel.useGrounding) {
-                    Text("Free OCR（纯文字）").tag(false)
-                    Text("Grounding（带 bbox）").tag(true)
-                }
-                .pickerStyle(.segmented)
-                
-                Button("选择图片测试") {
+                Button("选择图片测试 OCR") {
                     viewModel.showImagePicker = true
                 }
                 .disabled(!viewModel.isConfigured)
@@ -86,11 +102,6 @@ struct OCRSettingsView: View {
                 }
             } header: {
                 Text("测试识别")
-            } footer: {
-                Text(viewModel.useGrounding 
-                    ? "输出格式: <|ref|>文字<|/ref|><|det|>[[x1,y1,x2,y2]]<|/det|>" 
-                    : "纯文字输出，无位置信息")
-                    .font(.caption2)
             }
         }
         .formStyle(.grouped)
@@ -102,32 +113,37 @@ struct OCRSettingsView: View {
         ) { result in
             viewModel.handleImageSelection(result)
         }
-        .onAppear { viewModel.loadSettings() }
-        .onDisappear { viewModel.saveSettings() }
     }
 }
 
 // MARK: - View Model
 
 @MainActor
-class OCRSettingsViewModel: ObservableObject {
-    @Published var apiKey: String = ""
-    @Published var useGrounding: Bool = false
+final class OCRSettingsViewModel: ObservableObject {
+    @Published var provider: OCRProvider {
+        didSet { configStore.provider = provider }
+    }
+    @Published var deepseekApiKey: String = "" {
+        didSet { configStore.apiKey = deepseekApiKey.isEmpty ? nil : deepseekApiKey }
+    }
+    @Published var paddleApiKey: String = "" {
+        didSet { configStore.paddleApiKey = paddleApiKey.isEmpty ? nil : paddleApiKey }
+    }
     
-    @Published var isTesting: Bool = false
+    @Published var isTesting = false
     @Published var testResult: TestResult?
     
-    @Published var showImagePicker: Bool = false
+    @Published var showImagePicker = false
     @Published var testImage: NSImage?
-    @Published var isRecognizing: Bool = false
+    @Published var isRecognizing = false
     @Published var ocrResult: String?
     @Published var ocrError: String?
     
-    private var configStore: OCRConfigStoreProtocol
+    private let configStore: OCRConfigStore
     private let ocrService: OCRAPIServiceProtocol
     private let logger: LoggerServiceProtocol
     
-    var isConfigured: Bool { !apiKey.isEmpty }
+    var isConfigured: Bool { configStore.isConfigured }
     
     struct TestResult {
         let success: Bool
@@ -135,23 +151,18 @@ class OCRSettingsViewModel: ObservableObject {
     }
     
     init() {
-        self.configStore = DIContainer.shared.ocrConfigStore
+        self.configStore = OCRConfigStore.shared
         self.ocrService = DIContainer.shared.ocrAPIService
         self.logger = DIContainer.shared.loggerService
-    }
-    
-    func loadSettings() {
-        apiKey = configStore.apiKey ?? ""
-    }
-    
-    func saveSettings() {
-        configStore.apiKey = apiKey.isEmpty ? nil : apiKey
+        
+        self.provider = configStore.provider
+        self.deepseekApiKey = configStore.apiKey ?? ""
+        self.paddleApiKey = configStore.paddleApiKey ?? ""
     }
     
     func testConnection() async {
         isTesting = true
         testResult = nil
-        saveSettings()
         
         do {
             let success = try await ocrService.testConnection()
@@ -187,20 +198,15 @@ class OCRSettingsViewModel: ObservableObject {
         }
     }
     
-    func recognizeImage(_ image: NSImage) async {
+    private func recognizeImage(_ image: NSImage) async {
         isRecognizing = true
         ocrResult = nil
         ocrError = nil
-        saveSettings()
         
         do {
-            if useGrounding {
-                let result = try await ocrService.recognizeWithGrounding(image)
-                ocrResult = formatBBoxResult(result)
-            } else {
-                let text = try await ocrService.recognizeFreeOCR(image)
-                ocrResult = text
-            }
+            // 目前只支持 DeepSeek-OCR
+            let text = try await ocrService.recognizeFreeOCR(image)
+            ocrResult = text
             logger.info("[OCR] Recognition completed")
         } catch {
             ocrError = error.localizedDescription
@@ -208,22 +214,6 @@ class OCRSettingsViewModel: ObservableObject {
         }
         
         isRecognizing = false
-    }
-    
-    private func formatBBoxResult(_ result: OCRResultWithBBox) -> String {
-        var output = "=== 原始输出 ===\n\(result.rawText)\n\n"
-        output += "=== 解析的文本块 (\(result.textBlocks.count) 个) ===\n"
-        
-        for (i, block) in result.textBlocks.enumerated() {
-            output += "\n[\(i + 1)] \(block.text)"
-            output += "\n    坐标: [\(block.rawBbox.map { String($0) }.joined(separator: ", "))]"
-        }
-        
-        if let usage = result.tokenUsage {
-            output += "\n\n=== Token ===\nTotal: \(usage.totalTokens ?? 0)"
-        }
-        
-        return output
     }
 }
 
