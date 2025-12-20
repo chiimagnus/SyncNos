@@ -53,13 +53,34 @@ final class WechatChatViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// 导入截图并识别
-    func importScreenshots(urls: [URL]) async {
+    /// 创建新对话（用户手动输入名称）
+    /// - Parameter name: 联系人/群聊名称
+    /// - Returns: 新创建的联系人 ID
+    @discardableResult
+    func createConversation(name: String, isGroup: Bool = false) -> UUID {
+        let contact = WechatContact(name: name, isGroup: isGroup)
+        let conversation = WechatConversation(contact: contact, screenshots: [])
+        conversations[contact.id] = conversation
+        updateContactsList()
+        logger.info("[WechatChat] Created new conversation: \(name)")
+        return contact.id
+    }
+    
+    /// 向指定对话追加截图
+    /// - Parameters:
+    ///   - contactId: 联系人 ID
+    ///   - urls: 截图文件 URL 列表
+    func addScreenshots(to contactId: UUID, urls: [URL]) async {
+        guard conversations[contactId] != nil else {
+            errorMessage = "对话不存在"
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
         for url in urls {
-            await importSingleScreenshot(url: url)
+            await importScreenshotToConversation(contactId: contactId, url: url)
         }
         
         isLoading = false
@@ -99,9 +120,27 @@ final class WechatChatViewModel: ObservableObject {
         NSPasteboard.general.setString(text, forType: .string)
     }
     
+    /// 重命名对话
+    func renameConversation(_ contactId: UUID, newName: String) {
+        guard var conversation = conversations[contactId] else { return }
+        let oldContact = conversation.contact
+        let newContact = WechatContact(
+            id: oldContact.id,
+            name: newName,
+            lastMessage: oldContact.lastMessage,
+            lastMessageTime: oldContact.lastMessageTime,
+            messageCount: oldContact.messageCount,
+            isGroup: oldContact.isGroup
+        )
+        conversation = WechatConversation(contact: newContact, screenshots: conversation.screenshots)
+        conversations[contactId] = conversation
+        updateContactsList()
+    }
+    
     // MARK: - Private Methods
     
-    private func importSingleScreenshot(url: URL) async {
+    /// 向指定对话导入单个截图
+    private func importScreenshotToConversation(contactId: UUID, url: URL) async {
         guard url.startAccessingSecurityScopedResource() else {
             errorMessage = "无法访问文件: \(url.lastPathComponent)"
             return
@@ -113,41 +152,27 @@ final class WechatChatViewModel: ObservableObject {
             return
         }
         
-        // 创建截图记录
         var screenshot = WechatScreenshot(image: image, isProcessing: true)
         let screenshotId = screenshot.id
         processingScreenshotIds.insert(screenshotId)
         
         do {
-            logger.info("[WechatChat] Processing screenshot: \(url.lastPathComponent)")
+            logger.info("[WechatChat] Processing screenshot for conversation: \(url.lastPathComponent)")
             
-            // OCR 识别
             let ocrResult = try await ocrService.recognize(image)
             let messages = parser.parse(ocrResult: ocrResult, imageSize: image.size)
             
             screenshot.messages = messages
             screenshot.isProcessing = false
             
-            // 从 OCR 结果或文件名提取联系人名称
-            let contactName = extractContactName(from: ocrResult, fileName: url.lastPathComponent)
-            screenshot.contactName = contactName
-            
-            // 查找或创建联系人
-            let contact = findOrCreateContact(name: contactName, isGroup: detectIsGroup(messages: messages))
-            
-            // 更新对话
-            if var conversation = conversations[contact.id] {
+            // 追加到现有对话
+            if var conversation = conversations[contactId] {
                 conversation.screenshots.append(screenshot)
-                conversations[contact.id] = conversation
-            } else {
-                let newConversation = WechatConversation(contact: contact, screenshots: [screenshot])
-                conversations[contact.id] = newConversation
+                conversations[contactId] = conversation
+                updateContactsList()
             }
             
-            // 更新联系人列表
-            updateContactsList()
-            
-            logger.info("[WechatChat] Parsed \(messages.count) messages for \(contactName)")
+            logger.info("[WechatChat] Added \(messages.count) messages to conversation")
             
         } catch {
             logger.error("[WechatChat] OCR failed: \(error)")
@@ -157,55 +182,16 @@ final class WechatChatViewModel: ObservableObject {
         processingScreenshotIds.remove(screenshotId)
     }
     
-    /// 从 OCR 结果提取联系人名称
-    private func extractContactName(from ocrResult: OCRResult, fileName: String) -> String {
-        // 尝试从第一个 block 提取（通常是标题栏）
-        if let firstBlock = ocrResult.blocks.first {
-            let text = firstBlock.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            // 排除时间戳
-            if !text.isEmpty && !parser.isLikelyTimestamp(text) && text.count < 30 {
-                return text
-            }
-        }
-        
-        // 使用文件名作为备选
-        let name = fileName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
-        return name.isEmpty ? "未知联系人" : name
-    }
-    
-    /// 查找或创建联系人
-    private func findOrCreateContact(name: String, isGroup: Bool) -> WechatContact {
-        // 查找现有联系人
-        if let existingItem = contacts.first(where: { $0.name == name }) {
-            return WechatContact(
-                id: existingItem.contactId,
-                name: existingItem.name,
-                isGroup: existingItem.isGroup
-            )
-        }
-        
-        // 创建新联系人
-        return WechatContact(name: name, isGroup: isGroup)
-    }
-    
-    /// 检测是否是群聊（通过消息中是否有多个不同的发送者名称）
-    private func detectIsGroup(messages: [WechatMessage]) -> Bool {
-        let senderNames = Set(messages.compactMap { $0.senderName })
-        return senderNames.count > 1
-    }
-    
     /// 更新联系人列表
     private func updateContactsList() {
         contacts = conversations.values.map { conversation in
             var contact = conversation.contact
             
-            // 更新最后消息和消息数量
             let allMessages = conversation.allMessages.filter { $0.type == .text || $0.type == .image || $0.type == .voice }
             contact.messageCount = allMessages.count
             
             if let lastMessage = allMessages.last {
                 contact.lastMessage = lastMessage.content
-                // 查找最近的时间戳
                 if let timestamp = conversation.allMessages.last(where: { $0.type == .timestamp }) {
                     contact.lastMessageTime = timestamp.content
                 }
@@ -219,7 +205,6 @@ final class WechatChatViewModel: ObservableObject {
 // MARK: - Parser Helper Extension
 
 extension WechatOCRParser {
-    /// 检测是否像时间戳
     func isLikelyTimestamp(_ text: String) -> Bool {
         let patterns = [
             #"^\d{1,2}:\d{2}$"#,

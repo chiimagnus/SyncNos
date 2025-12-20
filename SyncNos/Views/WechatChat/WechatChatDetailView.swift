@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Wechat Chat Detail View
 
@@ -7,7 +8,9 @@ struct WechatChatDetailView: View {
     @ObservedObject var listViewModel: WechatChatViewModel
     @Binding var selectedContactId: String?
     
+    @State private var showFilePicker = false
     @EnvironmentObject private var fontScaleManager: FontScaleManager
+    @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
     
     private var selectedContact: WechatBookListItem? {
         guard let id = selectedContactId else { return nil }
@@ -29,9 +32,23 @@ struct WechatChatDetailView: View {
                 
                 // 消息列表
                 if messages.isEmpty {
-                    emptyMessagesView
+                    emptyMessagesView(contact: contact)
                 } else {
                     messageListView
+                }
+            }
+            .fileImporter(
+                isPresented: $showFilePicker,
+                allowedContentTypes: [.image],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    Task {
+                        await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
+                    }
+                case .failure(let error):
+                    listViewModel.errorMessage = error.localizedDescription
                 }
             }
         } else {
@@ -42,28 +59,26 @@ struct WechatChatDetailView: View {
     // MARK: - Header
     
     private func headerView(contact: WechatBookListItem) -> some View {
-        HStack {
+        HStack(spacing: 12) {
             // 头像
             Circle()
                 .fill(Color(contact.avatarColor))
                 .frame(width: 32, height: 32)
                 .overlay {
-                    Text(contact.name.prefix(1))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
+                    if contact.isGroup {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                    } else {
+                        Text(contact.name.prefix(1))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                 }
             
             VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(contact.name)
-                        .font(.headline)
-                    
-                    if contact.isGroup {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                Text(contact.name)
+                    .font(.headline)
                 
                 Text("\(contact.messageCount) 条消息")
                     .font(.caption)
@@ -72,13 +87,34 @@ struct WechatChatDetailView: View {
             
             Spacer()
             
-            // 复制按钮
-            Button {
-                listViewModel.copyToClipboard(for: contact.contactId)
-            } label: {
-                Label("复制", systemImage: "doc.on.doc")
+            // 工具按钮
+            HStack(spacing: 8) {
+                // 导入截图按钮
+                Button {
+                    showFilePicker = true
+                } label: {
+                    Label("导入截图", systemImage: "photo.badge.plus")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!ocrConfigStore.isConfigured || listViewModel.isLoading)
+                .help("追加聊天截图")
+                
+                // 复制按钮
+                Button {
+                    listViewModel.copyToClipboard(for: contact.contactId)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .disabled(contact.messageCount == 0)
+                .help("复制全部聊天记录")
             }
-            .buttonStyle(.borderless)
+            
+            // 加载指示器
+            if listViewModel.isLoading {
+                ProgressView()
+                    .scaleEffect(0.7)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -101,13 +137,28 @@ struct WechatChatDetailView: View {
     
     // MARK: - Empty States
     
-    private var emptyMessagesView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "bubble.left.and.bubble.right")
+    private func emptyMessagesView(contact: WechatBookListItem) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 40))
                 .foregroundColor(.secondary)
+            
             Text("暂无消息")
+                .font(.headline)
                 .foregroundColor(.secondary)
+            
+            Text("点击上方「导入截图」添加聊天记录")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Button {
+                showFilePicker = true
+            } label: {
+                Label("导入截图", systemImage: "photo.badge.plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .disabled(!ocrConfigStore.isConfigured)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -209,6 +260,7 @@ private struct MessageBubble: View {
                 
                 // 消息内容
                 Text(messageContent)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
@@ -245,4 +297,3 @@ private struct MessageBubble: View {
     .environmentObject(FontScaleManager.shared)
     .frame(width: 500, height: 600)
 }
-
