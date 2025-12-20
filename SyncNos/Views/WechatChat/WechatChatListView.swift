@@ -10,6 +10,7 @@ struct WechatChatListView: View {
     
     @State private var showFilePicker = false
     @EnvironmentObject private var fontScaleManager: FontScaleManager
+    @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -58,7 +59,7 @@ struct WechatChatListView: View {
                 Label("导入截图", systemImage: "photo.badge.plus")
             }
             .buttonStyle(.borderless)
-            .disabled(!viewModel.isConfigured || viewModel.isLoading)
+            .disabled(!ocrConfigStore.isConfigured || viewModel.isLoading)
             
             Spacer()
             
@@ -82,7 +83,7 @@ struct WechatChatListView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            if !viewModel.isConfigured {
+            if !ocrConfigStore.isConfigured {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 40))
                     .foregroundColor(.orange)
