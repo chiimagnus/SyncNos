@@ -13,7 +13,8 @@
 - Apple Books
 - GoodLinks
 - WeRead（微信读书）
-- Dedao（得到）
+- Dedao（得到电子书笔记）
+- 聊天记录beta - OCR 版本
 - Notion
 
 ### Apple Books 同步
