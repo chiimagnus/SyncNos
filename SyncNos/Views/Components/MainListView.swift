@@ -25,6 +25,12 @@ struct MainListView: View {
     @State private var selectedDedaoBookIds: Set<String> = []
     @State private var selectedWechatContactIds: Set<String> = []
     
+    // MARK: - WeChat Chat State
+    
+    @State private var showNewConversationAlert: Bool = false
+    @State private var newConversationName: String = ""
+    @State private var newConversationIsGroup: Bool = false
+    
     // MARK: - Centralized Alert State
     
     /// 统一的 Notion 配置弹窗状态
@@ -237,6 +243,27 @@ struct MainListView: View {
                 .ignoresSafeArea()
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
+            // MARK: - WeChat Chat New Conversation Alert
+            .alert("新建对话", isPresented: $showNewConversationAlert) {
+                TextField("联系人/群聊名称", text: $newConversationName)
+                Toggle("群聊", isOn: $newConversationIsGroup)
+                Button("创建") {
+                    guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                    let contactId = wechatChatVM.createConversation(
+                        name: newConversationName.trimmingCharacters(in: .whitespaces),
+                        isGroup: newConversationIsGroup
+                    )
+                    selectedWechatContactIds = [contactId.uuidString]
+                    newConversationName = ""
+                    newConversationIsGroup = false
+                }
+                Button("取消", role: .cancel) {
+                    newConversationName = ""
+                    newConversationIsGroup = false
+                }
+            } message: {
+                Text("输入联系人或群聊名称")
+            }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗
             .alert("Notion Configuration Required", isPresented: $showNotionConfigAlert) {
@@ -735,7 +762,7 @@ struct MainListView: View {
             case .dedao:
                 dedaoFilterMenu
             case .wechatChat:
-                EmptyView() // 微信聊天没有筛选菜单
+                wechatChatFilterMenu
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
@@ -933,6 +960,26 @@ struct MainListView: View {
                 } else {
                     Label("Ascending", systemImage: "xmark")
                 }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var wechatChatFilterMenu: some View {
+        Button {
+            showNewConversationAlert = true
+        } label: {
+            Label("新建对话", systemImage: "plus.message")
+        }
+        
+        if !wechatChatVM.contacts.isEmpty {
+            Divider()
+            
+            Button(role: .destructive) {
+                wechatChatVM.clearAll()
+                selectedWechatContactIds.removeAll()
+            } label: {
+                Label("清空所有对话", systemImage: "trash")
             }
         }
     }
