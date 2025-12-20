@@ -15,8 +15,11 @@ struct WechatChatListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 联系人列表
-            if viewModel.contacts.isEmpty {
+            if viewModel.contacts.isEmpty && !viewModel.isLoading {
                 emptyStateView
+            } else if viewModel.isLoading && viewModel.contacts.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 contactList
             }
@@ -27,6 +30,12 @@ struct WechatChatListView: View {
             }
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        .task {
+            // 视图首次出现时从缓存加载
+            if viewModel.contacts.isEmpty {
+                await viewModel.loadFromCache()
+            }
         }
     }
     

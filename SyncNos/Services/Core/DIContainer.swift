@@ -39,6 +39,8 @@ class DIContainer {
     // OCR
     private var _ocrConfigStore: OCRConfigStoreProtocol?
     private var _ocrAPIService: OCRAPIServiceProtocol?
+    // WechatChat
+    private var _wechatChatCacheService: WechatChatCacheServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -272,6 +274,22 @@ class DIContainer {
         }
         return _ocrAPIService!
     }
+    
+    // MARK: - WechatChat Services
+    
+    var wechatChatCacheService: WechatChatCacheServiceProtocol {
+        if _wechatChatCacheService == nil {
+            do {
+                let container = try WechatChatModelContainerFactory.createContainer()
+                _wechatChatCacheService = WechatChatCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] WechatChatCacheService initialized with ModelContainer")
+            } catch {
+                loggerService.error("[DIContainer] Failed to create WechatChat ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create WechatChat ModelContainer: \(error.localizedDescription)")
+            }
+        }
+        return _wechatChatCacheService!
+    }
 
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
@@ -377,5 +395,9 @@ class DIContainer {
     
     func register(ocrAPIService: OCRAPIServiceProtocol) {
         self._ocrAPIService = ocrAPIService
+    }
+    
+    func register(wechatChatCacheService: WechatChatCacheServiceProtocol) {
+        self._wechatChatCacheService = wechatChatCacheService
     }
 }

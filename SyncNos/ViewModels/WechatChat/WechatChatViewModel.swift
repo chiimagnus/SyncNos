@@ -12,7 +12,7 @@ final class WechatChatViewModel: ObservableObject {
     /// 联系人/对话列表（用于左侧列表显示）
     @Published var contacts: [WechatBookListItem] = []
     
-    /// 所有对话数据
+    /// 所有对话数据（内存缓存）
     @Published private(set) var conversations: [UUID: WechatConversation] = [:]
     
     /// 是否正在加载
@@ -31,6 +31,7 @@ final class WechatChatViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let ocrService: OCRAPIServiceProtocol
+    private let cacheService: WechatChatCacheServiceProtocol
     private let parser: WechatOCRParser
     private let logger: LoggerServiceProtocol
     
@@ -44,14 +45,38 @@ final class WechatChatViewModel: ObservableObject {
     
     init(
         ocrService: OCRAPIServiceProtocol = DIContainer.shared.ocrAPIService,
+        cacheService: WechatChatCacheServiceProtocol = DIContainer.shared.wechatChatCacheService,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
         self.ocrService = ocrService
+        self.cacheService = cacheService
         self.parser = WechatOCRParser()
         self.logger = logger
     }
     
     // MARK: - Public Methods
+    
+    /// 从本地缓存加载对话列表
+    func loadFromCache() async {
+        isLoading = true
+        do {
+            let cachedContacts = try await cacheService.fetchAllConversations()
+            contacts = cachedContacts
+            
+            // 加载每个对话的消息到内存
+            for contact in cachedContacts {
+                if let conversation = try await cacheService.fetchConversation(id: contact.id) {
+                    conversations[contact.contactId] = conversation
+                }
+            }
+            
+            logger.info("[WechatChat] Loaded \(cachedContacts.count) conversations from cache")
+        } catch {
+            logger.error("[WechatChat] Failed to load from cache: \(error)")
+            errorMessage = "加载缓存失败: \(error.localizedDescription)"
+        }
+        isLoading = false
+    }
     
     /// 创建新对话（用户手动输入名称）
     /// - Parameter name: 联系人/群聊名称
@@ -62,7 +87,17 @@ final class WechatChatViewModel: ObservableObject {
         let conversation = WechatConversation(contact: contact, screenshots: [])
         conversations[contact.id] = conversation
         updateContactsList()
-        logger.info("[WechatChat] Created new conversation: \(name)")
+        
+        // 异步保存到缓存
+        Task {
+            do {
+                try await cacheService.saveConversation(contact)
+                logger.info("[WechatChat] Created and saved new conversation: \(name)")
+            } catch {
+                logger.error("[WechatChat] Failed to save conversation: \(error)")
+            }
+        }
+        
         return contact.id
     }
     
@@ -100,12 +135,32 @@ final class WechatChatViewModel: ObservableObject {
     func deleteContact(_ contact: WechatBookListItem) {
         contacts.removeAll { $0.id == contact.id }
         conversations.removeValue(forKey: contact.contactId)
+        
+        // 异步从缓存删除
+        Task {
+            do {
+                try await cacheService.deleteConversation(id: contact.id)
+                logger.info("[WechatChat] Deleted conversation: \(contact.name)")
+            } catch {
+                logger.error("[WechatChat] Failed to delete conversation: \(error)")
+            }
+        }
     }
     
     /// 清除所有数据
     func clearAll() {
         contacts.removeAll()
         conversations.removeAll()
+        
+        // 异步清除缓存
+        Task {
+            do {
+                try await cacheService.clearAllData()
+                logger.info("[WechatChat] Cleared all data")
+            } catch {
+                logger.error("[WechatChat] Failed to clear cache: \(error)")
+            }
+        }
     }
     
     /// 导出指定联系人的聊天记录
@@ -135,6 +190,16 @@ final class WechatChatViewModel: ObservableObject {
         conversation = WechatConversation(contact: newContact, screenshots: conversation.screenshots)
         conversations[contactId] = conversation
         updateContactsList()
+        
+        // 异步更新缓存
+        Task {
+            do {
+                try await cacheService.renameConversation(id: contactId.uuidString, newName: newName)
+                logger.info("[WechatChat] Renamed conversation to: \(newName)")
+            } catch {
+                logger.error("[WechatChat] Failed to rename conversation: \(error)")
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -165,14 +230,18 @@ final class WechatChatViewModel: ObservableObject {
             screenshot.messages = messages
             screenshot.isProcessing = false
             
-            // 追加到现有对话
+            // 追加到现有对话（内存）
             if var conversation = conversations[contactId] {
                 conversation.screenshots.append(screenshot)
                 conversations[contactId] = conversation
                 updateContactsList()
             }
             
-            logger.info("[WechatChat] Added \(messages.count) messages to conversation")
+            // 保存到缓存
+            try await cacheService.saveScreenshotMeta(screenshot, conversationId: contactId.uuidString)
+            try await cacheService.saveMessages(messages, conversationId: contactId.uuidString, screenshotId: screenshotId.uuidString)
+            
+            logger.info("[WechatChat] Added and saved \(messages.count) messages to conversation")
             
         } catch {
             logger.error("[WechatChat] OCR failed: \(error)")
