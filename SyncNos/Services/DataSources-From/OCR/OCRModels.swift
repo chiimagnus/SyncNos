@@ -3,20 +3,16 @@ import AppKit
 
 // MARK: - OCR Request/Response Models
 
-/// OCR API 请求消息内容类型
 enum OCRMessageContent: Encodable {
     case text(String)
     case imageURL(url: String)
     
     private enum CodingKeys: String, CodingKey {
-        case type
-        case text
+        case type, text
         case imageUrl = "image_url"
     }
     
-    private enum ImageURLKeys: String, CodingKey {
-        case url
-    }
+    private enum ImageURLKeys: String, CodingKey { case url }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -32,13 +28,11 @@ enum OCRMessageContent: Encodable {
     }
 }
 
-/// OCR API 请求消息
 struct OCRRequestMessage: Encodable {
     let role: String
     let content: [OCRMessageContent]
 }
 
-/// OCR API 请求体
 struct OCRRequest: Encodable {
     let model: String
     let messages: [OCRRequestMessage]
@@ -46,38 +40,24 @@ struct OCRRequest: Encodable {
     let temperature: Double
     
     private enum CodingKeys: String, CodingKey {
-        case model
-        case messages
+        case model, messages
         case maxTokens = "max_tokens"
         case temperature
     }
 }
 
-/// OCR API 响应
 struct OCRResponse: Decodable {
     let id: String?
-    let object: String?
-    let created: Int?
-    let model: String?
     let choices: [OCRChoice]?
     let usage: OCRUsage?
     let error: OCRError?
 }
 
 struct OCRChoice: Decodable {
-    let index: Int?
     let message: OCRResponseMessage?
-    let finishReason: String?
-    
-    private enum CodingKeys: String, CodingKey {
-        case index
-        case message
-        case finishReason = "finish_reason"
-    }
 }
 
 struct OCRResponseMessage: Decodable {
-    let role: String?
     let content: String?
 }
 
@@ -95,49 +75,6 @@ struct OCRUsage: Decodable {
 
 struct OCRError: Decodable {
     let message: String?
-    let type: String?
-    let code: String?
-}
-
-// MARK: - Wechat Chat Message Model
-
-/// 微信聊天消息
-struct WechatChatMessage: Identifiable, Codable {
-    let id: UUID
-    let sender: String           // 发送者名称
-    let content: String          // 消息内容
-    let timestamp: Date?         // 时间戳
-    let isFromMe: Bool           // 是否是自己发送的
-    let messageType: MessageType // 消息类型
-    
-    enum MessageType: String, Codable {
-        case text = "text"
-        case image = "image"
-        case voice = "voice"
-        case video = "video"
-        case link = "link"
-        case emoji = "emoji"
-        case file = "file"
-        case unknown = "unknown"
-    }
-    
-    init(id: UUID = UUID(), sender: String, content: String, timestamp: Date? = nil, isFromMe: Bool = false, messageType: MessageType = .text) {
-        self.id = id
-        self.sender = sender
-        self.content = content
-        self.timestamp = timestamp
-        self.isFromMe = isFromMe
-        self.messageType = messageType
-    }
-}
-
-/// 微信聊天截图识别结果
-struct WechatOCRResult {
-    let rawText: String              // 原始 OCR 结果
-    let messages: [WechatChatMessage] // 解析后的消息列表
-    let processedAt: Date            // 处理时间
-    let sourceImage: NSImage?        // 原始图片
-    let tokenUsage: OCRUsage?        // Token 使用量
 }
 
 // MARK: - OCR BBox Models
@@ -145,27 +82,15 @@ struct WechatOCRResult {
 /// OCR 识别的文本块（带边界框）
 struct OCRTextBlock: Identifiable {
     let id: UUID
-    let text: String                 // 识别的文字
-    let bbox: CGRect                 // 边界框（归一化坐标 0-1）
-    let rawBbox: [Int]               // 原始坐标 (0-999)
-    let blockType: BlockType         // 块类型
+    let text: String         // 识别的文字
+    let bbox: CGRect         // 归一化坐标 (0-1)
+    let rawBbox: [Int]       // 原始坐标 (0-999)
     
-    enum BlockType: String {
-        case text = "text"
-        case title = "title"
-        case image = "image"
-        case table = "table"
-        case formula = "formula"
-        case unknown = "unknown"
-    }
-    
-    init(id: UUID = UUID(), text: String, rawBbox: [Int], blockType: BlockType = .text) {
+    init(id: UUID = UUID(), text: String, rawBbox: [Int]) {
         self.id = id
         self.text = text
         self.rawBbox = rawBbox
-        self.blockType = blockType
         
-        // 将 0-999 坐标转换为 0-1 归一化坐标
         if rawBbox.count >= 4 {
             let x1 = CGFloat(rawBbox[0]) / 999.0
             let y1 = CGFloat(rawBbox[1]) / 999.0
@@ -177,9 +102,9 @@ struct OCRTextBlock: Identifiable {
         }
     }
     
-    /// 将归一化坐标转换为实际像素坐标
+    /// 转换为像素坐标
     func pixelRect(imageSize: CGSize) -> CGRect {
-        return CGRect(
+        CGRect(
             x: bbox.origin.x * imageSize.width,
             y: bbox.origin.y * imageSize.height,
             width: bbox.width * imageSize.width,
@@ -188,43 +113,33 @@ struct OCRTextBlock: Identifiable {
     }
 }
 
-/// 带 bbox 的 OCR 识别结果
+/// 带 bbox 的 OCR 结果
 struct OCRResultWithBBox {
-    let rawText: String              // 原始 OCR 结果
-    let textBlocks: [OCRTextBlock]   // 文本块列表（带 bbox）
-    let processedAt: Date            // 处理时间
-    let sourceImage: NSImage?        // 原始图片
-    let tokenUsage: OCRUsage?        // Token 使用量
+    let rawText: String
+    let textBlocks: [OCRTextBlock]
+    let processedAt: Date
+    let sourceImage: NSImage?
+    let tokenUsage: OCRUsage?
 }
 
 // MARK: - OCR Service Error
 
-/// OCR 服务错误
 enum OCRServiceError: LocalizedError {
     case apiKeyNotConfigured
     case invalidImageData
     case networkError(Error)
     case apiError(String)
-    case decodingError(Error)
     case rateLimitExceeded
     case unknown(String)
     
     var errorDescription: String? {
         switch self {
-        case .apiKeyNotConfigured:
-            return "OCR API Key 未配置，请在设置中配置硅基流动 API Key"
-        case .invalidImageData:
-            return "无效的图片数据"
-        case .networkError(let error):
-            return "网络错误: \(error.localizedDescription)"
-        case .apiError(let message):
-            return "API 错误: \(message)"
-        case .decodingError(let error):
-            return "数据解析错误: \(error.localizedDescription)"
-        case .rateLimitExceeded:
-            return "API 请求频率超限，请稍后重试"
-        case .unknown(let message):
-            return "未知错误: \(message)"
+        case .apiKeyNotConfigured: return "OCR API Key 未配置"
+        case .invalidImageData: return "无效的图片数据"
+        case .networkError(let error): return "网络错误: \(error.localizedDescription)"
+        case .apiError(let message): return "API 错误: \(message)"
+        case .rateLimitExceeded: return "API 请求频率超限"
+        case .unknown(let message): return "未知错误: \(message)"
         }
     }
 }
