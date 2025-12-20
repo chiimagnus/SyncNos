@@ -12,12 +12,14 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @ObservedObject var goodLinksVM: GoodLinksViewModel
     @ObservedObject var weReadVM: WeReadViewModel
     @ObservedObject var dedaoVM: DedaoViewModel
+    @ObservedObject var wechatChatVM: WechatChatViewModel
     
     // 选择状态绑定
     @Binding var selectedBookIds: Set<String>
     @Binding var selectedLinkIds: Set<String>
     @Binding var selectedWeReadBookIds: Set<String>
     @Binding var selectedDedaoBookIds: Set<String>
+    @Binding var selectedWechatContactIds: Set<String>
     
     // Filter 菜单
     @ViewBuilder var filterMenu: () -> FilterMenu
@@ -204,12 +206,21 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                 }
             )
         case .wechatChat:
-            // 微信聊天没有选择功能
             return SelectionCommands(
-                selectAll: {},
-                deselectAll: {},
-                canSelectAll: { false },
-                canDeselect: { false }
+                selectAll: {
+                    let all = Set(wechatChatVM.contacts.map { $0.id })
+                    if !all.isEmpty { selectedWechatContactIds = all }
+                },
+                deselectAll: {
+                    selectedWechatContactIds.removeAll()
+                },
+                canSelectAll: {
+                    let total = wechatChatVM.contacts.count
+                    return total > 0 && selectedWechatContactIds.count < total
+                },
+                canDeselect: {
+                    !selectedWechatContactIds.isEmpty
+                }
             )
         }
     }
@@ -228,7 +239,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         case .dedao:
             DedaoListView(viewModel: dedaoVM, selectionIds: $selectedDedaoBookIds)
         case .wechatChat:
-            WechatChatView()
+            WechatChatListView(viewModel: wechatChatVM, selectionIds: $selectedWechatContactIds)
         }
     }
     
