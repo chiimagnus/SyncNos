@@ -11,18 +11,29 @@ protocol OCRConfigStoreProtocol: AnyObject {
 // MARK: - OCR Config Store
 
 /// PaddleOCR-VL API 配置存储
-/// Token 从 https://aistudio.baidu.com/paddleocr/task 获取
+/// - API URL: 存储在 UserDefaults（非敏感）
+/// - Token: 存储在 Keychain（敏感信息，加密存储）
 final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     static let shared = OCRConfigStore()
+    
+    // MARK: - Constants
+    
+    private let keychainService = "com.syncnos.ocr"
+    private let tokenAccount = "paddle_token"
+    private let apiURLKey = "ocr_paddle_api_url"
     
     // MARK: - Published Properties
     
     @Published var apiURL: String? {
-        didSet { save(apiURL, forKey: .apiURL) }
+        didSet {
+            UserDefaults.standard.set(apiURL, forKey: apiURLKey)
+        }
     }
     
     @Published var token: String? {
-        didSet { save(token, forKey: .token) }
+        didSet {
+            saveTokenToKeychain(token)
+        }
     }
     
     // MARK: - Computed Properties
@@ -35,18 +46,35 @@ final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     // MARK: - Init
     
     private init() {
-        self.apiURL = UserDefaults.standard.string(forKey: Keys.apiURL.rawValue)
-        self.token = UserDefaults.standard.string(forKey: Keys.token.rawValue)
+        // 从 UserDefaults 加载 API URL
+        self.apiURL = UserDefaults.standard.string(forKey: apiURLKey)
+        
+        // 从 Keychain 加载 Token
+        self.token = loadTokenFromKeychain()
     }
     
-    // MARK: - Keys
+    // MARK: - Keychain Methods
     
-    private enum Keys: String {
-        case apiURL = "ocr_paddle_api_url"
-        case token = "ocr_paddle_token"
+    private func saveTokenToKeychain(_ token: String?) {
+        if let token = token, !token.isEmpty {
+            guard let data = token.data(using: .utf8) else { return }
+            KeychainHelper.shared.save(service: keychainService, account: tokenAccount, data: data)
+        } else {
+            KeychainHelper.shared.delete(service: keychainService, account: tokenAccount)
+        }
     }
     
-    private func save(_ value: String?, forKey key: Keys) {
-        UserDefaults.standard.set(value, forKey: key.rawValue)
+    private func loadTokenFromKeychain() -> String? {
+        guard let data = KeychainHelper.shared.read(service: keychainService, account: tokenAccount) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
+    
+    // MARK: - Clear Methods
+    
+    func clearAll() {
+        apiURL = nil
+        token = nil
     }
 }
