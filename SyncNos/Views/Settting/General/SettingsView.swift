@@ -144,9 +144,25 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: OCRSettingsView()) {
                         HStack {
-                            Label("WeChat OCR", systemImage: "text.viewfinder")
+                            Label("OCR 设置", systemImage: "text.viewfinder")
                                 .scaledFont(.body)
                             Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .scaledFont(.caption)
+                        }
+                    }
+                    
+                    NavigationLink(destination: WechatChatView()) {
+                        HStack {
+                            Label("微信聊天记录", systemImage: "message.fill")
+                                .scaledFont(.body)
+                            Spacer()
+                            if OCRConfigStore.shared.isConfigured {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .scaledFont(.caption)
+                            }
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                                 .scaledFont(.caption)

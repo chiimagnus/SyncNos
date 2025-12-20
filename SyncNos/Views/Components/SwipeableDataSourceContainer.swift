@@ -203,6 +203,14 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                     !selectedDedaoBookIds.isEmpty
                 }
             )
+        case .wechatChat:
+            // 微信聊天没有选择功能
+            return SelectionCommands(
+                selectAll: {},
+                deselectAll: {},
+                canSelectAll: { false },
+                canDeselect: { false }
+            )
         }
     }
     
@@ -219,6 +227,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
         case .dedao:
             DedaoListView(viewModel: dedaoVM, selectionIds: $selectedDedaoBookIds)
+        case .wechatChat:
+            WechatChatView()
         }
     }
     
