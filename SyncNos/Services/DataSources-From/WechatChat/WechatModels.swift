@@ -1,6 +1,44 @@
 import Foundation
 import AppKit
 
+// MARK: - Wechat Contact (联系人/对话)
+
+/// 微信联系人/对话（从截图标题或消息中提取）
+struct WechatContact: Identifiable, Hashable {
+    let id: UUID
+    let name: String                    // 联系人/群聊名称
+    let avatarColor: NSColor            // 随机头像颜色
+    var lastMessage: String?            // 最后一条消息预览
+    var lastMessageTime: String?        // 最后消息时间
+    var messageCount: Int               // 消息数量
+    var isGroup: Bool                   // 是否是群聊
+    
+    init(
+        id: UUID = UUID(),
+        name: String,
+        lastMessage: String? = nil,
+        lastMessageTime: String? = nil,
+        messageCount: Int = 0,
+        isGroup: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.avatarColor = WechatContact.randomAvatarColor()
+        self.lastMessage = lastMessage
+        self.lastMessageTime = lastMessageTime
+        self.messageCount = messageCount
+        self.isGroup = isGroup
+    }
+    
+    private static func randomAvatarColor() -> NSColor {
+        let colors: [NSColor] = [
+            .systemBlue, .systemGreen, .systemOrange,
+            .systemPink, .systemPurple, .systemRed, .systemTeal
+        ]
+        return colors.randomElement() ?? .systemBlue
+    }
+}
+
 // MARK: - Wechat Message
 
 /// 微信聊天消息
@@ -48,6 +86,7 @@ struct WechatScreenshot: Identifiable {
     let image: NSImage
     let imageSize: CGSize
     let importedAt: Date
+    var contactName: String?            // 从截图标题提取的联系人名称
     var messages: [WechatMessage]
     var isProcessing: Bool
     var error: String?
@@ -55,6 +94,7 @@ struct WechatScreenshot: Identifiable {
     init(
         id: UUID = UUID(),
         image: NSImage,
+        contactName: String? = nil,
         messages: [WechatMessage] = [],
         isProcessing: Bool = false,
         error: String? = nil
@@ -63,6 +103,7 @@ struct WechatScreenshot: Identifiable {
         self.image = image
         self.imageSize = image.size
         self.importedAt = Date()
+        self.contactName = contactName
         self.messages = messages
         self.isProcessing = isProcessing
         self.error = error
@@ -71,14 +112,16 @@ struct WechatScreenshot: Identifiable {
 
 // MARK: - Wechat Conversation
 
-/// 微信对话（多张截图合并）
-struct WechatConversation {
+/// 微信对话（一个联系人的所有消息）
+struct WechatConversation: Identifiable {
+    let id: UUID
+    let contact: WechatContact
     var screenshots: [WechatScreenshot]
-    let createdAt: Date
     
-    init(screenshots: [WechatScreenshot] = []) {
+    init(contact: WechatContact, screenshots: [WechatScreenshot] = []) {
+        self.id = contact.id
+        self.contact = contact
         self.screenshots = screenshots
-        self.createdAt = Date()
     }
     
     /// 所有消息（按顺序）
@@ -89,6 +132,7 @@ struct WechatConversation {
     /// 导出为纯文本
     func exportAsText() -> String {
         var lines: [String] = []
+        lines.append("=== \(contact.name) ===\n")
         
         for message in allMessages {
             switch message.type {
@@ -97,7 +141,7 @@ struct WechatConversation {
             case .system:
                 lines.append("[\(message.content)]")
             case .text, .image, .voice:
-                let sender = message.isFromMe ? "我" : (message.senderName ?? "对方")
+                let sender = message.isFromMe ? "我" : (message.senderName ?? contact.name)
                 lines.append("\(sender): \(message.content)")
             }
         }
@@ -106,3 +150,27 @@ struct WechatConversation {
     }
 }
 
+// MARK: - Wechat Book List Item (for MainListView compatibility)
+
+/// 微信联系人列表项（用于 MainListView 兼容）
+struct WechatBookListItem: Identifiable {
+    let id: String              // contactId.uuidString
+    let contactId: UUID
+    let name: String
+    let lastMessage: String?
+    let lastMessageTime: String?
+    let messageCount: Int
+    let isGroup: Bool
+    let avatarColor: NSColor
+    
+    init(from contact: WechatContact) {
+        self.id = contact.id.uuidString
+        self.contactId = contact.id
+        self.name = contact.name
+        self.lastMessage = contact.lastMessage
+        self.lastMessageTime = contact.lastMessageTime
+        self.messageCount = contact.messageCount
+        self.isGroup = contact.isGroup
+        self.avatarColor = contact.avatarColor
+    }
+}

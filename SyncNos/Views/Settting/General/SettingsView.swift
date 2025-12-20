@@ -153,21 +153,6 @@ struct SettingsView: View {
                         }
                     }
                     
-                    NavigationLink(destination: WechatChatView()) {
-                        HStack {
-                            Label("微信聊天记录", systemImage: "message.fill")
-                                .scaledFont(.body)
-                            Spacer()
-                            if OCRConfigStore.shared.isConfigured {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .scaledFont(.caption)
-                            }
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
 
 #if DEBUG
                     NavigationLink(destination: EmptyView()) {

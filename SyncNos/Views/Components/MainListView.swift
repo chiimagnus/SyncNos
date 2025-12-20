@@ -15,6 +15,7 @@ struct MainListView: View {
     @StateObject private var goodLinksVM = GoodLinksViewModel()
     @StateObject private var weReadVM = WeReadViewModel()
     @StateObject private var dedaoVM: DedaoViewModel
+    @StateObject private var wechatChatVM = WechatChatViewModel()
     
     // MARK: - Selection State
     
@@ -22,6 +23,7 @@ struct MainListView: View {
     @State private var selectedLinkIds: Set<String> = []
     @State private var selectedWeReadBookIds: Set<String> = []
     @State private var selectedDedaoBookIds: Set<String> = []
+    @State private var selectedWechatContactIds: Set<String> = []
     
     // MARK: - Centralized Alert State
     
@@ -704,10 +706,12 @@ struct MainListView: View {
             goodLinksVM: goodLinksVM,
             weReadVM: weReadVM,
             dedaoVM: dedaoVM,
+            wechatChatVM: wechatChatVM,
             selectedBookIds: $selectedBookIds,
             selectedLinkIds: $selectedLinkIds,
             selectedWeReadBookIds: $selectedWeReadBookIds,
             selectedDedaoBookIds: $selectedDedaoBookIds,
+            selectedWechatContactIds: $selectedWechatContactIds,
             filterMenu: { dataSourceToolbarMenu }
         )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -944,7 +948,7 @@ struct MainListView: View {
         case .dedao:
             dedaoDetailView
         case .wechatChat:
-            WechatChatView() // 微信聊天使用独立视图
+            wechatChatDetailView
         }
     }
     
@@ -1045,6 +1049,40 @@ struct MainListView: View {
                 totalCount: dedaoVM.books.count,
                 onSyncSelected: selectedDedaoBookIds.isEmpty ? nil : { syncSelectedDedao() }
             )
+        }
+    }
+    
+    @ViewBuilder
+    private var wechatChatDetailView: some View {
+        if selectedWechatContactIds.count == 1 {
+            let singleContactBinding = Binding<String?>(
+                get: { selectedWechatContactIds.first },
+                set: { new in selectedWechatContactIds = new.map { Set([$0]) } ?? [] }
+            )
+            WechatChatDetailView(
+                listViewModel: wechatChatVM,
+                selectedContactId: singleContactBinding
+            )
+        } else {
+            // 微信聊天没有同步功能，显示简单的占位符
+            VStack(spacing: 16) {
+                Image(systemName: "message.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.secondary)
+                if selectedWechatContactIds.isEmpty {
+                    Text("选择一个对话")
+                        .scaledFont(.title3)
+                        .foregroundColor(.secondary)
+                    Text("从左侧列表选择联系人查看聊天记录")
+                        .scaledFont(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("已选择 \(selectedWechatContactIds.count) 个对话")
+                        .scaledFont(.title3)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
     
