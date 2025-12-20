@@ -9,11 +9,8 @@ final class CachedWechatConversation {
     /// 对话唯一标识
     @Attribute(.unique) var conversationId: String
     
-    /// 联系人/群聊名称
+    /// 联系人名称
     var name: String
-    
-    /// 是否是群聊
-    var isGroup: Bool
     
     /// 创建时间
     var createdAt: Date
@@ -36,13 +33,11 @@ final class CachedWechatConversation {
     init(
         conversationId: String,
         name: String,
-        isGroup: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
         self.conversationId = conversationId
         self.name = name
-        self.isGroup = isGroup
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -52,7 +47,6 @@ final class CachedWechatConversation {
         self.init(
             conversationId: contact.id.uuidString,
             name: contact.name,
-            isGroup: contact.isGroup,
             createdAt: Date(),
             updatedAt: Date()
         )
@@ -267,8 +261,7 @@ extension WechatContact {
         self.init(
             id: UUID(uuidString: cached.conversationId) ?? UUID(),
             name: cached.name,
-            messageCount: cached.messages?.count ?? 0,
-            isGroup: cached.isGroup
+            messageCount: cached.messages?.count ?? 0
         )
     }
 }
@@ -293,8 +286,7 @@ extension WechatBookListItem {
             name: cached.name,
             lastMessage: lastTextMessage?.content,
             lastMessageTime: lastTimestamp?.content,
-            messageCount: textMessages.count,
-            isGroup: cached.isGroup
+            messageCount: textMessages.count
         ))
     }
 }

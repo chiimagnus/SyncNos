@@ -244,14 +244,11 @@ struct MainListView: View {
             .toolbarBackground(.hidden, for: .windowToolbar)
             // MARK: - WeChat Chat New Conversation Alert
             .alert("新建对话", isPresented: $showNewConversationAlert) {
-                TextField("联系人/群聊名称", text: $newConversationName)
+                TextField("联系人名称", text: $newConversationName)
                 Button("创建") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    // 通过名称是否包含"群"字自动判断是否是群聊
-                    let isGroup = newConversationName.contains("群")
                     let contactId = wechatChatVM.createConversation(
-                        name: newConversationName.trimmingCharacters(in: .whitespaces),
-                        isGroup: isGroup
+                        name: newConversationName.trimmingCharacters(in: .whitespaces)
                     )
                     selectedWechatContactIds = [contactId.uuidString]
                     newConversationName = ""
@@ -260,7 +257,7 @@ struct MainListView: View {
                     newConversationName = ""
                 }
             } message: {
-                Text("输入联系人或群聊名称（名称包含\"群\"将自动标记为群聊）")
+                Text("输入联系人名称")
             }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗

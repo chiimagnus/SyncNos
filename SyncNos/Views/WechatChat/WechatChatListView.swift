@@ -107,13 +107,6 @@ private struct ContactRow: View {
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
                 
-                // 群聊标识
-                if contact.isGroup {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
                 Spacer()
                 
                 // 时间
