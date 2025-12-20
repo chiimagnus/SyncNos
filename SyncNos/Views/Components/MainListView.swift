@@ -130,6 +130,9 @@ struct MainListView: View {
             .onChange(of: dedaoSourceEnabled) { _, _ in
                 updateDataSourceSwitchViewModel()
             }
+            .onChange(of: wechatChatSourceEnabled) { _, _ in
+                updateDataSourceSwitchViewModel()
+            }
             // 当菜单切换时，同步到滑动容器
             .onChange(of: contentSourceRawValue) { _, newValue in
                 if let source = ContentSource(rawValue: newValue) {
