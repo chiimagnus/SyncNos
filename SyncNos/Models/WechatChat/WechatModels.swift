@@ -6,20 +6,18 @@ import AppKit
 /// 微信联系人/对话（从截图标题或消息中提取）
 struct WechatContact: Identifiable, Hashable {
     let id: UUID
-    let name: String                    // 联系人/群聊名称
+    let name: String                    // 联系人名称
     let avatarColor: NSColor            // 随机头像颜色
     var lastMessage: String?            // 最后一条消息预览
     var lastMessageTime: String?        // 最后消息时间
     var messageCount: Int               // 消息数量
-    var isGroup: Bool                   // 是否是群聊
     
     init(
         id: UUID = UUID(),
         name: String,
         lastMessage: String? = nil,
         lastMessageTime: String? = nil,
-        messageCount: Int = 0,
-        isGroup: Bool = false
+        messageCount: Int = 0
     ) {
         self.id = id
         self.name = name
@@ -27,7 +25,6 @@ struct WechatContact: Identifiable, Hashable {
         self.lastMessage = lastMessage
         self.lastMessageTime = lastMessageTime
         self.messageCount = messageCount
-        self.isGroup = isGroup
     }
     
     private static func randomAvatarColor() -> NSColor {
@@ -160,7 +157,6 @@ struct WechatBookListItem: Identifiable {
     let lastMessage: String?
     let lastMessageTime: String?
     let messageCount: Int
-    let isGroup: Bool
     let avatarColor: NSColor
     
     init(from contact: WechatContact) {
@@ -170,7 +166,6 @@ struct WechatBookListItem: Identifiable {
         self.lastMessage = contact.lastMessage
         self.lastMessageTime = contact.lastMessageTime
         self.messageCount = contact.messageCount
-        self.isGroup = contact.isGroup
         self.avatarColor = contact.avatarColor
     }
 }
