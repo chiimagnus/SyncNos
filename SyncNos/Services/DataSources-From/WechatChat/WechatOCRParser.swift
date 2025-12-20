@@ -9,8 +9,13 @@ final class WechatOCRParser {
     
     // MARK: - Constants
     
-    /// 右侧阈值：消息气泡结束 x 坐标 > 图片宽度的 55% 为我的消息
-    private let rightThreshold: CGFloat = 0.55
+    /// 左侧阈值：消息气泡起始 x 坐标 < 图片宽度的 20% 为对方消息
+    /// 微信布局：对方消息左边有头像（约 50px），气泡紧挨着头像
+    private let leftThreshold: CGFloat = 0.20
+    
+    /// 右侧阈值：消息气泡结束 x 坐标 > 图片宽度的 80% 为我的消息
+    /// 微信布局：我的消息右边有头像（约 50px），气泡紧挨着头像
+    private let rightThreshold: CGFloat = 0.80
     
     /// 时间戳 y 位置容差（用于判断某个文本是否紧挨着下一条消息）
     private let senderNameYThreshold: CGFloat = 50
@@ -105,13 +110,32 @@ final class WechatOCRParser {
     // MARK: - Private Methods
     
     /// 判断是否是右侧消息（我发送的）
+    /// 
+    /// 微信布局特点：
+    /// - 对方消息：左侧有头像（约 50px 宽），消息气泡紧挨着头像
+    ///   → 气泡的 minX 很小（< 20% 图片宽度）
+    /// - 我的消息：右侧有头像（约 50px 宽），消息气泡紧挨着头像
+    ///   → 气泡的 maxX 很大（> 80% 图片宽度）
+    /// - 时间戳/系统消息：居中显示
+    ///   → minX 和 maxX 都在中间区域
     private func isRightSide(block: OCRBlock, imageWidth: CGFloat) -> Bool {
-        // 使用气泡的结束 x 坐标
-        let endX = block.bbox.maxX
-        let relativeEndX = endX / imageWidth
+        let relativeMinX = block.bbox.minX / imageWidth
+        let relativeMaxX = block.bbox.maxX / imageWidth
         
-        // 如果气泡结束位置靠近右边，是我的消息
-        return relativeEndX > rightThreshold
+        // 优先判断：如果消息起始位置在左侧（靠近左边头像），是对方消息
+        if relativeMinX < leftThreshold {
+            return false
+        }
+        
+        // 如果消息结束位置在右侧（靠近右边头像），是我的消息
+        if relativeMaxX > rightThreshold {
+            return true
+        }
+        
+        // 中间地带：使用中心点判断
+        // 但对于时间戳/系统消息，这个判断不会被调用（因为已经在前面处理了）
+        let centerX = block.bbox.midX / imageWidth
+        return centerX > 0.6  // 偏右 60% 以上视为我的消息
     }
     
     /// 判断消息类型
