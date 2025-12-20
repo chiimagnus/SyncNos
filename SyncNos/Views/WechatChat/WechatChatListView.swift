@@ -91,62 +91,55 @@ private struct ContactRow: View {
     let contact: WechatBookListItem
     
     var body: some View {
-        HStack(spacing: 12) {
-            // 头像
-            Circle()
-                .fill(Color(contact.avatarColor))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    if contact.isGroup {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                    } else {
-                        Text(contact.name.prefix(1))
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(contact.name)
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    if let time = contact.lastMessageTime {
-                        Text(time)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                // 联系人名称
+                Text(contact.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                
+                // 群聊标识
+                if contact.isGroup {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
                 
-                HStack {
-                    if let lastMessage = contact.lastMessage {
-                        Text(lastMessage)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    } else if contact.messageCount == 0 {
-                        Text("暂无消息")
-                            .font(.caption)
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .italic()
-                    }
-                    
-                    Spacer()
-                    
-                    if contact.messageCount > 0 {
-                        Text("\(contact.messageCount)")
-                            .font(.caption2)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green)
-                            .clipShape(Capsule())
-                    }
+                Spacer()
+                
+                // 时间
+                if let time = contact.lastMessageTime {
+                    Text(time)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            HStack {
+                // 最后消息预览
+                if let lastMessage = contact.lastMessage {
+                    Text(lastMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                } else if contact.messageCount == 0 {
+                    Text("暂无消息")
+                        .font(.caption)
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .italic()
+                }
+                
+                Spacer()
+                
+                // 消息数量
+                if contact.messageCount > 0 {
+                    Text("\(contact.messageCount)")
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green)
+                        .clipShape(Capsule())
                 }
             }
         }
