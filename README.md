@@ -15,6 +15,7 @@
 - WeRead
 - Dedao
 - Notion
+- Chat History beta - OCR version
 
 ### Apple Books Sync
 - **Complete Data Extraction**: Book title, author, highlights, notes, color labels
