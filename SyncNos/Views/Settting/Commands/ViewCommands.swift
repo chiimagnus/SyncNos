@@ -55,7 +55,7 @@ struct ViewCommands: Commands {
         enabledContentSources.firstIndex(of: source)
     }
 
-    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 / cmd+2 / cmd+3 / cmd+4 / cmd+5）
+    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 到 cmd+9）
     private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
         guard let index = indexForSource(source) else { return nil }
         switch index {
@@ -64,6 +64,10 @@ struct ViewCommands: Commands {
         case 2: return "3"
         case 3: return "4"
         case 4: return "5"
+        case 5: return "6"
+        case 6: return "7"
+        case 7: return "8"
+        case 8: return "9"
         default: return nil
         }
     }
