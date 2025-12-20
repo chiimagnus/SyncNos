@@ -4,40 +4,21 @@ import UniformTypeIdentifiers
 // MARK: - Wechat Chat List View
 
 /// 微信联系人列表视图（左侧栏）
+/// 注意：「新建对话」功能在底部 filterMenu 中（MainListView 传入）
 struct WechatChatListView: View {
     @ObservedObject var viewModel: WechatChatViewModel
     @Binding var selectionIds: Set<String>
     
-    @State private var showFilePicker = false
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
     
     var body: some View {
         VStack(spacing: 0) {
-            // 工具栏
-            toolbar
-            
-            Divider()
-            
             // 联系人列表
             if viewModel.contacts.isEmpty {
                 emptyStateView
             } else {
                 contactList
-            }
-        }
-        .fileImporter(
-            isPresented: $showFilePicker,
-            allowedContentTypes: [.image],
-            allowsMultipleSelection: true
-        ) { result in
-            switch result {
-            case .success(let urls):
-                Task {
-                    await viewModel.importScreenshots(urls: urls)
-                }
-            case .failure(let error):
-                viewModel.errorMessage = error.localizedDescription
             }
         }
         .alert("错误", isPresented: .constant(viewModel.errorMessage != nil)) {
@@ -47,36 +28,6 @@ struct WechatChatListView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
-    }
-    
-    // MARK: - Toolbar
-    
-    private var toolbar: some View {
-        HStack {
-            Button {
-                showFilePicker = true
-            } label: {
-                Label("导入截图", systemImage: "photo.badge.plus")
-            }
-            .buttonStyle(.borderless)
-            .disabled(!ocrConfigStore.isConfigured || viewModel.isLoading)
-            
-            Spacer()
-            
-            if viewModel.isLoading {
-                ProgressView()
-                    .scaleEffect(0.7)
-            }
-            
-            if !viewModel.contacts.isEmpty {
-                Text("\(viewModel.contacts.count) 个对话")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(NSColor.controlBackgroundColor))
     }
     
     // MARK: - Empty State
@@ -98,17 +49,9 @@ struct WechatChatListView: View {
                     .foregroundColor(.secondary)
                 Text("暂无对话")
                     .scaledFont(.headline)
-                Text("点击「导入截图」添加微信聊天截图")
+                Text("点击右下角「+」新建对话")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
-                
-                Button {
-                    showFilePicker = true
-                } label: {
-                    Label("导入截图", systemImage: "photo.badge.plus")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -154,27 +97,25 @@ private struct ContactRow: View {
                 .fill(Color(contact.avatarColor))
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Text(contact.name.prefix(1))
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                    if contact.isGroup {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                    } else {
+                        Text(contact.name.prefix(1))
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                 }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    // 联系人名称
                     Text(contact.name)
                         .font(.system(size: 14, weight: .medium))
                         .lineLimit(1)
                     
-                    if contact.isGroup {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    
                     Spacer()
                     
-                    // 时间
                     if let time = contact.lastMessageTime {
                         Text(time)
                             .font(.caption2)
@@ -183,17 +124,20 @@ private struct ContactRow: View {
                 }
                 
                 HStack {
-                    // 最后消息预览
                     if let lastMessage = contact.lastMessage {
                         Text(lastMessage)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
+                    } else if contact.messageCount == 0 {
+                        Text("暂无消息")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .italic()
                     }
                     
                     Spacer()
                     
-                    // 消息数量
                     if contact.messageCount > 0 {
                         Text("\(contact.messageCount)")
                             .font(.caption2)
@@ -220,4 +164,3 @@ private struct ContactRow: View {
     .environmentObject(FontScaleManager.shared)
     .frame(width: 300, height: 500)
 }
-
