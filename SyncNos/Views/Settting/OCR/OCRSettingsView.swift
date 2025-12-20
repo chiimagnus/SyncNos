@@ -1,39 +1,32 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// OCR 设置视图
+/// OCR 设置视图（PaddleOCR-VL）
 struct OCRSettingsView: View {
     @StateObject private var viewModel = OCRSettingsViewModel()
     
     var body: some View {
         Form {
-            // MARK: - Provider 选择
+            // MARK: - API 配置
             Section {
-                Picker("OCR 服务", selection: $viewModel.provider) {
-                    ForEach(OCRProvider.allCases) { provider in
-                        Text(provider.displayName).tag(provider)
-                    }
-                }
-                .pickerStyle(.menu)
-            } header: {
-                Text("OCR 服务提供商")
-            }
-            
-            // MARK: - API Key 配置
-            Section {
-                if viewModel.provider == .deepseekOCR {
-                    SecureField("硅基流动 API Key", text: $viewModel.deepseekApiKey)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    Link("获取 API Key", destination: URL(string: "https://cloud.siliconflow.cn")!)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("API URL")
                         .font(.caption)
-                } else {
-                    SecureField("百度 AI Studio API Key", text: $viewModel.paddleApiKey)
+                        .foregroundColor(.secondary)
+                    TextField("从 PaddleOCR 官网获取", text: $viewModel.apiURL)
                         .textFieldStyle(.roundedBorder)
-                    
-                    Link("获取 API Key", destination: URL(string: "https://www.paddleocr.com")!)
-                        .font(.caption)
                 }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Token")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    SecureField("从 PaddleOCR 官网获取", text: $viewModel.token)
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                Link("获取 API URL 和 Token", destination: URL(string: "https://aistudio.baidu.com/paddleocr/task")!)
+                    .font(.caption)
                 
                 HStack {
                     Button("测试连接") {
@@ -54,13 +47,9 @@ struct OCRSettingsView: View {
                         .font(.caption)
                 }
             } header: {
-                Text("API 配置")
+                Text("PaddleOCR-VL API 配置")
             } footer: {
-                if viewModel.provider == .deepseekOCR {
-                    Text("模型: deepseek-ai/DeepSeek-OCR")
-                } else {
-                    Text("模型: PP-OCRv5 (通用 OCR)")
-                }
+                Text("PaddleOCR-VL 支持 109 种语言，可识别文本、表格、公式和图表")
             }
             
             // MARK: - 测试识别
@@ -86,14 +75,41 @@ struct OCRSettingsView: View {
                 }
                 
                 if let result = viewModel.ocrResult {
-                    GroupBox("识别结果") {
-                        ScrollView {
-                            Text(result)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 8) {
+                        // 显示 Markdown 结果（如果有）
+                        if let markdown = result.markdownText, !markdown.isEmpty {
+                            GroupBox("Markdown 结果") {
+                                ScrollView {
+                                    Text(markdown)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(maxHeight: 200)
+                            }
                         }
-                        .frame(maxHeight: 300)
+                        
+                        // 显示识别的 Blocks
+                        GroupBox("识别内容 (\(result.blocks.count) 个区块)") {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ForEach(result.blocks) { block in
+                                        HStack(alignment: .top) {
+                                            Text("[\(block.label)]")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                                .frame(width: 60, alignment: .leading)
+                                            Text(block.text)
+                                                .font(.caption)
+                                                .textSelection(.enabled)
+                                        }
+                                        Divider()
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxHeight: 200)
+                        }
                     }
                 }
                 
@@ -120,14 +136,11 @@ struct OCRSettingsView: View {
 
 @MainActor
 final class OCRSettingsViewModel: ObservableObject {
-    @Published var provider: OCRProvider {
-        didSet { configStore.provider = provider }
+    @Published var apiURL: String = "" {
+        didSet { configStore.apiURL = apiURL.isEmpty ? nil : apiURL }
     }
-    @Published var deepseekApiKey: String = "" {
-        didSet { configStore.apiKey = deepseekApiKey.isEmpty ? nil : deepseekApiKey }
-    }
-    @Published var paddleApiKey: String = "" {
-        didSet { configStore.paddleApiKey = paddleApiKey.isEmpty ? nil : paddleApiKey }
+    @Published var token: String = "" {
+        didSet { configStore.token = token.isEmpty ? nil : token }
     }
     
     @Published var isTesting = false
@@ -136,7 +149,7 @@ final class OCRSettingsViewModel: ObservableObject {
     @Published var showImagePicker = false
     @Published var testImage: NSImage?
     @Published var isRecognizing = false
-    @Published var ocrResult: String?
+    @Published var ocrResult: OCRResult?
     @Published var ocrError: String?
     
     private let configStore: OCRConfigStore
@@ -155,9 +168,8 @@ final class OCRSettingsViewModel: ObservableObject {
         self.ocrService = DIContainer.shared.ocrAPIService
         self.logger = DIContainer.shared.loggerService
         
-        self.provider = configStore.provider
-        self.deepseekApiKey = configStore.apiKey ?? ""
-        self.paddleApiKey = configStore.paddleApiKey ?? ""
+        self.apiURL = configStore.apiURL ?? ""
+        self.token = configStore.token ?? ""
     }
     
     func testConnection() async {
@@ -204,10 +216,9 @@ final class OCRSettingsViewModel: ObservableObject {
         ocrError = nil
         
         do {
-            // 目前只支持 DeepSeek-OCR
-            let text = try await ocrService.recognizeFreeOCR(image)
-            ocrResult = text
-            logger.info("[OCR] Recognition completed")
+            let result = try await ocrService.recognize(image)
+            ocrResult = result
+            logger.info("[OCR] Recognition completed: \(result.blocks.count) blocks")
         } catch {
             ocrError = error.localizedDescription
             logger.error("[OCR] Recognition failed: \(error)")
@@ -219,5 +230,5 @@ final class OCRSettingsViewModel: ObservableObject {
 
 #Preview {
     OCRSettingsView()
-        .frame(width: 500, height: 600)
+        .frame(width: 500, height: 700)
 }
