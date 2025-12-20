@@ -27,16 +27,12 @@ struct OCRSettingsView: View {
                     Text("API URL")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    TextField("从 PaddleOCR 官网获取", text: $viewModel.apiURL)
-                        .textFieldStyle(.roundedBorder)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Token")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    SecureField("从 PaddleOCR 官网获取", text: $viewModel.token)
-                        .textFieldStyle(.roundedBorder)
                 }
                 
                 Link("获取 API URL 和 Token", destination: URL(string: "https://aistudio.baidu.com/paddleocr/task")!)
