@@ -24,101 +24,64 @@ struct WechatChatDetailView: View {
     
     var body: some View {
         if let contact = selectedContact {
-            VStack(spacing: 0) {
-                // 标题栏
-                headerView(contact: contact)
-                
-                Divider()
-                
-                // 消息列表
-                if messages.isEmpty {
-                    emptyMessagesView(contact: contact)
-                } else {
-                    messageListView
-                }
-            }
-            .fileImporter(
-                isPresented: $showFilePicker,
-                allowedContentTypes: [.image],
-                allowsMultipleSelection: true
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    Task {
-                        await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
+            contentView(for: contact)
+                .navigationTitle(contact.name)
+                .navigationSubtitle("\(contact.messageCount) 条消息")
+                .toolbar {
+                    ToolbarItemGroup{
+                        // 加载指示器
+                        if listViewModel.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        }
+                        
+                        // 导入截图按钮
+                        Button {
+                            showFilePicker = true
+                        } label: {
+                            Label("导入截图", systemImage: "photo.badge.plus")
+                        }
+                        .disabled(!ocrConfigStore.isConfigured || listViewModel.isLoading)
+                        .help("追加聊天截图")
+                        
+                        // 复制按钮
+                        Button {
+                            listViewModel.copyToClipboard(for: contact.contactId)
+                        } label: {
+                            Label("复制", systemImage: "doc.on.doc")
+                        }
+                        .disabled(contact.messageCount == 0)
+                        .help("复制全部聊天记录")
                     }
-                case .failure(let error):
-                    listViewModel.errorMessage = error.localizedDescription
                 }
-            }
+                .fileImporter(
+                    isPresented: $showFilePicker,
+                    allowedContentTypes: [.image],
+                    allowsMultipleSelection: true
+                ) { result in
+                    switch result {
+                    case .success(let urls):
+                        Task {
+                            await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
+                        }
+                    case .failure(let error):
+                        listViewModel.errorMessage = error.localizedDescription
+                    }
+                }
         } else {
             emptySelectionView
         }
     }
     
-    // MARK: - Header
+    // MARK: - Content View
     
-    private func headerView(contact: WechatBookListItem) -> some View {
-        HStack(spacing: 12) {
-            // 头像
-            Circle()
-                .fill(Color(contact.avatarColor))
-                .frame(width: 32, height: 32)
-                .overlay {
-                    if contact.isGroup {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white)
-                    } else {
-                        Text(contact.name.prefix(1))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                }
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(contact.name)
-                    .font(.headline)
-                
-                Text("\(contact.messageCount) 条消息")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // 工具按钮
-            HStack(spacing: 8) {
-                // 导入截图按钮
-                Button {
-                    showFilePicker = true
-                } label: {
-                    Label("导入截图", systemImage: "photo.badge.plus")
-                }
-                .buttonStyle(.borderless)
-                .disabled(!ocrConfigStore.isConfigured || listViewModel.isLoading)
-                .help("追加聊天截图")
-                
-                // 复制按钮
-                Button {
-                    listViewModel.copyToClipboard(for: contact.contactId)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                }
-                .buttonStyle(.borderless)
-                .disabled(contact.messageCount == 0)
-                .help("复制全部聊天记录")
-            }
-            
-            // 加载指示器
-            if listViewModel.isLoading {
-                ProgressView()
-                    .scaleEffect(0.7)
-            }
+    @ViewBuilder
+    private func contentView(for contact: WechatBookListItem) -> some View {
+        if messages.isEmpty {
+            emptyMessagesView(contact: contact)
+        } else {
+            messageListView
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(NSColor.controlBackgroundColor))
     }
     
     // MARK: - Message List
@@ -132,7 +95,6 @@ struct WechatChatDetailView: View {
             }
             .padding()
         }
-        .background(Color(NSColor.textBackgroundColor).opacity(0.5))
     }
     
     // MARK: - Empty States
