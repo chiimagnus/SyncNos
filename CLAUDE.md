@@ -349,7 +349,25 @@ DIContainer.shared.dedaoCacheService
   - 缓存书籍列表和高亮数据
   - 支持离线访问
 
-**8. 通用同步调度** (Services/SyncScheduling/)
+**8. 微信聊天 OCR 集成** (Services/DataSources-From/WechatChat/)
+- `WechatOCRParser`: OCR 结果解析器
+  - 基于 `minX` 判断消息方向（对方消息 minX < 15%）
+  - 时间戳和系统消息自动检测
+  - 发送者昵称智能识别（群聊场景）
+- `WechatChatCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
+  - 缓存对话和消息数据
+  - 支持离线访问和快速启动
+
+**9. OCR 服务** (Services/DataSources-From/OCR/)
+- `OCRAPIService`: PaddleOCR-VL API 客户端
+  - 支持图片 Base64 编码上传
+  - 返回 `OCRResult` 包含 blocks 和 bbox
+- `OCRConfigStore`: OCR 配置存储
+  - API URL 存储在 UserDefaults
+  - Token 安全存储在 Keychain
+- `OCRModels`: OCR 请求/响应数据模型
+
+**10. 通用同步调度** (Services/SyncScheduling/)
 - `AutoSyncService`: 后台同步调度器（每 5 分钟触发智能增量同步）
 - `AutoSyncSourceProvider`: 自动同步协议
 - `AppleBooksAutoSyncProvider`: Apple Books 智能增量同步（基于 `maxModifiedDate`）
@@ -359,13 +377,13 @@ DIContainer.shared.dedaoCacheService
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
-**9. 核心服务** (Services/Core/)
+**11. 核心服务** (Services/Core/)
 - `DIContainer`: 中心服务容器和依赖注入
 - `LoggerService`: 统一日志记录
 - `ConcurrencyLimiter`: 全局并发控制
 - `Protocols`: 所有服务协议定义
 
-**10. 认证与购买** (Services/Auth/)
+**12. 认证与购买** (Services/Auth/)
 - `AuthService`: Apple Sign In 集成
 - `IAPService`: 应用内购买服务
 - `KeychainHelper`: 安全凭证存储
@@ -404,6 +422,16 @@ DIContainer.shared.dedaoCacheService
 - `CachedDedaoBook`: SwiftData 缓存的书籍
 - `CachedDedaoHighlight`: SwiftData 缓存的高亮
 - `DedaoSyncState`: 全局同步状态
+
+**WechatChat 模型**（Models/WechatChat/）：
+- `WechatContact`: 联系人/对话模型（用于 UI 显示）
+- `WechatMessage`: 聊天消息模型（包含消息类型、方向、发送者昵称）
+- `WechatScreenshot`: 截图模型（包含原始图片和解析结果）
+- `WechatConversation`: 对话模型（联系人 + 截图列表）
+- `WechatBookListItem`: UI 列表展示模型（用于 MainListView 兼容）
+- `CachedWechatConversation`: SwiftData 缓存的对话
+- `CachedWechatMessage`: SwiftData 缓存的消息
+- `CachedWechatScreenshotMeta`: SwiftData 缓存的截图元数据
 
 ## 开发模式
 
@@ -538,87 +566,3 @@ swiftformat --dryrun SyncNos/
 swift package resolve
 swift package update
 ```
-
-## 最新重要更新
-
-### 智能增量自动同步
-- **5 分钟检查间隔**：替代原来的 24 小时全量同步
-- **基于内容变更判断**：比较「最新修改时间」与「上次同步时间」，只同步有变化的内容
-- **各数据源实现**：
-  - Apple Books：基于 `maxModifiedDate`（高亮修改时间）
-  - GoodLinks：基于 `modifiedAt`（文章修改时间）
-  - WeRead：基于 `updatedAt`（API 返回的更新时间）
-  - Dedao：基于本地缓存计算的 `maxHighlightUpdatedAt`
-- **节省 Notion API**：无变更的内容直接跳过，大幅减少 API 调用
-- **近实时同步体验**：新增笔记后最多 5 分钟自动同步到 Notion
-
-### 同步架构重构
-- **统一同步引擎**：引入 `NotionSyncEngine` + 适配器模式
-- **消除重复代码**：原 `AppleBooksSyncStrategySingleDB`、`AppleBooksSyncStrategyPerBook`、`WeReadSyncService` 等已合并
-- **统一高亮模型**：`UnifiedHighlight` 作为跨数据源的通用模型
-- **目录结构优化**：
-  - 合并 `NotionServiceCore` 到 `NotionService`
-  - 配置文件移至 `Configuration/`
-  - 同步引擎和适配器集中在 `SyncEngine/`
-
-### WeRead 集成
-- **Cookie 自动刷新机制**：`CookieRefreshCoordinator` (Actor) 和 `WeReadCookieRefreshService`
-- **透明认证流程**：简化登录UI，移除手动cookie输入
-- **本地缓存**：使用 SwiftData + `@ModelActor` 缓存书籍和高亮数据
-  - `WeReadCacheService`：使用 `@ModelActor` 的本地持久化服务
-  - `CachedWeReadBook`/`CachedWeReadHighlight`：SwiftData 模型
-  - 支持快速启动和离线访问，后台线程执行不阻塞 UI
-- **增量同步**：`WeReadIncrementalSyncService` 基于 syncKey 的增量同步
-- **自动同步**：`WeReadAutoSyncProvider` 支持后台定时同步
-- **登录导航修复**：Cookie 过期时自动导航到 WeRead 设置并打开登录 Sheet
-
-### Dedao（得到）集成
-- **WebView 登录**：通过 WKWebView 实现 dedao.cn 登录，自动捕获 Cookie
-- **令牌桶限流**：`DedaoRequestLimiter` 防止触发反爬机制
-  - 每秒 2 个令牌，最大桶容量 10 个
-  - 自动指数退避重试
-- **API 客户端**：`DedaoAPIService` 封装所有 API 调用
-  - 电子书列表获取（支持分页）
-  - 笔记/高亮获取（自动过滤无效笔记）
-  - 用户信息获取
-- **本地缓存**：使用 SwiftData + `@ModelActor` 缓存书籍和高亮数据
-  - `DedaoCacheService`：使用 `@ModelActor` 的本地持久化服务
-  - `CachedDedaoBook`/`CachedDedaoHighlight`：SwiftData 模型
-  - 后台线程执行不阻塞 UI
-- **适配器模式**：`DedaoNotionAdapter` 实现 `NotionSyncSourceProtocol`
-- **自动同步**：`DedaoAutoSyncProvider` 支持后台定时同步
-- **兼容双格式 API**：支持标准格式和混合格式两种 API 响应
-
-### IAP 系统
-- **30天试用期**：试用期管理和到期检查
-- **统一付费墙**：整合为 `PayWallView`
-- **订阅过期检测**：完整的订阅过期监听和状态同步机制
-
-### RootView 架构
-- **视图层级管理**：`RootView` 作为根视图，管理 Onboarding、PayWall、MainListView 的切换
-- **PayWall 前置**：确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用
-- **书签恢复懒加载**：书签恢复只在用户切换到对应数据源时才触发，避免在 PayWall 之前触发系统安全弹窗
-  - Apple Books: `AppleBooksListView.onAppear` → `viewModel.restoreBookmarkAndConfigureRoot()`
-  - GoodLinks: `GoodLinksListView.onAppear` → `loadRecentLinks()` → `resolveDatabasePath()`
-- **视图切换流程**：
-  ```
-  SyncNosApp
-  └── Window("main")
-      └── RootView
-          ├── OnboardingView      (未完成引导时)
-          ├── PayWallView         (需要显示付费墙时)
-          └── MainListView        (正常使用时)
-              ├── AppleBooksListView.onAppear → restoreBookmarkAndConfigureRoot()
-              ├── GoodLinksListView.onAppear → loadRecentLinks()
-              ├── WeReadListView.onAppear → loadBooks()
-              └── DedaoListView.onAppear → loadBooks()
-  ```
-
-### UI/UX 改进
-- **日志颜色编码**：为不同日志级别添加颜色区分
-- **日志搜索功能**：LogWindow 新增搜索框，支持在消息、文件名、函数名中搜索
-- **日志文本选择**：日志条目支持文本选择和复制
-- **动态语言切换**：无需重启应用，实时更新界面语言
-- **时间戳显示优化**：统一跨视图的最后同步时间显示
-- **PayWallView UI**：采用 Onboarding 风格的底部布局，添加礼物图标摇摆动画和紧急提醒脉冲动画
-- **Notion 配置弹窗统一**：将分散在各视图的 Notion 配置提示弹窗统一到 `MainListView` 处理
