@@ -52,6 +52,31 @@ struct OCRSettingsView: View {
                 Text("PaddleOCR-VL 支持 109 种语言，可识别文本、表格、公式和图表")
             }
             
+            // MARK: - 微信聊天 OCR
+            Section {
+                NavigationLink(destination: WechatChatView()) {
+                    HStack {
+                        Image(systemName: "message.fill")
+                            .foregroundColor(.green)
+                        Text("微信聊天记录识别")
+                        Spacer()
+                        if viewModel.isConfigured {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        } else {
+                            Text("需先配置 API")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .disabled(!viewModel.isConfigured)
+            } header: {
+                Text("功能")
+            } footer: {
+                Text("从微信聊天截图中提取消息内容")
+            }
+            
             // MARK: - 测试识别
             Section {
                 Button("选择图片测试 OCR") {
