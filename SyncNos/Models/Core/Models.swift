@@ -9,6 +9,7 @@ enum ContentSource: String, Codable, CaseIterable {
     case goodLinks = "goodLinks"
     case weRead = "weRead"
     case dedao = "dedao"
+    case wechatChat = "wechatChat"
 
     var title: String {
         switch self {
@@ -16,6 +17,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
         case .dedao: return "Dedao"
+        case .wechatChat: return "微信聊天"
         }
     }
     
@@ -26,6 +28,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .goodLinks: return "bookmark"
         case .weRead: return "w.square"
         case .dedao: return "d.square"
+        case .wechatChat: return "message.fill"
         }
     }
     
@@ -41,6 +44,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .goodLinks: return Color("BrandGoodLinks")
         case .weRead: return Color("BrandWeRead")
         case .dedao: return Color("BrandDedao")
+        case .wechatChat: return Color.green
         }
     }
     

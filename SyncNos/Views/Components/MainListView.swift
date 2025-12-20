@@ -54,6 +54,7 @@ struct MainListView: View {
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
+    @AppStorage("datasource.wechatChat.enabled") private var wechatChatSourceEnabled: Bool = false
     
     // MARK: - Font Scale Support
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
@@ -93,6 +94,8 @@ struct MainListView: View {
             return weReadSourceEnabled
         case .dedao:
             return dedaoSourceEnabled
+        case .wechatChat:
+            return wechatChatSourceEnabled
         }
     }
 
@@ -452,6 +455,8 @@ struct MainListView: View {
             return selectedWeReadBookIds.count == 1
         case .dedao:
             return selectedDedaoBookIds.count == 1
+        case .wechatChat:
+            return false // 微信聊天没有详情视图
         }
     }
     
@@ -551,6 +556,8 @@ struct MainListView: View {
             return Notification.Name("DataSourceSwitchedToWeRead")
         case .dedao:
             return Notification.Name("DataSourceSwitchedToDedao")
+        case .wechatChat:
+            return Notification.Name("DataSourceSwitchedToWechatChat")
         }
     }
     
@@ -579,6 +586,8 @@ struct MainListView: View {
             weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .dedao:
             dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+        case .wechatChat:
+            break // 微信聊天不支持同步到 Notion
         }
     }
     
@@ -625,6 +634,8 @@ struct MainListView: View {
                     }
                     return nil
                 }
+            case .wechatChat:
+                return // 微信聊天不支持同步
             }
             
             // 清除每个选中项的本地记录
@@ -655,6 +666,8 @@ struct MainListView: View {
                 await weReadVM.loadBooks()
             case .dedao:
                 await dedaoVM.loadBooks()
+            case .wechatChat:
+                break // 微信聊天没有刷新操作
             }
         }
     }
@@ -714,6 +727,8 @@ struct MainListView: View {
                 weReadFilterMenu
             case .dedao:
                 dedaoFilterMenu
+            case .wechatChat:
+                EmptyView() // 微信聊天没有筛选菜单
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
@@ -928,6 +943,8 @@ struct MainListView: View {
             weReadDetailView
         case .dedao:
             dedaoDetailView
+        case .wechatChat:
+            WechatChatView() // 微信聊天使用独立视图
         }
     }
     
