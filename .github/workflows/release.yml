@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate release notes from CHANGELOG.md
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          changelog_path = Path("CHANGELOG.md")
+          if not changelog_path.exists():
+              print("ERROR: CHANGELOG.md not found at repo root.", file=sys.stderr)
+              sys.exit(1)
+
+          tag = os.environ.get("GITHUB_REF_NAME", "").strip()
+          if not tag:
+              print("ERROR: GITHUB_REF_NAME is empty.", file=sys.stderr)
+              sys.exit(1)
+
+          version = tag[1:] if tag.startswith("v") else tag
+          semver_re = re.compile(r"v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
+
+          lines = changelog_path.read_text(encoding="utf-8").splitlines()
+
+          def is_heading(line: str) -> bool:
+              return line.lstrip().startswith("#")
+
+          def extract_semver_token(heading_line: str) -> str | None:
+              text = heading_line.lstrip()
+              if not text.startswith("#"):
+                  return None
+              # 去掉前导 # 和空格，得到标题文本
+              title = re.sub(r"^#{1,6}\s+", "", text).strip()
+              m = semver_re.search(title)
+              if not m:
+                  return None
+              token = m.group(0)
+              return token[1:] if token.startswith("v") else token
+
+          start: int | None = None
+          end: int | None = None
+
+          for i, line in enumerate(lines):
+              if not is_heading(line):
+                  continue
+
+              token = extract_semver_token(line)
+              if token is None:
+                  continue
+
+              if start is None:
+                  if token == version:
+                      start = i + 1  # 跳过版本标题本身
+                  continue
+              else:
+                  # 已经在目标版本段落中，遇到下一个版本标题就截止
+                  end = i
+                  break
+
+          if start is None:
+              print(
+                  f"ERROR: Cannot find changelog section for tag '{tag}' (version '{version}').",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+
+          section_lines = lines[start:end] if end is not None else lines[start:]
+          # 去掉首尾多余空行
+          while section_lines and section_lines[0].strip() == "":
+              section_lines.pop(0)
+          while section_lines and section_lines[-1].strip() == "":
+              section_lines.pop()
+
+          out = "\n".join(section_lines).rstrip() + "\n"
+          Path("RELEASE_NOTES.md").write_text(out, encoding="utf-8")
+          print("Generated RELEASE_NOTES.md")
+          PY
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
