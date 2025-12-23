@@ -17,12 +17,6 @@ struct SyncNosApp: App {
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
         }
 #endif
-
-        // 注意：书签恢复采用懒加载模式，只在用户切换到对应数据源时才触发
-        // - Apple Books: AppleBooksListView.onAppear → viewModel.restoreBookmarkAndConfigureRoot()
-        // - GoodLinks: GoodLinksListView.onAppear → loadRecentLinks() → resolveDatabasePath()
-        // 这样可以避免在 PayWall 显示之前触发系统安全弹窗
-
         // Start observing IAP transactions and check trial status
         DIContainer.shared.iapService.startObservingTransactions()
         
