@@ -1151,9 +1151,3 @@ struct MainListView: View {
         dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
-
-struct MainListView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainListView()
-    }
-}
