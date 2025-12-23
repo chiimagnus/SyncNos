@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead 和 Dedao（得到）中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead、Dedao（得到）和微信聊天 OCR 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
@@ -10,6 +10,7 @@
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
 - ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
+- ✅ **WechatChat OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和群聊昵称识别
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
@@ -40,17 +41,24 @@ SyncNos/
 ├── AppDelegate.swift             # 应用生命周期管理
 ├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── RootView.swift            # 根视图：管理 Onboarding/PayWall/MainListView 切换
+│   ├── MainListView.swift        # 主列表视图
 │   ├── Components/               # 可复用 UI 组件
-│   │   ├── AppTheme.swift        # 应用主题和样式
-│   │   ├── ArticleContentCardView.swift
-│   │   ├── FilterSortBar.swift   # 统一筛选排序栏
-│   │   ├── HighlightCardView.swift
-│   │   ├── InfoHeaderCardView.swift
-│   │   ├── LiveResizeObserver.swift
-│   │   ├── MainListView.swift    # 主列表视图
-│   │   ├── MenuBarView.swift     # 菜单栏视图
-│   │   ├── SyncQueueView.swift   # 同步队列管理视图
-│   │   └── WaterfallLayout.swift # 瀑布流布局
+│   │   ├── Cards/                # 卡片组件
+│   │   │   ├── ArticleContentCardView.swift
+│   │   │   ├── HighlightCardView.swift
+│   │   │   ├── InfoHeaderCardView.swift
+│   │   │   └── WaterfallLayout.swift # 瀑布流布局
+│   │   ├── Controls/             # 控制组件
+│   │   │   ├── DataSourceIndicatorBar.swift
+│   │   │   ├── FilterSortBar.swift   # 统一筛选排序栏
+│   │   │   ├── SwipeableDataSourceContainer.swift
+│   │   │   └── SyncQueueView.swift   # 同步队列管理视图
+│   │   ├── Keyboard/             # 键盘相关组件
+│   │   │   ├── EnclosingScrollViewReader.swift
+│   │   │   └── WindowReader.swift
+│   │   ├── Main/                 # 主界面组件
+│   │   └── Theme/                # 主题组件
+│   │       └── AppTheme.swift    # 应用主题和样式
 │   ├── AppleBooks/
 │   │   ├── AppleBooksListView.swift
 │   │   └── AppleBooksDetailView.swift
@@ -63,24 +71,31 @@ SyncNos/
 │   ├── Dedao/
 │   │   ├── DedaoListView.swift
 │   │   └── DedaoDetailView.swift
-│   └── Settting/
+│   ├── WechatChat/              # 微信聊天 OCR 视图
+│   │   ├── WechatChatListView.swift
+│   │   └── WechatChatDetailView.swift
+│   └── Settings/
 │       ├── General/
 │       │   ├── AboutView.swift
 │       │   ├── AppleAccountView.swift
-│       │   ├── IAPViews/
-│       │   │   ├── PayWallView.swift
-│       │   │   └── IAPView.swift
+│       │   ├── IAPView.swift
 │       │   ├── LanguageView.swift
 │       │   ├── LogWindow.swift
+│       │   ├── MenuBarView.swift     # 菜单栏视图
+│       │   ├── OnboardingComponents.swift
+│       │   ├── PayWallView.swift
 │       │   ├── SettingsView.swift
-│       │   ├── UserGuideView.swift
+│       │   ├── TextSizeSettingsView.swift
 │       │   └── VisualEffectBackground.swift
-│       ├── Sync/
+│       ├── SyncFrom/
 │       │   ├── AppleBooksSettingsView.swift
 │       │   ├── GoodLinksSettingsView.swift
 │       │   ├── WeReadSettingsView.swift
+│       │   ├── WeReadLoginView.swift
 │       │   ├── DedaoSettingsView.swift
 │       │   ├── DedaoLoginView.swift
+│       │   └── OCRSettingsView.swift
+│       ├── SyncTo/
 │       │   └── NotionIntegrationView.swift
 │       └── Commands/
 │           ├── AppCommands.swift
@@ -96,6 +111,7 @@ SyncNos/
 │   │   └── AppleBooksSettingsViewModel.swift
 │   ├── GoodLinks/
 │   │   ├── GoodLinksViewModel.swift          # 使用 NotionSyncEngine + Adapter
+│   │   ├── GoodLinksDetailViewModel.swift    # 使用 NotionSyncEngine + Adapter
 │   │   └── GoodLinksSettingsViewModel.swift
 │   ├── WeRead/
 │   │   ├── WeReadViewModel.swift             # 使用 NotionSyncEngine + Adapter
@@ -107,16 +123,23 @@ SyncNos/
 │   │   ├── DedaoDetailViewModel.swift        # 使用 NotionSyncEngine + Adapter
 │   │   ├── DedaoLoginViewModel.swift
 │   │   └── DedaoSettingsViewModel.swift
+│   ├── WechatChat/
+│   │   └── WechatChatViewModel.swift         # 微信聊天 OCR 视图模型
 │   ├── Account/
 │   │   ├── AccountViewModel.swift
 │   │   ├── AppleSignInViewModel.swift
-│   │   └── IAPViewModel.swift
+│   │   ├── IAPViewModel.swift
+│   │   └── PayWallViewModel.swift
 │   ├── MenuBar/
 │   │   └── MenuBarViewModel.swift
 │   ├── Notion/
 │   │   └── NotionIntegrationViewModel.swift
+│   ├── Onboarding/
+│   │   └── OnboardingViewModel.swift
 │   ├── Settings/
 │   │   └── LoginItemViewModel.swift
+│   ├── Sidebar/
+│   │   └── DataSourceSwitchViewModel.swift
 │   ├── Sync/
 │   │   └── SyncQueueViewModel.swift
 │   └── LogViewModel.swift
@@ -134,9 +157,12 @@ SyncNos/
 │   ├── WeRead/                   # 微信读书模型
 │   │   ├── WeReadModels.swift    # API DTO 模型
 │   │   └── WeReadCacheModels.swift # SwiftData 缓存模型
-│   └── Dedao/                    # 得到模型
-│       ├── DedaoModels.swift     # API DTO 模型
-│       └── DedaoCacheModels.swift # SwiftData 缓存模型
+│   ├── Dedao/                    # 得到模型
+│   │   ├── DedaoModels.swift     # API DTO 模型
+│   │   └── DedaoCacheModels.swift # SwiftData 缓存模型
+│   └── WechatChat/               # 微信聊天模型
+│       ├── WechatModels.swift    # 微信聊天数据模型
+│       └── WechatChatCacheModels.swift # SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -144,8 +170,11 @@ SyncNos/
     ├── Core/                     # 核心服务
     │   ├── ConcurrencyLimiter.swift
     │   ├── DIContainer.swift     # 依赖注入容器
+    │   ├── EnvironmentDetector.swift
+    │   ├── FontScaleManager.swift
     │   ├── LoggerService.swift
     │   ├── KeychainHelper.swift
+    │   ├── LoginItemService.swift
     │   └── Protocols.swift       # 服务协议定义
     ├── DataSources-From/         # 数据源（从...获取）
     │   ├── AppleBooks/           # Apple Books SQLite 访问
@@ -169,12 +198,20 @@ SyncNos/
     │   │   ├── WeReadCookieRefreshService.swift # Cookie 自动刷新
     │   │   ├── CookieRefreshCoordinator.swift  # 刷新协调器（Actor）
     │   │   ├── WeReadCacheService.swift        # SwiftData 本地缓存
-    │   │   └── WeReadIncrementalSyncService.swift # 增量同步服务
-    │   └── Dedao/                # 得到电子书集成
-    │       ├── DedaoAPIService.swift           # API 客户端（令牌桶限流）
-    │       ├── DedaoAuthService.swift          # Cookie 认证服务
-    │       ├── DedaoRequestLimiter.swift       # 请求限流器
-    │       └── DedaoCacheService.swift         # SwiftData 本地缓存
+    │   │   ├── WeReadIncrementalSyncService.swift # 增量同步服务
+    │   │   └── WeReadRequestLimiter.swift      # 请求限流器
+    │   ├── Dedao/                # 得到电子书集成
+    │   │   ├── DedaoAPIService.swift           # API 客户端（令牌桶限流）
+    │   │   ├── DedaoAuthService.swift          # Cookie 认证服务
+    │   │   ├── DedaoRequestLimiter.swift       # 请求限流器
+    │   │   └── DedaoCacheService.swift         # SwiftData 本地缓存
+    │   ├── WechatChat/           # 微信聊天 OCR 集成
+    │   │   ├── WechatOCRParser.swift           # OCR 结果解析器
+    │   │   └── WechatChatCacheService.swift    # SwiftData 本地缓存服务
+    │   └── OCR/                  # OCR 服务
+    │       ├── OCRAPIService.swift             # PaddleOCR-VL API 客户端
+    │       ├── OCRConfigStore.swift            # OCR 配置存储
+    │       └── OCRModels.swift                 # OCR 请求/响应数据模型
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Notion/               # Notion 集成（重构后）
     │   │   ├── Configuration/    # 配置管理
@@ -212,6 +249,7 @@ SyncNos/
         ├── WeReadAutoSyncProvider.swift     # WeRead 自动同步
         ├── DedaoAutoSyncProvider.swift      # Dedao 自动同步
         ├── SyncActivityMonitor.swift       # 同步活动监控
+        ├── SyncedHighlightStore.swift      # 已同步高亮记录存储
         └── SyncQueueStore.swift            # 同步队列存储
 ```
 
@@ -279,6 +317,14 @@ DIContainer.shared.weReadCacheService
 DIContainer.shared.dedaoAuthService
 DIContainer.shared.dedaoAPIService
 DIContainer.shared.dedaoCacheService
+
+// WechatChat 服务
+DIContainer.shared.wechatChatCacheService
+DIContainer.shared.wechatOCRParser
+
+// OCR 服务
+DIContainer.shared.ocrAPIService
+DIContainer.shared.ocrConfigStore
 ```
 
 ### 关键服务层
@@ -375,6 +421,7 @@ DIContainer.shared.dedaoCacheService
 - `WeReadAutoSyncProvider`: WeRead 智能增量同步（基于 `updatedAt`）
 - `DedaoAutoSyncProvider`: Dedao 智能增量同步（基于本地缓存 `maxHighlightUpdatedAt`）
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
+- `SyncedHighlightStore`: 已同步高亮记录存储（本地 UUID → blockId 映射）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
 
 **11. 核心服务** (Services/Core/)
