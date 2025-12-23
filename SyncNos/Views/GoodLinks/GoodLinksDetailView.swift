@@ -329,7 +329,7 @@ struct GoodLinksDetailView: View {
                 .toolbar {
                     // 中间区域：Filter 控件
                     ToolbarItem(placement: .automatic) {
-                        FiltetSortBar(
+                        FilterSortBar(
                             noteFilter: $detailViewModel.noteFilter,
                             selectedStyles: $detailViewModel.selectedStyles,
                             colorTheme: .goodLinks,
