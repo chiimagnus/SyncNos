@@ -43,7 +43,7 @@ SyncNos/
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── AppTheme.swift        # 应用主题和样式
 │   │   ├── ArticleContentCardView.swift
-│   │   ├── FiltetSortBar.swift   # 统一筛选排序栏
+│   │   ├── FilterSortBar.swift   # 统一筛选排序栏
 │   │   ├── HighlightCardView.swift
 │   │   ├── InfoHeaderCardView.swift
 │   │   ├── LiveResizeObserver.swift

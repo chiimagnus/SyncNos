@@ -186,7 +186,7 @@ struct WeReadDetailView: View {
         .navigationTitle("WeRead")
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                FiltetSortBar(
+                FilterSortBar(
                     noteFilter: $detailViewModel.noteFilter,
                     selectedStyles: $detailViewModel.selectedStyles,
                     colorTheme: .weRead,

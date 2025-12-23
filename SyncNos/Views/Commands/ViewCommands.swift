@@ -404,7 +404,7 @@ struct ViewCommands: Commands {
                         }
                     }
 
-                    // 颜色筛选（与 FiltetSortBar 的行为一致）
+                    // 颜色筛选（与 FilterSortBar 的行为一致）
                     let theme: HighlightColorTheme = {
                         switch currentSource {
                         case .appleBooks: return .appleBooks
@@ -428,7 +428,7 @@ struct ViewCommands: Commands {
 
                     ForEach(0..<theme.colorCount, id: \.self) { colorIndex in
                         let (_, name) = theme.colorInfo(for: colorIndex)
-                        // FiltetSortBar 中的 isSelected 规则：空集表示"全部选中"
+                        // FilterSortBar 中的 isSelected 规则：空集表示"全部选中"
                         let isSelected = currentSet.isEmpty || currentSet.contains(colorIndex)
                         Button {
                             var newSet = currentSet

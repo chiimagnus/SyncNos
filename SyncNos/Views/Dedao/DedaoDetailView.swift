@@ -232,7 +232,7 @@ struct DedaoDetailView: View {
     @ToolbarContentBuilder
     private func toolbarContent(book: DedaoBookListItem) -> some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            FiltetSortBar(
+            FilterSortBar(
                 noteFilter: $detailViewModel.noteFilter,
                 selectedStyles: $detailViewModel.selectedStyles,
                 colorTheme: .dedao,

@@ -190,7 +190,7 @@ struct AppleBooksDetailView: View {
         .toolbar {
             // 中间区域：Filter 控件
             ToolbarItem(placement: .automatic) {
-                FiltetSortBar(
+                FilterSortBar(
                     noteFilter: $viewModel.noteFilter,
                     selectedStyles: $viewModel.selectedStyles,
                     colorTheme: .appleBooks,
