@@ -112,7 +112,11 @@ struct PaddleMarkdown: Decodable {
     let isEnd: Bool?
 }
 
-struct PaddleDataInfo: Decodable {}
+struct PaddleDataInfo: Decodable {
+    let width: Double?
+    let height: Double?
+    let type: String?
+}
 
 // MARK: - OCR Result (统一结果模型)
 
@@ -121,6 +125,9 @@ struct OCRResult {
     let markdownText: String?
     let blocks: [OCRBlock]
     let processedAt: Date
+    /// OCR 输出坐标系对应的图像尺寸（来自 Paddle `dataInfo.width/height`，单位：px）
+    /// - 若为空，调用方可回退到 `cgImage.width/height`
+    let coordinateSize: CGSize?
 }
 
 struct OCRBlock: Identifiable {
