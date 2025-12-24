@@ -291,19 +291,34 @@ private struct WechatChatSelectableText: NSViewRepresentable {
         layoutManager.ensureLayout(for: textContainer)
         
         let idealGlyphRange = layoutManager.glyphRange(for: textContainer)
-        let idealUsed = layoutManager.boundingRect(forGlyphRange: idealGlyphRange, in: textContainer)
-        let idealWidth = ceil(idealUsed.width) + horizontalPadding * 2
+        let idealUsedWidth = maxLineFragmentUsedWidth(
+            layoutManager: layoutManager,
+            glyphRange: idealGlyphRange
+        )
+        let idealWidth = ceil(idealUsedWidth) + horizontalPadding * 2
         let targetWidth = min(idealWidth, maxWidth)
         
         let wrapContainerWidth = max(0, targetWidth - horizontalPadding * 2)
         textContainer.containerSize = CGSize(width: wrapContainerWidth, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: textContainer)
         
-        let wrappedGlyphRange = layoutManager.glyphRange(for: textContainer)
-        let wrappedUsed = layoutManager.boundingRect(forGlyphRange: wrappedGlyphRange, in: textContainer)
+        // 高度用 usedRect 更稳定；宽度我们取 targetWidth（避免被撑满）
+        let wrappedUsed = layoutManager.usedRect(for: textContainer)
         let width = targetWidth
         let height = ceil(wrappedUsed.height) + verticalPadding * 2
         return CGSize(width: width, height: height)
+    }
+    
+    /// 获取每行实际使用宽度的最大值（比 usedRect / boundingRect 更能避免“整行宽被撑满”的情况）
+    private func maxLineFragmentUsedWidth(
+        layoutManager: NSLayoutManager,
+        glyphRange: NSRange
+    ) -> CGFloat {
+        var maxWidth: CGFloat = 0
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, _, _ in
+            maxWidth = max(maxWidth, usedRect.width)
+        }
+        return maxWidth
     }
     
     private func applyContent(to textView: MenuAwareTextView, coordinator: Coordinator) {
@@ -384,7 +399,7 @@ private struct WechatChatSelectableText: NSViewRepresentable {
 private struct MessageBubble: View {
     let message: WechatMessage
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
-    
+
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
     private let otherBubbleColor = Color.white
 
@@ -410,9 +425,9 @@ private struct MessageBubble: View {
                         onClassify(message, isFromMe, kind)
                     }
                 )
-                .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
-                .cornerRadius(8)
-                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+                    .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
 
             if !message.isFromMe {
@@ -453,10 +468,10 @@ private struct SystemMessageRow: View {
                 onClassify(message, isFromMe, kind)
             }
         )
-        .background(Color.secondary.opacity(0.10))
-        .cornerRadius(6)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.10))
+            .cornerRadius(6)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
     }
 }
 
