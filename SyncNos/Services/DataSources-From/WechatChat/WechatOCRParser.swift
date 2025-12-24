@@ -105,8 +105,10 @@ private extension WechatOCRParser {
     /// - 与左右边界距离都较大（minEdgeDistance 大）
     /// - centerX 接近 0.5
     ///
-    /// 为了避免写死阈值，先对 minEdgeDistance 做 2-means 分布聚类，取“更大的一簇”作为系统候选，
-    /// 再叠加 centerX 接近 0.5 的约束。
+    /// 为了避免误把“短气泡”当成系统消息：
+    /// - 第一步：对 minEdgeDistance 做 2-means 分布聚类，取“更大的一簇”作为系统候选（更居中）
+    /// - 第二步：在系统候选中，再对 abs(bias) 做 2-means（取更小的一簇），确保“左右留白均衡”才算系统/时间戳
+    /// - 最后：叠加 centerX 接近 0.5 的约束
     func classifyCenteredSystemFlags(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [Bool] {
         guard !candidates.isEmpty, imageWidth > 0 else { return [] }
 
@@ -120,10 +122,15 @@ private extension WechatOCRParser {
             Double(cand.bbox.midX / imageWidth)
         }
 
-        let (assignments, centers) = kMeans2(values: minEdgeDistances, iterations: 6)
-        let systemCluster = centers.0 >= centers.1 ? 0 : 1
-        let minCenter = min(centers.0, centers.1)
-        let maxCenter = max(centers.0, centers.1)
+        let biases: [Double] = candidates.map { cand in
+            Double((cand.bbox.minX + cand.bbox.maxX) / imageWidth) - 1.0
+        }
+
+        // Step 1: minEdgeDistance 聚类（更大的簇更可能是“居中系统/时间戳”）
+        let (edgeAssignments, edgeCenters) = kMeans2(values: minEdgeDistances, iterations: 6)
+        let centeredCluster = edgeCenters.0 >= edgeCenters.1 ? 0 : 1
+        let minCenter = min(edgeCenters.0, edgeCenters.1)
+        let maxCenter = max(edgeCenters.0, edgeCenters.1)
 
         // 若两簇分离不明显，则不标记系统消息（避免误判导致“漏气泡”）
         let hasClearSplit = (maxCenter - minCenter) >= 0.12 && maxCenter >= 0.18
@@ -131,10 +138,33 @@ private extension WechatOCRParser {
             return Array(repeating: false, count: candidates.count)
         }
 
-        return zip(assignments, centerXs).map { cluster, cx in
-            let centered = abs(cx - 0.5) <= 0.12
-            return cluster == systemCluster && centered
+        // Step 2: 在“居中簇”里，再用 abs(bias) 聚类（更小的一簇才是真系统/时间戳）
+        var candidateIndices: [Int] = []
+        candidateIndices.reserveCapacity(candidates.count)
+
+        for i in candidates.indices {
+            let centered = abs(centerXs[i] - 0.5) <= 0.12
+            if edgeAssignments[i] == centeredCluster, centered {
+                candidateIndices.append(i)
+            }
         }
+
+        guard !candidateIndices.isEmpty else {
+            return Array(repeating: false, count: candidates.count)
+        }
+
+        let absBiasValues: [Double] = candidateIndices.map { abs(biases[$0]) }
+        let (biasAssignments, biasCenters) = kMeans2(values: absBiasValues, iterations: 6)
+        let systemBiasCluster = biasCenters.0 <= biasCenters.1 ? 0 : 1
+
+        var flags = Array(repeating: false, count: candidates.count)
+        for (j, idx) in candidateIndices.enumerated() {
+            if biasAssignments[j] == systemBiasCluster {
+                flags[idx] = true
+            }
+        }
+
+        return flags
     }
 }
 
