@@ -174,17 +174,6 @@ struct WechatBookListItem: Identifiable {
 
 /// 微信聊天截图解析参数（集中管理，避免阈值散落在 Parser 内部）
 struct WechatChatParseConfig: Sendable {
-    // MARK: Region Filtering
-    var topIgnoreRatio: Double
-    var bottomIgnoreRatio: Double
-    /// 仅过滤“居中内容”（如标题/时间戳/系统行）的 centerX 容差（0-1）
-    /// - 仅在 top/bottom band 内生效
-    var centeredBlockToleranceRatio: Double
-    /// 居中候选（时间戳/系统行）最大宽度比例（0-1），用于全局过滤
-    var centeredCandidateMaxWidthRatio: Double
-    /// 居中候选（时间戳/系统行）最大高度比例（0-1），用于全局过滤
-    var centeredCandidateMaxHeightRatio: Double
-
     // MARK: Line Grouping
     var maxLineHorizontalGapPx: Double
     var minLineVerticalOverlapRatio: Double
@@ -198,33 +187,14 @@ struct WechatChatParseConfig: Sendable {
     var minClusterGapRatio: Double
     var singleSideRightMeanThreshold: Double
 
-    // MARK: Group Sender Name Binding
-    var senderNameMaxGapPx: Double
-    var senderNameXAlignTolerancePx: Double
-    var senderNameMaxHeightRatio: Double
-    var senderNameMaxWidthRatio: Double
-
-    // MARK: Post Processing
-    var enableCardMerge: Bool
-
     static let `default` = WechatChatParseConfig(
-        topIgnoreRatio: 0.12,
-        bottomIgnoreRatio: 0.10,
-        centeredBlockToleranceRatio: 0.22,
-        centeredCandidateMaxWidthRatio: 0.40,
-        centeredCandidateMaxHeightRatio: 0.06,
         maxLineHorizontalGapPx: 18,
         minLineVerticalOverlapRatio: 0.30,
         maxMessageLineGapPx: 26,
         maxMessageXAlignDeltaPx: 28,
         minDirectionSampleCount: 4,
         minClusterGapRatio: 0.18,
-        singleSideRightMeanThreshold: 0.62,
-        senderNameMaxGapPx: 80,
-        senderNameXAlignTolerancePx: 80,
-        senderNameMaxHeightRatio: 0.035,
-        senderNameMaxWidthRatio: 0.45,
-        enableCardMerge: false
+        singleSideRightMeanThreshold: 0.62
     )
 }
 

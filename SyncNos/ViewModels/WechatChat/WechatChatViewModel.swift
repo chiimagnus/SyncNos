@@ -212,7 +212,8 @@ final class WechatChatViewModel: ObservableObject {
             logger.info("[WechatChatV2] Processing screenshot: \(url.lastPathComponent)")
 
             let pixelSize = try imagePixelSize(image)
-            let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .wechatChat)
+            // 简化：回到默认 OCR 请求配置（不做场景化调参），先把私聊展示完整做稳
+            let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .default)
 
             let normalizedBlocksJSON = try encodeNormalizedBlocks(ocrResult.blocks)
             let parsedMessages = parser.parse(ocrResult: ocrResult, imageSize: pixelSize)
