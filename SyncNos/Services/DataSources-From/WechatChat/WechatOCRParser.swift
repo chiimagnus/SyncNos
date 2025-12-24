@@ -24,7 +24,8 @@ final class WechatOCRParser {
 
         let lines = groupBlocksIntoLines(blocks)
         let candidates = groupLinesIntoCandidates(lines)
-        let directed = classifyDirection(candidates, imageWidth: imageSize.width)
+        let filteredCandidates = filterCenteredCandidates(candidates, imageSize: imageSize)
+        let directed = classifyDirection(filteredCandidates, imageWidth: imageSize.width)
         let bound = bindSenderNames(directed, imageSize: imageSize)
 
         return bound.enumerated().map { index, item in
@@ -200,6 +201,29 @@ private extension WechatOCRParser {
     }
 }
 
+// MARK: - Candidate Filtering (Centered timestamps/system)
+
+private extension WechatOCRParser {
+    /// 过滤居中且“窄+矮”的候选（通常是时间戳/系统提示），避免在群聊里污染消息列表
+    func filterCenteredCandidates(_ candidates: [MessageCandidate], imageSize: CGSize) -> [MessageCandidate] {
+        guard imageSize.width > 0, imageSize.height > 0 else { return candidates }
+
+        let width = imageSize.width
+        let height = imageSize.height
+
+        return candidates.filter { cand in
+            let relativeCenterX = cand.bbox.midX / width
+            let isCentered = abs(Double(relativeCenterX) - 0.5) <= config.centeredBlockToleranceRatio
+            guard isCentered else { return true }
+
+            let wRatio = Double(cand.bbox.width / width)
+            let hRatio = Double(cand.bbox.height / height)
+
+            return !(wRatio <= config.centeredCandidateMaxWidthRatio && hRatio <= config.centeredCandidateMaxHeightRatio)
+        }
+    }
+}
+
 // MARK: - Direction Classification (Data-driven)
 
 private extension WechatOCRParser {
@@ -275,11 +299,13 @@ private extension WechatOCRParser {
 
                 if !next.isFromMe {
                     let gapY = next.bbox.minY - current.bbox.maxY
-                    let xDelta = abs(next.bbox.minX - current.bbox.minX)
+                    let minXDelta = abs(next.bbox.minX - current.bbox.minX)
+                    let overlap = horizontalOverlapRatio(a: current.bbox, b: next.bbox)
+                    let isAligned = overlap >= 0.20 || minXDelta <= config.senderNameXAlignTolerancePx
 
                     if gapY >= 0,
                        gapY <= config.senderNameMaxGapPx,
-                       xDelta <= config.senderNameXAlignTolerancePx {
+                       isAligned {
                         next.senderName = current.text
                         result.append(next)
                         i += 2
@@ -310,6 +336,14 @@ private func horizontalGapPx(a: CGRect, b: CGRect) -> Double {
     if a.maxX < b.minX { return Double(b.minX - a.maxX) }
     if b.maxX < a.minX { return Double(a.minX - b.maxX) }
     return 0
+}
+
+private func horizontalOverlapRatio(a: CGRect, b: CGRect) -> Double {
+    let overlap = min(a.maxX, b.maxX) - max(a.minX, b.minX)
+    guard overlap > 0 else { return 0 }
+    let minWidth = min(a.width, b.width)
+    guard minWidth > 0 else { return 0 }
+    return Double(overlap / minWidth)
 }
 
 
