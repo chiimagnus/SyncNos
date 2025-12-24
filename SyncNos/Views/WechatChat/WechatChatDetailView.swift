@@ -239,7 +239,7 @@ private struct SystemMessageRow: View {
 
 #if DEBUG
 
-/// 查看当前对话的 OCR 原始数据
+/// 查看当前对话的 OCR Normalized Blocks 数据
 private struct WechatChatOCRPayloadSheet: View {
     let conversationId: String
     let conversationName: String
@@ -247,14 +247,6 @@ private struct WechatChatOCRPayloadSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = OCRPayloadSheetViewModel()
     @State private var selection: String?
-    @State private var selectedTab: PayloadTab = .response
-    @State private var prettyPrintEnabled = true
-    
-    private enum PayloadTab: String, CaseIterable {
-        case response = "Response JSON"
-        case blocks = "Normalized Blocks"
-        case request = "Request JSON"
-    }
     
     var body: some View {
         NavigationSplitView {
@@ -269,7 +261,7 @@ private struct WechatChatOCRPayloadSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     
-                    Text("resp \(formatBytes(item.responseBytes)), blocks \(formatBytes(item.blocksBytes))")
+                    Text("\(formatBytes(item.blocksBytes))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -287,7 +279,7 @@ private struct WechatChatOCRPayloadSheet: View {
         } detail: {
             detailView
         }
-        .frame(minWidth: 900, minHeight: 600)
+        .frame(minWidth: 800, minHeight: 500)
         .task {
             await viewModel.reload(conversationId: conversationId)
             if selection == nil {
@@ -301,35 +293,26 @@ private struct WechatChatOCRPayloadSheet: View {
             }
             Task { await viewModel.loadDetail(screenshotId: id) }
         }
-        .overlay(alignment: .topTrailing) {
-            Button("关闭") { dismiss() }
-                .keyboardShortcut(.escape, modifiers: [])
-                .padding()
-        }
     }
     
     @ViewBuilder
     private var detailView: some View {
         if let detail = viewModel.detail {
             VStack(spacing: 12) {
-                // 元数据
+                // 元数据 + 复制按钮
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("screenshotId: \(detail.screenshotId)")
-                        Text("importedAt: \(detail.importedAt.formatted(date: .abbreviated, time: .standard))")
-                        Text("parsedAt: \(detail.parsedAt.formatted(date: .abbreviated, time: .standard))")
+                        Text("截图 ID: \(detail.screenshotId)")
+                        Text("导入时间: \(detail.importedAt.formatted(date: .abbreviated, time: .standard))")
+                        Text("解析时间: \(detail.parsedAt.formatted(date: .abbreviated, time: .standard))")
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     
                     Spacer()
                     
-                    Toggle("Pretty", isOn: $prettyPrintEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                    
                     Button {
-                        copyToClipboard(currentText(detail: detail))
+                        copyToClipboard(formattedBlocks(detail: detail))
                     } label: {
                         Label("复制", systemImage: "doc.on.doc")
                     }
@@ -338,18 +321,9 @@ private struct WechatChatOCRPayloadSheet: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
                 
-                // Tab 选择
-                Picker("", selection: $selectedTab) {
-                    ForEach(PayloadTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 12)
-                
-                // JSON 内容
+                // Normalized Blocks JSON 内容（美化显示）
                 ScrollView {
-                    Text(currentText(detail: detail))
+                    Text(formattedBlocks(detail: detail))
                         .font(.system(size: 11, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -370,26 +344,14 @@ private struct WechatChatOCRPayloadSheet: View {
         }
     }
     
-    private func currentText(detail: WechatOcrPayloadDetail) -> String {
-        let raw: String
-        switch selectedTab {
-        case .response:
-            raw = detail.responseJSON
-        case .blocks:
-            raw = detail.normalizedBlocksJSON
-        case .request:
-            raw = detail.requestJSON ?? "<nil>"
-        }
-        return maybePrettyPrint(raw)
-    }
-    
-    private func maybePrettyPrint(_ text: String) -> String {
-        guard prettyPrintEnabled else { return text }
-        guard let data = text.data(using: .utf8),
+    /// 美化显示 Normalized Blocks JSON
+    private func formattedBlocks(detail: WechatOcrPayloadDetail) -> String {
+        let raw = detail.normalizedBlocksJSON
+        guard let data = raw.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data),
               let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
               let str = String(data: pretty, encoding: .utf8) else {
-            return text
+            return raw
         }
         return str
     }
