@@ -1,3 +1,7 @@
+## v0.9.11
+
+**Key updates:** improve the UI of the chat detail view.
+
 ## v0.9.10
 
 **Key updates:** adding OCR recognition of chat conversations improves the recognition accuracy of chat records.
