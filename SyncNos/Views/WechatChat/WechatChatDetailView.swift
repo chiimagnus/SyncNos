@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AppKit
 
 // MARK: - Wechat Chat Detail View (V2)
 
@@ -177,64 +178,212 @@ struct WechatChatDetailView: View {
     }
 }
 
-// MARK: - Shared Classification Menu
+// MARK: - Selectable Text (AppKit) + Conditional Context Menu
 
-/// 共享的消息分类右键菜单
-/// - Parameters:
-///   - message: 当前消息
-///   - copyText: 复制时使用的文本内容
-///   - onClassify: 分类回调
-@ViewBuilder
-private func messageClassificationMenu(
-    message: WechatMessage,
-    copyText: String,
-    onClassify: @escaping (WechatMessage, Bool, WechatMessageKind) -> Void
-) -> some View {
-    // 复制按钮（补偿系统菜单被覆盖的问题）
-    Button {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(copyText, forType: .string)
-    } label: {
-        Label("复制", systemImage: "doc.on.doc")
-    }
-    
-    Divider()
-    
-    // 对方消息
-    Button {
-        onClassify(message, false, .text)
-    } label: {
-        HStack {
-            if !message.isFromMe && message.kind != .system {
-                Image(systemName: "checkmark")
-            }
-            Text("对方消息")
+/// 在 macOS 上复刻 iMessage 交互：
+/// - 无选区：右键显示自定义“消息分类”菜单
+/// - 有选区：右键显示系统文本菜单（拷贝/查询/翻译等）
+private struct WechatChatSelectableText: NSViewRepresentable {
+    struct Style {
+        let font: NSFont
+        let textColor: NSColor
+        let backgroundColor: NSColor
+        let cornerRadius: CGFloat
+        let shadowColor: NSColor?
+        let shadowOpacity: Float
+        let shadowRadius: CGFloat
+        let shadowOffset: CGSize
+        let horizontalPadding: CGFloat
+        let verticalPadding: CGFloat
+        
+        static func bubble(isFromMe: Bool) -> Style {
+            Style(
+                font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                textColor: .black,
+                backgroundColor: isFromMe
+                    ? NSColor(calibratedRed: 0.58, green: 0.92, blue: 0.41, alpha: 1.0) // #95EC69 微信绿
+                    : .white,
+                cornerRadius: 8,
+                shadowColor: .black,
+                shadowOpacity: 0.05,
+                shadowRadius: 1,
+                shadowOffset: CGSize(width: 0, height: -1),
+                horizontalPadding: 12,
+                verticalPadding: 8
+            )
+        }
+        
+        static func system() -> Style {
+            Style(
+                font: NSFont.preferredFont(forTextStyle: .caption1),
+                textColor: .secondaryLabelColor,
+                backgroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.10),
+                cornerRadius: 6,
+                shadowColor: nil,
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                shadowOffset: .zero,
+                horizontalPadding: 12,
+                verticalPadding: 6
+            )
         }
     }
     
-    // 我的消息
-    Button {
-        onClassify(message, true, .text)
-    } label: {
-        HStack {
-            if message.isFromMe && message.kind != .system {
-                Image(systemName: "checkmark")
+    let text: String
+    let isFromMe: Bool
+    let kind: WechatMessageKind
+    let style: Style
+    let onClassify: (Bool, WechatMessageKind) -> Void
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onClassify: onClassify)
+    }
+    
+    func makeNSView(context: Context) -> MenuAwareTextView {
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer()
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+        
+        let textView = MenuAwareTextView(frame: .zero, textContainer: textContainer)
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.allowsUndo = false
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
+        textView.textContainer?.lineFragmentPadding = 0
+        
+        // 渲染与布局
+        applyStyle(to: textView)
+        applyContent(to: textView, coordinator: context.coordinator)
+        
+        // 条件菜单
+        textView.menuProvider = { [weak coordinator = context.coordinator] in
+            coordinator?.makeMenu()
+        }
+        
+        return textView
+    }
+    
+    func updateNSView(_ nsView: MenuAwareTextView, context: Context) {
+        context.coordinator.isFromMe = isFromMe
+        context.coordinator.kind = kind
+        context.coordinator.onClassify = onClassify
+        
+        applyStyle(to: nsView)
+        applyContent(to: nsView, coordinator: context.coordinator)
+    }
+    
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: MenuAwareTextView, context: Context) -> CGSize? {
+        guard let textContainer = nsView.textContainer,
+              let layoutManager = nsView.layoutManager else {
+            return nil
+        }
+        
+        let maxWidth = proposal.width ?? 520
+        let horizontalPadding = style.horizontalPadding
+        let verticalPadding = style.verticalPadding
+        
+        let containerWidth = max(0, maxWidth - horizontalPadding * 2)
+        textContainer.containerSize = CGSize(width: containerWidth, height: .greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+        
+        let used = layoutManager.usedRect(for: textContainer)
+        let width = min(ceil(used.width) + horizontalPadding * 2, maxWidth)
+        let height = ceil(used.height) + verticalPadding * 2
+        return CGSize(width: width, height: height)
+    }
+    
+    private func applyContent(to textView: MenuAwareTextView, coordinator: Coordinator) {
+        if textView.string != text {
+            textView.string = text
+        }
+        textView.font = style.font
+        textView.textColor = style.textColor
+        textView.textContainerInset = NSSize(width: style.horizontalPadding, height: style.verticalPadding)
+        
+        coordinator.isFromMe = isFromMe
+        coordinator.kind = kind
+    }
+    
+    private func applyStyle(to textView: MenuAwareTextView) {
+        textView.wantsLayer = true
+        if let layer = textView.layer {
+            layer.backgroundColor = style.backgroundColor.cgColor
+            layer.cornerRadius = style.cornerRadius
+            layer.masksToBounds = false
+            
+            if let shadowColor = style.shadowColor {
+                layer.shadowColor = shadowColor.cgColor
+                layer.shadowOpacity = style.shadowOpacity
+                layer.shadowRadius = style.shadowRadius
+                layer.shadowOffset = style.shadowOffset
+            } else {
+                layer.shadowOpacity = 0
             }
-            Text("我的消息")
         }
     }
     
-    Divider()
+    // MARK: - Coordinator
     
-    // 系统消息
-    Button {
-        onClassify(message, false, .system)
-    } label: {
-        HStack {
-            if message.kind == .system {
-                Image(systemName: "checkmark")
+    final class Coordinator: NSObject {
+        var isFromMe: Bool = false
+        var kind: WechatMessageKind = .text
+        var onClassify: (Bool, WechatMessageKind) -> Void
+        
+        init(onClassify: @escaping (Bool, WechatMessageKind) -> Void) {
+            self.onClassify = onClassify
+        }
+        
+        func makeMenu() -> NSMenu {
+            let menu = NSMenu()
+            
+            let otherItem = NSMenuItem(title: "对方消息", action: #selector(classifyOther), keyEquivalent: "")
+            otherItem.target = self
+            otherItem.state = (!isFromMe && kind != .system) ? .on : .off
+            menu.addItem(otherItem)
+            
+            let meItem = NSMenuItem(title: "我的消息", action: #selector(classifyMe), keyEquivalent: "")
+            meItem.target = self
+            meItem.state = (isFromMe && kind != .system) ? .on : .off
+            menu.addItem(meItem)
+            
+            menu.addItem(.separator())
+            
+            let systemItem = NSMenuItem(title: "系统消息", action: #selector(classifySystem), keyEquivalent: "")
+            systemItem.target = self
+            systemItem.state = (kind == .system) ? .on : .off
+            menu.addItem(systemItem)
+            
+            return menu
+        }
+        
+        @objc private func classifyOther() {
+            onClassify(false, .text)
+        }
+        
+        @objc private func classifyMe() {
+            onClassify(true, .text)
+        }
+        
+        @objc private func classifySystem() {
+            onClassify(false, .system)
+        }
+    }
+    
+    // MARK: - NSTextView subclass
+    
+    final class MenuAwareTextView: NSTextView {
+        var menuProvider: (() -> NSMenu?)?
+        
+        override func menu(for event: NSEvent) -> NSMenu? {
+            if selectedRange.length > 0 {
+                return super.menu(for: event)
             }
-            Text("系统消息")
+            return menuProvider?() ?? super.menu(for: event)
         }
     }
 }
@@ -244,9 +393,6 @@ private func messageClassificationMenu(
 private struct MessageBubble: View {
     let message: WechatMessage
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
-
-    private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
-    private let otherBubbleColor = Color.white
 
     var body: some View {
         HStack {
@@ -260,27 +406,21 @@ private struct MessageBubble: View {
                         .font(.caption2)
                         .foregroundColor(Color(red: 0.34, green: 0.42, blue: 0.58)) // #576B95 微信蓝
                 }
-
-                Text(messageContent)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
-                    .foregroundColor(.black)
-                    .cornerRadius(8)
-                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+                
+                WechatChatSelectableText(
+                    text: messageContent,
+                    isFromMe: message.isFromMe,
+                    kind: message.kind,
+                    style: .bubble(isFromMe: message.isFromMe),
+                    onClassify: { isFromMe, kind in
+                        onClassify(message, isFromMe, kind)
+                    }
+                )
             }
 
             if !message.isFromMe {
                 Spacer(minLength: 60)
             }
-        }
-        .contextMenu {
-            messageClassificationMenu(
-                message: message,
-                copyText: messageContent,
-                onClassify: onClassify
-            )
         }
     }
 
@@ -307,22 +447,17 @@ private struct SystemMessageRow: View {
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
 
     var body: some View {
-        Text(message.content)
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.10))
-            .cornerRadius(6)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 6)
-            .contextMenu {
-                messageClassificationMenu(
-                    message: message,
-                    copyText: message.content,
-                    onClassify: onClassify
-                )
+        WechatChatSelectableText(
+            text: message.content,
+            isFromMe: message.isFromMe,
+            kind: message.kind,
+            style: .system(),
+            onClassify: { isFromMe, kind in
+                onClassify(message, isFromMe, kind)
             }
+        )
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 6)
     }
 }
 
