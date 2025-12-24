@@ -3,15 +3,17 @@ import AppKit
 
 // MARK: - Wechat Contact (联系人/对话)
 
-/// 微信联系人/对话（从截图标题或消息中提取）
+/// 微信联系人/对话（由用户创建或从截图标题提取）
 struct WechatContact: Identifiable, Hashable {
     let id: UUID
-    let name: String                    // 联系人名称
-    let avatarColor: NSColor            // 随机头像颜色
-    var lastMessage: String?            // 最后一条消息预览
-    var lastMessageTime: String?        // 最后消息时间
-    var messageCount: Int               // 消息数量
-    
+    let name: String
+    let avatarColor: NSColor
+
+    // UI 预览字段（可为空）
+    var lastMessage: String?
+    var lastMessageTime: String?  // V2 暂不展示时间，保留字段以便未来扩展
+    var messageCount: Int
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -26,7 +28,7 @@ struct WechatContact: Identifiable, Hashable {
         self.lastMessageTime = lastMessageTime
         self.messageCount = messageCount
     }
-    
+
     private static func randomAvatarColor() -> NSColor {
         let colors: [NSColor] = [
             .systemBlue, .systemGreen, .systemOrange,
@@ -36,62 +38,64 @@ struct WechatContact: Identifiable, Hashable {
     }
 }
 
-// MARK: - Wechat Message
+// MARK: - Wechat Message (V2)
 
-/// 微信聊天消息
+/// 消息类型（仅气泡消息；不包含 timestamp/system）
+enum WechatMessageKind: String, Hashable, Sendable {
+    case text
+    case image
+    case voice
+    case card
+}
+
+/// 微信聊天消息（V2：仅气泡消息）
 struct WechatMessage: Identifiable, Hashable {
     let id: UUID
     let content: String
     let isFromMe: Bool
     let senderName: String?
-    let type: MessageType
-    let bbox: CGRect
-    let blockOrder: Int
-    
-    enum MessageType: String, Hashable {
-        case text       // 普通文本
-        case timestamp  // 时间戳
-        case system     // 系统消息
-        case image      // 图片
-        case voice      // 语音
-    }
-    
+    let kind: WechatMessageKind
+    let bbox: CGRect?
+    let order: Int
+
     init(
         id: UUID = UUID(),
         content: String,
         isFromMe: Bool,
         senderName: String? = nil,
-        type: MessageType = .text,
-        bbox: CGRect = .zero,
-        blockOrder: Int = 0
+        kind: WechatMessageKind = .text,
+        bbox: CGRect? = nil,
+        order: Int = 0
     ) {
         self.id = id
         self.content = content
         self.isFromMe = isFromMe
         self.senderName = senderName
-        self.type = type
+        self.kind = kind
         self.bbox = bbox
-        self.blockOrder = blockOrder
+        self.order = order
     }
 }
 
-// MARK: - Wechat Screenshot
+// MARK: - Wechat Screenshot (Import Session)
 
-/// 微信聊天截图
+/// 导入的微信聊天截图（内存态，用于导入/处理中间态；不持久化图片本体）
 struct WechatScreenshot: Identifiable {
     let id: UUID
     let image: NSImage
     let imageSize: CGSize
     let importedAt: Date
-    var contactName: String?            // 从截图标题提取的联系人名称
+
+    /// 解析结果
     var messages: [WechatMessage]
+
+    /// 处理状态
     var isProcessing: Bool
     var error: String?
-    
+
     init(
         id: UUID = UUID(),
         image: NSImage,
-        contactName: String? = nil,
         messages: [WechatMessage] = [],
         isProcessing: Bool = false,
         error: String? = nil
@@ -100,49 +104,45 @@ struct WechatScreenshot: Identifiable {
         self.image = image
         self.imageSize = image.size
         self.importedAt = Date()
-        self.contactName = contactName
         self.messages = messages
         self.isProcessing = isProcessing
         self.error = error
     }
 }
 
-// MARK: - Wechat Conversation
+// MARK: - Wechat Conversation (V2)
 
-/// 微信对话（一个联系人的所有消息）
+/// 微信对话（一个联系人的消息集合；不再把截图作为 UI 结构的一部分）
 struct WechatConversation: Identifiable {
     let id: UUID
-    let contact: WechatContact
-    var screenshots: [WechatScreenshot]
-    
-    init(contact: WechatContact, screenshots: [WechatScreenshot] = []) {
+    var contact: WechatContact
+    var messages: [WechatMessage]
+
+    init(contact: WechatContact, messages: [WechatMessage] = []) {
         self.id = contact.id
         self.contact = contact
-        self.screenshots = screenshots
+        self.messages = messages
     }
-    
-    /// 所有消息（按顺序）
-    var allMessages: [WechatMessage] {
-        screenshots.flatMap { $0.messages }
-    }
-    
+
     /// 导出为纯文本
     func exportAsText() -> String {
         var lines: [String] = []
         lines.append("=== \(contact.name) ===\n")
-        
-        for message in allMessages {
-            switch message.type {
-            case .timestamp:
-                lines.append("\n── \(message.content) ──\n")
-            case .system:
-                lines.append("[\(message.content)]")
-            case .text, .image, .voice:
-                let sender = message.isFromMe ? "我" : (message.senderName ?? contact.name)
+
+        for message in messages.sorted(by: { $0.order < $1.order }) {
+            let sender = message.isFromMe ? "我" : (message.senderName ?? contact.name)
+            switch message.kind {
+            case .image:
+                lines.append("\(sender): [图片]")
+            case .voice:
+                lines.append("\(sender): [语音]")
+            case .card:
+                lines.append("\(sender): [卡片]\n\(message.content)")
+            case .text:
                 lines.append("\(sender): \(message.content)")
             }
         }
-        
+
         return lines.joined(separator: "\n")
     }
 }
@@ -158,7 +158,7 @@ struct WechatBookListItem: Identifiable {
     let lastMessageTime: String?
     let messageCount: Int
     let avatarColor: NSColor
-    
+
     init(from contact: WechatContact) {
         self.id = contact.id.uuidString
         self.contactId = contact.id
@@ -169,3 +169,49 @@ struct WechatBookListItem: Identifiable {
         self.avatarColor = contact.avatarColor
     }
 }
+
+// MARK: - WechatChat Parse Config
+
+/// 微信聊天截图解析参数（集中管理，避免阈值散落在 Parser 内部）
+struct WechatChatParseConfig: Sendable {
+    // MARK: Region Filtering
+    var topIgnoreRatio: Double
+    var bottomIgnoreRatio: Double
+
+    // MARK: Line Grouping
+    var maxLineHorizontalGapPx: Double
+    var minLineVerticalOverlapRatio: Double
+
+    // MARK: Message Grouping
+    var maxMessageLineGapPx: Double
+    var maxMessageXAlignDeltaPx: Double
+
+    // MARK: Direction Classification
+    var minDirectionSampleCount: Int
+    var minClusterGapRatio: Double
+    var singleSideRightMeanThreshold: Double
+
+    // MARK: Group Sender Name Binding
+    var senderNameMaxGapPx: Double
+    var senderNameXAlignTolerancePx: Double
+    var senderNameMaxHeightRatio: Double
+    var senderNameMaxWidthRatio: Double
+
+    static let `default` = WechatChatParseConfig(
+        topIgnoreRatio: 0.12,
+        bottomIgnoreRatio: 0.10,
+        maxLineHorizontalGapPx: 18,
+        minLineVerticalOverlapRatio: 0.30,
+        maxMessageLineGapPx: 26,
+        maxMessageXAlignDeltaPx: 28,
+        minDirectionSampleCount: 4,
+        minClusterGapRatio: 0.18,
+        singleSideRightMeanThreshold: 0.62,
+        senderNameMaxGapPx: 28,
+        senderNameXAlignTolerancePx: 32,
+        senderNameMaxHeightRatio: 0.035,
+        senderNameMaxWidthRatio: 0.45
+    )
+}
+
+

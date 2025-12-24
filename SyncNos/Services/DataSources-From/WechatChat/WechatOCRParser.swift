@@ -1,290 +1,312 @@
 import Foundation
-import AppKit
+import CoreGraphics
 
-// MARK: - Wechat OCR Parser
+// MARK: - Wechat OCR Parser (V2)
+//
+// 目标：
+// - 仅解析“气泡消息”（我/对方），支持私聊 + 群聊（昵称绑定）。
+// - 不做系统消息关键词表，不做时间戳展示路径。
+// - 主要依赖 bbox 的几何特征（过滤/合并/方向判定/昵称绑定）。
+//
 
-/// 微信聊天截图 OCR 解析器
-/// 统一处理私聊和群聊场景
 final class WechatOCRParser {
-    
-    // MARK: - Constants
-    
-    /// 左侧消息阈值：消息起始 x < 15% 图片宽度 → 对方消息（头像约50px，图片宽度约500-1000px）
-    private let leftMinXThreshold: CGFloat = 0.15
-    
-    /// 右侧消息阈值：消息起始 x > 50% 图片宽度 且 结束 x > 85% → 我的消息
-    private let rightMinXThreshold: CGFloat = 0.50
-    private let rightMaxXThreshold: CGFloat = 0.85
-    
-    /// 发送者昵称与消息的最大间距（像素）
-    private let senderNameMaxGap: CGFloat = 60
-    
-    // MARK: - Public Methods
-    
-    /// 解析 OCR 结果为微信消息
-    /// - Parameters:
-    ///   - ocrResult: PaddleOCR 返回的识别结果
-    ///   - imageSize: 图片尺寸
-    /// - Returns: 解析后的消息列表
+    private let config: WechatChatParseConfig
+
+    init(config: WechatChatParseConfig = .default) {
+        self.config = config
+    }
+
     func parse(ocrResult: OCRResult, imageSize: CGSize) -> [WechatMessage] {
-        guard imageSize.width > 0 else { return [] }
-        
-        // Step 1: 按 y 坐标排序（从上到下）
-        let sortedBlocks = ocrResult.blocks.sorted { $0.bbox.minY < $1.bbox.minY }
-        
-        // Step 2: 预处理 - 分类每个 block
-        var classifiedBlocks: [ClassifiedBlock] = []
-        
-        for (index, block) in sortedBlocks.enumerated() {
-            let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            
-            let classification = classifyBlock(
-                text: text,
-                block: block,
-                imageWidth: imageSize.width
+        guard imageSize.width > 0, imageSize.height > 0 else { return [] }
+
+        let blocks = normalizeBlocks(ocrResult.blocks, imageSize: imageSize)
+        guard !blocks.isEmpty else { return [] }
+
+        let lines = groupBlocksIntoLines(blocks)
+        let candidates = groupLinesIntoCandidates(lines)
+        let directed = classifyDirection(candidates, imageWidth: imageSize.width)
+        let bound = bindSenderNames(directed, imageSize: imageSize)
+
+        return bound.enumerated().map { index, item in
+            WechatMessage(
+                content: item.text,
+                isFromMe: item.isFromMe,
+                senderName: item.senderName,
+                kind: .text,
+                bbox: item.bbox,
+                order: index
             )
-            
-            classifiedBlocks.append(ClassifiedBlock(
-                originalIndex: index,
-                block: block,
-                text: text,
-                classification: classification
-            ))
         }
-        
-        // Step 3: 处理发送者昵称 - 将昵称关联到下一条消息
-        var messages: [WechatMessage] = []
+    }
+}
+
+// MARK: - Internal Models
+
+private struct NormalizedBlock {
+    var text: String
+    var label: String
+    var bbox: CGRect
+}
+
+private struct Line {
+    var blocks: [NormalizedBlock]
+    var bbox: CGRect
+
+    var text: String {
+        let sorted = blocks.sorted { $0.bbox.minX < $1.bbox.minX }
+        return sorted.map(\.text).joined(separator: " ")
+    }
+}
+
+private struct MessageCandidate {
+    var lines: [Line]
+    var bbox: CGRect
+
+    var text: String {
+        lines.map(\.text).joined(separator: "\n")
+    }
+}
+
+private struct DirectedCandidate {
+    var text: String
+    var bbox: CGRect
+    var isFromMe: Bool
+    var senderName: String?
+}
+
+// MARK: - Normalization & Filtering
+
+private extension WechatOCRParser {
+    func normalizeBlocks(_ blocks: [OCRBlock], imageSize: CGSize) -> [NormalizedBlock] {
+        let width = imageSize.width
+        let height = imageSize.height
+
+        let topY = height * config.topIgnoreRatio
+        let bottomY = height * (1 - config.bottomIgnoreRatio)
+
+        return blocks.compactMap { block in
+            let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+
+            // 仅依赖几何过滤顶部/底部噪声
+            if block.bbox.maxY <= topY { return nil }
+            if block.bbox.minY >= bottomY { return nil }
+
+            // 基础 sanity：过滤异常 bbox（可防止极端噪声）
+            guard block.bbox.width > 1, block.bbox.height > 1 else { return nil }
+            guard block.bbox.minX >= 0, block.bbox.minY >= 0 else { return nil }
+            guard block.bbox.maxX <= width * 1.05, block.bbox.maxY <= height * 1.05 else { return nil }
+
+            return NormalizedBlock(text: text, label: block.label, bbox: block.bbox)
+        }
+        .sorted {
+            if $0.bbox.minY != $1.bbox.minY { return $0.bbox.minY < $1.bbox.minY }
+            if $0.bbox.minX != $1.bbox.minX { return $0.bbox.minX < $1.bbox.minX }
+            return $0.bbox.width < $1.bbox.width
+        }
+    }
+}
+
+// MARK: - Grouping: Blocks -> Lines
+
+private extension WechatOCRParser {
+    func groupBlocksIntoLines(_ blocks: [NormalizedBlock]) -> [Line] {
+        var lines: [Line] = []
+
+        for block in blocks {
+            if let index = bestLineIndex(for: block, in: lines) {
+                lines[index].blocks.append(block)
+                lines[index].bbox = lines[index].bbox.union(block.bbox)
+            } else {
+                lines.append(Line(blocks: [block], bbox: block.bbox))
+            }
+        }
+
+        // 重新按阅读顺序排序 line（同一 y 段可能有左右两列）
+        return lines.sorted {
+            if $0.bbox.minY != $1.bbox.minY { return $0.bbox.minY < $1.bbox.minY }
+            return $0.bbox.minX < $1.bbox.minX
+        }
+    }
+
+    func bestLineIndex(for block: NormalizedBlock, in lines: [Line]) -> Int? {
+        var best: (index: Int, score: Double)?
+
+        for (i, line) in lines.enumerated() {
+            let overlapRatio = verticalOverlapRatio(a: line.bbox, b: block.bbox)
+            guard overlapRatio >= config.minLineVerticalOverlapRatio else { continue }
+
+            let gap = horizontalGapPx(a: line.bbox, b: block.bbox)
+            guard gap <= config.maxLineHorizontalGapPx else { continue }
+
+            // score 越小越好（优先水平更近，其次 y 更近）
+            let dy = abs(Double(line.bbox.midY - block.bbox.midY))
+            let score = gap + dy * 0.05
+
+            if best == nil || score < best!.score {
+                best = (i, score)
+            }
+        }
+
+        return best?.index
+    }
+}
+
+// MARK: - Grouping: Lines -> Message Candidates
+
+private extension WechatOCRParser {
+    func groupLinesIntoCandidates(_ lines: [Line]) -> [MessageCandidate] {
+        var candidates: [MessageCandidate] = []
+
+        for line in lines {
+            if let index = bestCandidateIndex(for: line, in: candidates) {
+                candidates[index].lines.append(line)
+                candidates[index].bbox = candidates[index].bbox.union(line.bbox)
+            } else {
+                candidates.append(MessageCandidate(lines: [line], bbox: line.bbox))
+            }
+        }
+
+        return candidates.sorted {
+            if $0.bbox.minY != $1.bbox.minY { return $0.bbox.minY < $1.bbox.minY }
+            return $0.bbox.minX < $1.bbox.minX
+        }
+    }
+
+    func bestCandidateIndex(for line: Line, in candidates: [MessageCandidate]) -> Int? {
+        var best: (index: Int, score: Double)?
+
+        for (i, cand) in candidates.enumerated() {
+            // 必须在候选的下方（阅读顺序）
+            let gapY = Double(line.bbox.minY - cand.bbox.maxY)
+            guard gapY >= 0, gapY <= config.maxMessageLineGapPx else { continue }
+
+            // 水平对齐：minX 或 maxX 接近即可
+            let minXDelta = abs(Double(line.bbox.minX - cand.bbox.minX))
+            let maxXDelta = abs(Double(line.bbox.maxX - cand.bbox.maxX))
+            let align = min(minXDelta, maxXDelta)
+            guard align <= config.maxMessageXAlignDeltaPx else { continue }
+
+            let score = gapY + align * 0.5
+            if best == nil || score < best!.score {
+                best = (i, score)
+            }
+        }
+
+        return best?.index
+    }
+}
+
+// MARK: - Direction Classification (Data-driven)
+
+private extension WechatOCRParser {
+    func classifyDirection(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [DirectedCandidate] {
+        guard !candidates.isEmpty, imageWidth > 0 else { return [] }
+
+        // 使用 centerX 做 1D 分割（更稳：长消息不易误判）
+        let centers: [Double] = candidates.map { Double($0.bbox.midX / imageWidth) }
+
+        let directedFlags = inferDirectionFlags(centers: centers)
+        return zip(candidates, directedFlags).map { cand, isFromMe in
+            DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: isFromMe, senderName: nil)
+        }
+    }
+
+    func inferDirectionFlags(centers: [Double]) -> [Bool] {
+        guard centers.count >= config.minDirectionSampleCount else {
+            return inferSingleSide(centers: centers)
+        }
+
+        let sorted = centers.sorted()
+        guard sorted.count >= 2 else { return inferSingleSide(centers: centers) }
+
+        var bestGap: Double = -1
+        var bestIndex: Int?
+        for i in 0..<(sorted.count - 1) {
+            let gap = sorted[i + 1] - sorted[i]
+            if gap > bestGap {
+                bestGap = gap
+                bestIndex = i
+            }
+        }
+
+        // 是否存在左右两列？
+        if bestGap >= config.minClusterGapRatio, let i = bestIndex {
+            let threshold = (sorted[i] + sorted[i + 1]) / 2
+            return centers.map { $0 > threshold }
+        }
+
+        return inferSingleSide(centers: centers)
+    }
+
+    func inferSingleSide(centers: [Double]) -> [Bool] {
+        guard !centers.isEmpty else { return [] }
+        let mean = centers.reduce(0, +) / Double(centers.count)
+        let allRight = mean >= config.singleSideRightMeanThreshold
+        return Array(repeating: allRight, count: centers.count)
+    }
+}
+
+// MARK: - Group Sender Name Binding (Geometry-based)
+
+private extension WechatOCRParser {
+    func bindSenderNames(_ items: [DirectedCandidate], imageSize: CGSize) -> [DirectedCandidate] {
+        guard !items.isEmpty else { return [] }
+
+        let maxNameHeight = imageSize.height * config.senderNameMaxHeightRatio
+        let maxNameWidth = imageSize.width * config.senderNameMaxWidthRatio
+
+        var result: [DirectedCandidate] = []
+        result.reserveCapacity(items.count)
+
         var i = 0
-        
-        while i < classifiedBlocks.count {
-            let current = classifiedBlocks[i]
-            
-            switch current.classification {
-            case .timestamp:
-                messages.append(WechatMessage(
-                    content: current.text,
-                    isFromMe: false,
-                    type: .timestamp,
-                    bbox: current.block.bbox,
-                    blockOrder: current.originalIndex
-                ))
-                
-            case .system:
-                messages.append(WechatMessage(
-                    content: current.text,
-                    isFromMe: false,
-                    type: .system,
-                    bbox: current.block.bbox,
-                    blockOrder: current.originalIndex
-                ))
-                
-            case .senderName:
-                // 检查下一个 block 是否是消息
-                if i + 1 < classifiedBlocks.count {
-                    let next = classifiedBlocks[i + 1]
-                    if case .message(let isFromMe) = next.classification {
-                        // 昵称和消息在一起处理
-                        let gap = next.block.bbox.minY - current.block.bbox.maxY
-                        if gap < senderNameMaxGap && gap > 0 {
-                            messages.append(WechatMessage(
-                                content: next.text,
-                                isFromMe: isFromMe,
-                                senderName: current.text,
-                                type: determineMessageType(text: next.text),
-                                bbox: next.block.bbox,
-                                blockOrder: next.originalIndex
-                            ))
-                            i += 2  // 跳过昵称和消息
-                            continue
-                        }
+        while i < items.count {
+            let current = items[i]
+
+            // 只尝试把“上一行昵称”绑定给下一条左侧消息
+            if !current.isFromMe,
+               current.bbox.height <= maxNameHeight,
+               current.bbox.width <= maxNameWidth,
+               i + 1 < items.count {
+                var next = items[i + 1]
+
+                if !next.isFromMe {
+                    let gapY = next.bbox.minY - current.bbox.maxY
+                    let xDelta = abs(next.bbox.minX - current.bbox.minX)
+
+                    if gapY >= 0,
+                       gapY <= config.senderNameMaxGapPx,
+                       xDelta <= config.senderNameXAlignTolerancePx {
+                        next.senderName = current.text
+                        result.append(next)
+                        i += 2
+                        continue
                     }
                 }
-                // 如果没有匹配的消息，当作普通消息处理
-                messages.append(WechatMessage(
-                    content: current.text,
-                    isFromMe: false,
-                    type: .text,
-                    bbox: current.block.bbox,
-                    blockOrder: current.originalIndex
-                ))
-                
-            case .message(let isFromMe):
-                messages.append(WechatMessage(
-                    content: current.text,
-                    isFromMe: isFromMe,
-                    type: determineMessageType(text: current.text),
-                    bbox: current.block.bbox,
-                    blockOrder: current.originalIndex
-                ))
             }
-            
+
+            result.append(current)
             i += 1
         }
-        
-        return messages
-    }
-    
-    // MARK: - Private Types
-    
-    /// Block 分类
-    private enum BlockClassification {
-        case timestamp                    // 时间戳
-        case system                       // 系统消息
-        case senderName                   // 发送者昵称（群聊）
-        case message(isFromMe: Bool)      // 普通消息
-    }
-    
-    /// 带分类的 Block
-    private struct ClassifiedBlock {
-        let originalIndex: Int
-        let block: OCRBlock
-        let text: String
-        let classification: BlockClassification
-    }
-    
-    // MARK: - Private Methods
-    
-    /// 分类单个 block
-    private func classifyBlock(text: String, block: OCRBlock, imageWidth: CGFloat) -> BlockClassification {
-        // 1. 时间戳检测（优先级最高）
-        if isTimestamp(text) {
-            return .timestamp
-        }
-        
-        // 2. 系统消息检测
-        if isSystemMessage(text) {
-            return .system
-        }
-        
-        // 3. 计算相对位置
-        let relativeMinX = block.bbox.minX / imageWidth
-        let relativeMaxX = block.bbox.maxX / imageWidth
-        
-        // 4. 可能是发送者昵称的特征：
-        //    - 短文本（< 20 字符）
-        //    - 在左侧（minX < 15%）
-        //    - 不是时间戳/系统消息
-        if text.count < 20 && relativeMinX < leftMinXThreshold {
-            if isLikelySenderName(text) {
-                return .senderName
-            }
-        }
-        
-        // 5. 判断消息方向 - 核心逻辑
-        //    微信布局特点：
-        //    - 对方消息：头像在左侧，气泡紧挨头像 → minX 很小（< 15%）
-        //    - 我的消息：头像在右侧，气泡紧挨头像 → minX 很大（> 50%）且 maxX 接近右边（> 85%）
-        //    - 长消息：即使对方发的长消息，maxX 可能很大，但 minX 仍然很小
-        
-        // 如果 minX 很小，说明气泡从左侧开始 → 对方消息
-        if relativeMinX < leftMinXThreshold {
-            return .message(isFromMe: false)
-        }
-        
-        // 如果 minX 很大（>50%）且 maxX 接近右边界（>85%）→ 我的消息
-        if relativeMinX > rightMinXThreshold && relativeMaxX > rightMaxXThreshold {
-            return .message(isFromMe: true)
-        }
-        
-        // 6. 中间地带（可能是居中的消息卡片、链接等）
-        //    使用 minX 作为主要判断依据：minX < 30% 视为对方，否则视为我的
-        return .message(isFromMe: relativeMinX > 0.30)
-    }
-    
-    /// 判断是否可能是发送者昵称
-    private func isLikelySenderName(_ text: String) -> Bool {
-        // 昵称特征：
-        // 1. 长度 2-15 字符
-        // 2. 不包含常见标点（消息通常有标点）
-        // 3. 不是纯数字
-        // 4. 不包含"["或"]"（特殊消息标记）
-        
-        guard text.count >= 2 && text.count <= 15 else { return false }
-        
-        // 常见标点符号
-        let punctuation = CharacterSet.punctuationCharacters
-        if text.unicodeScalars.contains(where: { punctuation.contains($0) }) {
-            return false
-        }
-        
-        if text.allSatisfy({ $0.isNumber }) {
-            return false
-        }
-        
-        if text.contains("[") || text.contains("]") {
-            return false
-        }
-        
-        return true
-    }
-    
-    /// 判断消息类型
-    private func determineMessageType(text: String) -> WechatMessage.MessageType {
-        if text.contains("[图片]") || text.contains("[照片]") || text.contains("[Image]") {
-            return .image
-        }
-        if text.contains("[语音]") || text.contains("[Voice]") {
-            return .voice
-        }
-        if text.range(of: #"^\d+['\"″]$"#, options: .regularExpression) != nil {
-            return .voice  // 语音时长，如 "5""
-        }
-        return .text
-    }
-    
-    /// 检测是否为时间戳
-    private func isTimestamp(_ text: String) -> Bool {
-        let patterns = [
-            #"^\d{1,2}:\d{2}$"#,                        // 10:30
-            #"^(上午|下午)\s*\d{1,2}:\d{2}$"#,           // 上午 12:34
-            #"^(昨天|前天|今天)\s*\d{1,2}:\d{2}$"#,       // 昨天 12:34
-            #"^\d{1,2}月\d{1,2}日\s*\d{1,2}:\d{2}$"#,   // 7月29日 03:11
-            #"^星期[一二三四五六日天]\s*\d{1,2}:\d{2}$"#,  // 星期六 12:34
-            #"^\d{4}年\d{1,2}月\d{1,2}日"#,             // 2024年12月20日
-            #"^\d{1,2}/\d{1,2}/\d{2,4}"#,              // 12/20/24
-            #"^\d{4}-\d{1,2}-\d{1,2}"#                 // 2024-12-20
-        ]
-        
-        for pattern in patterns {
-            if text.range(of: pattern, options: .regularExpression) != nil {
-                return true
-            }
-        }
-        return false
-    }
-    
-    /// 检测是否为系统消息
-    private func isSystemMessage(_ text: String) -> Bool {
-        let keywords = [
-            "撤回了一条消息",
-            "加入了群聊",
-            "退出了群聊",
-            "修改群名",
-            "你已添加了",
-            "以上是打招呼的内容",
-            "拍了拍",
-            "邀请你加入",
-            "与群里其他人都不是朋友关系",
-            "发起了群聊",
-            "开启了公告",
-            "发起了视频通话",
-            "发起了语音通话",
-            "发送了一个红包",
-            "领取了你的红包",
-            "已过期",
-            "已被领完"
-        ]
-        
-        return keywords.contains { text.contains($0) }
+
+        return result
     }
 }
 
-// MARK: - Parser Helper Extension (for ViewModel)
+// MARK: - Geometry Helpers
 
-extension WechatOCRParser {
-    /// 用于 ViewModel 调用的辅助方法
-    func isLikelyTimestamp(_ text: String) -> Bool {
-        isTimestamp(text)
-    }
+private func verticalOverlapRatio(a: CGRect, b: CGRect) -> Double {
+    let overlap = min(a.maxY, b.maxY) - max(a.minY, b.minY)
+    guard overlap > 0 else { return 0 }
+    let minHeight = min(a.height, b.height)
+    guard minHeight > 0 else { return 0 }
+    return Double(overlap / minHeight)
 }
+
+private func horizontalGapPx(a: CGRect, b: CGRect) -> Double {
+    if a.maxX < b.minX { return Double(b.minX - a.maxX) }
+    if b.maxX < a.minX { return Double(a.minX - b.maxX) }
+    return 0
+}
+
+
