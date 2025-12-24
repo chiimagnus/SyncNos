@@ -189,28 +189,64 @@ private extension WechatOCRParser {
     func classifyDirection(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [DirectedCandidate] {
         guard !candidates.isEmpty, imageWidth > 0 else { return [] }
 
-        let otherMaxMinX = CGFloat(config.otherMessageMaxMinXRatio)
-        let myMinMinX = CGFloat(config.myMessageMinMinXRatio)
-        let myMinMaxX = CGFloat(config.myMessageMinMaxXRatio)
-        let fallbackMyMinX = CGFloat(config.fallbackMyMessageMinXRatio)
+        // 使用“分布”而非固定阈值：
+        // 以气泡到左右边界的相对距离差作为 1D 特征：
+        // bias = leftDistance - rightDistance
+        //      = (minX/width) - (1 - maxX/width)
+        //      = (minX + maxX)/width - 1
+        // bias 越大越偏右（更可能是“我”）
 
-        return candidates.map { cand in
-            let relativeMinX = cand.bbox.minX / imageWidth
-            let relativeMaxX = cand.bbox.maxX / imageWidth
-
-            // 1) 对方：左侧起始 x 小
-            if relativeMinX <= otherMaxMinX {
-                return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: false)
-            }
-
-            // 2) 我：右侧贴边（maxX 大）且起始也更靠右（minX 大）
-            if relativeMaxX >= myMinMaxX, relativeMinX >= myMinMinX {
-                return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: true)
-            }
-
-            // 3) 兜底：minX 足够靠右则判为我
-            return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: relativeMinX >= fallbackMyMinX)
+        let biases: [Double] = candidates.map { cand in
+            Double((cand.bbox.minX + cand.bbox.maxX) / imageWidth) - 1.0
         }
+
+        let (assignments, centers) = kMeans2(values: biases, iterations: 8)
+        let rightCluster = centers.0 >= centers.1 ? 0 : 1
+
+        return zip(candidates, assignments).map { cand, cluster in
+            DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: cluster == rightCluster)
+        }
+    }
+
+    /// 1D k-means (k=2) on normalized values
+    func kMeans2(values: [Double], iterations: Int) -> (assignments: [Int], centers: (Double, Double)) {
+        guard !values.isEmpty else { return ([], (0, 0)) }
+
+        var c0 = values.min() ?? 0
+        var c1 = values.max() ?? 0
+
+        // 全部相同：全部归为一个簇
+        if c0 == c1 {
+            return (Array(repeating: 0, count: values.count), (c0, c1))
+        }
+
+        var assignments = Array(repeating: 0, count: values.count)
+
+        for _ in 0..<max(1, iterations) {
+            var sum0: Double = 0
+            var sum1: Double = 0
+            var cnt0: Int = 0
+            var cnt1: Int = 0
+
+            for (idx, v) in values.enumerated() {
+                let d0 = abs(v - c0)
+                let d1 = abs(v - c1)
+                let a = (d0 <= d1) ? 0 : 1
+                assignments[idx] = a
+                if a == 0 {
+                    sum0 += v
+                    cnt0 += 1
+                } else {
+                    sum1 += v
+                    cnt1 += 1
+                }
+            }
+
+            if cnt0 > 0 { c0 = sum0 / Double(cnt0) }
+            if cnt1 > 0 { c1 = sum1 / Double(cnt1) }
+        }
+
+        return (assignments, (c0, c1))
     }
 }
 

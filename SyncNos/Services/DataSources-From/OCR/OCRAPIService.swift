@@ -126,11 +126,21 @@ final class OCRAPIService: OCRAPIServiceProtocol {
         
         logger.info("[OCR] Recognition completed: \(blocks.count) blocks")
         
+        let coordinateSize: CGSize? = {
+            guard let w = responseResult.dataInfo?.width,
+                  let h = responseResult.dataInfo?.height,
+                  w > 0, h > 0 else {
+                return nil
+            }
+            return CGSize(width: w, height: h)
+        }()
+
         let ocrResult = OCRResult(
             rawText: rawText,
             markdownText: layout.markdown?.text,
             blocks: blocks,
-            processedAt: Date()
+            processedAt: Date(),
+            coordinateSize: coordinateSize
         )
         return (result: ocrResult, rawResponse: data, requestJSON: requestJSON)
     }
