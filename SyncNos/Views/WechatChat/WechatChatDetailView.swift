@@ -10,6 +10,7 @@ struct WechatChatDetailView: View {
     @Binding var selectedContactId: String?
 
     @State private var showFilePicker = false
+    @State private var showOCRPayloadSheet = false
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -51,8 +52,25 @@ struct WechatChatDetailView: View {
                         }
                         .disabled(contact.messageCount == 0)
                         .help("复制全部聊天记录")
+                        
+#if DEBUG
+                        Divider()
+                        
+                        Button {
+                            showOCRPayloadSheet = true
+                        } label: {
+                            Label("OCR JSON", systemImage: "doc.text.magnifyingglass")
+                        }
+                        .disabled(contact.messageCount == 0)
+                        .help("查看 OCR 原始数据")
+#endif
                     }
                 }
+#if DEBUG
+                .sheet(isPresented: $showOCRPayloadSheet) {
+                    WechatChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
+                }
+#endif
                 .fileImporter(
                     isPresented: $showFilePicker,
                     allowedContentTypes: [.image],
@@ -216,5 +234,213 @@ private struct SystemMessageRow: View {
     .environmentObject(FontScaleManager.shared)
     .frame(width: 500, height: 600)
 }
+
+// MARK: - OCR Payload Sheet (Debug Only)
+
+#if DEBUG
+
+/// 查看当前对话的 OCR 原始数据
+private struct WechatChatOCRPayloadSheet: View {
+    let conversationId: String
+    let conversationName: String
+    
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = OCRPayloadSheetViewModel()
+    @State private var selection: String?
+    @State private var selectedTab: PayloadTab = .response
+    @State private var prettyPrintEnabled = true
+    
+    private enum PayloadTab: String, CaseIterable {
+        case response = "Response JSON"
+        case blocks = "Normalized Blocks"
+        case request = "Request JSON"
+    }
+    
+    var body: some View {
+        NavigationSplitView {
+            List(viewModel.payloads, selection: $selection) { item in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.screenshotId)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    
+                    Text(item.importedAt, style: .time)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("resp \(formatBytes(item.responseBytes)), blocks \(formatBytes(item.blocksBytes))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .tag(item.screenshotId)
+            }
+            .navigationTitle(conversationName)
+            .toolbar {
+                ToolbarItemGroup {
+                    Button("刷新") {
+                        Task { await viewModel.reload(conversationId: conversationId) }
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+            }
+        } detail: {
+            detailView
+        }
+        .frame(minWidth: 900, minHeight: 600)
+        .task {
+            await viewModel.reload(conversationId: conversationId)
+            if selection == nil {
+                selection = viewModel.payloads.first?.screenshotId
+            }
+        }
+        .onChange(of: selection) { _, newValue in
+            guard let id = newValue else {
+                viewModel.detail = nil
+                return
+            }
+            Task { await viewModel.loadDetail(screenshotId: id) }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button("关闭") { dismiss() }
+                .keyboardShortcut(.escape, modifiers: [])
+                .padding()
+        }
+    }
+    
+    @ViewBuilder
+    private var detailView: some View {
+        if let detail = viewModel.detail {
+            VStack(spacing: 12) {
+                // 元数据
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("screenshotId: \(detail.screenshotId)")
+                        Text("importedAt: \(detail.importedAt.formatted(date: .abbreviated, time: .standard))")
+                        Text("parsedAt: \(detail.parsedAt.formatted(date: .abbreviated, time: .standard))")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Toggle("Pretty", isOn: $prettyPrintEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    
+                    Button {
+                        copyToClipboard(currentText(detail: detail))
+                    } label: {
+                        Label("复制", systemImage: "doc.on.doc")
+                    }
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                
+                // Tab 选择
+                Picker("", selection: $selectedTab) {
+                    ForEach(PayloadTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 12)
+                
+                // JSON 内容
+                ScrollView {
+                    Text(currentText(detail: detail))
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .background(Color(nsColor: .textBackgroundColor))
+                .cornerRadius(6)
+                .padding([.horizontal, .bottom], 12)
+            }
+        } else if viewModel.isLoading {
+            ProgressView("加载中...")
+        } else if let error = viewModel.errorMessage {
+            Text(error)
+                .foregroundStyle(.red)
+        } else {
+            Text("选择一个截图查看详情")
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func currentText(detail: WechatOcrPayloadDetail) -> String {
+        let raw: String
+        switch selectedTab {
+        case .response:
+            raw = detail.responseJSON
+        case .blocks:
+            raw = detail.normalizedBlocksJSON
+        case .request:
+            raw = detail.requestJSON ?? "<nil>"
+        }
+        return maybePrettyPrint(raw)
+    }
+    
+    private func maybePrettyPrint(_ text: String) -> String {
+        guard prettyPrintEnabled else { return text }
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
+              let str = String(data: pretty, encoding: .utf8) else {
+            return text
+        }
+        return str
+    }
+    
+    private func formatBytes(_ bytes: Int) -> String {
+        if bytes < 1024 { return "\(bytes)B" }
+        if bytes < 1024 * 1024 { return "\(bytes / 1024)KB" }
+        return String(format: "%.1fMB", Double(bytes) / (1024 * 1024))
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+// MARK: - OCR Payload Sheet ViewModel
+
+@MainActor
+private final class OCRPayloadSheetViewModel: ObservableObject {
+    @Published var payloads: [WechatOcrPayloadSummary] = []
+    @Published var detail: WechatOcrPayloadDetail?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    private let cacheService: WechatChatCacheServiceProtocol = DIContainer.shared.wechatChatCacheService
+    
+    func reload(conversationId: String) async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            // 获取所有截图，然后过滤当前对话
+            let allPayloads = try await cacheService.fetchRecentOcrPayloads(limit: 100)
+            payloads = allPayloads.filter { $0.conversationId == conversationId }
+            errorMessage = nil
+        } catch {
+            errorMessage = "加载失败: \(error.localizedDescription)"
+        }
+    }
+    
+    func loadDetail(screenshotId: String) async {
+        do {
+            detail = try await cacheService.fetchOcrPayload(screenshotId: screenshotId)
+            errorMessage = nil
+        } catch {
+            errorMessage = "读取失败: \(error.localizedDescription)"
+        }
+    }
+}
+
+#endif
 
 
