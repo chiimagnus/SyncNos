@@ -63,6 +63,10 @@ protocol WechatChatCacheServiceProtocol: Actor {
 
     // 清理
     func clearAllData() throws
+
+    // Debug: OCR Payload Inspect
+    func fetchRecentOcrPayloads(limit: Int) throws -> [WechatOcrPayloadSummary]
+    func fetchOcrPayload(screenshotId: String) throws -> WechatOcrPayloadDetail?
 }
 
 // MARK: - WechatChat Cache Service (V2)
@@ -288,6 +292,48 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         try modelContext.save()
         logger.info("[WechatChatCacheV2] Cleared all data")
     }
+
+    // MARK: Debug - OCR Payload Inspect
+
+    func fetchRecentOcrPayloads(limit: Int) throws -> [WechatOcrPayloadSummary] {
+        var descriptor = FetchDescriptor<CachedWechatScreenshotV2>(
+            sortBy: [SortDescriptor(\.importedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = max(0, limit)
+
+        let screenshots = try modelContext.fetch(descriptor)
+        return screenshots.map {
+            WechatOcrPayloadSummary(
+                screenshotId: $0.screenshotId,
+                conversationId: $0.conversationId,
+                importedAt: $0.importedAt,
+                parsedAt: $0.parsedAt,
+                responseBytes: $0.ocrResponseJSON.count,
+                blocksBytes: $0.normalizedBlocksJSON.count
+            )
+        }
+    }
+
+    func fetchOcrPayload(screenshotId: String) throws -> WechatOcrPayloadDetail? {
+        let targetId = screenshotId
+        let predicate = #Predicate<CachedWechatScreenshotV2> { shot in
+            shot.screenshotId == targetId
+        }
+        var descriptor = FetchDescriptor<CachedWechatScreenshotV2>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let shot = try modelContext.fetch(descriptor).first else { return nil }
+
+        return WechatOcrPayloadDetail(
+            screenshotId: shot.screenshotId,
+            conversationId: shot.conversationId,
+            importedAt: shot.importedAt,
+            parsedAt: shot.parsedAt,
+            requestJSON: shot.ocrRequestJSON.flatMap { String(data: $0, encoding: .utf8) },
+            responseJSON: String(data: shot.ocrResponseJSON, encoding: .utf8) ?? "<non-utf8 data>",
+            normalizedBlocksJSON: String(data: shot.normalizedBlocksJSON, encoding: .utf8) ?? "<non-utf8 data>"
+        )
+    }
 }
 
 // MARK: - Conversion
@@ -304,6 +350,29 @@ private extension CachedWechatMessageV2 {
             order: order
         )
     }
+}
+
+// MARK: - Debug DTOs (Sendable)
+
+struct WechatOcrPayloadSummary: Identifiable, Hashable, Sendable {
+    var id: String { screenshotId }
+
+    let screenshotId: String
+    let conversationId: String
+    let importedAt: Date
+    let parsedAt: Date
+    let responseBytes: Int
+    let blocksBytes: Int
+}
+
+struct WechatOcrPayloadDetail: Sendable {
+    let screenshotId: String
+    let conversationId: String
+    let importedAt: Date
+    let parsedAt: Date
+    let requestJSON: String?
+    let responseJSON: String
+    let normalizedBlocksJSON: String
 }
 
 
