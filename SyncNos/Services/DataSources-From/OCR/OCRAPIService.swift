@@ -6,6 +6,9 @@ import AppKit
 protocol OCRAPIServiceProtocol {
     /// 识别图片
     func recognize(_ image: NSImage) async throws -> OCRResult
+
+    /// 识别图片（返回 raw JSON，便于持久化/回放/排障）
+    func recognizeWithRaw(_ image: NSImage, config: OCRRequestConfig) async throws -> (result: OCRResult, rawResponse: Data, requestJSON: Data)
     
     /// 测试 API 连接
     func testConnection() async throws -> Bool
@@ -45,6 +48,11 @@ final class OCRAPIService: OCRAPIServiceProtocol {
     // MARK: - Public Methods
     
     func recognize(_ image: NSImage) async throws -> OCRResult {
+        let (result, _, _) = try await recognizeWithRaw(image, config: .default)
+        return result
+    }
+
+    func recognizeWithRaw(_ image: NSImage, config: OCRRequestConfig) async throws -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
         guard configStore.isConfigured else {
             throw OCRServiceError.notConfigured
         }
@@ -61,13 +69,22 @@ final class OCRAPIService: OCRAPIServiceProtocol {
         logger.info("[OCR] Starting PaddleOCR recognition...")
         
         let base64Image = try encodeImageToBase64(image)
-        let request = PaddleOCRRequest(file: base64Image)
+        let request = PaddleOCRRequest(
+            file: base64Image,
+            fileType: 1,
+            useDocOrientationClassify: config.useDocOrientationClassify,
+            useDocUnwarping: config.useDocUnwarping,
+            useLayoutDetection: config.useLayoutDetection,
+            useChartRecognition: config.useChartRecognition,
+            visualize: config.visualize
+        )
         
         var httpRequest = URLRequest(url: url)
         httpRequest.httpMethod = "POST"
         httpRequest.setValue("token \(token)", forHTTPHeaderField: "Authorization")
         httpRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        httpRequest.httpBody = try JSONEncoder().encode(request)
+        let requestJSON = try JSONEncoder().encode(request)
+        httpRequest.httpBody = requestJSON
         
         logger.debug("[OCR] Sending request to \(apiURL)...")
         
@@ -92,8 +109,8 @@ final class OCRAPIService: OCRAPIServiceProtocol {
             throw OCRServiceError.apiError(ocrResponse.errorMsg)
         }
         
-        guard let result = ocrResponse.result,
-              let layout = result.layoutParsingResults.first else {
+        guard let responseResult = ocrResponse.result,
+              let layout = responseResult.layoutParsingResults.first else {
             throw OCRServiceError.noResult
         }
         
@@ -109,12 +126,13 @@ final class OCRAPIService: OCRAPIServiceProtocol {
         
         logger.info("[OCR] Recognition completed: \(blocks.count) blocks")
         
-        return OCRResult(
+        let ocrResult = OCRResult(
             rawText: rawText,
             markdownText: layout.markdown?.text,
             blocks: blocks,
             processedAt: Date()
         )
+        return (result: ocrResult, rawResponse: data, requestJSON: requestJSON)
     }
     
     func testConnection() async throws -> Bool {
