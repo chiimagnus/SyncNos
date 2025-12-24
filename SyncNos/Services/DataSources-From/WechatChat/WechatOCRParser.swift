@@ -189,47 +189,28 @@ private extension WechatOCRParser {
     func classifyDirection(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [DirectedCandidate] {
         guard !candidates.isEmpty, imageWidth > 0 else { return [] }
 
-        // 使用 centerX 做 1D 分割（更稳：长消息不易误判）
-        let centers: [Double] = candidates.map { Double($0.bbox.midX / imageWidth) }
+        let otherMaxMinX = CGFloat(config.otherMessageMaxMinXRatio)
+        let myMinMinX = CGFloat(config.myMessageMinMinXRatio)
+        let myMinMaxX = CGFloat(config.myMessageMinMaxXRatio)
+        let fallbackMyMinX = CGFloat(config.fallbackMyMessageMinXRatio)
 
-        let directedFlags = inferDirectionFlags(centers: centers)
-        return zip(candidates, directedFlags).map { cand, isFromMe in
-            DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: isFromMe)
-        }
-    }
+        return candidates.map { cand in
+            let relativeMinX = cand.bbox.minX / imageWidth
+            let relativeMaxX = cand.bbox.maxX / imageWidth
 
-    func inferDirectionFlags(centers: [Double]) -> [Bool] {
-        guard centers.count >= config.minDirectionSampleCount else {
-            return inferSingleSide(centers: centers)
-        }
-
-        let sorted = centers.sorted()
-        guard sorted.count >= 2 else { return inferSingleSide(centers: centers) }
-
-        var bestGap: Double = -1
-        var bestIndex: Int?
-        for i in 0..<(sorted.count - 1) {
-            let gap = sorted[i + 1] - sorted[i]
-            if gap > bestGap {
-                bestGap = gap
-                bestIndex = i
+            // 1) 对方：左侧起始 x 小
+            if relativeMinX <= otherMaxMinX {
+                return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: false)
             }
+
+            // 2) 我：右侧贴边（maxX 大）且起始也更靠右（minX 大）
+            if relativeMaxX >= myMinMaxX, relativeMinX >= myMinMinX {
+                return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: true)
+            }
+
+            // 3) 兜底：minX 足够靠右则判为我
+            return DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: relativeMinX >= fallbackMyMinX)
         }
-
-        // 是否存在左右两列？
-        if bestGap >= config.minClusterGapRatio, let i = bestIndex {
-            let threshold = (sorted[i] + sorted[i + 1]) / 2
-            return centers.map { $0 > threshold }
-        }
-
-        return inferSingleSide(centers: centers)
-    }
-
-    func inferSingleSide(centers: [Double]) -> [Bool] {
-        guard !centers.isEmpty else { return [] }
-        let mean = centers.reduce(0, +) / Double(centers.count)
-        let allRight = mean >= config.singleSideRightMeanThreshold
-        return Array(repeating: allRight, count: centers.count)
     }
 }
 
