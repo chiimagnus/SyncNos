@@ -5,6 +5,7 @@ plans/
 .kiro/
 .claude/
 .specify/
+.github/*.md
 
 # Notion OAuth 配置文件（包含敏感信息）
 notion_auth.env
