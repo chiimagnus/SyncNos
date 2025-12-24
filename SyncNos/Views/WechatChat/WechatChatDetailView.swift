@@ -54,8 +54,6 @@ struct WechatChatDetailView: View {
                         .help("复制全部聊天记录")
                         
 #if DEBUG
-                        Divider()
-                        
                         Button {
                             showOCRPayloadSheet = true
                         } label: {
@@ -244,84 +242,89 @@ private struct WechatChatOCRPayloadSheet: View {
     let conversationId: String
     let conversationName: String
     
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = OCRPayloadSheetViewModel()
-    @State private var selection: String?
+    @State private var selectedIndex: Int = 0
     
     var body: some View {
-        NavigationSplitView {
-            List(viewModel.payloads, selection: $selection) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.screenshotId)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    
-                    Text(item.importedAt, style: .time)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("\(formatBytes(item.blocksBytes))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .tag(item.screenshotId)
-            }
-            .navigationTitle(conversationName)
-            .toolbar {
-                ToolbarItemGroup {
-                    Button("刷新") {
-                        Task { await viewModel.reload(conversationId: conversationId) }
+        VStack(spacing: 0) {
+            // 标题栏
+            HStack {
+                Text("OCR Blocks: \(conversationName)")
+                    .font(.headline)
+                
+                Spacer()
+                
+                // 多截图时显示切换器
+                if viewModel.payloads.count > 1 {
+                    HStack(spacing: 8) {
+                        Button {
+                            if selectedIndex > 0 {
+                                selectedIndex -= 1
+                                loadCurrentDetail()
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .disabled(selectedIndex == 0)
+                        
+                        Text("\(selectedIndex + 1) / \(viewModel.payloads.count)")
+                            .font(.caption)
+                            .monospacedDigit()
+                        
+                        Button {
+                            if selectedIndex < viewModel.payloads.count - 1 {
+                                selectedIndex += 1
+                                loadCurrentDetail()
+                            }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                        }
+                        .disabled(selectedIndex >= viewModel.payloads.count - 1)
                     }
-                    .disabled(viewModel.isLoading)
                 }
+                
+                Button {
+                    if let detail = viewModel.detail {
+                        copyToClipboard(formattedBlocks(detail: detail))
+                    }
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
+                }
+                .controlSize(.small)
+                .disabled(viewModel.detail == nil)
             }
-        } detail: {
-            detailView
+            .padding()
+            .background(Color(nsColor: .windowBackgroundColor))
+            
+            Divider()
+            
+            // 内容区域
+            contentView
         }
-        .frame(minWidth: 800, minHeight: 500)
+        .frame(minWidth: 600, minHeight: 400)
         .task {
             await viewModel.reload(conversationId: conversationId)
-            if selection == nil {
-                selection = viewModel.payloads.first?.screenshotId
-            }
-        }
-        .onChange(of: selection) { _, newValue in
-            guard let id = newValue else {
-                viewModel.detail = nil
-                return
-            }
-            Task { await viewModel.loadDetail(screenshotId: id) }
+            loadCurrentDetail()
         }
     }
     
     @ViewBuilder
-    private var detailView: some View {
+    private var contentView: some View {
         if let detail = viewModel.detail {
-            VStack(spacing: 12) {
-                // 元数据 + 复制按钮
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("截图 ID: \(detail.screenshotId)")
-                        Text("导入时间: \(detail.importedAt.formatted(date: .abbreviated, time: .standard))")
-                        Text("解析时间: \(detail.parsedAt.formatted(date: .abbreviated, time: .standard))")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    
+            VStack(spacing: 8) {
+                // 元数据
+                HStack {
+                    Text("导入: \(detail.importedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text("·")
+                    Text("解析: \(detail.parsedAt.formatted(date: .abbreviated, time: .shortened))")
                     Spacer()
-                    
-                    Button {
-                        copyToClipboard(formattedBlocks(detail: detail))
-                    } label: {
-                        Label("复制", systemImage: "doc.on.doc")
-                    }
-                    .controlSize(.small)
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
                 
-                // Normalized Blocks JSON 内容（美化显示）
+                // JSON 内容
                 ScrollView {
                     Text(formattedBlocks(detail: detail))
                         .font(.system(size: 11, design: .monospaced))
@@ -335,13 +338,26 @@ private struct WechatChatOCRPayloadSheet: View {
             }
         } else if viewModel.isLoading {
             ProgressView("加载中...")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {
             Text(error)
                 .foregroundStyle(.red)
-        } else {
-            Text("选择一个截图查看详情")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if viewModel.payloads.isEmpty {
+            Text("该对话暂无 OCR 数据")
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Text("加载中...")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+    
+    private func loadCurrentDetail() {
+        guard selectedIndex >= 0, selectedIndex < viewModel.payloads.count else { return }
+        let screenshotId = viewModel.payloads[selectedIndex].screenshotId
+        Task { await viewModel.loadDetail(screenshotId: screenshotId) }
     }
     
     /// 美化显示 Normalized Blocks JSON
@@ -354,12 +370,6 @@ private struct WechatChatOCRPayloadSheet: View {
             return raw
         }
         return str
-    }
-    
-    private func formatBytes(_ bytes: Int) -> String {
-        if bytes < 1024 { return "\(bytes)B" }
-        if bytes < 1024 * 1024 { return "\(bytes / 1024)KB" }
-        return String(format: "%.1fMB", Double(bytes) / (1024 * 1024))
     }
     
     private func copyToClipboard(_ text: String) {
