@@ -88,9 +88,12 @@ private extension WechatOCRParser {
             let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
 
-            // 仅依赖几何过滤顶部/底部噪声
-            if block.bbox.maxY <= topY { return nil }
-            if block.bbox.minY >= bottomY { return nil }
+            // 仅依赖几何过滤顶部/底部“居中内容”（标题/时间戳/系统行）
+            let relativeCenterX = width > 0 ? block.bbox.midX / width : 0
+            let isCentered = abs(Double(relativeCenterX) - 0.5) <= config.centeredBlockToleranceRatio
+
+            if block.bbox.maxY <= topY, isCentered { return nil }
+            if block.bbox.minY >= bottomY, isCentered { return nil }
 
             // 基础 sanity：过滤异常 bbox（可防止极端噪声）
             guard block.bbox.width > 1, block.bbox.height > 1 else { return nil }
