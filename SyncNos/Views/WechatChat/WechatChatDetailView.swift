@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 // MARK: - Wechat Chat Detail View (V2)
 
 /// 微信聊天记录详情视图（右侧栏）
-/// V2：仅展示气泡消息（我/对方），不展示时间戳/系统消息
+/// V2：展示气泡消息（我/对方）+ 居中系统/时间戳文本（不做关键词识别）
 struct WechatChatDetailView: View {
     @ObservedObject var listViewModel: WechatChatViewModel
     @Binding var selectedContactId: String?
@@ -80,7 +80,12 @@ struct WechatChatDetailView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(messages) { message in
-                        MessageBubble(message: message)
+                        switch message.kind {
+                        case .system:
+                            SystemMessageRow(text: message.content)
+                        default:
+                            MessageBubble(message: message)
+                        }
                     }
                 }
                 .padding()
@@ -171,6 +176,8 @@ private struct MessageBubble: View {
 
     private var messageContent: String {
         switch message.kind {
+        case .system:
+            return message.content
         case .image:
             return "[图片]"
         case .voice:
@@ -180,6 +187,24 @@ private struct MessageBubble: View {
         case .text:
             return message.content
         }
+    }
+}
+
+// MARK: - System Message Row
+
+private struct SystemMessageRow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.10))
+            .cornerRadius(6)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
     }
 }
 

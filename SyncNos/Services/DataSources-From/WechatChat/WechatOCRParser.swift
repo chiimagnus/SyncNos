@@ -24,18 +24,42 @@ final class WechatOCRParser {
 
         let lines = groupBlocksIntoLines(blocks)
         let candidates = groupLinesIntoCandidates(lines)
-        let directed = classifyDirection(candidates, imageWidth: imageSize.width)
+        let systemFlags = classifyCenteredSystemFlags(candidates, imageWidth: imageSize.width)
 
-        return directed.enumerated().map { index, item in
-            WechatMessage(
-                content: item.text,
-                isFromMe: item.isFromMe,
-                senderName: nil, // 简化：私聊先不做昵称绑定
-                kind: .text,
-                bbox: item.bbox,
-                order: index
-            )
+        let bubbleCandidates: [MessageCandidate] = zip(candidates, systemFlags)
+            .compactMap { cand, isSystem in isSystem ? nil : cand }
+
+        let directedBubbles = classifyDirection(bubbleCandidates, imageWidth: imageSize.width)
+        var bubbleIndex = 0
+
+        var messages: [WechatMessage] = []
+        messages.reserveCapacity(candidates.count)
+
+        for (idx, cand) in candidates.enumerated() {
+            if systemFlags[idx] {
+                messages.append(WechatMessage(
+                    content: cand.text,
+                    isFromMe: false,
+                    senderName: nil,
+                    kind: .system,
+                    bbox: cand.bbox,
+                    order: messages.count
+                ))
+            } else {
+                let bubble = directedBubbles[bubbleIndex]
+                bubbleIndex += 1
+                messages.append(WechatMessage(
+                    content: bubble.text,
+                    isFromMe: bubble.isFromMe,
+                    senderName: nil,
+                    kind: .text,
+                    bbox: bubble.bbox,
+                    order: messages.count
+                ))
+            }
         }
+
+        return messages
     }
 }
 
@@ -70,6 +94,48 @@ private struct DirectedCandidate {
     var text: String
     var bbox: CGRect
     var isFromMe: Bool
+}
+
+// MARK: - Centered System/Timestamp Detection (geometry only)
+
+private extension WechatOCRParser {
+    /// 识别位于 X 轴中间的系统/时间戳文本（不做关键词识别）
+    ///
+    /// 思路：中心文本通常同时满足：
+    /// - 与左右边界距离都较大（minEdgeDistance 大）
+    /// - centerX 接近 0.5
+    ///
+    /// 为了避免写死阈值，先对 minEdgeDistance 做 2-means 分布聚类，取“更大的一簇”作为系统候选，
+    /// 再叠加 centerX 接近 0.5 的约束。
+    func classifyCenteredSystemFlags(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [Bool] {
+        guard !candidates.isEmpty, imageWidth > 0 else { return [] }
+
+        let minEdgeDistances: [Double] = candidates.map { cand in
+            let left = Double(cand.bbox.minX / imageWidth)
+            let right = Double(1 - cand.bbox.maxX / imageWidth)
+            return min(left, right)
+        }
+
+        let centerXs: [Double] = candidates.map { cand in
+            Double(cand.bbox.midX / imageWidth)
+        }
+
+        let (assignments, centers) = kMeans2(values: minEdgeDistances, iterations: 6)
+        let systemCluster = centers.0 >= centers.1 ? 0 : 1
+        let minCenter = min(centers.0, centers.1)
+        let maxCenter = max(centers.0, centers.1)
+
+        // 若两簇分离不明显，则不标记系统消息（避免误判导致“漏气泡”）
+        let hasClearSplit = (maxCenter - minCenter) >= 0.12 && maxCenter >= 0.18
+        guard hasClearSplit else {
+            return Array(repeating: false, count: candidates.count)
+        }
+
+        return zip(assignments, centerXs).map { cluster, cx in
+            let centered = abs(cx - 0.5) <= 0.12
+            return cluster == systemCluster && centered
+        }
+    }
 }
 
 // MARK: - Normalization & Filtering
