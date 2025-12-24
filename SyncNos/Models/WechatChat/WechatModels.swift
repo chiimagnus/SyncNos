@@ -177,6 +177,9 @@ struct WechatChatParseConfig: Sendable {
     // MARK: Region Filtering
     var topIgnoreRatio: Double
     var bottomIgnoreRatio: Double
+    /// 仅过滤“居中内容”（如标题/时间戳/系统行）的 centerX 容差（0-1）
+    /// - 仅在 top/bottom band 内生效
+    var centeredBlockToleranceRatio: Double
 
     // MARK: Line Grouping
     var maxLineHorizontalGapPx: Double
@@ -200,6 +203,7 @@ struct WechatChatParseConfig: Sendable {
     static let `default` = WechatChatParseConfig(
         topIgnoreRatio: 0.12,
         bottomIgnoreRatio: 0.10,
+        centeredBlockToleranceRatio: 0.22,
         maxLineHorizontalGapPx: 18,
         minLineVerticalOverlapRatio: 0.30,
         maxMessageLineGapPx: 26,
