@@ -188,6 +188,46 @@ final class WechatChatViewModel: ObservableObject {
             }
         }
     }
+    
+    /// 更新消息分类（isFromMe / kind）
+    func updateMessageClassification(
+        messageId: UUID,
+        isFromMe: Bool,
+        kind: WechatMessageKind,
+        for contactId: UUID
+    ) {
+        // 1. 更新内存
+        guard var conversation = conversations[contactId] else { return }
+        
+        if let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
+            let oldMessage = conversation.messages[index]
+            let newMessage = WechatMessage(
+                id: oldMessage.id,
+                content: oldMessage.content,
+                isFromMe: isFromMe,
+                senderName: oldMessage.senderName,
+                kind: kind,
+                bbox: oldMessage.bbox,
+                order: oldMessage.order
+            )
+            conversation.messages[index] = newMessage
+            conversations[contactId] = conversation
+        }
+        
+        // 2. 持久化
+        Task {
+            do {
+                try await cacheService.updateMessageClassification(
+                    messageId: messageId.uuidString,
+                    isFromMe: isFromMe,
+                    kind: kind
+                )
+                logger.info("[WechatChatV2] Updated message classification: \(messageId)")
+            } catch {
+                logger.error("[WechatChatV2] Failed to update message classification: \(error)")
+            }
+        }
+    }
 
     // MARK: - Private
 

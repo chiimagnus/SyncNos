@@ -46,6 +46,13 @@ protocol WechatChatCacheServiceProtocol: Actor {
 
     // 消息读取
     func fetchMessages(conversationId: String) throws -> [WechatMessage]
+    
+    // 消息分类更新
+    func updateMessageClassification(
+        messageId: String,
+        isFromMe: Bool,
+        kind: WechatMessageKind
+    ) throws
 
     // 截图导入（持久化 raw OCR + blocks + parsed messages）
     func appendScreenshot(
@@ -189,6 +196,32 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         )
         let cached = try modelContext.fetch(descriptor)
         return cached.map { $0.toWechatMessage() }
+    }
+    
+    // MARK: Update Message Classification
+    
+    func updateMessageClassification(
+        messageId: String,
+        isFromMe: Bool,
+        kind: WechatMessageKind
+    ) throws {
+        let targetId = messageId
+        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+            msg.messageId == targetId
+        }
+        var descriptor = FetchDescriptor<CachedWechatMessageV2>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        
+        guard let message = try modelContext.fetch(descriptor).first else {
+            logger.warning("[WechatChatCacheV2] Message not found for update: \(messageId)")
+            return
+        }
+        
+        message.isFromMe = isFromMe
+        message.kindRaw = kind.rawValue
+        
+        try modelContext.save()
+        logger.info("[WechatChatCacheV2] Updated message classification: \(messageId) -> isFromMe=\(isFromMe), kind=\(kind.rawValue)")
     }
 
     // MARK: Append Screenshot
