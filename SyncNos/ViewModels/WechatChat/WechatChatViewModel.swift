@@ -211,10 +211,11 @@ final class WechatChatViewModel: ObservableObject {
         do {
             logger.info("[WechatChatV2] Processing screenshot: \(url.lastPathComponent)")
 
+            let pixelSize = try imagePixelSize(image)
             let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .wechatChat)
 
             let normalizedBlocksJSON = try encodeNormalizedBlocks(ocrResult.blocks)
-            let parsedMessages = parser.parse(ocrResult: ocrResult, imageSize: image.size)
+            let parsedMessages = parser.parse(ocrResult: ocrResult, imageSize: pixelSize)
 
             // 内存更新：调整 order 连续
             let adjusted = adjustOrders(parsedMessages, for: contactId)
@@ -230,7 +231,7 @@ final class WechatChatViewModel: ObservableObject {
                 conversationId: contactId.uuidString,
                 screenshotId: screenshotId.uuidString,
                 importedAt: screenshot.importedAt,
-                imageSize: image.size,
+                imageSize: pixelSize,
                 ocrEngine: "PaddleOCR-VL",
                 ocrRequestJSON: requestJSON,
                 ocrResponseJSON: rawResponse,
@@ -262,6 +263,13 @@ final class WechatChatViewModel: ObservableObject {
             )
         }
         return try JSONEncoder().encode(snapshots)
+    }
+
+    private func imagePixelSize(_ image: NSImage) throws -> CGSize {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            throw OCRServiceError.invalidImage
+        }
+        return CGSize(width: cgImage.width, height: cgImage.height)
     }
 
     private func adjustOrders(_ messages: [WechatMessage], for contactId: UUID) -> [WechatMessage] {
