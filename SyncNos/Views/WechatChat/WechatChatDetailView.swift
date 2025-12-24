@@ -177,6 +177,68 @@ struct WechatChatDetailView: View {
     }
 }
 
+// MARK: - Shared Classification Menu
+
+/// 共享的消息分类右键菜单
+/// - Parameters:
+///   - message: 当前消息
+///   - copyText: 复制时使用的文本内容
+///   - onClassify: 分类回调
+@ViewBuilder
+private func messageClassificationMenu(
+    message: WechatMessage,
+    copyText: String,
+    onClassify: @escaping (WechatMessage, Bool, WechatMessageKind) -> Void
+) -> some View {
+    // 复制按钮（补偿系统菜单被覆盖的问题）
+    Button {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(copyText, forType: .string)
+    } label: {
+        Label("复制", systemImage: "doc.on.doc")
+    }
+    
+    Divider()
+    
+    // 对方消息
+    Button {
+        onClassify(message, false, .text)
+    } label: {
+        HStack {
+            if !message.isFromMe && message.kind != .system {
+                Image(systemName: "checkmark")
+            }
+            Text("对方消息")
+        }
+    }
+    
+    // 我的消息
+    Button {
+        onClassify(message, true, .text)
+    } label: {
+        HStack {
+            if message.isFromMe && message.kind != .system {
+                Image(systemName: "checkmark")
+            }
+            Text("我的消息")
+        }
+    }
+    
+    Divider()
+    
+    // 系统消息
+    Button {
+        onClassify(message, false, .system)
+    } label: {
+        HStack {
+            if message.kind == .system {
+                Image(systemName: "checkmark")
+            }
+            Text("系统消息")
+        }
+    }
+}
+
 // MARK: - Message Bubble
 
 private struct MessageBubble: View {
@@ -214,48 +276,11 @@ private struct MessageBubble: View {
             }
         }
         .contextMenu {
-            classificationMenu
-        }
-    }
-    
-    @ViewBuilder
-    private var classificationMenu: some View {
-        // 对方消息
-        Button {
-            onClassify(message, false, .text)
-        } label: {
-            HStack {
-                if !message.isFromMe && message.kind != .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("对方消息")
-            }
-        }
-        
-        // 我的消息
-        Button {
-            onClassify(message, true, .text)
-        } label: {
-            HStack {
-                if message.isFromMe && message.kind != .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("我的消息")
-            }
-        }
-        
-        Divider()
-        
-        // 系统消息
-        Button {
-            onClassify(message, false, .system)
-        } label: {
-            HStack {
-                if message.kind == .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("系统消息")
-            }
+            messageClassificationMenu(
+                message: message,
+                copyText: messageContent,
+                onClassify: onClassify
+            )
         }
     }
 
@@ -292,49 +317,12 @@ private struct SystemMessageRow: View {
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
             .contextMenu {
-                classificationMenu
+                messageClassificationMenu(
+                    message: message,
+                    copyText: message.content,
+                    onClassify: onClassify
+                )
             }
-    }
-    
-    @ViewBuilder
-    private var classificationMenu: some View {
-        // 对方消息
-        Button {
-            onClassify(message, false, .text)
-        } label: {
-            HStack {
-                if !message.isFromMe && message.kind != .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("对方消息")
-            }
-        }
-        
-        // 我的消息
-        Button {
-            onClassify(message, true, .text)
-        } label: {
-            HStack {
-                if message.isFromMe && message.kind != .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("我的消息")
-            }
-        }
-        
-        Divider()
-        
-        // 系统消息
-        Button {
-            onClassify(message, false, .system)
-        } label: {
-            HStack {
-                if message.kind == .system {
-                    Image(systemName: "checkmark")
-                }
-                Text("系统消息")
-            }
-        }
     }
 }
 
