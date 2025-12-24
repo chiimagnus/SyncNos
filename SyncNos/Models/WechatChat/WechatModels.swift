@@ -182,25 +182,11 @@ struct WechatChatParseConfig: Sendable {
     var maxMessageLineGapPx: Double
     var maxMessageXAlignDeltaPx: Double
 
-    // MARK: Direction Classification (Private Chat Focus)
-    /// 对方消息：minX 相对宽度 <= 阈值，认为在左侧
-    var otherMessageMaxMinXRatio: Double
-    /// 我方消息：minX 相对宽度 >= 阈值（避免把超宽/居中块误判为我方）
-    var myMessageMinMinXRatio: Double
-    /// 我方消息：maxX 相对宽度 >= 阈值（贴近右边）
-    var myMessageMinMaxXRatio: Double
-    /// 兜底：minX 相对宽度 >= 阈值则判为我方
-    var fallbackMyMessageMinXRatio: Double
-
     static let `default` = WechatChatParseConfig(
         maxLineHorizontalGapPx: 18,
         minLineVerticalOverlapRatio: 0.30,
         maxMessageLineGapPx: 26,
-        maxMessageXAlignDeltaPx: 28,
-        otherMessageMaxMinXRatio: 0.25,
-        myMessageMinMinXRatio: 0.35,
-        myMessageMinMaxXRatio: 0.86,
-        fallbackMyMessageMinXRatio: 0.55
+        maxMessageXAlignDeltaPx: 28
     )
 }
 

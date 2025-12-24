@@ -216,7 +216,10 @@ final class WechatChatViewModel: ObservableObject {
             let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .default)
 
             let normalizedBlocksJSON = try encodeNormalizedBlocks(ocrResult.blocks)
-            let parsedMessages = parser.parse(ocrResult: ocrResult, imageSize: pixelSize)
+            let ocrCoordinateSize = ocrResult.coordinateSize
+                ?? estimateCoordinateSize(from: ocrResult.blocks)
+                ?? pixelSize
+            let parsedMessages = parser.parse(ocrResult: ocrResult, imageSize: ocrCoordinateSize)
 
             // 内存更新：调整 order 连续
             let adjusted = adjustOrders(parsedMessages, for: contactId)
@@ -232,7 +235,7 @@ final class WechatChatViewModel: ObservableObject {
                 conversationId: contactId.uuidString,
                 screenshotId: screenshotId.uuidString,
                 importedAt: screenshot.importedAt,
-                imageSize: pixelSize,
+                imageSize: ocrCoordinateSize,
                 ocrEngine: "PaddleOCR-VL",
                 ocrRequestJSON: requestJSON,
                 ocrResponseJSON: rawResponse,
@@ -264,6 +267,18 @@ final class WechatChatViewModel: ObservableObject {
             )
         }
         return try JSONEncoder().encode(snapshots)
+    }
+
+    /// 当 Paddle `dataInfo.width/height` 缺失时，用 bbox 的最大边界估算 OCR 坐标系尺寸，避免相对坐标失真导致方向误判
+    private func estimateCoordinateSize(from blocks: [OCRBlock]) -> CGSize? {
+        var maxX: CGFloat = 0
+        var maxY: CGFloat = 0
+        for block in blocks {
+            maxX = max(maxX, block.bbox.maxX)
+            maxY = max(maxY, block.bbox.maxY)
+        }
+        guard maxX > 0, maxY > 0 else { return nil }
+        return CGSize(width: maxX, height: maxY)
     }
 
     private func imagePixelSize(_ image: NSImage) throws -> CGSize {
