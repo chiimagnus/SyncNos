@@ -32,6 +32,10 @@ struct WechatChatDetailView: View {
                 .navigationTitle(contact.name)
                 .navigationSubtitle("\(contact.messageCount) 条消息")
                 .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        Spacer()
+                    }
+
                     ToolbarItemGroup {
                         if listViewModel.isLoading {
                             ProgressView()

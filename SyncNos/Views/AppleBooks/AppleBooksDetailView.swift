@@ -188,7 +188,7 @@ struct AppleBooksDetailView: View {
         }
         .navigationTitle("Apple Books")
         .toolbar {
-            // 中间区域：Filter 控件
+            // Filter 控件
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
                     noteFilter: $viewModel.noteFilter,
@@ -205,7 +205,7 @@ struct AppleBooksDetailView: View {
                     Spacer()
                 }
             
-            // 后缘：Sync 按钮 / 进度
+            // Sync 按钮 / 进度
             ToolbarItem(placement: .automatic) {
                 if externalIsSyncing {
                     HStack(spacing: 8) {

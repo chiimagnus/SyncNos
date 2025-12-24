@@ -327,7 +327,7 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
-                    // 中间区域：Filter 控件
+                    // Filter 控件
                     ToolbarItem(placement: .automatic) {
                         FilterSortBar(
                             noteFilter: $detailViewModel.noteFilter,
@@ -350,7 +350,7 @@ struct GoodLinksDetailView: View {
                         Spacer()
                     }
 
-                    // 后缘：Sync 按钮 / 进度
+                    // Sync 按钮 / 进度
                     ToolbarItem(placement: .automatic) {
                         if externalIsSyncing {
                             HStack(spacing: 8) {
