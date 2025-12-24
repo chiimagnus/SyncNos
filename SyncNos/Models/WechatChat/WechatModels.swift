@@ -180,6 +180,10 @@ struct WechatChatParseConfig: Sendable {
     /// 仅过滤“居中内容”（如标题/时间戳/系统行）的 centerX 容差（0-1）
     /// - 仅在 top/bottom band 内生效
     var centeredBlockToleranceRatio: Double
+    /// 居中候选（时间戳/系统行）最大宽度比例（0-1），用于全局过滤
+    var centeredCandidateMaxWidthRatio: Double
+    /// 居中候选（时间戳/系统行）最大高度比例（0-1），用于全局过滤
+    var centeredCandidateMaxHeightRatio: Double
 
     // MARK: Line Grouping
     var maxLineHorizontalGapPx: Double
@@ -200,10 +204,15 @@ struct WechatChatParseConfig: Sendable {
     var senderNameMaxHeightRatio: Double
     var senderNameMaxWidthRatio: Double
 
+    // MARK: Post Processing
+    var enableCardMerge: Bool
+
     static let `default` = WechatChatParseConfig(
         topIgnoreRatio: 0.12,
         bottomIgnoreRatio: 0.10,
         centeredBlockToleranceRatio: 0.22,
+        centeredCandidateMaxWidthRatio: 0.40,
+        centeredCandidateMaxHeightRatio: 0.06,
         maxLineHorizontalGapPx: 18,
         minLineVerticalOverlapRatio: 0.30,
         maxMessageLineGapPx: 26,
@@ -211,10 +220,11 @@ struct WechatChatParseConfig: Sendable {
         minDirectionSampleCount: 4,
         minClusterGapRatio: 0.18,
         singleSideRightMeanThreshold: 0.62,
-        senderNameMaxGapPx: 28,
-        senderNameXAlignTolerancePx: 32,
+        senderNameMaxGapPx: 80,
+        senderNameXAlignTolerancePx: 80,
         senderNameMaxHeightRatio: 0.035,
-        senderNameMaxWidthRatio: 0.45
+        senderNameMaxWidthRatio: 0.45,
+        enableCardMerge: false
     )
 }
 
