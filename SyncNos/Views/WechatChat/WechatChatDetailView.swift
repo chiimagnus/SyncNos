@@ -187,27 +187,13 @@ private struct WechatChatSelectableText: NSViewRepresentable {
     struct Style {
         let font: NSFont
         let textColor: NSColor
-        let backgroundColor: NSColor
-        let cornerRadius: CGFloat
-        let shadowColor: NSColor?
-        let shadowOpacity: Float
-        let shadowRadius: CGFloat
-        let shadowOffset: CGSize
         let horizontalPadding: CGFloat
         let verticalPadding: CGFloat
         
-        static func bubble(isFromMe: Bool) -> Style {
+        static func bubble() -> Style {
             Style(
                 font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                 textColor: .black,
-                backgroundColor: isFromMe
-                    ? NSColor(calibratedRed: 0.58, green: 0.92, blue: 0.41, alpha: 1.0) // #95EC69 微信绿
-                    : .white,
-                cornerRadius: 8,
-                shadowColor: .black,
-                shadowOpacity: 0.05,
-                shadowRadius: 1,
-                shadowOffset: CGSize(width: 0, height: -1),
                 horizontalPadding: 12,
                 verticalPadding: 8
             )
@@ -217,12 +203,6 @@ private struct WechatChatSelectableText: NSViewRepresentable {
             Style(
                 font: NSFont.preferredFont(forTextStyle: .caption1),
                 textColor: .secondaryLabelColor,
-                backgroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.10),
-                cornerRadius: 6,
-                shadowColor: nil,
-                shadowOpacity: 0,
-                shadowRadius: 0,
-                shadowOffset: .zero,
                 horizontalPadding: 12,
                 verticalPadding: 6
             )
@@ -254,10 +234,19 @@ private struct WechatChatSelectableText: NSViewRepresentable {
         textView.allowsUndo = false
         textView.drawsBackground = false
         textView.backgroundColor = .clear
-        textView.textContainer?.lineFragmentPadding = 0
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = .zero
+        
+        if let textContainer = textView.textContainer {
+            textContainer.lineFragmentPadding = 0
+            textContainer.lineBreakMode = .byWordWrapping
+            textContainer.widthTracksTextView = false
+            textContainer.heightTracksTextView = false
+        }
         
         // 渲染与布局
-        applyStyle(to: textView)
         applyContent(to: textView, coordinator: context.coordinator)
         
         // 条件菜单
@@ -273,7 +262,6 @@ private struct WechatChatSelectableText: NSViewRepresentable {
         context.coordinator.kind = kind
         context.coordinator.onClassify = onClassify
         
-        applyStyle(to: nsView)
         applyContent(to: nsView, coordinator: context.coordinator)
     }
     
@@ -283,17 +271,38 @@ private struct WechatChatSelectableText: NSViewRepresentable {
             return nil
         }
         
-        let maxWidth = proposal.width ?? 520
+        // SwiftUI 在某些布局情况下可能会传入无限宽度，这里做一次兜底，避免视图被错误拉伸
+        let maxWidth: CGFloat = {
+            guard let proposed = proposal.width,
+                  proposed.isFinite,
+                  proposed > 0 else {
+                return 520
+            }
+            return proposed
+        }()
         let horizontalPadding = style.horizontalPadding
         let verticalPadding = style.verticalPadding
         
-        let containerWidth = max(0, maxWidth - horizontalPadding * 2)
-        textContainer.containerSize = CGSize(width: containerWidth, height: .greatestFiniteMagnitude)
+        // 两段测量：
+        // 1) 用一个很大的容器测出“单行理想宽度”
+        // 2) 再按 maxWidth 折行测出实际高度（保证短文本不会被拉满整行）
+        let unconstrainedWidth: CGFloat = 10_000
+        textContainer.containerSize = CGSize(width: unconstrainedWidth, height: CGFloat.greatestFiniteMagnitude)
         layoutManager.ensureLayout(for: textContainer)
         
-        let used = layoutManager.usedRect(for: textContainer)
-        let width = min(ceil(used.width) + horizontalPadding * 2, maxWidth)
-        let height = ceil(used.height) + verticalPadding * 2
+        let idealGlyphRange = layoutManager.glyphRange(for: textContainer)
+        let idealUsed = layoutManager.boundingRect(forGlyphRange: idealGlyphRange, in: textContainer)
+        let idealWidth = ceil(idealUsed.width) + horizontalPadding * 2
+        let targetWidth = min(idealWidth, maxWidth)
+        
+        let wrapContainerWidth = max(0, targetWidth - horizontalPadding * 2)
+        textContainer.containerSize = CGSize(width: wrapContainerWidth, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+        
+        let wrappedGlyphRange = layoutManager.glyphRange(for: textContainer)
+        let wrappedUsed = layoutManager.boundingRect(forGlyphRange: wrappedGlyphRange, in: textContainer)
+        let width = targetWidth
+        let height = ceil(wrappedUsed.height) + verticalPadding * 2
         return CGSize(width: width, height: height)
     }
     
@@ -307,24 +316,6 @@ private struct WechatChatSelectableText: NSViewRepresentable {
         
         coordinator.isFromMe = isFromMe
         coordinator.kind = kind
-    }
-    
-    private func applyStyle(to textView: MenuAwareTextView) {
-        textView.wantsLayer = true
-        if let layer = textView.layer {
-            layer.backgroundColor = style.backgroundColor.cgColor
-            layer.cornerRadius = style.cornerRadius
-            layer.masksToBounds = false
-            
-            if let shadowColor = style.shadowColor {
-                layer.shadowColor = shadowColor.cgColor
-                layer.shadowOpacity = style.shadowOpacity
-                layer.shadowRadius = style.shadowRadius
-                layer.shadowOffset = style.shadowOffset
-            } else {
-                layer.shadowOpacity = 0
-            }
-        }
     }
     
     // MARK: - Coordinator
@@ -393,6 +384,9 @@ private struct WechatChatSelectableText: NSViewRepresentable {
 private struct MessageBubble: View {
     let message: WechatMessage
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
+    
+    private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
+    private let otherBubbleColor = Color.white
 
     var body: some View {
         HStack {
@@ -406,16 +400,19 @@ private struct MessageBubble: View {
                         .font(.caption2)
                         .foregroundColor(Color(red: 0.34, green: 0.42, blue: 0.58)) // #576B95 微信蓝
                 }
-                
+
                 WechatChatSelectableText(
                     text: messageContent,
                     isFromMe: message.isFromMe,
                     kind: message.kind,
-                    style: .bubble(isFromMe: message.isFromMe),
+                    style: .bubble(),
                     onClassify: { isFromMe, kind in
                         onClassify(message, isFromMe, kind)
                     }
                 )
+                .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
+                .cornerRadius(8)
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
 
             if !message.isFromMe {
@@ -456,6 +453,8 @@ private struct SystemMessageRow: View {
                 onClassify(message, isFromMe, kind)
             }
         )
+        .background(Color.secondary.opacity(0.10))
+        .cornerRadius(6)
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.vertical, 6)
     }
