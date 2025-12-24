@@ -46,6 +46,8 @@ enum WechatMessageKind: String, Hashable, Sendable {
     case image
     case voice
     case card
+    /// 居中显示的系统/时间戳类文本（不做关键词识别，仅用几何规则判定）
+    case system
 }
 
 /// 微信聊天消息（V2：仅气泡消息）
@@ -132,6 +134,8 @@ struct WechatConversation: Identifiable {
         for message in messages.sorted(by: { $0.order < $1.order }) {
             let sender = message.isFromMe ? "我" : (message.senderName ?? contact.name)
             switch message.kind {
+            case .system:
+                lines.append("[系统] \(message.content)")
             case .image:
                 lines.append("\(sender): [图片]")
             case .voice:
