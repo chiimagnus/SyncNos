@@ -1,6 +1,6 @@
 ## v0.9.10
 
-**Key updates:** Adding OCR recognition of chat conversations improves the recognition accuracy of chat records.
+**Key updates:** adding OCR recognition of chat conversations improves the recognition accuracy of chat records.
 
 ## v0.9.9
 
