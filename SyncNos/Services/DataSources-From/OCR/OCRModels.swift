@@ -130,6 +130,34 @@ struct OCRBlock: Identifiable {
     let bbox: CGRect   // 像素坐标
 }
 
+// MARK: - OCR Request Config (profiles)
+
+/// OCR 请求参数配置（用于不同场景的默认参数；不要求暴露在 UI）
+struct OCRRequestConfig: Sendable {
+    var useDocOrientationClassify: Bool
+    var useDocUnwarping: Bool
+    var useLayoutDetection: Bool
+    var useChartRecognition: Bool
+    var visualize: Bool
+
+    static let `default` = OCRRequestConfig(
+        useDocOrientationClassify: false,
+        useDocUnwarping: false,
+        useLayoutDetection: true,
+        useChartRecognition: false,
+        visualize: false
+    )
+
+    /// 聊天截图建议默认值（可后续再调优）
+    static let wechatChat = OCRRequestConfig(
+        useDocOrientationClassify: true,
+        useDocUnwarping: false,
+        useLayoutDetection: true,
+        useChartRecognition: false,
+        visualize: false
+    )
+}
+
 // MARK: - OCR Service Error
 
 enum OCRServiceError: LocalizedError {
