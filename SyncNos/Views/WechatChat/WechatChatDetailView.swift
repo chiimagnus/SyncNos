@@ -98,15 +98,39 @@ struct WechatChatDetailView: View {
                     ForEach(messages) { message in
                         switch message.kind {
                         case .system:
-                            SystemMessageRow(text: message.content)
+                            SystemMessageRow(
+                                message: message,
+                                onClassify: { msg, isFromMe, kind in
+                                    handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                }
+                            )
                         default:
-                            MessageBubble(message: message)
+                            MessageBubble(
+                                message: message,
+                                onClassify: { msg, isFromMe, kind in
+                                    handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                }
+                            )
                         }
                     }
                 }
                 .padding()
             }
         }
+    }
+    
+    private func handleClassification(
+        _ message: WechatMessage,
+        isFromMe: Bool,
+        kind: WechatMessageKind,
+        for contact: WechatBookListItem
+    ) {
+        listViewModel.updateMessageClassification(
+            messageId: message.id,
+            isFromMe: isFromMe,
+            kind: kind,
+            for: contact.contactId
+        )
     }
 
     // MARK: - Empty States
@@ -157,6 +181,7 @@ struct WechatChatDetailView: View {
 
 private struct MessageBubble: View {
     let message: WechatMessage
+    let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
 
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
     private let otherBubbleColor = Color.white
@@ -188,6 +213,50 @@ private struct MessageBubble: View {
                 Spacer(minLength: 60)
             }
         }
+        .contextMenu {
+            classificationMenu
+        }
+    }
+    
+    @ViewBuilder
+    private var classificationMenu: some View {
+        // 对方消息
+        Button {
+            onClassify(message, false, .text)
+        } label: {
+            HStack {
+                if !message.isFromMe && message.kind != .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("对方消息")
+            }
+        }
+        
+        // 我的消息
+        Button {
+            onClassify(message, true, .text)
+        } label: {
+            HStack {
+                if message.isFromMe && message.kind != .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("我的消息")
+            }
+        }
+        
+        Divider()
+        
+        // 系统消息
+        Button {
+            onClassify(message, false, .system)
+        } label: {
+            HStack {
+                if message.kind == .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("系统消息")
+            }
+        }
     }
 
     private var messageContent: String {
@@ -209,10 +278,11 @@ private struct MessageBubble: View {
 // MARK: - System Message Row
 
 private struct SystemMessageRow: View {
-    let text: String
+    let message: WechatMessage
+    let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
 
     var body: some View {
-        Text(text)
+        Text(message.content)
             .font(.caption)
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
@@ -221,6 +291,50 @@ private struct SystemMessageRow: View {
             .cornerRadius(6)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
+            .contextMenu {
+                classificationMenu
+            }
+    }
+    
+    @ViewBuilder
+    private var classificationMenu: some View {
+        // 对方消息
+        Button {
+            onClassify(message, false, .text)
+        } label: {
+            HStack {
+                if !message.isFromMe && message.kind != .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("对方消息")
+            }
+        }
+        
+        // 我的消息
+        Button {
+            onClassify(message, true, .text)
+        } label: {
+            HStack {
+                if message.isFromMe && message.kind != .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("我的消息")
+            }
+        }
+        
+        Divider()
+        
+        // 系统消息
+        Button {
+            onClassify(message, false, .system)
+        } label: {
+            HStack {
+                if message.kind == .system {
+                    Image(systemName: "checkmark")
+                }
+                Text("系统消息")
+            }
+        }
     }
 }
 
