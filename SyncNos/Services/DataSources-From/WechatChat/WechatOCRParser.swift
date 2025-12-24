@@ -24,15 +24,13 @@ final class WechatOCRParser {
 
         let lines = groupBlocksIntoLines(blocks)
         let candidates = groupLinesIntoCandidates(lines)
-        let filteredCandidates = filterCenteredCandidates(candidates, imageSize: imageSize)
-        let directed = classifyDirection(filteredCandidates, imageWidth: imageSize.width)
-        let bound = bindSenderNames(directed, imageSize: imageSize)
+        let directed = classifyDirection(candidates, imageWidth: imageSize.width)
 
-        return bound.enumerated().map { index, item in
+        return directed.enumerated().map { index, item in
             WechatMessage(
                 content: item.text,
                 isFromMe: item.isFromMe,
-                senderName: item.senderName,
+                senderName: nil, // 简化：私聊先不做昵称绑定
                 kind: .text,
                 bbox: item.bbox,
                 order: index
@@ -72,34 +70,18 @@ private struct DirectedCandidate {
     var text: String
     var bbox: CGRect
     var isFromMe: Bool
-    var senderName: String?
 }
 
 // MARK: - Normalization & Filtering
 
 private extension WechatOCRParser {
     func normalizeBlocks(_ blocks: [OCRBlock], imageSize: CGSize) -> [NormalizedBlock] {
-        let width = imageSize.width
-        let height = imageSize.height
-
-        let topY = height * config.topIgnoreRatio
-        let bottomY = height * (1 - config.bottomIgnoreRatio)
-
         return blocks.compactMap { block in
             let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
 
-            // 仅依赖几何过滤顶部/底部“居中内容”（标题/时间戳/系统行）
-            let relativeCenterX = width > 0 ? block.bbox.midX / width : 0
-            let isCentered = abs(Double(relativeCenterX) - 0.5) <= config.centeredBlockToleranceRatio
-
-            if block.bbox.maxY <= topY, isCentered { return nil }
-            if block.bbox.minY >= bottomY, isCentered { return nil }
-
-            // 基础 sanity：过滤异常 bbox（可防止极端噪声）
+            // 简化：不做顶部/底部过滤；只过滤明显无效 bbox
             guard block.bbox.width > 1, block.bbox.height > 1 else { return nil }
-            guard block.bbox.minX >= 0, block.bbox.minY >= 0 else { return nil }
-            guard block.bbox.maxX <= width * 1.05, block.bbox.maxY <= height * 1.05 else { return nil }
 
             return NormalizedBlock(text: text, label: block.label, bbox: block.bbox)
         }
@@ -201,29 +183,6 @@ private extension WechatOCRParser {
     }
 }
 
-// MARK: - Candidate Filtering (Centered timestamps/system)
-
-private extension WechatOCRParser {
-    /// 过滤居中且“窄+矮”的候选（通常是时间戳/系统提示），避免在群聊里污染消息列表
-    func filterCenteredCandidates(_ candidates: [MessageCandidate], imageSize: CGSize) -> [MessageCandidate] {
-        guard imageSize.width > 0, imageSize.height > 0 else { return candidates }
-
-        let width = imageSize.width
-        let height = imageSize.height
-
-        return candidates.filter { cand in
-            let relativeCenterX = cand.bbox.midX / width
-            let isCentered = abs(Double(relativeCenterX) - 0.5) <= config.centeredBlockToleranceRatio
-            guard isCentered else { return true }
-
-            let wRatio = Double(cand.bbox.width / width)
-            let hRatio = Double(cand.bbox.height / height)
-
-            return !(wRatio <= config.centeredCandidateMaxWidthRatio && hRatio <= config.centeredCandidateMaxHeightRatio)
-        }
-    }
-}
-
 // MARK: - Direction Classification (Data-driven)
 
 private extension WechatOCRParser {
@@ -235,7 +194,7 @@ private extension WechatOCRParser {
 
         let directedFlags = inferDirectionFlags(centers: centers)
         return zip(candidates, directedFlags).map { cand, isFromMe in
-            DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: isFromMe, senderName: nil)
+            DirectedCandidate(text: cand.text, bbox: cand.bbox, isFromMe: isFromMe)
         }
     }
 
@@ -274,54 +233,6 @@ private extension WechatOCRParser {
     }
 }
 
-// MARK: - Group Sender Name Binding (Geometry-based)
-
-private extension WechatOCRParser {
-    func bindSenderNames(_ items: [DirectedCandidate], imageSize: CGSize) -> [DirectedCandidate] {
-        guard !items.isEmpty else { return [] }
-
-        let maxNameHeight = imageSize.height * config.senderNameMaxHeightRatio
-        let maxNameWidth = imageSize.width * config.senderNameMaxWidthRatio
-
-        var result: [DirectedCandidate] = []
-        result.reserveCapacity(items.count)
-
-        var i = 0
-        while i < items.count {
-            let current = items[i]
-
-            // 只尝试把“上一行昵称”绑定给下一条左侧消息
-            if !current.isFromMe,
-               current.bbox.height <= maxNameHeight,
-               current.bbox.width <= maxNameWidth,
-               i + 1 < items.count {
-                var next = items[i + 1]
-
-                if !next.isFromMe {
-                    let gapY = next.bbox.minY - current.bbox.maxY
-                    let minXDelta = abs(next.bbox.minX - current.bbox.minX)
-                    let overlap = horizontalOverlapRatio(a: current.bbox, b: next.bbox)
-                    let isAligned = overlap >= 0.20 || minXDelta <= config.senderNameXAlignTolerancePx
-
-                    if gapY >= 0,
-                       gapY <= config.senderNameMaxGapPx,
-                       isAligned {
-                        next.senderName = current.text
-                        result.append(next)
-                        i += 2
-                        continue
-                    }
-                }
-            }
-
-            result.append(current)
-            i += 1
-        }
-
-        return result
-    }
-}
-
 // MARK: - Geometry Helpers
 
 private func verticalOverlapRatio(a: CGRect, b: CGRect) -> Double {
@@ -336,14 +247,6 @@ private func horizontalGapPx(a: CGRect, b: CGRect) -> Double {
     if a.maxX < b.minX { return Double(b.minX - a.maxX) }
     if b.maxX < a.minX { return Double(a.minX - b.maxX) }
     return 0
-}
-
-private func horizontalOverlapRatio(a: CGRect, b: CGRect) -> Double {
-    let overlap = min(a.maxX, b.maxX) - max(a.minX, b.minX)
-    guard overlap > 0 else { return 0 }
-    let minWidth = min(a.width, b.width)
-    guard minWidth > 0 else { return 0 }
-    return Double(overlap / minWidth)
 }
 
 
