@@ -13,7 +13,9 @@ struct WechatChatDetailView: View {
     @State private var showFilePicker = false
     @State private var showOCRPayloadSheet = false
     @State private var selectedMessageId: UUID?
-    @FocusState private var isFocused: Bool
+    @State private var keyboardMonitor: Any?
+    @State private var scrollProxy: ScrollViewProxy?
+    @State private var isViewActive = false  // 标记视图是否活跃，用于键盘监听范围控制
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -101,63 +103,88 @@ struct WechatChatDetailView: View {
             emptyMessagesView(contact: contact)
         } else {
             ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(messages) { message in
-                        switch message.kind {
-                        case .system:
-                            SystemMessageRow(
-                                message: message,
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(messages) { message in
+                            switch message.kind {
+                            case .system:
+                                SystemMessageRow(
+                                    message: message,
                                     isSelected: selectedMessageId == message.id,
                                     onTap: { selectedMessageId = message.id },
-                                onClassify: { msg, isFromMe, kind in
-                                    handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
-                                }
-                            )
+                                    onClassify: { msg, isFromMe, kind in
+                                        handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                    }
+                                )
                                 .id(compositeId(for: message))
-                        default:
-                            MessageBubble(
-                                message: message,
+                            default:
+                                MessageBubble(
+                                    message: message,
                                     isSelected: selectedMessageId == message.id,
                                     onTap: { selectedMessageId = message.id },
-                                onClassify: { msg, isFromMe, kind in
-                                    handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
-                                }
-                            )
+                                    onClassify: { msg, isFromMe, kind in
+                                        handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                    }
+                                )
                                 .id(compositeId(for: message))
                             }
                         }
                     }
                     .padding()
                 }
-                .focusable()
-                .focused($isFocused)
-                .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { keyPress in
-                    guard keyPress.modifiers.contains(.option) else { return .ignored }
-                    
-                    switch keyPress.key {
-                    case .upArrow:
-                        navigateMessage(direction: .up, proxy: proxy)
-                        return .handled
-                    case .downArrow:
-                        navigateMessage(direction: .down, proxy: proxy)
-                        return .handled
-                    case .leftArrow:
-                        cycleClassification(direction: .left, for: contact)
-                        return .handled
-                    case .rightArrow:
-                        cycleClassification(direction: .right, for: contact)
-                        return .handled
-                    default:
-                        return .ignored
-                    }
+                .onAppear {
+                    scrollProxy = proxy
+                    isViewActive = true
+                    setupKeyboardMonitor(for: contact, proxy: proxy)
                 }
-                .onAppear { isFocused = true }
+                .onDisappear {
+                    isViewActive = false
+                    removeKeyboardMonitor()
+                }
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
-                    isFocused = true
                 }
             }
+        }
+    }
+    
+    // MARK: - Keyboard Monitor (NSEvent)
+    
+    private func setupKeyboardMonitor(for contact: WechatBookListItem, proxy: ScrollViewProxy) {
+        // 移除旧的监听器
+        removeKeyboardMonitor()
+        
+        // 添加局部键盘事件监听器
+        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // 只有当视图活跃时才处理键盘事件
+            guard isViewActive else { return event }
+            
+            // 检查 Option + 方向键
+            guard event.modifierFlags.contains(.option) else { return event }
+            
+            switch event.keyCode {
+            case 126: // Up Arrow
+                navigateMessage(direction: .up, proxy: proxy)
+                return nil // 消费事件
+            case 125: // Down Arrow
+                navigateMessage(direction: .down, proxy: proxy)
+                return nil
+            case 123: // Left Arrow
+                cycleClassification(direction: .left, for: contact)
+                return nil
+            case 124: // Right Arrow
+                cycleClassification(direction: .right, for: contact)
+                return nil
+            default:
+                return event // 不处理，继续传递
+            }
+        }
+    }
+    
+    private func removeKeyboardMonitor() {
+        if let monitor = keyboardMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyboardMonitor = nil
         }
     }
     
