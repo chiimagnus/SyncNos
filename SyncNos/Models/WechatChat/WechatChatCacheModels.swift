@@ -1,11 +1,16 @@
 import Foundation
 import SwiftData
 
-// MARK: - WechatChat SwiftData Models (V2)
+// MARK: - WechatChat SwiftData Models (V2 with Encryption)
 //
 // 说明：
-// - 该 schema 对应全新的 store 文件（未发布，无需迁移）。
-// - 重点能力：为每张截图持久化 raw OCR JSON + normalized blocks，支持离线重解析。
+// - 该 schema 对应 wechatchat_v2.store 文件
+// - 敏感字段（消息内容、发送者昵称、对话名称）使用 AES-256-GCM 加密存储
+// - 加密密钥存储在 macOS Keychain，由 EncryptionService 管理
+//
+// 安全说明（Kerckhoffs 原则）：
+// - 算法公开不影响安全性，安全性完全依赖密钥的保密性
+// - 密钥由系统 Keychain 保护，受 macOS 登录密码保护
 //
 
 // MARK: - CachedWechatConversationV2
@@ -15,8 +20,9 @@ final class CachedWechatConversationV2 {
     /// 对话唯一标识（UUID 字符串）
     @Attribute(.unique) var conversationId: String
 
-    /// 对话名称（用户输入或从截图标题提取）
-    var name: String
+    /// 对话名称（加密存储）
+    /// - 存储格式：AES-256-GCM combined (nonce + ciphertext + tag)
+    var nameEncrypted: Data
 
     /// 创建时间
     var createdAt: Date
@@ -33,17 +39,48 @@ final class CachedWechatConversationV2 {
     /// 该对话的解析消息
     @Relationship(deleteRule: .cascade, inverse: \CachedWechatMessageV2.conversation)
     var messages: [CachedWechatMessageV2]?
+    
+    // MARK: Computed (解密访问器)
+    
+    /// 对话名称（解密后）
+    var name: String {
+        (try? EncryptionService.shared.decrypt(nameEncrypted)) ?? "[解密失败]"
+    }
 
-    init(
+    /// 使用明文初始化（自动加密）
+    /// - Throws: 加密失败时抛出错误
+    convenience init(
         conversationId: String,
         name: String,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
+    ) throws {
+        let encryptedName = try EncryptionService.shared.encrypt(name)
+        self.init(
+            conversationId: conversationId,
+            nameEncrypted: encryptedName,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+    
+    /// 使用已加密数据初始化
+    init(
+        conversationId: String,
+        nameEncrypted: Data,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
     ) {
         self.conversationId = conversationId
-        self.name = name
+        self.nameEncrypted = nameEncrypted
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+    
+    /// 更新对话名称（加密后存储）
+    func updateName(_ newName: String) throws {
+        self.nameEncrypted = try EncryptionService.shared.encrypt(newName)
+        self.updatedAt = Date()
     }
 }
 
@@ -122,14 +159,15 @@ final class CachedWechatMessageV2 {
     /// 所属截图 ID
     var screenshotId: String
 
-    /// 消息内容（合并后的文本）
-    var content: String
+    /// 消息内容（加密存储）
+    /// - 存储格式：AES-256-GCM combined (nonce + ciphertext + tag)
+    var contentEncrypted: Data
 
     /// 是否为我发送
     var isFromMe: Bool
 
-    /// 群聊：发送者昵称（仅左侧消息可能有）
-    var senderName: String?
+    /// 群聊：发送者昵称（加密存储，可选）
+    var senderNameEncrypted: Data?
 
     /// 消息类型（仅气泡消息；不包含 timestamp/system）
     var kindRaw: String
@@ -144,7 +182,18 @@ final class CachedWechatMessageV2 {
 
     var conversation: CachedWechatConversationV2?
 
-    // MARK: Computed
+    // MARK: Computed (解密访问器)
+
+    /// 消息内容（解密后）
+    var content: String {
+        (try? EncryptionService.shared.decrypt(contentEncrypted)) ?? "[解密失败]"
+    }
+    
+    /// 发送者昵称（解密后）
+    var senderName: String? {
+        guard let encrypted = senderNameEncrypted else { return nil }
+        return try? EncryptionService.shared.decrypt(encrypted)
+    }
 
     var kind: WechatMessageKind {
         WechatMessageKind(rawValue: kindRaw) ?? .text
@@ -182,7 +231,9 @@ final class CachedWechatMessageV2 {
         }
     }
 
-    init(
+    /// 使用明文初始化（自动加密）
+    /// - Throws: 加密失败时抛出错误
+    convenience init(
         messageId: String,
         conversationId: String,
         screenshotId: String,
@@ -192,13 +243,41 @@ final class CachedWechatMessageV2 {
         kind: WechatMessageKind = .text,
         order: Int,
         bbox: CGRect? = nil
+    ) throws {
+        let encryptedContent = try EncryptionService.shared.encrypt(content)
+        let encryptedSenderName = try senderName.map { try EncryptionService.shared.encrypt($0) }
+        
+        self.init(
+            messageId: messageId,
+            conversationId: conversationId,
+            screenshotId: screenshotId,
+            contentEncrypted: encryptedContent,
+            isFromMe: isFromMe,
+            senderNameEncrypted: encryptedSenderName,
+            kind: kind,
+            order: order,
+            bbox: bbox
+        )
+    }
+    
+    /// 使用已加密数据初始化
+    init(
+        messageId: String,
+        conversationId: String,
+        screenshotId: String,
+        contentEncrypted: Data,
+        isFromMe: Bool,
+        senderNameEncrypted: Data?,
+        kind: WechatMessageKind = .text,
+        order: Int,
+        bbox: CGRect? = nil
     ) {
         self.messageId = messageId
         self.conversationId = conversationId
         self.screenshotId = screenshotId
-        self.content = content
+        self.contentEncrypted = contentEncrypted
         self.isFromMe = isFromMe
-        self.senderName = senderName
+        self.senderNameEncrypted = senderNameEncrypted
         self.kindRaw = kind.rawValue
         self.order = order
 

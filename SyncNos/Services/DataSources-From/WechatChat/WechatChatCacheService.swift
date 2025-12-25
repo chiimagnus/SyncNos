@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 import AppKit
 
-// MARK: - WechatChat Model Container Factory (V2)
+// MARK: - WechatChat Model Container Factory (V2 with Encryption)
 
-/// WechatChat v2 ModelContainer 工厂（独立 store 文件）
+/// WechatChat v2 ModelContainer 工厂（独立 store 文件，支持加密字段）
 enum WechatChatModelContainerFactory {
     static func createContainer() throws -> ModelContainer {
         let schema = Schema([
@@ -13,10 +13,13 @@ enum WechatChatModelContainerFactory {
             CachedWechatMessageV2.self
         ])
 
-        // 破坏性升级：使用全新 store 文件，避免与旧 schema 冲突
+        // 破坏性升级：使用全新 store 文件（v2_encrypted），因为字段类型变更
+        // - name -> nameEncrypted (String -> Data)
+        // - content -> contentEncrypted (String -> Data)
+        // - senderName -> senderNameEncrypted (String? -> Data?)
         let storeURL = URL.applicationSupportDirectory
             .appendingPathComponent("SyncNos", isDirectory: true)
-            .appendingPathComponent("wechatchat_v2.store")
+            .appendingPathComponent("wechatchat_v2_encrypted.store")
 
         // 确保目录存在
         let directory = storeURL.deletingLastPathComponent()
@@ -136,12 +139,11 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         descriptor.fetchLimit = 1
 
         if let existing = try modelContext.fetch(descriptor).first {
-            existing.name = contact.name
-            existing.updatedAt = Date()
+            try existing.updateName(contact.name)  // 加密更新
         } else {
-            let newConversation = CachedWechatConversationV2(
+            let newConversation = try CachedWechatConversationV2(
                 conversationId: targetId,
-                name: contact.name,
+                name: contact.name,  // 自动加密
                 createdAt: Date(),
                 updatedAt: Date()
             )
@@ -176,8 +178,7 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         descriptor.fetchLimit = 1
 
         if let conv = try modelContext.fetch(descriptor).first {
-            conv.name = newName
-            conv.updatedAt = Date()
+            try conv.updateName(newName)  // 加密更新
             try modelContext.save()
             logger.info("[WechatChatCacheV2] Renamed conversation to: \(newName)")
         }
@@ -277,15 +278,15 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         lastMsgDescriptor.fetchLimit = 1
         let maxOrder = (try modelContext.fetch(lastMsgDescriptor).first?.order) ?? -1
 
-        // 4) 插入消息
+        // 4) 插入消息（加密存储）
         for (index, message) in messages.enumerated() {
-            let cachedMessage = CachedWechatMessageV2(
+            let cachedMessage = try CachedWechatMessageV2(
                 messageId: message.id.uuidString,
                 conversationId: conversationId,
                 screenshotId: screenshotId,
-                content: message.content,
+                content: message.content,        // 自动加密
                 isFromMe: message.isFromMe,
-                senderName: message.senderName,
+                senderName: message.senderName,  // 自动加密（如有）
                 kind: message.kind,
                 order: maxOrder + 1 + index,
                 bbox: message.bbox
