@@ -10,7 +10,7 @@
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
 - ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
-- ✅ **WechatChat OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和群聊昵称识别
+- ✅ **WechatChat OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和本地存储加密
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
@@ -428,6 +428,7 @@ DIContainer.shared.ocrConfigStore
 - `DIContainer`: 中心服务容器和依赖注入
 - `LoggerService`: 统一日志记录
 - `ConcurrencyLimiter`: 全局并发控制
+- `EncryptionService`: 本地数据加密服务（AES-256-GCM + Keychain）
 - `Protocols`: 所有服务协议定义
 
 **12. 认证与购买** (Services/Auth/)
@@ -476,8 +477,11 @@ DIContainer.shared.ocrConfigStore
 - `WechatScreenshot`: 截图模型（包含原始图片和解析结果）
 - `WechatConversation`: 对话模型（联系人 + 截图列表）
 - `WechatBookListItem`: UI 列表展示模型（用于 MainListView 兼容）
-- `CachedWechatConversation`: SwiftData 缓存的对话
-- `CachedWechatMessage`: SwiftData 缓存的消息
+- `CachedWechatConversationV2`: SwiftData 缓存的对话（加密存储）
+  - `nameEncrypted: Data`（原 `name: String`）
+- `CachedWechatMessageV2`: SwiftData 缓存的消息（加密存储）
+  - `contentEncrypted: Data`（原 `content: String`）
+  - `senderNameEncrypted: Data?`（原 `senderName: String?`）
 - `CachedWechatScreenshotMeta`: SwiftData 缓存的截图元数据
 
 ## 开发模式
