@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// 键盘导航目标：当前焦点在 List 还是 Detail
-private enum KeyboardNavigationTarget {
+enum KeyboardNavigationTarget {
     case list
     case detail
 }
@@ -39,20 +39,20 @@ struct MainListView: View {
     @State private var sessionExpiredSource: ContentSource = .weRead
     @State private var sessionExpiredReason: String = ""
     
-    // MARK: - Keyboard Navigation State
+    // MARK: - Keyboard Navigation State (internal for extensions)
     
     /// 当前键盘导航目标（List 或 Detail）
-    @State private var keyboardNavigationTarget: KeyboardNavigationTarget = .list
+    @State var keyboardNavigationTarget: KeyboardNavigationTarget = .list
     /// 当前 Detail 视图的 NSScrollView（用于键盘滚动）
-    @State private var currentDetailScrollView: NSScrollView?
+    @State var currentDetailScrollView: NSScrollView?
     /// 保存进入 Detail 前的 firstResponder，用于返回时恢复
-    @State private var savedMasterFirstResponder: NSResponder?
+    @State var savedMasterFirstResponder: NSResponder?
     /// 当前窗口引用（用于过滤键盘事件）
-    @State private var mainWindow: NSWindow?
+    @State var mainWindow: NSWindow?
     /// 键盘事件监听器
-    @State private var keyDownMonitor: Any?
+    @State var keyDownMonitor: Any?
     /// 鼠标点击事件监听器（用于同步焦点状态）
-    @State private var mouseDownMonitor: Any?
+    @State var mouseDownMonitor: Any?
     
     // MARK: - App Storage
     
@@ -80,9 +80,9 @@ struct MainListView: View {
     
     @Environment(\.openWindow) private var openWindow
 
-    // MARK: - Computed Properties
+    // MARK: - Computed Properties (internal for extensions)
     
-    private var contentSource: ContentSource {
+    var contentSource: ContentSource {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
     }
 
@@ -805,178 +805,4 @@ struct MainListView: View {
         .menuIndicator(.hidden)
     }
     
-    // MARK: - Detail Column
-    
-    @ViewBuilder
-    private var detailColumn: some View {
-        switch contentSource {
-        case .appleBooks:
-            appleBooksDetailView
-        case .goodLinks:
-            goodLinksDetailView
-        case .weRead:
-            weReadDetailView
-        case .dedao:
-            dedaoDetailView
-        case .wechatChat:
-            wechatChatDetailView
-        }
-    }
-    
-    @ViewBuilder
-    private var appleBooksDetailView: some View {
-        if selectedBookIds.count == 1 {
-            let singleBookBinding = Binding<String?>(
-                get: { selectedBookIds.first },
-                set: { new in selectedBookIds = new.map { Set([$0]) } ?? [] }
-            )
-            AppleBooksDetailView(
-                viewModelList: appleBooksVM,
-                selectedBookId: singleBookBinding,
-                onScrollViewResolved: { scrollView in
-                    currentDetailScrollView = scrollView
-                }
-            )
-        } else {
-            SelectionPlaceholderView(
-                source: contentSource,
-                count: selectedBookIds.isEmpty ? nil : selectedBookIds.count,
-                filteredCount: appleBooksVM.displayBooks.count,
-                totalCount: appleBooksVM.books.count,
-                onSyncSelected: selectedBookIds.isEmpty ? nil : { syncSelectedAppleBooks() }
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private var goodLinksDetailView: some View {
-        if selectedLinkIds.count == 1 {
-            let singleLinkBinding = Binding<String?>(
-                get: { selectedLinkIds.first },
-                set: { new in selectedLinkIds = new.map { Set([$0]) } ?? [] }
-            )
-            GoodLinksDetailView(
-                viewModel: goodLinksVM,
-                selectedLinkId: singleLinkBinding,
-                onScrollViewResolved: { scrollView in
-                    currentDetailScrollView = scrollView
-                }
-            )
-        } else {
-            SelectionPlaceholderView(
-                source: contentSource,
-                count: selectedLinkIds.isEmpty ? nil : selectedLinkIds.count,
-                filteredCount: goodLinksVM.displayLinks.count,
-                totalCount: goodLinksVM.links.count,
-                onSyncSelected: selectedLinkIds.isEmpty ? nil : { syncSelectedGoodLinks() }
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private var weReadDetailView: some View {
-        if selectedWeReadBookIds.count == 1 {
-            let singleWeReadBinding = Binding<String?>(
-                get: { selectedWeReadBookIds.first },
-                set: { new in selectedWeReadBookIds = new.map { Set([$0]) } ?? [] }
-            )
-            WeReadDetailView(
-                listViewModel: weReadVM,
-                selectedBookId: singleWeReadBinding,
-                onScrollViewResolved: { scrollView in
-                    currentDetailScrollView = scrollView
-                }
-            )
-        } else {
-            SelectionPlaceholderView(
-                source: contentSource,
-                count: selectedWeReadBookIds.isEmpty ? nil : selectedWeReadBookIds.count,
-                filteredCount: weReadVM.displayBooks.count,
-                totalCount: weReadVM.books.count,
-                onSyncSelected: selectedWeReadBookIds.isEmpty ? nil : { syncSelectedWeRead() }
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private var dedaoDetailView: some View {
-        if selectedDedaoBookIds.count == 1 {
-            let singleDedaoBookBinding = Binding<String?>(
-                get: { selectedDedaoBookIds.first },
-                set: { new in selectedDedaoBookIds = new.map { Set([$0]) } ?? [] }
-            )
-            DedaoDetailView(
-                listViewModel: dedaoVM,
-                selectedBookId: singleDedaoBookBinding,
-                onScrollViewResolved: { scrollView in
-                    currentDetailScrollView = scrollView
-                }
-            )
-        } else {
-            SelectionPlaceholderView(
-                source: contentSource,
-                count: selectedDedaoBookIds.isEmpty ? nil : selectedDedaoBookIds.count,
-                filteredCount: dedaoVM.displayBooks.count,
-                totalCount: dedaoVM.books.count,
-                onSyncSelected: selectedDedaoBookIds.isEmpty ? nil : { syncSelectedDedao() }
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private var wechatChatDetailView: some View {
-        if selectedWechatContactIds.count == 1 {
-            let singleContactBinding = Binding<String?>(
-                get: { selectedWechatContactIds.first },
-                set: { new in selectedWechatContactIds = new.map { Set([$0]) } ?? [] }
-            )
-            WechatChatDetailView(
-                listViewModel: wechatChatVM,
-                selectedContactId: singleContactBinding,
-                onScrollViewResolved: { scrollView in
-                    currentDetailScrollView = scrollView
-                }
-            )
-        } else {
-            // 微信聊天没有同步功能，显示简单的占位符
-            VStack(spacing: 16) {
-                Image(systemName: "message.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(.secondary)
-                if selectedWechatContactIds.isEmpty {
-                    Text("选择一个对话")
-                        .scaledFont(.title3)
-                        .foregroundColor(.secondary)
-                    Text("从左侧列表选择联系人查看聊天记录")
-                        .scaledFont(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("已选择 \(selectedWechatContactIds.count) 个对话")
-                        .scaledFont(.title3)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-    
-    // MARK: - Sync Methods
-    // 注意：任务入队由各 ViewModel 的 batchSync() 方法通过 SyncQueueStore.enqueue() 统一处理，
-    // 此处不应直接操作 SyncQueueStore，遵循唯一入口原则。
-    
-    private func syncSelectedAppleBooks() {
-        appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-    }
-    
-    private func syncSelectedGoodLinks() {
-        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
-    }
-    
-    private func syncSelectedWeRead() {
-        weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-    }
-    
-    private func syncSelectedDedao() {
-        dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-    }
 }
