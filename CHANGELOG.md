@@ -1,3 +1,8 @@
+## v0.9.12
+**Key updates:**
+- Add encryption to the chat record local storage to protect user privacy.
+- Keyboard focus management for message navigation and category switching via Option + Arrow Keys.
+
 ## v0.9.11
 
 **Key updates:** improve the UI of the chat detail view.
