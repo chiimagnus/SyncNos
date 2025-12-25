@@ -483,7 +483,7 @@ struct MainListView: View {
         case .dedao:
             return selectedDedaoBookIds.count == 1
         case .wechatChat:
-            return false // 微信聊天没有详情视图
+            return selectedWechatContactIds.count == 1
         }
     }
     
@@ -1106,7 +1106,10 @@ struct MainListView: View {
             )
             WechatChatDetailView(
                 listViewModel: wechatChatVM,
-                selectedContactId: singleContactBinding
+                selectedContactId: singleContactBinding,
+                onScrollViewResolved: { scrollView in
+                    currentDetailScrollView = scrollView
+                }
             )
         } else {
             // 微信聊天没有同步功能，显示简单的占位符
