@@ -9,7 +9,7 @@
 - GoodLinks
 - WeRead
 - Dedao
-- Chat History beta - OCR version
+- Chat History beta - OCR version (with local storage encryption)
 
 ## Sync Data To
 - Notion
