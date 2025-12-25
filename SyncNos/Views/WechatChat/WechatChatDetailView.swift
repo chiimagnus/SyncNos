@@ -12,6 +12,8 @@ struct WechatChatDetailView: View {
 
     @State private var showFilePicker = false
     @State private var showOCRPayloadSheet = false
+    @State private var selectedMessageId: UUID?
+    @FocusState private var isFocused: Bool
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -98,6 +100,7 @@ struct WechatChatDetailView: View {
         if messages.isEmpty {
             emptyMessagesView(contact: contact)
         } else {
+            ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(messages) { message in
@@ -105,22 +108,155 @@ struct WechatChatDetailView: View {
                         case .system:
                             SystemMessageRow(
                                 message: message,
+                                    isSelected: selectedMessageId == message.id,
+                                    onTap: { selectedMessageId = message.id },
                                 onClassify: { msg, isFromMe, kind in
                                     handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                 }
                             )
+                                .id(compositeId(for: message))
                         default:
                             MessageBubble(
                                 message: message,
+                                    isSelected: selectedMessageId == message.id,
+                                    onTap: { selectedMessageId = message.id },
                                 onClassify: { msg, isFromMe, kind in
                                     handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                 }
                             )
+                                .id(compositeId(for: message))
+                            }
                         }
                     }
+                    .padding()
                 }
-                .padding()
+                .focusable()
+                .focused($isFocused)
+                .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { keyPress in
+                    guard keyPress.modifiers.contains(.option) else { return .ignored }
+                    
+                    switch keyPress.key {
+                    case .upArrow:
+                        navigateMessage(direction: .up, proxy: proxy)
+                        return .handled
+                    case .downArrow:
+                        navigateMessage(direction: .down, proxy: proxy)
+                        return .handled
+                    case .leftArrow:
+                        cycleClassification(direction: .left, for: contact)
+                        return .handled
+                    case .rightArrow:
+                        cycleClassification(direction: .right, for: contact)
+                        return .handled
+                    default:
+                        return .ignored
+                    }
+                }
+                .onAppear { isFocused = true }
+                .onChange(of: selectedContactId) { _, _ in
+                    selectedMessageId = nil
+                    isFocused = true
+                }
             }
+        }
+    }
+    
+    // MARK: - Keyboard Navigation
+    
+    private enum NavigationDirection {
+        case up, down
+    }
+    
+    private enum ClassificationDirection {
+        case left, right
+    }
+    
+    /// 生成复合 ID，用于 ScrollViewReader 导航和视图标识
+    private func compositeId(for message: WechatMessage) -> String {
+        "\(message.id.uuidString)-\(message.kind.rawValue)"
+    }
+    
+    /// 消息分类状态（用于循环切换）
+    private enum MessageClassification {
+        case other   // 对方消息：isFromMe = false, kind != .system
+        case system  // 系统消息：kind == .system
+        case me      // 我的消息：isFromMe = true, kind != .system
+        
+        init(from message: WechatMessage) {
+            if message.kind == .system {
+                self = .system
+            } else if message.isFromMe {
+                self = .me
+            } else {
+                self = .other
+            }
+        }
+        
+        var isFromMe: Bool {
+            switch self {
+            case .me: return true
+            case .other, .system: return false
+            }
+        }
+        
+        var kind: WechatMessageKind {
+            switch self {
+            case .system: return .system
+            case .me, .other: return .text
+            }
+        }
+        
+        func next(direction: ClassificationDirection) -> MessageClassification {
+            switch (direction, self) {
+            case (.right, .other): return .system
+            case (.right, .system): return .me
+            case (.right, .me): return .other
+            case (.left, .other): return .me
+            case (.left, .system): return .other
+            case (.left, .me): return .system
+            }
+        }
+    }
+    
+    private func navigateMessage(direction: NavigationDirection, proxy: ScrollViewProxy) {
+        guard !messages.isEmpty else { return }
+        
+        if let currentId = selectedMessageId,
+           let currentIndex = messages.firstIndex(where: { $0.id == currentId }) {
+            let newIndex: Int
+            switch direction {
+            case .up:
+                newIndex = currentIndex > 0 ? currentIndex - 1 : messages.count - 1
+            case .down:
+                newIndex = currentIndex < messages.count - 1 ? currentIndex + 1 : 0
+            }
+            let newMessage = messages[newIndex]
+            selectedMessageId = newMessage.id
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(compositeId(for: newMessage), anchor: .center)
+            }
+        } else {
+            // 无选中时，选中第一条（向下）或最后一条（向上）
+            let message = direction == .down ? messages.first : messages.last
+            selectedMessageId = message?.id
+            if let message = message {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(compositeId(for: message), anchor: .center)
+                }
+            }
+        }
+    }
+    
+    private func cycleClassification(direction: ClassificationDirection, for contact: WechatBookListItem) {
+        guard let messageId = selectedMessageId,
+              let message = messages.first(where: { $0.id == messageId }) else { return }
+        
+        let current = MessageClassification(from: message)
+        let next = current.next(direction: direction)
+        
+        // 延迟到下一个事件循环，避免在视图更新中发布变更
+        Task { @MainActor in
+            handleClassification(message, isFromMe: next.isFromMe, kind: next.kind, for: contact)
         }
     }
     
@@ -217,10 +353,11 @@ private struct WechatChatSelectableText: NSViewRepresentable {
     let isFromMe: Bool
     let kind: WechatMessageKind
     let style: Style
+    let onSelect: () -> Void
     let onClassify: (Bool, WechatMessageKind) -> Void
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(onClassify: onClassify)
+        Coordinator(onSelect: onSelect, onClassify: onClassify)
     }
     
     func makeNSView(context: Context) -> MenuAwareTextView {
@@ -253,9 +390,16 @@ private struct WechatChatSelectableText: NSViewRepresentable {
         // 渲染与布局
         applyContent(to: textView, coordinator: context.coordinator)
         
-        // 条件菜单
+        // 条件菜单 + 选中回调
         textView.menuProvider = { [weak coordinator = context.coordinator] in
-            coordinator?.makeMenu()
+            // 右键菜单弹出时触发选中
+            coordinator?.onSelect()
+            return coordinator?.makeMenu()
+        }
+        
+        // 左键点击时触发选中
+        textView.onMouseDown = { [weak coordinator = context.coordinator] in
+            coordinator?.onSelect()
         }
         
         return textView
@@ -264,6 +408,7 @@ private struct WechatChatSelectableText: NSViewRepresentable {
     func updateNSView(_ nsView: MenuAwareTextView, context: Context) {
         context.coordinator.isFromMe = isFromMe
         context.coordinator.kind = kind
+        context.coordinator.onSelect = onSelect
         context.coordinator.onClassify = onClassify
         
         applyContent(to: nsView, coordinator: context.coordinator)
@@ -342,9 +487,11 @@ private struct WechatChatSelectableText: NSViewRepresentable {
     final class Coordinator: NSObject {
         var isFromMe: Bool = false
         var kind: WechatMessageKind = .text
+        var onSelect: () -> Void
         var onClassify: (Bool, WechatMessageKind) -> Void
         
-        init(onClassify: @escaping (Bool, WechatMessageKind) -> Void) {
+        init(onSelect: @escaping () -> Void, onClassify: @escaping (Bool, WechatMessageKind) -> Void) {
+            self.onSelect = onSelect
             self.onClassify = onClassify
         }
         
@@ -388,6 +535,12 @@ private struct WechatChatSelectableText: NSViewRepresentable {
     
     final class MenuAwareTextView: NSTextView {
         var menuProvider: (() -> NSMenu?)?
+        var onMouseDown: (() -> Void)?
+        
+        override func mouseDown(with event: NSEvent) {
+            onMouseDown?()
+            super.mouseDown(with: event)
+        }
         
         override func menu(for event: NSEvent) -> NSMenu? {
             if selectedRange.length > 0 {
@@ -402,10 +555,13 @@ private struct WechatChatSelectableText: NSViewRepresentable {
 
 private struct MessageBubble: View {
     let message: WechatMessage
+    let isSelected: Bool
+    let onTap: () -> Void
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
 
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
     private let otherBubbleColor = Color.white
+    private let selectedBorderColor = Color.accentColor
 
     var body: some View {
         HStack {
@@ -425,12 +581,18 @@ private struct MessageBubble: View {
                     isFromMe: message.isFromMe,
                     kind: message.kind,
                     style: .bubble(),
+                    onSelect: onTap,
                     onClassify: { isFromMe, kind in
                         onClassify(message, isFromMe, kind)
                     }
                 )
                     .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
                     .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(selectedBorderColor, lineWidth: 2)
+                            .opacity(isSelected ? 1 : 0)
+                    )
                     .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             }
 
@@ -460,7 +622,11 @@ private struct MessageBubble: View {
 
 private struct SystemMessageRow: View {
     let message: WechatMessage
+    let isSelected: Bool
+    let onTap: () -> Void
     let onClassify: (WechatMessage, Bool, WechatMessageKind) -> Void
+
+    private let selectedBorderColor = Color.accentColor
 
     var body: some View {
         WechatChatSelectableText(
@@ -468,12 +634,18 @@ private struct SystemMessageRow: View {
             isFromMe: message.isFromMe,
             kind: message.kind,
             style: .system(),
+            onSelect: onTap,
             onClassify: { isFromMe, kind in
                 onClassify(message, isFromMe, kind)
             }
         )
             .background(Color.secondary.opacity(0.10))
             .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(selectedBorderColor, lineWidth: 2)
+                    .opacity(isSelected ? 1 : 0)
+            )
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
     }
