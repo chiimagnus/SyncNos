@@ -1,8 +1,9 @@
 # WechatChat 本地存储加密实现计划
 
-> **状态**：📋 规划中（2024-12-25）  
+> **状态**：✅ 已实现（2024-12-25）  
 > **优先级**：P1（隐私保护需求明确）  
-> **预计工作量**：1.5-2 天
+> **预计工作量**：1.5-2 天  
+> **实际工作量**：0.5 天
 
 ---
 
@@ -406,30 +407,30 @@ if hasUnencryptedData() {
 
 ## 六、实现步骤
 
-### 第一步：创建 EncryptionService（0.5 天）
+### 第一步：创建 EncryptionService（0.5 天）✅ 已完成
 
-1. 创建 `Services/Core/EncryptionService.swift`
-2. 实现 Keychain 密钥存储
-3. 实现 AES-GCM 加密/解密
-4. 添加单元测试
+1. ✅ 创建 `Services/Core/EncryptionService.swift`
+2. ✅ 实现 Keychain 密钥存储（使用 `KeychainHelper`）
+3. ✅ 实现 AES-GCM 加密/解密
+4. ⏳ 添加单元测试（待用户测试确认后添加）
 
-### 第二步：修改 SwiftData 模型（0.5 天）
+### 第二步：修改 SwiftData 模型（0.5 天）✅ 已完成
 
-1. 修改 `CachedWechatMessageV2`
+1. ✅ 修改 `CachedWechatMessageV2`
    - 新增 `contentEncrypted: Data` 字段
    - 新增 `senderNameEncrypted: Data?` 字段
-   - 添加便捷访问器
-2. 修改 `CachedWechatConversationV2`
-   - 新增 `contactNameEncrypted: Data` 字段
-3. 处理数据迁移（清空旧数据或版本迁移）
+   - 添加便捷访问器（计算属性自动解密）
+2. ✅ 修改 `CachedWechatConversationV2`
+   - 新增 `nameEncrypted: Data` 字段
+3. ✅ 处理数据迁移：新建 `wechatchat_v3.store`（清空重建策略）
 
-### 第三步：适配 CacheService（0.5 天）
+### 第三步：适配 CacheService（0.5 天）✅ 已完成
 
-1. 修改 `WechatChatCacheService` 的保存方法
-2. 修改读取方法，确保解密正常
-3. 添加错误处理（解密失败时的降级策略）
+1. ✅ 修改 `WechatChatCacheService` 的保存方法
+2. ✅ 修改读取方法，确保解密正常
+3. ✅ 添加错误处理（解密失败时返回 `"[解密失败]"`）
 
-### 第四步：UI 和设置（可选，0.5 天）
+### 第四步：UI 和设置（可选，0.5 天）⏳ 未实施
 
 1. 在设置中添加"加密状态"指示
 2. 添加"清除加密数据"选项
