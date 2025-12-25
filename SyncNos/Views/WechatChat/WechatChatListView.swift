@@ -9,6 +9,9 @@ struct WechatChatListView: View {
     @ObservedObject var viewModel: WechatChatViewModel
     @Binding var selectionIds: Set<String>
     
+    /// 用于接收焦点的 FocusState
+    @FocusState private var isListFocused: Bool
+    
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
     
@@ -91,6 +94,19 @@ struct WechatChatListView: View {
             }
         }
         .listStyle(.sidebar)
+        .focused($isListFocused)
+        .onAppear {
+            // 延迟获取焦点，确保视图已完全加载
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isListFocused = true
+            }
+        }
+        // 监听数据源切换通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToWechatChat")).receive(on: DispatchQueue.main)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isListFocused = true
+            }
+        }
     }
 }
 

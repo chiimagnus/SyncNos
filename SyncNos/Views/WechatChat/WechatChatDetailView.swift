@@ -9,13 +9,13 @@ import AppKit
 struct WechatChatDetailView: View {
     @ObservedObject var listViewModel: WechatChatViewModel
     @Binding var selectedContactId: String?
+    /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
+    var onScrollViewResolved: (NSScrollView) -> Void
 
     @State private var showFilePicker = false
     @State private var showOCRPayloadSheet = false
     @State private var selectedMessageId: UUID?
-    @State private var keyboardMonitor: Any?
-    @State private var scrollProxy: ScrollViewProxy?
-    @State private var isViewActive = false  // 标记视图是否活跃，用于键盘监听范围控制
+    @FocusState private var isDetailFocused: Bool
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -105,13 +105,26 @@ struct WechatChatDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
+                        // 顶部锚点，用于解析 NSScrollView
+                        Color.clear
+                            .frame(height: 0)
+                            .id("wechatChatDetailTop")
+                            .background(
+                                EnclosingScrollViewReader { scrollView in
+                                    onScrollViewResolved(scrollView)
+                                }
+                            )
+                        
                         ForEach(messages) { message in
                             switch message.kind {
                             case .system:
                                 SystemMessageRow(
                                     message: message,
                                     isSelected: selectedMessageId == message.id,
-                                    onTap: { selectedMessageId = message.id },
+                                    onTap: {
+                                        selectedMessageId = message.id
+                                        isDetailFocused = true
+                                    },
                                     onClassify: { msg, isFromMe, kind in
                                         handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                     }
@@ -121,7 +134,10 @@ struct WechatChatDetailView: View {
                                 MessageBubble(
                                     message: message,
                                     isSelected: selectedMessageId == message.id,
-                                    onTap: { selectedMessageId = message.id },
+                                    onTap: {
+                                        selectedMessageId = message.id
+                                        isDetailFocused = true
+                                    },
                                     onClassify: { msg, isFromMe, kind in
                                         handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                     }
@@ -132,59 +148,34 @@ struct WechatChatDetailView: View {
                     }
                     .padding()
                 }
-                .onAppear {
-                    scrollProxy = proxy
-                    isViewActive = true
-                    setupKeyboardMonitor(for: contact, proxy: proxy)
-                }
-                .onDisappear {
-                    isViewActive = false
-                    removeKeyboardMonitor()
+                .focusable()
+                .focusEffectDisabled()
+                .focused($isDetailFocused)
+                .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { keyPress in
+                    // 只处理 Option + 方向键
+                    guard keyPress.modifiers.contains(.option) else { return .ignored }
+                    
+                    switch keyPress.key {
+                    case .upArrow:
+                        navigateMessage(direction: .up, proxy: proxy)
+                        return .handled
+                    case .downArrow:
+                        navigateMessage(direction: .down, proxy: proxy)
+                        return .handled
+                    case .leftArrow:
+                        cycleClassification(direction: .left, for: contact)
+                        return .handled
+                    case .rightArrow:
+                        cycleClassification(direction: .right, for: contact)
+                        return .handled
+                    default:
+                        return .ignored
+                    }
                 }
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
                 }
             }
-        }
-    }
-    
-    // MARK: - Keyboard Monitor (NSEvent)
-    
-    private func setupKeyboardMonitor(for contact: WechatBookListItem, proxy: ScrollViewProxy) {
-        // 移除旧的监听器
-        removeKeyboardMonitor()
-        
-        // 添加局部键盘事件监听器
-        keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
-            // 只有当视图活跃时才处理键盘事件
-            guard isViewActive else { return event }
-            
-            // 检查 Option + 方向键
-            guard event.modifierFlags.contains(.option) else { return event }
-            
-            switch event.keyCode {
-            case 126: // Up Arrow
-                navigateMessage(direction: .up, proxy: proxy)
-                return nil // 消费事件
-            case 125: // Down Arrow
-                navigateMessage(direction: .down, proxy: proxy)
-                return nil
-            case 123: // Left Arrow
-                cycleClassification(direction: .left, for: contact)
-                return nil
-            case 124: // Right Arrow
-                cycleClassification(direction: .right, for: contact)
-                return nil
-            default:
-                return event // 不处理，继续传递
-            }
-        }
-    }
-    
-    private func removeKeyboardMonitor() {
-        if let monitor = keyboardMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyboardMonitor = nil
         }
     }
     
@@ -681,7 +672,8 @@ private struct SystemMessageRow: View {
 #Preview {
     WechatChatDetailView(
         listViewModel: WechatChatViewModel(),
-        selectedContactId: .constant(nil)
+        selectedContactId: .constant(nil),
+        onScrollViewResolved: { _ in }
     )
     .environmentObject(FontScaleManager.shared)
     .frame(width: 500, height: 600)
