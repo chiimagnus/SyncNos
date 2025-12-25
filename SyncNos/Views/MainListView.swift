@@ -355,8 +355,48 @@ struct MainListView: View {
                 }
             }
             
-            // 不拦截带 Option/Control 的组合键
-            if hasOption || hasControl {
+            // Option + 方向键：WechatChat 消息导航和分类切换
+            if hasOption && !hasCommand && !hasControl {
+                if self.contentSource == .wechatChat && self.keyboardNavigationTarget == .detail {
+                    switch event.keyCode {
+                    case 126: // Option+↑ 选择上一条消息
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatNavigateMessage"),
+                            object: nil,
+                            userInfo: ["direction": "up"]
+                        )
+                        return nil
+                    case 125: // Option+↓ 选择下一条消息
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatNavigateMessage"),
+                            object: nil,
+                            userInfo: ["direction": "down"]
+                        )
+                        return nil
+                    case 123: // Option+← 切换分类（向左：我 → 系统 → 对方）
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatCycleClassification"),
+                            object: nil,
+                            userInfo: ["direction": "left"]
+                        )
+                        return nil
+                    case 124: // Option+→ 切换分类（向右：对方 → 系统 → 我）
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatCycleClassification"),
+                            object: nil,
+                            userInfo: ["direction": "right"]
+                        )
+                        return nil
+                    default:
+                        break
+                    }
+                }
+                // 其他 Option 组合键不拦截
+                return event
+            }
+            
+            // 不拦截带 Control 的组合键
+            if hasControl {
                 return event
             }
             
