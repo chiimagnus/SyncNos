@@ -15,7 +15,7 @@ struct WechatChatDetailView: View {
     @State private var showFilePicker = false
     @State private var showOCRPayloadSheet = false
     @State private var selectedMessageId: UUID?
-    @FocusState private var isDetailFocused: Bool
+    @State private var scrollProxy: ScrollViewProxy?
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -121,10 +121,7 @@ struct WechatChatDetailView: View {
                                 SystemMessageRow(
                                     message: message,
                                     isSelected: selectedMessageId == message.id,
-                                    onTap: {
-                                        selectedMessageId = message.id
-                                        isDetailFocused = true
-                                    },
+                                    onTap: { selectedMessageId = message.id },
                                     onClassify: { msg, isFromMe, kind in
                                         handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                     }
@@ -134,10 +131,7 @@ struct WechatChatDetailView: View {
                                 MessageBubble(
                                     message: message,
                                     isSelected: selectedMessageId == message.id,
-                                    onTap: {
-                                        selectedMessageId = message.id
-                                        isDetailFocused = true
-                                    },
+                                    onTap: { selectedMessageId = message.id },
                                     onClassify: { msg, isFromMe, kind in
                                         handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
                                     }
@@ -148,32 +142,23 @@ struct WechatChatDetailView: View {
                     }
                     .padding()
                 }
-                .focusable()
-                .focusEffectDisabled()
-                .focused($isDetailFocused)
-                .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { keyPress in
-                    // 只处理 Option + 方向键
-                    guard keyPress.modifiers.contains(.option) else { return .ignored }
-                    
-                    switch keyPress.key {
-                    case .upArrow:
-                        navigateMessage(direction: .up, proxy: proxy)
-                        return .handled
-                    case .downArrow:
-                        navigateMessage(direction: .down, proxy: proxy)
-                        return .handled
-                    case .leftArrow:
-                        cycleClassification(direction: .left, for: contact)
-                        return .handled
-                    case .rightArrow:
-                        cycleClassification(direction: .right, for: contact)
-                        return .handled
-                    default:
-                        return .ignored
-                    }
+                .onAppear {
+                    scrollProxy = proxy
                 }
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
+                }
+                // 监听来自 MainListView 的消息导航通知
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatNavigateMessage")).receive(on: DispatchQueue.main)) { notification in
+                    guard let userInfo = notification.userInfo,
+                          let direction = userInfo["direction"] as? String else { return }
+                    navigateMessage(direction: direction == "up" ? .up : .down, proxy: proxy)
+                }
+                // 监听来自 MainListView 的分类切换通知
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatCycleClassification")).receive(on: DispatchQueue.main)) { notification in
+                    guard let userInfo = notification.userInfo,
+                          let direction = userInfo["direction"] as? String else { return }
+                    cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
                 }
             }
         }
