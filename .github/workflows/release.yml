@@ -94,7 +94,9 @@ jobs:
           while section_lines and section_lines[-1].strip() == "":
               section_lines.pop()
 
-          out = "\n".join(section_lines).rstrip() + "\n"
+          # 在开头添加下载链接
+          download_link = "download link: https://apps.apple.com/app/syncnos/id6755133888\n\n"
+          out = download_link + "\n".join(section_lines).rstrip() + "\n"
           Path("RELEASE_NOTES.md").write_text(out, encoding="utf-8")
           print("Generated RELEASE_NOTES.md")
           PY
