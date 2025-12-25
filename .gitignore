@@ -1,7 +1,6 @@
 /Backend/.venv
 *.db
 Backend/.env
-plans/
 .kiro/
 .claude/
 .specify/
