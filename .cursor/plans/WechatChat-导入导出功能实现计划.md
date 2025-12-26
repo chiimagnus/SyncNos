@@ -390,12 +390,40 @@ extension WechatChatDetailView {
 
 ---
 
-## 12. 执行确认
+## 12. 实现状态
 
-请确认以下事项后开始实施：
+### ✅ 已完成
 
-- [ ] 导出格式设计是否满足需求？
-- [ ] 导入时默认创建新对话是否合适？
-- [ ] Markdown 解析规则是否需要调整？
-- [ ] 拖拽功能优先级是否正确？
+| 阶段 | 状态 | 说明 |
+|-----|------|-----|
+| Phase 1: 导出功能 | ✅ 完成 | `WechatChatExporter.swift` |
+| Phase 2: 导入功能 | ✅ 完成 | `WechatChatImporter.swift` |
+| Phase 3: ViewModel 集成 | ✅ 完成 | `WechatChatViewModel.swift` |
+| Phase 4: UI 集成 | ✅ 完成 | `WechatChatDetailView.swift` |
+| Phase 5: 拖拽功能 | ✅ 完成 | 支持图片/JSON/MD 拖拽 |
+
+### 文件清单
+
+- `Services/DataSources-From/WechatChat/WechatChatExporter.swift` - 导出工具
+- `Services/DataSources-From/WechatChat/WechatChatImporter.swift` - 导入工具
+- `ViewModels/WechatChat/WechatChatViewModel.swift` - 添加导入导出方法
+- `Views/WechatChat/WechatChatDetailView.swift` - UI 集成（导出菜单、导入按钮、拖拽支持）
+- `Services/DataSources-From/WechatChat/WechatChatCacheService.swift` - 添加 `fetchAllMessages` 方法
+
+### 功能特性
+
+1. **导出功能**
+   - JSON 格式：带版本号的结构化数据
+   - Markdown 格式：使用 `# 发送者` 标识对话人
+   - 通过菜单选择格式，调用系统文件保存器
+
+2. **导入功能**
+   - 支持 JSON 和 Markdown 格式
+   - 可追加到现有对话或创建新对话
+   - 自动检测文件格式
+
+3. **拖拽功能**
+   - 图片拖拽 → OCR 识别
+   - JSON/MD 文件拖拽 → 自动导入
+   - 拖拽时显示视觉反馈覆盖层
 
