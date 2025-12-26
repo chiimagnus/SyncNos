@@ -1,6 +1,6 @@
 ## v0.9.15
 
-Key updates:
+**Key updates:**
 - WechatChat: custom SwiftUI context menu with Copy/Share; replace NSTextView with native SwiftUI Text in chat bubbles.
 - WechatChat: add JSON/Markdown import/export, message pagination with scroll preservation, improved loading states and drag & drop.
 - WechatChat UI: dynamic font scaling support.
