@@ -460,9 +460,6 @@ struct WechatChatDetailView: View {
     // MARK: - Drag & Drop
     
     private var dropTargetOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.3)
-            
             VStack(spacing: 12) {
                 Image(systemName: "arrow.down.doc.fill")
                     .font(.system(size: 48))
@@ -481,7 +478,6 @@ struct WechatChatDetailView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.accentColor.opacity(0.9))
             )
-        }
         .allowsHitTesting(false)
     }
     
