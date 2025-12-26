@@ -24,10 +24,28 @@ struct WechatChatDetailView: View {
         return listViewModel.contacts.first { $0.id == id }
     }
 
+    /// 使用分页加载的消息（已按 order 排序）
     private var messages: [WechatMessage] {
         guard let contact = selectedContact else { return [] }
-        return listViewModel.getMessages(for: contact.contactId)
-            .sorted(by: { $0.order < $1.order })
+        return listViewModel.getLoadedMessages(for: contact.contactId)
+    }
+    
+    /// 是否可以加载更多（用于显示顶部加载指示器）
+    private var canLoadMore: Bool {
+        guard let contact = selectedContact else { return false }
+        return listViewModel.canLoadMore(for: contact.contactId)
+    }
+    
+    /// 是否正在加载更多
+    private var isLoadingMore: Bool {
+        guard let contact = selectedContact else { return false }
+        return listViewModel.isLoadingMore(for: contact.contactId)
+    }
+    
+    /// 是否已完成首次加载
+    private var hasInitiallyLoaded: Bool {
+        guard let contact = selectedContact else { return false }
+        return listViewModel.hasInitiallyLoaded(for: contact.contactId)
     }
 
     var body: some View {
@@ -99,7 +117,19 @@ struct WechatChatDetailView: View {
 
     @ViewBuilder
     private func contentView(for contact: WechatBookListItem) -> some View {
-        if messages.isEmpty {
+        // 首次加载中状态
+        if !hasInitiallyLoaded && listViewModel.isLoading {
+            VStack {
+                ProgressView()
+                Text("加载中...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if messages.isEmpty && hasInitiallyLoaded {
+            emptyMessagesView(contact: contact)
+        } else if messages.isEmpty {
+            // 首次加载未完成且无消息，显示空状态
             emptyMessagesView(contact: contact)
         } else {
             ScrollViewReader { proxy in
@@ -115,28 +145,64 @@ struct WechatChatDetailView: View {
                                 }
                             )
                         
-                        ForEach(messages) { message in
-                            switch message.kind {
-                            case .system:
-                                SystemMessageRow(
-                                    message: message,
-                                    isSelected: selectedMessageId == message.id,
-                                    onTap: { selectedMessageId = message.id },
-                                    onClassify: { msg, isFromMe, kind in
-                                        handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                        // 顶部加载更多指示器
+                        if canLoadMore {
+                            HStack(spacing: 8) {
+                                if isLoadingMore {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                    Text("加载更多...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Button {
+                                        Task {
+                                            await listViewModel.loadMoreMessages(for: contact.contactId)
+                                        }
+                                    } label: {
+                                        Text("加载更早的消息")
+                                            .font(.caption)
+                                            .foregroundColor(.accentColor)
                                     }
-                                )
-                                .id(compositeId(for: message))
-                            default:
-                                MessageBubble(
-                                    message: message,
-                                    isSelected: selectedMessageId == message.id,
-                                    onTap: { selectedMessageId = message.id },
-                                    onClassify: { msg, isFromMe, kind in
-                                        handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .id("loadMoreIndicator")
+                        }
+                        
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                            Group {
+                                switch message.kind {
+                                case .system:
+                                    SystemMessageRow(
+                                        message: message,
+                                        isSelected: selectedMessageId == message.id,
+                                        onTap: { selectedMessageId = message.id },
+                                        onClassify: { msg, isFromMe, kind in
+                                            handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                        }
+                                    )
+                                default:
+                                    MessageBubble(
+                                        message: message,
+                                        isSelected: selectedMessageId == message.id,
+                                        onTap: { selectedMessageId = message.id },
+                                        onClassify: { msg, isFromMe, kind in
+                                            handleClassification(msg, isFromMe: isFromMe, kind: kind, for: contact)
+                                        }
+                                    )
+                                }
+                            }
+                            .id(compositeId(for: message))
+                            .onAppear {
+                                // 当接近顶部时预加载更多消息
+                                if index < WechatChatPaginationConfig.preloadThreshold && canLoadMore && !isLoadingMore {
+                                    Task {
+                                        await listViewModel.loadMoreMessages(for: contact.contactId)
                                     }
-                                )
-                                .id(compositeId(for: message))
+                                }
                             }
                         }
                     }
@@ -160,6 +226,10 @@ struct WechatChatDetailView: View {
                           let direction = userInfo["direction"] as? String else { return }
                     cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
                 }
+            }
+            // 首次进入对话时自动加载初始消息
+            .task(id: contact.contactId) {
+                await listViewModel.loadInitialMessages(for: contact.contactId)
             }
         }
     }
