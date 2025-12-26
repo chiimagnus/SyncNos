@@ -281,6 +281,7 @@ struct WechatChatDetailView: View {
                     }
                     .padding()
                 }
+                .defaultScrollAnchor(.bottom) // 默认显示底部（最新消息）
                 .onAppear {
                     scrollProxy = proxy
                 }
