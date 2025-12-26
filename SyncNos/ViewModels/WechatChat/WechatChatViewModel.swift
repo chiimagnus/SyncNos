@@ -161,6 +161,22 @@ final class WechatChatViewModel: ObservableObject {
         }
     }
 
+    /// 向指定对话追加截图（来自拖拽/剪贴板等“内存数据”，无需落盘）
+    func addScreenshotData(to contactId: UUID, imageDatas: [Data]) async {
+        guard conversations[contactId] != nil else {
+            errorMessage = "对话不存在"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        for data in imageDatas {
+            await importScreenshotToConversation(contactId: contactId, imageData: data)
+        }
+    }
+
     func getConversation(for contactId: UUID) -> WechatConversation? {
         conversations[contactId]
     }
@@ -526,14 +542,39 @@ final class WechatChatViewModel: ObservableObject {
             errorMessage = "无法加载图片: \(url.lastPathComponent)"
             return
         }
+        
+        await importScreenshotToConversation(
+            contactId: contactId,
+            image: image,
+            sourceName: url.lastPathComponent
+        )
+    }
+    
+    private func importScreenshotToConversation(contactId: UUID, imageData: Data) async {
+        guard let image = NSImage(data: imageData) else {
+            errorMessage = "无法处理拖入的图片"
+            return
+        }
+        
+        await importScreenshotToConversation(
+            contactId: contactId,
+            image: image,
+            sourceName: "DroppedImage"
+        )
+    }
 
+    private func importScreenshotToConversation(contactId: UUID, image: NSImage, sourceName: String?) async {
         let screenshot = WechatScreenshot(image: image, isProcessing: true)
         let screenshotId = screenshot.id
         processingScreenshotIds.insert(screenshotId)
         defer { processingScreenshotIds.remove(screenshotId) }
 
         do {
-            logger.info("[WechatChatV2] Processing screenshot: \(url.lastPathComponent)")
+            if let sourceName {
+                logger.info("[WechatChatV2] Processing screenshot: \(sourceName)")
+            } else {
+                logger.info("[WechatChatV2] Processing screenshot")
+            }
 
             let pixelSize = try imagePixelSize(image)
             // 简化：回到默认 OCR 请求配置（不做场景化调参），先把私聊展示完整做稳
