@@ -43,24 +43,10 @@ extension MainListView {
                 }
             }
             
-            // Option + 方向键：WechatChat 消息导航和分类切换
+            // Option + 方向键：WechatChat 分类切换（消息导航改为 ↑/↓，见下方无修饰键分支）
             if hasOption && !hasCommand && !hasControl {
                 if self.contentSource == .wechatChat && self.keyboardNavigationTarget == .detail {
                     switch event.keyCode {
-                    case 126: // Option+↑ 选择上一条消息
-                        NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatNavigateMessage"),
-                            object: nil,
-                            userInfo: ["direction": "up"]
-                        )
-                        return nil
-                    case 125: // Option+↓ 选择下一条消息
-                        NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatNavigateMessage"),
-                            object: nil,
-                            userInfo: ["direction": "down"]
-                        )
-                        return nil
                     case 123: // Option+← 切换分类（向左：我 → 系统 → 对方）
                         NotificationCenter.default.post(
                             name: Notification.Name("WechatChatCycleClassification"),
@@ -107,12 +93,30 @@ extension MainListView {
                 return event
             case 126: // ↑
                 if self.keyboardNavigationTarget == .detail {
+                    // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
+                    if self.contentSource == .wechatChat {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatNavigateMessage"),
+                            object: nil,
+                            userInfo: ["direction": "up"]
+                        )
+                        return nil
+                    }
                     self.scrollCurrentDetail(byLines: -1)
                     return nil
                 }
                 return event
             case 125: // ↓
                 if self.keyboardNavigationTarget == .detail {
+                    // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
+                    if self.contentSource == .wechatChat {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("WechatChatNavigateMessage"),
+                            object: nil,
+                            userInfo: ["direction": "down"]
+                        )
+                        return nil
+                    }
                     self.scrollCurrentDetail(byLines: 1)
                     return nil
                 }
