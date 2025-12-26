@@ -13,9 +13,14 @@ struct WechatChatDetailView: View {
     var onScrollViewResolved: (NSScrollView) -> Void
 
     @State private var showFilePicker = false
+    @State private var showImportFilePicker = false
+    @State private var showExportFileSaver = false
+    @State private var exportFormat: WechatExportFormat = .json
+    @State private var exportContent: String = ""
     @State private var showOCRPayloadSheet = false
     @State private var selectedMessageId: UUID?
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var isDragTargeted = false
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -72,13 +77,40 @@ struct WechatChatDetailView: View {
                         .disabled(!ocrConfigStore.isConfigured || listViewModel.isLoading)
                         .help("追加聊天截图")
 
-                        Button {
-                            listViewModel.copyToClipboard(for: contact.contactId)
+                        // 导出菜单
+                        Menu {
+                            Button {
+                                prepareExport(for: contact, format: .json)
+                            } label: {
+                                Label("导出为 JSON", systemImage: "doc.text")
+                            }
+                            
+                            Button {
+                                prepareExport(for: contact, format: .markdown)
+                            } label: {
+                                Label("导出为 Markdown", systemImage: "doc.richtext")
+                            }
+                            
+                            Divider()
+                            
+                            Button {
+                                listViewModel.copyToClipboard(for: contact.contactId)
+                            } label: {
+                                Label("复制纯文本", systemImage: "doc.on.doc")
+                            }
                         } label: {
-                            Label("复制", systemImage: "doc.on.doc")
+                            Label("导出", systemImage: "square.and.arrow.up")
                         }
                         .disabled(contact.messageCount == 0)
-                        .help("复制全部聊天记录")
+                        .help("导出聊天记录")
+                        
+                        // 导入按钮
+                        Button {
+                            showImportFilePicker = true
+                        } label: {
+                            Label("导入", systemImage: "square.and.arrow.down")
+                        }
+                        .help("从 JSON 或 Markdown 文件导入消息")
                         
 #if DEBUG
                         Button {
@@ -106,6 +138,50 @@ struct WechatChatDetailView: View {
                         Task { await listViewModel.addScreenshots(to: contact.contactId, urls: urls) }
                     case .failure(let error):
                         listViewModel.errorMessage = error.localizedDescription
+                    }
+                }
+                // 导入文件选择器
+                .fileImporter(
+                    isPresented: $showImportFilePicker,
+                    allowedContentTypes: [.json, UTType(filenameExtension: "md") ?? .plainText],
+                    allowsMultipleSelection: false
+                ) { result in
+                    switch result {
+                    case .success(let urls):
+                        guard let url = urls.first else { return }
+                        Task {
+                            do {
+                                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
+                            } catch {
+                                listViewModel.errorMessage = error.localizedDescription
+                            }
+                        }
+                    case .failure(let error):
+                        listViewModel.errorMessage = error.localizedDescription
+                    }
+                }
+                // 导出文件保存器
+                .fileExporter(
+                    isPresented: $showExportFileSaver,
+                    document: WechatExportDocument(content: exportContent, format: exportFormat),
+                    contentType: exportFormat.utType,
+                    defaultFilename: listViewModel.generateExportFileName(for: contact.contactId, format: exportFormat)
+                ) { result in
+                    switch result {
+                    case .success(let url):
+                        DIContainer.shared.loggerService.info("[WechatChat] Exported to: \(url.path)")
+                    case .failure(let error):
+                        listViewModel.errorMessage = error.localizedDescription
+                    }
+                }
+                // 拖拽功能
+                .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+                    handleDrop(providers, for: contact)
+                    return true
+                }
+                .overlay {
+                    if isDragTargeted {
+                        dropTargetOverlay
                     }
                 }
         } else {
@@ -345,6 +421,131 @@ struct WechatChatDetailView: View {
             kind: kind,
             for: contact.contactId
         )
+    }
+
+    // MARK: - Export Helper
+    
+    private func prepareExport(for contact: WechatBookListItem, format: WechatExportFormat) {
+        exportFormat = format
+        
+        // 异步加载全部消息后导出
+        Task {
+            if let content = await listViewModel.exportAllMessages(contact.contactId, format: format) {
+                exportContent = content
+                showExportFileSaver = true
+            }
+        }
+    }
+    
+    // MARK: - Drag & Drop
+    
+    private var dropTargetOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+            
+            VStack(spacing: 12) {
+                Image(systemName: "arrow.down.doc.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.white)
+                
+                Text("拖放文件到此处")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Text("支持: 图片 (OCR), JSON, Markdown")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.accentColor.opacity(0.9))
+            )
+        }
+        .allowsHitTesting(false)
+    }
+    
+    private func handleDrop(_ providers: [NSItemProvider], for contact: WechatBookListItem) {
+        for provider in providers {
+            // 优先处理文件 URL
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                    guard let data = item as? Data,
+                          let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                        return
+                    }
+                    
+                    Task { @MainActor in
+                        await handleDroppedFile(url, for: contact)
+                    }
+                }
+            }
+            // 处理直接拖入的图片（非文件 URL）
+            else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
+                    guard let data = data,
+                          let image = NSImage(data: data) else {
+                        return
+                    }
+                    
+                    Task { @MainActor in
+                        await handleDroppedImage(image, for: contact)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func handleDroppedFile(_ url: URL, for contact: WechatBookListItem) async {
+        let fileExtension = url.pathExtension.lowercased()
+        
+        switch fileExtension {
+        case "json", "md", "markdown":
+            // 导入 JSON 或 Markdown 文件
+            do {
+                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
+            } catch {
+                listViewModel.errorMessage = error.localizedDescription
+            }
+            
+        case "png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp":
+            // 图片文件 → OCR 识别
+            guard ocrConfigStore.isConfigured else {
+                listViewModel.errorMessage = "请先配置 OCR 服务"
+                return
+            }
+            await listViewModel.addScreenshots(to: contact.contactId, urls: [url])
+            
+        default:
+            listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
+        }
+    }
+    
+    private func handleDroppedImage(_ image: NSImage, for contact: WechatBookListItem) async {
+        guard ocrConfigStore.isConfigured else {
+            listViewModel.errorMessage = "请先配置 OCR 服务"
+            return
+        }
+        
+        // 保存临时文件后调用 OCR
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
+        
+        guard let tiffData = image.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+            listViewModel.errorMessage = "无法处理拖入的图片"
+            return
+        }
+        
+        do {
+            try pngData.write(to: tempURL)
+            await listViewModel.addScreenshots(to: contact.contactId, urls: [tempURL])
+            try? FileManager.default.removeItem(at: tempURL)
+        } catch {
+            listViewModel.errorMessage = "保存临时图片失败: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Empty States
@@ -721,6 +922,35 @@ private struct SystemMessageRow: View {
             )
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Export Document
+
+/// 用于 fileExporter 的文档类型
+struct WechatExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json, .plainText] }
+    
+    let content: String
+    let format: WechatExportFormat
+    
+    init(content: String, format: WechatExportFormat) {
+        self.content = content
+        self.format = format
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            content = String(data: data, encoding: .utf8) ?? ""
+        } else {
+            content = ""
+        }
+        format = .json
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let data = content.data(using: .utf8) ?? Data()
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 
