@@ -164,7 +164,10 @@ enum WechatChatImporter {
                 finalContent = content.replacingOccurrences(of: "📋 [Card]", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
             } else if content.contains("📋") && content.contains("[卡片]") {
                 kind = .card
-                finalContent = content.replacingOccurrences(of: "📋 *[卡片]*", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                finalContent = content
+                    .replacingOccurrences(of: "📋 [卡片]", with: "")
+                    .replacingOccurrences(of: "📋 *[卡片]*", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
                 kind = .text
                 finalContent = content
