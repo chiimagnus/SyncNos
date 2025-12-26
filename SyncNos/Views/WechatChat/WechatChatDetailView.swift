@@ -586,13 +586,9 @@ struct WechatChatDetailView: View {
             // 处理直接拖入的图片（非文件 URL）
             else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                 provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
-                    guard let data = data,
-                          let image = NSImage(data: data) else {
-                        return
-                    }
-                    
+                    guard let data else { return }
                     Task { @MainActor in
-                        await handleDroppedImage(image, for: contact)
+                        await handleDroppedImageData(data, for: contact)
                     }
                 }
             }
@@ -629,31 +625,14 @@ struct WechatChatDetailView: View {
         listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
     }
     
-    private func handleDroppedImage(_ image: NSImage, for contact: WechatBookListItem) async {
+    private func handleDroppedImageData(_ data: Data, for contact: WechatBookListItem) async {
         guard ocrConfigStore.isConfigured else {
             listViewModel.errorMessage = "请先配置 OCR 服务"
             return
         }
         
-        // 保存临时文件后调用 OCR
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("png")
-        
-        guard let tiffData = image.tiffRepresentation,
-              let bitmapRep = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-            listViewModel.errorMessage = "无法处理拖入的图片"
-            return
-        }
-        
-        do {
-            try pngData.write(to: tempURL)
-            await listViewModel.addScreenshots(to: contact.contactId, urls: [tempURL])
-            try? FileManager.default.removeItem(at: tempURL)
-        } catch {
-            listViewModel.errorMessage = "保存临时图片失败: \(error.localizedDescription)"
-        }
+        // 直接走内存数据导入路径：无需落盘临时文件
+        await listViewModel.addScreenshotData(to: contact.contactId, imageDatas: [data])
     }
 
     // MARK: - Empty States
