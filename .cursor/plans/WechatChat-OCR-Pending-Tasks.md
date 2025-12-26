@@ -70,15 +70,7 @@
   - `ViewModels/WechatChat/WechatChatViewModel.swift`
   - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`
 
-### 2. Debug Overlay ❌
-- **状态**：🚫 已撤回（2025-12-24）
-- **备注**：当前阶段不需要此功能
-
----
-
-## 四、待实现功能
-
-### 1. 🔐 聊天记录本地存储加密 ✅
+### 2. 🔐 聊天记录本地存储加密 ✅
 - **状态**：✅ 已实现（2025-12-25）
 - **方案**：CryptoKit AES-GCM + Keychain 存储密钥（Apple 官方推荐）
 - **加密范围**：消息内容、发送者昵称、对话名称
@@ -93,7 +85,45 @@
   - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`（修改）
 - **详细计划**：`.cursor/plans/WechatChat-本地存储加密计划.md`
 
-### 2. 解析日志详细输出
+### 3. 分页加载 ✅
+- **状态**：✅ 已实现（2025-12-26）
+- **功能描述**：
+  - 消息列表分页加载，每页 50 条
+  - 支持"加载更多"按钮和滚动触发加载
+  - 优化大量消息（2000+）的性能
+- **相关文件**：
+  - `ViewModels/WechatChat/WechatChatViewModel.swift`（添加分页状态管理）
+  - `Views/WechatChat/WechatChatDetailView.swift`（添加加载更多 UI）
+  - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`（添加分页查询方法）
+- **详细计划**：`.cursor/plans/WechatChat-分页加载实现计划.md`
+
+### 4. 导入导出功能 ✅
+- **状态**：✅ 已实现（2025-12-26）
+- **功能描述**：
+  - **导出**：支持 JSON 和 Markdown 格式
+  - **导入**：支持从 JSON 和 Markdown 文件导入对话
+  - **拖拽**：支持拖拽图片（触发 OCR）和 JSON/MD 文件（触发导入）
+  - **UI**：统一的 Import/Export 菜单
+- **Markdown 格式规范**：
+  - 发送者使用 `# Name`
+  - 系统消息使用 `# System`
+  - "我" 统一使用 `Me`
+- **相关文件**：
+  - `Services/DataSources-From/WechatChat/WechatChatExporter.swift`（新增）
+  - `Services/DataSources-From/WechatChat/WechatChatImporter.swift`（新增）
+  - `ViewModels/WechatChat/WechatChatViewModel.swift`（添加导入导出方法）
+  - `Views/WechatChat/WechatChatDetailView.swift`（添加菜单和拖拽支持）
+- **详细计划**：`.cursor/plans/WechatChat-导入导出功能实现计划.md`
+
+### 5. Debug Overlay ❌
+- **状态**：🚫 已撤回（2025-12-24）
+- **备注**：当前阶段不需要此功能
+
+---
+
+## 四、待实现功能
+
+### 1. 解析日志详细输出
 - **状态**：⏸️ 待实现
 - **技术文档描述**：
   - 每张截图输出：输入 blocks 数、过滤后 blocks 数、候选消息数、左/右消息数
@@ -125,6 +155,8 @@
 | 优先级 | 功能 | 状态 | 理由 |
 |--------|------|------|------|
 | P1 | 本地存储加密 | ✅ 已完成 | 隐私保护需求明确 |
+| P1 | 分页加载 | ✅ 已完成 | 性能优化必需 |
+| P1 | 导入导出 | ✅ 已完成 | 数据备份和迁移 |
 | P2 | 截图拼接 | ⏸️ | 提升用户体验 |
 | P3 | 解析日志 | ⏸️ | 排障辅助 |
 | P3 | Notion 同步 | ⏸️ | 取决于产品规划 |
