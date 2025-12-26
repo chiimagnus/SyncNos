@@ -9,30 +9,24 @@ struct WechatChatSystemMessageRow: View {
     private let selectedBorderColor = Color.accentColor
 
     var body: some View {
-        Text(message.content)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+        WechatChatSelectableTextView(
+            text: message.content,
+            isFromMe: message.isFromMe,
+            kind: message.kind,
+            style: .system(),
+            onSelect: onTap,
+            onClassify: onClassify
+        )
             .background(Color.secondary.opacity(0.10))
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(selectedBorderColor, lineWidth: 2)
                     .opacity(isSelected ? 1 : 0)
+                    .allowsHitTesting(false)
             )
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
-            .contentShape(Rectangle())
-            .onTapGesture { onTap() }
-            .contextMenu {
-                WechatChatClassificationMenu(
-                    copyText: message.content,
-                    isFromMe: message.isFromMe,
-                    kind: message.kind,
-                    onClassify: onClassify
-                )
-            }
     }
 }
 
