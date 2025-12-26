@@ -315,6 +315,132 @@ final class WechatChatViewModel: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
+    
+    // MARK: - Export (导出)
+    
+    /// 导出对话为指定格式
+    /// - Parameters:
+    ///   - contactId: 对话 ID
+    ///   - format: 导出格式
+    /// - Returns: 导出的字符串内容
+    func exportConversation(_ contactId: UUID, format: WechatExportFormat) -> String? {
+        // 优先使用分页加载的消息（用户当前看到的数据）
+        let messages = paginationStates[contactId]?.loadedMessages ?? conversations[contactId]?.messages ?? []
+        guard !messages.isEmpty else { return nil }
+        
+        let contactName = conversations[contactId]?.contact.name ?? "Unknown"
+        return WechatChatExporter.export(messages: messages, contactName: contactName, format: format)
+    }
+    
+    /// 导出所有消息（需要先加载全部消息）
+    func exportAllMessages(_ contactId: UUID, format: WechatExportFormat) async -> String? {
+        // 加载全部消息
+        do {
+            let allMessages = try await cacheService.fetchAllMessages(conversationId: contactId.uuidString)
+            let contactName = conversations[contactId]?.contact.name ?? "Unknown"
+            return WechatChatExporter.export(messages: allMessages, contactName: contactName, format: format)
+        } catch {
+            logger.error("[WechatChatV2] Failed to fetch all messages for export: \(error)")
+            errorMessage = "导出失败: \(error.localizedDescription)"
+            return nil
+        }
+    }
+    
+    /// 生成导出文件名
+    func generateExportFileName(for contactId: UUID, format: WechatExportFormat) -> String {
+        let contactName = conversations[contactId]?.contact.name ?? "Chat"
+        return WechatChatExporter.generateFileName(contactName: contactName, format: format)
+    }
+    
+    // MARK: - Import (导入)
+    
+    /// 从文件导入对话
+    /// - Parameters:
+    ///   - url: 文件 URL
+    ///   - appendTo: 如果提供，则追加到现有对话；否则创建新对话
+    /// - Returns: 导入的对话 ID
+    @discardableResult
+    func importConversation(from url: URL, appendTo existingContactId: UUID? = nil) async throws -> UUID {
+        // 获取文件访问权限
+        guard url.startAccessingSecurityScopedResource() else {
+            throw WechatImportError.fileReadError("无法访问文件")
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        
+        let result = try WechatChatImporter.importFromFile(url: url)
+        
+        let contactId: UUID
+        
+        if let existingId = existingContactId, conversations[existingId] != nil {
+            // 追加到现有对话
+            contactId = existingId
+            
+            // 调整 order
+            let adjustedMessages = adjustOrders(result.messages, for: existingId)
+            
+            // 更新内存
+            if var conversation = conversations[existingId] {
+                conversation.messages.append(contentsOf: adjustedMessages)
+                conversations[existingId] = conversation
+            }
+            
+            // 更新分页状态
+            if var state = paginationStates[existingId] {
+                state.loadedMessages.append(contentsOf: adjustedMessages)
+                state.totalCount += adjustedMessages.count
+                paginationStates[existingId] = state
+            }
+            
+            // 保存到缓存
+            try await saveImportedMessages(adjustedMessages, to: existingId)
+            
+            updateContactsList()
+            
+            logger.info("[WechatChatV2] Imported \(adjustedMessages.count) messages to existing conversation")
+        } else {
+            // 创建新对话
+            let contact = WechatContact(name: result.contactName)
+            let conversation = WechatConversation(contact: contact, messages: result.messages)
+            conversations[contact.id] = conversation
+            contactId = contact.id
+            
+            // 初始化分页状态
+            var state = WechatChatPaginationState()
+            state.loadedMessages = result.messages
+            state.totalCount = result.messages.count
+            state.hasInitiallyLoaded = true
+            paginationStates[contact.id] = state
+            
+            // 保存对话和消息
+            try await cacheService.saveConversation(contact)
+            try await saveImportedMessages(result.messages, to: contact.id)
+            
+            updateContactsList()
+            
+            logger.info("[WechatChatV2] Imported new conversation '\(result.contactName)' with \(result.messages.count) messages")
+        }
+        
+        return contactId
+    }
+    
+    /// 保存导入的消息到缓存
+    private func saveImportedMessages(_ messages: [WechatMessage], to contactId: UUID) async throws {
+        // 使用虚拟截图 ID 保存导入的消息
+        let screenshotId = UUID()
+        
+        try await cacheService.appendScreenshot(
+            conversationId: contactId.uuidString,
+            screenshotId: screenshotId.uuidString,
+            importedAt: Date(),
+            imageSize: .zero,  // 导入的消息无原始图片
+            ocrEngine: "Import",
+            ocrRequestJSON: nil,
+            ocrResponseJSON: Data("{}".utf8),
+            normalizedBlocksJSON: Data("[]".utf8),
+            parsedAt: Date(),
+            messages: messages
+        )
+    }
 
     func renameConversation(_ contactId: UUID, newName: String) {
         guard var conversation = conversations[contactId] else { return }

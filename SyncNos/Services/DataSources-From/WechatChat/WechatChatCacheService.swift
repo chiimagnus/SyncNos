@@ -50,6 +50,9 @@ protocol WechatChatCacheServiceProtocol: Actor {
     // 消息读取（全量，保留兼容）
     func fetchMessages(conversationId: String) throws -> [WechatMessage]
     
+    // 消息读取（全量，按 order 升序，用于导出）
+    func fetchAllMessages(conversationId: String) throws -> [WechatMessage]
+    
     // 消息分页读取（倒序分页：从最新消息开始）
     /// - Parameters:
     ///   - conversationId: 对话 ID
@@ -239,6 +242,21 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         // 反转结果为正序（order ASC），符合聊天界面展示习惯
         let messages = cached.reversed().map { $0.toWechatMessage() }
         return Array(messages)
+    }
+    
+    func fetchAllMessages(conversationId: String) throws -> [WechatMessage] {
+        let targetId = conversationId
+        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+            msg.conversationId == targetId
+        }
+        
+        let descriptor = FetchDescriptor<CachedWechatMessageV2>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.order, order: .forward)]
+        )
+        
+        let cached = try modelContext.fetch(descriptor)
+        return cached.map { $0.toWechatMessage() }
     }
     
     func fetchMessageCount(conversationId: String) throws -> Int {
