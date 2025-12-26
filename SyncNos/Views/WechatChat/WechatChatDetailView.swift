@@ -12,7 +12,6 @@ struct WechatChatDetailView: View {
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
 
-    @State private var showImportFilePicker = false
     @State private var showOCRPayloadSheet = false
     @State private var showExportSavePanel = false
     @State private var exportDocument: WechatExportDocument?
@@ -90,7 +89,7 @@ struct WechatChatDetailView: View {
                             }
                             
                             Button {
-                                showImportFilePicker = true
+                                openImportFilePicker(for: contact)
                             } label: {
                                 Label("Import from JSON/Markdown", systemImage: "square.and.arrow.down")
                             }
@@ -134,26 +133,6 @@ struct WechatChatDetailView: View {
                     WechatChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
                 }
 #endif
-                // 导入 JSON/Markdown 文件选择器
-                .fileImporter(
-                    isPresented: $showImportFilePicker,
-                    allowedContentTypes: [.json, UTType(filenameExtension: "md") ?? .plainText],
-                    allowsMultipleSelection: false
-                ) { result in
-                    switch result {
-                    case .success(let urls):
-                        guard let url = urls.first else { return }
-                        Task {
-                            do {
-                                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
-                            } catch {
-                                listViewModel.errorMessage = error.localizedDescription
-                            }
-                        }
-                    case .failure(let error):
-                        listViewModel.errorMessage = error.localizedDescription
-                    }
-                }
             // 导出文件保存器
             .fileExporter(
                 isPresented: $showExportSavePanel,
@@ -455,6 +434,35 @@ struct WechatChatDetailView: View {
                 let urls = panel.urls
                 DIContainer.shared.loggerService.info("[WechatChat] Selected \(urls.count) images for OCR")
                 await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
+            }
+        }
+    }
+    
+    // MARK: - Import File Picker (NSOpenPanel)
+    
+    /// 使用 NSOpenPanel 打开 JSON/Markdown 导入文件选择器
+    /// - 目的：避免 SwiftUI `.fileImporter` 在 `Menu` 场景下偶发不弹出的问题
+    private func openImportFilePicker(for contact: WechatBookListItem) {
+        Task { @MainActor in
+            guard !listViewModel.isLoading else { return }
+            
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            panel.canChooseFiles = true
+            
+            let markdownType = UTType(filenameExtension: "md") ?? .plainText
+            panel.allowedContentTypes = [.json, markdownType]
+            panel.message = String(localized: "选择要导入的文件", comment: "Open panel message")
+            panel.prompt = String(localized: "导入", comment: "Open panel button")
+            
+            let response = await panel.begin()
+            guard response == .OK, let url = panel.urls.first else { return }
+            
+            do {
+                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
+            } catch {
+                listViewModel.errorMessage = error.localizedDescription
             }
         }
     }
