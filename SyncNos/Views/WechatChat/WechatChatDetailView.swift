@@ -296,6 +296,18 @@ struct WechatChatDetailView: View {
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
                 }
+                // 监听来自 MainListView 的消息导航通知
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatNavigateMessage")).receive(on: DispatchQueue.main)) { notification in
+                    guard let userInfo = notification.userInfo,
+                          let direction = userInfo["direction"] as? String else { return }
+                    navigateMessage(direction: direction == "up" ? .up : .down, proxy: proxy)
+                }
+                // 监听来自 MainListView 的分类切换通知
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatCycleClassification")).receive(on: DispatchQueue.main)) { notification in
+                    guard let userInfo = notification.userInfo,
+                          let direction = userInfo["direction"] as? String else { return }
+                    cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
+                }
             }
         }
     }
@@ -324,11 +336,107 @@ struct WechatChatDetailView: View {
         }
     }
     
-    // MARK: - Helpers
+    // MARK: - Keyboard Navigation
+    
+    private enum NavigationDirection {
+        case up, down
+    }
+    
+    private enum ClassificationDirection {
+        case left, right
+    }
     
     /// 生成复合 ID，用于 ScrollViewReader 导航和视图标识
     private func compositeId(for message: WechatMessage) -> String {
         "\(message.id.uuidString)-\(message.kind.rawValue)"
+    }
+    
+    /// 消息分类状态（用于循环切换）
+    private enum MessageClassification {
+        case other   // 对方消息：isFromMe = false, kind != .system
+        case system  // 系统消息：kind == .system
+        case me      // 我的消息：isFromMe = true, kind != .system
+        
+        init(from message: WechatMessage) {
+            if message.kind == .system {
+                self = .system
+            } else if message.isFromMe {
+                self = .me
+            } else {
+                self = .other
+            }
+        }
+        
+        var isFromMe: Bool {
+            switch self {
+            case .me: return true
+            case .other, .system: return false
+            }
+        }
+        
+        var kind: WechatMessageKind {
+            switch self {
+            case .system: return .system
+            case .me, .other: return .text
+            }
+        }
+        
+        func next(direction: ClassificationDirection) -> MessageClassification {
+            switch (direction, self) {
+            case (.right, .other): return .system
+            case (.right, .system): return .me
+            case (.right, .me): return .other
+            case (.left, .other): return .me
+            case (.left, .system): return .other
+            case (.left, .me): return .system
+            }
+        }
+    }
+    
+    private func navigateMessage(direction: NavigationDirection, proxy: ScrollViewProxy) {
+        guard !messages.isEmpty else { return }
+        
+        if let currentId = selectedMessageId,
+           let currentIndex = messages.firstIndex(where: { $0.id == currentId }) {
+            let newIndex: Int
+            switch direction {
+            case .up:
+                // 顶部不回绕
+                newIndex = max(0, currentIndex - 1)
+            case .down:
+                // 底部不回绕
+                newIndex = min(messages.count - 1, currentIndex + 1)
+            }
+            // 到边界就不再滚动/跳转
+            guard newIndex != currentIndex else { return }
+            let newMessage = messages[newIndex]
+            selectedMessageId = newMessage.id
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(compositeId(for: newMessage), anchor: .center)
+            }
+        } else {
+            // 无选中时：从底部（最新消息）开始
+            let message = messages.last
+            selectedMessageId = message?.id
+            if let message {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(compositeId(for: message), anchor: .center)
+                }
+            }
+        }
+    }
+    
+    private func cycleClassification(direction: ClassificationDirection, for contact: WechatBookListItem) {
+        guard let messageId = selectedMessageId,
+              let message = messages.first(where: { $0.id == messageId }) else { return }
+        
+        let current = MessageClassification(from: message)
+        let next = current.next(direction: direction)
+        
+        // 延迟到下一个事件循环，避免在视图更新中发布变更
+        Task { @MainActor in
+            handleClassification(message, isFromMe: next.isFromMe, kind: next.kind, for: contact)
+        }
     }
     
     private func handleClassification(
