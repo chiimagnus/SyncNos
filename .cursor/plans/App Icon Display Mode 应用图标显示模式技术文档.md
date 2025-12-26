@@ -6,9 +6,9 @@ SyncNos 支持三种应用图标显示模式，允许用户自定义应用在系
 
 | 模式 | 说明 | Dock 显示 | 菜单栏显示 |
 |------|------|-----------|------------|
+| **In the Menu Bar and Dock** | 同时显示（默认） | ✅ | ✅ |
 | **In the Menu Bar** | 仅在菜单栏显示 | ❌ | ✅ |
 | **In the Dock** | 仅在 Dock 显示 | ✅ | ❌ |
-| **In the Menu Bar and Dock** | 同时显示（默认） | ✅ | ✅ |
 
 ## 架构设计
 
@@ -32,9 +32,9 @@ SyncNos/
 
 ```swift
 enum AppIconDisplayMode: Int, CaseIterable, Identifiable {
-    case menuBarOnly = 0  // 仅菜单栏
-    case dockOnly = 1     // 仅 Dock
-    case both = 2         // 两者都显示（默认）
+    case both = 0         // 两者都显示（默认）
+    case menuBarOnly = 1  // 仅菜单栏
+    case dockOnly = 2     // 仅 Dock
     
     var showsMenuBarIcon: Bool { ... }  // 是否显示菜单栏图标
     var showsDockIcon: Bool { ... }     // 是否显示 Dock 图标
@@ -45,6 +45,8 @@ enum AppIconDisplayMode: Int, CaseIterable, Identifiable {
 ```
 
 **存储**：使用 `UserDefaults` 键 `appIconDisplayMode` 持久化。
+
+**默认值**：`0`（`.both`），确保新用户默认同时在菜单栏和 Dock 显示。由于 `UserDefaults.integer(forKey:)` 对未设置的键返回 `0`，将 `.both` 设为 `rawValue = 0` 可自然实现默认值。
 
 #### 2. AppIconDisplayViewModel（视图模型）
 
@@ -68,7 +70,7 @@ final class AppIconDisplayViewModel: ObservableObject {
 ```swift
 @main
 struct SyncNosApp: App {
-    @AppStorage("appIconDisplayMode") private var iconDisplayModeRaw: Int = 2
+    @AppStorage("appIconDisplayMode") private var iconDisplayModeRaw: Int = 0
     
     private var menuBarIconInserted: Binding<Bool> { ... }  // 动态控制
     
@@ -111,6 +113,26 @@ SwiftUI 的 `MenuBarExtra` 支持 `isInserted: Binding<Bool>` 参数：
 - `false`：菜单栏图标隐藏
 
 用户也可以从系统菜单栏手动移除图标，此时 Binding 会被设为 `false`。
+
+### 模式切换的平滑过渡
+
+从 `.accessory` 切换到 `.regular` 模式时需要特别处理：
+
+```swift
+if currentPolicy == .accessory && newPolicy == .regular {
+    DispatchQueue.main.async {
+        app.setActivationPolicy(newPolicy)
+        app.activate(ignoringOtherApps: true)
+        
+        // 确保主窗口可见
+        if let mainWindow = app.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+            mainWindow.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+```
+
+**原因**：直接切换可能导致应用无法正确激活，需要延迟执行并显式激活应用。
 
 ### 数据流
 
@@ -167,10 +189,20 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 set: { newValue in
     if !newValue {
         iconDisplayModeRaw = AppIconDisplayMode.dockOnly.rawValue
-        AppIconDisplayViewModel.applyStoredMode()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            AppIconDisplayViewModel.applyStoredMode()
+        }
     }
 }
 ```
+
+**注意**：使用 `asyncAfter` 延迟执行以避免 UI 更新冲突。
+
+### 4. 默认值设计
+
+枚举 rawValue 设计：
+- `.both = 0`：确保 `UserDefaults.integer(forKey:)` 返回的默认值 `0` 对应正确的默认模式
+- 这避免了需要额外注册默认值的代码
 
 ## 国际化
 
@@ -179,16 +211,17 @@ set: { newValue in
 | 键 | 英文 | 中文 |
 |----|------|------|
 | `Display SyncNos icon` | Display SyncNos icon | 显示 SyncNos 图标 |
+| `In the Menu Bar and Dock` | In the Menu Bar and Dock | 在菜单栏和 Dock 中 |
 | `In the Menu Bar` | In the Menu Bar | 在菜单栏中 |
 | `In the Dock` | In the Dock | 在 Dock 中 |
-| `In the Menu Bar and Dock` | In the Menu Bar and Dock | 在菜单栏和 Dock 中 |
 
 ## 测试要点
 
-1. **启动测试**：验证应用启动时正确加载保存的设置
+1. **启动测试**：验证新安装的应用默认显示模式为 "In the Menu Bar and Dock"
 2. **切换测试**：验证三种模式切换时 Dock 和菜单栏图标的显示/隐藏
 3. **持久化测试**：验证设置在应用重启后保持
-4. **边界情况**：验证用户手动从菜单栏移除图标时的行为
+4. **平滑过渡测试**：验证从菜单栏模式切换到 Dock 模式时不会崩溃
+5. **边界情况**：验证用户手动从菜单栏移除图标时的行为
 
 ## 相关 API 参考
 
