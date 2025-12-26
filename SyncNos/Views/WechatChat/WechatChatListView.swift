@@ -77,14 +77,6 @@ struct WechatChatListView: View {
                 ContactRow(contact: contact)
                     .tag(contact.id)
                     .contextMenu {
-                        Button {
-                            viewModel.copyToClipboard(for: contact.contactId)
-                        } label: {
-                            Label("复制聊天记录", systemImage: "doc.on.doc")
-                        }
-                        
-                        Divider()
-                        
                         Button(role: .destructive) {
                             viewModel.deleteContact(contact)
                         } label: {
