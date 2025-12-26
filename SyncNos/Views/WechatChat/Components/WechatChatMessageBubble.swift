@@ -20,7 +20,7 @@ struct WechatChatMessageBubble: View {
             VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 4) {
                 if let name = message.senderName, !message.isFromMe {
                     Text(name)
-                        .font(.caption2)
+                        .scaledFont(.caption2)
                         .foregroundColor(Color(red: 0.34, green: 0.42, blue: 0.58)) // #576B95 微信蓝
                 }
 
@@ -36,6 +36,7 @@ struct WechatChatMessageBubble: View {
     private var bubbleBody: some View {
         Text(messageContent)
             .foregroundStyle(.black)
+            .scaledFont(.body)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

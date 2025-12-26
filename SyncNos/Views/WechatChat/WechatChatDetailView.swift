@@ -261,7 +261,7 @@ struct WechatChatDetailView: View {
                 VStack {
                     ProgressView()
                     Text("加载中...")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -310,14 +310,14 @@ struct WechatChatDetailView: View {
                                     ProgressView()
                                         .scaleEffect(0.7)
                                     Text("加载更多...")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
                                     Button {
                                         loadMoreAndPreservePosition(for: contact, proxy: proxy)
                                     } label: {
                                         Text("加载更早的消息")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundColor(.accentColor)
                                     }
                                     .buttonStyle(.plain)
@@ -549,15 +549,15 @@ struct WechatChatDetailView: View {
     private var dropTargetOverlay: some View {
             VStack(spacing: 12) {
                 Image(systemName: "arrow.down.doc.fill")
-                    .font(.system(size: 48))
+                    .font(.system(size: 48 * fontScaleManager.scaleFactor))
                     .foregroundColor(.white)
                 
                 Text("拖放文件到此处")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundColor(.white)
                 
                 Text("支持: 图片 (OCR), JSON, Markdown")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundColor(.white.opacity(0.8))
             }
             .padding(32)
@@ -640,15 +640,15 @@ struct WechatChatDetailView: View {
     private func emptyMessagesView(contact: WechatBookListItem) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 40))
+                .font(.system(size: 40 * fontScaleManager.scaleFactor))
                 .foregroundColor(.secondary)
 
             Text("暂无消息")
-                .font(.headline)
+                .scaledFont(.headline)
                 .foregroundColor(.secondary)
 
             Text("点击上方「导入截图」添加聊天记录")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundColor(.secondary)
 
             Button {
@@ -674,7 +674,7 @@ struct WechatChatDetailView: View {
     private var emptySelectionView: some View {
         VStack(spacing: 16) {
             Image(systemName: "message.fill")
-                .font(.system(size: 48))
+                .font(.system(size: 48 * fontScaleManager.scaleFactor))
                 .foregroundColor(.secondary)
             Text("选择一个对话")
                 .scaledFont(.title3)

@@ -10,7 +10,7 @@ struct WechatChatSystemMessageRow: View {
 
     var body: some View {
         Text(message.content)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
