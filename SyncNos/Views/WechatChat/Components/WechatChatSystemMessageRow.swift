@@ -12,7 +12,6 @@ struct WechatChatSystemMessageRow: View {
         Text(message.content)
             .font(.caption)
             .foregroundStyle(.secondary)
-            .textSelection(.enabled)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(Color.secondary.opacity(0.10))
@@ -28,6 +27,7 @@ struct WechatChatSystemMessageRow: View {
             .onTapGesture { onTap() }
             .contextMenu {
                 WechatChatClassificationMenu(
+                    copyText: message.content,
                     isFromMe: message.isFromMe,
                     kind: message.kind,
                     onClassify: onClassify
