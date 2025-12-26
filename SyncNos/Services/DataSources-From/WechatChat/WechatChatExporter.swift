@@ -1,0 +1,243 @@
+import Foundation
+import UniformTypeIdentifiers
+
+// MARK: - Export Format
+
+/// 微信聊天记录导出格式
+enum WechatExportFormat: String, CaseIterable, Identifiable {
+    case json = "JSON"
+    case markdown = "Markdown"
+    
+    var id: String { rawValue }
+    
+    var fileExtension: String {
+        switch self {
+        case .json: return "json"
+        case .markdown: return "md"
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .json:
+            return String(localized: "JSON Format", comment: "Export format: JSON")
+        case .markdown:
+            return String(localized: "Markdown Format", comment: "Export format: Markdown")
+        }
+    }
+    
+    var utType: UTType {
+        switch self {
+        case .json: return .json
+        case .markdown: return UTType(filenameExtension: "md") ?? .plainText
+        }
+    }
+}
+
+// MARK: - JSON Export Model
+
+/// JSON 导出模型（带版本号，便于后续兼容性处理）
+struct WechatExportJSON: Codable {
+    let version: Int
+    let exportedAt: Date
+    let conversation: WechatExportConversation
+    
+    static let currentVersion = 1
+}
+
+struct WechatExportConversation: Codable {
+    let contactName: String
+    let messageCount: Int
+    let messages: [WechatExportMessage]
+}
+
+struct WechatExportMessage: Codable {
+    let content: String
+    let isFromMe: Bool
+    let kind: String
+    let senderName: String?
+    let order: Int
+}
+
+// MARK: - Exporter
+
+/// 微信聊天记录导出工具
+enum WechatChatExporter {
+    
+    // MARK: - Public Methods
+    
+    /// 导出对话为指定格式
+    /// - Parameters:
+    ///   - conversation: 对话数据
+    ///   - format: 导出格式
+    /// - Returns: 导出的字符串内容
+    static func export(_ conversation: WechatConversation, format: WechatExportFormat) -> String {
+        switch format {
+        case .json:
+            return exportAsJSON(conversation)
+        case .markdown:
+            return exportAsMarkdown(conversation)
+        }
+    }
+    
+    /// 从消息数组导出（用于分页加载场景）
+    /// - Parameters:
+    ///   - messages: 消息数组
+    ///   - contactName: 联系人名称
+    ///   - format: 导出格式
+    /// - Returns: 导出的字符串内容
+    static func export(messages: [WechatMessage], contactName: String, format: WechatExportFormat) -> String {
+        let contact = WechatContact(name: contactName)
+        let conversation = WechatConversation(contact: contact, messages: messages)
+        return export(conversation, format: format)
+    }
+    
+    /// 生成导出文件名
+    /// - Parameters:
+    ///   - contactName: 联系人名称
+    ///   - format: 导出格式
+    /// - Returns: 文件名（含扩展名）
+    static func generateFileName(contactName: String, format: WechatExportFormat) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = dateFormatter.string(from: Date())
+        
+        // 清理文件名中的非法字符
+        let sanitizedName = contactName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+            .replacingOccurrences(of: "*", with: "_")
+            .replacingOccurrences(of: "?", with: "_")
+            .replacingOccurrences(of: "\"", with: "_")
+            .replacingOccurrences(of: "<", with: "_")
+            .replacingOccurrences(of: ">", with: "_")
+            .replacingOccurrences(of: "|", with: "_")
+        
+        return "\(sanitizedName)_\(timestamp).\(format.fileExtension)"
+    }
+    
+    // MARK: - JSON Export
+    
+    private static func exportAsJSON(_ conversation: WechatConversation) -> String {
+        let messages = conversation.messages
+            .sorted(by: { $0.order < $1.order })
+            .map { msg in
+                WechatExportMessage(
+                    content: msg.content,
+                    isFromMe: msg.isFromMe,
+                    kind: msg.kind.rawValue,
+                    senderName: msg.senderName,
+                    order: msg.order
+                )
+            }
+        
+        let exportData = WechatExportJSON(
+            version: WechatExportJSON.currentVersion,
+            exportedAt: Date(),
+            conversation: WechatExportConversation(
+                contactName: conversation.contact.name,
+                messageCount: messages.count,
+                messages: messages
+            )
+        )
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let data = try encoder.encode(exportData)
+            return String(data: data, encoding: .utf8) ?? "{}"
+        } catch {
+            return "{ \"error\": \"Export failed: \(error.localizedDescription)\" }"
+        }
+    }
+    
+    // MARK: - Markdown Export
+    
+    private static func exportAsMarkdown(_ conversation: WechatConversation) -> String {
+        var lines: [String] = []
+        
+        // 标题（对话联系人名称）
+        lines.append("# \(conversation.contact.name)")
+        lines.append("")
+        
+        // 元信息
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        dateFormatter.timeStyle = .short
+        lines.append("> 导出时间: \(dateFormatter.string(from: Date()))")
+        lines.append("> 消息数量: \(conversation.messages.count)")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        
+        // 消息内容
+        var lastSender: String?
+        
+        for message in conversation.messages.sorted(by: { $0.order < $1.order }) {
+            switch message.kind {
+            case .system:
+                // 系统消息：斜体
+                lines.append("*\(message.content)*")
+                lines.append("")
+                lastSender = nil
+                
+            case .image:
+                let sender = formatSender(message, defaultName: conversation.contact.name)
+                if lastSender != sender {
+                    lines.append("# \(sender)")
+                    lastSender = sender
+                }
+                lines.append("📷 *[图片]*")
+                lines.append("")
+                
+            case .voice:
+                let sender = formatSender(message, defaultName: conversation.contact.name)
+                if lastSender != sender {
+                    lines.append("# \(sender)")
+                    lastSender = sender
+                }
+                lines.append("🎤 *[语音]*")
+                lines.append("")
+                
+            case .card:
+                let sender = formatSender(message, defaultName: conversation.contact.name)
+                if lastSender != sender {
+                    lines.append("# \(sender)")
+                    lastSender = sender
+                }
+                lines.append("📋 *[卡片]*")
+                if !message.content.isEmpty {
+                    lines.append(message.content)
+                }
+                lines.append("")
+                
+            case .text:
+                let sender = formatSender(message, defaultName: conversation.contact.name)
+                if lastSender != sender {
+                    lines.append("# \(sender)")
+                    lastSender = sender
+                }
+                lines.append(message.content)
+                lines.append("")
+            }
+        }
+        
+        return lines.joined(separator: "\n")
+    }
+    
+    // MARK: - Helper
+    
+    private static func formatSender(_ message: WechatMessage, defaultName: String) -> String {
+        if message.isFromMe {
+            return "我"
+        } else if let senderName = message.senderName, !senderName.isEmpty {
+            return senderName
+        } else {
+            return defaultName
+        }
+    }
+}
+
