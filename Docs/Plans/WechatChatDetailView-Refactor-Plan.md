@@ -22,7 +22,7 @@
 
 - **右键菜单（已切到 SwiftUI 自定义菜单）**
   - 已禁用系统文本 context menu（不依赖 `NSTextView` / 不使用 `.textSelection(.enabled)` 触发系统菜单）。
-  - 右键只显示我们自定义的 SwiftUI `.contextMenu`，并把常用系统能力（复制/分享/查词/朗读）整合到自定义菜单中。
+  - 右键只显示我们自定义的 SwiftUI `.contextMenu`，并把常用系统能力（复制/分享）整合到自定义菜单中。
   - 代价：不再支持“选区级别”的系统文本菜单能力（如需选区 Look Up/Translate，需要回到 `NSTextView` 方案）。
 
 - **图片处理（NSImage）**
@@ -243,7 +243,7 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 - **P1（调整版）**：在“拆文件/拆职责”的同时，直接把气泡文本从 `NSTextView` 替换为 SwiftUI：
   - `Text(...)` + SwiftUI 绘制气泡
   - 右键菜单使用 SwiftUI `.contextMenu`（禁用系统文本菜单）
-  - 将常用系统能力（Copy/Share/Look Up/Speech）加入自定义菜单，并保留分类项
+  - 将常用系统能力（Copy/Share）加入自定义菜单，并保留分类项
 - **P2（调整版）**：推进 `.fileImporter`，并删除 `NSOpenPanel`（接受可能的稳定性差异；必要时再迭代 UI 触发结构来“做稳”）。
 - **P3**：再考虑 Drag&Drop 图片 data 路径去 AppKit（ImageIO），以及其它小范围收口。
 

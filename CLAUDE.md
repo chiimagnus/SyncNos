@@ -73,7 +73,12 @@ SyncNos/
 │   │   └── DedaoDetailView.swift
 │   ├── WechatChat/              # 微信聊天 OCR 视图
 │   │   ├── WechatChatListView.swift
-│   │   └── WechatChatDetailView.swift
+│   │   ├── WechatChatDetailView.swift
+│   │   └── Components/
+│   │       ├── WechatChatMessageBubble.swift
+│   │       ├── WechatChatSystemMessageRow.swift
+│   │       ├── WechatChatMessageContextMenu.swift
+│   │       └── WechatExportDocument.swift
 │   └── Settings/
 │       ├── General/
 │       │   ├── AboutView.swift
