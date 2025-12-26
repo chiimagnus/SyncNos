@@ -7,7 +7,8 @@ struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     /// 使用 AppStorage 监听图标显示模式变化，自动控制 MenuBarExtra 可见性
-    @AppStorage(AppIconDisplayMode.userDefaultsKey) private var iconDisplayModeRaw: Int = AppIconDisplayMode.both.rawValue
+    /// 默认值为 0（.both），即同时在菜单栏和 Dock 显示
+    @AppStorage(AppIconDisplayMode.userDefaultsKey) private var iconDisplayModeRaw: Int = 0
     
     /// 计算菜单栏图标是否应该显示（Binding 用于 MenuBarExtra isInserted 参数）
     private var menuBarIconInserted: Binding<Bool> {
@@ -17,10 +18,16 @@ struct SyncNosApp: App {
                 return mode.showsMenuBarIcon
             },
             set: { newValue in
-                // 当用户从菜单栏移除图标时，切换到 dockOnly 模式
-                if !newValue {
+                // 只在用户从菜单栏手动移除图标时处理
+                // 如果当前模式已经是 dockOnly，说明是我们主动设置的，不需要再处理
+                let currentMode = AppIconDisplayMode(rawValue: iconDisplayModeRaw) ?? .both
+                if !newValue && currentMode != .dockOnly {
+                    // 用户从菜单栏手动移除了图标，切换到 dockOnly 模式
                     iconDisplayModeRaw = AppIconDisplayMode.dockOnly.rawValue
-                    AppIconDisplayViewModel.applyStoredMode()
+                    // 延迟执行以避免 UI 更新冲突
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        AppIconDisplayViewModel.applyStoredMode()
+                    }
                 }
             }
         )
