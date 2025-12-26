@@ -36,7 +36,6 @@ struct WechatChatMessageBubble: View {
     private var bubbleBody: some View {
         Text(messageContent)
             .foregroundStyle(.black)
-            .textSelection(.enabled)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
@@ -52,6 +51,7 @@ struct WechatChatMessageBubble: View {
             .onTapGesture { onTap() }
             .contextMenu {
                 WechatChatClassificationMenu(
+                    copyText: messageContent,
                     isFromMe: message.isFromMe,
                     kind: message.kind,
                     onClassify: onClassify
