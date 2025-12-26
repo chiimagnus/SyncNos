@@ -437,13 +437,43 @@ extension WechatChatDetailView {
 ### 技术要点
 
 1. **拖拽文件权限处理**
-   - 从 Downloads 等目录拖拽文件时，使用 `Data(contentsOf:)` 直接读取（拖拽授予临时权限）
-   - 保存到 `FileManager.default.temporaryDirectory` 后再处理
-   - 处理完成后清理临时文件
+   - 从 Downloads 等目录拖拽文件时，系统自动授予临时访问权限
+   - 直接使用原始 URL 即可，无需复制到临时目录
+   - 拖拽触发的文件访问不需要调用 `startAccessingSecurityScopedResource()`
 
 2. **Markdown 格式规范**
    - 发送者使用一级标题 `# Name`
    - 系统消息使用 `# System`
    - "我" 统一使用英文 `Me`
    - 特殊消息类型使用 emoji 标识：📷 [Image], 🎤 [Voice], 📋 [Card]
+
+3. **文件选择器实现**
+   - 图片导入（Import Screenshot）使用 AppKit 的 `NSOpenPanel`（更可靠）
+   - JSON/Markdown 导入使用 SwiftUI 的 `.fileImporter`
+   - 导出使用 SwiftUI 的 `.fileExporter`（需要正确配置 `FileDocument`）
+
+4. **App Sandbox 权限**
+   - 需要 `com.apple.security.app-sandbox` 启用沙盒
+   - 需要 `com.apple.security.files.user-selected.read-write` 用于文件对话框
+
+### 踩坑记录
+
+1. **SwiftUI `.fileImporter` 在 Menu 中不可靠**
+   - 问题：在 `Menu` 的 `Button` 中设置 `showFilePicker = true`，但 `.fileImporter` 不弹出
+   - 原因：可能是 SwiftUI 的 bug 或与 Menu 的交互问题
+   - 解决：改用 AppKit 的 `NSOpenPanel.beginSheetModal(for:)` 直接呈现
+
+2. **Menu Button 的 `.disabled()` 修饰符**
+   - 问题：在 `Menu` 内的 `Button` 上使用 `.disabled()` 可能导致按钮完全无法点击
+   - 解决：将条件检查移到按钮的 action 闭包内
+
+3. **FileDocument 的 `writableContentTypes`**
+   - 问题：导出 JSON 结果是 Markdown 格式
+   - 原因：`FileDocument` 需要显式定义 `static var writableContentTypes`
+   - 解决：同时定义 `readableContentTypes` 和 `writableContentTypes`
+
+4. **空状态视图与初始加载的竞争条件**
+   - 问题：消息存在但显示空状态视图
+   - 原因：`hasInitiallyLoaded = false` 且 `isLoading = false` 时误显示空状态
+   - 解决：当 `!hasInitiallyLoaded` 时显示加载视图并触发 `.task { loadInitialMessages }`
 
