@@ -192,8 +192,8 @@ struct WechatChatDetailView: View {
 
     @ViewBuilder
     private func contentView(for contact: WechatBookListItem) -> some View {
-        // 首次加载中状态
-        if !hasInitiallyLoaded && listViewModel.isLoading {
+        // 情况1：首次加载尚未完成 → 显示加载中（并触发加载）
+        if !hasInitiallyLoaded {
             VStack {
                 ProgressView()
                 Text("加载中...")
@@ -201,11 +201,13 @@ struct WechatChatDetailView: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if messages.isEmpty && hasInitiallyLoaded {
-            emptyMessagesView(contact: contact)
+            .task(id: contact.contactId) {
+                await listViewModel.loadInitialMessages(for: contact.contactId)
+            }
+        // 情况2：首次加载完成 + 无消息 → 显示空状态
         } else if messages.isEmpty {
-            // 首次加载未完成且无消息，显示空状态
             emptyMessagesView(contact: contact)
+        // 情况3：有消息 → 显示消息列表
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -301,10 +303,6 @@ struct WechatChatDetailView: View {
                           let direction = userInfo["direction"] as? String else { return }
                     cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
                 }
-            }
-            // 首次进入对话时自动加载初始消息
-            .task(id: contact.contactId) {
-                await listViewModel.loadInitialMessages(for: contact.contactId)
             }
         }
     }
