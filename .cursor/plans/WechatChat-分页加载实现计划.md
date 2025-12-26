@@ -53,7 +53,8 @@ struct WechatChatPaginationConfig {
 │  │  ┌─────────────────────────────────────────────┐     │    │
 │  │  │  LazyVStack                                  │     │    │
 │  │  │  - ForEach(messages) { MessageBubble }       │     │    │
-│  │  │  - 监听 onAppear 检测顶部消息可见            │     │    │
+│  │  │  - LoadMoreIndicator.onAppear 作为触发哨兵    │     │    │
+│  │  │  - prepend 后 scrollTo 锚回旧第一条，保持位置 │     │    │
 │  │  └─────────────────────────────────────────────┘     │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
@@ -188,16 +189,12 @@ func isLoadingMore(for contactId: UUID) -> Bool
 
 3. **滚动到顶部时加载更多**：
 ```swift
-// 在第一条消息上添加 onAppear
-ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-    MessageBubble(...)
+// ✅ 使用顶部 LoadMoreIndicator 作为“单一触发点”（避免按消息 onAppear 造成 prepend 连锁加载）
+if canLoadMore {
+    HStack { ... }
+        .id("loadMoreIndicator")
         .onAppear {
-            // 当第 N 条消息出现时，预加载更多
-            if index < WechatChatPaginationConfig.preloadThreshold {
-                Task {
-                    await listViewModel.loadMoreMessages(for: contactId)
-                }
-            }
+            loadMoreAndPreservePosition(for: contact, proxy: proxy)
         }
 }
 ```
@@ -217,7 +214,26 @@ if listViewModel.isLoadingMore(for: contactId) {
 ```
 
 5. **保持滚动位置**：
-加载更多后，使用 ScrollViewReader 定位到之前的第一条可见消息。
+加载更多是 prepend（更早消息插入数组头部）。如果不做位置保持，用户停在顶部时会立刻看到新插入的消息并持续触发加载，最终一次性把所有历史拉完。
+
+实现方式：在触发加载前记录 prepend 前的第一条消息 ID，加载完成后 `scrollTo` 回该消息（`anchor: .top`），让视口保持在原位置，用户需要继续向上滚动才会再次触发。
+
+```swift
+private func loadMoreAndPreservePosition(for contact: WechatBookListItem, proxy: ScrollViewProxy) {
+    guard viewModel.canLoadMore(for: contact.contactId),
+          !viewModel.isLoadingMore(for: contact.contactId) else { return }
+
+    let anchorId = viewModel.getLoadedMessages(for: contact.contactId).first.map { compositeId(for: $0) }
+
+    Task { @MainActor in
+        await viewModel.loadMoreMessages(for: contact.contactId)
+        guard let anchorId else { return }
+        DispatchQueue.main.async {
+            withAnimation(nil) { proxy.scrollTo(anchorId, anchor: .top) }
+        }
+    }
+}
+```
 
 ### 步骤 4：更新 loadFromCache 逻辑
 
@@ -288,7 +304,7 @@ func loadFromCache() async {
 // 可在 NotionSyncConfig 或单独的配置文件中定义
 enum WechatChatPaginationConfig {
     static let pageSize = 50                    // 每页消息数
-    static let preloadThreshold = 10            // 距离顶部多少条时预加载
+    static let preloadThreshold = 10            // 预留：如需“提前 N 条预加载”可启用（当前实现用顶部哨兵触发）
     static let initialLoadSize = 50             // 首次加载数量
 }
 ```
