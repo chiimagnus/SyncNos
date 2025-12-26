@@ -114,25 +114,29 @@ SwiftUI 的 `MenuBarExtra` 支持 `isInserted: Binding<Bool>` 参数：
 
 用户也可以从系统菜单栏手动移除图标，此时 Binding 会被设为 `false`。
 
-### 模式切换的平滑过渡
+### 模式切换实现
 
-从 `.accessory` 切换到 `.regular` 模式时需要特别处理：
+**核心逻辑**：使用同步方式设置 `activationPolicy`，避免与 SwiftUI 状态更新冲突。
 
 ```swift
-if currentPolicy == .accessory && newPolicy == .regular {
-    DispatchQueue.main.async {
-        app.setActivationPolicy(newPolicy)
+private static func updateActivationPolicyStatic(for mode: AppIconDisplayMode) {
+    guard let app = NSApp else { return }
+    
+    let currentPolicy = app.activationPolicy()
+    let newPolicy: NSApplication.ActivationPolicy = mode == .menuBarOnly ? .accessory : .regular
+    
+    // 如果策略没有变化，直接返回
+    guard currentPolicy != newPolicy else { return }
+    
+    // 同步设置策略
+    app.setActivationPolicy(newPolicy)
+    
+    // 如果从 accessory 切换到 regular，需要激活应用
+    if currentPolicy == .accessory && newPolicy == .regular {
         app.activate(ignoringOtherApps: true)
-        
-        // 确保主窗口可见
-        if let mainWindow = app.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-            mainWindow.makeKeyAndOrderFront(nil)
-        }
     }
 }
 ```
-
-**原因**：直接切换可能导致应用无法正确激活，需要延迟执行并显式激活应用。
 
 ### 数据流
 
@@ -155,23 +159,53 @@ menuBarIconInserted Binding 更新
 MenuBarExtra 显示/隐藏
 ```
 
-## 注意事项
+## 踩坑记录
 
-### 1. NSApp 初始化时机
+### 1. NSApp 在 App.init() 阶段为 nil
+
+**问题**：在 `SyncNosApp.init()` 中调用 `NSApp.setActivationPolicy()` 导致崩溃。
+
+**原因**：SwiftUI App 的 `init()` 在 `NSApplication` 完全初始化之前执行。
+
+**解决**：将调用移至 `AppDelegate.applicationDidFinishLaunching()`。
+
+### 2. 切换到 Dock 模式时应用卡死
+
+**问题**：从 "In the Menu Bar" 切换到 "In the Dock" 时应用无响应。
+
+**原因**：使用 `DispatchQueue.main.async` 包装 `setActivationPolicy()` 调用，可能与 SwiftUI 状态更新形成死锁或竞态条件。
+
+**解决**：改为同步调用，移除异步包装。
+
+### 3. 默认值不正确
+
+**问题**：新安装的应用默认显示模式不是 "In the Menu Bar and Dock"。
+
+**原因**：`UserDefaults.integer(forKey:)` 对未设置的键返回 `0`，但之前 `.menuBarOnly = 0`。
+
+**解决**：重新排列枚举值，使 `.both = 0` 成为默认值。
+
+### 4. Binding setter 重复触发
+
+**问题**：用户选择模式后，Binding setter 可能被重复调用导致冲突。
+
+**原因**：当 `menuBarIconInserted.get()` 返回 `false` 时，SwiftUI 会调用 setter，可能再次触发 `applyStoredMode()`。
+
+**解决**：在 setter 中添加条件检查，避免在模式已经是 `.dockOnly` 时重复处理。
 
 ```swift
-// ❌ 错误：App.init() 中 NSApp 为 nil
-init() {
-    AppIconDisplayViewModel.applyStoredMode()  // 崩溃！
-}
-
-// ✅ 正确：在 AppDelegate.applicationDidFinishLaunching 中调用
-func applicationDidFinishLaunching(_ notification: Notification) {
-    AppIconDisplayViewModel.applyStoredMode()  // NSApp 已初始化
+set: { newValue in
+    let currentMode = AppIconDisplayMode(rawValue: iconDisplayModeRaw) ?? .both
+    // 只在用户从菜单栏手动移除图标时处理
+    if !newValue && currentMode != .dockOnly {
+        // ...
+    }
 }
 ```
 
-### 2. MenuBarExtra 与 activationPolicy 的协调
+## 注意事项
+
+### MenuBarExtra 与 activationPolicy 的协调
 
 当切换到 `.menuBarOnly` 模式时：
 1. `activationPolicy` 设为 `.accessory`（隐藏 Dock）
@@ -181,28 +215,9 @@ func applicationDidFinishLaunching(_ notification: Notification) {
 1. `activationPolicy` 设为 `.regular`（显示 Dock）
 2. `menuBarIconInserted` 设为 `false`（隐藏菜单栏）
 
-### 3. 用户手动移除菜单栏图标
+### 用户手动移除菜单栏图标
 
-如果用户从系统偏好设置或菜单栏手动移除图标，`isInserted` Binding 会被设为 `false`。我们在 setter 中处理这种情况：
-
-```swift
-set: { newValue in
-    if !newValue {
-        iconDisplayModeRaw = AppIconDisplayMode.dockOnly.rawValue
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            AppIconDisplayViewModel.applyStoredMode()
-        }
-    }
-}
-```
-
-**注意**：使用 `asyncAfter` 延迟执行以避免 UI 更新冲突。
-
-### 4. 默认值设计
-
-枚举 rawValue 设计：
-- `.both = 0`：确保 `UserDefaults.integer(forKey:)` 返回的默认值 `0` 对应正确的默认模式
-- 这避免了需要额外注册默认值的代码
+如果用户从系统偏好设置或菜单栏手动移除图标，`isInserted` Binding 会被设为 `false`。我们在 setter 中处理这种情况，自动切换到 `.dockOnly` 模式。
 
 ## 国际化
 
@@ -220,7 +235,7 @@ set: { newValue in
 1. **启动测试**：验证新安装的应用默认显示模式为 "In the Menu Bar and Dock"
 2. **切换测试**：验证三种模式切换时 Dock 和菜单栏图标的显示/隐藏
 3. **持久化测试**：验证设置在应用重启后保持
-4. **平滑过渡测试**：验证从菜单栏模式切换到 Dock 模式时不会崩溃
+4. **无卡死测试**：验证从任意模式切换到任意模式都不会卡死
 5. **边界情况**：验证用户手动从菜单栏移除图标时的行为
 
 ## 相关 API 参考
