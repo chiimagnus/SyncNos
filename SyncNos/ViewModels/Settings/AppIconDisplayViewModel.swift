@@ -66,22 +66,34 @@ final class AppIconDisplayViewModel: ObservableObject {
             return
         }
         
-        let policy: NSApplication.ActivationPolicy
+        let currentPolicy = app.activationPolicy()
+        let newPolicy: NSApplication.ActivationPolicy
         
         switch mode {
         case .menuBarOnly:
             // 仅菜单栏：accessory 模式，不在 Dock 显示
-            policy = .accessory
-        case .dockOnly:
-            // 仅 Dock：regular 模式，在 Dock 显示
-            policy = .regular
-        case .both:
-            // 两者都显示：regular 模式
-            policy = .regular
+            newPolicy = .accessory
+        case .dockOnly, .both:
+            // Dock 显示或两者都显示：regular 模式
+            newPolicy = .regular
         }
         
-        app.setActivationPolicy(policy)
-        DIContainer.shared.loggerService.info("Applied activation policy: \(policy.rawValue) for mode: \(mode)")
+        // 如果策略没有变化，直接返回
+        guard currentPolicy != newPolicy else {
+            DIContainer.shared.loggerService.debug("Activation policy unchanged: \(newPolicy.rawValue)")
+            return
+        }
+        
+        // 统一使用同步方式设置策略
+        // 注意：切换 activationPolicy 可能会导致窗口状态变化
+        app.setActivationPolicy(newPolicy)
+        
+        // 如果从 accessory 切换到 regular，需要激活应用
+        if currentPolicy == .accessory && newPolicy == .regular {
+            app.activate(ignoringOtherApps: true)
+        }
+        
+        DIContainer.shared.loggerService.info("Applied activation policy: \(newPolicy.rawValue) for mode: \(mode)")
     }
 }
 
