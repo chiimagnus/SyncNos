@@ -34,29 +34,24 @@ struct WechatChatMessageBubble: View {
     }
 
     private var bubbleBody: some View {
-        Text(messageContent)
-            .foregroundStyle(.black)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+        WechatChatSelectableTextView(
+            text: messageContent,
+            isFromMe: message.isFromMe,
+            kind: message.kind,
+            style: .bubble(),
+            onSelect: onTap,
+            onClassify: onClassify
+        )
             .background(message.isFromMe ? myBubbleColor : otherBubbleColor)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(selectedBorderColor, lineWidth: 2)
                     .opacity(isSelected ? 1 : 0)
+                    .allowsHitTesting(false)
             )
             .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             .frame(maxWidth: maxBubbleWidth, alignment: message.isFromMe ? .trailing : .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 8))
-            .onTapGesture { onTap() }
-            .contextMenu {
-                WechatChatClassificationMenu(
-                    copyText: messageContent,
-                    isFromMe: message.isFromMe,
-                    kind: message.kind,
-                    onClassify: onClassify
-                )
-            }
     }
 
     private var messageContent: String {
