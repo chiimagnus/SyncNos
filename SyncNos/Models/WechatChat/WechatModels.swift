@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 // MARK: - Wechat Contact (联系人/对话)
 
@@ -6,7 +7,6 @@ import Foundation
 struct WechatContact: Identifiable, Hashable {
     let id: UUID
     let name: String
-    let avatarColor: NSColor
 
     // UI 预览字段（可为空）
     var lastMessage: String?
@@ -22,19 +22,11 @@ struct WechatContact: Identifiable, Hashable {
     ) {
         self.id = id
         self.name = name
-        self.avatarColor = WechatContact.randomAvatarColor()
         self.lastMessage = lastMessage
         self.lastMessageTime = lastMessageTime
         self.messageCount = messageCount
     }
 
-    private static func randomAvatarColor() -> NSColor {
-        let colors: [NSColor] = [
-            .systemBlue, .systemGreen, .systemOrange,
-            .systemPink, .systemPurple, .systemRed, .systemTeal
-        ]
-        return colors.randomElement() ?? .systemBlue
-    }
 }
 
 // MARK: - Wechat Message (V2)
@@ -160,7 +152,6 @@ struct WechatBookListItem: Identifiable {
     let lastMessage: String?
     let lastMessageTime: String?
     let messageCount: Int
-    let avatarColor: NSColor
 
     init(from contact: WechatContact) {
         self.id = contact.id.uuidString
@@ -169,7 +160,6 @@ struct WechatBookListItem: Identifiable {
         self.lastMessage = contact.lastMessage
         self.lastMessageTime = contact.lastMessageTime
         self.messageCount = contact.messageCount
-        self.avatarColor = contact.avatarColor
     }
 }
 
