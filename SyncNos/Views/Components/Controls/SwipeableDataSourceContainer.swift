@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// 可滑动的数据源容器
 /// 包含滑动区域和悬浮底部指示器

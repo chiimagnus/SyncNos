@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct DedaoListView: View {
     @ObservedObject var viewModel: DedaoViewModel

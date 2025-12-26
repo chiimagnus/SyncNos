@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import AppKit
 
 // MARK: - WechatChat Model Container Factory (V2 with Encryption)
 

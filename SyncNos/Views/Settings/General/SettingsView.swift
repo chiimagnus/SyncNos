@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()

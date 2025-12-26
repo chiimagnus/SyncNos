@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct VisualEffectBackground: NSViewRepresentable {
     var material: NSVisualEffectView.Material

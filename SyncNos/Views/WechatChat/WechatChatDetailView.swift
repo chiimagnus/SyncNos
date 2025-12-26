@@ -1,6 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import AppKit
 
 // MARK: - Wechat Chat Detail View (V2)
 
