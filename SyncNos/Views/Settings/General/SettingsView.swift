@@ -3,6 +3,7 @@ import AppKit
 
 struct SettingsView: View {
     @StateObject private var loginItemVM = LoginItemViewModel()
+    @StateObject private var appIconDisplayVM = AppIconDisplayViewModel()
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @State private var navigationPath = NavigationPath()
     
@@ -39,6 +40,18 @@ struct SettingsView: View {
                             .scaledFont(.body)
                     }
                     .toggleStyle(SwitchToggleStyle())
+                    
+                    // 图标显示模式选择
+                    Picker(selection: $appIconDisplayVM.selectedMode) {
+                        ForEach(AppIconDisplayMode.allCases) { mode in
+                            Text(mode.displayName)
+                                .tag(mode)
+                        }
+                    } label: {
+                        Label("Display SyncNos icon", systemImage: "square.grid.2x2")
+                            .scaledFont(.body)
+                    }
+                    .pickerStyle(.menu)
 
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
