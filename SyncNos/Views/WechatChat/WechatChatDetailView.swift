@@ -12,7 +12,6 @@ struct WechatChatDetailView: View {
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
 
-    @State private var showFilePicker = false
     @State private var showImportFilePicker = false
     @State private var showOCRPayloadSheet = false
     @State private var showExportSavePanel = false
@@ -55,10 +54,13 @@ struct WechatChatDetailView: View {
 
     var body: some View {
         if let contact = selectedContact {
-            contentView(for: contact)
-                .navigationTitle(contact.name)
-                .navigationSubtitle("\(contact.messageCount) 条消息")
-                .toolbar {
+            // 使用 ZStack 包裹 contentView，确保修饰符在视图切换时不会丢失
+            ZStack {
+                contentView(for: contact)
+            }
+            .navigationTitle(contact.name)
+            .navigationSubtitle("\(contact.messageCount) 条消息")
+            .toolbar {
                     ToolbarItem(placement: .automatic) {
                         Spacer()
                     }
@@ -73,11 +75,16 @@ struct WechatChatDetailView: View {
                         Menu {
                             // 导入部分
                             Button {
-                                if ocrConfigStore.isConfigured && !listViewModel.isLoading {
-                                    showFilePicker = true
-                                } else if !ocrConfigStore.isConfigured {
-                                    listViewModel.errorMessage = "请先配置 OCR 服务"
+                                DIContainer.shared.loggerService.debug("[WechatChat] Import Screenshot button clicked, isConfigured: \(ocrConfigStore.isConfigured), isLoading: \(listViewModel.isLoading)")
+                                guard ocrConfigStore.isConfigured else {
+                                    listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
+                                    return
                                 }
+                                guard !listViewModel.isLoading else {
+                                    return
+                                }
+                                // 使用 NSOpenPanel 代替 SwiftUI fileImporter（更可靠）
+                                openImagePicker(for: contact)
                             } label: {
                                 Label("Import Screenshot (OCR)", systemImage: "photo.badge.plus")
                             }
@@ -127,19 +134,7 @@ struct WechatChatDetailView: View {
                     WechatChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
                 }
 #endif
-                .fileImporter(
-                    isPresented: $showFilePicker,
-                    allowedContentTypes: [.image],
-                    allowsMultipleSelection: true
-                ) { result in
-                    switch result {
-                    case .success(let urls):
-                        Task { await listViewModel.addScreenshots(to: contact.contactId, urls: urls) }
-                    case .failure(let error):
-                        listViewModel.errorMessage = error.localizedDescription
-                    }
-                }
-                // 导入文件选择器
+                // 导入 JSON/Markdown 文件选择器
                 .fileImporter(
                     isPresented: $showImportFilePicker,
                     allowedContentTypes: [.json, UTType(filenameExtension: "md") ?? .plainText],
@@ -158,7 +153,7 @@ struct WechatChatDetailView: View {
                     case .failure(let error):
                         listViewModel.errorMessage = error.localizedDescription
                     }
-            }
+                }
             // 导出文件保存器
             .fileExporter(
                 isPresented: $showExportSavePanel,
@@ -421,6 +416,29 @@ struct WechatChatDetailView: View {
         )
     }
 
+    // MARK: - Image Picker (NSOpenPanel)
+    
+    /// 使用 NSOpenPanel 打开图片选择器（比 SwiftUI fileImporter 更可靠）
+    private func openImagePicker(for contact: WechatBookListItem) {
+        Task { @MainActor in
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = true
+            panel.canChooseDirectories = false
+            panel.canChooseFiles = true
+            panel.allowedContentTypes = [.image]
+            panel.message = String(localized: "选择截图", comment: "Open panel message")
+            panel.prompt = String(localized: "导入", comment: "Open panel button")
+            
+            let response = await panel.begin()
+            
+            if response == .OK {
+                let urls = panel.urls
+                DIContainer.shared.loggerService.info("[WechatChat] Selected \(urls.count) images for OCR")
+                await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
+            }
+        }
+    }
+    
     // MARK: - Export Helper
     
     private func prepareExport(for contact: WechatBookListItem, format: WechatExportFormat) {
@@ -572,7 +590,11 @@ struct WechatChatDetailView: View {
                 .foregroundColor(.secondary)
 
             Button {
-                showFilePicker = true
+                guard ocrConfigStore.isConfigured else {
+                    listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
+                    return
+                }
+                openImagePicker(for: contact)
             } label: {
                 Label("导入截图", systemImage: "photo.badge.plus")
             }
