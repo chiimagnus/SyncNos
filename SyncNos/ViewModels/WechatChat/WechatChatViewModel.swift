@@ -2,6 +2,32 @@ import Foundation
 import AppKit
 import Combine
 
+// MARK: - Pagination Config
+
+enum WechatChatPaginationConfig {
+    static let pageSize = 50                    // 每页消息数
+    static let preloadThreshold = 10            // 距离顶部多少条时预加载
+    static let initialLoadSize = 50             // 首次加载数量
+}
+
+// MARK: - Pagination State
+
+struct WechatChatPaginationState {
+    var loadedMessages: [WechatMessage] = []
+    var currentOffset: Int = 0
+    var totalCount: Int = 0
+    var isLoadingMore: Bool = false
+    var hasInitiallyLoaded: Bool = false
+    
+    var canLoadMore: Bool {
+        loadedMessages.count < totalCount
+    }
+    
+    var hasLoadedAll: Bool {
+        !canLoadMore
+    }
+}
+
 // MARK: - Wechat Chat View Model (V2)
 
 @MainActor
@@ -14,6 +40,9 @@ final class WechatChatViewModel: ObservableObject {
 
     /// 内存态对话（用于导出/详情展示）
     @Published private(set) var conversations: [UUID: WechatConversation] = [:]
+    
+    /// 分页状态（每个对话独立管理）
+    @Published private(set) var paginationStates: [UUID: WechatChatPaginationState] = [:]
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -49,7 +78,7 @@ final class WechatChatViewModel: ObservableObject {
 
     // MARK: - Public
 
-    /// 从本地缓存加载对话列表与消息
+    /// 从本地缓存加载对话列表（不加载消息，消息在选中对话时分页加载）
     func loadFromCache() async {
         isLoading = true
         defer { isLoading = false }
@@ -59,10 +88,12 @@ final class WechatChatViewModel: ObservableObject {
             contacts = cachedContacts
 
             var dict: [UUID: WechatConversation] = [:]
+            var states: [UUID: WechatChatPaginationState] = [:]
             dict.reserveCapacity(cachedContacts.count)
+            states.reserveCapacity(cachedContacts.count)
 
             for item in cachedContacts {
-                let messages = try await cacheService.fetchMessages(conversationId: item.id)
+                // 只创建对话结构，不加载消息（消息在选中时分页加载）
                 let contact = WechatContact(
                     id: item.contactId,
                     name: item.name,
@@ -70,11 +101,17 @@ final class WechatChatViewModel: ObservableObject {
                     lastMessageTime: item.lastMessageTime,
                     messageCount: item.messageCount
                 )
-                dict[item.contactId] = WechatConversation(contact: contact, messages: messages)
+                dict[item.contactId] = WechatConversation(contact: contact, messages: [])
+                
+                // 初始化分页状态，设置总数
+                var state = WechatChatPaginationState()
+                state.totalCount = item.messageCount
+                states[item.contactId] = state
             }
 
             conversations = dict
-            logger.info("[WechatChatV2] Loaded \(cachedContacts.count) conversations from cache")
+            paginationStates = states
+            logger.info("[WechatChatV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
         } catch {
             logger.error("[WechatChatV2] Failed to load from cache: \(error)")
             errorMessage = "加载缓存失败: \(error.localizedDescription)"
@@ -87,6 +124,13 @@ final class WechatChatViewModel: ObservableObject {
         let contact = WechatContact(name: name)
         let conversation = WechatConversation(contact: contact, messages: [])
         conversations[contact.id] = conversation
+        
+        // 初始化分页状态
+        var state = WechatChatPaginationState()
+        state.hasInitiallyLoaded = true  // 新对话无消息，标记为已加载
+        state.totalCount = 0
+        paginationStates[contact.id] = state
+        
         updateContactsList()
 
         Task {
@@ -124,10 +168,118 @@ final class WechatChatViewModel: ObservableObject {
     func getMessages(for contactId: UUID) -> [WechatMessage] {
         conversations[contactId]?.messages ?? []
     }
+    
+    // MARK: - Pagination (分页加载)
+    
+    /// 获取已分页加载的消息（供 DetailView 使用）
+    func getLoadedMessages(for contactId: UUID) -> [WechatMessage] {
+        paginationStates[contactId]?.loadedMessages ?? []
+    }
+    
+    /// 是否可以加载更多
+    func canLoadMore(for contactId: UUID) -> Bool {
+        paginationStates[contactId]?.canLoadMore ?? false
+    }
+    
+    /// 是否正在加载更多
+    func isLoadingMore(for contactId: UUID) -> Bool {
+        paginationStates[contactId]?.isLoadingMore ?? false
+    }
+    
+    /// 是否已完成首次加载
+    func hasInitiallyLoaded(for contactId: UUID) -> Bool {
+        paginationStates[contactId]?.hasInitiallyLoaded ?? false
+    }
+    
+    /// 加载对话的初始消息（最新的一页）
+    func loadInitialMessages(for contactId: UUID) async {
+        // 如果已经加载过，直接返回
+        if paginationStates[contactId]?.hasInitiallyLoaded == true {
+            return
+        }
+        
+        await loadMessages(for: contactId, reset: true)
+    }
+    
+    /// 加载更早的消息（向上滚动时触发）
+    func loadMoreMessages(for contactId: UUID) async {
+        guard let state = paginationStates[contactId] else { return }
+        
+        // 防止重复加载
+        if state.isLoadingMore || !state.canLoadMore {
+            return
+        }
+        
+        await loadMessages(for: contactId, reset: false)
+    }
+    
+    /// 核心分页加载逻辑
+    private func loadMessages(for contactId: UUID, reset: Bool) async {
+        // 初始化或获取当前状态
+        var state = paginationStates[contactId] ?? WechatChatPaginationState()
+        
+        // 防止重复加载
+        if state.isLoadingMore { return }
+        
+        state.isLoadingMore = true
+        paginationStates[contactId] = state
+        
+        do {
+            // 获取总数（首次加载时）
+            if reset || state.totalCount == 0 {
+                let totalCount = try await cacheService.fetchMessageCount(conversationId: contactId.uuidString)
+                state.totalCount = totalCount
+            }
+            
+            // 计算偏移量
+            let offset = reset ? 0 : state.loadedMessages.count
+            let limit = WechatChatPaginationConfig.pageSize
+            
+            // 分页查询
+            let newMessages = try await cacheService.fetchMessagesPage(
+                conversationId: contactId.uuidString,
+                limit: limit,
+                offset: offset
+            )
+            
+            if reset {
+                // 重置：用新消息替换
+                state.loadedMessages = newMessages
+            } else {
+                // 追加：新消息插入到头部（因为是加载更早的消息）
+                state.loadedMessages = newMessages + state.loadedMessages
+            }
+            
+            state.currentOffset = state.loadedMessages.count
+            state.hasInitiallyLoaded = true
+            state.isLoadingMore = false
+            
+            paginationStates[contactId] = state
+            
+            // 同步更新 conversations（供导出等功能使用）
+            if var conversation = conversations[contactId] {
+                conversation.messages = state.loadedMessages
+                conversations[contactId] = conversation
+            }
+            
+            logger.info("[WechatChatV2] Loaded \(newMessages.count) messages (total: \(state.loadedMessages.count)/\(state.totalCount)) for \(contactId)")
+        } catch {
+            logger.error("[WechatChatV2] Failed to load messages page: \(error)")
+            state.isLoadingMore = false
+            paginationStates[contactId] = state
+            errorMessage = "加载消息失败: \(error.localizedDescription)"
+        }
+    }
+    
+    /// 重置分页状态（用于新消息导入后刷新）
+    func resetPaginationState(for contactId: UUID) {
+        paginationStates[contactId] = nil
+    }
 
     func deleteContact(_ contact: WechatBookListItem) {
         contacts.removeAll { $0.id == contact.id }
         conversations.removeValue(forKey: contact.contactId)
+        paginationStates.removeValue(forKey: contact.contactId)
 
         Task {
             do {
@@ -142,6 +294,7 @@ final class WechatChatViewModel: ObservableObject {
     func clearAll() {
         contacts.removeAll()
         conversations.removeAll()
+        paginationStates.removeAll()
 
         Task {
             do {
@@ -196,12 +349,9 @@ final class WechatChatViewModel: ObservableObject {
         kind: WechatMessageKind,
         for contactId: UUID
     ) {
-        // 1. 更新内存
-        guard var conversation = conversations[contactId] else { return }
-        
-        if let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
-            let oldMessage = conversation.messages[index]
-            let newMessage = WechatMessage(
+        // 创建更新后的消息
+        func createUpdatedMessage(from oldMessage: WechatMessage) -> WechatMessage {
+            WechatMessage(
                 id: oldMessage.id,
                 content: oldMessage.content,
                 isFromMe: isFromMe,
@@ -210,11 +360,23 @@ final class WechatChatViewModel: ObservableObject {
                 bbox: oldMessage.bbox,
                 order: oldMessage.order
             )
-            conversation.messages[index] = newMessage
+        }
+        
+        // 1. 更新 conversations 内存
+        if var conversation = conversations[contactId],
+           let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
+            conversation.messages[index] = createUpdatedMessage(from: conversation.messages[index])
             conversations[contactId] = conversation
         }
         
-        // 2. 持久化
+        // 2. 更新 paginationStates 内存
+        if var state = paginationStates[contactId],
+           let index = state.loadedMessages.firstIndex(where: { $0.id == messageId }) {
+            state.loadedMessages[index] = createUpdatedMessage(from: state.loadedMessages[index])
+            paginationStates[contactId] = state
+        }
+        
+        // 3. 持久化
         Task {
             do {
                 try await cacheService.updateMessageClassification(
@@ -268,6 +430,13 @@ final class WechatChatViewModel: ObservableObject {
                 conversation.messages.append(contentsOf: adjusted)
                 conversations[contactId] = conversation
                 updateContactsList()
+            }
+            
+            // 更新分页状态：将新消息追加到已加载列表末尾
+            if var state = paginationStates[contactId] {
+                state.loadedMessages.append(contentsOf: adjusted)
+                state.totalCount += adjusted.count
+                paginationStates[contactId] = state
             }
 
             // 落库：截图 raw + blocks + parsed messages
