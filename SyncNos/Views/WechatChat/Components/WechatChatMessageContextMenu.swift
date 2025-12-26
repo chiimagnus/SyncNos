@@ -1,16 +1,13 @@
 import SwiftUI
 import AppKit
-import AVFoundation
 
 /// WechatChat 消息右键菜单（SwiftUI 版本）
 ///
 /// 目标：
 /// - 禁用系统“文本选择”右键菜单（不使用 `.textSelection(.enabled)`）
 /// - 用 SwiftUI `.contextMenu` 提供我们自己的菜单
-/// - 尽量补齐系统菜单常用能力（复制/查词/朗读/分享）
+/// - 尽量补齐系统菜单常用能力（复制/分享）
 struct WechatChatMessageContextMenu: View {
-    @Environment(\.openURL) private var openURL
-
     let text: String
     let isFromMe: Bool
     let kind: WechatMessageKind
@@ -52,31 +49,6 @@ struct WechatChatMessageContextMenu: View {
         ShareLink(item: text) {
             Label("Share…", systemImage: "square.and.arrow.up")
         }
-
-        Divider()
-
-        Button {
-            onSelect()
-            lookUpInDictionary(text)
-        } label: {
-            Label("Look Up", systemImage: "book")
-        }
-
-        Divider()
-
-        Button {
-            onSelect()
-            WechatChatSpeech.speak(text)
-        } label: {
-            Label("Speech", systemImage: "speaker.wave.2")
-        }
-
-        Button(role: .destructive) {
-            WechatChatSpeech.stop()
-        } label: {
-            Label("Stop Speaking", systemImage: "speaker.slash")
-        }
-        .disabled(!WechatChatSpeech.isSpeaking)
     }
 
     @ViewBuilder
@@ -92,37 +64,5 @@ struct WechatChatMessageContextMenu: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
-
-    private func lookUpInDictionary(_ text: String) {
-        // 词典查词更适合短文本；这里做一个温和的截断
-        let term = urlEncoded(text, maxLength: 64)
-        guard let url = URL(string: "dict://\(term)") else { return }
-        openURL(url)
-    }
-
-    private func urlEncoded(_ text: String, maxLength: Int) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let limited = String(trimmed.prefix(maxLength))
-        return limited.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-    }
 }
-
-@MainActor
-private enum WechatChatSpeech {
-    private static let synthesizer = AVSpeechSynthesizer()
-
-    static var isSpeaking: Bool { synthesizer.isSpeaking }
-
-    static func speak(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        synthesizer.stopSpeaking(at: .immediate)
-        synthesizer.speak(AVSpeechUtterance(string: trimmed))
-    }
-
-    static func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
-    }
-}
-
 
