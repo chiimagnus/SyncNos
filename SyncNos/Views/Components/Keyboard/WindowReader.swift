@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// 读取 SwiftUI 视图所在的 `NSWindow`。
 ///
