@@ -1,3 +1,7 @@
+## v0.9.13
+
+**Key updates:** add app icon display mode to control the display of the app icon in the menu bar and dock.
+
 ## v0.9.12
 **Key updates:**
 - Add encryption to the chat record local storage to protect user privacy.
