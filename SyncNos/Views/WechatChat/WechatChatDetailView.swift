@@ -14,10 +14,10 @@ struct WechatChatDetailView: View {
 
     @State private var showFilePicker = false
     @State private var showImportFilePicker = false
-    @State private var showExportFileSaver = false
-    @State private var exportFormat: WechatExportFormat = .json
-    @State private var exportContent: String = ""
     @State private var showOCRPayloadSheet = false
+    @State private var showExportSavePanel = false
+    @State private var exportDocument: WechatExportDocument?
+    @State private var exportFileName: String = ""
     @State private var selectedMessageId: UUID?
     @State private var scrollProxy: ScrollViewProxy?
     @State private var isDragTargeted = false
@@ -158,31 +158,32 @@ struct WechatChatDetailView: View {
                     case .failure(let error):
                         listViewModel.errorMessage = error.localizedDescription
                     }
+            }
+            // 导出文件保存器
+            .fileExporter(
+                isPresented: $showExportSavePanel,
+                document: exportDocument,
+                contentType: exportDocument?.format.utType ?? .json,
+                defaultFilename: exportFileName
+            ) { result in
+                switch result {
+                case .success(let url):
+                    DIContainer.shared.loggerService.info("[WechatChat] Exported to: \(url.path)")
+                case .failure(let error):
+                    listViewModel.errorMessage = "导出失败: \(error.localizedDescription)"
                 }
-                // 导出文件保存器
-                .fileExporter(
-                    isPresented: $showExportFileSaver,
-                    document: WechatExportDocument(content: exportContent, format: exportFormat),
-                    contentType: exportFormat.utType,
-                    defaultFilename: listViewModel.generateExportFileName(for: contact.contactId, format: exportFormat)
-                ) { result in
-                    switch result {
-                    case .success(let url):
-                        DIContainer.shared.loggerService.info("[WechatChat] Exported to: \(url.path)")
-                    case .failure(let error):
-                        listViewModel.errorMessage = error.localizedDescription
-                    }
+                exportDocument = nil
+            }
+            // 拖拽功能
+            .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
+                handleDrop(providers, for: contact)
+                return true
+            }
+            .overlay {
+                if isDragTargeted {
+                    dropTargetOverlay
                 }
-                // 拖拽功能
-                .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
-                    handleDrop(providers, for: contact)
-                    return true
-                }
-                .overlay {
-                    if isDragTargeted {
-                        dropTargetOverlay
-                    }
-                }
+            }
         } else {
             emptySelectionView
         }
@@ -423,14 +424,18 @@ struct WechatChatDetailView: View {
     // MARK: - Export Helper
     
     private func prepareExport(for contact: WechatBookListItem, format: WechatExportFormat) {
-        exportFormat = format
-        
         // 异步加载全部消息后导出
-        Task {
-            if let content = await listViewModel.exportAllMessages(contact.contactId, format: format) {
-                exportContent = content
-                showExportFileSaver = true
+        Task { @MainActor in
+            guard let content = await listViewModel.exportAllMessages(contact.contactId, format: format),
+                  !content.isEmpty else {
+                listViewModel.errorMessage = String(localized: "导出失败：无法获取消息内容", comment: "Export error")
+                return
             }
+            
+            // 设置导出文档和文件名
+            exportDocument = WechatExportDocument(content: content, format: format)
+            exportFileName = WechatChatExporter.generateFileName(contactName: contact.name, format: format)
+            showExportSavePanel = true
         }
     }
     
@@ -931,7 +936,15 @@ private struct SystemMessageRow: View {
 
 /// 用于 fileExporter 的文档类型
 struct WechatExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json, .plainText] }
+    // 支持读取的类型
+    static var readableContentTypes: [UTType] { 
+        [.json, .plainText, UTType(filenameExtension: "md")].compactMap { $0 }
+    }
+    
+    // 支持写入的类型 - 根据 format 动态返回
+    var writableContentTypes: [UTType] {
+        [format.utType]
+    }
     
     let content: String
     let format: WechatExportFormat
