@@ -2,7 +2,7 @@
 
 - **计划生成时间**：2025-12-26
 - **当前文件**：`SyncNos/Views/WechatChat/WechatChatDetailView.swift`
-- **现状**：功能正常，但单文件承担了过多职责（UI + 导入导出 + Drag&Drop + AppKit 可选中文本 + 键盘导航联动），导致可读性/可维护性差。
+- **现状**：功能正常，但单文件承担了过多职责（UI + 导入导出 + Drag&Drop + 右键菜单/消息分类 + 键盘导航联动），导致可读性/可维护性差。
 
 ---
 
@@ -17,13 +17,13 @@
   - Detail 通过 `EnclosingScrollViewReader` 回传底层 `NSScrollView` 给 MainListView（`onScrollViewResolved`）。
   - **这部分不是 WechatChat 独有**，是整个应用的键盘交互基础；要完全 SwiftUI 需要重写全局键盘监控，SwiftUI 目前没有等价能力。
 
-- **导入文件选择（当前用 `NSOpenPanel`）**
-  - `WechatChatDetailView.swift` 明确写了：`Menu` + SwiftUI `.fileImporter` 场景“偶发不弹出”，所以退回 `NSOpenPanel`。
-  - **理论上可用 SwiftUI `.fileImporter` 替换**，但要调整触发位置/结构来规避 `Menu` 的已知坑；否则会引入“偶发不可用”的回归风险。
+- **导入文件选择（已切到 SwiftUI）**
+  - 已使用 SwiftUI `.fileImporter` 替换 `NSOpenPanel`，并收敛为「单一 importer + mode 切换」，避免多个 `.fileImporter` 互相覆盖导致不弹窗。
 
-- **可选中文本 + 条件右键菜单（关键）**
-  - 目前用 `NSTextView` 实现：**无选区 → 显示自定义“消息分类”菜单；有选区 → 显示系统文本菜单（拷贝/查询/翻译等）**。
-  - SwiftUI 的 `.textSelection(.enabled)` 能“选中”，但 **无法在右键菜单层面做到“有选区显示系统菜单、无选区显示自定义菜单”** 的同等行为（至少在现有代码结构与常规 SwiftUI 能力下不现实）。
+- **右键菜单（已切到 SwiftUI 自定义菜单）**
+  - 已禁用系统文本 context menu（不依赖 `NSTextView` / 不使用 `.textSelection(.enabled)` 触发系统菜单）。
+  - 右键只显示我们自定义的 SwiftUI `.contextMenu`，并把常用系统能力（复制/分享/查词/朗读）整合到自定义菜单中。
+  - 代价：不再支持“选区级别”的系统文本菜单能力（如需选区 Look Up/Translate，需要回到 `NSTextView` 方案）。
 
 - **图片处理（NSImage）**
   - OCR API：`OCRAPIServiceProtocol` 直接要求 `NSImage`（`OCRAPIService.swift`）。
@@ -61,9 +61,9 @@
 
 - **拆分 `WechatChatDetailView.swift`**
   - 将以下内容移动到独立文件（建议放到 `SyncNos/Views/WechatChat/Components/`）：
-    - `WechatChatSelectableText`（`NSTextView` 桥接 + menu 逻辑）
-    - `MessageBubble`
-    - `SystemMessageRow`
+    - `WechatChatMessageContextMenu`（SwiftUI 右键菜单：系统能力 + 分类）
+    - `WechatChatMessageBubble`
+    - `WechatChatSystemMessageRow`
     - `WechatExportDocument`
   - 将导入/导出、Drag&Drop 的辅助函数抽到单独的 `WechatChatDetailActions.swift`（或 `WechatChatDetailImportExport.swift`），Detail 主文件只保留：状态、布局、子视图组合。
 
@@ -78,18 +78,16 @@
 
 - **明确 AppKit 边界（不移除，但隔离）**
   - `EnclosingScrollViewReader` 保持不变（全局键盘机制依赖）。
-  - `WechatChatSelectableText` 保持行为不变（右键菜单条件化）。
-  - `NSOpenPanel` 暂保留（因为当前代码明确是为稳定性做的取舍）。
+  - 右键菜单使用 SwiftUI `.contextMenu`（不再依赖 `NSTextView`）。
 
 #### 3.2 预计改动文件
 
 - **新增**
-  - `SyncNos/Views/WechatChat/Components/WechatChatSelectableText.swift`
+  - `SyncNos/Views/WechatChat/Components/WechatChatMessageContextMenu.swift`
   - `SyncNos/Views/WechatChat/Components/WechatChatMessageBubble.swift`
   - `SyncNos/Views/WechatChat/Components/WechatChatSystemMessageRow.swift`
   - `SyncNos/Views/WechatChat/Components/WechatExportDocument.swift`
   - `SyncNos/Views/WechatChat/WechatChatNotifications.swift`
-  - `SyncNos/Views/WechatChat/WechatChatDetailActions.swift`（命名可按现有风格调整）
 - **修改**
   - `SyncNos/Views/WechatChat/WechatChatDetailView.swift`（大幅瘦身）
   - `SyncNos/Views/Components/Main/MainListView+KeyboardMonitor.swift`（仅替换 Notification.Name 常量引用）
@@ -105,7 +103,7 @@
   - 导出 JSON/Markdown 正常
   - Drag&Drop 图片/文件正常
   - WechatChat：↑/↓ 消息选择导航正常；Option+←/→ 分类循环正常
-  - 右键：无选区显示“分类菜单”，有选区显示系统文本菜单
+  - 右键：只显示自定义菜单（包含分类与常用系统能力）
 
 #### 3.4 P1 Build 验证
 
@@ -243,9 +241,9 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 据此，推荐把执行路径调整为：
 
 - **P1（调整版）**：在“拆文件/拆职责”的同时，直接把气泡文本从 `NSTextView` 替换为 SwiftUI：
-  - `Text(...).textSelection(.enabled)` + SwiftUI 绘制气泡
-  - 分类入口走 SwiftUI（**右键 `contextMenu` 做分类**）
-  - 彻底移除 `WechatChatSelectableText` 这一套 AppKit 桥接
+  - `Text(...)` + SwiftUI 绘制气泡
+  - 右键菜单使用 SwiftUI `.contextMenu`（禁用系统文本菜单）
+  - 将常用系统能力（Copy/Share/Look Up/Speech）加入自定义菜单，并保留分类项
 - **P2（调整版）**：推进 `.fileImporter`，并删除 `NSOpenPanel`（接受可能的稳定性差异；必要时再迭代 UI 触发结构来“做稳”）。
 - **P3**：再考虑 Drag&Drop 图片 data 路径去 AppKit（ImageIO），以及其它小范围收口。
 
@@ -257,7 +255,8 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 
 - **P1（已完成）**
   - 将气泡/系统消息拆到 `SyncNos/Views/WechatChat/Components/`
-  - 右键菜单实现采用 **AppKit `NSTextView` 合并菜单**：在系统文本菜单（Look Up/Translate/Copy/...）顶部插入「消息分类」项（与你截图里的体验一致）
+  - 右键菜单已改为 **SwiftUI 自定义 `.contextMenu`**：禁用系统文本菜单，并提供 Copy/Share + 分类项
+  - 已删除 `WechatChatSelectableTextView.swift`（`NSTextView` 桥接不再需要）
   - `WechatChatDetailView.swift` 行数显著下降（从 1000+ 降到 ~700 左右）
   - 统一了 wechatChat 的通知名常量
   - 已通过 `xcodebuild`（macOS Debug）
