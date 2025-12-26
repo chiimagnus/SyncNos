@@ -15,6 +15,13 @@ import SwiftUI
     deinit {
         if let token = bypassObserver { NotificationCenter.default.removeObserver(token) }
     }
+    
+    // MARK: - Application Launch
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 应用保存的图标显示模式设置（NSApp 此时已初始化）
+        AppIconDisplayViewModel.applyStoredMode()
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // 若之前已在其它流程中确认过“退出”，则直接退出一次
