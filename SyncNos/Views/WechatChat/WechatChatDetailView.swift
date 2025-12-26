@@ -255,6 +255,7 @@ struct WechatChatDetailView: View {
                     }
                     .padding()
                 }
+                .id(contact.contactId) // 为不同对话创建独立的 ScrollView 实例，避免滚动状态在对话间串联
                 .defaultScrollAnchor(.bottom) // 默认显示底部（最新消息）
                 .onAppear {
                     scrollProxy = proxy
@@ -277,7 +278,7 @@ struct WechatChatDetailView: View {
             }
         }
     }
-
+    
     // MARK: - Pagination Trigger (Preserve Scroll Position)
     
     /// 加载更早的消息（prepend）并保持当前视口位置，避免由于 prepend 导致的“连锁 onAppear 触发 → 自动把所有历史拉完”
