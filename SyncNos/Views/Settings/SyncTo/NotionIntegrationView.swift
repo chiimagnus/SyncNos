@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct NotionIntegrationView: View {
     @StateObject private var viewModel = NotionIntegrationViewModel()

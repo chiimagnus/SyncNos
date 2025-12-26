@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // MARK: - Edit Commands
 struct EditCommands: Commands {

@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct LogWindow: View {
     @StateObject private var viewModel = LogViewModel()

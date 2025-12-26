@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct MenuBarView: View {
     @StateObject private var viewModel = MenuBarViewModel()

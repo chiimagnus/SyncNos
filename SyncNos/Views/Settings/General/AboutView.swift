@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct AboutView: View {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared

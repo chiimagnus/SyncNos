@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct WeReadDetailView: View {
     @ObservedObject var listViewModel: WeReadViewModel

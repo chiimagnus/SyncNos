@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// 在 `ScrollView` 内容内部使用，用于拿到其底层 `NSScrollView`（enclosingScrollView）。
 ///

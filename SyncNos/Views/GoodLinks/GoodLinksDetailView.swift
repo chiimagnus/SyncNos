@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel

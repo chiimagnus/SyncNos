@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct AppleBooksListView: View {
     @ObservedObject var viewModel: AppleBooksViewModel

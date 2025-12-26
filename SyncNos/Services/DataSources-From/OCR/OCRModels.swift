@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 // MARK: - PaddleOCR Request
 

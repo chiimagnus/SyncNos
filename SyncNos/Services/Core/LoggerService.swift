@@ -1,6 +1,5 @@
 import Foundation
 @preconcurrency import Combine
-import AppKit
 
 // MARK: - Logger Service Implementation
 final class LoggerService: LoggerServiceProtocol {

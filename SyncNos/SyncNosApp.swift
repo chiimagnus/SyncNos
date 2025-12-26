@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
-import AppKit
 import StoreKit
+
 @main
 struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate

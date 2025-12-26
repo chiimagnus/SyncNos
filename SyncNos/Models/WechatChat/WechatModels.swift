@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 // MARK: - Wechat Contact (联系人/对话)
 
