@@ -48,14 +48,14 @@ extension MainListView {
                     switch event.keyCode {
                     case 123: // Option+← 切换分类（向左：我 → 系统 → 对方）
                         NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatCycleClassification"),
+                            name: .wechatChatCycleClassification,
                             object: nil,
                             userInfo: ["direction": "left"]
                         )
                         return nil
                     case 124: // Option+→ 切换分类（向右：对方 → 系统 → 我）
                         NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatCycleClassification"),
+                            name: .wechatChatCycleClassification,
                             object: nil,
                             userInfo: ["direction": "right"]
                         )
@@ -95,7 +95,7 @@ extension MainListView {
                     // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
                     if self.contentSource == .wechatChat {
                         NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatNavigateMessage"),
+                            name: .wechatChatNavigateMessage,
                             object: nil,
                             userInfo: ["direction": "up"]
                         )
@@ -110,7 +110,7 @@ extension MainListView {
                     // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
                     if self.contentSource == .wechatChat {
                         NotificationCenter.default.post(
-                            name: Notification.Name("WechatChatNavigateMessage"),
+                            name: .wechatChatNavigateMessage,
                             object: nil,
                             userInfo: ["direction": "down"]
                         )

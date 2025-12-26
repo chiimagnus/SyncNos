@@ -296,13 +296,13 @@ struct WechatChatDetailView: View {
                     selectedMessageId = nil
                 }
                 // 监听来自 MainListView 的消息导航通知
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatNavigateMessage")).receive(on: DispatchQueue.main)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: .wechatChatNavigateMessage).receive(on: DispatchQueue.main)) { notification in
                     guard let userInfo = notification.userInfo,
                           let direction = userInfo["direction"] as? String else { return }
                     navigateMessage(direction: direction == "up" ? .up : .down, proxy: proxy)
                 }
                 // 监听来自 MainListView 的分类切换通知
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WechatChatCycleClassification")).receive(on: DispatchQueue.main)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: .wechatChatCycleClassification).receive(on: DispatchQueue.main)) { notification in
                     guard let userInfo = notification.userInfo,
                           let direction = userInfo["direction"] as? String else { return }
                     cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
