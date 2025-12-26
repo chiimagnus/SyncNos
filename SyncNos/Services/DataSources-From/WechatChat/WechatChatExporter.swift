@@ -167,8 +167,8 @@ enum WechatChatExporter {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .long
         dateFormatter.timeStyle = .short
-        lines.append("> 导出时间: \(dateFormatter.string(from: Date()))")
-        lines.append("> 消息数量: \(conversation.messages.count)")
+        lines.append("> Exported: \(dateFormatter.string(from: Date()))")
+        lines.append("> Messages: \(conversation.messages.count)")
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -179,10 +179,13 @@ enum WechatChatExporter {
         for message in conversation.messages.sorted(by: { $0.order < $1.order }) {
             switch message.kind {
             case .system:
-                // 系统消息：斜体
-                lines.append("*\(message.content)*")
+                // 系统消息：使用 # System 标题
+                if lastSender != "System" {
+                    lines.append("# System")
+                    lastSender = "System"
+                }
+                lines.append(message.content)
                 lines.append("")
-                lastSender = nil
                 
             case .image:
                 let sender = formatSender(message, defaultName: conversation.contact.name)
@@ -190,7 +193,7 @@ enum WechatChatExporter {
                     lines.append("# \(sender)")
                     lastSender = sender
                 }
-                lines.append("📷 *[图片]*")
+                lines.append("📷 [Image]")
                 lines.append("")
                 
             case .voice:
@@ -199,7 +202,7 @@ enum WechatChatExporter {
                     lines.append("# \(sender)")
                     lastSender = sender
                 }
-                lines.append("🎤 *[语音]*")
+                lines.append("🎤 [Voice]")
                 lines.append("")
                 
             case .card:
@@ -208,7 +211,7 @@ enum WechatChatExporter {
                     lines.append("# \(sender)")
                     lastSender = sender
                 }
-                lines.append("📋 *[卡片]*")
+                lines.append("📋 [Card]")
                 if !message.content.isEmpty {
                     lines.append(message.content)
                 }
@@ -232,7 +235,7 @@ enum WechatChatExporter {
     
     private static func formatSender(_ message: WechatMessage, defaultName: String) -> String {
         if message.isFromMe {
-            return "我"
+            return "Me"
         } else if let senderName = message.senderName, !senderName.isEmpty {
             return senderName
         } else {

@@ -128,10 +128,6 @@ enum WechatChatImporter {
         
         // 正则表达式
         let titlePattern = try? NSRegularExpression(pattern: "^#\\s+(.+)$", options: [])
-        let systemPattern = try? NSRegularExpression(pattern: "^\\*(.+)\\*$", options: [])
-        let imagePattern = try? NSRegularExpression(pattern: "📷\\s*\\*\\[图片\\]\\*", options: [])
-        let voicePattern = try? NSRegularExpression(pattern: "🎤\\s*\\*\\[语音\\]\\*", options: [])
-        let cardPattern = try? NSRegularExpression(pattern: "📋\\s*\\*\\[卡片\\]\\*", options: [])
         
         // 辅助函数：保存当前待处理的消息
         func flushPendingMessage() {
@@ -144,18 +140,30 @@ enum WechatChatImporter {
             }
             
             // 检测消息类型
-            let kind: WechatMessageKind
-            let finalContent: String
+            var kind: WechatMessageKind
+            var finalContent: String
             
-            if let imagePattern, imagePattern.firstMatch(in: content, options: [], range: NSRange(content.startIndex..., in: content)) != nil {
+            // 检查是否是系统消息（发送者为 "System"）
+            if sender.lowercased() == "system" {
+                kind = .system
+                finalContent = content
+            } else if content.contains("📷") && content.contains("[Image]") {
                 kind = .image
                 finalContent = ""
-            } else if let voicePattern, voicePattern.firstMatch(in: content, options: [], range: NSRange(content.startIndex..., in: content)) != nil {
+            } else if content.contains("📷") && content.contains("[图片]") {
+                kind = .image
+                finalContent = ""
+            } else if content.contains("🎤") && content.contains("[Voice]") {
                 kind = .voice
                 finalContent = ""
-            } else if let cardPattern, cardPattern.firstMatch(in: content, options: [], range: NSRange(content.startIndex..., in: content)) != nil {
+            } else if content.contains("🎤") && content.contains("[语音]") {
+                kind = .voice
+                finalContent = ""
+            } else if content.contains("📋") && content.contains("[Card]") {
                 kind = .card
-                // 卡片消息去除标识符
+                finalContent = content.replacingOccurrences(of: "📋 [Card]", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if content.contains("📋") && content.contains("[卡片]") {
+                kind = .card
                 finalContent = content.replacingOccurrences(of: "📋 *[卡片]*", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
                 kind = .text
@@ -166,7 +174,7 @@ enum WechatChatImporter {
                 id: UUID(),
                 content: finalContent,
                 isFromMe: currentIsFromMe,
-                senderName: currentIsFromMe ? nil : sender,
+                senderName: (currentIsFromMe || kind == .system) ? nil : sender,
                 kind: kind,
                 bbox: nil,
                 order: messageOrder
@@ -206,7 +214,15 @@ enum WechatChatImporter {
                     // 分隔符后的标题是发送者
                     flushPendingMessage()
                     currentSender = title
-                    currentIsFromMe = (title == "我")
+                    // 支持中英文 "我" / "Me"，以及系统消息 "System"
+                    let lowerTitle = title.lowercased()
+                    if lowerTitle == "system" {
+                        // 系统消息特殊处理
+                        currentSender = "System"
+                        currentIsFromMe = false
+                    } else {
+                        currentIsFromMe = (title == "我" || lowerTitle == "me")
+                    }
                 }
                 continue
             }
@@ -216,30 +232,7 @@ enum WechatChatImporter {
                 continue
             }
             
-            // 检测系统消息 (*xxx*)
-            if let systemPattern,
-               let match = systemPattern.firstMatch(in: trimmedLine, options: [], range: NSRange(trimmedLine.startIndex..., in: trimmedLine)),
-               let range = Range(match.range(at: 1), in: trimmedLine) {
-                
-                flushPendingMessage()
-                
-                let systemContent = String(trimmedLine[range])
-                let message = WechatMessage(
-                    id: UUID(),
-                    content: systemContent,
-                    isFromMe: false,
-                    senderName: nil,
-                    kind: .system,
-                    bbox: nil,
-                    order: messageOrder
-                )
-                messages.append(message)
-                messageOrder += 1
-                currentSender = nil
-                continue
-            }
-            
-            // 普通消息内容
+            // 普通消息内容（包括 System 发送者的系统消息）
             if currentSender != nil {
                 pendingContent.append(trimmedLine)
             }

@@ -69,48 +69,47 @@ struct WechatChatDetailView: View {
                                 .scaleEffect(0.7)
                         }
 
-                        Button {
-                            showFilePicker = true
-                        } label: {
-                            Label("导入截图", systemImage: "photo.badge.plus")
-                        }
-                        .disabled(!ocrConfigStore.isConfigured || listViewModel.isLoading)
-                        .help("追加聊天截图")
-
-                        // 导出菜单
+                        // 统一的导入/导出菜单
                         Menu {
+                            // 导入部分
                             Button {
-                                prepareExport(for: contact, format: .json)
+                                if ocrConfigStore.isConfigured && !listViewModel.isLoading {
+                                    showFilePicker = true
+                                } else if !ocrConfigStore.isConfigured {
+                                    listViewModel.errorMessage = "请先配置 OCR 服务"
+                                }
                             } label: {
-                                Label("导出为 JSON", systemImage: "doc.text")
+                                Label("Import Screenshot (OCR)", systemImage: "photo.badge.plus")
                             }
                             
                             Button {
-                                prepareExport(for: contact, format: .markdown)
+                                showImportFilePicker = true
                             } label: {
-                                Label("导出为 Markdown", systemImage: "doc.richtext")
+                                Label("Import from JSON/Markdown", systemImage: "square.and.arrow.down")
                             }
                             
                             Divider()
                             
+                            // 导出部分
                             Button {
-                                listViewModel.copyToClipboard(for: contact.contactId)
+                                if contact.messageCount > 0 {
+                                    prepareExport(for: contact, format: .json)
+                                }
                             } label: {
-                                Label("复制纯文本", systemImage: "doc.on.doc")
+                                Label("Export as JSON", systemImage: "doc.text")
+                            }
+                            
+                            Button {
+                                if contact.messageCount > 0 {
+                                    prepareExport(for: contact, format: .markdown)
+                                }
+                            } label: {
+                                Label("Export as Markdown", systemImage: "doc.richtext")
                             }
                         } label: {
-                            Label("导出", systemImage: "square.and.arrow.up")
+                            Label("Import/Export", systemImage: "arrow.up.arrow.down.circle")
                         }
-                        .disabled(contact.messageCount == 0)
-                        .help("导出聊天记录")
-                        
-                        // 导入按钮
-                        Button {
-                            showImportFilePicker = true
-                        } label: {
-                            Label("导入", systemImage: "square.and.arrow.down")
-                        }
-                        .help("从 JSON 或 Markdown 文件导入消息")
+                        .help("Import or export chat records")
                         
 #if DEBUG
                         Button {
@@ -476,7 +475,7 @@ struct WechatChatDetailView: View {
                     }
                     
                     Task { @MainActor in
-                        await handleDroppedFile(url, for: contact)
+                        await handleDroppedFileURL(url, for: contact)
                     }
                 }
             }
@@ -496,29 +495,34 @@ struct WechatChatDetailView: View {
         }
     }
     
-    private func handleDroppedFile(_ url: URL, for contact: WechatBookListItem) async {
+    /// 处理拖拽的文件 URL
+    /// 拖拽操作授予了对文件的访问权限，可以直接读取
+    private func handleDroppedFileURL(_ url: URL, for contact: WechatBookListItem) async {
         let fileExtension = url.pathExtension.lowercased()
         
-        switch fileExtension {
-        case "json", "md", "markdown":
-            // 导入 JSON 或 Markdown 文件
-            do {
-                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
-            } catch {
-                listViewModel.errorMessage = error.localizedDescription
-            }
-            
-        case "png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp":
-            // 图片文件 → OCR 识别
+        // 图片文件 → OCR 识别
+        if ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"].contains(fileExtension) {
             guard ocrConfigStore.isConfigured else {
                 listViewModel.errorMessage = "请先配置 OCR 服务"
                 return
             }
-            await listViewModel.addScreenshots(to: contact.contactId, urls: [url])
             
-        default:
-            listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
+            // 拖拽授予了访问权限，直接传递 URL
+            await listViewModel.addScreenshots(to: contact.contactId, urls: [url])
+            return
         }
+        
+        // JSON/MD 文件 → 导入
+        if ["json", "md", "markdown"].contains(fileExtension) {
+            do {
+                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
+            } catch {
+                listViewModel.errorMessage = "导入失败: \(error.localizedDescription)"
+            }
+            return
+        }
+        
+        listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
     }
     
     private func handleDroppedImage(_ image: NSImage, for contact: WechatBookListItem) async {

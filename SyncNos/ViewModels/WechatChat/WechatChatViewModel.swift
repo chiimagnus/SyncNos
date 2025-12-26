@@ -306,16 +306,6 @@ final class WechatChatViewModel: ObservableObject {
         }
     }
 
-    func exportAsText(for contactId: UUID) -> String? {
-        conversations[contactId]?.exportAsText()
-    }
-
-    func copyToClipboard(for contactId: UUID) {
-        guard let text = exportAsText(for: contactId) else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-    
     // MARK: - Export (导出)
     
     /// 导出对话为指定格式
@@ -361,11 +351,14 @@ final class WechatChatViewModel: ObservableObject {
     /// - Returns: 导入的对话 ID
     @discardableResult
     func importConversation(from url: URL, appendTo existingContactId: UUID? = nil) async throws -> UUID {
-        // 获取文件访问权限
-        guard url.startAccessingSecurityScopedResource() else {
-            throw WechatImportError.fileReadError("无法访问文件")
+        // 尝试获取安全作用域访问权限（对于 fileImporter 选择的文件需要）
+        // 对于拖拽的文件会返回 false，但这不影响访问
+        let hasSecurityAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
         
         let result = try WechatChatImporter.importFromFile(url: url)
         
@@ -520,11 +513,14 @@ final class WechatChatViewModel: ObservableObject {
     // MARK: - Private
 
     private func importScreenshotToConversation(contactId: UUID, url: URL) async {
-        guard url.startAccessingSecurityScopedResource() else {
-            errorMessage = "无法访问文件: \(url.lastPathComponent)"
-            return
+        // 尝试获取安全作用域访问权限（对于 fileImporter 选择的文件需要）
+        // 对于临时目录中的文件会返回 false，但这不影响访问
+        let hasSecurityAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
 
         guard let image = NSImage(contentsOf: url) else {
             errorMessage = "无法加载图片: \(url.lastPathComponent)"
