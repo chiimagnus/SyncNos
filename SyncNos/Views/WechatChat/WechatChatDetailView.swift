@@ -12,6 +12,11 @@ struct WechatChatDetailView: View {
     var onScrollViewResolved: (NSScrollView) -> Void
 
     @State private var showOCRPayloadSheet = false
+    @State private var showImporter = false
+    @State private var importerMode: ImporterMode?
+    @State private var importerAllowedContentTypes: [UTType] = []
+    @State private var importerAllowsMultipleSelection = false
+    @State private var pendingImportContactId: UUID?
     @State private var showExportSavePanel = false
     @State private var exportDocument: WechatExportDocument?
     @State private var exportFileName: String = ""
@@ -49,6 +54,15 @@ struct WechatChatDetailView: View {
         guard let contact = selectedContact else { return false }
         return listViewModel.hasInitiallyLoaded(for: contact.contactId)
     }
+    
+    private var markdownUTType: UTType {
+        UTType(filenameExtension: "md") ?? .plainText
+    }
+    
+    private enum ImporterMode {
+        case images
+        case conversationFile
+    }
 
     var body: some View {
         if let contact = selectedContact {
@@ -81,14 +95,22 @@ struct WechatChatDetailView: View {
                                 guard !listViewModel.isLoading else {
                                     return
                                 }
-                                // 使用 NSOpenPanel 代替 SwiftUI fileImporter（更可靠）
-                                openImagePicker(for: contact)
+                                pendingImportContactId = contact.contactId
+                                importerMode = .images
+                                importerAllowedContentTypes = [.image]
+                                importerAllowsMultipleSelection = true
+                                showImporter = true
                             } label: {
                                 Label("Import Screenshot (OCR)", systemImage: "photo.badge.plus")
                             }
                             
                             Button {
-                                openImportFilePicker(for: contact)
+                                guard !listViewModel.isLoading else { return }
+                                pendingImportContactId = contact.contactId
+                                importerMode = .conversationFile
+                                importerAllowedContentTypes = [.json, markdownUTType]
+                                importerAllowsMultipleSelection = false
+                                showImporter = true
                             } label: {
                                 Label("Import from JSON/Markdown", systemImage: "square.and.arrow.down")
                             }
@@ -146,6 +168,58 @@ struct WechatChatDetailView: View {
                     listViewModel.errorMessage = "导出失败: \(error.localizedDescription)"
                 }
                 exportDocument = nil
+            }
+            // 导入（统一入口）：避免多个 `.fileImporter` 修饰符互相覆盖导致“某个 importer 不弹”的问题
+            .fileImporter(
+                isPresented: $showImporter,
+                allowedContentTypes: importerAllowedContentTypes,
+                allowsMultipleSelection: importerAllowsMultipleSelection
+            ) { result in
+                guard let mode = importerMode,
+                      let contactId = pendingImportContactId else {
+                    importerMode = nil
+                    pendingImportContactId = nil
+                    return
+                }
+
+                // 立刻清空上下文，避免重复触发
+                importerMode = nil
+                pendingImportContactId = nil
+
+                let isUserCancelled: (Error) -> Bool = { error in
+                    let nsError = error as NSError
+                    return nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError
+                }
+
+                switch mode {
+                case .images:
+                    switch result {
+                    case .success(let urls):
+                        guard !urls.isEmpty else { return }
+                        Task { @MainActor in
+                            await listViewModel.addScreenshots(to: contactId, urls: urls)
+                        }
+                    case .failure(let error):
+                        guard !isUserCancelled(error) else { return }
+                        listViewModel.errorMessage = "导入失败: \(error.localizedDescription)"
+                    }
+
+                case .conversationFile:
+                    switch result {
+                    case .success(let urls):
+                        guard let url = urls.first else { return }
+                        Task { @MainActor in
+                            do {
+                                try await listViewModel.importConversation(from: url, appendTo: contactId)
+                            } catch {
+                                listViewModel.errorMessage = error.localizedDescription
+                            }
+                        }
+                    case .failure(let error):
+                        guard !isUserCancelled(error) else { return }
+                        listViewModel.errorMessage = error.localizedDescription
+                    }
+                }
             }
             // 拖拽功能
             .onDrop(of: [.fileURL, .image], isTargeted: $isDragTargeted) { providers in
@@ -452,58 +526,6 @@ struct WechatChatDetailView: View {
         )
     }
 
-    // MARK: - Image Picker (NSOpenPanel)
-    
-    /// 使用 NSOpenPanel 打开图片选择器（比 SwiftUI fileImporter 更可靠）
-    private func openImagePicker(for contact: WechatBookListItem) {
-        Task { @MainActor in
-            let panel = NSOpenPanel()
-            panel.allowsMultipleSelection = true
-            panel.canChooseDirectories = false
-            panel.canChooseFiles = true
-            panel.allowedContentTypes = [.image]
-            panel.message = String(localized: "选择截图", comment: "Open panel message")
-            panel.prompt = String(localized: "导入", comment: "Open panel button")
-            
-            let response = await panel.begin()
-            
-            if response == .OK {
-                let urls = panel.urls
-                DIContainer.shared.loggerService.info("[WechatChat] Selected \(urls.count) images for OCR")
-                await listViewModel.addScreenshots(to: contact.contactId, urls: urls)
-            }
-        }
-    }
-    
-    // MARK: - Import File Picker (NSOpenPanel)
-    
-    /// 使用 NSOpenPanel 打开 JSON/Markdown 导入文件选择器
-    /// - 目的：避免 SwiftUI `.fileImporter` 在 `Menu` 场景下偶发不弹出的问题
-    private func openImportFilePicker(for contact: WechatBookListItem) {
-        Task { @MainActor in
-            guard !listViewModel.isLoading else { return }
-            
-            let panel = NSOpenPanel()
-            panel.allowsMultipleSelection = false
-            panel.canChooseDirectories = false
-            panel.canChooseFiles = true
-            
-            let markdownType = UTType(filenameExtension: "md") ?? .plainText
-            panel.allowedContentTypes = [.json, markdownType]
-            panel.message = String(localized: "选择要导入的文件", comment: "Open panel message")
-            panel.prompt = String(localized: "导入", comment: "Open panel button")
-            
-            let response = await panel.begin()
-            guard response == .OK, let url = panel.urls.first else { return }
-            
-            do {
-                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
-            } catch {
-                listViewModel.errorMessage = error.localizedDescription
-            }
-        }
-    }
-    
     // MARK: - Export Helper
     
     private func prepareExport(for contact: WechatBookListItem, format: WechatExportFormat) {
@@ -655,7 +677,11 @@ struct WechatChatDetailView: View {
                     listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
                     return
                 }
-                openImagePicker(for: contact)
+                pendingImportContactId = contact.contactId
+                importerMode = .images
+                importerAllowedContentTypes = [.image]
+                importerAllowsMultipleSelection = true
+                showImporter = true
             } label: {
                 Label("导入截图", systemImage: "photo.badge.plus")
             }
