@@ -229,9 +229,7 @@ struct WechatChatDetailView: View {
                                         .foregroundColor(.secondary)
                                 } else {
                                     Button {
-                                        Task {
-                                            await listViewModel.loadMoreMessages(for: contact.contactId)
-                                        }
+                                        loadMoreAndPreservePosition(for: contact, proxy: proxy)
                                     } label: {
                                         Text("加载更早的消息")
                                             .font(.caption)
@@ -243,9 +241,14 @@ struct WechatChatDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .id("loadMoreIndicator")
+                            // 当用户滚动到顶部加载条可见时，自动加载上一页（仅触发一次；加载完成后会被 scrollTo 锚回，避免连锁加载）
+                            .onAppear {
+                                guard !isLoadingMore else { return }
+                                loadMoreAndPreservePosition(for: contact, proxy: proxy)
+                            }
                         }
                         
-                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                        ForEach(messages, id: \.id) { message in
                             Group {
                                 switch message.kind {
                                 case .system:
@@ -269,14 +272,6 @@ struct WechatChatDetailView: View {
                                 }
                             }
                             .id(compositeId(for: message))
-                            .onAppear {
-                                // 当接近顶部时预加载更多消息
-                                if index < WechatChatPaginationConfig.preloadThreshold && canLoadMore && !isLoadingMore {
-                                    Task {
-                                        await listViewModel.loadMoreMessages(for: contact.contactId)
-                                    }
-                                }
-                            }
                         }
                     }
                     .padding()
@@ -300,6 +295,30 @@ struct WechatChatDetailView: View {
                           let direction = userInfo["direction"] as? String else { return }
                     cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
                 }
+            }
+        }
+    }
+
+    // MARK: - Pagination Trigger (Preserve Scroll Position)
+    
+    /// 加载更早的消息（prepend）并保持当前视口位置，避免由于 prepend 导致的“连锁 onAppear 触发 → 自动把所有历史拉完”
+    private func loadMoreAndPreservePosition(for contact: WechatBookListItem, proxy: ScrollViewProxy) {
+        guard listViewModel.canLoadMore(for: contact.contactId),
+              !listViewModel.isLoadingMore(for: contact.contactId) else { return }
+        
+        // 记录 prepend 之前的“第一条消息”，用于加载完成后把视口锚回，避免跳到最顶部从而连锁触发自动加载
+        let anchorId: String? = listViewModel
+            .getLoadedMessages(for: contact.contactId)
+            .first
+            .map { compositeId(for: $0) }
+        
+        Task { @MainActor in
+            await listViewModel.loadMoreMessages(for: contact.contactId)
+            
+            // 等待一次 runloop，确保新数据已进入布局，再把视口锚回到旧的第一条消息
+            guard let anchorId else { return }
+            DispatchQueue.main.async {
+                withAnimation(nil) { proxy.scrollTo(anchorId, anchor: .top) }
             }
         }
     }
