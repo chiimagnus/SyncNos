@@ -401,20 +401,24 @@ struct WechatChatDetailView: View {
             let newIndex: Int
             switch direction {
             case .up:
-                newIndex = currentIndex > 0 ? currentIndex - 1 : messages.count - 1
+                // 顶部不回绕
+                newIndex = max(0, currentIndex - 1)
             case .down:
-                newIndex = currentIndex < messages.count - 1 ? currentIndex + 1 : 0
+                // 底部不回绕
+                newIndex = min(messages.count - 1, currentIndex + 1)
             }
+            // 到边界就不再滚动/跳转
+            guard newIndex != currentIndex else { return }
             let newMessage = messages[newIndex]
             selectedMessageId = newMessage.id
             withAnimation(.easeInOut(duration: 0.2)) {
                 proxy.scrollTo(compositeId(for: newMessage), anchor: .center)
             }
         } else {
-            // 无选中时，选中第一条（向下）或最后一条（向上）
-            let message = direction == .down ? messages.first : messages.last
+            // 无选中时：从底部（最新消息）开始
+            let message = messages.last
             selectedMessageId = message?.id
-            if let message = message {
+            if let message {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(compositeId(for: message), anchor: .center)
                 }
