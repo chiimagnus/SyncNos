@@ -169,19 +169,52 @@ struct WechatChatDetailView: View {
     private func contentView(for contact: WechatBookListItem) -> some View {
         // 情况1：首次加载尚未完成 → 显示加载中（并触发加载）
         if !hasInitiallyLoaded {
-            VStack {
-                ProgressView()
-                Text("加载中...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            ZStack {
+                // 重要：与其它数据源保持一致——即使是“加载中/空状态”，也保证 Detail 有一个可解析的 ScrollView，
+                // 这样 MainListView 的 ←/→ 键盘焦点切换就不会因为 currentDetailScrollView 为 nil 而失效。
+                ScrollView {
+                    Color.clear
+                        .frame(height: 0)
+                        .id("wechatChatDetailTop")
+                        .background(
+                            EnclosingScrollViewReader { scrollView in
+                                onScrollViewResolved(scrollView)
+                            }
+                        )
+                }
+                .id(contact.contactId)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                VStack {
+                    ProgressView()
+                    Text("加载中...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .task(id: contact.contactId) {
                 await listViewModel.loadInitialMessages(for: contact.contactId)
             }
         // 情况2：首次加载完成 + 无消息 → 显示空状态
         } else if messages.isEmpty {
-            emptyMessagesView(contact: contact)
+            ZStack {
+                // 同“加载中”分支：空状态也提供一个 ScrollView 以支持键盘焦点切换。
+                ScrollView {
+                    Color.clear
+                        .frame(height: 0)
+                        .id("wechatChatDetailTop")
+                        .background(
+                            EnclosingScrollViewReader { scrollView in
+                                onScrollViewResolved(scrollView)
+                            }
+                        )
+                }
+                .id(contact.contactId)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                emptyMessagesView(contact: contact)
+            }
         // 情况3：有消息 → 显示消息列表
         } else {
             ScrollViewReader { proxy in
