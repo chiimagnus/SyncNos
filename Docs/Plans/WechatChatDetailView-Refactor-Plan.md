@@ -249,6 +249,29 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 - **P2（调整版）**：推进 `.fileImporter`，并删除 `NSOpenPanel`（接受可能的稳定性差异；必要时再迭代 UI 触发结构来“做稳”）。
 - **P3**：再考虑 Drag&Drop 图片 data 路径去 AppKit（ImageIO），以及其它小范围收口。
 
+---
+
+### 10) 实施记录（截至 2025-12-26）
+
+已落地的内容：
+
+- **P1（已完成）**
+  - 将气泡/系统消息拆到 `SyncNos/Views/WechatChat/Components/`
+  - 右键菜单实现采用 **AppKit `NSTextView` 合并菜单**：在系统文本菜单（Look Up/Translate/Copy/...）顶部插入「消息分类」项（与你截图里的体验一致）
+  - `WechatChatDetailView.swift` 行数显著下降（从 1000+ 降到 ~700 左右）
+  - 统一了 wechatChat 的通知名常量
+  - 已通过 `xcodebuild`（macOS Debug）
+
+- **P2（已完成）**
+  - `NSOpenPanel` 已用 SwiftUI `.fileImporter` 替换（图片多选 + JSON/Markdown 单选）
+  - 为避免多个 `.fileImporter` 覆盖导致“某个 importer 不弹”，已收敛为 **单一 importer + mode 切换**
+  - 已通过 `xcodebuild`（macOS Debug）
+
+- **P3（已完成）**
+  - Drag&Drop 的“直接拖入图片 data（非文件 URL）”路径已改为 **内存导入**：新增 `WechatChatViewModel.addScreenshotData(...)`，直接用 `NSImage(data:)` 走 OCR/解析/落库流程，**无需写入临时文件**
+  - 已通过 `xcodebuild`（macOS Debug）
+
+
 
 
 
