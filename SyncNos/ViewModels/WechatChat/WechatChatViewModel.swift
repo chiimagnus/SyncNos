@@ -5,9 +5,9 @@ import Combine
 // MARK: - Pagination Config
 
 enum WechatChatPaginationConfig {
-    static let pageSize = 50                    // 每页消息数
+    static let pageSize = 100                   // 每页消息数
     static let preloadThreshold = 10            // 距离顶部多少条时预加载
-    static let initialLoadSize = 50             // 首次加载数量
+    static let initialLoadSize = 100            // 首次加载数量
 }
 
 // MARK: - Pagination State
