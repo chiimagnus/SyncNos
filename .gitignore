@@ -5,6 +5,7 @@ Backend/.env
 .claude/
 .specify/
 .github/*.md
+.cursorignore
 
 # Notion OAuth 配置文件（包含敏感信息）
 notion_auth.env
