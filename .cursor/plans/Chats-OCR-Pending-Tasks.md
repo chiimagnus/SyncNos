@@ -128,7 +128,7 @@
 - **技术文档描述**：
   - 每张截图输出：输入 blocks 数、过滤后 blocks 数、候选消息数、左/右消息数
 - **实现建议**：
-  - 在 `WechatOCRParser.parse()` 中增加 debug 日志
+  - 在 `ChatOCRParser.parse()` 中增加 debug 日志
   - 可选：返回解析统计信息供 UI 展示
 
 ### 3. OCR 请求参数 Profile 化
@@ -168,12 +168,12 @@
 
 以下代码位置已预留扩展能力：
 
-1. **`WechatOCRParser.swift`**
-   - `config: ChatsParseConfig` 支持自定义参数
+1. **`ChatOCRParser.swift`**
+   - `config: ChatParseConfig` 支持自定义参数
 
-2. **`ChatsCacheModels.swift`**
-   - `CachedWechatMessageV2.senderName` 已预留
-   - `WechatOCRBlockSnapshot` 支持离线重解析
+2. **`ChatCacheModels.swift`**
+   - `CachedChatMessageV2.senderName` 已预留
+   - `ChatOCRBlockSnapshot` 支持离线重解析
 
 3. **`OCRModels.swift`**
    - `OCRRequestConfig.chats` 已预留
