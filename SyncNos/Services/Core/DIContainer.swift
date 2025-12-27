@@ -39,8 +39,8 @@ class DIContainer {
     // OCR
     private var _ocrConfigStore: OCRConfigStoreProtocol?
     private var _ocrAPIService: OCRAPIServiceProtocol?
-    // WechatChat
-    private var _wechatChatCacheService: WechatChatCacheServiceProtocol?
+    // Chats
+    private var _chatsCacheService: ChatCacheServiceProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -275,20 +275,20 @@ class DIContainer {
         return _ocrAPIService!
     }
     
-    // MARK: - WechatChat Services
+    // MARK: - Chats Services
     
-    var wechatChatCacheService: WechatChatCacheServiceProtocol {
-        if _wechatChatCacheService == nil {
+    var chatsCacheService: ChatCacheServiceProtocol {
+        if _chatsCacheService == nil {
             do {
-                let container = try WechatChatModelContainerFactory.createContainer()
-                _wechatChatCacheService = WechatChatCacheService(modelContainer: container)
-                loggerService.info("[DIContainer] WechatChatCacheService initialized with ModelContainer")
+                let container = try ChatModelContainerFactory.createContainer()
+                _chatsCacheService = ChatCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] ChatCacheService initialized with ModelContainer")
             } catch {
-                loggerService.error("[DIContainer] Failed to create WechatChat ModelContainer: \(error.localizedDescription)")
-                fatalError("Failed to create WechatChat ModelContainer: \(error.localizedDescription)")
+                loggerService.error("[DIContainer] Failed to create Chats ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create Chats ModelContainer: \(error.localizedDescription)")
             }
         }
-        return _wechatChatCacheService!
+        return _chatsCacheService!
     }
 
     // MARK: - Registration Methods
@@ -397,7 +397,7 @@ class DIContainer {
         self._ocrAPIService = ocrAPIService
     }
     
-    func register(wechatChatCacheService: WechatChatCacheServiceProtocol) {
-        self._wechatChatCacheService = wechatChatCacheService
+    func register(chatsCacheService: ChatCacheServiceProtocol) {
+        self._chatsCacheService = chatsCacheService
     }
 }
