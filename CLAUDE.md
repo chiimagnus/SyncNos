@@ -78,7 +78,7 @@ SyncNos/
 │   │       ├── ChatsMessageBubble.swift
 │   │       ├── ChatsSystemMessageRow.swift
 │   │       ├── ChatsMessageContextMenu.swift
-│   │       └── WechatExportDocument.swift
+│   │       └── ChatExportDocument.swift
 │   └── Settings/
 │       ├── General/
 │       │   ├── AboutView.swift
@@ -166,7 +166,7 @@ SyncNos/
 │   │   ├── DedaoModels.swift     # API DTO 模型
 │   │   └── DedaoCacheModels.swift # SwiftData 缓存模型
 │   └── Chats/               # 微信聊天模型
-│       ├── WechatModels.swift    # 微信聊天数据模型
+│       ├── ChatModels.swift    # 微信聊天数据模型
 │       └── ChatsCacheModels.swift # SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
@@ -211,7 +211,7 @@ SyncNos/
     │   │   ├── DedaoRequestLimiter.swift       # 请求限流器
     │   │   └── DedaoCacheService.swift         # SwiftData 本地缓存
     │   ├── Chats/           # 微信聊天 OCR 集成
-    │   │   ├── WechatOCRParser.swift           # OCR 结果解析器
+    │   │   ├── ChatOCRParser.swift           # OCR 结果解析器
     │   │   └── ChatsCacheService.swift    # SwiftData 本地缓存服务
     │   └── OCR/                  # OCR 服务
     │       ├── OCRAPIService.swift             # PaddleOCR-VL API 客户端
@@ -325,7 +325,7 @@ DIContainer.shared.dedaoCacheService
 
 // Chats 服务
 DIContainer.shared.chatsCacheService
-DIContainer.shared.wechatOCRParser
+DIContainer.shared.chatOCRParser
 
 // OCR 服务
 DIContainer.shared.ocrAPIService
@@ -401,7 +401,7 @@ DIContainer.shared.ocrConfigStore
   - 支持离线访问
 
 **8. 微信聊天 OCR 集成** (Services/DataSources-From/Chats/)
-- `WechatOCRParser`: OCR 结果解析器
+- `ChatOCRParser`: OCR 结果解析器
   - 基于 `minX` 判断消息方向（对方消息 minX < 15%）
   - 时间戳和系统消息自动检测
   - 发送者昵称智能识别（群聊场景）
@@ -477,17 +477,17 @@ DIContainer.shared.ocrConfigStore
 - `DedaoSyncState`: 全局同步状态
 
 **Chats 模型**（Models/Chats/）：
-- `WechatContact`: 联系人/对话模型（用于 UI 显示）
-- `WechatMessage`: 聊天消息模型（包含消息类型、方向、发送者昵称）
-- `WechatScreenshot`: 截图模型（包含原始图片和解析结果）
-- `WechatConversation`: 对话模型（联系人 + 截图列表）
-- `WechatBookListItem`: UI 列表展示模型（用于 MainListView 兼容）
-- `CachedWechatConversationV2`: SwiftData 缓存的对话（加密存储）
+- `ChatContact`: 联系人/对话模型（用于 UI 显示）
+- `ChatMessage`: 聊天消息模型（包含消息类型、方向、发送者昵称）
+- `ChatScreenshot`: 截图模型（包含原始图片和解析结果）
+- `ChatConversation`: 对话模型（联系人 + 截图列表）
+- `ChatBookListItem`: UI 列表展示模型（用于 MainListView 兼容）
+- `CachedChatConversationV2`: SwiftData 缓存的对话（加密存储）
   - `nameEncrypted: Data`（原 `name: String`）
-- `CachedWechatMessageV2`: SwiftData 缓存的消息（加密存储）
+- `CachedChatMessageV2`: SwiftData 缓存的消息（加密存储）
   - `contentEncrypted: Data`（原 `content: String`）
   - `senderNameEncrypted: Data?`（原 `senderName: String?`）
-- `CachedWechatScreenshotMeta`: SwiftData 缓存的截图元数据
+- `CachedChatScreenshotMeta`: SwiftData 缓存的截图元数据
 
 ## 开发模式
 

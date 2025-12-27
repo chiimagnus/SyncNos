@@ -64,7 +64,7 @@
     - `ChatMessageContextMenu`（SwiftUI 右键菜单：系统能力 + 分类）
     - `ChatMessageBubble`
     - `ChatSystemMessageRow`
-    - `WechatExportDocument`
+    - `ChatExportDocument`
   - 将导入/导出、Drag&Drop 的辅助函数抽到单独的 `ChatDetailActions.swift`（或 `ChatDetailImportExport.swift`），Detail 主文件只保留：状态、布局、子视图组合。
 
 - **统一通知名，去掉字符串散落**
@@ -86,7 +86,7 @@
   - `SyncNos/Views/Chat/Components/ChatMessageContextMenu.swift`
   - `SyncNos/Views/Chat/Components/ChatMessageBubble.swift`
   - `SyncNos/Views/Chat/Components/ChatSystemMessageRow.swift`
-  - `SyncNos/Views/Chat/Components/WechatExportDocument.swift`
+  - `SyncNos/Views/Chat/Components/ChatExportDocument.swift`
   - `SyncNos/Views/Chat/ChatNotifications.swift`
 - **修改**
   - `SyncNos/Views/Chat/ChatDetailView.swift`（大幅瘦身）
@@ -201,7 +201,7 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 - **OCR 层改造**
   - `OCRAPIServiceProtocol` 从 `NSImage` 改为 `Data/CGImage`
   - `OCRAPIService` 的图片编码、测试图片生成全部重写（ImageIO/CoreGraphics）
-  - `ChatViewModel`、`WechatScreenshot`、相关调用链全面改签名
+  - `ChatViewModel`、`ChatScreenshot`、相关调用链全面改签名
 - **全局键盘监控改造**
   - `MainListView+KeyboardMonitor.swift` 目前基于 `NSEvent` 的本地事件监控，这是 SwiftUI 缺少的能力
   - 该部分基本无法做到 100% SwiftUI 等价（除非引入更重的架构与大量自定义 NSView/NSWindow 层）
