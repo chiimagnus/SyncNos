@@ -9,7 +9,7 @@ struct ViewCommands: Commands {
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
-    @AppStorage("datasource.wechatChat.enabled") private var wechatChatSourceEnabled: Bool = false
+    @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
     @AppStorage("bookList_sort_key") private var bookListSortKey: String = BookListSortKey.title.rawValue
     @AppStorage("bookList_sort_ascending") private var bookListSortAscending: Bool = true
     @AppStorage("bookList_showWithTitleOnly") private var bookListShowWithTitleOnly: Bool = false
@@ -45,8 +45,8 @@ struct ViewCommands: Commands {
             return weReadSourceEnabled
         case .dedao:
             return dedaoSourceEnabled
-        case .wechatChat:
-            return wechatChatSourceEnabled
+        case .chats:
+            return chatsSourceEnabled
         }
     }
 
@@ -189,18 +189,18 @@ struct ViewCommands: Commands {
                 }
             }
 
-            if isDataSourceEnabled(.wechatChat) {
-                if let key = shortcutKey(for: .wechatChat) {
+            if isDataSourceEnabled(.chats) {
+                if let key = shortcutKey(for: .chats) {
                     Button("微信聊天", systemImage: "message.fill") {
-                        contentSourceRawValue = ContentSource.wechatChat.rawValue
+                        contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .wechatChat)
+                    .disabled(currentSource == .chats)
                 } else {
                     Button("微信聊天", systemImage: "message.fill") {
-                        contentSourceRawValue = ContentSource.wechatChat.rawValue
+                        contentSourceRawValue = ContentSource.chats.rawValue
                     }
-                    .disabled(currentSource == .wechatChat)
+                    .disabled(currentSource == .chats)
                 }
             }
 
@@ -411,7 +411,7 @@ struct ViewCommands: Commands {
                         case .goodLinks: return .goodLinks
                         case .weRead: return .weRead
                         case .dedao: return .dedao
-                        case .wechatChat: return .appleBooks // 微信聊天不使用高亮颜色
+                        case .chats: return .appleBooks // 微信聊天不使用高亮颜色
                         }
                     }()
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）

@@ -1,12 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Wechat Chat List View
+// MARK: - Chat List View
 
 /// 微信联系人列表视图（左侧栏）
 /// 注意：「新建对话」功能在底部 filterMenu 中（MainListView 传入）
-struct WechatChatListView: View {
-    @ObservedObject var viewModel: WechatChatViewModel
+struct ChatListView: View {
+    @ObservedObject var viewModel: ChatViewModel
     @Binding var selectionIds: Set<String>
     
     /// 用于接收焦点的 FocusState
@@ -94,7 +94,7 @@ struct WechatChatListView: View {
             }
         }
         // 监听数据源切换通知，切换到此视图时获取焦点
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToWechatChat")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToChats")).receive(on: DispatchQueue.main)) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isListFocused = true
             }
@@ -105,7 +105,7 @@ struct WechatChatListView: View {
 // MARK: - Contact Row
 
 private struct ContactRow: View {
-    let contact: WechatBookListItem
+    let contact: ChatBookListItem
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -160,8 +160,8 @@ private struct ContactRow: View {
 // MARK: - Preview
 
 #Preview {
-    WechatChatListView(
-        viewModel: WechatChatViewModel(),
+    ChatListView(
+        viewModel: ChatViewModel(),
         selectionIds: .constant([])
     )
     .environmentObject(FontScaleManager.shared)

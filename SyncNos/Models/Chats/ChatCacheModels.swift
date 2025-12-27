@@ -1,10 +1,10 @@
 import Foundation
 import SwiftData
 
-// MARK: - WechatChat SwiftData Models (V2 with Encryption)
+// MARK: - ChatChat SwiftData Models (V2 with Encryption)
 //
 // 说明：
-// - 该 schema 对应 wechatchat_v2.store 文件
+// - 该 schema 对应 chats_v2.store 文件
 // - 敏感字段（消息内容、发送者昵称、对话名称）使用 AES-256-GCM 加密存储
 // - 加密密钥存储在 macOS Keychain，由 EncryptionService 管理
 //
@@ -13,10 +13,10 @@ import SwiftData
 // - 密钥由系统 Keychain 保护，受 macOS 登录密码保护
 //
 
-// MARK: - CachedWechatConversationV2
+// MARK: - CachedChatConversationV2
 
 @Model
-final class CachedWechatConversationV2 {
+final class CachedChatConversationV2 {
     /// 对话唯一标识（UUID 字符串）
     @Attribute(.unique) var conversationId: String
 
@@ -33,12 +33,12 @@ final class CachedWechatConversationV2 {
     // MARK: Relationships
 
     /// 该对话的截图记录
-    @Relationship(deleteRule: .cascade, inverse: \CachedWechatScreenshotV2.conversation)
-    var screenshots: [CachedWechatScreenshotV2]?
+    @Relationship(deleteRule: .cascade, inverse: \CachedChatScreenshotV2.conversation)
+    var screenshots: [CachedChatScreenshotV2]?
 
     /// 该对话的解析消息
-    @Relationship(deleteRule: .cascade, inverse: \CachedWechatMessageV2.conversation)
-    var messages: [CachedWechatMessageV2]?
+    @Relationship(deleteRule: .cascade, inverse: \CachedChatMessageV2.conversation)
+    var messages: [CachedChatMessageV2]?
     
     // MARK: Computed (解密访问器)
     
@@ -84,11 +84,11 @@ final class CachedWechatConversationV2 {
     }
 }
 
-// MARK: - CachedWechatScreenshotV2
+// MARK: - CachedChatScreenshotV2
 
 /// 每张导入截图一条记录（不保存图片本体）
 @Model
-final class CachedWechatScreenshotV2 {
+final class CachedChatScreenshotV2 {
     /// 截图唯一标识（UUID 字符串）
     @Attribute(.unique) var screenshotId: String
 
@@ -119,7 +119,7 @@ final class CachedWechatScreenshotV2 {
 
     // MARK: Relationships
 
-    var conversation: CachedWechatConversationV2?
+    var conversation: CachedChatConversationV2?
 
     init(
         screenshotId: String,
@@ -146,10 +146,10 @@ final class CachedWechatScreenshotV2 {
     }
 }
 
-// MARK: - CachedWechatMessageV2
+// MARK: - CachedChatMessageV2
 
 @Model
-final class CachedWechatMessageV2 {
+final class CachedChatMessageV2 {
     /// 消息唯一标识（UUID 字符串）
     @Attribute(.unique) var messageId: String
 
@@ -180,7 +180,7 @@ final class CachedWechatMessageV2 {
 
     // MARK: Relationships
 
-    var conversation: CachedWechatConversationV2?
+    var conversation: CachedChatConversationV2?
 
     // MARK: Computed (解密访问器)
 
@@ -195,8 +195,8 @@ final class CachedWechatMessageV2 {
         return try? EncryptionService.shared.decrypt(encrypted)
     }
 
-    var kind: WechatMessageKind {
-        WechatMessageKind(rawValue: kindRaw) ?? .text
+    var kind: ChatMessageKind {
+        ChatMessageKind(rawValue: kindRaw) ?? .text
     }
 
     var bbox: CGRect? {
@@ -240,7 +240,7 @@ final class CachedWechatMessageV2 {
         content: String,
         isFromMe: Bool,
         senderName: String? = nil,
-        kind: WechatMessageKind = .text,
+        kind: ChatMessageKind = .text,
         order: Int,
         bbox: CGRect? = nil
     ) throws {
@@ -268,7 +268,7 @@ final class CachedWechatMessageV2 {
         contentEncrypted: Data,
         isFromMe: Bool,
         senderNameEncrypted: Data?,
-        kind: WechatMessageKind = .text,
+        kind: ChatMessageKind = .text,
         order: Int,
         bbox: CGRect? = nil
     ) {
@@ -299,13 +299,13 @@ final class CachedWechatMessageV2 {
 // MARK: - Normalized Block Snapshot (for persistence & replay)
 
 /// 归一化 blocks：仅保留解析所需字段，便于离线重解析
-struct WechatOCRBlockSnapshot: Codable, Hashable, Sendable {
+struct ChatOCRBlockSnapshot: Codable, Hashable, Sendable {
     var text: String
     var label: String
-    var bbox: WechatRectSnapshot
+    var bbox: ChatRectSnapshot
 }
 
-struct WechatRectSnapshot: Codable, Hashable, Sendable {
+struct ChatRectSnapshot: Codable, Hashable, Sendable {
     var x: Double
     var y: Double
     var width: Double

@@ -1,12 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Wechat Chat Detail View (V2)
+// MARK: - Chat Detail View (V2)
 
 /// 微信聊天记录详情视图（右侧栏）
 /// V2：展示气泡消息（我/对方）+ 居中系统/时间戳文本（不做关键词识别）
-struct WechatChatDetailView: View {
-    @ObservedObject var listViewModel: WechatChatViewModel
+struct ChatDetailView: View {
+    @ObservedObject var listViewModel: ChatViewModel
     @Binding var selectedContactId: String?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
@@ -18,7 +18,7 @@ struct WechatChatDetailView: View {
     @State private var importerAllowsMultipleSelection = false
     @State private var pendingImportContactId: UUID?
     @State private var showExportSavePanel = false
-    @State private var exportDocument: WechatExportDocument?
+    @State private var exportDocument: ChatExportDocument?
     @State private var exportFileName: String = ""
     @State private var selectedMessageId: UUID?
     @State private var scrollProxy: ScrollViewProxy?
@@ -26,13 +26,13 @@ struct WechatChatDetailView: View {
     @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
-    private var selectedContact: WechatBookListItem? {
+    private var selectedContact: ChatBookListItem? {
         guard let id = selectedContactId else { return nil }
         return listViewModel.contacts.first { $0.id == id }
     }
 
     /// 使用分页加载的消息（已按 order 排序）
-    private var messages: [WechatMessage] {
+    private var messages: [ChatMessage] {
         guard let contact = selectedContact else { return [] }
         return listViewModel.getLoadedMessages(for: contact.contactId)
     }
@@ -87,7 +87,7 @@ struct WechatChatDetailView: View {
                         Menu {
                             // 导入部分
                             Button {
-                                DIContainer.shared.loggerService.debug("[WechatChat] Import Screenshot button clicked, isConfigured: \(ocrConfigStore.isConfigured), isLoading: \(listViewModel.isLoading)")
+                                DIContainer.shared.loggerService.debug("[Chats] Import Screenshot button clicked, isConfigured: \(ocrConfigStore.isConfigured), isLoading: \(listViewModel.isLoading)")
                                 guard ocrConfigStore.isConfigured else {
                                     listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
                                     return
@@ -151,7 +151,7 @@ struct WechatChatDetailView: View {
                 }
 #if DEBUG
                 .sheet(isPresented: $showOCRPayloadSheet) {
-                    WechatChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
+                    ChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
                 }
 #endif
             // 导出文件保存器
@@ -163,7 +163,7 @@ struct WechatChatDetailView: View {
             ) { result in
                 switch result {
                 case .success(let url):
-                    DIContainer.shared.loggerService.info("[WechatChat] Exported to: \(url.path)")
+                    DIContainer.shared.loggerService.info("[Chats] Exported to: \(url.path)")
                 case .failure(let error):
                     listViewModel.errorMessage = "导出失败: \(error.localizedDescription)"
                 }
@@ -239,7 +239,7 @@ struct WechatChatDetailView: View {
     // MARK: - Content
 
     @ViewBuilder
-    private func contentView(for contact: WechatBookListItem) -> some View {
+    private func contentView(for contact: ChatBookListItem) -> some View {
         // 情况1：首次加载尚未完成 → 显示加载中（并触发加载）
         if !hasInitiallyLoaded {
             ZStack {
@@ -248,7 +248,7 @@ struct WechatChatDetailView: View {
                 ScrollView {
                     Color.clear
                         .frame(height: 0)
-                        .id("wechatChatDetailTop")
+                        .id("chatsDetailTop")
                         .background(
                             EnclosingScrollViewReader { scrollView in
                                 onScrollViewResolved(scrollView)
@@ -276,7 +276,7 @@ struct WechatChatDetailView: View {
                 ScrollView {
                     Color.clear
                         .frame(height: 0)
-                        .id("wechatChatDetailTop")
+                        .id("chatsDetailTop")
                         .background(
                             EnclosingScrollViewReader { scrollView in
                                 onScrollViewResolved(scrollView)
@@ -296,7 +296,7 @@ struct WechatChatDetailView: View {
                         // 顶部锚点，用于解析 NSScrollView
                         Color.clear
                             .frame(height: 0)
-                            .id("wechatChatDetailTop")
+                            .id("chatsDetailTop")
                             .background(
                                 EnclosingScrollViewReader { scrollView in
                                     onScrollViewResolved(scrollView)
@@ -337,7 +337,7 @@ struct WechatChatDetailView: View {
                             Group {
                                 switch message.kind {
                                 case .system:
-                                    WechatChatSystemMessageRow(
+                                    ChatSystemMessageRow(
                                         message: message,
                                         isSelected: selectedMessageId == message.id,
                                         onTap: { selectedMessageId = message.id },
@@ -346,7 +346,7 @@ struct WechatChatDetailView: View {
                                         }
                                     )
                                 default:
-                                    WechatChatMessageBubble(
+                                    ChatMessageBubble(
                                         message: message,
                                         isSelected: selectedMessageId == message.id,
                                         onTap: { selectedMessageId = message.id },
@@ -370,13 +370,13 @@ struct WechatChatDetailView: View {
                     selectedMessageId = nil
                 }
                 // 监听来自 MainListView 的消息导航通知
-                .onReceive(NotificationCenter.default.publisher(for: .wechatChatNavigateMessage).receive(on: DispatchQueue.main)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: .chatsNavigateMessage).receive(on: DispatchQueue.main)) { notification in
                     guard let userInfo = notification.userInfo,
                           let direction = userInfo["direction"] as? String else { return }
                     navigateMessage(direction: direction == "up" ? .up : .down, proxy: proxy)
                 }
                 // 监听来自 MainListView 的分类切换通知
-                .onReceive(NotificationCenter.default.publisher(for: .wechatChatCycleClassification).receive(on: DispatchQueue.main)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: .chatsCycleClassification).receive(on: DispatchQueue.main)) { notification in
                     guard let userInfo = notification.userInfo,
                           let direction = userInfo["direction"] as? String else { return }
                     cycleClassification(direction: direction == "left" ? .left : .right, for: contact)
@@ -388,7 +388,7 @@ struct WechatChatDetailView: View {
     // MARK: - Pagination Trigger (Preserve Scroll Position)
     
     /// 加载更早的消息（prepend）并保持当前视口位置，避免由于 prepend 导致的“连锁 onAppear 触发 → 自动把所有历史拉完”
-    private func loadMoreAndPreservePosition(for contact: WechatBookListItem, proxy: ScrollViewProxy) {
+    private func loadMoreAndPreservePosition(for contact: ChatBookListItem, proxy: ScrollViewProxy) {
         guard listViewModel.canLoadMore(for: contact.contactId),
               !listViewModel.isLoadingMore(for: contact.contactId) else { return }
         
@@ -420,7 +420,7 @@ struct WechatChatDetailView: View {
     }
     
     /// 生成复合 ID，用于 ScrollViewReader 导航和视图标识
-    private func compositeId(for message: WechatMessage) -> String {
+    private func compositeId(for message: ChatMessage) -> String {
         "\(message.id.uuidString)-\(message.kind.rawValue)"
     }
     
@@ -430,7 +430,7 @@ struct WechatChatDetailView: View {
         case system  // 系统消息：kind == .system
         case me      // 我的消息：isFromMe = true, kind != .system
         
-        init(from message: WechatMessage) {
+        init(from message: ChatMessage) {
             if message.kind == .system {
                 self = .system
             } else if message.isFromMe {
@@ -447,7 +447,7 @@ struct WechatChatDetailView: View {
             }
         }
         
-        var kind: WechatMessageKind {
+        var kind: ChatMessageKind {
             switch self {
             case .system: return .system
             case .me, .other: return .text
@@ -499,7 +499,7 @@ struct WechatChatDetailView: View {
         }
     }
     
-    private func cycleClassification(direction: ClassificationDirection, for contact: WechatBookListItem) {
+    private func cycleClassification(direction: ClassificationDirection, for contact: ChatBookListItem) {
         guard let messageId = selectedMessageId,
               let message = messages.first(where: { $0.id == messageId }) else { return }
         
@@ -513,10 +513,10 @@ struct WechatChatDetailView: View {
     }
     
     private func handleClassification(
-        _ message: WechatMessage,
+        _ message: ChatMessage,
         isFromMe: Bool,
-        kind: WechatMessageKind,
-        for contact: WechatBookListItem
+        kind: ChatMessageKind,
+        for contact: ChatBookListItem
     ) {
         listViewModel.updateMessageClassification(
             messageId: message.id,
@@ -528,7 +528,7 @@ struct WechatChatDetailView: View {
 
     // MARK: - Export Helper
     
-    private func prepareExport(for contact: WechatBookListItem, format: WechatExportFormat) {
+    private func prepareExport(for contact: ChatBookListItem, format: ChatExportFormat) {
         // 异步加载全部消息后导出
         Task { @MainActor in
             guard let content = await listViewModel.exportAllMessages(contact.contactId, format: format),
@@ -538,8 +538,8 @@ struct WechatChatDetailView: View {
             }
             
             // 设置导出文档和文件名
-            exportDocument = WechatExportDocument(content: content, format: format)
-            exportFileName = WechatChatExporter.generateFileName(contactName: contact.name, format: format)
+            exportDocument = ChatExportDocument(content: content, format: format)
+            exportFileName = ChatExporter.generateFileName(contactName: contact.name, format: format)
             showExportSavePanel = true
         }
     }
@@ -568,7 +568,7 @@ struct WechatChatDetailView: View {
         .allowsHitTesting(false)
     }
     
-    private func handleDrop(_ providers: [NSItemProvider], for contact: WechatBookListItem) {
+    private func handleDrop(_ providers: [NSItemProvider], for contact: ChatBookListItem) {
         for provider in providers {
             // 优先处理文件 URL
             if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
@@ -597,7 +597,7 @@ struct WechatChatDetailView: View {
     
     /// 处理拖拽的文件 URL
     /// 拖拽操作授予了对文件的访问权限，可以直接读取
-    private func handleDroppedFileURL(_ url: URL, for contact: WechatBookListItem) async {
+    private func handleDroppedFileURL(_ url: URL, for contact: ChatBookListItem) async {
         let fileExtension = url.pathExtension.lowercased()
         
         // 图片文件 → OCR 识别
@@ -625,7 +625,7 @@ struct WechatChatDetailView: View {
         listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
     }
     
-    private func handleDroppedImageData(_ data: Data, for contact: WechatBookListItem) async {
+    private func handleDroppedImageData(_ data: Data, for contact: ChatBookListItem) async {
         guard ocrConfigStore.isConfigured else {
             listViewModel.errorMessage = "请先配置 OCR 服务"
             return
@@ -637,7 +637,7 @@ struct WechatChatDetailView: View {
 
     // MARK: - Empty States
 
-    private func emptyMessagesView(contact: WechatBookListItem) -> some View {
+    private func emptyMessagesView(contact: ChatBookListItem) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 40 * fontScaleManager.scaleFactor))
@@ -688,8 +688,8 @@ struct WechatChatDetailView: View {
 }
 
 #Preview {
-    WechatChatDetailView(
-        listViewModel: WechatChatViewModel(),
+    ChatDetailView(
+        listViewModel: ChatViewModel(),
         selectedContactId: .constant(nil),
         onScrollViewResolved: { _ in }
     )

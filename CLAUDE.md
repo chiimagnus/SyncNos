@@ -10,7 +10,7 @@
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
 - ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
-- ✅ **WechatChat OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和本地存储加密
+- ✅ **Chats OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和本地存储加密
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
@@ -71,13 +71,13 @@ SyncNos/
 │   ├── Dedao/
 │   │   ├── DedaoListView.swift
 │   │   └── DedaoDetailView.swift
-│   ├── WechatChat/              # 微信聊天 OCR 视图
-│   │   ├── WechatChatListView.swift
-│   │   ├── WechatChatDetailView.swift
+│   ├── Chats/              # 微信聊天 OCR 视图
+│   │   ├── ChatsListView.swift
+│   │   ├── ChatsDetailView.swift
 │   │   └── Components/
-│   │       ├── WechatChatMessageBubble.swift
-│   │       ├── WechatChatSystemMessageRow.swift
-│   │       ├── WechatChatMessageContextMenu.swift
+│   │       ├── ChatsMessageBubble.swift
+│   │       ├── ChatsSystemMessageRow.swift
+│   │       ├── ChatsMessageContextMenu.swift
 │   │       └── WechatExportDocument.swift
 │   └── Settings/
 │       ├── General/
@@ -128,8 +128,8 @@ SyncNos/
 │   │   ├── DedaoDetailViewModel.swift        # 使用 NotionSyncEngine + Adapter
 │   │   ├── DedaoLoginViewModel.swift
 │   │   └── DedaoSettingsViewModel.swift
-│   ├── WechatChat/
-│   │   └── WechatChatViewModel.swift         # 微信聊天 OCR 视图模型
+│   ├── Chats/
+│   │   └── ChatsViewModel.swift         # 微信聊天 OCR 视图模型
 │   ├── Account/
 │   │   ├── AccountViewModel.swift
 │   │   ├── AppleSignInViewModel.swift
@@ -165,9 +165,9 @@ SyncNos/
 │   ├── Dedao/                    # 得到模型
 │   │   ├── DedaoModels.swift     # API DTO 模型
 │   │   └── DedaoCacheModels.swift # SwiftData 缓存模型
-│   └── WechatChat/               # 微信聊天模型
+│   └── Chats/               # 微信聊天模型
 │       ├── WechatModels.swift    # 微信聊天数据模型
-│       └── WechatChatCacheModels.swift # SwiftData 缓存模型
+│       └── ChatsCacheModels.swift # SwiftData 缓存模型
 └── Services/                     # 业务逻辑和数据访问
     ├── Auth/                     # 认证服务
     │   ├── AuthService.swift     # Apple Sign In 认证
@@ -210,9 +210,9 @@ SyncNos/
     │   │   ├── DedaoAuthService.swift          # Cookie 认证服务
     │   │   ├── DedaoRequestLimiter.swift       # 请求限流器
     │   │   └── DedaoCacheService.swift         # SwiftData 本地缓存
-    │   ├── WechatChat/           # 微信聊天 OCR 集成
+    │   ├── Chats/           # 微信聊天 OCR 集成
     │   │   ├── WechatOCRParser.swift           # OCR 结果解析器
-    │   │   └── WechatChatCacheService.swift    # SwiftData 本地缓存服务
+    │   │   └── ChatsCacheService.swift    # SwiftData 本地缓存服务
     │   └── OCR/                  # OCR 服务
     │       ├── OCRAPIService.swift             # PaddleOCR-VL API 客户端
     │       ├── OCRConfigStore.swift            # OCR 配置存储
@@ -323,8 +323,8 @@ DIContainer.shared.dedaoAuthService
 DIContainer.shared.dedaoAPIService
 DIContainer.shared.dedaoCacheService
 
-// WechatChat 服务
-DIContainer.shared.wechatChatCacheService
+// Chats 服务
+DIContainer.shared.chatsCacheService
 DIContainer.shared.wechatOCRParser
 
 // OCR 服务
@@ -400,12 +400,12 @@ DIContainer.shared.ocrConfigStore
   - 缓存书籍列表和高亮数据
   - 支持离线访问
 
-**8. 微信聊天 OCR 集成** (Services/DataSources-From/WechatChat/)
+**8. 微信聊天 OCR 集成** (Services/DataSources-From/Chats/)
 - `WechatOCRParser`: OCR 结果解析器
   - 基于 `minX` 判断消息方向（对方消息 minX < 15%）
   - 时间戳和系统消息自动检测
   - 发送者昵称智能识别（群聊场景）
-- `WechatChatCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
+- `ChatsCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
   - 缓存对话和消息数据
   - 支持离线访问和快速启动
 
@@ -476,7 +476,7 @@ DIContainer.shared.ocrConfigStore
 - `CachedDedaoHighlight`: SwiftData 缓存的高亮
 - `DedaoSyncState`: 全局同步状态
 
-**WechatChat 模型**（Models/WechatChat/）：
+**Chats 模型**（Models/Chats/）：
 - `WechatContact`: 联系人/对话模型（用于 UI 显示）
 - `WechatMessage`: 聊天消息模型（包含消息类型、方向、发送者昵称）
 - `WechatScreenshot`: 截图模型（包含原始图片和解析结果）
