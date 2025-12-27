@@ -33,7 +33,7 @@
 
 ### 2.2 输出（结构化消息）
 
-- `WechatMessage`（或 V2 DTO）数组，按视觉阅读顺序排列：
+- `ChatMessage`（或 V2 DTO）数组，按视觉阅读顺序排列：
   - 仅包含“气泡消息”
   - 不包含 timestamp/system
 
@@ -182,7 +182,7 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 ### 6.2 建议持久化的字段
 
-每张截图一条记录（`CachedWechatScreenshotV2`）：
+每张截图一条记录（`CachedChatScreenshotV2`）：
 
 - `ocrResponseJSON: Data`（必存）
 - `normalizedBlocksJSON: Data`（必存）

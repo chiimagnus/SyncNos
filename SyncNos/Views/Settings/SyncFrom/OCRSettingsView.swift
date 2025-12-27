@@ -11,12 +11,12 @@ struct OCRSettingsView: View {
             // MARK: - 数据源开关
             Section {
                 Toggle(isOn: $chatsSourceEnabled) {
-                    Text("Enable WeChat Chat source")
+                    Text("Enable Chats source")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Show WeChat Chat in the main list")
+                .help("Show Chats in the main list")
             } header: {
                 Text("Data Source")
             }
