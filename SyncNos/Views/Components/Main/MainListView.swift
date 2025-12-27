@@ -24,7 +24,7 @@ struct MainListView: View {
     @State var selectedDedaoBookIds: Set<String> = []
     @State var selectedChatsContactIds: Set<String> = []
     
-    // MARK: - WeChat Chat State (internal for extensions)
+    // MARK: - Chats State (internal for extensions)
     
     @State var showNewConversationAlert: Bool = false
     @State var newConversationName: String = ""
@@ -241,7 +241,7 @@ struct MainListView: View {
                 .ignoresSafeArea()
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
-            // MARK: - WeChat Chat New Conversation Alert
+            // MARK: - Chats New Conversation Alert
             .alert("新建对话", isPresented: $showNewConversationAlert) {
                 TextField("联系人名称", text: $newConversationName)
                 Button("创建") {
