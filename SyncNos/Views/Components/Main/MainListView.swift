@@ -14,7 +14,7 @@ struct MainListView: View {
     @StateObject var goodLinksVM = GoodLinksViewModel()
     @StateObject var weReadVM = WeReadViewModel()
     @StateObject var dedaoVM: DedaoViewModel
-    @StateObject var wechatChatVM = WechatChatViewModel()
+    @StateObject var chatsVM = ChatViewModel()
     
     // MARK: - Selection State (internal for extensions)
     
@@ -22,7 +22,7 @@ struct MainListView: View {
     @State var selectedLinkIds: Set<String> = []
     @State var selectedWeReadBookIds: Set<String> = []
     @State var selectedDedaoBookIds: Set<String> = []
-    @State var selectedWechatContactIds: Set<String> = []
+    @State var selectedChatsContactIds: Set<String> = []
     
     // MARK: - WeChat Chat State (internal for extensions)
     
@@ -60,7 +60,7 @@ struct MainListView: View {
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
     @AppStorage("datasource.dedao.enabled") private var dedaoSourceEnabled: Bool = false
-    @AppStorage("datasource.wechatChat.enabled") private var wechatChatSourceEnabled: Bool = false
+    @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
     
     // MARK: - Font Scale Support (internal for extensions)
     @ObservedObject var fontScaleManager = FontScaleManager.shared
@@ -100,8 +100,8 @@ struct MainListView: View {
             return weReadSourceEnabled
         case .dedao:
             return dedaoSourceEnabled
-        case .wechatChat:
-            return wechatChatSourceEnabled
+        case .chats:
+            return chatsSourceEnabled
         }
     }
 
@@ -134,7 +134,7 @@ struct MainListView: View {
             .onChange(of: dedaoSourceEnabled) { _, _ in
                 updateDataSourceSwitchViewModel()
             }
-            .onChange(of: wechatChatSourceEnabled) { _, _ in
+            .onChange(of: chatsSourceEnabled) { _, _ in
                 updateDataSourceSwitchViewModel()
             }
             // 当菜单切换时，同步到滑动容器
@@ -246,10 +246,10 @@ struct MainListView: View {
                 TextField("联系人名称", text: $newConversationName)
                 Button("创建") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    let contactId = wechatChatVM.createConversation(
+                    let contactId = chatsVM.createConversation(
                         name: newConversationName.trimmingCharacters(in: .whitespaces)
                     )
-                    selectedWechatContactIds = [contactId.uuidString]
+                    selectedChatsContactIds = [contactId.uuidString]
                     newConversationName = ""
                 }
                 Button("取消", role: .cancel) {
@@ -348,12 +348,12 @@ struct MainListView: View {
             goodLinksVM: goodLinksVM,
             weReadVM: weReadVM,
             dedaoVM: dedaoVM,
-            wechatChatVM: wechatChatVM,
+            chatsVM: chatsVM,
             selectedBookIds: $selectedBookIds,
             selectedLinkIds: $selectedLinkIds,
             selectedWeReadBookIds: $selectedWeReadBookIds,
             selectedDedaoBookIds: $selectedDedaoBookIds,
-            selectedWechatContactIds: $selectedWechatContactIds,
+            selectedChatsContactIds: $selectedChatsContactIds,
             filterMenu: { dataSourceToolbarMenu }
         )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
@@ -373,8 +373,8 @@ struct MainListView: View {
                 weReadFilterMenu
             case .dedao:
                 dedaoFilterMenu
-            case .wechatChat:
-                wechatChatFilterMenu
+            case .chats:
+                chatsFilterMenu
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease")

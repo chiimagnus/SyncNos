@@ -1,15 +1,15 @@
 import Foundation
 import SwiftData
 
-// MARK: - WechatChat Model Container Factory (V2 with Encryption)
+// MARK: - Chats Model Container Factory (V2 with Encryption)
 
-/// WechatChat v2 ModelContainer 工厂（独立 store 文件，支持加密字段）
-enum WechatChatModelContainerFactory {
+/// Chats v2 ModelContainer 工厂（独立 store 文件，支持加密字段）
+enum ChatModelContainerFactory {
     static func createContainer() throws -> ModelContainer {
         let schema = Schema([
-            CachedWechatConversationV2.self,
-            CachedWechatScreenshotV2.self,
-            CachedWechatMessageV2.self
+            CachedChatConversationV2.self,
+            CachedChatScreenshotV2.self,
+            CachedChatMessageV2.self
         ])
 
         // 破坏性升级：使用全新 store 文件（v2_encrypted），因为字段类型变更
@@ -18,7 +18,7 @@ enum WechatChatModelContainerFactory {
         // - senderName -> senderNameEncrypted (String? -> Data?)
         let storeURL = URL.applicationSupportDirectory
             .appendingPathComponent("SyncNos", isDirectory: true)
-            .appendingPathComponent("wechatchat_v2_encrypted.store")
+            .appendingPathComponent("chats_v2_encrypted.store")
 
         // 确保目录存在
         let directory = storeURL.deletingLastPathComponent()
@@ -37,20 +37,20 @@ enum WechatChatModelContainerFactory {
     }
 }
 
-// MARK: - WechatChat Cache Service Protocol (V2)
+// MARK: - Chats Cache Service Protocol (V2)
 
-protocol WechatChatCacheServiceProtocol: Actor {
+protocol ChatCacheServiceProtocol: Actor {
     // 对话管理
-    func fetchAllConversations() throws -> [WechatBookListItem]
-    func saveConversation(_ contact: WechatContact) throws
+    func fetchAllConversations() throws -> [ChatBookListItem]
+    func saveConversation(_ contact: ChatContact) throws
     func deleteConversation(id: String) throws
     func renameConversation(id: String, newName: String) throws
 
     // 消息读取（全量，保留兼容）
-    func fetchMessages(conversationId: String) throws -> [WechatMessage]
+    func fetchMessages(conversationId: String) throws -> [ChatMessage]
     
     // 消息读取（全量，按 order 升序，用于导出）
-    func fetchAllMessages(conversationId: String) throws -> [WechatMessage]
+    func fetchAllMessages(conversationId: String) throws -> [ChatMessage]
     
     // 消息分页读取（倒序分页：从最新消息开始）
     /// - Parameters:
@@ -62,7 +62,7 @@ protocol WechatChatCacheServiceProtocol: Actor {
         conversationId: String,
         limit: Int,
         offset: Int
-    ) throws -> [WechatMessage]
+    ) throws -> [ChatMessage]
     
     /// 获取对话消息总数
     func fetchMessageCount(conversationId: String) throws -> Int
@@ -71,7 +71,7 @@ protocol WechatChatCacheServiceProtocol: Actor {
     func updateMessageClassification(
         messageId: String,
         isFromMe: Bool,
-        kind: WechatMessageKind
+        kind: ChatMessageKind
     ) throws
 
     // 截图导入（持久化 raw OCR + blocks + parsed messages）
@@ -85,21 +85,21 @@ protocol WechatChatCacheServiceProtocol: Actor {
         ocrResponseJSON: Data,
         normalizedBlocksJSON: Data,
         parsedAt: Date,
-        messages: [WechatMessage]
+        messages: [ChatMessage]
     ) throws
 
     // 清理
     func clearAllData() throws
 
     // Debug: OCR Payload Inspect
-    func fetchRecentOcrPayloads(limit: Int) throws -> [WechatOcrPayloadSummary]
-    func fetchOcrPayload(screenshotId: String) throws -> WechatOcrPayloadDetail?
+    func fetchRecentOcrPayloads(limit: Int) throws -> [ChatOcrPayloadSummary]
+    func fetchOcrPayload(screenshotId: String) throws -> ChatOcrPayloadDetail?
 }
 
-// MARK: - WechatChat Cache Service (V2)
+// MARK: - Chats Cache Service (V2)
 
 @ModelActor
-actor WechatChatCacheService: WechatChatCacheServiceProtocol {
+actor ChatCacheService: ChatCacheServiceProtocol {
     // 注意：@ModelActor 不能有存储属性
     private var logger: LoggerServiceProtocol {
         DIContainer.shared.loggerService
@@ -107,58 +107,58 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
 
     // MARK: Conversation
 
-    func fetchAllConversations() throws -> [WechatBookListItem] {
-        let descriptor = FetchDescriptor<CachedWechatConversationV2>(
+    func fetchAllConversations() throws -> [ChatBookListItem] {
+        let descriptor = FetchDescriptor<CachedChatConversationV2>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         let conversations = try modelContext.fetch(descriptor)
 
-        var items: [WechatBookListItem] = []
+        var items: [ChatBookListItem] = []
         items.reserveCapacity(conversations.count)
 
         for conv in conversations {
             let convId = conv.conversationId
 
-            let msgPredicate = #Predicate<CachedWechatMessageV2> { msg in
+            let msgPredicate = #Predicate<CachedChatMessageV2> { msg in
                 msg.conversationId == convId
             }
 
             // 消息数量（仅气泡消息）
-            let count = try modelContext.fetchCount(FetchDescriptor<CachedWechatMessageV2>(predicate: msgPredicate))
+            let count = try modelContext.fetchCount(FetchDescriptor<CachedChatMessageV2>(predicate: msgPredicate))
 
             // 最后一条消息
-            var lastDescriptor = FetchDescriptor<CachedWechatMessageV2>(
+            var lastDescriptor = FetchDescriptor<CachedChatMessageV2>(
                 predicate: msgPredicate,
                 sortBy: [SortDescriptor(\.order, order: .reverse)]
             )
             lastDescriptor.fetchLimit = 1
             let lastMessage = try modelContext.fetch(lastDescriptor).first
 
-            let contact = WechatContact(
+            let contact = ChatContact(
                 id: UUID(uuidString: conv.conversationId) ?? UUID(),
                 name: conv.name,
                 lastMessage: lastMessage?.content,
                 lastMessageTime: nil,
                 messageCount: count
             )
-            items.append(WechatBookListItem(from: contact))
+            items.append(ChatBookListItem(from: contact))
         }
 
         return items
     }
 
-    func saveConversation(_ contact: WechatContact) throws {
+    func saveConversation(_ contact: ChatContact) throws {
         let targetId = contact.id.uuidString
-        let predicate = #Predicate<CachedWechatConversationV2> { conv in
+        let predicate = #Predicate<CachedChatConversationV2> { conv in
             conv.conversationId == targetId
         }
-        var descriptor = FetchDescriptor<CachedWechatConversationV2>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedChatConversationV2>(predicate: predicate)
         descriptor.fetchLimit = 1
 
         if let existing = try modelContext.fetch(descriptor).first {
             try existing.updateName(contact.name)  // 加密更新
         } else {
-            let newConversation = try CachedWechatConversationV2(
+            let newConversation = try CachedChatConversationV2(
                 conversationId: targetId,
                 name: contact.name,  // 自动加密
                 createdAt: Date(),
@@ -168,52 +168,52 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         }
 
         try modelContext.save()
-        logger.info("[WechatChatCacheV2] Saved conversation: \(contact.name)")
+        logger.info("[ChatCacheV2] Saved conversation: \(contact.name)")
     }
 
     func deleteConversation(id: String) throws {
         let targetId = id
-        let predicate = #Predicate<CachedWechatConversationV2> { conv in
+        let predicate = #Predicate<CachedChatConversationV2> { conv in
             conv.conversationId == targetId
         }
-        var descriptor = FetchDescriptor<CachedWechatConversationV2>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedChatConversationV2>(predicate: predicate)
         descriptor.fetchLimit = 1
 
         if let conv = try modelContext.fetch(descriptor).first {
             modelContext.delete(conv)
             try modelContext.save()
-            logger.info("[WechatChatCacheV2] Deleted conversation: \(id)")
+            logger.info("[ChatCacheV2] Deleted conversation: \(id)")
         }
     }
 
     func renameConversation(id: String, newName: String) throws {
         let targetId = id
-        let predicate = #Predicate<CachedWechatConversationV2> { conv in
+        let predicate = #Predicate<CachedChatConversationV2> { conv in
             conv.conversationId == targetId
         }
-        var descriptor = FetchDescriptor<CachedWechatConversationV2>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedChatConversationV2>(predicate: predicate)
         descriptor.fetchLimit = 1
 
         if let conv = try modelContext.fetch(descriptor).first {
             try conv.updateName(newName)  // 加密更新
             try modelContext.save()
-            logger.info("[WechatChatCacheV2] Renamed conversation to: \(newName)")
+            logger.info("[ChatCacheV2] Renamed conversation to: \(newName)")
         }
     }
 
     // MARK: Messages
 
-    func fetchMessages(conversationId: String) throws -> [WechatMessage] {
+    func fetchMessages(conversationId: String) throws -> [ChatMessage] {
         let targetId = conversationId
-        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
             msg.conversationId == targetId
         }
-        let descriptor = FetchDescriptor<CachedWechatMessageV2>(
+        let descriptor = FetchDescriptor<CachedChatMessageV2>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.order, order: .forward)]
         )
         let cached = try modelContext.fetch(descriptor)
-        return cached.map { $0.toWechatMessage() }
+        return cached.map { $0.toChatMessage() }
     }
     
     // MARK: Paginated Messages
@@ -222,14 +222,14 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         conversationId: String,
         limit: Int,
         offset: Int
-    ) throws -> [WechatMessage] {
+    ) throws -> [ChatMessage] {
         let targetId = conversationId
-        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
             msg.conversationId == targetId
         }
         
         // 倒序查询：从最新消息开始（order DESC）
-        var descriptor = FetchDescriptor<CachedWechatMessageV2>(
+        var descriptor = FetchDescriptor<CachedChatMessageV2>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.order, order: .reverse)]
         )
@@ -239,31 +239,31 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         let cached = try modelContext.fetch(descriptor)
         
         // 反转结果为正序（order ASC），符合聊天界面展示习惯
-        let messages = cached.reversed().map { $0.toWechatMessage() }
+        let messages = cached.reversed().map { $0.toChatMessage() }
         return Array(messages)
     }
     
-    func fetchAllMessages(conversationId: String) throws -> [WechatMessage] {
+    func fetchAllMessages(conversationId: String) throws -> [ChatMessage] {
         let targetId = conversationId
-        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
             msg.conversationId == targetId
         }
         
-        let descriptor = FetchDescriptor<CachedWechatMessageV2>(
+        let descriptor = FetchDescriptor<CachedChatMessageV2>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.order, order: .forward)]
         )
         
         let cached = try modelContext.fetch(descriptor)
-        return cached.map { $0.toWechatMessage() }
+        return cached.map { $0.toChatMessage() }
     }
     
     func fetchMessageCount(conversationId: String) throws -> Int {
         let targetId = conversationId
-        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
             msg.conversationId == targetId
         }
-        let descriptor = FetchDescriptor<CachedWechatMessageV2>(predicate: predicate)
+        let descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
         return try modelContext.fetchCount(descriptor)
     }
     
@@ -272,17 +272,17 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
     func updateMessageClassification(
         messageId: String,
         isFromMe: Bool,
-        kind: WechatMessageKind
+        kind: ChatMessageKind
     ) throws {
         let targetId = messageId
-        let predicate = #Predicate<CachedWechatMessageV2> { msg in
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
             msg.messageId == targetId
         }
-        var descriptor = FetchDescriptor<CachedWechatMessageV2>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
         descriptor.fetchLimit = 1
         
         guard let message = try modelContext.fetch(descriptor).first else {
-            logger.warning("[WechatChatCacheV2] Message not found for update: \(messageId)")
+            logger.warning("[ChatCacheV2] Message not found for update: \(messageId)")
             return
         }
         
@@ -290,7 +290,7 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         message.kindRaw = kind.rawValue
         
         try modelContext.save()
-        logger.info("[WechatChatCacheV2] Updated message classification: \(messageId) -> isFromMe=\(isFromMe), kind=\(kind.rawValue)")
+        logger.info("[ChatCacheV2] Updated message classification: \(messageId) -> isFromMe=\(isFromMe), kind=\(kind.rawValue)")
     }
 
     // MARK: Append Screenshot
@@ -305,22 +305,22 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         ocrResponseJSON: Data,
         normalizedBlocksJSON: Data,
         parsedAt: Date,
-        messages: [WechatMessage]
+        messages: [ChatMessage]
     ) throws {
         // 1) 确保对话存在
         let targetConvId = conversationId
-        let convPredicate = #Predicate<CachedWechatConversationV2> { conv in
+        let convPredicate = #Predicate<CachedChatConversationV2> { conv in
             conv.conversationId == targetConvId
         }
-        var convDescriptor = FetchDescriptor<CachedWechatConversationV2>(predicate: convPredicate)
+        var convDescriptor = FetchDescriptor<CachedChatConversationV2>(predicate: convPredicate)
         convDescriptor.fetchLimit = 1
 
         guard let conversation = try modelContext.fetch(convDescriptor).first else {
-            throw NSError(domain: "WechatChatCacheV2", code: 404, userInfo: [NSLocalizedDescriptionKey: "对话不存在"])
+            throw NSError(domain: "ChatCacheV2", code: 404, userInfo: [NSLocalizedDescriptionKey: "对话不存在"])
         }
 
         // 2) 插入截图记录（raw OCR + blocks）
-        let screenshot = CachedWechatScreenshotV2(
+        let screenshot = CachedChatScreenshotV2(
             screenshotId: screenshotId,
             conversationId: conversationId,
             importedAt: importedAt,
@@ -336,10 +336,10 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         modelContext.insert(screenshot)
 
         // 3) 计算当前对话最大 order
-        let msgPredicate = #Predicate<CachedWechatMessageV2> { msg in
+        let msgPredicate = #Predicate<CachedChatMessageV2> { msg in
             msg.conversationId == targetConvId
         }
-        var lastMsgDescriptor = FetchDescriptor<CachedWechatMessageV2>(
+        var lastMsgDescriptor = FetchDescriptor<CachedChatMessageV2>(
             predicate: msgPredicate,
             sortBy: [SortDescriptor(\.order, order: .reverse)]
         )
@@ -348,7 +348,7 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
 
         // 4) 插入消息（加密存储）
         for (index, message) in messages.enumerated() {
-            let cachedMessage = try CachedWechatMessageV2(
+            let cachedMessage = try CachedChatMessageV2(
                 messageId: message.id.uuidString,
                 conversationId: conversationId,
                 screenshotId: screenshotId,
@@ -367,45 +367,45 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         conversation.updatedAt = Date()
 
         try modelContext.save()
-        logger.info("[WechatChatCacheV2] Appended screenshot(\(screenshotId)) + \(messages.count) messages")
+        logger.info("[ChatCacheV2] Appended screenshot(\(screenshotId)) + \(messages.count) messages")
     }
 
     // MARK: Cleanup
 
     func clearAllData() throws {
         // 删除所有消息
-        let msgDescriptor = FetchDescriptor<CachedWechatMessageV2>()
+        let msgDescriptor = FetchDescriptor<CachedChatMessageV2>()
         for msg in try modelContext.fetch(msgDescriptor) {
             modelContext.delete(msg)
         }
 
         // 删除所有截图
-        let screenshotDescriptor = FetchDescriptor<CachedWechatScreenshotV2>()
+        let screenshotDescriptor = FetchDescriptor<CachedChatScreenshotV2>()
         for shot in try modelContext.fetch(screenshotDescriptor) {
             modelContext.delete(shot)
         }
 
         // 删除所有对话
-        let convDescriptor = FetchDescriptor<CachedWechatConversationV2>()
+        let convDescriptor = FetchDescriptor<CachedChatConversationV2>()
         for conv in try modelContext.fetch(convDescriptor) {
             modelContext.delete(conv)
         }
 
         try modelContext.save()
-        logger.info("[WechatChatCacheV2] Cleared all data")
+        logger.info("[ChatCacheV2] Cleared all data")
     }
 
     // MARK: Debug - OCR Payload Inspect
 
-    func fetchRecentOcrPayloads(limit: Int) throws -> [WechatOcrPayloadSummary] {
-        var descriptor = FetchDescriptor<CachedWechatScreenshotV2>(
+    func fetchRecentOcrPayloads(limit: Int) throws -> [ChatOcrPayloadSummary] {
+        var descriptor = FetchDescriptor<CachedChatScreenshotV2>(
             sortBy: [SortDescriptor(\.importedAt, order: .reverse)]
         )
         descriptor.fetchLimit = max(0, limit)
 
         let screenshots = try modelContext.fetch(descriptor)
         return screenshots.map {
-            WechatOcrPayloadSummary(
+            ChatOcrPayloadSummary(
                 screenshotId: $0.screenshotId,
                 conversationId: $0.conversationId,
                 importedAt: $0.importedAt,
@@ -416,17 +416,17 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
         }
     }
 
-    func fetchOcrPayload(screenshotId: String) throws -> WechatOcrPayloadDetail? {
+    func fetchOcrPayload(screenshotId: String) throws -> ChatOcrPayloadDetail? {
         let targetId = screenshotId
-        let predicate = #Predicate<CachedWechatScreenshotV2> { shot in
+        let predicate = #Predicate<CachedChatScreenshotV2> { shot in
             shot.screenshotId == targetId
         }
-        var descriptor = FetchDescriptor<CachedWechatScreenshotV2>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedChatScreenshotV2>(predicate: predicate)
         descriptor.fetchLimit = 1
 
         guard let shot = try modelContext.fetch(descriptor).first else { return nil }
 
-        return WechatOcrPayloadDetail(
+        return ChatOcrPayloadDetail(
             screenshotId: shot.screenshotId,
             conversationId: shot.conversationId,
             importedAt: shot.importedAt,
@@ -440,9 +440,9 @@ actor WechatChatCacheService: WechatChatCacheServiceProtocol {
 
 // MARK: - Conversion
 
-private extension CachedWechatMessageV2 {
-    func toWechatMessage() -> WechatMessage {
-        WechatMessage(
+private extension CachedChatMessageV2 {
+    func toChatMessage() -> ChatMessage {
+        ChatMessage(
             id: UUID(uuidString: messageId) ?? UUID(),
             content: content,
             isFromMe: isFromMe,
@@ -456,7 +456,7 @@ private extension CachedWechatMessageV2 {
 
 // MARK: - Debug DTOs (Sendable)
 
-struct WechatOcrPayloadSummary: Identifiable, Hashable, Sendable {
+struct ChatOcrPayloadSummary: Identifiable, Hashable, Sendable {
     var id: String { screenshotId }
 
     let screenshotId: String
@@ -467,7 +467,7 @@ struct WechatOcrPayloadSummary: Identifiable, Hashable, Sendable {
     let blocksBytes: Int
 }
 
-struct WechatOcrPayloadDetail: Sendable {
+struct ChatOcrPayloadDetail: Sendable {
     let screenshotId: String
     let conversationId: String
     let importedAt: Date
