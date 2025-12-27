@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct WechatChatSystemMessageRow: View {
-    let message: WechatMessage
+struct ChatSystemMessageRow: View {
+    let message: ChatMessage
     let isSelected: Bool
     let onTap: () -> Void
-    let onClassify: (_ isFromMe: Bool, _ kind: WechatMessageKind) -> Void
+    let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
 
     private let selectedBorderColor = Color.accentColor
 
@@ -28,7 +28,7 @@ struct WechatChatSystemMessageRow: View {
             .contentShape(Rectangle())
             .onTapGesture { onTap() }
             .contextMenu {
-                WechatChatMessageContextMenu(
+                ChatMessageContextMenu(
                     text: message.content,
                     isFromMe: message.isFromMe,
                     kind: message.kind,

@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - Pagination Config
 
-enum WechatChatPaginationConfig {
+enum ChatPaginationConfig {
     static let pageSize = 100                   // 每页消息数
     static let preloadThreshold = 10            // 距离顶部多少条时预加载
     static let initialLoadSize = 100            // 首次加载数量
@@ -12,8 +12,8 @@ enum WechatChatPaginationConfig {
 
 // MARK: - Pagination State
 
-struct WechatChatPaginationState {
-    var loadedMessages: [WechatMessage] = []
+struct ChatPaginationState {
+    var loadedMessages: [ChatMessage] = []
     var currentOffset: Int = 0
     var totalCount: Int = 0
     var isLoadingMore: Bool = false
@@ -28,21 +28,21 @@ struct WechatChatPaginationState {
     }
 }
 
-// MARK: - Wechat Chat View Model (V2)
+// MARK: - Chat View Model (V2)
 
 @MainActor
-final class WechatChatViewModel: ObservableObject {
+final class ChatViewModel: ObservableObject {
 
     // MARK: - Published Properties
 
     /// 联系人/对话列表（左侧列表）
-    @Published var contacts: [WechatBookListItem] = []
+    @Published var contacts: [ChatBookListItem] = []
 
     /// 内存态对话（用于导出/详情展示）
-    @Published private(set) var conversations: [UUID: WechatConversation] = [:]
+    @Published private(set) var conversations: [UUID: ChatConversation] = [:]
     
     /// 分页状态（每个对话独立管理）
-    @Published private(set) var paginationStates: [UUID: WechatChatPaginationState] = [:]
+    @Published private(set) var paginationStates: [UUID: ChatPaginationState] = [:]
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -50,13 +50,13 @@ final class WechatChatViewModel: ObservableObject {
 
     // MARK: - Display Books (for MainListView compatibility)
 
-    var displayBooks: [WechatBookListItem] { contacts }
+    var displayBooks: [ChatBookListItem] { contacts }
 
     // MARK: - Dependencies
 
     private let ocrService: OCRAPIServiceProtocol
-    private let cacheService: WechatChatCacheServiceProtocol
-    private let parser: WechatOCRParser
+    private let cacheService: ChatCacheServiceProtocol
+    private let parser: ChatOCRParser
     private let logger: LoggerServiceProtocol
 
     // MARK: - Computed
@@ -67,12 +67,12 @@ final class WechatChatViewModel: ObservableObject {
 
     init(
         ocrService: OCRAPIServiceProtocol = DIContainer.shared.ocrAPIService,
-        cacheService: WechatChatCacheServiceProtocol = DIContainer.shared.wechatChatCacheService,
+        cacheService: ChatCacheServiceProtocol = DIContainer.shared.chatsCacheService,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
         self.ocrService = ocrService
         self.cacheService = cacheService
-        self.parser = WechatOCRParser(config: .default)
+        self.parser = ChatOCRParser(config: .default)
         self.logger = logger
     }
 
@@ -87,33 +87,33 @@ final class WechatChatViewModel: ObservableObject {
             let cachedContacts = try await cacheService.fetchAllConversations()
             contacts = cachedContacts
 
-            var dict: [UUID: WechatConversation] = [:]
-            var states: [UUID: WechatChatPaginationState] = [:]
+            var dict: [UUID: ChatConversation] = [:]
+            var states: [UUID: ChatPaginationState] = [:]
             dict.reserveCapacity(cachedContacts.count)
             states.reserveCapacity(cachedContacts.count)
 
             for item in cachedContacts {
                 // 只创建对话结构，不加载消息（消息在选中时分页加载）
-                let contact = WechatContact(
+                let contact = ChatContact(
                     id: item.contactId,
                     name: item.name,
                     lastMessage: item.lastMessage,
                     lastMessageTime: item.lastMessageTime,
                     messageCount: item.messageCount
                 )
-                dict[item.contactId] = WechatConversation(contact: contact, messages: [])
+                dict[item.contactId] = ChatConversation(contact: contact, messages: [])
                 
                 // 初始化分页状态，设置总数
-                var state = WechatChatPaginationState()
+                var state = ChatPaginationState()
                 state.totalCount = item.messageCount
                 states[item.contactId] = state
             }
 
             conversations = dict
             paginationStates = states
-            logger.info("[WechatChatV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
+            logger.info("[ChatsV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
         } catch {
-            logger.error("[WechatChatV2] Failed to load from cache: \(error)")
+            logger.error("[ChatsV2] Failed to load from cache: \(error)")
             errorMessage = "加载缓存失败: \(error.localizedDescription)"
         }
     }
@@ -121,12 +121,12 @@ final class WechatChatViewModel: ObservableObject {
     /// 创建新对话（用户输入名称）
     @discardableResult
     func createConversation(name: String) -> UUID {
-        let contact = WechatContact(name: name)
-        let conversation = WechatConversation(contact: contact, messages: [])
+        let contact = ChatContact(name: name)
+        let conversation = ChatConversation(contact: contact, messages: [])
         conversations[contact.id] = conversation
         
         // 初始化分页状态
-        var state = WechatChatPaginationState()
+        var state = ChatPaginationState()
         state.hasInitiallyLoaded = true  // 新对话无消息，标记为已加载
         state.totalCount = 0
         paginationStates[contact.id] = state
@@ -136,9 +136,9 @@ final class WechatChatViewModel: ObservableObject {
         Task {
             do {
                 try await cacheService.saveConversation(contact)
-                logger.info("[WechatChatV2] Created and saved new conversation: \(name)")
+                logger.info("[ChatsV2] Created and saved new conversation: \(name)")
             } catch {
-                logger.error("[WechatChatV2] Failed to save conversation: \(error)")
+                logger.error("[ChatsV2] Failed to save conversation: \(error)")
             }
         }
 
@@ -177,18 +177,18 @@ final class WechatChatViewModel: ObservableObject {
         }
     }
 
-    func getConversation(for contactId: UUID) -> WechatConversation? {
+    func getConversation(for contactId: UUID) -> ChatConversation? {
         conversations[contactId]
     }
 
-    func getMessages(for contactId: UUID) -> [WechatMessage] {
+    func getMessages(for contactId: UUID) -> [ChatMessage] {
         conversations[contactId]?.messages ?? []
     }
     
     // MARK: - Pagination (分页加载)
     
     /// 获取已分页加载的消息（供 DetailView 使用）
-    func getLoadedMessages(for contactId: UUID) -> [WechatMessage] {
+    func getLoadedMessages(for contactId: UUID) -> [ChatMessage] {
         paginationStates[contactId]?.loadedMessages ?? []
     }
     
@@ -232,7 +232,7 @@ final class WechatChatViewModel: ObservableObject {
     /// 核心分页加载逻辑
     private func loadMessages(for contactId: UUID, reset: Bool) async {
         // 初始化或获取当前状态
-        var state = paginationStates[contactId] ?? WechatChatPaginationState()
+        var state = paginationStates[contactId] ?? ChatPaginationState()
         
         // 防止重复加载
         if state.isLoadingMore { return }
@@ -249,7 +249,7 @@ final class WechatChatViewModel: ObservableObject {
             
             // 计算偏移量
             let offset = reset ? 0 : state.loadedMessages.count
-            let limit = WechatChatPaginationConfig.pageSize
+            let limit = ChatPaginationConfig.pageSize
             
             // 分页查询
             let newMessages = try await cacheService.fetchMessagesPage(
@@ -278,9 +278,9 @@ final class WechatChatViewModel: ObservableObject {
                 conversations[contactId] = conversation
             }
             
-            logger.info("[WechatChatV2] Loaded \(newMessages.count) messages (total: \(state.loadedMessages.count)/\(state.totalCount)) for \(contactId)")
+            logger.info("[ChatsV2] Loaded \(newMessages.count) messages (total: \(state.loadedMessages.count)/\(state.totalCount)) for \(contactId)")
         } catch {
-            logger.error("[WechatChatV2] Failed to load messages page: \(error)")
+            logger.error("[ChatsV2] Failed to load messages page: \(error)")
             state.isLoadingMore = false
             paginationStates[contactId] = state
             errorMessage = "加载消息失败: \(error.localizedDescription)"
@@ -292,7 +292,7 @@ final class WechatChatViewModel: ObservableObject {
         paginationStates[contactId] = nil
     }
 
-    func deleteContact(_ contact: WechatBookListItem) {
+    func deleteContact(_ contact: ChatBookListItem) {
         contacts.removeAll { $0.id == contact.id }
         conversations.removeValue(forKey: contact.contactId)
         paginationStates.removeValue(forKey: contact.contactId)
@@ -300,9 +300,9 @@ final class WechatChatViewModel: ObservableObject {
         Task {
             do {
                 try await cacheService.deleteConversation(id: contact.id)
-                logger.info("[WechatChatV2] Deleted conversation: \(contact.name)")
+                logger.info("[ChatsV2] Deleted conversation: \(contact.name)")
             } catch {
-                logger.error("[WechatChatV2] Failed to delete conversation: \(error)")
+                logger.error("[ChatsV2] Failed to delete conversation: \(error)")
             }
         }
     }
@@ -315,9 +315,9 @@ final class WechatChatViewModel: ObservableObject {
         Task {
             do {
                 try await cacheService.clearAllData()
-                logger.info("[WechatChatV2] Cleared all data")
+                logger.info("[ChatsV2] Cleared all data")
             } catch {
-                logger.error("[WechatChatV2] Failed to clear cache: \(error)")
+                logger.error("[ChatsV2] Failed to clear cache: \(error)")
             }
         }
     }
@@ -329,33 +329,33 @@ final class WechatChatViewModel: ObservableObject {
     ///   - contactId: 对话 ID
     ///   - format: 导出格式
     /// - Returns: 导出的字符串内容
-    func exportConversation(_ contactId: UUID, format: WechatExportFormat) -> String? {
+    func exportConversation(_ contactId: UUID, format: ChatExportFormat) -> String? {
         // 优先使用分页加载的消息（用户当前看到的数据）
         let messages = paginationStates[contactId]?.loadedMessages ?? conversations[contactId]?.messages ?? []
         guard !messages.isEmpty else { return nil }
         
         let contactName = conversations[contactId]?.contact.name ?? "Unknown"
-        return WechatChatExporter.export(messages: messages, contactName: contactName, format: format)
+        return ChatExporter.export(messages: messages, contactName: contactName, format: format)
     }
     
     /// 导出所有消息（需要先加载全部消息）
-    func exportAllMessages(_ contactId: UUID, format: WechatExportFormat) async -> String? {
+    func exportAllMessages(_ contactId: UUID, format: ChatExportFormat) async -> String? {
         // 加载全部消息
         do {
             let allMessages = try await cacheService.fetchAllMessages(conversationId: contactId.uuidString)
             let contactName = conversations[contactId]?.contact.name ?? "Unknown"
-            return WechatChatExporter.export(messages: allMessages, contactName: contactName, format: format)
+            return ChatExporter.export(messages: allMessages, contactName: contactName, format: format)
         } catch {
-            logger.error("[WechatChatV2] Failed to fetch all messages for export: \(error)")
+            logger.error("[ChatsV2] Failed to fetch all messages for export: \(error)")
             errorMessage = "导出失败: \(error.localizedDescription)"
             return nil
         }
     }
     
     /// 生成导出文件名
-    func generateExportFileName(for contactId: UUID, format: WechatExportFormat) -> String {
+    func generateExportFileName(for contactId: UUID, format: ChatExportFormat) -> String {
         let contactName = conversations[contactId]?.contact.name ?? "Chat"
-        return WechatChatExporter.generateFileName(contactName: contactName, format: format)
+        return ChatExporter.generateFileName(contactName: contactName, format: format)
     }
     
     // MARK: - Import (导入)
@@ -376,7 +376,7 @@ final class WechatChatViewModel: ObservableObject {
             }
         }
         
-        let result = try WechatChatImporter.importFromFile(url: url)
+        let result = try ChatImporter.importFromFile(url: url)
         
         let contactId: UUID
         
@@ -405,16 +405,16 @@ final class WechatChatViewModel: ObservableObject {
             
             updateContactsList()
             
-            logger.info("[WechatChatV2] Imported \(adjustedMessages.count) messages to existing conversation")
+            logger.info("[ChatsV2] Imported \(adjustedMessages.count) messages to existing conversation")
         } else {
             // 创建新对话
-            let contact = WechatContact(name: result.contactName)
-            let conversation = WechatConversation(contact: contact, messages: result.messages)
+            let contact = ChatContact(name: result.contactName)
+            let conversation = ChatConversation(contact: contact, messages: result.messages)
             conversations[contact.id] = conversation
             contactId = contact.id
             
             // 初始化分页状态
-            var state = WechatChatPaginationState()
+            var state = ChatPaginationState()
             state.loadedMessages = result.messages
             state.totalCount = result.messages.count
             state.hasInitiallyLoaded = true
@@ -426,14 +426,14 @@ final class WechatChatViewModel: ObservableObject {
             
             updateContactsList()
             
-            logger.info("[WechatChatV2] Imported new conversation '\(result.contactName)' with \(result.messages.count) messages")
+            logger.info("[ChatsV2] Imported new conversation '\(result.contactName)' with \(result.messages.count) messages")
         }
         
         return contactId
     }
     
     /// 保存导入的消息到缓存
-    private func saveImportedMessages(_ messages: [WechatMessage], to contactId: UUID) async throws {
+    private func saveImportedMessages(_ messages: [ChatMessage], to contactId: UUID) async throws {
         // 使用虚拟截图 ID 保存导入的消息
         let screenshotId = UUID()
         
@@ -455,7 +455,7 @@ final class WechatChatViewModel: ObservableObject {
         guard var conversation = conversations[contactId] else { return }
 
         var contact = conversation.contact
-        contact = WechatContact(
+        contact = ChatContact(
             id: contact.id,
             name: newName,
             lastMessage: contact.lastMessage,
@@ -470,9 +470,9 @@ final class WechatChatViewModel: ObservableObject {
         Task {
             do {
                 try await cacheService.renameConversation(id: contactId.uuidString, newName: newName)
-                logger.info("[WechatChatV2] Renamed conversation to: \(newName)")
+                logger.info("[ChatsV2] Renamed conversation to: \(newName)")
             } catch {
-                logger.error("[WechatChatV2] Failed to rename conversation: \(error)")
+                logger.error("[ChatsV2] Failed to rename conversation: \(error)")
             }
         }
     }
@@ -481,12 +481,12 @@ final class WechatChatViewModel: ObservableObject {
     func updateMessageClassification(
         messageId: UUID,
         isFromMe: Bool,
-        kind: WechatMessageKind,
+        kind: ChatMessageKind,
         for contactId: UUID
     ) {
         // 创建更新后的消息
-        func createUpdatedMessage(from oldMessage: WechatMessage) -> WechatMessage {
-            WechatMessage(
+        func createUpdatedMessage(from oldMessage: ChatMessage) -> ChatMessage {
+            ChatMessage(
                 id: oldMessage.id,
                 content: oldMessage.content,
                 isFromMe: isFromMe,
@@ -519,9 +519,9 @@ final class WechatChatViewModel: ObservableObject {
                     isFromMe: isFromMe,
                     kind: kind
                 )
-                logger.info("[WechatChatV2] Updated message classification: \(messageId)")
+                logger.info("[ChatsV2] Updated message classification: \(messageId)")
             } catch {
-                logger.error("[WechatChatV2] Failed to update message classification: \(error)")
+                logger.error("[ChatsV2] Failed to update message classification: \(error)")
             }
         }
     }
@@ -564,16 +564,16 @@ final class WechatChatViewModel: ObservableObject {
     }
 
     private func importScreenshotToConversation(contactId: UUID, image: NSImage, sourceName: String?) async {
-        let screenshot = WechatScreenshot(image: image, isProcessing: true)
+        let screenshot = ChatScreenshot(image: image, isProcessing: true)
         let screenshotId = screenshot.id
         processingScreenshotIds.insert(screenshotId)
         defer { processingScreenshotIds.remove(screenshotId) }
 
         do {
             if let sourceName {
-                logger.info("[WechatChatV2] Processing screenshot: \(sourceName)")
+                logger.info("[ChatsV2] Processing screenshot: \(sourceName)")
             } else {
-                logger.info("[WechatChatV2] Processing screenshot")
+                logger.info("[ChatsV2] Processing screenshot")
             }
 
             let pixelSize = try imagePixelSize(image)
@@ -616,21 +616,21 @@ final class WechatChatViewModel: ObservableObject {
                 messages: adjusted
             )
 
-            logger.info("[WechatChatV2] Imported screenshot -> \(adjusted.count) messages")
+            logger.info("[ChatsV2] Imported screenshot -> \(adjusted.count) messages")
         } catch {
-            logger.error("[WechatChatV2] OCR/parse failed: \(error)")
+            logger.error("[ChatsV2] OCR/parse failed: \(error)")
             errorMessage = error.localizedDescription
         }
     }
 
     private func encodeNormalizedBlocks(_ blocks: [OCRBlock]) throws -> Data {
-        let snapshots: [WechatOCRBlockSnapshot] = blocks.compactMap { block in
+        let snapshots: [ChatOCRBlockSnapshot] = blocks.compactMap { block in
             let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
-            return WechatOCRBlockSnapshot(
+            return ChatOCRBlockSnapshot(
                 text: text,
                 label: block.label,
-                bbox: WechatRectSnapshot(
+                bbox: ChatRectSnapshot(
                     x: Double(block.bbox.origin.x),
                     y: Double(block.bbox.origin.y),
                     width: Double(block.bbox.size.width),
@@ -660,11 +660,11 @@ final class WechatChatViewModel: ObservableObject {
         return CGSize(width: cgImage.width, height: cgImage.height)
     }
 
-    private func adjustOrders(_ messages: [WechatMessage], for contactId: UUID) -> [WechatMessage] {
+    private func adjustOrders(_ messages: [ChatMessage], for contactId: UUID) -> [ChatMessage] {
         let existingMax = conversations[contactId]?.messages.map(\.order).max() ?? -1
         let start = existingMax + 1
         return messages.enumerated().map { idx, msg in
-            WechatMessage(
+            ChatMessage(
                 id: msg.id,
                 content: msg.content,
                 isFromMe: msg.isFromMe,
@@ -682,7 +682,7 @@ final class WechatChatViewModel: ObservableObject {
             contact.messageCount = conversation.messages.count
             contact.lastMessage = conversation.messages.sorted(by: { $0.order < $1.order }).last?.content
             contact.lastMessageTime = nil
-            return WechatBookListItem(from: contact)
+            return ChatBookListItem(from: contact)
         }
         .sorted { $0.name < $1.name }
     }
