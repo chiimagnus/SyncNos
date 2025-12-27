@@ -199,19 +199,19 @@ extension MainListView {
     }
     
     @ViewBuilder
-    var wechatChatFilterMenu: some View {
+    var chatsFilterMenu: some View {
         Button {
             showNewConversationAlert = true
         } label: {
             Label("新建对话", systemImage: "plus.message")
         }
         
-        if !wechatChatVM.contacts.isEmpty {
+        if !chatsVM.contacts.isEmpty {
             Divider()
             
             Button(role: .destructive) {
-                wechatChatVM.clearAll()
-                selectedWechatContactIds.removeAll()
+                chatsVM.clearAll()
+                selectedChatsContactIds.removeAll()
             } label: {
                 Label("清空所有对话", systemImage: "trash")
             }

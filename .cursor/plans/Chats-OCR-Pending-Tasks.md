@@ -1,8 +1,8 @@
 # 微信聊天 OCR 待办事项（V2 后续迭代）
 
-> 本文档记录 WechatChat OCR V2 重构完成后，尚未实现或明确推迟的功能。  
+> 本文档记录 Chats OCR V2 重构完成后，尚未实现或明确推迟的功能。  
 > 关联文档：
-> - `.cursor/plans/WechatChat-OCR-Parsing-TechDoc.md`
+> - `.cursor/plans/Chats-OCR-Parsing-TechDoc.md`
 
 ---
 
@@ -46,9 +46,9 @@
 
 ### 3. Notion 同步
 - **状态**：⏸️ 暂不实现
-- **原因**：计划文档明确"保持 WechatChat 独立模块"
+- **原因**：计划文档明确"保持 Chats 独立模块"
 - **后续计划**：
-  - 如需同步，需创建 `WechatChatNotionAdapter` 适配器
+  - 如需同步，需创建 `ChatsNotionAdapter` 适配器
   - 遵循 `NotionSyncSourceProtocol` 协议
 
 ---
@@ -66,9 +66,9 @@
     - Option + ←/→：循环切换消息分类（对方 ↔ 系统 ↔ 我的）
     - 点击消息可选中，选中消息显示蓝色边框高亮
 - **相关文件**：
-  - `Views/WechatChat/WechatChatDetailView.swift`
-  - `ViewModels/WechatChat/WechatChatViewModel.swift`
-  - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`
+  - `Views/Chats/ChatsDetailView.swift`
+  - `ViewModels/Chats/ChatsViewModel.swift`
+  - `Services/DataSources-From/Chats/ChatsCacheService.swift`
 
 ### 2. 🔐 聊天记录本地存储加密 ✅
 - **状态**：✅ 已实现（2025-12-25）
@@ -81,9 +81,9 @@
   - 不同步到 iCloud Keychain
 - **相关文件**：
   - `Services/Core/EncryptionService.swift`（新增）
-  - `Models/WechatChat/WechatChatCacheModels.swift`（修改）
-  - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`（修改）
-- **详细计划**：`.cursor/plans/WechatChat-本地存储加密计划.md`
+  - `Models/Chats/ChatsCacheModels.swift`（修改）
+  - `Services/DataSources-From/Chats/ChatsCacheService.swift`（修改）
+- **详细计划**：`.cursor/plans/Chats-本地存储加密计划.md`
 
 ### 3. 分页加载 ✅
 - **状态**：✅ 已实现（2025-12-26）
@@ -92,10 +92,10 @@
   - 支持"加载更多"按钮和滚动触发加载
   - 优化大量消息（2000+）的性能
 - **相关文件**：
-  - `ViewModels/WechatChat/WechatChatViewModel.swift`（添加分页状态管理）
-  - `Views/WechatChat/WechatChatDetailView.swift`（添加加载更多 UI）
-  - `Services/DataSources-From/WechatChat/WechatChatCacheService.swift`（添加分页查询方法）
-- **详细计划**：`.cursor/plans/WechatChat-分页加载实现计划.md`
+  - `ViewModels/Chats/ChatsViewModel.swift`（添加分页状态管理）
+  - `Views/Chats/ChatsDetailView.swift`（添加加载更多 UI）
+  - `Services/DataSources-From/Chats/ChatsCacheService.swift`（添加分页查询方法）
+- **详细计划**：`.cursor/plans/Chats-分页加载实现计划.md`
 
 ### 4. 导入导出功能 ✅
 - **状态**：✅ 已实现（2025-12-26）
@@ -109,11 +109,11 @@
   - 系统消息使用 `# System`
   - "我" 统一使用 `Me`
 - **相关文件**：
-  - `Services/DataSources-From/WechatChat/WechatChatExporter.swift`（新增）
-  - `Services/DataSources-From/WechatChat/WechatChatImporter.swift`（新增）
-  - `ViewModels/WechatChat/WechatChatViewModel.swift`（添加导入导出方法）
-  - `Views/WechatChat/WechatChatDetailView.swift`（添加菜单和拖拽支持）
-- **详细计划**：`.cursor/plans/WechatChat-导入导出功能实现计划.md`
+  - `Services/DataSources-From/Chats/ChatsExporter.swift`（新增）
+  - `Services/DataSources-From/Chats/ChatsImporter.swift`（新增）
+  - `ViewModels/Chats/ChatsViewModel.swift`（添加导入导出方法）
+  - `Views/Chats/ChatsDetailView.swift`（添加菜单和拖拽支持）
+- **详细计划**：`.cursor/plans/Chats-导入导出功能实现计划.md`
 
 ### 5. Debug Overlay ❌
 - **状态**：🚫 已撤回（2025-12-24）
@@ -169,16 +169,16 @@
 以下代码位置已预留扩展能力：
 
 1. **`WechatOCRParser.swift`**
-   - `config: WechatChatParseConfig` 支持自定义参数
+   - `config: ChatsParseConfig` 支持自定义参数
 
-2. **`WechatChatCacheModels.swift`**
+2. **`ChatsCacheModels.swift`**
    - `CachedWechatMessageV2.senderName` 已预留
    - `WechatOCRBlockSnapshot` 支持离线重解析
 
 3. **`OCRModels.swift`**
-   - `OCRRequestConfig.wechatChat` 已预留
+   - `OCRRequestConfig.chats` 已预留
    - 可扩展其他 profile
 
-4. **`WechatChatCacheService.swift`**
+4. **`ChatsCacheService.swift`**
    - `fetchOcrPayload()` 支持 Debug 面板
    - 可扩展加密/解密方法

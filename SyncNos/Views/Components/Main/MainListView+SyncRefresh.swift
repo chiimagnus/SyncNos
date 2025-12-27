@@ -29,7 +29,7 @@ extension MainListView {
             weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .dedao:
             dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
-        case .wechatChat:
+        case .chats:
             break // 微信聊天不支持同步到 Notion
         }
     }
@@ -77,7 +77,7 @@ extension MainListView {
                     }
                     return nil
                 }
-            case .wechatChat:
+            case .chats:
                 return // 微信聊天不支持同步
             }
             
@@ -111,7 +111,7 @@ extension MainListView {
                 await weReadVM.loadBooks()
             case .dedao:
                 await dedaoVM.loadBooks()
-            case .wechatChat:
+            case .chats:
                 break // 微信聊天没有刷新操作
             }
         }

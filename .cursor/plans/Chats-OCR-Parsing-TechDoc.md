@@ -195,7 +195,7 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 1. 从 store 读出 `normalizedBlocksJSON`
 2. 反序列化为 blocks
-3. 用当前版本 `WechatChatOCRParserV2` 重新 parse
+3. 用当前版本 `ChatsOCRParserV2` 重新 parse
 4. 覆盖/重写该截图对应的消息集合
 
 ## 7. 调试与可观测性（建议逐步加）

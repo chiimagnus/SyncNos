@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - Wechat OCR Parser (V2)
+// MARK: - Chat OCR Parser (V2)
 //
 // 目标：
 // - 仅解析“气泡消息”（我/对方），支持私聊 + 群聊（昵称绑定）。
@@ -9,14 +9,14 @@ import CoreGraphics
 // - 主要依赖 bbox 的几何特征（过滤/合并/方向判定/昵称绑定）。
 //
 
-final class WechatOCRParser {
-    private let config: WechatChatParseConfig
+final class ChatOCRParser {
+    private let config: ChatParseConfig
 
-    init(config: WechatChatParseConfig = .default) {
+    init(config: ChatParseConfig = .default) {
         self.config = config
     }
 
-    func parse(ocrResult: OCRResult, imageSize: CGSize) -> [WechatMessage] {
+    func parse(ocrResult: OCRResult, imageSize: CGSize) -> [ChatMessage] {
         guard imageSize.width > 0, imageSize.height > 0 else { return [] }
 
         let blocks = normalizeBlocks(ocrResult.blocks, imageSize: imageSize)
@@ -32,12 +32,12 @@ final class WechatOCRParser {
         let directedBubbles = classifyDirection(bubbleCandidates, imageWidth: imageSize.width)
         var bubbleIndex = 0
 
-        var messages: [WechatMessage] = []
+        var messages: [ChatMessage] = []
         messages.reserveCapacity(candidates.count)
 
         for (idx, cand) in candidates.enumerated() {
             if systemFlags[idx] {
-                messages.append(WechatMessage(
+                messages.append(ChatMessage(
                     content: cand.text,
                     isFromMe: false,
                     senderName: nil,
@@ -48,7 +48,7 @@ final class WechatOCRParser {
             } else {
                 let bubble = directedBubbles[bubbleIndex]
                 bubbleIndex += 1
-                messages.append(WechatMessage(
+                messages.append(ChatMessage(
                     content: bubble.text,
                     isFromMe: bubble.isFromMe,
                     senderName: nil,
@@ -98,7 +98,7 @@ private struct DirectedCandidate {
 
 // MARK: - Centered System/Timestamp Detection (geometry only)
 
-private extension WechatOCRParser {
+private extension ChatOCRParser {
     /// 识别位于 X 轴中间的系统/时间戳文本（不做关键词识别）
     ///
     /// 思路：中心文本通常同时满足：
@@ -170,7 +170,7 @@ private extension WechatOCRParser {
 
 // MARK: - Normalization & Filtering
 
-private extension WechatOCRParser {
+private extension ChatOCRParser {
     func normalizeBlocks(_ blocks: [OCRBlock], imageSize: CGSize) -> [NormalizedBlock] {
         return blocks.compactMap { block in
             let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,7 +191,7 @@ private extension WechatOCRParser {
 
 // MARK: - Grouping: Blocks -> Lines
 
-private extension WechatOCRParser {
+private extension ChatOCRParser {
     func groupBlocksIntoLines(_ blocks: [NormalizedBlock]) -> [Line] {
         var lines: [Line] = []
 
@@ -236,7 +236,7 @@ private extension WechatOCRParser {
 
 // MARK: - Grouping: Lines -> Message Candidates
 
-private extension WechatOCRParser {
+private extension ChatOCRParser {
     func groupLinesIntoCandidates(_ lines: [Line]) -> [MessageCandidate] {
         var candidates: [MessageCandidate] = []
 
@@ -281,7 +281,7 @@ private extension WechatOCRParser {
 
 // MARK: - Direction Classification (Data-driven)
 
-private extension WechatOCRParser {
+private extension ChatOCRParser {
     func classifyDirection(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [DirectedCandidate] {
         guard !candidates.isEmpty, imageWidth > 0 else { return [] }
 

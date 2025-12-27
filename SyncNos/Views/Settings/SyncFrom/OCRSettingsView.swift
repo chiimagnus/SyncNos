@@ -4,13 +4,13 @@ import UniformTypeIdentifiers
 /// OCR 设置视图（PaddleOCR-VL）
 struct OCRSettingsView: View {
     @StateObject private var viewModel = OCRSettingsViewModel()
-    @AppStorage("datasource.wechatChat.enabled") private var wechatChatSourceEnabled: Bool = false
+    @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
     
     var body: some View {
         Form {
             // MARK: - 数据源开关
             Section {
-                Toggle(isOn: $wechatChatSourceEnabled) {
+                Toggle(isOn: $chatsSourceEnabled) {
                     Text("Enable WeChat Chat source")
                         .scaledFont(.body)
                 }

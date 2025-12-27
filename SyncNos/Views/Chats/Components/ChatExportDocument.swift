@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// 用于 SwiftUI `fileExporter` 的文档类型
-struct WechatExportDocument: FileDocument {
+struct ChatExportDocument: FileDocument {
     /// 支持读取的类型
     static var readableContentTypes: [UTType] {
         [.json, .plainText, UTType(filenameExtension: "md")].compactMap { $0 }
@@ -14,9 +14,9 @@ struct WechatExportDocument: FileDocument {
     }
 
     let content: String
-    let format: WechatExportFormat
+    let format: ChatExportFormat
 
-    init(content: String, format: WechatExportFormat) {
+    init(content: String, format: ChatExportFormat) {
         self.content = content
         self.format = format
     }

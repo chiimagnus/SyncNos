@@ -36,7 +36,7 @@ final class EncryptionService: EncryptionServiceProtocol {
     // MARK: - Constants
     
     private let keychainService = "com.syncnos.encryption"
-    private let keychainAccount = "wechat.aes.key"
+    private let keychainAccount = "chats.aes.key"
     
     // MARK: - State
     

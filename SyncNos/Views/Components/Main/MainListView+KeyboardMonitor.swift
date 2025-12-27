@@ -42,20 +42,20 @@ extension MainListView {
                 }
             }
             
-            // Option + 方向键：WechatChat 分类切换（消息导航改为 ↑/↓，见下方无修饰键分支）
+            // Option + 方向键：Chats 分类切换（消息导航改为 ↑/↓，见下方无修饰键分支）
             if hasOption && !hasCommand && !hasControl {
-                if self.contentSource == .wechatChat && self.keyboardNavigationTarget == .detail {
+                if self.contentSource == .chats && self.keyboardNavigationTarget == .detail {
                     switch event.keyCode {
                     case 123: // Option+← 切换分类（向左：我 → 系统 → 对方）
                         NotificationCenter.default.post(
-                            name: .wechatChatCycleClassification,
+                            name: .chatsCycleClassification,
                             object: nil,
                             userInfo: ["direction": "left"]
                         )
                         return nil
                     case 124: // Option+→ 切换分类（向右：对方 → 系统 → 我）
                         NotificationCenter.default.post(
-                            name: .wechatChatCycleClassification,
+                            name: .chatsCycleClassification,
                             object: nil,
                             userInfo: ["direction": "right"]
                         )
@@ -92,10 +92,10 @@ extension MainListView {
                 return event
             case 126: // ↑
                 if self.keyboardNavigationTarget == .detail {
-                    // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
-                    if self.contentSource == .wechatChat {
+                    // Chats：↑/↓ 用于消息选择导航（不再做逐行滚动）
+                    if self.contentSource == .chats {
                         NotificationCenter.default.post(
-                            name: .wechatChatNavigateMessage,
+                            name: .chatsNavigateMessage,
                             object: nil,
                             userInfo: ["direction": "up"]
                         )
@@ -107,10 +107,10 @@ extension MainListView {
                 return event
             case 125: // ↓
                 if self.keyboardNavigationTarget == .detail {
-                    // WechatChat：↑/↓ 用于消息选择导航（不再做逐行滚动）
-                    if self.contentSource == .wechatChat {
+                    // Chats：↑/↓ 用于消息选择导航（不再做逐行滚动）
+                    if self.contentSource == .chats {
                         NotificationCenter.default.post(
-                            name: .wechatChatNavigateMessage,
+                            name: .chatsNavigateMessage,
                             object: nil,
                             userInfo: ["direction": "down"]
                         )
@@ -213,8 +213,8 @@ extension MainListView {
             return selectedWeReadBookIds.count == 1
         case .dedao:
             return selectedDedaoBookIds.count == 1
-        case .wechatChat:
-            return selectedWechatContactIds.count == 1
+        case .chats:
+            return selectedChatsContactIds.count == 1
         }
     }
     
@@ -316,8 +316,8 @@ extension MainListView {
             return Notification.Name("DataSourceSwitchedToWeRead")
         case .dedao:
             return Notification.Name("DataSourceSwitchedToDedao")
-        case .wechatChat:
-            return Notification.Name("DataSourceSwitchedToWechatChat")
+        case .chats:
+            return Notification.Name("DataSourceSwitchedToChats")
         }
     }
 }
