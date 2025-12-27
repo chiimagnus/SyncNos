@@ -24,15 +24,19 @@ struct OCRSettingsView: View {
             // MARK: - API 配置
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("API URL")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    TextField("API URL", text: $viewModel.apiURL)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textSelection(.enabled)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Token")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    SecureField("API Token", text: $viewModel.token)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textSelection(.enabled)
                 }
                 
                 Link("获取 API URL 和 Token", destination: URL(string: "https://aistudio.baidu.com/paddleocr/task")!)
