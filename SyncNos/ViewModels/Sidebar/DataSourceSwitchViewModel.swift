@@ -99,8 +99,8 @@ final class DataSourceSwitchViewModel: ObservableObject {
             notificationName = Notification.Name("DataSourceSwitchedToWeRead")
         case .dedao:
             notificationName = Notification.Name("DataSourceSwitchedToDedao")
-        case .wechatChat:
-            notificationName = Notification.Name("DataSourceSwitchedToWechatChat")
+        case .chats:
+            notificationName = Notification.Name("DataSourceSwitchedToChats")
         }
         // 延迟发送，确保视图切换动画完成
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
