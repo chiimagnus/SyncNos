@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct WechatChatMessageBubble: View {
-    let message: WechatMessage
+struct ChatMessageBubble: View {
+    let message: ChatMessage
     let isSelected: Bool
     let onTap: () -> Void
-    let onClassify: (_ isFromMe: Bool, _ kind: WechatMessageKind) -> Void
+    let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
 
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
     private let otherBubbleColor = Color.white
@@ -53,7 +53,7 @@ struct WechatChatMessageBubble: View {
             .contentShape(RoundedRectangle(cornerRadius: 8))
             .onTapGesture { onTap() }
             .contextMenu {
-                WechatChatMessageContextMenu(
+                ChatMessageContextMenu(
                     text: messageContent,
                     isFromMe: message.isFromMe,
                     kind: message.kind,

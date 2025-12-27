@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - OCR Payload Sheet View
 
 /// 查看当前对话的 OCR Normalized Blocks 数据
-struct WechatChatOCRPayloadSheet: View {
+struct ChatOCRPayloadSheet: View {
     let conversationId: String
     let conversationName: String
     
@@ -126,7 +126,7 @@ struct WechatChatOCRPayloadSheet: View {
     }
     
     /// 美化显示 Normalized Blocks JSON
-    private func formattedBlocks(detail: WechatOcrPayloadDetail) -> String {
+    private func formattedBlocks(detail: ChatOcrPayloadDetail) -> String {
         let raw = detail.normalizedBlocksJSON
         guard let data = raw.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data),
@@ -147,12 +147,12 @@ struct WechatChatOCRPayloadSheet: View {
 
 @MainActor
 private final class OCRPayloadSheetViewModel: ObservableObject {
-    @Published var payloads: [WechatOcrPayloadSummary] = []
-    @Published var detail: WechatOcrPayloadDetail?
+    @Published var payloads: [ChatOcrPayloadSummary] = []
+    @Published var detail: ChatOcrPayloadDetail?
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    private let cacheService: WechatChatCacheServiceProtocol = DIContainer.shared.wechatChatCacheService
+    private let cacheService: ChatCacheServiceProtocol = DIContainer.shared.chatsCacheService
     
     func reload(conversationId: String) async {
         isLoading = true

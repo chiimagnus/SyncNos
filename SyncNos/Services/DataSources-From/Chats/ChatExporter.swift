@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 // MARK: - Export Format
 
 /// 微信聊天记录导出格式
-enum WechatExportFormat: String, CaseIterable, Identifiable {
+enum ChatExportFormat: String, CaseIterable, Identifiable {
     case json = "JSON"
     case markdown = "Markdown"
     
@@ -37,21 +37,21 @@ enum WechatExportFormat: String, CaseIterable, Identifiable {
 // MARK: - JSON Export Model
 
 /// JSON 导出模型（带版本号，便于后续兼容性处理）
-struct WechatExportJSON: Codable {
+struct ChatExportJSON: Codable {
     let version: Int
     let exportedAt: Date
-    let conversation: WechatExportConversation
+    let conversation: ChatExportConversation
     
     static let currentVersion = 1
 }
 
-struct WechatExportConversation: Codable {
+struct ChatExportConversation: Codable {
     let contactName: String
     let messageCount: Int
-    let messages: [WechatExportMessage]
+    let messages: [ChatExportMessage]
 }
 
-struct WechatExportMessage: Codable {
+struct ChatExportMessage: Codable {
     let content: String
     let isFromMe: Bool
     let kind: String
@@ -62,7 +62,7 @@ struct WechatExportMessage: Codable {
 // MARK: - Exporter
 
 /// 微信聊天记录导出工具
-enum WechatChatExporter {
+enum ChatExporter {
     
     // MARK: - Public Methods
     
@@ -71,7 +71,7 @@ enum WechatChatExporter {
     ///   - conversation: 对话数据
     ///   - format: 导出格式
     /// - Returns: 导出的字符串内容
-    static func export(_ conversation: WechatConversation, format: WechatExportFormat) -> String {
+    static func export(_ conversation: ChatConversation, format: ChatExportFormat) -> String {
         switch format {
         case .json:
             return exportAsJSON(conversation)
@@ -86,9 +86,9 @@ enum WechatChatExporter {
     ///   - contactName: 联系人名称
     ///   - format: 导出格式
     /// - Returns: 导出的字符串内容
-    static func export(messages: [WechatMessage], contactName: String, format: WechatExportFormat) -> String {
-        let contact = WechatContact(name: contactName)
-        let conversation = WechatConversation(contact: contact, messages: messages)
+    static func export(messages: [ChatMessage], contactName: String, format: ChatExportFormat) -> String {
+        let contact = ChatContact(name: contactName)
+        let conversation = ChatConversation(contact: contact, messages: messages)
         return export(conversation, format: format)
     }
     
@@ -97,7 +97,7 @@ enum WechatChatExporter {
     ///   - contactName: 联系人名称
     ///   - format: 导出格式
     /// - Returns: 文件名（含扩展名）
-    static func generateFileName(contactName: String, format: WechatExportFormat) -> String {
+    static func generateFileName(contactName: String, format: ChatExportFormat) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
         let timestamp = dateFormatter.string(from: Date())
@@ -119,11 +119,11 @@ enum WechatChatExporter {
     
     // MARK: - JSON Export
     
-    private static func exportAsJSON(_ conversation: WechatConversation) -> String {
+    private static func exportAsJSON(_ conversation: ChatConversation) -> String {
         let messages = conversation.messages
             .sorted(by: { $0.order < $1.order })
             .map { msg in
-                WechatExportMessage(
+                ChatExportMessage(
                     content: msg.content,
                     isFromMe: msg.isFromMe,
                     kind: msg.kind.rawValue,
@@ -132,10 +132,10 @@ enum WechatChatExporter {
                 )
             }
         
-        let exportData = WechatExportJSON(
-            version: WechatExportJSON.currentVersion,
+        let exportData = ChatExportJSON(
+            version: ChatExportJSON.currentVersion,
             exportedAt: Date(),
-            conversation: WechatExportConversation(
+            conversation: ChatExportConversation(
                 contactName: conversation.contact.name,
                 messageCount: messages.count,
                 messages: messages
@@ -156,7 +156,7 @@ enum WechatChatExporter {
     
     // MARK: - Markdown Export
     
-    private static func exportAsMarkdown(_ conversation: WechatConversation) -> String {
+    private static func exportAsMarkdown(_ conversation: ChatConversation) -> String {
         var lines: [String] = []
         
         // 标题（对话联系人名称）
@@ -233,7 +233,7 @@ enum WechatChatExporter {
     
     // MARK: - Helper
     
-    private static func formatSender(_ message: WechatMessage, defaultName: String) -> String {
+    private static func formatSender(_ message: ChatMessage, defaultName: String) -> String {
         if message.isFromMe {
             return "Me"
         } else if let senderName = message.senderName, !senderName.isEmpty {

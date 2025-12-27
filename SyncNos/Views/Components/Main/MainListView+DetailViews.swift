@@ -17,8 +17,8 @@ extension MainListView {
             weReadDetailView
         case .dedao:
             dedaoDetailView
-        case .wechatChat:
-            wechatChatDetailView
+        case .chats:
+            chatsDetailView
         }
     }
     
@@ -123,14 +123,14 @@ extension MainListView {
     }
     
     @ViewBuilder
-    var wechatChatDetailView: some View {
-        if selectedWechatContactIds.count == 1 {
+    var chatsDetailView: some View {
+        if selectedChatsContactIds.count == 1 {
             let singleContactBinding = Binding<String?>(
-                get: { selectedWechatContactIds.first },
-                set: { new in selectedWechatContactIds = new.map { Set([$0]) } ?? [] }
+                get: { selectedChatsContactIds.first },
+                set: { new in selectedChatsContactIds = new.map { Set([$0]) } ?? [] }
             )
-            WechatChatDetailView(
-                listViewModel: wechatChatVM,
+            ChatDetailView(
+                listViewModel: chatsVM,
                 selectedContactId: singleContactBinding,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
@@ -142,7 +142,7 @@ extension MainListView {
                 Image(systemName: "message.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.secondary)
-                if selectedWechatContactIds.isEmpty {
+                if selectedChatsContactIds.isEmpty {
                     Text("选择一个对话")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
@@ -150,7 +150,7 @@ extension MainListView {
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("已选择 \(selectedWechatContactIds.count) 个对话")
+                    Text("已选择 \(selectedChatsContactIds.count) 个对话")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
                 }
