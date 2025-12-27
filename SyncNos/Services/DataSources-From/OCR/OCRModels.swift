@@ -155,7 +155,7 @@ struct OCRRequestConfig: Sendable {
     )
 
     /// 聊天截图建议默认值（可后续再调优）
-    static let wechatChat = OCRRequestConfig(
+    static let chats = OCRRequestConfig(
         useDocOrientationClassify: true,
         useDocUnwarping: false,
         useLayoutDetection: true,

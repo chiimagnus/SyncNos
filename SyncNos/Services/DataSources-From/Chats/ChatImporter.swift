@@ -3,16 +3,16 @@ import Foundation
 // MARK: - Import Result
 
 /// 导入结果
-struct WechatImportResult {
+struct ChatImportResult {
     let contactName: String
-    let messages: [WechatMessage]
-    let format: WechatExportFormat
+    let messages: [ChatMessage]
+    let format: ChatExportFormat
 }
 
 // MARK: - Import Error
 
 /// 导入错误
-enum WechatImportError: LocalizedError {
+enum ChatImportError: LocalizedError {
     case invalidFormat
     case jsonParseError(String)
     case markdownParseError(String)
@@ -41,18 +41,18 @@ enum WechatImportError: LocalizedError {
 // MARK: - Importer
 
 /// 微信聊天记录导入工具
-enum WechatChatImporter {
+enum ChatImporter {
     
     // MARK: - Public Methods
     
     /// 从文件 URL 自动检测格式并导入
     /// - Parameter url: 文件 URL
     /// - Returns: 导入结果
-    static func importFromFile(url: URL) throws -> WechatImportResult {
+    static func importFromFile(url: URL) throws -> ChatImportResult {
         let fileExtension = url.pathExtension.lowercased()
         
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
-            throw WechatImportError.fileReadError(url.lastPathComponent)
+            throw ChatImportError.fileReadError(url.lastPathComponent)
         }
         
         switch fileExtension {
@@ -61,65 +61,65 @@ enum WechatChatImporter {
         case "md", "markdown":
             return try importFromMarkdown(content)
         default:
-            throw WechatImportError.invalidFormat
+            throw ChatImportError.invalidFormat
         }
     }
     
     /// 从 JSON 字符串导入
     /// - Parameter jsonString: JSON 字符串
     /// - Returns: 导入结果
-    static func importFromJSON(_ jsonString: String) throws -> WechatImportResult {
+    static func importFromJSON(_ jsonString: String) throws -> ChatImportResult {
         guard let data = jsonString.data(using: .utf8) else {
-            throw WechatImportError.jsonParseError("Invalid UTF-8 encoding")
+            throw ChatImportError.jsonParseError("Invalid UTF-8 encoding")
         }
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         
         do {
-            let exportData = try decoder.decode(WechatExportJSON.self, from: data)
+            let exportData = try decoder.decode(ChatExportJSON.self, from: data)
             
             // 版本检查
-            if exportData.version > WechatExportJSON.currentVersion {
-                throw WechatImportError.unsupportedVersion(exportData.version)
+            if exportData.version > ChatExportJSON.currentVersion {
+                throw ChatImportError.unsupportedVersion(exportData.version)
             }
             
             let messages = exportData.conversation.messages.enumerated().map { index, msg in
-                WechatMessage(
+                ChatMessage(
                     id: UUID(),
                     content: msg.content,
                     isFromMe: msg.isFromMe,
                     senderName: msg.senderName,
-                    kind: WechatMessageKind(rawValue: msg.kind) ?? .text,
+                    kind: ChatMessageKind(rawValue: msg.kind) ?? .text,
                     bbox: nil,
                     order: msg.order >= 0 ? msg.order : index
                 )
             }
             
             if messages.isEmpty {
-                throw WechatImportError.emptyContent
+                throw ChatImportError.emptyContent
             }
             
-            return WechatImportResult(
+            return ChatImportResult(
                 contactName: exportData.conversation.contactName,
                 messages: messages,
                 format: .json
             )
-        } catch let error as WechatImportError {
+        } catch let error as ChatImportError {
             throw error
         } catch {
-            throw WechatImportError.jsonParseError(error.localizedDescription)
+            throw ChatImportError.jsonParseError(error.localizedDescription)
         }
     }
     
     /// 从 Markdown 字符串导入
     /// - Parameter markdownString: Markdown 字符串
     /// - Returns: 导入结果
-    static func importFromMarkdown(_ markdownString: String) throws -> WechatImportResult {
+    static func importFromMarkdown(_ markdownString: String) throws -> ChatImportResult {
         let lines = markdownString.components(separatedBy: .newlines)
         
         var contactName: String?
-        var messages: [WechatMessage] = []
+        var messages: [ChatMessage] = []
         var currentSender: String?
         var currentIsFromMe = false
         var pendingContent: [String] = []
@@ -140,7 +140,7 @@ enum WechatChatImporter {
             }
             
             // 检测消息类型
-            var kind: WechatMessageKind
+            var kind: ChatMessageKind
             var finalContent: String
             
             // 检查是否是系统消息（发送者为 "System"）
@@ -173,7 +173,7 @@ enum WechatChatImporter {
                 finalContent = content
             }
             
-            let message = WechatMessage(
+            let message = ChatMessage(
                 id: UUID(),
                 content: finalContent,
                 isFromMe: currentIsFromMe,
@@ -246,14 +246,14 @@ enum WechatChatImporter {
         
         // 验证结果
         guard let name = contactName, !name.isEmpty else {
-            throw WechatImportError.markdownParseError("Contact name not found (expected # Title at the beginning)")
+            throw ChatImportError.markdownParseError("Contact name not found (expected # Title at the beginning)")
         }
         
         if messages.isEmpty {
-            throw WechatImportError.emptyContent
+            throw ChatImportError.emptyContent
         }
         
-        return WechatImportResult(
+        return ChatImportResult(
             contactName: name,
             messages: messages,
             format: .markdown

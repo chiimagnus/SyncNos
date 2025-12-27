@@ -1,7 +1,7 @@
-## WechatChat `WechatChatDetailView.swift` 重构计划（SwiftUI 优先 / 尽量减少 AppKit）
+## Chat `ChatDetailView.swift` 重构计划（SwiftUI 优先 / 尽量减少 AppKit）
 
 - **计划生成时间**：2025-12-26
-- **当前文件**：`SyncNos/Views/WechatChat/WechatChatDetailView.swift`
+- **当前文件**：`SyncNos/Views/Chat/ChatDetailView.swift`
 - **现状**：功能正常，但单文件承担了过多职责（UI + 导入导出 + Drag&Drop + 右键菜单/消息分类 + 键盘导航联动），导致可读性/可维护性差。
 
 ---
@@ -10,12 +10,12 @@
 
 **结论：在不牺牲现有交互与稳定性的前提下，做不到完全移除 AppKit；但可以“把 AppKit 限定在极小的边界内”，让主体 UI 100% SwiftUI，且文件结构清爽。**
 
-#### 1.1 当前 WechatChat Detail 涉及的 AppKit 点（盘点）
+#### 1.1 当前 Chat Detail 涉及的 AppKit 点（盘点）
 
 - **键盘导航/焦点/滚动联动（全局机制）**
   - `MainListView+KeyboardMonitor.swift` 使用 `NSEvent`、`NSWindow`、`NSScrollView` 实现：←/→ 切焦点、PageUp/Down、Cmd+↑/↓ 等。
   - Detail 通过 `EnclosingScrollViewReader` 回传底层 `NSScrollView` 给 MainListView（`onScrollViewResolved`）。
-  - **这部分不是 WechatChat 独有**，是整个应用的键盘交互基础；要完全 SwiftUI 需要重写全局键盘监控，SwiftUI 目前没有等价能力。
+  - **这部分不是 Chat 独有**，是整个应用的键盘交互基础；要完全 SwiftUI 需要重写全局键盘监控，SwiftUI 目前没有等价能力。
 
 - **导入文件选择（已切到 SwiftUI）**
   - 已使用 SwiftUI `.fileImporter` 替换 `NSOpenPanel`，并收敛为「单一 importer + mode 切换」，避免多个 `.fileImporter` 互相覆盖导致不弹窗。
@@ -27,7 +27,7 @@
 
 - **图片处理（NSImage）**
   - OCR API：`OCRAPIServiceProtocol` 直接要求 `NSImage`（`OCRAPIService.swift`）。
-  - WechatChat：`WechatChatViewModel` 通过 `NSImage(contentsOf:)` 加载并调用 OCR。
+  - Chat：`ChatViewModel` 通过 `NSImage(contentsOf:)` 加载并调用 OCR。
   - 要彻底 AppKit-free，需要把 OCR 输入改为 `Data/CGImage` 并重写图片编码/测试图生成，属于跨模块大改。
 
 #### 1.2 推荐路线
@@ -41,14 +41,14 @@
 
 #### 2.1 目标
 
-- **可维护性**：`WechatChatDetailView.swift` 不再是 1000+ 行巨石文件。
+- **可维护性**：`ChatDetailView.swift` 不再是 1000+ 行巨石文件。
 - **职责拆分**：UI、导入导出、Drag&Drop、可选中文本（AppKit）分别落在清晰的组件/文件中。
 - **SwiftUI 主体化**：除非确实做不到，否则优先用 SwiftUI 原生能力。
 - **可回归验证**：每个优先级完成后必须能 `xcodebuild` 成功，并手动走一遍关键路径。
 
 #### 2.2 非目标（本轮不做 / 高风险）
 
-- 不在 P1 里改动 OCR 解析算法（`WechatOCRParser`）与 SwiftData 缓存结构（`WechatChatCacheService` / `CachedWechat*V2`）。
+- 不在 P1 里改动 OCR 解析算法（`WechatOCRParser`）与 SwiftData 缓存结构（`ChatCacheService` / `CachedWechat*V2`）。
 - 不在 P1 里重写全局键盘监控机制（`MainListView+KeyboardMonitor.swift`）。
 
 ---
@@ -59,22 +59,22 @@
 
 #### 3.1 要做的事情（Checklist）
 
-- **拆分 `WechatChatDetailView.swift`**
-  - 将以下内容移动到独立文件（建议放到 `SyncNos/Views/WechatChat/Components/`）：
-    - `WechatChatMessageContextMenu`（SwiftUI 右键菜单：系统能力 + 分类）
-    - `WechatChatMessageBubble`
-    - `WechatChatSystemMessageRow`
+- **拆分 `ChatDetailView.swift`**
+  - 将以下内容移动到独立文件（建议放到 `SyncNos/Views/Chat/Components/`）：
+    - `ChatMessageContextMenu`（SwiftUI 右键菜单：系统能力 + 分类）
+    - `ChatMessageBubble`
+    - `ChatSystemMessageRow`
     - `WechatExportDocument`
-  - 将导入/导出、Drag&Drop 的辅助函数抽到单独的 `WechatChatDetailActions.swift`（或 `WechatChatDetailImportExport.swift`），Detail 主文件只保留：状态、布局、子视图组合。
+  - 将导入/导出、Drag&Drop 的辅助函数抽到单独的 `ChatDetailActions.swift`（或 `ChatDetailImportExport.swift`），Detail 主文件只保留：状态、布局、子视图组合。
 
 - **统一通知名，去掉字符串散落**
-  - 新增 `WechatChatNotifications.swift`：
-    - `Notification.Name.wechatChatNavigateMessage`
-    - `Notification.Name.wechatChatCycleClassification`
+  - 新增 `ChatNotifications.swift`：
+    - `Notification.Name.chatsNavigateMessage`
+    - `Notification.Name.chatsCycleClassification`
   - MainListView 与 Detail 统一改用强类型 name，避免字符串拼写风险。
 
 - **把“分页 + 锚点 + 保持滚动位置”的逻辑局部化**
-  - 建议把“加载更早消息条 + preserve anchor”抽成一个子视图（例如 `WechatChatHistoryLoaderRow`），避免主体 `contentView` 巨大。
+  - 建议把“加载更早消息条 + preserve anchor”抽成一个子视图（例如 `ChatHistoryLoaderRow`），避免主体 `contentView` 巨大。
 
 - **明确 AppKit 边界（不移除，但隔离）**
   - `EnclosingScrollViewReader` 保持不变（全局键盘机制依赖）。
@@ -83,26 +83,26 @@
 #### 3.2 预计改动文件
 
 - **新增**
-  - `SyncNos/Views/WechatChat/Components/WechatChatMessageContextMenu.swift`
-  - `SyncNos/Views/WechatChat/Components/WechatChatMessageBubble.swift`
-  - `SyncNos/Views/WechatChat/Components/WechatChatSystemMessageRow.swift`
-  - `SyncNos/Views/WechatChat/Components/WechatExportDocument.swift`
-  - `SyncNos/Views/WechatChat/WechatChatNotifications.swift`
+  - `SyncNos/Views/Chat/Components/ChatMessageContextMenu.swift`
+  - `SyncNos/Views/Chat/Components/ChatMessageBubble.swift`
+  - `SyncNos/Views/Chat/Components/ChatSystemMessageRow.swift`
+  - `SyncNos/Views/Chat/Components/WechatExportDocument.swift`
+  - `SyncNos/Views/Chat/ChatNotifications.swift`
 - **修改**
-  - `SyncNos/Views/WechatChat/WechatChatDetailView.swift`（大幅瘦身）
+  - `SyncNos/Views/Chat/ChatDetailView.swift`（大幅瘦身）
   - `SyncNos/Views/Components/Main/MainListView+KeyboardMonitor.swift`（仅替换 Notification.Name 常量引用）
 
 > 注意：项目是 Xcode 工程（非 SwiftPM）。新增文件需要确保被加入 `SyncNos` target（实现阶段用 Xcode 添加，或编辑 `project.pbxproj`）。
 
 #### 3.3 P1 验收标准
 
-- `WechatChatDetailView.swift` 文件行数显著下降（目标：< 300~400 行）。
+- `ChatDetailView.swift` 文件行数显著下降（目标：< 300~400 行）。
 - 行为不变：
   - 导入截图（OCR）正常
   - 导入 JSON/Markdown 正常
   - 导出 JSON/Markdown 正常
   - Drag&Drop 图片/文件正常
-  - WechatChat：↑/↓ 消息选择导航正常；Option+←/→ 分类循环正常
+  - Chat：↑/↓ 消息选择导航正常；Option+←/→ 分类循环正常
   - 右键：只显示自定义菜单（包含分类与常用系统能力）
 
 #### 3.4 P1 Build 验证
@@ -165,7 +165,7 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 
 #### 5.1 可选中文本：用 SwiftUI `.textSelection(.enabled)` 替换 `NSTextView`
 
-- 将 `WechatChatSelectableText` 替换为 SwiftUI 组件：
+- 将 `ChatSelectableText` 替换为 SwiftUI 组件：
   - `Text(messageContent).textSelection(.enabled)`
   - 气泡背景/圆角/选中描边继续由 SwiftUI 绘制
 
@@ -196,12 +196,12 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 
 ### 6) P4（不建议 / 仅用于讨论）：全链路移除 AppKit
 
-如果你希望“整个 WechatChat/OCR 都不 import AppKit”，需要跨模块大改：
+如果你希望“整个 Chat/OCR 都不 import AppKit”，需要跨模块大改：
 
 - **OCR 层改造**
   - `OCRAPIServiceProtocol` 从 `NSImage` 改为 `Data/CGImage`
   - `OCRAPIService` 的图片编码、测试图片生成全部重写（ImageIO/CoreGraphics）
-  - `WechatChatViewModel`、`WechatScreenshot`、相关调用链全面改签名
+  - `ChatViewModel`、`WechatScreenshot`、相关调用链全面改签名
 - **全局键盘监控改造**
   - `MainListView+KeyboardMonitor.swift` 目前基于 `NSEvent` 的本地事件监控，这是 SwiftUI 缺少的能力
   - 该部分基本无法做到 100% SwiftUI 等价（除非引入更重的架构与大量自定义 NSView/NSWindow 层）
@@ -254,11 +254,11 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
 已落地的内容：
 
 - **P1（已完成）**
-  - 将气泡/系统消息拆到 `SyncNos/Views/WechatChat/Components/`
+  - 将气泡/系统消息拆到 `SyncNos/Views/Chat/Components/`
   - 右键菜单已改为 **SwiftUI 自定义 `.contextMenu`**：禁用系统文本菜单，并提供 Copy/Share + 分类项
-  - 已删除 `WechatChatSelectableTextView.swift`（`NSTextView` 桥接不再需要）
-  - `WechatChatDetailView.swift` 行数显著下降（从 1000+ 降到 ~700 左右）
-  - 统一了 wechatChat 的通知名常量
+  - 已删除 `ChatSelectableTextView.swift`（`NSTextView` 桥接不再需要）
+  - `ChatDetailView.swift` 行数显著下降（从 1000+ 降到 ~700 左右）
+  - 统一了 chats 的通知名常量
   - 已通过 `xcodebuild`（macOS Debug）
 
 - **P2（已完成）**
@@ -267,7 +267,7 @@ xcodebuild -scheme SyncNos -configuration Debug -destination "platform=macOS" bu
   - 已通过 `xcodebuild`（macOS Debug）
 
 - **P3（已完成）**
-  - Drag&Drop 的“直接拖入图片 data（非文件 URL）”路径已改为 **内存导入**：新增 `WechatChatViewModel.addScreenshotData(...)`，直接用 `NSImage(data:)` 走 OCR/解析/落库流程，**无需写入临时文件**
+  - Drag&Drop 的“直接拖入图片 data（非文件 URL）”路径已改为 **内存导入**：新增 `ChatViewModel.addScreenshotData(...)`，直接用 `NSImage(data:)` 走 OCR/解析/落库流程，**无需写入临时文件**
   - 已通过 `xcodebuild`（macOS Debug）
 
 

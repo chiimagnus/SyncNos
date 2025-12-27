@@ -1,18 +1,18 @@
 import SwiftUI
 import AppKit
 
-/// WechatChat 消息右键菜单（SwiftUI 版本）
+/// Chat 消息右键菜单（SwiftUI 版本）
 ///
 /// 目标：
 /// - 禁用系统“文本选择”右键菜单（不使用 `.textSelection(.enabled)`）
 /// - 用 SwiftUI `.contextMenu` 提供我们自己的菜单
 /// - 尽量补齐系统菜单常用能力（复制/分享）
-struct WechatChatMessageContextMenu: View {
+struct ChatMessageContextMenu: View {
     let text: String
     let isFromMe: Bool
-    let kind: WechatMessageKind
+    let kind: ChatMessageKind
     let onSelect: () -> Void
-    let onClassify: (_ isFromMe: Bool, _ kind: WechatMessageKind) -> Void
+    let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
 
     var body: some View {
         // 分类（业务菜单）
