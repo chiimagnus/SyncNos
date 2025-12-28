@@ -1,5 +1,12 @@
 import SwiftUI
 
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// 通知 ListView 更新焦点状态（focused 参数为 true/false）
+    static let listViewShouldUpdateFocus = Notification.Name("ListViewShouldUpdateFocus")
+}
+
 // MARK: - MainListView Keyboard & Focus Extension
 
 extension MainListView {
@@ -176,12 +183,20 @@ extension MainListView {
         guard let window = mainWindow else { return }
         guard let firstResponder = window.firstResponder else { return }
         
+        // 保存旧状态，用于检测变化
+        let oldTarget = keyboardNavigationTarget
+        
         // 检查 firstResponder 是否在 Detail 的 ScrollView 中
         if let detailScrollView = currentDetailScrollView {
             var responder: NSResponder? = firstResponder
             while let r = responder {
                 if r === detailScrollView || r === detailScrollView.contentView {
                     keyboardNavigationTarget = .detail
+                    
+                    // 如果状态发生变化，通知 ListView 失去焦点
+                    if oldTarget != keyboardNavigationTarget {
+                        notifyListViewFocusChange(focused: false)
+                    }
                     return
                 }
                 responder = r.nextResponder
@@ -190,6 +205,23 @@ extension MainListView {
         
         // 否则认为焦点在 List
         keyboardNavigationTarget = .list
+        
+        // 如果状态发生变化，通知 ListView 获得焦点
+        if oldTarget != keyboardNavigationTarget {
+            notifyListViewFocusChange(focused: true)
+        }
+    }
+    
+    /// 通知当前的 ListView 焦点状态变化
+    private func notifyListViewFocusChange(focused: Bool) {
+        NotificationCenter.default.post(
+            name: .listViewShouldUpdateFocus,
+            object: nil,
+            userInfo: [
+                "focused": focused,
+                "source": contentSource.rawValue
+            ]
+        )
     }
     
     func stopKeyboardMonitorIfNeeded() {

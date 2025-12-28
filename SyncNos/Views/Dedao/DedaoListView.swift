@@ -126,6 +126,16 @@ struct DedaoListView: View {
                 isListFocused = true
             }
         }
+        // 监听焦点状态更新通知（鼠标点击 DetailView 时同步焦点状态）
+        .onReceive(NotificationCenter.default.publisher(for: .listViewShouldUpdateFocus).receive(on: DispatchQueue.main)) { notification in
+            // 只处理发给当前数据源的通知
+            guard let source = notification.userInfo?["source"] as? String,
+                  source == ContentSource.dedao.rawValue else { return }
+            
+            if let focused = notification.userInfo?["focused"] as? Bool {
+                isListFocused = focused
+            }
+        }
         // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoSettings")).receive(on: DispatchQueue.main)) { _ in
             // 打开设置窗口
