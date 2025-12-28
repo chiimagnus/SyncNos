@@ -4,15 +4,18 @@ import AppKit
 /// Chat 消息右键菜单（SwiftUI 版本）
 ///
 /// 目标：
-/// - 禁用系统“文本选择”右键菜单（不使用 `.textSelection(.enabled)`）
+/// - 禁用系统"文本选择"右键菜单（不使用 `.textSelection(.enabled)`）
 /// - 用 SwiftUI `.contextMenu` 提供我们自己的菜单
 /// - 尽量补齐系统菜单常用能力（复制/分享）
 struct ChatMessageContextMenu: View {
     let text: String
     let isFromMe: Bool
     let kind: ChatMessageKind
+    let senderName: String?
     let onSelect: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
+    let onSetSenderName: () -> Void
+    let onClearSenderName: () -> Void
 
     var body: some View {
         // 分类（业务菜单）
@@ -35,6 +38,29 @@ struct ChatMessageContextMenu: View {
             onClassify(false, .system)
         } label: {
             classifyLabel("系统消息", isActive: kind == .system)
+        }
+
+        Divider()
+
+        // 昵称设置
+        Button {
+            onSelect()
+            onSetSenderName()
+        } label: {
+            if let name = senderName, !name.isEmpty {
+                Label("Change Sender Name (\(name))...", systemImage: "person.text.rectangle")
+            } else {
+                Label("Set Sender Name...", systemImage: "person.text.rectangle")
+            }
+        }
+
+        if senderName != nil {
+            Button(role: .destructive) {
+                onSelect()
+                onClearSenderName()
+            } label: {
+                Label("Clear Sender Name", systemImage: "person.badge.minus")
+            }
         }
 
         Divider()
