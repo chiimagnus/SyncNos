@@ -1,6 +1,7 @@
 # 微信聊天 OCR - 群聊昵称功能实现计划
 
 > **创建日期**：2025-12-28  
+> **更新日期**：2025-12-28  
 > **状态**：📋 待实现  
 > **关联文档**：
 > - `.cursor/plans/Chats-OCR-Parsing-TechDoc.md`
@@ -21,7 +22,7 @@
 
 在群聊截图中，用户希望能够：
 1. 为消息设置发送者昵称
-2. 方便地从历史昵称列表中选择
+2. 方便地从本对话已使用的昵称列表中选择
 3. 在消息气泡上方显示发送者昵称（微信群聊风格）
 
 ### 1.3 设计决策
@@ -31,7 +32,9 @@
 - 几何规则识别准确率不稳定，受截图分辨率/主题影响
 - 群聊中用户只关注少数重要发送者，手动标注更可控
 
-**采用方案**：用户手动设置昵称 + 历史昵称标签选择器
+**采用方案**：用户手动设置昵称 + 单对话昵称标签选择器
+
+**不区分私聊/群聊**：所有对话统一处理，昵称字段为可选
 
 ---
 
@@ -56,12 +59,11 @@
     ↓
 弹出昵称选择/输入 Popover
     ↓
-用户选择历史昵称 或 输入新昵称
+用户选择本对话已使用的昵称 或 输入新昵称
     ↓
 确认后：
     - 更新消息的 senderName
-    - 持久化到 SwiftData
-    - 新昵称加入全局历史列表
+    - 持久化到 SwiftData（加密存储）
 ```
 
 ### 2.2 UI 设计
@@ -72,10 +74,9 @@
 ┌─────────────────────────────────────┐
 │  设置发送者昵称                       │
 │  ────────────────────────────────── │
-│  历史昵称：                           │
+│  本对话中已使用的昵称：               │
 │  ┌─────────────────────────────────┐│
-│  │ [信年君] [抄底狂魔苏兄] [None]   ││ ← 可点选的标签
-│  │ [王小明] [张三]                  ││
+│  │ [信年君] [抄底狂魔苏兄] [None]   ││ ← 从当前对话消息中提取
 │  └─────────────────────────────────┘│
 │  ────────────────────────────────── │
 │  或输入新昵称：                       │
@@ -86,6 +87,8 @@
 │           [取消]    [确定]           │
 └─────────────────────────────────────┘
 ```
+
+**注意**：昵称列表来源于当前对话中所有已设置 senderName 的消息（动态提取，无需额外存储）
 
 #### 消息气泡昵称显示
 
@@ -105,7 +108,7 @@
                     ┌────────────────────┐
                     │  消息内容...        │
                     └────────────────────┘
-（"我的消息"通常不显示昵称，但 senderName 字段可存储）
+（"我的消息"不显示昵称）
 ```
 
 ### 2.3 数据模型
@@ -122,43 +125,19 @@ struct ChatMessage {
 // ChatCacheModels.swift - 已有字段
 @Model
 class CachedChatMessageV2 {
-    var senderNameEncrypted: Data?  // ✅ 已预留
+    var senderNameEncrypted: Data?  // ✅ 已预留，加密存储
     // ...
 }
 ```
 
-#### 全局昵称历史列表（新增）
+#### 单对话昵称列表（动态提取，无需额外存储）
 
 ```swift
-// 存储位置：UserDefaults
-// Key: "chat.sender.name.history"
-// Value: [String] - 最近使用的昵称列表（去重、按使用时间排序）
-// 最大数量：20 个
-
-final class ChatSenderNameHistoryStore {
-    static let shared = ChatSenderNameHistoryStore()
-    
-    private let key = "chat.sender.name.history"
-    private let maxCount = 20
-    
-    var names: [String] {
-        get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
-    }
-    
-    func add(_ name: String) {
-        guard !name.isEmpty else { return }
-        var list = names.filter { $0 != name }  // 去重
-        list.insert(name, at: 0)  // 最新使用的放最前面
-        if list.count > maxCount {
-            list = Array(list.prefix(maxCount))
-        }
-        names = list
-    }
-    
-    func remove(_ name: String) {
-        names = names.filter { $0 != name }
-    }
+// 从当前对话消息中提取已使用的昵称
+func getUsedSenderNames(for contactId: UUID) -> [String] {
+    let messages = getLoadedMessages(for: contactId)
+    let names = messages.compactMap { $0.senderName }
+    return Array(Set(names)).sorted()  // 去重、排序
 }
 ```
 
@@ -170,12 +149,11 @@ final class ChatSenderNameHistoryStore {
 
 | 文件 | 变更类型 | 描述 |
 |------|----------|------|
-| `ChatSenderNameHistoryStore.swift` | **新增** | 全局昵称历史列表存储 |
 | `ChatSenderNamePickerView.swift` | **新增** | 昵称选择/输入 Popover 视图 |
 | `ChatMessageContextMenu.swift` | 修改 | 添加"设置发送者昵称"菜单项 |
-| `ChatMessageBubble.swift` | 修改 | 显示发送者昵称 |
-| `ChatViewModel.swift` | 修改 | 添加 `updateMessageSenderName()` |
-| `ChatsCacheService.swift` | 修改 | 添加昵称更新方法 |
+| `ChatMessageBubble.swift` | 修改 | 触发昵称选择 Popover |
+| `ChatViewModel.swift` | 修改 | 添加 `updateMessageSenderName()` 和 `getUsedSenderNames()` |
+| `ChatsCacheService.swift` | 修改 | 添加昵称持久化方法 |
 
 ### 3.2 优先级与任务分解
 
@@ -183,85 +161,31 @@ final class ChatSenderNameHistoryStore {
 
 | 任务 | 描述 | 预估时间 |
 |------|------|----------|
-| **P1.1** | 创建 `ChatSenderNameHistoryStore` | 15 min |
-| **P1.2** | 创建 `ChatSenderNamePickerView` | 45 min |
-| **P1.3** | 修改 `ChatMessageContextMenu` 添加菜单项 | 20 min |
-| **P1.4** | 修改 `ChatViewModel` 添加 `updateMessageSenderName()` | 15 min |
+| **P1.1** | 创建 `ChatSenderNamePickerView`（标签选择 + 输入框） | 40 min |
+| **P1.2** | 修改 `ChatMessageContextMenu` 添加菜单项 | 20 min |
+| **P1.3** | 修改 `ChatViewModel` 添加 `updateMessageSenderName()` | 15 min |
+| **P1.4** | 修改 `ChatViewModel` 添加 `getUsedSenderNames()` | 10 min |
 | **P1.5** | 修改 `ChatsCacheService` 添加昵称持久化方法 | 20 min |
 
 #### P2 - 显示优化
 
 | 任务 | 描述 | 预估时间 |
 |------|------|----------|
-| **P2.1** | 修改 `ChatMessageBubble` 显示昵称 | 15 min |
+| **P2.1** | 确保 `ChatMessageBubble` 正确显示昵称 | 10 min |
 | **P2.2** | 添加"清除昵称"菜单项 | 10 min |
-| **P2.3** | 昵称颜色样式（微信蓝 #576B95） | 10 min |
+| **P2.3** | 昵称颜色样式（微信蓝 #576B95） | 5 min |
 
 #### P3 - 增强功能（可选）
 
 | 任务 | 描述 | 预估时间 |
 |------|------|----------|
 | **P3.1** | 批量设置昵称（多选消息） | 30 min |
-| **P3.2** | 昵称历史管理（删除不常用昵称） | 20 min |
 
 ---
 
 ## 四、详细实现步骤
 
-### 4.1 P1.1 - ChatSenderNameHistoryStore
-
-**新建文件**：`SyncNos/Services/DataSources-From/Chats/ChatSenderNameHistoryStore.swift`
-
-```swift
-import Foundation
-
-/// 全局昵称历史列表存储
-/// - 存储位置：UserDefaults
-/// - 最大数量：20 个
-/// - 排序：按最近使用时间（最新在前）
-final class ChatSenderNameHistoryStore: ObservableObject {
-    static let shared = ChatSenderNameHistoryStore()
-    
-    private let key = "chat.sender.name.history"
-    private let maxCount = 20
-    
-    @Published private(set) var names: [String] = []
-    
-    private init() {
-        names = UserDefaults.standard.stringArray(forKey: key) ?? []
-    }
-    
-    /// 添加昵称到历史列表（自动去重、排序、限制数量）
-    func add(_ name: String) {
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        var list = names.filter { $0 != trimmed }
-        list.insert(trimmed, at: 0)
-        
-        if list.count > maxCount {
-            list = Array(list.prefix(maxCount))
-        }
-        
-        names = list
-        UserDefaults.standard.set(list, forKey: key)
-    }
-    
-    /// 从历史列表中移除昵称
-    func remove(_ name: String) {
-        names = names.filter { $0 != name }
-        UserDefaults.standard.set(names, forKey: key)
-    }
-    
-    /// 清空历史列表
-    func clear() {
-        names = []
-        UserDefaults.standard.removeObject(forKey: key)
-    }
-}
-```
-
-### 4.2 P1.2 - ChatSenderNamePickerView
+### 4.1 P1.1 - ChatSenderNamePickerView
 
 **新建文件**：`SyncNos/Views/Chats/Components/ChatSenderNamePickerView.swift`
 
@@ -270,34 +194,34 @@ import SwiftUI
 
 /// 昵称选择/输入 Popover
 struct ChatSenderNamePickerView: View {
-    @Binding var isPresented: Bool
+    let usedNames: [String]  // 本对话中已使用的昵称
     let currentName: String?
     let onSelect: (String?) -> Void
+    let onDismiss: () -> Void
     
-    @StateObject private var historyStore = ChatSenderNameHistoryStore.shared
     @State private var inputText: String = ""
     @FocusState private var isInputFocused: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("设置发送者昵称")
-                .font(.headline)
+            Text("Set Sender Name")
+                .scaledFont(.headline)
             
             Divider()
             
-            // 历史昵称标签区
-            if !historyStore.names.isEmpty {
-                Text("历史昵称：")
-                    .font(.subheadline)
+            // 本对话已使用的昵称标签区
+            if !usedNames.isEmpty {
+                Text("Used in this chat:")
+                    .scaledFont(.subheadline)
                     .foregroundColor(.secondary)
                 
                 FlowLayout(spacing: 6) {
-                    ForEach(historyStore.names, id: \.self) { name in
+                    ForEach(usedNames, id: \.self) { name in
                         Button {
                             selectName(name)
                         } label: {
                             Text(name)
-                                .font(.callout)
+                                .scaledFont(.callout)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                                 .background(
@@ -314,20 +238,18 @@ struct ChatSenderNamePickerView: View {
             }
             
             // 输入新昵称
-            Text("或输入新昵称：")
-                .font(.subheadline)
+            Text("Or enter new name:")
+                .scaledFont(.subheadline)
                 .foregroundColor(.secondary)
             
-            HStack {
-                TextField("输入昵称...", text: $inputText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($isInputFocused)
-                    .onSubmit {
-                        if !inputText.isEmpty {
-                            selectName(inputText)
-                        }
+            TextField("Enter name...", text: $inputText)
+                .textFieldStyle(.roundedBorder)
+                .focused($isInputFocused)
+                .onSubmit {
+                    if !inputText.isEmpty {
+                        selectName(inputText)
                     }
-            }
+                }
             
             Divider()
             
@@ -335,24 +257,24 @@ struct ChatSenderNamePickerView: View {
             HStack {
                 Spacer()
                 
-                Button("取消") {
-                    isPresented = false
+                Button("Cancel") {
+                    onDismiss()
                 }
                 .keyboardShortcut(.escape)
                 
-                Button("确定") {
+                Button("OK") {
                     if !inputText.isEmpty {
                         selectName(inputText)
                     } else {
-                        isPresented = false
+                        onDismiss()
                     }
                 }
                 .keyboardShortcut(.return)
-                .disabled(inputText.isEmpty && currentName == nil)
+                .buttonStyle(.borderedProminent)
             }
         }
         .padding()
-        .frame(width: 300)
+        .frame(width: 280)
         .onAppear {
             inputText = currentName ?? ""
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -364,10 +286,7 @@ struct ChatSenderNamePickerView: View {
     private func selectName(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        historyStore.add(trimmed)
         onSelect(trimmed)
-        isPresented = false
     }
 }
 
@@ -416,23 +335,48 @@ struct FlowLayout: Layout {
 }
 ```
 
-### 4.3 P1.3 - 修改 ChatMessageContextMenu
+### 4.2 P1.2 - 修改 ChatMessageContextMenu
 
 **修改文件**：`SyncNos/Views/Chats/Components/ChatMessageContextMenu.swift`
 
-添加"设置发送者昵称"和"清除昵称"菜单项。
+添加"设置发送者昵称"菜单项，需要传递回调来触发 Popover。
 
-### 4.4 P1.4 - 修改 ChatViewModel
+### 4.3 P1.3 - 修改 ChatViewModel
 
 **修改文件**：`SyncNos/ViewModels/Chats/ChatViewModel.swift`
 
-添加 `updateMessageSenderName()` 方法。
+```swift
+// 新增方法
+func updateMessageSenderName(
+    messageId: UUID,
+    senderName: String?,
+    for contactId: UUID
+) {
+    // 1. 更新 conversations 内存
+    // 2. 更新 paginationStates 内存
+    // 3. 持久化到 SwiftData
+}
 
-### 4.5 P1.5 - 修改 ChatsCacheService
+func getUsedSenderNames(for contactId: UUID) -> [String] {
+    let messages = getLoadedMessages(for: contactId)
+    let names = messages.compactMap { $0.senderName }
+    return Array(Set(names)).sorted()
+}
+```
+
+### 4.4 P1.4 - 修改 ChatsCacheService
 
 **修改文件**：`SyncNos/Services/DataSources-From/Chats/ChatsCacheService.swift`
 
-添加昵称持久化方法。
+```swift
+// 新增方法
+func updateMessageSenderName(
+    messageId: String,
+    senderName: String?
+) async throws {
+    // 加密并更新 senderNameEncrypted 字段
+}
+```
 
 ---
 
@@ -444,9 +388,10 @@ struct FlowLayout: Layout {
 |--------|----------|
 | 右键菜单显示"设置发送者昵称" | ✅ 菜单项正常显示 |
 | 点击后弹出昵称选择 Popover | ✅ Popover 正常弹出 |
-| 选择历史昵称 | ✅ 消息昵称更新、Popover 关闭 |
-| 输入新昵称并确认 | ✅ 消息昵称更新、新昵称加入历史列表 |
-| 重启应用后历史昵称保留 | ✅ UserDefaults 持久化正常 |
+| Popover 显示本对话已使用的昵称 | ✅ 标签正确显示 |
+| 选择已有昵称 | ✅ 消息昵称更新、Popover 关闭 |
+| 输入新昵称并确认 | ✅ 消息昵称更新 |
+| 重启应用后昵称保留 | ✅ SwiftData 持久化正常 |
 | 消息气泡上方显示昵称 | ✅ 仅对方消息显示昵称 |
 | 清除昵称 | ✅ senderName 设为 nil、气泡不再显示昵称 |
 
@@ -454,19 +399,17 @@ struct FlowLayout: Layout {
 
 | 测试项 | 预期结果 |
 |--------|----------|
-| 历史昵称达到 20 个上限 | ✅ 自动移除最旧的昵称 |
+| 新对话无历史昵称 | ✅ 只显示输入框，无标签区 |
 | 输入空白昵称 | ✅ 阻止提交 |
-| 输入已存在的历史昵称 | ✅ 移到列表最前面（去重） |
-| 我的消息设置昵称 | ✅ 支持（但默认不显示） |
+| 我的消息设置昵称 | ✅ 支持（但不显示） |
 
 ---
 
 ## 六、后续迭代建议
 
 1. **昵称颜色区分**：不同昵称显示不同颜色（类似微信群聊）
-2. **昵称头像绑定**：支持为昵称设置头像（可选）
-3. **智能昵称建议**：基于 OCR 识别的"疑似昵称"区域，提供建议（需优化几何规则）
-4. **导出时保留昵称**：JSON/Markdown 导出包含 senderName 字段
+2. **导出时保留昵称**：JSON/Markdown 导出包含 senderName 字段
+3. **批量设置昵称**：选中多条消息统一设置
 
 ---
 
@@ -475,4 +418,4 @@ struct FlowLayout: Layout {
 | 日期 | 版本 | 描述 |
 |------|------|------|
 | 2025-12-28 | v1.0 | 初始计划文档 |
-
+| 2025-12-28 | v1.1 | 改为单对话昵称列表（动态提取），移除全局历史存储 |
