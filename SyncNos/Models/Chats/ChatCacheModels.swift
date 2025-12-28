@@ -294,6 +294,15 @@ final class CachedChatMessageV2 {
             }
         }
     }
+    
+    /// 更新发送者昵称（加密后存储）
+    func updateSenderName(_ newName: String?) throws {
+        if let name = newName, !name.isEmpty {
+            self.senderNameEncrypted = try EncryptionService.shared.encrypt(name)
+        } else {
+            self.senderNameEncrypted = nil
+        }
+    }
 }
 
 // MARK: - Normalized Block Snapshot (for persistence & replay)

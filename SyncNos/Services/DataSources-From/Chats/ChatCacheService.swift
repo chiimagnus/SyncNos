@@ -73,6 +73,12 @@ protocol ChatCacheServiceProtocol: Actor {
         isFromMe: Bool,
         kind: ChatMessageKind
     ) throws
+    
+    // 消息昵称更新
+    func updateMessageSenderName(
+        messageId: String,
+        senderName: String?
+    ) throws
 
     // 截图导入（持久化 raw OCR + blocks + parsed messages）
     func appendScreenshot(
@@ -291,6 +297,30 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         
         try modelContext.save()
         logger.info("[ChatCacheV2] Updated message classification: \(messageId) -> isFromMe=\(isFromMe), kind=\(kind.rawValue)")
+    }
+    
+    // MARK: Update Message Sender Name
+    
+    func updateMessageSenderName(
+        messageId: String,
+        senderName: String?
+    ) throws {
+        let targetId = messageId
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
+            msg.messageId == targetId
+        }
+        var descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        
+        guard let message = try modelContext.fetch(descriptor).first else {
+            logger.warning("[ChatCacheV2] Message not found for sender name update: \(messageId)")
+            return
+        }
+        
+        try message.updateSenderName(senderName)
+        
+        try modelContext.save()
+        logger.info("[ChatCacheV2] Updated message sender name: \(messageId) -> \(senderName ?? "nil")")
     }
 
     // MARK: Append Screenshot
