@@ -203,18 +203,7 @@ extension MainListView {
         Button {
             showNewConversationAlert = true
         } label: {
-            Label("New Conversation", systemImage: "plus.message")
-        }
-        
-        if !chatsVM.contacts.isEmpty {
-            Divider()
-            
-            Button(role: .destructive) {
-                chatsVM.clearAll()
-                selectedChatsContactIds.removeAll()
-            } label: {
-                Label("Clear All Conversations", systemImage: "trash")
-            }
+            Label("New Chat", systemImage: "plus.message")
         }
     }
 }

@@ -97,6 +97,7 @@ enum ChatExporter {
     ///   - contactName: 联系人名称
     ///   - format: 导出格式
     /// - Returns: 文件名（含扩展名）
+    /// - Note: 格式为 `SyncNos_<chatName>_<timestamp>.<ext>`
     static func generateFileName(contactName: String, format: ChatExportFormat) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
@@ -114,7 +115,7 @@ enum ChatExporter {
             .replacingOccurrences(of: ">", with: "_")
             .replacingOccurrences(of: "|", with: "_")
         
-        return "\(sanitizedName)_\(timestamp).\(format.fileExtension)"
+        return "SyncNos_\(sanitizedName)_\(timestamp).\(format.fileExtension)"
     }
     
     // MARK: - JSON Export
