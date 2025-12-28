@@ -21,7 +21,8 @@ struct ChatMessageBubble: View {
             }
 
             VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 4) {
-                if let name = message.senderName, !message.isFromMe {
+                // 显示昵称（仅当 senderName 存在时）
+                if let name = message.senderName, !name.isEmpty {
                     Text(name)
                         .scaledFont(.caption2)
                         .foregroundColor(senderNameColor)
