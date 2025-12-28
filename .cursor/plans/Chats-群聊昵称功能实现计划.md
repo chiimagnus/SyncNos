@@ -426,7 +426,7 @@ func updateMessageSenderName(
 ## 六、后续迭代建议
 
 1. **昵称颜色区分**：不同昵称显示不同颜色（类似微信群聊）
-2. **导出时保留昵称**：JSON/Markdown 导出包含 senderName 字段
+2. ✅ **导出时保留昵称**：JSON/Markdown 导出包含 senderName 字段（已实现）
 3. **批量设置昵称**：选中多条消息统一设置
 
 ---
@@ -440,3 +440,4 @@ func updateMessageSenderName(
 | 2025-12-28 | v1.2 | ✅ P1/P2 全部完成：右键菜单、昵称弹窗、持久化、气泡显示 |
 | 2025-12-28 | v1.3 | 调整：我的消息也显示昵称；系统消息隐藏昵称菜单项 |
 | 2025-12-28 | v1.4 | 优化：Popover 位置调整（arrowEdge: .leading，显示在右侧） |
+| 2025-12-28 | v1.5 | ✅ 验证完成：导出时保留昵称功能已实现（JSON/Markdown） |
