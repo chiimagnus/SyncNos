@@ -2,7 +2,7 @@
 
 [<img src="Resource/image.png" alt="Download" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
-> **SyncNos** - A professional reading notes sync tool that seamlessly syncs highlights and annotations from Apple Books, GoodLinks, WeRead, and Dedao to Notion, supporting multiple sync strategies and powerful customization features.
+> **SyncNos** - Sync Everything to Notion, including AppleBooks, GoodLinks, WeRead, AI Chats, Chats(OCR version) and etc.
 
 ## Sync Data From
 - Apple Books
