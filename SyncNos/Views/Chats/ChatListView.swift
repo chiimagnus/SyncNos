@@ -12,8 +12,8 @@ struct ChatListView: View {
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
     
-    @EnvironmentObject private var fontScaleManager: FontScaleManager
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
+    @Environment(\.fontScale) private var fontScale
     
     var body: some View {
         VStack(spacing: 0) {
@@ -48,7 +48,7 @@ struct ChatListView: View {
         VStack(spacing: 16) {
             if !ocrConfigStore.isConfigured {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 40))
+                    .font(.system(size: 40 * fontScale))
                     .foregroundColor(.orange)
                 Text("Please configure PaddleOCR API first")
                     .scaledFont(.headline)
@@ -57,7 +57,7 @@ struct ChatListView: View {
                     .foregroundColor(.secondary)
             } else {
                 Image(systemName: "message.badge.filled.fill")
-                    .font(.system(size: 40))
+                    .font(.system(size: 40 * fontScale))
                     .foregroundColor(.secondary)
                 Text("No Conversations")
                     .scaledFont(.headline)
@@ -106,45 +106,46 @@ struct ChatListView: View {
 
 private struct ContactRow: View {
     let contact: ChatBookListItem
+    @Environment(\.fontScale) private var fontScale
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                // 联系人名称
+                // Contact name
                 Text(contact.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .scaledFont(.subheadline, weight: .medium)
                     .lineLimit(1)
                 
                 Spacer()
                 
-                // 时间
+                // Time
                 if let time = contact.lastMessageTime {
                     Text(time)
-                        .font(.caption2)
+                        .scaledFont(.caption2)
                         .foregroundColor(.secondary)
                 }
             }
             
             HStack {
-                // 最后消息预览
+                // Last message preview
                 if let lastMessage = contact.lastMessage {
                     Text(lastMessage)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 } else if contact.messageCount == 0 {
                     Text("No messages")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary.opacity(0.6))
                         .italic()
                 }
                 
                 Spacer()
                 
-                // 消息数量
+                // Message count
                 if contact.messageCount > 0 {
                     Text("\(contact.messageCount)")
-                        .font(.caption2)
+                        .scaledFont(.caption2)
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -164,6 +165,6 @@ private struct ContactRow: View {
         viewModel: ChatViewModel(),
         selectionIds: .constant([])
     )
-    .environmentObject(FontScaleManager.shared)
+    .applyFontScale()
     .frame(width: 300, height: 500)
 }
