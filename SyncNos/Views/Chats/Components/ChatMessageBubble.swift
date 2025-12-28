@@ -6,7 +6,7 @@ struct ChatMessageBubble: View {
     let onTap: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
 
-    private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 微信绿
+    private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 WeChat green
     private let otherBubbleColor = Color.white
     private let selectedBorderColor = Color.accentColor
     private let maxBubbleWidth: CGFloat = 520
@@ -21,7 +21,7 @@ struct ChatMessageBubble: View {
                 if let name = message.senderName, !message.isFromMe {
                     Text(name)
                         .scaledFont(.caption2)
-                        .foregroundColor(Color(red: 0.34, green: 0.42, blue: 0.58)) // #576B95 微信蓝
+                        .foregroundColor(Color(red: 0.34, green: 0.42, blue: 0.58)) // #576B95 WeChat blue
                 }
 
                 bubbleBody

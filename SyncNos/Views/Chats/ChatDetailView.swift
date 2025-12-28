@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Chat Detail View (V2)
 
-/// 微信聊天记录详情视图（右侧栏）
+/// Chat detail view (right panel)
 /// V2：展示气泡消息（我/对方）+ 居中系统/时间戳文本（不做关键词识别）
 struct ChatDetailView: View {
     @ObservedObject var listViewModel: ChatViewModel
@@ -71,7 +71,7 @@ struct ChatDetailView: View {
                 contentView(for: contact)
             }
             .navigationTitle(contact.name)
-            .navigationSubtitle("\(contact.messageCount) 条消息")
+            .navigationSubtitle("\(contact.messageCount) messages")
             .toolbar {
                     ToolbarItem(placement: .automatic) {
                         Spacer()
@@ -89,7 +89,7 @@ struct ChatDetailView: View {
                             Button {
                                 DIContainer.shared.loggerService.debug("[Chats] Import Screenshot button clicked, isConfigured: \(ocrConfigStore.isConfigured), isLoading: \(listViewModel.isLoading)")
                                 guard ocrConfigStore.isConfigured else {
-                                    listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
+                                    listViewModel.errorMessage = "Please configure OCR service first"
                                     return
                                 }
                                 guard !listViewModel.isLoading else {
@@ -145,7 +145,7 @@ struct ChatDetailView: View {
                             Label("OCR JSON", systemImage: "doc.text.magnifyingglass")
                         }
                         .disabled(contact.messageCount == 0)
-                        .help("查看 OCR 原始数据")
+                        .help("View OCR raw data")
 #endif
                     }
                 }
@@ -165,7 +165,7 @@ struct ChatDetailView: View {
                 case .success(let url):
                     DIContainer.shared.loggerService.info("[Chats] Exported to: \(url.path)")
                 case .failure(let error):
-                    listViewModel.errorMessage = "导出失败: \(error.localizedDescription)"
+                    listViewModel.errorMessage = "Export failed: \(error.localizedDescription)"
                 }
                 exportDocument = nil
             }
@@ -201,7 +201,7 @@ struct ChatDetailView: View {
                         }
                     case .failure(let error):
                         guard !isUserCancelled(error) else { return }
-                        listViewModel.errorMessage = "导入失败: \(error.localizedDescription)"
+                        listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
                     }
 
                 case .conversationFile:
@@ -260,7 +260,7 @@ struct ChatDetailView: View {
                 
                 VStack {
                     ProgressView()
-                    Text("加载中...")
+                    Text("Loading...")
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -309,14 +309,14 @@ struct ChatDetailView: View {
                                 if isLoadingMore {
                                     ProgressView()
                                         .scaleEffect(0.7)
-                                    Text("加载更多...")
+                                    Text("Loading more...")
                                         .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
                                     Button {
                                         loadMoreAndPreservePosition(for: contact, proxy: proxy)
                                     } label: {
-                                        Text("加载更早的消息")
+                                        Text("Load earlier messages")
                                             .scaledFont(.caption)
                                             .foregroundColor(.accentColor)
                                     }
@@ -533,7 +533,7 @@ struct ChatDetailView: View {
         Task { @MainActor in
             guard let content = await listViewModel.exportAllMessages(contact.contactId, format: format),
                   !content.isEmpty else {
-                listViewModel.errorMessage = String(localized: "导出失败：无法获取消息内容", comment: "Export error")
+                listViewModel.errorMessage = "Export failed: Unable to get message content"
                 return
             }
             
@@ -552,11 +552,11 @@ struct ChatDetailView: View {
                     .font(.system(size: 48 * fontScaleManager.scaleFactor))
                     .foregroundColor(.white)
                 
-                Text("拖放文件到此处")
+                Text("Drop files here")
                     .scaledFont(.headline)
                     .foregroundColor(.white)
                 
-                Text("支持: 图片 (OCR), JSON, Markdown")
+                Text("Supported: Images (OCR), JSON, Markdown")
                     .scaledFont(.caption)
                     .foregroundColor(.white.opacity(0.8))
             }
@@ -603,7 +603,7 @@ struct ChatDetailView: View {
         // 图片文件 → OCR 识别
         if ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"].contains(fileExtension) {
             guard ocrConfigStore.isConfigured else {
-                listViewModel.errorMessage = "请先配置 OCR 服务"
+                listViewModel.errorMessage = "Please configure OCR service first"
                 return
             }
             
@@ -617,17 +617,17 @@ struct ChatDetailView: View {
             do {
                 try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
             } catch {
-                listViewModel.errorMessage = "导入失败: \(error.localizedDescription)"
+                listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
             }
             return
         }
         
-        listViewModel.errorMessage = "不支持的文件类型: .\(fileExtension)"
+        listViewModel.errorMessage = "Unsupported file type: .\(fileExtension)"
     }
     
     private func handleDroppedImageData(_ data: Data, for contact: ChatBookListItem) async {
         guard ocrConfigStore.isConfigured else {
-            listViewModel.errorMessage = "请先配置 OCR 服务"
+            listViewModel.errorMessage = "Please configure OCR service first"
             return
         }
         
@@ -643,17 +643,17 @@ struct ChatDetailView: View {
                 .font(.system(size: 40 * fontScaleManager.scaleFactor))
                 .foregroundColor(.secondary)
 
-            Text("暂无消息")
+            Text("No Messages")
                 .scaledFont(.headline)
                 .foregroundColor(.secondary)
 
-            Text("点击上方「导入截图」添加聊天记录")
+            Text("Click \"Import Screenshot\" above to add chat records")
                 .scaledFont(.caption)
                 .foregroundColor(.secondary)
 
             Button {
                 guard ocrConfigStore.isConfigured else {
-                    listViewModel.errorMessage = String(localized: "请先配置 OCR 服务", comment: "Error when OCR not configured")
+                    listViewModel.errorMessage = "Please configure OCR service first"
                     return
                 }
                 pendingImportContactId = contact.contactId
@@ -662,7 +662,7 @@ struct ChatDetailView: View {
                 importerAllowsMultipleSelection = true
                 showImporter = true
             } label: {
-                Label("导入截图", systemImage: "photo.badge.plus")
+                Label("Import Screenshot", systemImage: "photo.badge.plus")
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
@@ -676,10 +676,10 @@ struct ChatDetailView: View {
             Image(systemName: "message.fill")
                 .font(.system(size: 48 * fontScaleManager.scaleFactor))
                 .foregroundColor(.secondary)
-            Text("选择一个对话")
+            Text("Select a conversation")
                 .scaledFont(.title3)
                 .foregroundColor(.secondary)
-            Text("从左侧列表选择联系人查看聊天记录")
+            Text("Select a contact from the left list to view chat history")
                 .scaledFont(.caption)
                 .foregroundColor(.secondary)
         }

@@ -191,13 +191,13 @@ struct ViewCommands: Commands {
 
             if isDataSourceEnabled(.chats) {
                 if let key = shortcutKey(for: .chats) {
-                    Button("微信聊天", systemImage: "message.fill") {
+                    Button("Chats", systemImage: "message.fill") {
                         contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .chats)
                 } else {
-                    Button("微信聊天", systemImage: "message.fill") {
+                    Button("Chats", systemImage: "message.fill") {
                         contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .disabled(currentSource == .chats)
@@ -411,7 +411,7 @@ struct ViewCommands: Commands {
                         case .goodLinks: return .goodLinks
                         case .weRead: return .weRead
                         case .dedao: return .dedao
-                        case .chats: return .appleBooks // 微信聊天不使用高亮颜色
+                        case .chats: return .appleBooks // Chats does not use highlight colors
                         }
                     }()
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）

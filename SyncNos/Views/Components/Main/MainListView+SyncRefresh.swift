@@ -30,7 +30,7 @@ extension MainListView {
         case .dedao:
             dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .chats:
-            break // 微信聊天不支持同步到 Notion
+            break // Chats does not support sync to Notion
         }
     }
     
@@ -78,7 +78,7 @@ extension MainListView {
                     return nil
                 }
             case .chats:
-                return // 微信聊天不支持同步
+                return // Chats does not support sync
             }
             
             // 清除每个选中项的本地记录
@@ -112,7 +112,7 @@ extension MainListView {
             case .dedao:
                 await dedaoVM.loadBooks()
             case .chats:
-                break // 微信聊天没有刷新操作
+                break // Chats does not have refresh operation
             }
         }
     }

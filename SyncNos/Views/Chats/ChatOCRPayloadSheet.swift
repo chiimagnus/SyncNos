@@ -53,7 +53,7 @@ struct ChatOCRPayloadSheet: View {
                         copyToClipboard(formattedBlocks(detail: detail))
                     }
                 } label: {
-                    Label("复制", systemImage: "doc.on.doc")
+                    Label("Copy", systemImage: "doc.on.doc")
                 }
                 .controlSize(.small)
                 .disabled(viewModel.detail == nil)
@@ -79,9 +79,9 @@ struct ChatOCRPayloadSheet: View {
             VStack(spacing: 8) {
                 // 元数据
                 HStack {
-                    Text("导入: \(detail.importedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text("Imported: \(detail.importedAt.formatted(date: .abbreviated, time: .shortened))")
                     Text("·")
-                    Text("解析: \(detail.parsedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text("Parsed: \(detail.parsedAt.formatted(date: .abbreviated, time: .shortened))")
                     Spacer()
                 }
                 .font(.caption)
@@ -102,18 +102,18 @@ struct ChatOCRPayloadSheet: View {
                 .padding([.horizontal, .bottom], 12)
             }
         } else if viewModel.isLoading {
-            ProgressView("加载中...")
+            ProgressView("Loading...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {
             Text(error)
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.payloads.isEmpty {
-            Text("该对话暂无 OCR 数据")
+            Text("No OCR data for this conversation")
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            Text("加载中...")
+            Text("Loading...")
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -164,7 +164,7 @@ private final class OCRPayloadSheetViewModel: ObservableObject {
             payloads = allPayloads.filter { $0.conversationId == conversationId }
             errorMessage = nil
         } catch {
-            errorMessage = "加载失败: \(error.localizedDescription)"
+            errorMessage = "Load failed: \(error.localizedDescription)"
         }
     }
     
@@ -173,7 +173,7 @@ private final class OCRPayloadSheetViewModel: ObservableObject {
             detail = try await cacheService.fetchOcrPayload(screenshotId: screenshotId)
             errorMessage = nil
         } catch {
-            errorMessage = "读取失败: \(error.localizedDescription)"
+            errorMessage = "Read failed: \(error.localizedDescription)"
         }
     }
 }

@@ -1,9 +1,9 @@
 import Foundation
 import AppKit
 
-// MARK: - Chat Contact (联系人/对话)
+// MARK: - Chat Contact
 
-/// 微信联系人/对话（由用户创建或从截图标题提取）
+/// Chat contact/conversation (created by user or extracted from screenshot title)
 struct ChatContact: Identifiable, Hashable {
     let id: UUID
     let name: String
@@ -41,7 +41,7 @@ enum ChatMessageKind: String, Hashable, Sendable {
     case system
 }
 
-/// 微信聊天消息（V2：仅气泡消息）
+/// Chat message (V2: bubble messages only)
 struct ChatMessage: Identifiable, Hashable {
     let id: UUID
     let content: String
@@ -72,7 +72,7 @@ struct ChatMessage: Identifiable, Hashable {
 
 // MARK: - Chat Screenshot (Import Session)
 
-/// 导入的微信聊天截图（内存态，用于导入/处理中间态；不持久化图片本体）
+/// Imported chat screenshot (in-memory state for import/processing; image body not persisted)
 struct ChatScreenshot: Identifiable {
     let id: UUID
     let image: NSImage
@@ -105,7 +105,7 @@ struct ChatScreenshot: Identifiable {
 
 // MARK: - Chat Conversation (V2)
 
-/// 微信对话（一个联系人的消息集合；不再把截图作为 UI 结构的一部分）
+/// Chat conversation (a collection of messages for a contact; screenshots no longer part of UI structure)
 struct ChatConversation: Identifiable {
     let id: UUID
     var contact: ChatContact
@@ -144,7 +144,7 @@ struct ChatConversation: Identifiable {
 
 // MARK: - Chat Book List Item (for MainListView compatibility)
 
-/// 微信联系人列表项（用于 MainListView 兼容）
+/// Chat contact list item (for MainListView compatibility)
 struct ChatBookListItem: Identifiable {
     let id: String              // contactId.uuidString
     let contactId: UUID
@@ -165,7 +165,7 @@ struct ChatBookListItem: Identifiable {
 
 // MARK: - Chat Parse Config
 
-/// 微信聊天截图解析参数（集中管理，避免阈值散落在 Parser 内部）
+/// Chat screenshot parsing parameters (centralized management, avoiding thresholds scattered in Parser)
 struct ChatParseConfig: Sendable {
     // MARK: Line Grouping
     var maxLineHorizontalGapPx: Double

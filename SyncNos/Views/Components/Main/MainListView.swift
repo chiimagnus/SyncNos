@@ -242,9 +242,9 @@ struct MainListView: View {
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
             // MARK: - Chats New Conversation Alert
-            .alert("新建对话", isPresented: $showNewConversationAlert) {
-                TextField("联系人名称", text: $newConversationName)
-                Button("创建") {
+            .alert("New Conversation", isPresented: $showNewConversationAlert) {
+                TextField("Contact Name", text: $newConversationName)
+                Button("Create") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                     let contactId = chatsVM.createConversation(
                         name: newConversationName.trimmingCharacters(in: .whitespaces)
@@ -252,11 +252,11 @@ struct MainListView: View {
                     selectedChatsContactIds = [contactId.uuidString]
                     newConversationName = ""
                 }
-                Button("取消", role: .cancel) {
+                Button("Cancel", role: .cancel) {
                     newConversationName = ""
                 }
             } message: {
-                Text("输入联系人名称")
+                Text("Enter contact name")
             }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗

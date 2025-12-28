@@ -38,11 +38,11 @@ struct OCRSettingsView: View {
                         .textSelection(.enabled)
                 }
                 
-                Link("获取 API URL 和 Token", destination: URL(string: "https://aistudio.baidu.com/paddleocr/task")!)
+                Link("Get API URL and Token", destination: URL(string: "https://aistudio.baidu.com/paddleocr/task")!)
                     .font(.caption)
                 
                 HStack {
-                    Button("测试连接") {
+                    Button("Test Connection") {
                         Task { await viewModel.testConnection() }
                     }
                     .disabled(!viewModel.isConfigured || viewModel.isTesting)
@@ -60,13 +60,13 @@ struct OCRSettingsView: View {
                         .font(.caption)
                 }
             } header: {
-                Text("PaddleOCR-VL API 配置")
+                Text("PaddleOCR-VL API Configuration")
             } footer: {
-                Text("PaddleOCR-VL 支持 109 种语言，可识别文本、表格、公式和图表")
+                Text("PaddleOCR-VL supports 109 languages, recognizing text, tables, formulas, and charts")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("OCR 设置")
+        .navigationTitle("OCR Settings")
     }
 }
 
@@ -110,7 +110,7 @@ final class OCRSettingsViewModel: ObservableObject {
         
         do {
             let success = try await ocrService.testConnection()
-            testResult = TestResult(success: success, message: success ? "连接成功" : "连接失败")
+            testResult = TestResult(success: success, message: success ? "Connection successful" : "Connection failed")
         } catch {
             testResult = TestResult(success: false, message: error.localizedDescription)
         }

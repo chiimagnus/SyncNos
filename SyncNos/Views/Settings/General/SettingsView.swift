@@ -156,7 +156,7 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: OCRSettingsView()) {
                         HStack {
-                            Label("OCR 设置", systemImage: "text.viewfinder")
+                            Label("OCR Settings", systemImage: "text.viewfinder")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
