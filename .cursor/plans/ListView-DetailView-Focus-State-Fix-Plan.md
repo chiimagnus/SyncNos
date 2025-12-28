@@ -37,300 +37,268 @@
    - 各 ListView 的 `@FocusState private var isListFocused: Bool`（SwiftUI 状态）
    - 这两者**没有绑定关系**
 
-2. **键盘导航的正确流程**
-   ```
-   keyDown 事件 (← / →)
-       ↓
-   MainListView+KeyboardMonitor.swift
-       ↓
-   window.makeFirstResponder(responder)  ← 关键：直接改变 AppKit firstResponder
-       ↓
-   AppKit 更新 firstResponder
-       ↓
-   SwiftUI @FocusState 自动同步
-       ↓
-   List 高亮颜色变化
-   ```
+2. **AppKit/SwiftUI 的双重性质**
+   - macOS 上的 SwiftUI 视图底层是 AppKit（NSView）
+   - `NSWindow.firstResponder` 是 AppKit 层控制焦点的**唯一权威**
+   - SwiftUI 的 `@FocusState` 只是对 AppKit 状态的**反映/包装**
 
-3. **鼠标点击的错误流程**
-   ```
-   leftMouseDown 事件
-       ↓
-   MainListView+KeyboardMonitor.swift
-       ↓
-   syncNavigationTargetWithFocus()
-       ↓
-   keyboardNavigationTarget = .detail  ← 只更新了 Swift 变量
-       ↓
-   ❌ 没有调用 makeFirstResponder
-       ↓
-   ❌ AppKit firstResponder 未改变
-       ↓
-   ❌ @FocusState 未更新
-       ↓
-   ❌ List 高亮颜色不变
-   ```
-
-### macOS List 高亮行为
-
-macOS 的 NSTableView/NSOutlineView（SwiftUI List 的底层）有内置行为：
-- 当表格是 firstResponder 时 → 选中行高亮为**强调色**
-- 当表格失去 firstResponder 时 → 选中行高亮变为**灰色**
-
-SwiftUI 的 `@FocusState` 是对 AppKit firstResponder 状态的**反映**，而不是**控制**。
+3. **我们的代码引入了自定义焦点管理**
+   - 我们添加了 `keyboardNavigationTarget` 来实现键盘在 List/Detail 之间导航
+   - 这本身就是对 AppKit 默认焦点行为的**覆盖/扩展**
+   - 键盘导航正确是因为我们**主动调用了 `makeFirstResponder`**
+   - 鼠标点击没有调用 `makeFirstResponder`，导致状态不一致
 
 ---
 
-## 修复方案
+## 主要修复方案：方案 D（本质解决）
 
-### P1（必须修复）：鼠标点击 DetailView 时触发焦点变化
+### 核心思路
 
-#### 方案 A：在鼠标点击事件中调用 makeFirstResponder（推荐）
+**完全依赖 AppKit 的 firstResponder，移除自定义的 keyboardNavigationTarget 状态**
 
-**修改文件**：`MainListView+KeyboardMonitor.swift`
+- 移除 `keyboardNavigationTarget` 枚举状态
+- 通过监听 `NSWindow.firstResponder` 的变化来判断当前焦点位置
+- 统一键盘和鼠标的焦点处理逻辑
 
-**当前代码**（`leftMouseDown` 处理）：
+### 为什么这是本质解决
+
+- 不再维护"影子状态"（`keyboardNavigationTarget`）
+- 唯一的焦点权威是 AppKit 的 `firstResponder`
+- 行为完全统一，无论是键盘还是鼠标
+
+---
+
+## P1：实现 FirstResponder 监听机制
+
+### 1.1 创建 FirstResponderObserver
+
+**新建文件**：`SyncNos/Views/Components/Keyboard/FirstResponderObserver.swift`
+
 ```swift
-func startMouseDownMonitorIfNeeded() {
-    // ... 现有逻辑 ...
-    // 目前只调用 syncNavigationTargetWithFocus()
+import AppKit
+import Combine
+
+/// 监听窗口的 firstResponder 变化
+final class FirstResponderObserver: ObservableObject {
+    enum FocusLocation {
+        case list
+        case detail
+        case other
+    }
+    
+    @Published private(set) var focusLocation: FocusLocation = .list
+    
+    private var timer: Timer?
+    private weak var window: NSWindow?
+    private var listViewIdentifier: ObjectIdentifier?
+    private var detailScrollView: NSScrollView?
+    
+    func startObserving(window: NSWindow) {
+        self.window = window
+        
+        // 使用定时器轮询 firstResponder（因为 NSWindow 没有 KVO）
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.checkFirstResponder()
+        }
+    }
+    
+    func stopObserving() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    func setDetailScrollView(_ scrollView: NSScrollView?) {
+        self.detailScrollView = scrollView
+    }
+    
+    private func checkFirstResponder() {
+        guard let window = window,
+              let responder = window.firstResponder else { return }
+        
+        let newLocation = determineLocation(for: responder)
+        if newLocation != focusLocation {
+            focusLocation = newLocation
+        }
+    }
+    
+    private func determineLocation(for responder: NSResponder) -> FocusLocation {
+        var current: NSResponder? = responder
+        
+        while let view = current as? NSView {
+            // 检查是否在 DetailView 的 ScrollView 中
+            if let detailSV = detailScrollView,
+               view === detailSV || view.isDescendant(of: detailSV) {
+                return .detail
+            }
+            current = view.superview
+        }
+        
+        // 默认认为在 List 中（如果不在 detail）
+        return .list
+    }
 }
 ```
 
-**修改方案**：
+### 1.2 修改 MainListView
+
+**文件**：`MainListView.swift`
+
+变更：
+1. 移除 `@State private var keyboardNavigationTarget: NavigationTarget = .list`
+2. 添加 `@StateObject private var focusObserver = FirstResponderObserver()`
+3. 使用 `focusObserver.focusLocation` 替代 `keyboardNavigationTarget`
+
+### 1.3 修改 MainListView+KeyboardMonitor.swift
+
+变更：
+1. 移除 `mouseDownMonitor` 和 `syncNavigationTargetWithFocus()`
+2. 简化 `keyDown` 处理，只处理方向键导航，焦点变化交给 AppKit
+3. 保留 `makeFirstResponder` 调用以支持键盘导航
+
+---
+
+## P2：移除各 ListView 的 @FocusState
+
+### 目标
+
+统一焦点管理，移除分散的 `@FocusState` 变量。
+
+### 修改文件
+
+- `AppleBooksListView.swift`
+- `GoodLinksListView.swift`
+- `WeReadListView.swift`
+- `DedaoListView.swift`
+- `ChatListView.swift`
+
+### 变更内容
+
+1. 移除 `@FocusState private var isListFocused: Bool`
+2. 移除 `.focused($isListFocused)`
+3. 移除 `.onAppear { isListFocused = true }` 和相关通知监听
+
+### 替代方案
+
+焦点变化由 AppKit 自动管理，List 的高亮颜色会自动跟随 firstResponder 变化。
+
+---
+
+## P3：清理和优化
+
+### 3.1 移除不再需要的代码
+
+- 移除 `NavigationTarget` 枚举
+- 移除 `DataSourceSwitchedTo*` 通知中的焦点设置逻辑
+- 清理 `startKeyboardMonitorIfNeeded()` 中的冗余代码
+
+### 3.2 优化轮询机制（可选）
+
+如果 0.1 秒的轮询间隔有性能问题：
+- 可以只在窗口激活时轮询
+- 可以使用更低频率（0.2-0.5秒）
+
+### 3.3 添加单元测试（可选）
+
+为 `FirstResponderObserver` 添加单元测试。
+
+---
+
+## 备选方案 A（快速修复）
+
+如果方案 D 实施过程中遇到问题，可以回退到方案 A：
+
+**在 `leftMouseDown` 事件中调用 `makeFirstResponder`**
+
 ```swift
+// MainListView+KeyboardMonitor.swift
 func startMouseDownMonitorIfNeeded() {
-    guard mouseDownMonitor == nil else { return }
     mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
         guard let self = self else { return event }
-        
-        // 获取点击位置
         guard let window = event.window else { return event }
         let locationInWindow = event.locationInWindow
         
-        // 判断点击是否在 DetailView 区域
         if let detailScrollView = self.currentDetailScrollView,
            let detailFrame = detailScrollView.superview?.convert(detailScrollView.frame, to: nil),
            detailFrame.contains(locationInWindow) {
-            // 点击在 DetailView → 将焦点转移到 DetailView
             DispatchQueue.main.async {
                 self.keyboardNavigationTarget = .detail
-                // 关键：让 DetailView 的 ScrollView 成为 firstResponder
                 window.makeFirstResponder(detailScrollView)
             }
-        } else {
-            // 点击在 ListView 区域 → 将焦点转移到 ListView
-            // ListView 会自动成为 firstResponder（通过 List 的内置行为）
         }
-        
         return event
     }
 }
 ```
 
-**优点**：
-- 最小化改动
-- 利用已有的 `currentDetailScrollView` 引用
-- 与键盘导航行为一致
-
-**缺点**：
-- 需要准确判断点击区域
-
-#### 方案 B：使用 SwiftUI 的 .onTapGesture
-
-**修改文件**：各 DetailView（`AppleBooksDetailView.swift` 等）
-
-```swift
-// 在 DetailView 的主容器添加
-.contentShape(Rectangle())
-.onTapGesture {
-    // 通知 MainListView 焦点已转移到 detail
-    NotificationCenter.default.post(
-        name: Notification.Name("DetailViewTapped"),
-        object: nil
-    )
-}
-```
-
-**修改文件**：`MainListView.swift`
-
-```swift
-.onReceive(NotificationCenter.default.publisher(for: Notification.Name("DetailViewTapped"))) { _ in
-    keyboardNavigationTarget = .detail
-    // 触发 firstResponder 变化
-    if let scrollView = currentDetailScrollView,
-       let window = scrollView.window {
-        window.makeFirstResponder(scrollView)
-    }
-}
-```
-
-**优点**：
-- 解耦，DetailView 不需要知道 ListView 的存在
-
-**缺点**：
-- 可能影响 DetailView 内其他点击交互（如按钮）
-- 需要修改多个文件
-
-#### 方案 C：移除 mouseDownMonitor，完全依赖 AppKit 的 firstResponder 机制
-
-**思路**：不主动监控鼠标点击，而是监控 `NSWindow` 的 `firstResponderDidChange` 通知。
-
-**修改文件**：`MainListView+KeyboardMonitor.swift`
-
-```swift
-func startFirstResponderObserver() {
-    NotificationCenter.default.addObserver(
-        forName: NSWindow.didBecomeKeyNotification,
-        object: nil,
-        queue: .main
-    ) { [weak self] _ in
-        self?.checkAndUpdateNavigationTarget()
-    }
-    
-    // 监听 firstResponder 变化（需要通过 window 的代理或 KVO）
-}
-
-private func checkAndUpdateNavigationTarget() {
-    guard let window = NSApp.keyWindow,
-          let responder = window.firstResponder else { return }
-    
-    // 判断 firstResponder 是 ListView 还是 DetailView
-    if isResponderInDetailView(responder) {
-        keyboardNavigationTarget = .detail
-    } else {
-        keyboardNavigationTarget = .list
-    }
-}
-```
-
-**优点**：
-- 最自然的解决方案，完全跟随 AppKit 行为
-
-**缺点**：
-- 需要更复杂的视图层级判断
-- NSWindow 没有直接的 "firstResponderDidChange" 通知
-
-### 推荐方案：P1 采用方案 A
-
-方案 A 是最直接、改动最小的解决方案。
-
----
-
-### P2（改进）：统一焦点管理逻辑
-
-#### 目标
-将分散在各处的焦点管理逻辑统一到一个地方。
-
-#### 当前问题
-- 各 ListView 有独立的 `@FocusState isListFocused`
-- `MainListView` 有 `keyboardNavigationTarget`
-- 这两者没有同步
-
-#### 改进方案
-
-1. **移除各 ListView 中的 `@FocusState isListFocused`**
-2. **在 `MainListView` 中管理统一的焦点状态**
-3. **通过 `@Binding` 将焦点状态传递给子视图**
-
-```swift
-// MainListView.swift
-@State private var listFocused: Bool = true
-
-// 传递给 ListView
-AppleBooksListView(
-    viewModel: appleBooksVM,
-    selectionIds: $selectedBookIds,
-    isListFocused: $listFocused  // 新增绑定
-)
-```
-
-```swift
-// AppleBooksListView.swift
-@Binding var isListFocused: Bool
-// 或者使用 FocusedValue
-```
-
-**风险**：改动较大，可能引入新问题。
-
----
-
-### P3（可选）：增强视觉反馈
-
-#### 目标
-除了高亮颜色变化，添加其他视觉反馈。
-
-#### 可能的增强
-- 添加细微的阴影变化
-- 添加焦点指示器（如侧边蓝色条）
-- 添加过渡动画
-
 ---
 
 ## 实施步骤
 
-### 第一阶段：P1 实现（方案 A）
+### 第一阶段：P1（预估 1.5 小时）
 
-1. **修改 `MainListView+KeyboardMonitor.swift`**
-   - 更新 `startMouseDownMonitorIfNeeded()` 函数
-   - 在 `leftMouseDown` 事件中判断点击区域
-   - 如果点击在 DetailView，调用 `window.makeFirstResponder(detailScrollView)`
+1. [ ] 创建 `FirstResponderObserver.swift`
+2. [ ] 修改 `MainListView.swift` 集成 observer
+3. [ ] 修改 `MainListView+KeyboardMonitor.swift` 简化逻辑
+4. [ ] 测试键盘导航是否正常
+5. [ ] 测试鼠标点击焦点变化
 
-2. **测试验证**
-   - 键盘左右导航 → 高亮颜色正确变化
-   - 鼠标点击 DetailView → 高亮颜色变灰
-   - 鼠标点击 ListView → 高亮颜色变蓝
-   - 所有数据源（AppleBooks、GoodLinks、WeRead、Dedao、Chats）都正常
+### 第二阶段：P2（预估 30 分钟）
 
-### 第二阶段：P2 实现（可选）
+1. [ ] 修改 `AppleBooksListView.swift` 移除 @FocusState
+2. [ ] 修改 `GoodLinksListView.swift` 移除 @FocusState
+3. [ ] 修改 `WeReadListView.swift` 移除 @FocusState
+4. [ ] 修改 `DedaoListView.swift` 移除 @FocusState
+5. [ ] 修改 `ChatListView.swift` 移除 @FocusState
+6. [ ] 全面测试所有数据源
 
-1. 评估 P1 修复后的代码质量
-2. 如果认为需要重构焦点管理，按 P2 方案执行
+### 第三阶段：P3（预估 30 分钟）
 
----
-
-## 相关代码引用
-
-### MainListView+KeyboardMonitor.swift 关键代码
-
-```swift
-// 当前 keyDown 处理（正确触发焦点变化）
-if keyCode == kVK_RightArrow {
-    if keyboardNavigationTarget == .list {
-        keyboardNavigationTarget = .detail
-        // ✅ 关键：调用了 makeFirstResponder
-        if let scrollView = currentDetailScrollView {
-            window.makeFirstResponder(scrollView)
-        }
-    }
-}
-
-// 当前 leftMouseDown 处理（缺少 makeFirstResponder 调用）
-func syncNavigationTargetWithFocus(_ window: NSWindow? = nil) {
-    // ❌ 只更新了 keyboardNavigationTarget，没有调用 makeFirstResponder
-}
-```
-
-### 各 ListView 的 @FocusState
-
-```swift
-// AppleBooksListView.swift (及其他 ListView)
-@FocusState private var isListFocused: Bool
-
-// 在 List 上应用
-.focused($isListFocused)
-```
+1. [ ] 清理不再需要的代码
+2. [ ] 代码审查和优化
+3. [ ] 更新文档
 
 ---
 
-## 预估工作量
+## 测试用例
+
+### 键盘导航测试
+- [ ] 按 → 键：焦点从 List 移到 Detail，List 高亮变灰
+- [ ] 按 ← 键：焦点从 Detail 移到 List，List 高亮变蓝
+- [ ] 按 ↑/↓ 键：在 List 中切换选中项
+
+### 鼠标点击测试
+- [ ] 点击 DetailView：List 高亮变灰
+- [ ] 点击 ListView：List 高亮变蓝
+- [ ] 点击 ListView 中的某一行：该行被选中，高亮为蓝色
+
+### 混合操作测试
+- [ ] 键盘导航到 Detail → 鼠标点击 List → 高亮正确
+- [ ] 鼠标点击 Detail → 键盘按 ← → 焦点正确回到 List
+
+### 数据源切换测试
+- [ ] 切换数据源后，焦点行为正常
+- [ ] 所有 5 个数据源都测试
+
+---
+
+## 风险评估
+
+| 风险 | 可能性 | 影响 | 缓解措施 |
+|------|--------|------|----------|
+| 轮询对性能有影响 | 低 | 低 | 可调整间隔或只在窗口激活时轮询 |
+| firstResponder 判断不准确 | 中 | 中 | 仔细测试，必要时调整判断逻辑 |
+| 与现有焦点逻辑冲突 | 低 | 高 | 可回退到方案 A |
+
+---
+
+## 预估总工作量
 
 | 阶段 | 任务 | 预估时间 |
 |------|------|----------|
-| P1 | 修改鼠标事件处理 | 30 分钟 |
-| P1 | 测试所有数据源 | 20 分钟 |
-| P2 | 重构焦点管理（可选） | 2-3 小时 |
-| P3 | 视觉增强（可选） | 1-2 小时 |
+| P1 | FirstResponder 监听机制 | 1.5 小时 |
+| P2 | 移除各 ListView 的 @FocusState | 30 分钟 |
+| P3 | 清理和优化 | 30 分钟 |
+| **总计** | | **2.5 小时** |
 
 ---
 
@@ -346,5 +314,4 @@ func syncNavigationTargetWithFocus(_ window: NSWindow? = nil) {
 2025-12-28
 
 ## 状态
-🟡 待实施
-
+🟡 待实施（已选定方案 D）
