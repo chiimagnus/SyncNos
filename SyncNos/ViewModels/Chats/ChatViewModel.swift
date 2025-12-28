@@ -192,6 +192,22 @@ final class ChatViewModel: ObservableObject {
         paginationStates[contactId]?.loadedMessages ?? []
     }
     
+    /// 获取对话中已使用的发送者昵称列表（去重，按出现顺序）
+    func getUsedSenderNames(for contactId: UUID) -> [String] {
+        let allMessages = conversations[contactId]?.messages ?? []
+        var seen = Set<String>()
+        var result: [String] = []
+        
+        for message in allMessages {
+            if let name = message.senderName, !name.isEmpty, !seen.contains(name) {
+                seen.insert(name)
+                result.append(name)
+            }
+        }
+        
+        return result
+    }
+    
     /// 是否可以加载更多
     func canLoadMore(for contactId: UUID) -> Bool {
         paginationStates[contactId]?.canLoadMore ?? false
@@ -507,6 +523,53 @@ final class ChatViewModel: ObservableObject {
                 logger.info("[ChatsV2] Updated message classification: \(messageId)")
             } catch {
                 logger.error("[ChatsV2] Failed to update message classification: \(error)")
+            }
+        }
+    }
+    
+    /// 更新消息发送者昵称
+    func updateMessageSenderName(
+        messageId: UUID,
+        senderName: String?,
+        for contactId: UUID
+    ) {
+        // 创建更新后的消息
+        func createUpdatedMessage(from oldMessage: ChatMessage) -> ChatMessage {
+            ChatMessage(
+                id: oldMessage.id,
+                content: oldMessage.content,
+                isFromMe: oldMessage.isFromMe,
+                senderName: senderName,
+                kind: oldMessage.kind,
+                bbox: oldMessage.bbox,
+                order: oldMessage.order
+            )
+        }
+        
+        // 1. 更新 conversations 内存
+        if var conversation = conversations[contactId],
+           let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
+            conversation.messages[index] = createUpdatedMessage(from: conversation.messages[index])
+            conversations[contactId] = conversation
+        }
+        
+        // 2. 更新 paginationStates 内存
+        if var state = paginationStates[contactId],
+           let index = state.loadedMessages.firstIndex(where: { $0.id == messageId }) {
+            state.loadedMessages[index] = createUpdatedMessage(from: state.loadedMessages[index])
+            paginationStates[contactId] = state
+        }
+        
+        // 3. 持久化
+        Task {
+            do {
+                try await cacheService.updateMessageSenderName(
+                    messageId: messageId.uuidString,
+                    senderName: senderName
+                )
+                logger.info("[ChatsV2] Updated message sender name: \(messageId) -> \(senderName ?? "nil")")
+            } catch {
+                logger.error("[ChatsV2] Failed to update message sender name: \(error)")
             }
         }
     }

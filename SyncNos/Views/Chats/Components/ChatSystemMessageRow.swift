@@ -5,6 +5,8 @@ struct ChatSystemMessageRow: View {
     let isSelected: Bool
     let onTap: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
+    let onSetSenderName: () -> Void
+    let onClearSenderName: () -> Void
 
     private let selectedBorderColor = Color.accentColor
 
@@ -32,8 +34,11 @@ struct ChatSystemMessageRow: View {
                     text: message.content,
                     isFromMe: message.isFromMe,
                     kind: message.kind,
+                    senderName: message.senderName,
                     onSelect: onTap,
-                    onClassify: onClassify
+                    onClassify: onClassify,
+                    onSetSenderName: onSetSenderName,
+                    onClearSenderName: onClearSenderName
                 )
             }
     }

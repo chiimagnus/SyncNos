@@ -23,6 +23,8 @@ struct ChatDetailView: View {
     @State private var selectedMessageId: UUID?
     @State private var scrollProxy: ScrollViewProxy?
     @State private var isDragTargeted = false
+    @State private var showSenderNamePicker = false
+    @State private var messageForSenderName: ChatMessage?
     @Environment(\.fontScale) private var fontScale
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
@@ -154,6 +156,26 @@ struct ChatDetailView: View {
                     ChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
                 }
 #endif
+            // 昵称设置弹窗
+            .popover(isPresented: $showSenderNamePicker) {
+                if let message = messageForSenderName {
+                    ChatSenderNamePickerView(
+                        usedNames: listViewModel.getUsedSenderNames(for: contact.contactId),
+                        currentName: message.senderName,
+                        onSelect: { newName in
+                            listViewModel.updateMessageSenderName(
+                                messageId: message.id,
+                                senderName: newName,
+                                for: contact.contactId
+                            )
+                            showSenderNamePicker = false
+                        },
+                        onDismiss: {
+                            showSenderNamePicker = false
+                        }
+                    )
+                }
+            }
             // 导出文件保存器
             .fileExporter(
                 isPresented: $showExportSavePanel,
@@ -343,6 +365,12 @@ struct ChatDetailView: View {
                                         onTap: { selectedMessageId = message.id },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
+                                        },
+                                        onSetSenderName: {
+                                            handleSetSenderName(message)
+                                        },
+                                        onClearSenderName: {
+                                            handleClearSenderName(message, for: contact)
                                         }
                                     )
                                 default:
@@ -352,6 +380,12 @@ struct ChatDetailView: View {
                                         onTap: { selectedMessageId = message.id },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
+                                        },
+                                        onSetSenderName: {
+                                            handleSetSenderName(message)
+                                        },
+                                        onClearSenderName: {
+                                            handleClearSenderName(message, for: contact)
                                         }
                                     )
                                 }
@@ -522,6 +556,21 @@ struct ChatDetailView: View {
             messageId: message.id,
             isFromMe: isFromMe,
             kind: kind,
+            for: contact.contactId
+        )
+    }
+    
+    // MARK: - Sender Name Handling
+    
+    private func handleSetSenderName(_ message: ChatMessage) {
+        messageForSenderName = message
+        showSenderNamePicker = true
+    }
+    
+    private func handleClearSenderName(_ message: ChatMessage, for contact: ChatBookListItem) {
+        listViewModel.updateMessageSenderName(
+            messageId: message.id,
+            senderName: nil,
             for: contact.contactId
         )
     }
