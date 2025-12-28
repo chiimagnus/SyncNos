@@ -314,4 +314,22 @@ func startMouseDownMonitorIfNeeded() {
 2025-12-28
 
 ## 状态
-🟡 待实施（已选定方案 D）
+🔴 方案 D 已撤回（待重新评估）
+
+## 方案 D 失败记录
+
+### 尝试日期
+2025-12-28
+
+### 失败原因
+
+1. **键盘导航失效** - 移除 `@FocusState` 后，ListView 无法正确获取焦点
+2. **List 点击时闪烁** - `mouseDownMonitor` 干扰了 List 的正常点击行为
+
+### 已撤回的更改
+
+所有代码更改已撤回，恢复到原始状态。
+
+### 建议
+
+考虑使用方案 A（最小改动）：只在鼠标点击 DetailView 时添加 `makeFirstResponder` 调用，不移除任何现有代码。
