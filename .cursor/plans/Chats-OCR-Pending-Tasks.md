@@ -8,12 +8,7 @@
 
 ## 一、明确放弃的功能
 
-### 1. 群聊昵称绑定 ❌
-- **状态**：🚫 已放弃（2025-12-25）
-- **原因**：用户明确不再实现此功能
-- **备注**：代码已预留 `senderName` 字段，如需恢复可参考原设计
-
-### 2. 离线重解析功能 ❌
+### 1. 离线重解析功能 ❌
 - **状态**：🚫 已放弃（2025-12-25）
 - **原因**：用户明确不再实现此功能
 - **备注**：`normalizedBlocksJSON` 已持久化，架构支持但不实现
@@ -119,6 +114,30 @@
 - **状态**：🚫 已撤回（2025-12-24）
 - **备注**：当前阶段不需要此功能
 
+### 6. 群聊昵称功能 ✅
+- **状态**：✅ 已实现（2025-12-28）
+- **功能描述**：
+  - 用户手动设置发送者昵称（放弃自动 OCR 识别）
+  - 右键菜单"Set Sender Name..."触发 Popover
+  - Popover 显示本对话中已使用的昵称标签（动态提取，无全局存储）
+  - 支持输入新昵称
+  - 昵称显示在消息气泡上方（我的消息和对方消息均显示）
+  - 系统消息隐藏昵称设置菜单（数据保留，便于恢复）
+  - 昵称加密存储（AES-256-GCM）
+- **UI 特性**：
+  - Popover 使用 `arrowEdge: .leading`，显示在内容区域右侧
+  - 昵称使用微信蓝色 `#576B95`
+- **相关文件**：
+  - `Views/Chats/Components/ChatSenderNamePickerView.swift`（新增）
+  - `Views/Chats/Components/ChatMessageContextMenu.swift`
+  - `Views/Chats/Components/ChatMessageBubble.swift`
+  - `Views/Chats/Components/ChatSystemMessageRow.swift`
+  - `Views/Chats/ChatDetailView.swift`
+  - `ViewModels/Chats/ChatViewModel.swift`
+  - `Services/DataSources-From/Chats/ChatCacheService.swift`
+  - `Models/Chats/ChatCacheModels.swift`
+- **详细计划**：`.cursor/plans/Chats-群聊昵称功能实现计划.md`
+
 ---
 
 ## 四、待实现功能
@@ -162,8 +181,10 @@
 | P1 | 分页加载 | ✅ 已完成 | 性能优化必需 |
 | P1 | 导入导出 | ✅ 已完成 | 数据备份和迁移 |
 | P1 | 解析日志 | ✅ 已完成 | 排障辅助 |
+| P1 | 群聊昵称 | ✅ 已完成 | 用户手动标注发送者 |
 | P2 | 截图拼接 | ⏸️ | 提升用户体验 |
 | P3 | Notion 同步 | ⏸️ | 取决于产品规划 |
+| P3 | 批量设置昵称 | ⏸️ | 群聊昵称增强功能 |
 | P4 | OCR Profile 化 | ⏸️ | 边缘场景优化 |
 
 ---
@@ -178,7 +199,8 @@
    - `parseWithStatistics()` 支持详细日志输出
 
 2. **`ChatCacheModels.swift`**
-   - `CachedChatMessageV2.senderName` 已预留
+   - `CachedChatMessageV2.senderName` ✅ 已使用
+   - `CachedChatMessageV2.updateSenderName()` 加密更新方法
    - `ChatOCRBlockSnapshot` 支持离线重解析
 
 3. **`OCRModels.swift`**
