@@ -2,20 +2,21 @@ import SwiftUI
 
 // MARK: - OCR Payload Sheet View
 
-/// 查看当前对话的 OCR Normalized Blocks 数据
+/// View OCR Normalized Blocks data for current conversation
 struct ChatOCRPayloadSheet: View {
     let conversationId: String
     let conversationName: String
     
     @StateObject private var viewModel = OCRPayloadSheetViewModel()
     @State private var selectedIndex: Int = 0
+    @Environment(\.fontScale) private var fontScale
     
     var body: some View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
                 Text("OCR Blocks: \(conversationName)")
-                    .font(.headline)
+                    .scaledFont(.headline)
                 
                 Spacer()
                 
@@ -33,7 +34,7 @@ struct ChatOCRPayloadSheet: View {
                         .disabled(selectedIndex == 0)
                         
                         Text("\(selectedIndex + 1) / \(viewModel.payloads.count)")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .monospacedDigit()
                         
                         Button {
@@ -67,6 +68,7 @@ struct ChatOCRPayloadSheet: View {
             contentView
         }
         .frame(minWidth: 600, minHeight: 400)
+        .applyFontScale()
         .task {
             await viewModel.reload(conversationId: conversationId)
             loadCurrentDetail()
@@ -84,7 +86,7 @@ struct ChatOCRPayloadSheet: View {
                     Text("Parsed: \(detail.parsedAt.formatted(date: .abbreviated, time: .shortened))")
                     Spacer()
                 }
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
@@ -92,7 +94,7 @@ struct ChatOCRPayloadSheet: View {
                 // JSON 内容
                 ScrollView {
                     Text(formattedBlocks(detail: detail))
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: Font.TextStyle.caption2.basePointSize * fontScale, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
@@ -103,17 +105,21 @@ struct ChatOCRPayloadSheet: View {
             }
         } else if viewModel.isLoading {
             ProgressView("Loading...")
+                .scaledFont(.body)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {
             Text(error)
+                .scaledFont(.body)
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.payloads.isEmpty {
             Text("No OCR data for this conversation")
+                .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Text("Loading...")
+                .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
