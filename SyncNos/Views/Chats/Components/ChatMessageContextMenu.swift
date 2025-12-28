@@ -42,28 +42,30 @@ struct ChatMessageContextMenu: View {
 
         Divider()
 
-        // 昵称设置
-        Button {
-            onSelect()
-            onSetSenderName()
-        } label: {
-            if let name = senderName, !name.isEmpty {
-                Label("Change Sender Name (\(name))...", systemImage: "person.text.rectangle")
-            } else {
-                Label("Set Sender Name...", systemImage: "person.text.rectangle")
-            }
-        }
-
-        if senderName != nil {
-            Button(role: .destructive) {
+        // 昵称设置（仅对非系统消息显示）
+        if kind != .system {
+            Button {
                 onSelect()
-                onClearSenderName()
+                onSetSenderName()
             } label: {
-                Label("Clear Sender Name", systemImage: "person.badge.minus")
+                if let name = senderName, !name.isEmpty {
+                    Label("Change Sender Name (\(name))...", systemImage: "person.text.rectangle")
+                } else {
+                    Label("Set Sender Name...", systemImage: "person.text.rectangle")
+                }
             }
-        }
 
-        Divider()
+            if let name = senderName, !name.isEmpty {
+                Button(role: .destructive) {
+                    onSelect()
+                    onClearSenderName()
+                } label: {
+                    Label("Clear Sender Name", systemImage: "person.badge.minus")
+                }
+            }
+
+            Divider()
+        }
 
         Button {
             onSelect()
