@@ -59,9 +59,9 @@ struct ChatListView: View {
                 Image(systemName: "message.badge.filled.fill")
                     .font(.system(size: 40 * fontScale))
                     .foregroundColor(.secondary)
-                Text("No Conversations")
+                Text("No Chats")
                     .scaledFont(.headline)
-                Text("Click \"+\" at the bottom right to create a new conversation")
+                Text("Click \"+\" at the bottom right to create a new chat")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
             }

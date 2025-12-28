@@ -676,7 +676,7 @@ struct ChatDetailView: View {
             Image(systemName: "message.fill")
                 .font(.system(size: 48 * fontScale))
                 .foregroundColor(.secondary)
-            Text("Select a conversation")
+            Text("Select a chat")
                 .scaledFont(.title3)
                 .foregroundColor(.secondary)
             Text("Select a contact from the left list to view chat history")
