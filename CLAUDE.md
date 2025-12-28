@@ -10,7 +10,7 @@
 - ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
 - ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
 - ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
-- ✅ **Chats OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断和本地存储加密
+- ✅ **Chats OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断、本地存储加密和解析统计日志
 - ✅ **Notion 数据库同步**，支持两种策略：
   - **单一数据库模式**：所有内容在一个 Notion 数据库中
   - **每本书独立模式**：每本书/文章有独立的数据库
@@ -211,8 +211,10 @@ SyncNos/
     │   │   ├── DedaoRequestLimiter.swift       # 请求限流器
     │   │   └── DedaoCacheService.swift         # SwiftData 本地缓存
     │   ├── Chats/           # 微信聊天 OCR 集成
-    │   │   ├── ChatOCRParser.swift           # OCR 结果解析器
-    │   │   └── ChatsCacheService.swift    # SwiftData 本地缓存服务
+    │   │   ├── ChatOCRParser.swift           # OCR 结果解析器（含解析统计）
+    │   │   ├── ChatsCacheService.swift       # SwiftData 本地缓存服务
+    │   │   ├── ChatExporter.swift            # 聊天记录导出（JSON/Markdown）
+    │   │   └── ChatImporter.swift            # 聊天记录导入
     │   └── OCR/                  # OCR 服务
     │       ├── OCRAPIService.swift             # PaddleOCR-VL API 客户端
     │       ├── OCRConfigStore.swift            # OCR 配置存储
@@ -402,12 +404,16 @@ DIContainer.shared.ocrConfigStore
 
 **8. 微信聊天 OCR 集成** (Services/DataSources-From/Chats/)
 - `ChatOCRParser`: OCR 结果解析器
-  - 基于 `minX` 判断消息方向（对方消息 minX < 15%）
-  - 时间戳和系统消息自动检测
-  - 发送者昵称智能识别（群聊场景）
+  - 使用 k-means 聚类判断消息方向（我/对方）
+  - 两阶段系统/时间戳检测（纯几何规则）
+  - `ChatParseStatistics` 结构体记录解析统计
+  - `parseWithStatistics()` 方法输出详细调试日志
 - `ChatsCacheService`: SwiftData 本地缓存服务（`@ModelActor`）
   - 缓存对话和消息数据
   - 支持离线访问和快速启动
+  - 本地存储加密（AES-256-GCM）
+- `ChatExporter`: 导出对话为 JSON/Markdown 格式
+- `ChatImporter`: 从 JSON/Markdown 导入对话
 
 **9. OCR 服务** (Services/DataSources-From/OCR/)
 - `OCRAPIService`: PaddleOCR-VL API 客户端
