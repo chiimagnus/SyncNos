@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - OCR Payload Sheet View
 
-/// View OCR Normalized Blocks data for current conversation
+/// 查看当前对话的 OCR Normalized Blocks 数据
 struct ChatOCRPayloadSheet: View {
     let conversationId: String
     let conversationName: String
@@ -113,7 +113,7 @@ struct ChatOCRPayloadSheet: View {
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.payloads.isEmpty {
-            Text("No OCR data for this conversation")
+            Text("No OCR data for this chat")
                 .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
