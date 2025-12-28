@@ -347,7 +347,7 @@ final class ChatViewModel: ObservableObject {
             return ChatExporter.export(messages: allMessages, contactName: contactName, format: format)
         } catch {
             logger.error("[ChatsV2] Failed to fetch all messages for export: \(error)")
-            errorMessage = "导出失败: \(error.localizedDescription)"
+            errorMessage = "Export failed: \(error.localizedDescription)"
             return nil
         }
     }

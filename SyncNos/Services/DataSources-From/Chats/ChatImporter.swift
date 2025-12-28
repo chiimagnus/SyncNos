@@ -40,7 +40,7 @@ enum ChatImportError: LocalizedError {
 
 // MARK: - Importer
 
-/// 微信聊天记录导入工具
+/// Chat records importer
 enum ChatImporter {
     
     // MARK: - Public Methods
