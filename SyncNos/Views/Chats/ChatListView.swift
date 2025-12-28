@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Chat List View
 
-/// 微信联系人列表视图（左侧栏）
+/// 联系人列表视图（左侧栏）
 /// 注意：「新建对话」功能在底部 filterMenu 中（MainListView 传入）
 struct ChatListView: View {
     @ObservedObject var viewModel: ChatViewModel
@@ -27,8 +27,8 @@ struct ChatListView: View {
                 contactList
             }
         }
-        .alert("错误", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("确定") {
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
                 viewModel.errorMessage = nil
             }
         } message: {
@@ -50,18 +50,18 @@ struct ChatListView: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 40))
                     .foregroundColor(.orange)
-                Text("请先配置 PaddleOCR API")
+                Text("Please configure PaddleOCR API first")
                     .scaledFont(.headline)
-                Text("前往 设置 → OCR 设置")
+                Text("Go to Settings → OCR Settings")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
             } else {
                 Image(systemName: "message.badge.filled.fill")
                     .font(.system(size: 40))
                     .foregroundColor(.secondary)
-                Text("暂无对话")
+                Text("No Conversations")
                     .scaledFont(.headline)
-                Text("点击右下角「+」新建对话")
+                Text("Click \"+\" at the bottom right to create a new conversation")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
             }
@@ -80,7 +80,7 @@ struct ChatListView: View {
                         Button(role: .destructive) {
                             viewModel.deleteContact(contact)
                         } label: {
-                            Label("删除", systemImage: "trash")
+                            Label("Delete", systemImage: "trash")
                         }
                     }
             }
@@ -133,7 +133,7 @@ private struct ContactRow: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 } else if contact.messageCount == 0 {
-                    Text("暂无消息")
+                    Text("No messages")
                         .font(.caption)
                         .foregroundColor(.secondary.opacity(0.6))
                         .italic()

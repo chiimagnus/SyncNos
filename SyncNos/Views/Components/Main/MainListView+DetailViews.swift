@@ -137,20 +137,20 @@ extension MainListView {
                 }
             )
         } else {
-            // 微信聊天没有同步功能，显示简单的占位符
+            // Chats does not have sync functionality, show simple placeholder
             VStack(spacing: 16) {
                 Image(systemName: "message.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.secondary)
                 if selectedChatsContactIds.isEmpty {
-                    Text("选择一个对话")
+                    Text("Select a conversation")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
-                    Text("从左侧列表选择联系人查看聊天记录")
+                    Text("Select a contact from the left list to view chat history")
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("已选择 \(selectedChatsContactIds.count) 个对话")
+                    Text("\(selectedChatsContactIds.count) conversations selected")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
                 }

@@ -203,7 +203,7 @@ extension MainListView {
         Button {
             showNewConversationAlert = true
         } label: {
-            Label("新建对话", systemImage: "plus.message")
+            Label("New Conversation", systemImage: "plus.message")
         }
         
         if !chatsVM.contacts.isEmpty {
@@ -213,7 +213,7 @@ extension MainListView {
                 chatsVM.clearAll()
                 selectedChatsContactIds.removeAll()
             } label: {
-                Label("清空所有对话", systemImage: "trash")
+                Label("Clear All Conversations", systemImage: "trash")
             }
         }
     }

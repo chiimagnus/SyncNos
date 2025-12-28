@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Export Format
 
-/// 微信聊天记录导出格式
+/// Chat records export format
 enum ChatExportFormat: String, CaseIterable, Identifiable {
     case json = "JSON"
     case markdown = "Markdown"
@@ -61,7 +61,7 @@ struct ChatExportMessage: Codable {
 
 // MARK: - Exporter
 
-/// 微信聊天记录导出工具
+/// Chat records exporter
 enum ChatExporter {
     
     // MARK: - Public Methods

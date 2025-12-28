@@ -4,34 +4,95 @@ import CoreGraphics
 // MARK: - Chat OCR Parser (V2)
 //
 // 目标：
-// - 仅解析“气泡消息”（我/对方），支持私聊 + 群聊（昵称绑定）。
+// - 仅解析"气泡消息"（我/对方），支持私聊 + 群聊（昵称绑定）。
 // - 不做系统消息关键词表，不做时间戳展示路径。
 // - 主要依赖 bbox 的几何特征（过滤/合并/方向判定/昵称绑定）。
 //
 
+/// Parse statistics returned alongside messages for debugging
+struct ChatParseStatistics {
+    let inputBlockCount: Int
+    let normalizedBlockCount: Int
+    let lineCount: Int
+    let candidateCount: Int
+    let systemMessageCount: Int
+    let leftBubbleCount: Int
+    let rightBubbleCount: Int
+    
+    var description: String {
+        "[OCR Parse] input=\(inputBlockCount) → normalized=\(normalizedBlockCount) → lines=\(lineCount) → candidates=\(candidateCount) | system=\(systemMessageCount) left=\(leftBubbleCount) right=\(rightBubbleCount)"
+    }
+}
+
 final class ChatOCRParser {
     private let config: ChatParseConfig
+    private let logger: LoggerServiceProtocol
 
-    init(config: ChatParseConfig = .default) {
+    init(config: ChatParseConfig = .default, logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
         self.config = config
+        self.logger = logger
+    }
+    
+    /// Parse OCR result into chat messages (legacy API without statistics)
+    func parse(ocrResult: OCRResult, imageSize: CGSize) -> [ChatMessage] {
+        let (messages, _) = parseWithStatistics(ocrResult: ocrResult, imageSize: imageSize)
+        return messages
     }
 
-    func parse(ocrResult: OCRResult, imageSize: CGSize) -> [ChatMessage] {
-        guard imageSize.width > 0, imageSize.height > 0 else { return [] }
+    /// Parse OCR result into chat messages with detailed statistics for debugging
+    func parseWithStatistics(ocrResult: OCRResult, imageSize: CGSize) -> (messages: [ChatMessage], statistics: ChatParseStatistics) {
+        let inputBlockCount = ocrResult.blocks.count
+        
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            let stats = ChatParseStatistics(
+                inputBlockCount: inputBlockCount,
+                normalizedBlockCount: 0,
+                lineCount: 0,
+                candidateCount: 0,
+                systemMessageCount: 0,
+                leftBubbleCount: 0,
+                rightBubbleCount: 0
+            )
+            logger.debug(stats.description)
+            return ([], stats)
+        }
 
         let blocks = normalizeBlocks(ocrResult.blocks, imageSize: imageSize)
-        guard !blocks.isEmpty else { return [] }
+        let normalizedBlockCount = blocks.count
+        
+        guard !blocks.isEmpty else {
+            let stats = ChatParseStatistics(
+                inputBlockCount: inputBlockCount,
+                normalizedBlockCount: 0,
+                lineCount: 0,
+                candidateCount: 0,
+                systemMessageCount: 0,
+                leftBubbleCount: 0,
+                rightBubbleCount: 0
+            )
+            logger.debug(stats.description)
+            return ([], stats)
+        }
 
         let lines = groupBlocksIntoLines(blocks)
+        let lineCount = lines.count
+        
         let candidates = groupLinesIntoCandidates(lines)
+        let candidateCount = candidates.count
+        
         let systemFlags = classifyCenteredSystemFlags(candidates, imageWidth: imageSize.width)
+        let systemMessageCount = systemFlags.filter { $0 }.count
 
         let bubbleCandidates: [MessageCandidate] = zip(candidates, systemFlags)
             .compactMap { cand, isSystem in isSystem ? nil : cand }
 
         let directedBubbles = classifyDirection(bubbleCandidates, imageWidth: imageSize.width)
+        
+        // Count left (other) and right (me) bubbles
+        let rightBubbleCount = directedBubbles.filter { $0.isFromMe }.count
+        let leftBubbleCount = directedBubbles.count - rightBubbleCount
+        
         var bubbleIndex = 0
-
         var messages: [ChatMessage] = []
         messages.reserveCapacity(candidates.count)
 
@@ -59,7 +120,19 @@ final class ChatOCRParser {
             }
         }
 
-        return messages
+        let stats = ChatParseStatistics(
+            inputBlockCount: inputBlockCount,
+            normalizedBlockCount: normalizedBlockCount,
+            lineCount: lineCount,
+            candidateCount: candidateCount,
+            systemMessageCount: systemMessageCount,
+            leftBubbleCount: leftBubbleCount,
+            rightBubbleCount: rightBubbleCount
+        )
+        
+        logger.debug(stats.description)
+        
+        return (messages, stats)
     }
 }
 
