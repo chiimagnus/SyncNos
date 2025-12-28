@@ -123,13 +123,17 @@
 
 ## 四、待实现功能
 
-### 1. 解析日志详细输出
-- **状态**：⏸️ 待实现
+### 1. 解析日志详细输出 ✅
+- **状态**：✅ 已实现（2025-12-28）
 - **技术文档描述**：
   - 每张截图输出：输入 blocks 数、过滤后 blocks 数、候选消息数、左/右消息数
-- **实现建议**：
-  - 在 `ChatOCRParser.parse()` 中增加 debug 日志
-  - 可选：返回解析统计信息供 UI 展示
+- **实现**：
+  - 新增 `ChatParseStatistics` 结构体记录解析统计
+  - 新增 `parseWithStatistics()` 方法
+  - 使用项目的 `LoggerService` 输出调试日志（可在 LoggerView 查看）
+  - 日志格式：`[OCR Parse] input=15 → normalized=12 → lines=10 → candidates=8 | system=2 left=3 right=3`
+- **相关文件**：
+  - `Services/DataSources-From/Chats/ChatOCRParser.swift`
 
 ### 3. OCR 请求参数 Profile 化
 - **状态**：⏸️ 待评估
@@ -157,8 +161,8 @@
 | P1 | 本地存储加密 | ✅ 已完成 | 隐私保护需求明确 |
 | P1 | 分页加载 | ✅ 已完成 | 性能优化必需 |
 | P1 | 导入导出 | ✅ 已完成 | 数据备份和迁移 |
+| P1 | 解析日志 | ✅ 已完成 | 排障辅助 |
 | P2 | 截图拼接 | ⏸️ | 提升用户体验 |
-| P3 | 解析日志 | ⏸️ | 排障辅助 |
 | P3 | Notion 同步 | ⏸️ | 取决于产品规划 |
 | P4 | OCR Profile 化 | ⏸️ | 边缘场景优化 |
 
@@ -170,6 +174,8 @@
 
 1. **`ChatOCRParser.swift`**
    - `config: ChatParseConfig` 支持自定义参数
+   - `ChatParseStatistics` 返回解析统计信息
+   - `parseWithStatistics()` 支持详细日志输出
 
 2. **`ChatCacheModels.swift`**
    - `CachedChatMessageV2.senderName` 已预留
