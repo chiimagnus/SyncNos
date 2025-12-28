@@ -700,10 +700,6 @@ struct ChatDetailView: View {
                 .scaledFont(.headline)
                 .foregroundColor(.secondary)
 
-            Text("Click \"Import Screenshot\" above to add chat records")
-                .scaledFont(.caption)
-                .foregroundColor(.secondary)
-
             Button {
                 guard ocrConfigStore.isConfigured else {
                     listViewModel.errorMessage = "Please configure OCR service first"
@@ -731,9 +727,6 @@ struct ChatDetailView: View {
                 .foregroundColor(.secondary)
             Text("Select a chat")
                 .scaledFont(.title3)
-                .foregroundColor(.secondary)
-            Text("Select a contact from the left list to view chat history")
-                .scaledFont(.caption)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
