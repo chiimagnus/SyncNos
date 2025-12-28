@@ -460,6 +460,63 @@ git checkout -- Resource/Localizable.xcstrings
 3. **考虑长度**：某些语言翻译后可能更长，注意 UI 适配
 4. **测试验证**：构建并运行应用，检查翻译效果
 
+## 高效批量翻译技巧
+
+### 紧凑格式（推荐用于简单字符串）
+
+对于简单的 UI 字符串，可以使用更紧凑的单行格式，加快翻译速度：
+
+```bash
+sed -i '' 's/"Export as JSON" : {/"Export as JSON" : {\
+      "localizations" : {\
+        "da" : { "stringUnit" : { "state" : "translated", "value" : "Eksportér som JSON" } },\
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Als JSON exportieren" } },\
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar como JSON" } },\
+        "fi" : { "stringUnit" : { "state" : "translated", "value" : "Vie JSON-muodossa" } },\
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Exporter en JSON" } },\
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Ekspor sebagai JSON" } },\
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "JSONとしてエクスポート" } },\
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "JSON으로 내보내기" } },\
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Exporteren als JSON" } },\
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Exportar como JSON" } },\
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Экспорт в JSON" } },\
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Exportera som JSON" } },\
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "ส่งออกเป็น JSON" } },\
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Xuất dưới dạng JSON" } },\
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出为 JSON" } }\
+      }\
+/' Resource/Localizable.xcstrings
+```
+
+### 批量处理多个字符串
+
+可以在一个命令中链式处理多个字符串（注意用 `&&` 连接）：
+
+```bash
+cd /path/to/SyncNos && \
+sed -i '' 's/"String1" : {/.../' Resource/Localizable.xcstrings && \
+sed -i '' 's/"String2" : {/.../' Resource/Localizable.xcstrings && \
+python3 -m json.tool Resource/Localizable.xcstrings > /dev/null 2>&1 && echo "JSON is valid" || echo "JSON is invalid"
+```
+
+### 空条目处理（重要）
+
+对于只有 `{}` 的空条目，插入后结尾应使用 `}\` 而不是 `},\`：
+
+```bash
+# 空条目示例
+"SomeString" : {
+
+},
+
+# 正确的插入格式（注意最后没有逗号）
+'s/"SomeString" : {/"SomeString" : {\
+      "localizations" : {\
+        ...\
+      }\
+/'
+```
+
 ## 文件路径
 
 - **Localizable.xcstrings**: `/Users/chii_magnus/Github_OpenSource/SyncNos/Resource/Localizable.xcstrings`
@@ -467,4 +524,4 @@ git checkout -- Resource/Localizable.xcstrings
 
 ---
 
-*最后更新: 2025年12月3日*
+*最后更新: 2025年12月28日*
