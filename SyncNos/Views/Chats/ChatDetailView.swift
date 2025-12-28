@@ -23,7 +23,7 @@ struct ChatDetailView: View {
     @State private var selectedMessageId: UUID?
     @State private var scrollProxy: ScrollViewProxy?
     @State private var isDragTargeted = false
-    @EnvironmentObject private var fontScaleManager: FontScaleManager
+    @Environment(\.fontScale) private var fontScale
     @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
     private var selectedContact: ChatBookListItem? {
@@ -549,7 +549,7 @@ struct ChatDetailView: View {
     private var dropTargetOverlay: some View {
             VStack(spacing: 12) {
                 Image(systemName: "arrow.down.doc.fill")
-                    .font(.system(size: 48 * fontScaleManager.scaleFactor))
+                    .font(.system(size: 48 * fontScale))
                     .foregroundColor(.white)
                 
                 Text("Drop files here")
@@ -640,7 +640,7 @@ struct ChatDetailView: View {
     private func emptyMessagesView(contact: ChatBookListItem) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 40 * fontScaleManager.scaleFactor))
+                .font(.system(size: 40 * fontScale))
                 .foregroundColor(.secondary)
 
             Text("No Messages")
@@ -674,7 +674,7 @@ struct ChatDetailView: View {
     private var emptySelectionView: some View {
         VStack(spacing: 16) {
             Image(systemName: "message.fill")
-                .font(.system(size: 48 * fontScaleManager.scaleFactor))
+                .font(.system(size: 48 * fontScale))
                 .foregroundColor(.secondary)
             Text("Select a conversation")
                 .scaledFont(.title3)
@@ -693,6 +693,6 @@ struct ChatDetailView: View {
         selectedContactId: .constant(nil),
         onScrollViewResolved: { _ in }
     )
-    .environmentObject(FontScaleManager.shared)
+    .applyFontScale()
     .frame(width: 500, height: 600)
 }

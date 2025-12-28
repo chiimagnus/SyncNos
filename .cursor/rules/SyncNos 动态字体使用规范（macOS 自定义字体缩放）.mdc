@@ -26,13 +26,14 @@ alwaysApply: false
    - 对需要字体缩放的窗口/根视图调用 `.applyFontScale()`（已用于 `RootView`、`SettingsView` 等）。  
    - 新增独立窗口或顶层视图时，请确认添加。
 
-3) **获取缩放因子：两种方式**  
-   - 仅需读环境：`@Environment(\.fontScale) var fontScale`（用于少量手工计算，如等宽字体）。  
-   - 需要计算属性/尺寸：`@ObservedObject private var fontScaleManager = FontScaleManager.shared`，使用 `scaleFactor` 计算图标/布局尺寸。
+3) **获取缩放因子：推荐方式**  
+   - **首选**：`@Environment(\.fontScale) var fontScale`（适用于所有需要手工计算的场景，如图标/布局尺寸）。  
+   - **备选**：`@ObservedObject private var fontScaleManager = FontScaleManager.shared`（仅当需要访问 `isAccessibilitySize` 等其他属性时使用）。
+   - **禁止**：不要使用 `@EnvironmentObject FontScaleManager`，因为 `.applyFontScale()` 只注入了 `Environment(\.fontScale)`，未注入 `environmentObject`，会导致运行时崩溃。
 
 4) **图标与布局尺寸缩放**  
-   - 使用 `fontScaleManager.scaleFactor` 手工计算：例如 `Image(...).font(.system(size: 40 * scaleFactor))`。  
-   - `AdaptiveStack` 或 `fontScaleManager.isAccessibilitySize` 决定布局切换。
+   - 使用 `fontScale` 手工计算：例如 `Image(...).font(.system(size: 40 * fontScale))`。  
+   - `AdaptiveStack` 或 `FontScaleManager.shared.isAccessibilitySize` 决定布局切换。
 
 5) **特殊字体（等宽等）**  
    - 需要 monospaced 时可手动计算：`Font.TextStyle.caption.basePointSize * fontScale`，并指定 `design: .monospaced`。
