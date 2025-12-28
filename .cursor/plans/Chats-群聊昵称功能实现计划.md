@@ -104,12 +104,24 @@
         │  消息内容...        │
         └────────────────────┘
 
-我的消息：
+我的消息（有昵称时）：
+                                     我
                     ┌────────────────────┐
                     │  消息内容...        │
                     └────────────────────┘
-（"我的消息"不显示昵称）
+（最终决定：我的消息也显示昵称）
+
+系统消息：
+        ────────────────────────────────
+              系统消息内容...
+        ────────────────────────────────
+（系统消息不显示昵称，且右键菜单隐藏昵称设置项）
 ```
+
+**设计决策（2025-12-28 更新）**：
+- ✅ "我的消息"和"对方消息"均显示昵称
+- ✅ "系统消息"隐藏昵称设置菜单项（右键菜单中不显示）
+- ✅ 消息从普通消息改为系统消息后，senderName 数据保留（不删除），便于恢复
 
 ### 2.3 数据模型
 
@@ -145,15 +157,18 @@ func getUsedSenderNames(for contactId: UUID) -> [String] {
 
 ## 三、技术实现计划
 
-### 3.1 文件变更清单
+### 3.1 文件变更清单（已完成）
 
-| 文件 | 变更类型 | 描述 |
-|------|----------|------|
-| `ChatSenderNamePickerView.swift` | **新增** | 昵称选择/输入 Popover 视图 |
-| `ChatMessageContextMenu.swift` | 修改 | 添加"设置发送者昵称"菜单项 |
-| `ChatMessageBubble.swift` | 修改 | 触发昵称选择 Popover |
-| `ChatViewModel.swift` | 修改 | 添加 `updateMessageSenderName()` 和 `getUsedSenderNames()` |
-| `ChatsCacheService.swift` | 修改 | 添加昵称持久化方法 |
+| 文件 | 变更类型 | 描述 | 状态 |
+|------|----------|------|------|
+| `ChatSenderNamePickerView.swift` | **新增** | 昵称选择/输入 Popover 视图 + FlowLayout | ✅ |
+| `ChatMessageContextMenu.swift` | 修改 | 添加"设置发送者昵称"菜单项，系统消息隐藏 | ✅ |
+| `ChatMessageBubble.swift` | 修改 | 显示昵称（我的消息+对方消息均显示） | ✅ |
+| `ChatSystemMessageRow.swift` | 修改 | 传递新的 `onSetSenderName/onClearSenderName` 参数 | ✅ |
+| `ChatDetailView.swift` | 修改 | 添加 Popover 状态管理和触发逻辑 | ✅ |
+| `ChatViewModel.swift` | 修改 | 添加 `updateMessageSenderName()` 和 `getUsedSenderNames()` | ✅ |
+| `ChatCacheService.swift` | 修改 | 添加 `updateMessageSenderName()` 协议和实现 | ✅ |
+| `ChatCacheModels.swift` | 修改 | 添加 `CachedChatMessageV2.updateSenderName()` 方法 | ✅ |
 
 ### 3.2 优先级与任务分解
 
@@ -386,14 +401,15 @@ func updateMessageSenderName(
 
 | 测试项 | 预期结果 |
 |--------|----------|
-| 右键菜单显示"设置发送者昵称" | ✅ 菜单项正常显示 |
-| 点击后弹出昵称选择 Popover | ✅ Popover 正常弹出 |
+| 右键菜单显示"设置发送者昵称" | ✅ 菜单项正常显示（非系统消息） |
+| 点击后弹出昵称选择 Popover | ✅ Popover 正常弹出（箭头朝左，显示在右侧） |
 | Popover 显示本对话已使用的昵称 | ✅ 标签正确显示 |
 | 选择已有昵称 | ✅ 消息昵称更新、Popover 关闭 |
 | 输入新昵称并确认 | ✅ 消息昵称更新 |
 | 重启应用后昵称保留 | ✅ SwiftData 持久化正常 |
-| 消息气泡上方显示昵称 | ✅ 仅对方消息显示昵称 |
+| 消息气泡上方显示昵称 | ✅ 我的消息和对方消息均显示昵称 |
 | 清除昵称 | ✅ senderName 设为 nil、气泡不再显示昵称 |
+| 系统消息右键菜单 | ✅ 不显示昵称设置菜单项 |
 
 ### 5.2 边界测试
 
@@ -401,7 +417,9 @@ func updateMessageSenderName(
 |--------|----------|
 | 新对话无历史昵称 | ✅ 只显示输入框，无标签区 |
 | 输入空白昵称 | ✅ 阻止提交 |
-| 我的消息设置昵称 | ✅ 支持（但不显示） |
+| 我的消息设置昵称 | ✅ 支持并显示昵称 |
+| 消息从普通改为系统消息 | ✅ senderName 数据保留 |
+| 消息从系统改回普通消息 | ✅ 昵称自动恢复显示 |
 
 ---
 
@@ -420,3 +438,5 @@ func updateMessageSenderName(
 | 2025-12-28 | v1.0 | 初始计划文档 |
 | 2025-12-28 | v1.1 | 改为单对话昵称列表（动态提取），移除全局历史存储 |
 | 2025-12-28 | v1.2 | ✅ P1/P2 全部完成：右键菜单、昵称弹窗、持久化、气泡显示 |
+| 2025-12-28 | v1.3 | 调整：我的消息也显示昵称；系统消息隐藏昵称菜单项 |
+| 2025-12-28 | v1.4 | 优化：Popover 位置调整（arrowEdge: .leading，显示在右侧） |
