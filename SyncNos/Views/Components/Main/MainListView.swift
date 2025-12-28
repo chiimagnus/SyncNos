@@ -241,8 +241,8 @@ struct MainListView: View {
                 .ignoresSafeArea()
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
-            // MARK: - Chats New Conversation Alert
-            .alert("New Conversation", isPresented: $showNewConversationAlert) {
+            // MARK: - Chats New Chat Alert
+            .alert("New Chat", isPresented: $showNewConversationAlert) {
                 TextField("Contact Name", text: $newConversationName)
                 Button("Create") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }

@@ -307,21 +307,6 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    func clearAll() {
-        contacts.removeAll()
-        conversations.removeAll()
-        paginationStates.removeAll()
-
-        Task {
-            do {
-                try await cacheService.clearAllData()
-                logger.info("[ChatsV2] Cleared all data")
-            } catch {
-                logger.error("[ChatsV2] Failed to clear cache: \(error)")
-            }
-        }
-    }
-
     // MARK: - Export (导出)
     
     /// 导出对话为指定格式

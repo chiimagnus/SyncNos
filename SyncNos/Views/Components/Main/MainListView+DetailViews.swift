@@ -143,14 +143,14 @@ extension MainListView {
                     .font(.system(size: 48))
                     .foregroundColor(.secondary)
                 if selectedChatsContactIds.isEmpty {
-                    Text("Select a conversation")
+                    Text("Select a chat")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
                     Text("Select a contact from the left list to view chat history")
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("\(selectedChatsContactIds.count) conversations selected")
+                    Text("\(selectedChatsContactIds.count) chats selected")
                         .scaledFont(.title3)
                         .foregroundColor(.secondary)
                 }
