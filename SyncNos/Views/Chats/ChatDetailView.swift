@@ -701,7 +701,7 @@ struct ChatDetailView: View {
 
     private var emptySelectionView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "message.fill")
+            Image(systemName: "message")
                 .font(.system(size: 48 * fontScale))
                 .foregroundColor(.secondary)
             Text("Select a chat")

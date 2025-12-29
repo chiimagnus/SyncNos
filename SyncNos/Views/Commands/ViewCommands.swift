@@ -191,13 +191,13 @@ struct ViewCommands: Commands {
 
             if isDataSourceEnabled(.chats) {
                 if let key = shortcutKey(for: .chats) {
-                    Button("Chats", systemImage: "message.fill") {
+                    Button("Chats", systemImage: "message") {
                         contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .chats)
                 } else {
-                    Button("Chats", systemImage: "message.fill") {
+                    Button("Chats", systemImage: "message") {
                         contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .disabled(currentSource == .chats)
