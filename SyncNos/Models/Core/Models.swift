@@ -28,7 +28,7 @@ enum ContentSource: String, Codable, CaseIterable {
         case .goodLinks: return "bookmark"
         case .weRead: return "w.square"
         case .dedao: return "d.square"
-        case .chats: return "message.fill"
+        case .chats: return "message"
         }
     }
     
