@@ -45,7 +45,7 @@ extension MainListView {
                     }
                     return event
                 default:
-                    // 其他 Cmd 组合键（如 Cmd+←/→ 切换数据源）不拦截
+                    // 其他 Cmd 组合键不拦截（数据源切换已改为 ⌥⌘←/→）
                     return event
                 }
             }

@@ -112,17 +112,17 @@ struct ViewCommands: Commands {
             }
             .keyboardShortcut("\\", modifiers: .command)
 
-            // 数据源切换：上一个/下一个（⌘+← / ⌘+→）- 循环切换
+            // 数据源切换：上一个/下一个（⌥⌘← / ⌥⌘→）- 循环切换
             Button("Previous Data Source") {
                 switchToPreviousDataSource()
             }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
             .disabled(!canSwitchDataSource)
 
             Button("Next Data Source") {
                 switchToNextDataSource()
             }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
             .disabled(!canSwitchDataSource)
 
             Divider()
