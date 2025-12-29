@@ -52,8 +52,6 @@ struct MainListView: View {
     @State var mainWindow: NSWindow?
     /// 键盘事件监听器
     @State var keyDownMonitor: Any?
-    /// 鼠标点击事件监听器（用于同步焦点状态）
-    @State var mouseDownMonitor: Any?
     
     // MARK: - App Storage
     
@@ -212,7 +210,7 @@ struct MainListView: View {
                             }
                             
                             self.keyboardNavigationTarget = .detail
-                            self.focusDetailScrollViewIfPossible(window: window)
+                            self.focusDetailIfPossible(window: window)
                         }
                     )
             }
