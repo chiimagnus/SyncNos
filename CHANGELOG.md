@@ -1,3 +1,6 @@
+## v0.10.4
+**Key updates:** Fix the focus manager issue, again and finally.😢
+
 ## v0.10.3
 **Key updates:** Optimize OCR automatic language recognition
 
