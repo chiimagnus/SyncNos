@@ -9,7 +9,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             List {
-                Section(header: Text("General").scaledFont(.headline)) {
+                Section {
                     LanguageView()
                     
                     // 字体大小设置
@@ -90,13 +90,17 @@ struct SettingsView: View {
                         }
                     }
                     .help("Support development and unlock Pro features")
+                } header: {
+                    Text("General")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                 }
                 .collapsible(false)
 
-                Section(header: Text("Sync Data To").scaledFont(.headline)) {
+                Section {
                     NavigationLink(value: "notion") {
                         HStack {
-                            Label("Notion API", systemImage: "n.square")
+                            Label("Notion", systemImage: "n.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -105,10 +109,14 @@ struct SettingsView: View {
                         }
                     }
                     .help("Configure Notion and run example API calls")
+                } header: {
+                    Text("Sync Data To")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                 }
                 .collapsible(false)
 
-                Section(header: Text("Get Data From").scaledFont(.headline)) {
+                Section {
                     // Per-source auto sync toggles and navigation
                     NavigationLink(destination: AppleBooksSettingsView()) {
                         HStack {
@@ -156,7 +164,7 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: OCRSettingsView()) {
                         HStack {
-                            Label("OCR Settings", systemImage: "text.viewfinder")
+                            Label("Chats", systemImage: "text.viewfinder")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -200,6 +208,10 @@ struct SettingsView: View {
                         }
                     }
 #endif
+                } header: {
+                    Text("Get Data From")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                 }
                 .collapsible(false)
             }
