@@ -354,7 +354,7 @@ func startKeyboardMonitorIfNeeded() {
 
 从 v0.9.11 开始，焦点管理相关代码已分离到独立文件 `MainListView+FocusManager.swift`。
 
-#### 鼠标点击焦点同步
+#### 鼠标点击焦点同步（v0.9.12+ 改进版）
 
 ```swift
 // MainListView+FocusManager.swift
@@ -368,9 +368,33 @@ func startMouseDownMonitorIfNeeded() {
             return event
         }
         
+        // 记录点击位置
+        let clickLocationInWindow = event.locationInWindow
+        
         // 延迟检查焦点，因为点击后焦点可能还没有切换
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // v0.9.12: 延迟从 0.1s 增加到 0.15s，给 SwiftUI 手势更多处理时间
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            // 先按当前 firstResponder 同步状态
             self.syncNavigationTargetWithFocus()
+            
+            // 兜底：如果用户点击了 Detail 区域，但 firstResponder 仍停留在 List，
+            // 则强制让 Detail 的 NSScrollView 成为 firstResponder
+            guard self.keyboardNavigationTarget == .list else { return }
+            
+            // v0.9.12: 检查点击是否在 Detail ScrollView 内，并获取命中的视图
+            guard let (isInside, hitView) = self.checkPointInDetailScrollView(clickLocationInWindow, window: window),
+                  isInside else { return }
+            
+            // v0.9.12: 如果点击的是交互控件，不强制切换焦点
+            // 允许 SwiftUI 的手势处理器和控件自然处理焦点
+            if self.isInteractiveElement(hitView) {
+                return
+            }
+            
+            // 点击的是被动区域（如背景、padding、空白ScrollView等），强制切换焦点
+            self.savedMasterFirstResponder = window.firstResponder
+            self.keyboardNavigationTarget = .detail
+            self.focusDetailScrollViewIfPossible(window: window)
         }
         
         return event
@@ -397,9 +421,68 @@ func syncNavigationTargetWithFocus() {
     // 否则认为焦点在 List
     keyboardNavigationTarget = .list
 }
+
+/// v0.9.12: 检查点击是否在 Detail ScrollView 内，并返回命中的视图
+private func checkPointInDetailScrollView(_ locationInWindow: NSPoint, window: NSWindow) -> (Bool, NSView?) {
+    guard let scrollView = currentDetailScrollView else { return (false, nil) }
+    guard scrollView.window === window else { return (false, nil) }
+    guard let contentView = window.contentView else { return (false, nil) }
+    
+    let pointInContentView = contentView.convert(locationInWindow, from: nil)
+    guard let hitView = contentView.hitTest(pointInContentView) else { return (false, nil) }
+    
+    var view: NSView? = hitView
+    while let v = view {
+        if v === scrollView || v === scrollView.contentView || v === scrollView.documentView {
+            return (true, hitView)
+        }
+        view = v.superview
+    }
+    
+    return (false, nil)
+}
+
+/// v0.9.12: 判断视图是否为交互元素（按钮、文本框、可点击控件等）
+private func isInteractiveElement(_ view: NSView?) -> Bool {
+    guard let view = view else { return false }
+    
+    // 检查 AppKit 交互控件
+    if view is NSButton || view is NSTextField || view is NSTextView {
+        return true
+    }
+    
+    // 检查 SwiftUI 内部类名
+    let className = String(describing: type(of: view))
+    if className.contains("Button") || 
+       className.contains("Control") || 
+       className.contains("Gesture") ||
+       className.contains("Interaction") {
+        return true
+    }
+    
+    // 检查父视图链（最多 5 层）
+    var parent = view.superview
+    var depth = 0
+    while let p = parent, depth < 5 {
+        let parentClassName = String(describing: type(of: p))
+        if parentClassName.contains("Button") || 
+           parentClassName.contains("Control") ||
+           parentClassName.contains("TextField") {
+            return true
+        }
+        parent = p.superview
+        depth += 1
+    }
+    
+    return false
+}
 ```
 
-**注意**：当前的 `syncNavigationTargetWithFocus()` 只更新 `keyboardNavigationTarget` 状态，不主动调用 `makeFirstResponder`。这意味着鼠标点击 DetailView 时，List 的高亮颜色不会自动变化（已知问题，见"已知问题"章节）。
+**改进说明（v0.9.12）**：
+- **延迟时间**：从 0.1s 增加到 0.15s，给 SwiftUI 手势识别更多时间
+- **交互元素检测**：新增 `isInteractiveElement()` 方法，识别按钮、控件、手势响应视图
+- **智能焦点切换**：只在点击被动区域（背景、空白）时强制切换焦点
+- **保护交互**：点击消息气泡、按钮等交互元素时不强制切换焦点，避免干扰用户操作
 
 #### 焦点切换方法
 
@@ -665,16 +748,28 @@ func stopMouseDownMonitorIfNeeded() {
 
 ## 已知问题
 
-### 鼠标点击 DetailView 时 List 高亮不变化
+### ~~鼠标点击 DetailView 时 List 高亮不变化~~ ✅ 已在 v0.9.12 修复
 
-**问题描述**：当用户用鼠标点击 DetailView 时，ListView 的选中项高亮颜色不会从强调色（蓝色）变为灰色。而使用键盘左右方向键导航时，高亮颜色正确变化。
+**问题描述**：~~当用户用鼠标点击 DetailView 时，ListView 的选中项高亮颜色不会从强调色（蓝色）变为灰色。而使用键盘左右方向键导航时，高亮颜色正确变化。~~
 
 **根本原因**：
-1. 键盘导航正确工作是因为我们主动调用了 `window.makeFirstResponder(scrollView.contentView)`
-2. 鼠标点击时，`syncNavigationTargetWithFocus()` 只更新了 `keyboardNavigationTarget` 状态，没有调用 `makeFirstResponder`
-3. AppKit 的 `firstResponder` 决定了 List 的高亮颜色，但 SwiftUI 的 ScrollView 点击时可能不会自动成为 firstResponder
+1. ~~键盘导航正确工作是因为我们主动调用了 `window.makeFirstResponder(scrollView.contentView)`~~
+2. ~~鼠标点击时，`syncNavigationTargetWithFocus()` 只更新了 `keyboardNavigationTarget` 状态，没有调用 `makeFirstResponder`~~
+3. ~~AppKit 的 `firstResponder` 决定了 List 的高亮颜色，但 SwiftUI 的 ScrollView 点击时可能不会自动成为 firstResponder~~
 
-**状态**：待修复（见 `.cursor/plans/ListView-DetailView-Focus-State-Fix-Plan.md`）
+**修复方案（v0.9.12 已实施）**：
+- 在 `mouseDownMonitor` 中增加了"兜底"逻辑：检测到点击 Detail 但焦点仍在 List 时，主动调用 `makeFirstResponder`
+- 延长延迟时间从 0.1s 到 0.15s，给 SwiftUI 手势识别更多时间
+- 增加交互元素检测（`isInteractiveElement()`），避免点击按钮、消息气泡等交互元素时误触焦点切换
+- 只在点击"被动区域"（背景、空白、padding）时才强制切换焦点
+
+**修复效果**：
+- ✅ 点击 Detail 空白区域 → List 高亮变灰（焦点切换到 Detail）
+- ✅ 点击 List → List 高亮恢复蓝色（焦点返回 List）
+- ✅ 点击消息气泡、按钮等交互元素 → 不强制切换焦点，元素自然处理
+- ✅ 键盘 ←/→ 导航 → 继续正常工作
+
+**详见**：`.cursor/plans/ListView-DetailView-Focus-State-Fix-Plans.md` 中的 P1 方案及 v0.9.12 改进。
 
 ## 扩展指南
 
