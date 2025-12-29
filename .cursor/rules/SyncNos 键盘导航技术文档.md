@@ -1,7 +1,7 @@
 # SyncNos 键盘导航技术文档
 
-version: v0.9.9
-上次编辑时间: 2025年12月19日 22:40
+version: v0.9.10
+上次编辑时间: 2025年12月29日 Monday
 创建时间: 2025年12月15日 14:47
 标签: docs, feat
 状态: 完成
@@ -31,7 +31,7 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 ┌─────────────────────────────────────────────────────────────────┐
 │                        MainListView                              │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │ 状态管理                                                     ││
+│  │ 状态管理 (MainListView.swift)                               ││
 │  │ - keyboardNavigationTarget: .list / .detail                 ││
 │  │ - currentDetailScrollView: NSScrollView?                    ││
 │  │ - savedMasterFirstResponder: NSResponder?                   ││
@@ -42,20 +42,34 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │                              │                                   │
 │                              ▼                                   │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │ NSEvent 监听器                                               ││
+│  │ NSEvent 监听器 (MainListView+KeyboardMonitor.swift)         ││
 │  │                                                             ││
 │  │ keyDownMonitor:                                             ││
 │  │   ├─ keyCode 123 (←): 切换到 List                           ││
 │  │   ├─ keyCode 124 (→): 切换到 Detail                         ││
-│  │   ├─ keyCode 126 (↑): Detail 向上滚动                       ││
-│  │   ├─ keyCode 125 (↓): Detail 向下滚动                       ││
+│  │   ├─ keyCode 126 (↑): Detail 向上滚动 / Chats 消息导航       ││
+│  │   ├─ keyCode 125 (↓): Detail 向下滚动 / Chats 消息导航       ││
 │  │   ├─ keyCode 115 (Home): 滚动到顶部                         ││
 │  │   ├─ keyCode 119 (End): 滚动到底部                          ││
 │  │   ├─ keyCode 116 (Page Up): 向上翻页                        ││
-│  │   └─ keyCode 121 (Page Down): 向下翻页                      ││
+│  │   ├─ keyCode 121 (Page Down): 向下翻页                      ││
+│  │   ├─ Cmd+↑/↓: 滚动到顶部/底部                               ││
+│  │   └─ Option+←/→: Chats 分类切换                             ││
 │  │                                                             ││
 │  │ mouseDownMonitor:                                           ││
-│  │   └─ 同步焦点状态                                            ││
+│  │   └─ syncNavigationTargetWithFocus()                        ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     ListView (各数据源)                          │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ @FocusState private var isListFocused: Bool                 ││
+│  │ List(...).focused($isListFocused)                           ││
+│  │                                                             ││
+│  │ .onAppear { isListFocused = true }                          ││
+│  │ .onReceive(DataSourceSwitchedTo* 通知) { isListFocused=true }│
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -69,19 +83,71 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │  │             └─ 回调给 MainListView 的 currentDetailScrollView││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
-
 ```
+
+## 文件结构
+
+| 文件路径 | 作用 |
+|---------|------|
+| `Views/Components/Main/MainListView.swift` | 主视图，定义状态变量和生命周期管理 |
+| `Views/Components/Main/MainListView+KeyboardMonitor.swift` | 键盘/鼠标事件监听器扩展 |
+| `Views/Components/Keyboard/WindowReader.swift` | 获取 NSWindow 的 NSViewRepresentable |
+| `Views/Components/Keyboard/EnclosingScrollViewReader.swift` | 获取 NSScrollView 的 NSViewRepresentable |
+| `Views/Chats/ChatNotifications.swift` | Chats 相关通知名称定义 |
+| `Views/AppleBooks/AppleBooksListView.swift` | Apple Books 列表视图（含 @FocusState） |
+| `Views/GoodLinks/GoodLinksListView.swift` | GoodLinks 列表视图（含 @FocusState） |
+| `Views/WeRead/WeReadListView.swift` | WeRead 列表视图（含 @FocusState） |
+| `Views/Dedao/DedaoListView.swift` | Dedao 列表视图（含 @FocusState） |
+| `Views/Chats/ChatListView.swift` | Chats 列表视图（含 @FocusState） |
 
 ## 核心组件
 
-### 1. WindowReader
+### 1. KeyboardNavigationTarget 枚举
 
 ```swift
-// SyncNos/Views/Components/Keyboard/WindowReader.swift
+// MainListView.swift
 
+/// 键盘导航目标：当前焦点在 List 还是 Detail
+enum KeyboardNavigationTarget {
+    case list
+    case detail
+}
+```
+
+**用途**：标记当前键盘导航的焦点区域，决定方向键的行为。
+
+### 2. MainListView 状态变量
+
+```swift
+// MainListView.swift
+
+// MARK: - Keyboard Navigation State (internal for extensions)
+
+/// 当前键盘导航目标（List 或 Detail）
+@State var keyboardNavigationTarget: KeyboardNavigationTarget = .list
+/// 当前 Detail 视图的 NSScrollView（用于键盘滚动）
+@State var currentDetailScrollView: NSScrollView?
+/// 保存进入 Detail 前的 firstResponder，用于返回时恢复
+@State var savedMasterFirstResponder: NSResponder?
+/// 当前窗口引用（用于过滤键盘事件）
+@State var mainWindow: NSWindow?
+/// 键盘事件监听器
+@State var keyDownMonitor: Any?
+/// 鼠标点击事件监听器（用于同步焦点状态）
+@State var mouseDownMonitor: Any?
+```
+
+### 3. WindowReader
+
+```swift
+// Views/Components/Keyboard/WindowReader.swift
+
+/// 读取 SwiftUI 视图所在的 `NSWindow`。
+///
+/// - Note: 通过 `NSViewRepresentable` 把 window 注入到 SwiftUI state，适用于需要基于窗口过滤 NSEvent 的场景。
 struct WindowReader: NSViewRepresentable {
     @Binding var window: NSWindow?
-
+    
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
@@ -89,7 +155,7 @@ struct WindowReader: NSViewRepresentable {
         }
         return view
     }
-
+    
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             if self.window !== nsView.window {
@@ -98,30 +164,40 @@ struct WindowReader: NSViewRepresentable {
         }
     }
 }
-
 ```
 
 **用途**：获取当前视图所在的 `NSWindow`，用于过滤键盘事件，确保只处理主窗口的事件。
 
-### 2. EnclosingScrollViewReader
+**使用方式**：
+```swift
+// MainListView.swift body
+mainContent
+    .background(WindowReader(window: $mainWindow))
+```
+
+### 4. EnclosingScrollViewReader
 
 ```swift
-// SyncNos/Views/Components/Keyboard/EnclosingScrollViewReader.swift
+// Views/Components/Keyboard/EnclosingScrollViewReader.swift
 
+/// 在 `ScrollView` 内容内部使用，用于拿到其底层 `NSScrollView`（enclosingScrollView）。
+///
+/// 典型用法：放在 `ScrollView` 的内容里（例如顶部 `Color.clear` 的 background），即可回调当前的 `NSScrollView`。
 struct EnclosingScrollViewReader: NSViewRepresentable {
     var onResolve: (NSScrollView) -> Void
-
+    
     final class Coordinator {
         weak var lastScrollView: NSScrollView?
     }
-
+    
     func makeCoordinator() -> Coordinator { Coordinator() }
-
+    
     func makeNSView(context: Context) -> NSView {
         NSView()
     }
-
+    
     func updateNSView(_ nsView: NSView, context: Context) {
+        // 需要等视图挂到层级后 enclosingScrollView 才稳定
         DispatchQueue.main.async {
             guard let scrollView = nsView.enclosingScrollView else { return }
             if context.coordinator.lastScrollView !== scrollView {
@@ -131,48 +207,80 @@ struct EnclosingScrollViewReader: NSViewRepresentable {
         }
     }
 }
-
 ```
 
 **用途**：获取 SwiftUI `ScrollView` 底层的 `NSScrollView`，用于程序化滚动。
 
-### 3. 键盘事件监听
+### 5. 键盘事件监听器
 
 ```swift
-// MainListView.swift
+// MainListView+KeyboardMonitor.swift
 
-private func startKeyboardMonitorIfNeeded() {
+func startKeyboardMonitorIfNeeded() {
     guard keyDownMonitor == nil else { return }
-
+    
     keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-        // 只处理 MainListView 所在窗口的事件
+        // 只处理 MainListView 所在窗口的事件，避免影响 Settings 等其它窗口
         guard let window = self.mainWindow, event.window === window else {
             return event
         }
-
+        
         // 检查修饰键
         let modifiers = event.modifierFlags
         let hasCommand = modifiers.contains(.command)
-
-        // Cmd+↑/↓ 用于滚动到顶部/底部
-        if hasCommand {
+        let hasOption = modifiers.contains(.option)
+        let hasControl = modifiers.contains(.control)
+        
+        // Cmd+↑/↓ 用于 Detail 滚动到顶部/底部
+        if hasCommand && !hasOption && !hasControl {
             switch event.keyCode {
-            case 126: // Cmd+↑
+            case 126: // Cmd+↑ 滚动到顶部
                 if self.keyboardNavigationTarget == .detail {
                     self.scrollCurrentDetailToTop()
                     return nil  // 消费事件
                 }
-            case 125: // Cmd+↓
+            case 125: // Cmd+↓ 滚动到底部
                 if self.keyboardNavigationTarget == .detail {
                     self.scrollCurrentDetailToBottom()
                     return nil
                 }
             default:
-                return event  // 不消费，传递给系统
+                // 其他 Cmd 组合键（如 Cmd+←/→ 切换数据源）不拦截
+                return event
             }
         }
-
-        // 普通方向键处理...
+        
+        // Option+←/→ 用于 Chats 分类切换
+        if hasOption && !hasCommand && !hasControl {
+            if self.contentSource == .chats && self.keyboardNavigationTarget == .detail {
+                switch event.keyCode {
+                case 123: // Option+← 切换分类（向左：我 → 系统 → 对方）
+                    NotificationCenter.default.post(
+                        name: .chatsCycleClassification,
+                        object: nil,
+                        userInfo: ["direction": "left"]
+                    )
+                    return nil
+                case 124: // Option+→ 切换分类（向右：对方 → 系统 → 我）
+                    NotificationCenter.default.post(
+                        name: .chatsCycleClassification,
+                        object: nil,
+                        userInfo: ["direction": "right"]
+                    )
+                    return nil
+                default:
+                    break
+                }
+            }
+            return event
+        }
+        
+        // 不拦截带 Control 的组合键
+        if hasControl {
+            return event
+        }
+        
+        // 普通方向键处理
         switch event.keyCode {
         case 123: // ←
             if self.keyboardNavigationTarget == .detail {
@@ -180,34 +288,119 @@ private func startKeyboardMonitorIfNeeded() {
                 self.focusBackToMaster(window: window)
                 return nil
             }
-        // ... 其他按键
+        case 124: // →
+            if self.keyboardNavigationTarget == .list, self.hasSingleSelectionForCurrentSource() {
+                self.savedMasterFirstResponder = window.firstResponder
+                self.keyboardNavigationTarget = .detail
+                self.focusDetailScrollViewIfPossible(window: window)
+                return nil
+            }
+        case 126: // ↑
+            if self.keyboardNavigationTarget == .detail {
+                if self.contentSource == .chats {
+                    NotificationCenter.default.post(
+                        name: .chatsNavigateMessage,
+                        object: nil,
+                        userInfo: ["direction": "up"]
+                    )
+                    return nil
+                }
+                self.scrollCurrentDetail(byLines: -1)
+                return nil
+            }
+        case 125: // ↓
+            if self.keyboardNavigationTarget == .detail {
+                if self.contentSource == .chats {
+                    NotificationCenter.default.post(
+                        name: .chatsNavigateMessage,
+                        object: nil,
+                        userInfo: ["direction": "down"]
+                    )
+                    return nil
+                }
+                self.scrollCurrentDetail(byLines: 1)
+                return nil
+            }
+        // ... Home, End, Page Up, Page Down
+        default:
+            return event
         }
+        
+        return event
+    }
+    
+    // 监听鼠标点击，同步焦点状态
+    startMouseDownMonitorIfNeeded()
+}
+```
 
+### 6. 鼠标点击焦点同步
+
+```swift
+// MainListView+KeyboardMonitor.swift
+
+func startMouseDownMonitorIfNeeded() {
+    guard mouseDownMonitor == nil else { return }
+    
+    mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+        // 只处理 MainListView 所在窗口的事件
+        guard let window = self.mainWindow, event.window === window else {
+            return event
+        }
+        
+        // 延迟检查焦点，因为点击后焦点可能还没有切换
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.syncNavigationTargetWithFocus()
+        }
+        
         return event
     }
 }
 
+/// 根据当前 firstResponder 同步 keyboardNavigationTarget 状态
+func syncNavigationTargetWithFocus() {
+    guard let window = mainWindow else { return }
+    guard let firstResponder = window.firstResponder else { return }
+    
+    // 检查 firstResponder 是否在 Detail 的 ScrollView 中
+    if let detailScrollView = currentDetailScrollView {
+        var responder: NSResponder? = firstResponder
+        while let r = responder {
+            if r === detailScrollView || r === detailScrollView.contentView {
+                keyboardNavigationTarget = .detail
+                return
+            }
+            responder = r.nextResponder
+        }
+    }
+    
+    // 否则认为焦点在 List
+    keyboardNavigationTarget = .list
+}
 ```
 
-### 4. 焦点管理
+**注意**：当前的 `syncNavigationTargetWithFocus()` 只更新 `keyboardNavigationTarget` 状态，不主动调用 `makeFirstResponder`。这意味着鼠标点击 DetailView 时，List 的高亮颜色不会自动变化（已知问题，见"已知问题"章节）。
+
+### 7. 焦点管理
 
 ```swift
-// MainListView.swift
+// MainListView+KeyboardMonitor.swift
 
-private func focusDetailScrollViewIfPossible(window: NSWindow) {
+func focusDetailScrollViewIfPossible(window: NSWindow) {
     guard let scrollView = currentDetailScrollView else { return }
     DispatchQueue.main.async {
+        // 让 Detail 真正成为 first responder，List 的选中高亮会变为非激活（灰色）
         _ = window.makeFirstResponder(scrollView.contentView)
     }
 }
 
-private func focusBackToMaster(window: NSWindow) {
+func focusBackToMaster(window: NSWindow) {
     let responder = savedMasterFirstResponder
     DispatchQueue.main.async {
         if let responder, window.makeFirstResponder(responder) {
             return
         }
-        // 兜底：发送通知让 List 重新获取焦点
+        // 兜底：触发当前数据源 List 再次请求焦点
         NotificationCenter.default.post(
             name: self.focusNotificationName(for: self.contentSource),
             object: nil
@@ -215,35 +408,119 @@ private func focusBackToMaster(window: NSWindow) {
     }
 }
 
+func focusNotificationName(for source: ContentSource) -> Notification.Name {
+    switch source {
+    case .appleBooks:
+        return Notification.Name("DataSourceSwitchedToAppleBooks")
+    case .goodLinks:
+        return Notification.Name("DataSourceSwitchedToGoodLinks")
+    case .weRead:
+        return Notification.Name("DataSourceSwitchedToWeRead")
+    case .dedao:
+        return Notification.Name("DataSourceSwitchedToDedao")
+    case .chats:
+        return Notification.Name("DataSourceSwitchedToChats")
+    }
+}
 ```
 
-### 5. 滚动控制
+### 8. 滚动控制
 
 ```swift
-// MainListView.swift
+// MainListView+KeyboardMonitor.swift
 
-private func scrollCurrentDetail(byLines lines: Int) {
+func scrollCurrentDetail(byLines lines: Int) {
     guard let scrollView = currentDetailScrollView else { return }
     guard let documentView = scrollView.documentView else { return }
-
+    
+    // 基于 "一行" 的滚动步长（同时考虑动态字体缩放）
     let baseStep: CGFloat = 56
     let step = baseStep * fontScaleManager.scaleFactor
     let delta = CGFloat(lines) * step
-
+    
+    // flipped 坐标系下，y 增大表示向下
     let effectiveDelta = (documentView.isFlipped ? delta : -delta)
-
+    
     let clipView = scrollView.contentView
     var newOrigin = clipView.bounds.origin
     newOrigin.y += effectiveDelta
-
+    
     let maxY = max(0, documentView.bounds.height - clipView.bounds.height)
     newOrigin.y = min(max(newOrigin.y, 0), maxY)
-
+    
     clipView.scroll(to: newOrigin)
     scrollView.reflectScrolledClipView(clipView)
 }
 
+/// 滚动到顶部 (Home / Cmd+↑)
+func scrollCurrentDetailToTop() { ... }
+
+/// 滚动到底部 (End / Cmd+↓)
+func scrollCurrentDetailToBottom() { ... }
+
+/// 按页滚动 (Page Up / Page Down)
+func scrollCurrentDetailByPage(up: Bool) { ... }
 ```
+
+### 9. ListView 的 @FocusState
+
+每个 ListView 都使用 `@FocusState` 来管理焦点：
+
+```swift
+// 以 AppleBooksListView.swift 为例
+
+struct AppleBooksListView: View {
+    @ObservedObject var viewModel: AppleBooksViewModel
+    @Binding var selectionIds: Set<String>
+    
+    /// 用于接收焦点的 FocusState
+    @FocusState private var isListFocused: Bool
+
+    var body: some View {
+        Group {
+            // ... loading / error / empty states
+            List(selection: $selectionIds) {
+                // ... content
+            }
+            .listStyle(.sidebar)
+            .focused($isListFocused)
+        }
+        .onAppear {
+            // ... load data
+            // 延迟获取焦点，确保视图已完全加载
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isListFocused = true
+            }
+        }
+        // 监听数据源切换通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToAppleBooks")).receive(on: DispatchQueue.main)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isListFocused = true
+            }
+        }
+    }
+}
+```
+
+**所有使用 @FocusState 的 ListView**：
+- `AppleBooksListView.swift`
+- `GoodLinksListView.swift`
+- `WeReadListView.swift`
+- `DedaoListView.swift`
+- `ChatListView.swift`
+
+### 10. Chats 特有的通知
+
+```swift
+// Views/Chats/ChatNotifications.swift
+
+extension Notification.Name {
+    static let chatsNavigateMessage = Notification.Name("ChatNavigateMessage")
+    static let chatsCycleClassification = Notification.Name("ChatCycleClassification")
+}
+```
+
+这些通知由 `MainListView+KeyboardMonitor.swift` 发送，由 `ChatDetailView.swift` 接收处理。
 
 ## 快捷键映射
 
@@ -251,14 +528,24 @@ private func scrollCurrentDetail(byLines lines: Int) {
 | --- | --- | --- | --- |
 | ← | 123 | 返回 List | `keyboardNavigationTarget == .detail` |
 | → | 124 | 进入 Detail | `keyboardNavigationTarget == .list` 且选中单个项目 |
-| ↑ | 126 | 向上滚动一行 | `keyboardNavigationTarget == .detail` |
-| ↓ | 125 | 向下滚动一行 | `keyboardNavigationTarget == .detail` |
+| ↑ | 126 | 向上滚动一行 / Chats 消息导航 | `keyboardNavigationTarget == .detail` |
+| ↓ | 125 | 向下滚动一行 / Chats 消息导航 | `keyboardNavigationTarget == .detail` |
 | Cmd+↑ | 126 | 滚动到顶部 | `keyboardNavigationTarget == .detail` |
 | Cmd+↓ | 125 | 滚动到底部 | `keyboardNavigationTarget == .detail` |
-| Home | 115 | 滚动到顶部 | `keyboardNavigationTarget == .detail` |
-| End | 119 | 滚动到底部 | `keyboardNavigationTarget == .detail` |
-| Page Up | 116 | 向上翻页 | `keyboardNavigationTarget == .detail` |
-| Page Down | 121 | 向下翻页 | `keyboardNavigationTarget == .detail` |
+| Option+← | 123 | Chats 分类切换（向左） | `contentSource == .chats` && `keyboardNavigationTarget == .detail` |
+| Option+→ | 124 | Chats 分类切换（向右） | `contentSource == .chats` && `keyboardNavigationTarget == .detail` |
+| Home (Fn+←) | 115 | 滚动到顶部 | `keyboardNavigationTarget == .detail` |
+| End (Fn+→) | 119 | 滚动到底部 | `keyboardNavigationTarget == .detail` |
+| Page Up (Fn+↑) | 116 | 向上翻页 | `keyboardNavigationTarget == .detail` |
+| Page Down (Fn+↓) | 121 | 向下翻页 | `keyboardNavigationTarget == .detail` |
+
+### 不拦截的系统快捷键
+
+| 按键 | 说明 |
+| --- | --- |
+| Cmd+←/→ | 数据源切换（由 ViewCommands 处理） |
+| Control+任意键 | 传递给系统 |
+| 其他 Cmd 组合键 | 传递给系统 |
 
 ## DetailView 集成
 
@@ -268,7 +555,7 @@ private func scrollCurrentDetail(byLines lines: Int) {
 struct AppleBooksDetailView: View {
     @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
-    var onScrollViewResolved: (NSScrollView) -> Void  // 新增
+    var onScrollViewResolved: (NSScrollView) -> Void
 
     var body: some View {
         ScrollView {
@@ -286,27 +573,108 @@ struct AppleBooksDetailView: View {
         }
     }
 }
-
 ```
+
+**重要**：即使是空状态或加载状态，也应该保留一个可解析的 ScrollView，以确保键盘焦点切换正常工作（见 `ChatDetailView.swift` 的实现）。
+
+## 生命周期管理
+
+```swift
+// MainListView.swift body
+
+.onAppear {
+    // 根据当前启用的数据源初始化滑动容器
+    updateDataSourceSwitchViewModel()
+    // 同步滑动容器与菜单状态
+    syncSwipeViewModelWithContentSource()
+    // 启动键盘监听
+    startKeyboardMonitorIfNeeded()
+}
+.onDisappear {
+    stopKeyboardMonitorIfNeeded()
+}
+```
+
+```swift
+// MainListView+KeyboardMonitor.swift
+
+func stopKeyboardMonitorIfNeeded() {
+    if let monitor = keyDownMonitor {
+        NSEvent.removeMonitor(monitor)
+        keyDownMonitor = nil
+    }
+    if let monitor = mouseDownMonitor {
+        NSEvent.removeMonitor(monitor)
+        mouseDownMonitor = nil
+    }
+}
+```
+
+## 数据源切换时的状态重置
+
+```swift
+// MainListView.swift
+
+.onChange(of: contentSourceRawValue) { _, _ in
+    // 切换数据源时重置选择和焦点状态
+    selectedBookIds.removeAll()
+    selectedLinkIds.removeAll()
+    selectedWeReadBookIds.removeAll()
+    selectedDedaoBookIds.removeAll()
+    keyboardNavigationTarget = .list
+    currentDetailScrollView = nil
+}
+```
+
+## 已知问题
+
+### 鼠标点击 DetailView 时 List 高亮不变化
+
+**问题描述**：当用户用鼠标点击 DetailView 时，ListView 的选中项高亮颜色不会从强调色（蓝色）变为灰色。而使用键盘左右方向键导航时，高亮颜色正确变化。
+
+**根本原因**：
+1. 键盘导航正确工作是因为我们主动调用了 `window.makeFirstResponder(scrollView.contentView)`
+2. 鼠标点击时，`syncNavigationTargetWithFocus()` 只更新了 `keyboardNavigationTarget` 状态，没有调用 `makeFirstResponder`
+3. AppKit 的 `firstResponder` 决定了 List 的高亮颜色，但 SwiftUI 的 ScrollView 点击时可能不会自动成为 firstResponder
+
+**状态**：待修复（见 `.cursor/plans/ListView-DetailView-Focus-State-Fix-Plan.md`）
 
 ## 扩展指南
 
 ### 添加新的快捷键
 
 1. 在 `startKeyboardMonitorIfNeeded()` 的 switch 语句中添加新的 case
-2. 确保正确检查 `keyboardNavigationTarget` 状态
+2. 确保正确检查 `keyboardNavigationTarget` 状态和修饰键
 3. 返回 `nil` 消费事件，或返回 `event` 传递给系统
 
 ### 添加新的 DetailView
 
 1. 在新的 DetailView 中添加 `onScrollViewResolved: (NSScrollView) -> Void` 参数
 2. 在 ScrollView 内部使用 `EnclosingScrollViewReader` 获取 NSScrollView
-3. 在 MainListView 的 `detailColumn` 中传递回调
+3. 在 MainListView 的 `detailColumn`（`MainListView+DetailViews.swift`）中传递回调
+4. 确保空状态和加载状态也有可解析的 ScrollView
+
+### 添加新的数据源 ListView
+
+1. 添加 `@FocusState private var isListFocused: Bool`
+2. 在 List 上添加 `.focused($isListFocused)`
+3. 在 `.onAppear` 中设置 `isListFocused = true`
+4. 监听对应的 `DataSourceSwitchedTo*` 通知并设置焦点
+5. 在 `MainListView+KeyboardMonitor.swift` 的 `focusNotificationName(for:)` 中添加映射
 
 ## 注意事项
 
 1. **生命周期管理**：确保在 `onDisappear` 中调用 `stopKeyboardMonitorIfNeeded()` 移除监听器
 2. **窗口过滤**：始终检查 `event.window === window` 避免影响其他窗口（如 Settings）
 3. **修饰键检查**：Cmd+←/→ 已用于切换数据源，不要拦截
-4. **焦点同步**：用户点击时需要同步 `keyboardNavigationTarget` 状态
+4. **焦点同步**：用户点击时需要通过 `syncNavigationTargetWithFocus()` 同步状态
 5. **动态字体缩放**：滚动步长需要考虑 `fontScaleManager.scaleFactor`
+6. **延迟检查**：`mouseDownMonitor` 使用 0.1 秒延迟，等待 AppKit 完成焦点切换后再检查
+7. **空状态处理**：DetailView 的空状态也需要提供 ScrollView，否则键盘切换会失效
+
+## 更新历史
+
+| 版本 | 日期 | 更新内容 |
+| --- | --- | --- |
+| v0.9.10 | 2025-12-29 | 完整文档重写：添加文件结构、所有代码示例、已知问题、扩展指南 |
+| v0.9.9 | 2025-12-19 | 初始版本，键盘导航功能完成 |
