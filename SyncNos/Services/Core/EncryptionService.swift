@@ -106,26 +106,38 @@ final class EncryptionService: EncryptionServiceProtocol {
     
     // MARK: - Key Management
     
-    /// 加载或创建加密密钥
+    /// Load or create the encryption key
     private func loadOrCreateKey() throws -> SymmetricKey {
-        // 检查缓存
+        // Check cached key first
         if let key = queue.sync(execute: { cachedKey }) {
             return key
         }
         
-        // 尝试从 Keychain 加载
-        if let keyData = KeychainHelper.shared.read(service: keychainService, account: keychainAccount) {
+        // Load from Keychain (distinguish unavailable vs missing)
+        let readResult = KeychainHelper.shared.readWithStatus(service: keychainService, account: keychainAccount)
+        switch readResult.status {
+        case errSecSuccess:
+            guard let keyData = readResult.data else {
+                throw EncryptionError.keychainDataCorrupted
+            }
             let key = SymmetricKey(data: keyData)
             queue.async(flags: .barrier) { [weak self] in
                 self?.cachedKey = key
             }
             return key
+        case errSecItemNotFound:
+            break  // Key not found - generate new key below
+        case errSecInteractionNotAllowed, errSecAuthFailed, errSecNotAvailable:
+            // Keychain temporarily unavailable (locked/needs interaction); avoid generating a new key that would break decryption
+            throw EncryptionError.keychainUnavailable(status: readResult.status)
+        default:
+            throw EncryptionError.keychainUnavailable(status: readResult.status)
         }
         
-        // 生成新密钥
+        // Generate new key
         let newKey = SymmetricKey(size: .bits256)
         
-        // 保存到 Keychain
+        // Persist key to Keychain
         let saved = saveKeyToKeychain(newKey)
         guard saved else {
             throw EncryptionError.keySaveFailed
@@ -184,6 +196,10 @@ enum EncryptionError: Error, LocalizedError {
     case keySaveFailed
     /// AES-GCM 解密失败（认证标签不匹配）
     case authenticationFailed
+    /// Keychain temporarily unavailable (e.g., device locked or permission denied)
+    case keychainUnavailable(status: OSStatus)
+    /// Keychain returned an unexpected payload
+    case keychainDataCorrupted
     
     var errorDescription: String? {
         switch self {
@@ -199,6 +215,10 @@ enum EncryptionError: Error, LocalizedError {
             return "Failed to save encryption key to Keychain"
         case .authenticationFailed:
             return "AES-GCM authentication failed - data may be corrupted"
+        case .keychainUnavailable(let status):
+            return "Unable to access Keychain (status: \(status)). Ensure the device is unlocked and Keychain access is allowed, then retry."
+        case .keychainDataCorrupted:
+            return "Keychain returned an unexpected response for the chat encryption key."
         }
     }
 }
@@ -220,4 +240,3 @@ extension EncryptionService {
         return try decrypt(ciphertext)
     }
 }
-

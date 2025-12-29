@@ -23,6 +23,14 @@ final class KeychainHelper {
     }
 
     func read(service: String, account: String) -> Data? {
+        let (data, status) = readWithStatus(service: service, account: account)
+        guard status == errSecSuccess else { return nil }
+        return data
+    }
+    
+    /// Read Keychain data and return status (distinguish unavailable vs missing)
+    /// - Returns: Tuple containing optional data and the OSStatus from SecItemCopyMatching
+    func readWithStatus(service: String, account: String) -> (data: Data?, status: OSStatus) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -32,8 +40,10 @@ final class KeychainHelper {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else { return nil }
-        return data
+        guard let data = item as? Data else {
+            return (nil, status)
+        }
+        return (data, status)
     }
 
     @discardableResult
