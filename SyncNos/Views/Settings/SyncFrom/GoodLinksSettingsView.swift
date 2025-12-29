@@ -6,7 +6,7 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+            Section {
                 LabeledContent {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
                         .textFieldStyle(.roundedBorder)
@@ -60,6 +60,10 @@ struct GoodLinksSettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose data folder and load notes")
+            } header: {
+                Text("Notion Sync Setting")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
 
             if let message = viewModel.message {
