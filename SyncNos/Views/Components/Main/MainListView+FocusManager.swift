@@ -81,11 +81,15 @@ extension MainListView {
     
     /// 将焦点切换到 Detail 的 ScrollView
     func focusDetailScrollViewIfPossible(window: NSWindow) {
-        guard let scrollView = currentDetailScrollView else { return }
         DispatchQueue.main.async {
             // 让 Detail 真正成为 first responder，List 的选中高亮会变为非激活（灰色）
-            // SwiftUI 的 ScrollView 底层实现可能导致 contentView 并不总能成为 firstResponder，
-            // 因此这里做多路兜底，优先让 NSScrollView 本身拿到 firstResponder。
+            // 优先使用 Detail 侧稳定的 firstResponder “落点”，避免依赖 ScrollView 内部实现细节
+            if let proxy = self.detailFirstResponderProxyView, window.makeFirstResponder(proxy) {
+                return
+            }
+            
+            // 兜底：仍尝试让 NSScrollView 成为 firstResponder（某些场景下更符合系统行为）
+            guard let scrollView = self.currentDetailScrollView else { return }
             if window.makeFirstResponder(scrollView) { return }
             if window.makeFirstResponder(scrollView.contentView) { return }
             if let documentView = scrollView.documentView, window.makeFirstResponder(documentView) { return }
