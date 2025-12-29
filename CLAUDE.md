@@ -422,9 +422,8 @@ DIContainer.shared.ocrConfigStore       // 配置存储
   - 自动翻转 Y 坐标以匹配图像坐标系（原点左上角）
   - 根据 `OCRConfigStore` 动态配置语言参数
 - `OCRConfigStore`: OCR 语言配置存储
-  - `OCRLanguageMode`：自动检测（`.automatic`）/ 手动选择（`.manual`）
   - `OCRLanguage`：30 种官方支持语言的定义（东亚、西欧、东欧、北欧、东南亚、中东）
-  - `selectedLanguageCodes`：用户手动选择的语言代码列表
+  - `selectedLanguageCodes`：用户选择的语言代码列表（空数组 = 自动检测）
   - 配置持久化到 `UserDefaults`
 - `OCRModels`: 数据模型（`OCRResult`、`OCRBlock`）和协议定义
 - `OCRModels`: OCR 请求/响应数据模型
