@@ -18,9 +18,24 @@ extension MainListView {
                 return event
             }
             
+            // 记录点击位置（窗口坐标系：原点在左下）
+            let clickLocationInWindow = event.locationInWindow
+            
             // 延迟检查焦点，因为点击后焦点可能还没有切换
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // 先按当前 firstResponder 同步状态
                 self.syncNavigationTargetWithFocus()
+                
+                // 兜底：如果用户点击了 Detail 区域，但 firstResponder 仍停留在 List，
+                // 则强制让 Detail 的 NSScrollView 成为 firstResponder，
+                // 这样 List 选中高亮会立即变为非激活（灰色）。
+                guard self.keyboardNavigationTarget == .list else { return }
+                guard self.isPointInsideCurrentDetailScrollView(clickLocationInWindow, window: window) else { return }
+                
+                // 保存进入 Detail 前的 firstResponder，用于 ← 返回时恢复
+                self.savedMasterFirstResponder = window.firstResponder
+                self.keyboardNavigationTarget = .detail
+                self.focusDetailScrollViewIfPossible(window: window)
             }
             
             return event
@@ -95,6 +110,31 @@ extension MainListView {
         case .chats:
             return Notification.Name("DataSourceSwitchedToChats")
         }
+    }
+    
+    // MARK: - Hit Testing Helpers
+    
+    /// 判断一次点击是否发生在当前 Detail 的 NSScrollView 区域内（窗口坐标系）
+    private func isPointInsideCurrentDetailScrollView(_ locationInWindow: NSPoint, window: NSWindow) -> Bool {
+        guard let scrollView = currentDetailScrollView else { return false }
+        // 只在 scrollView 仍挂载在当前窗口时才判断，避免使用过期引用
+        guard scrollView.window === window else { return false }
+        guard let contentView = window.contentView else { return false }
+        
+        // 命中测试：确保点击确实落在 Detail 的 ScrollView 视图树内，
+        // 避免仅靠 rect 判断在极端情况下误判（导致“点 List 也自动切到 Detail”）
+        let pointInContentView = contentView.convert(locationInWindow, from: nil)
+        guard let hitView = contentView.hitTest(pointInContentView) else { return false }
+        
+        var view: NSView? = hitView
+        while let v = view {
+            if v === scrollView || v === scrollView.contentView || v === scrollView.documentView {
+                return true
+            }
+            view = v.superview
+        }
+        
+        return false
     }
 }
 
