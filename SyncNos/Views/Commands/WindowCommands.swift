@@ -5,7 +5,9 @@ struct WindowCommands: Commands {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
 
     var body: some Commands {
-        // 禁用"Single Window List"（系统默认，通常用于文档类应用）
+        // 隐藏窗口列表（Settings、Logs、主窗口等不再显示在 Window 菜单）
+        CommandGroup(replacing: .windowList) {}
+
         // MARK: - Text Size Commands
         CommandGroup(replacing: .singleWindowList) {
             Button("Increase Text Size") {
