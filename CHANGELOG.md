@@ -1,3 +1,6 @@
+## v0.10.2
+**Key updates:** New Apple native OCR engine
+
 ## v0.9.15
 
 **Key updates:**
