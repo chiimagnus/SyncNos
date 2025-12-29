@@ -201,18 +201,18 @@ final class EncryptionService: EncryptionServiceProtocol {
             }
         }
         
-        // 密钥不存在，检查是否是新生成的（已在锁内，直接访问）
+        // 密钥不存在于 Keychain，检查内存中是否有新生成的标记
+        // 注意：由于我们已经持有 keyGenerationLock，并且这是在启动时调用的健康检查，
+        // 直接通过 queue.sync 访问是安全的（queue 不会尝试获取 keyGenerationLock）
         let wasNewlyGenerated = queue.sync(execute: { keyWasNewlyGenerated })
         if wasNewlyGenerated {
             Self.logger.warning("[Encryption] Key health check: Key was newly generated (previous data may be unrecoverable)")
             return .newlyGenerated
         }
         
-        // 尝试生成新密钥（注意：loadOrCreateKey 内部也会尝试获取锁，
-        // 由于我们已经持有锁，需要直接执行密钥生成逻辑）
-        // 再次检查 Keychain（双重检查）
+        // Keychain 中没有密钥，且没有标记为新生成，需要创建新密钥
+        // 再次检查 Keychain（防御性编程）
         if KeychainHelper.shared.read(service: keychainService, account: keychainAccount) != nil {
-            // 另一个线程可能已经生成了密钥
             return .healthy
         }
         
@@ -226,7 +226,8 @@ final class EncryptionService: EncryptionServiceProtocol {
             return .unavailable(reason: "Failed to save new key")
         }
         
-        queue.async(flags: .barrier) { [weak self] in
+        // 同步更新缓存和标记（使用 sync 确保立即生效）
+        queue.sync(flags: .barrier) { [weak self] in
             self?.cachedKey = newKey
             self?.keyWasNewlyGenerated = true
         }
@@ -241,7 +242,8 @@ final class EncryptionService: EncryptionServiceProtocol {
         keyGenerationLock.lock()
         defer { keyGenerationLock.unlock() }
         
-        queue.async(flags: .barrier) { [weak self] in
+        // 同步清除缓存，确保后续操作看到空状态
+        queue.sync(flags: .barrier) { [weak self] in
             self?.cachedKey = nil
             self?.keyWasNewlyGenerated = false
         }
