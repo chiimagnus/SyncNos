@@ -224,7 +224,10 @@ final class EncryptionService: EncryptionServiceProtocol {
             return .unavailable(reason: "Failed to save new key")
         }
         
-        // 通过 queue 更新缓存和标记（barrier 确保写入可见性）
+        // 通过 queue 更新缓存和标记
+        // 注意：使用 async 是有意为之 - 我们已经在返回值中表明这是新生成的密钥，
+        // 缓存更新可以异步进行，不会影响正确性（后续的 loadOrCreateKey 调用
+        // 会使用 Keychain 中的密钥，而不依赖内存中的 keyWasNewlyGenerated 标记）
         queue.async(flags: .barrier) { [weak self] in
             self?.cachedKey = newKey
             self?.keyWasNewlyGenerated = true
