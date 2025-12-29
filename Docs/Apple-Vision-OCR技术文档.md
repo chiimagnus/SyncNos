@@ -166,7 +166,7 @@ func convertToImageCoordinates(
 // ⚠️ 注意：此函数不翻转 Y 轴！
 let pixelRect = VNImageRectForNormalizedRect(boundingBox, Int(width), Int(height))
 // 结果：pixelRect.origin.y = boundingBox.origin.y * height
-// 这意味着 Y 值越大 = 距离图像底部越近（与 PaddleOCR 坐标系相反）
+// 这意味着 Y 值越大 = 距离图像底部越近（与标准图像坐标系相反）
 ```
 
 **关键区别：**
@@ -175,7 +175,7 @@ let pixelRect = VNImageRectForNormalizedRect(boundingBox, Int(width), Int(height
 |-------|---------|---------|
 | Vision 归一化坐标 | Y=0 在底部，Y=1 在顶部 | 左下角 |
 | VNImageRectForNormalizedRect 输出 | Y=0 在底部，Y=height 在顶部 | 左下角 |
-| 图像坐标 / PaddleOCR | Y=0 在顶部，Y=height 在底部 | 左上角 |
+| 标准图像坐标（UIKit/AppKit） | Y=0 在顶部，Y=height 在底部 | 左上角 |
 
 **在 SyncNos 中的实现：**
 
@@ -489,34 +489,28 @@ request.revision = VNRecognizeTextRequestRevision3
 
 ---
 
-## 7. 与 PaddleOCR 对比
+## 7. 功能概览
 
-### 7.1 功能对比
+### 7.1 Apple Vision OCR 功能
 
-| 功能 | Apple Vision | PaddleOCR |
-|-----|-------------|-----------|
-| 中文识别 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 英文识别 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 手写识别 | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| 表格识别 | ❌ | ⭐⭐⭐⭐ |
-| 版面分析 | ❌ | ⭐⭐⭐⭐⭐ |
-| 公式识别 | ❌ | ⭐⭐⭐⭐ |
-| BBox 精度 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 速度 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 离线可用 | ✅ | ✅（需部署） |
-| 隐私保护 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 功能 | 支持情况 |
+|-----|---------|
+| 中文识别（简体/繁体） | ✅ 完全支持 |
+| 英文识别 | ✅ 完全支持 |
+| 手写识别 | ⭐⭐⭐ 基础支持 |
+| BBox 精度 | ⭐⭐⭐⭐ 良好 |
+| 速度（Apple Silicon） | ⭐⭐⭐⭐⭐ 极快 |
+| 离线可用 | ✅ 完全离线 |
+| 隐私保护 | ⭐⭐⭐⭐⭐ 本地处理 |
 
-### 7.2 性能对比（Apple Silicon M1）
+### 7.2 性能参考（Apple Silicon M1）
 
-| 指标 | Apple Vision | PaddleOCR (云端) |
-|-----|-------------|-----------------|
-| 1080p 图片 | ~200-500ms | ~1-3s |
-| 4K 图片 | ~500-1000ms | ~2-5s |
-| 内存占用 | ~50MB | N/A |
+| 图片尺寸 | 处理时间 |
+|---------|---------|
+| 1080p | ~200-500ms |
+| 4K | ~500-1000ms |
 
-### 7.3 聊天截图场景适用性
-
-对于 SyncNos 的聊天截图 OCR 场景：
+### 7.3 SyncNos 聊天截图场景适用性
 
 | 需求 | Apple Vision 支持 |
 |-----|-----------------|
@@ -582,57 +576,34 @@ request.revision = VNRecognizeTextRequestRevision3
 }
 ```
 
-### 8.2 与现有 PaddleOCR 响应对比
+### 8.2 OCRBlock 结构
 
-**PaddleOCR 响应格式**：
-
-```json
-{
-  "result": {
-    "layoutParsingResults": [{
-      "prunedResult": {
-        "parsing_res_list": [{
-          "block_bbox": [54, 873, 432, 906],
-          "block_content": "你好，今天天气真好",
-          "block_label": "text",
-          "block_id": 0
-        }]
-      }
-    }]
-  }
-}
-```
-
-**Vision 框架等效输出**：
+Vision 框架返回的数据映射到 `OCRBlock` 结构：
 
 ```json
 {
   "blocks": [{
     "text": "你好，今天天气真好",
     "label": "text",
-    "bbox": { "x": 54, "y": 873, "width": 378, "height": 33 }
+    "bbox": { "x": 54, "y": 150, "width": 378, "height": 33 }
   }]
 }
 ```
 
-**结论**：Vision 框架返回的数据可以直接映射到现有的 `OCRBlock` 结构，无需修改 `ChatOCRParser`。
-
 ---
 
-## 9. 迁移到 Vision 框架
+## 9. SyncNos 实现
 
-### 9.1 代码变更点
+### 9.1 相关文件
 
-| 文件 | 变更类型 | 描述 |
-|-----|---------|------|
-| 新增 `VisionOCRService.swift` | 新增 | Vision OCR 实现 |
-| `DIContainer.swift` | 修改 | 添加 Vision 服务注册 |
-| `OCRConfigStore.swift` | 修改 | 添加引擎选择配置 |
-| `ChatViewModel.swift` | 最小改动 | 切换 OCR 服务提供者 |
+| 文件 | 描述 |
+|-----|------|
+| `VisionOCRService.swift` | Vision OCR 实现 |
+| `OCRConfigStore.swift` | 配置存储（Vision 始终可用） |
+| `OCRModels.swift` | 数据模型和协议定义 |
+| `DIContainer.swift` | 服务注册 |
 
-### 9.2 兼容性保证
-
-现有的 `OCRAPIServiceProtocol` 协议：
+### 9.2 OCRAPIServiceProtocol 协议
 
 ```swift
 protocol OCRAPIServiceProtocol {
@@ -642,19 +613,7 @@ protocol OCRAPIServiceProtocol {
 }
 ```
 
-Vision 实现完全遵循此协议，无需修改上层代码。
-
-### 9.3 配置切换
-
-```swift
-// OCRConfigStore.swift 添加
-enum OCREngine: String, Codable {
-    case vision = "vision"
-    case paddleOCR = "paddleocr"
-}
-
-@AppStorage("ocr.engine") var engine: OCREngine = .vision
-```
+`VisionOCRService` 完全遵循此协议。
 
 ---
 
@@ -716,7 +675,7 @@ for observation in observations {
 4. 完全兼容 Mac App Store
 5. 与现有 `ChatOCRParser` 无缝集成
 
-**保留 PaddleOCR 云端 API 作为可选高级功能**，供需要更高精度或复杂版面分析的用户使用。
+SyncNos 使用 Apple Vision 作为唯一的 OCR 引擎，满足聊天截图识别的所有需求。
 
 ---
 
