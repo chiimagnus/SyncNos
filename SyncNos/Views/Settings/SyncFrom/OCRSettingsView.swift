@@ -3,6 +3,8 @@ import SwiftUI
 /// OCR 设置视图
 struct OCRSettingsView: View {
     @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
+    @StateObject private var configStore = OCRConfigStore.shared
+    @State private var showingLanguageSheet = false
     
     var body: some View {
         Form {
@@ -29,7 +31,7 @@ struct OCRSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Apple Vision")
                             .font(.headline)
-                        Text("Native macOS OCR, offline, no configuration required")
+                        Text("Native macOS OCR • Offline • 30 languages")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -43,52 +45,194 @@ struct OCRSettingsView: View {
                 .padding(.vertical, 4)
             } header: {
                 Text("OCR Engine")
-            } footer: {
-                Text("Apple Vision uses the built-in macOS text recognition with automatic language detection.")
             }
             
-            // MARK: - 支持的语言
+            // MARK: - 语言设置
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Automatic language detection is enabled. The following languages are prioritized:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 4)
-                    
-                    LanguageRow(name: "Chinese (Simplified)", code: "zh-Hans")
-                    LanguageRow(name: "Chinese (Traditional)", code: "zh-Hant")
-                    LanguageRow(name: "English", code: "en-US")
+                // 语言模式选择
+                Picker("Detection Mode", selection: $configStore.languageMode) {
+                    ForEach(OCRLanguageMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                
+                // 手动模式下显示语言选择
+                if configStore.languageMode == .manual {
+                    Button {
+                        showingLanguageSheet = true
+                    } label: {
+                        HStack {
+                            Text("Languages")
+                            Spacer()
+                            if configStore.selectedLanguages.isEmpty {
+                                Text("None (using defaults)")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(configStore.selectedLanguages.prefix(3).map(\.code).joined(separator: ", "))
+                                    .foregroundStyle(.secondary)
+                                if configStore.selectedLanguages.count > 3 {
+                                    Text("+\(configStore.selectedLanguages.count - 3)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
             } header: {
-                Text("Recognition Languages")
+                Text("Language")
             } footer: {
-                Text("Vision framework supports 18+ languages including Japanese, Korean, French, German, Spanish, Portuguese, Italian, and more. Languages are automatically detected based on content.")
+                if configStore.languageMode == .automatic {
+                    Text("Vision automatically detects languages in the image.")
+                } else {
+                    Text("Select specific languages for better accuracy. Note: Chinese and Japanese cannot be used together.")
+                }
             }
         }
         .formStyle(.grouped)
         .navigationTitle("OCR Settings")
+        .sheet(isPresented: $showingLanguageSheet) {
+            LanguageSelectionSheet(configStore: configStore)
+        }
     }
 }
 
-// MARK: - Language Row
+// MARK: - Language Selection Sheet
 
-private struct LanguageRow: View {
-    let name: String
-    let code: String
+private struct LanguageSelectionSheet: View {
+    @ObservedObject var configStore: OCRConfigStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    
+    private var filteredGroups: [(String, [OCRLanguage])] {
+        let allGroups = OCRLanguage.groupedLanguages()
+        
+        if searchText.isEmpty {
+            return allGroups
+        }
+        
+        return allGroups.compactMap { (groupName, languages) in
+            let filtered = languages.filter { language in
+                language.name.localizedCaseInsensitiveContains(searchText) ||
+                language.localizedName.localizedCaseInsensitiveContains(searchText) ||
+                language.code.localizedCaseInsensitiveContains(searchText)
+            }
+            return filtered.isEmpty ? nil : (groupName, filtered)
+        }
+    }
     
     var body: some View {
-        HStack {
-            Text(name)
-                .font(.body)
-            Spacer()
-            Text(code)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                
+                Spacer()
+                
+                Text("Select Languages")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            
+            // Search
+            TextField("Search languages...", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            
+            // Selected count
+            if !configStore.selectedLanguageCodes.isEmpty {
+                HStack {
+                    Text("\(configStore.selectedLanguageCodes.count) language(s) selected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Button("Clear All") {
+                        configStore.selectedLanguageCodes = []
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+            
+            Divider()
+            
+            // Language List
+            List {
+                ForEach(filteredGroups, id: \.0) { group in
+                    Section(group.0) {
+                        ForEach(group.1) { language in
+                            LanguageToggleRow(
+                                language: language,
+                                isSelected: configStore.selectedLanguageCodes.contains(language.code)
+                            ) {
+                                configStore.toggleLanguage(language.code)
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.inset)
         }
+        .frame(width: 420, height: 500)
+    }
+}
+
+// MARK: - Language Toggle Row
+
+private struct LanguageToggleRow: View {
+    let language: OCRLanguage
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        Button {
+            onToggle()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(language.name)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    Text(language.localizedName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(language.code)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .font(.title3)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -418,12 +418,15 @@ DIContainer.shared.ocrConfigStore       // 配置存储
 **9. OCR 服务** (Services/DataSources-From/OCR/)
 - `VisionOCRService`: Apple Vision OCR（原生，离线）
   - 使用 `VNRecognizeTextRequest` 进行文本识别
-  - 支持中文简体、繁体和英文
+  - 支持 30 种语言（来自 `supportedRecognitionLanguages()` 运行时查询）
   - 自动翻转 Y 坐标以匹配图像坐标系（原点左上角）
-  - 即装即用，无需配置
-- `OCRConfigStore`: OCR 配置存储（Vision 始终可用）
-- `OCRModels`: 数据模型和协议定义
-  - Token 安全存储在 Keychain
+  - 根据 `OCRConfigStore` 动态配置语言参数
+- `OCRConfigStore`: OCR 语言配置存储
+  - `OCRLanguageMode`：自动检测（`.automatic`）/ 手动选择（`.manual`）
+  - `OCRLanguage`：30 种官方支持语言的定义（东亚、西欧、东欧、北欧、东南亚、中东）
+  - `selectedLanguageCodes`：用户手动选择的语言代码列表
+  - 配置持久化到 `UserDefaults`
+- `OCRModels`: 数据模型（`OCRResult`、`OCRBlock`）和协议定义
 - `OCRModels`: OCR 请求/响应数据模型
 
 **10. 通用同步调度** (Services/SyncScheduling/)
