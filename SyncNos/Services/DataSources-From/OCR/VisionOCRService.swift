@@ -10,20 +10,23 @@ import AppKit
 final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
     
     private let logger: LoggerServiceProtocol
+    private let configStore: OCRConfigStoreProtocol
     
     // MARK: - Constants
     
     private enum Constants {
-        /// 默认识别语言（中英文混合）
-        static let defaultLanguages = ["zh-Hans", "zh-Hant", "en-US"]
         /// 最小文字高度比例（相对于图像高度）
         static let minimumTextHeight: Float = 0.01
     }
     
     // MARK: - Init
     
-    init(logger: LoggerServiceProtocol = DIContainer.shared.loggerService) {
+    init(
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+        configStore: OCRConfigStoreProtocol = OCRConfigStore.shared
+    ) {
         self.logger = logger
+        self.configStore = configStore
     }
     
     // MARK: - OCRAPIServiceProtocol
@@ -46,7 +49,12 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
             height: CGFloat(cgImage.height)
         )
         
+        // 获取语言配置
+        let languageCodes = configStore.effectiveLanguageCodes
+        let isAutoDetect = configStore.isAutoDetectEnabled
+        
         logger.info("[VisionOCR] Starting recognition, image size: \(Int(imageSize.width))x\(Int(imageSize.height))")
+        logger.debug("[VisionOCR] Language mode: \(isAutoDetect ? "automatic" : "manual"), languages: \(languageCodes.joined(separator: ", "))")
         
         // 创建识别请求
         let request = VNRecognizeTextRequest()
@@ -57,14 +65,14 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         // 使用最新版本（macOS 14+）
         if #available(macOS 14.0, *) {
             request.revision = VNRecognizeTextRequestRevision3
-            // macOS 13+ 支持自动语言检测
-            request.automaticallyDetectsLanguage = true
+            // 根据配置决定是否启用自动语言检测
+            request.automaticallyDetectsLanguage = isAutoDetect
         } else {
             request.revision = VNRecognizeTextRequestRevision2
         }
         
-        // 设置识别语言（作为自动检测的 fallback 和优先级提示）
-        request.recognitionLanguages = Constants.defaultLanguages
+        // 设置识别语言
+        request.recognitionLanguages = languageCodes
         
         // 执行请求
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
@@ -230,4 +238,3 @@ extension VisionOCRService {
         }
     }
 }
-
