@@ -1,8 +1,9 @@
 # 微信聊天截图 OCR 解析技术文档（SyncNos）
 
 > **状态**：✅ V2 核心功能已实现
+> **OCR 引擎**：Apple Vision（原生，离线）
 
-本文档描述 SyncNos 中"微信聊天截图 OCR"从 PaddleOCR-VL 到结构化消息的完整技术链路，目标是让后续迭代（算法升级/回归测试/排障）都具备可追踪、可复放（replayable）的基础。
+本文档描述 SyncNos 中"微信聊天截图 OCR"从 Apple Vision OCR 到结构化消息的完整技术链路，目标是让后续迭代（算法升级/回归测试/排障）都具备可追踪、可复放（replayable）的基础。
 
 ## 1. 目标与范围
 
@@ -27,36 +28,65 @@
 ### 2.1 输入
 
 - `NSImage`：来自用户导入的微信聊天截图（私聊/群聊均可）
-- OCR 配置：
-  - `API URL` + `TOKEN`（来自 PaddleOCR-VL）
-  - 当前使用 `OCRRequestConfig.default`（减少变量；后续需要再 profile 化）
+- OCR 引擎：**Apple Vision**（内置，无需配置，离线可用）
+  - 支持自动语言检测（macOS 13.0+）
+  - 默认语言优先级：中文简体、中文繁体、英文、日文、韩文、法文、德文、西班牙文
 
 ### 2.2 输出（结构化消息）
 
 - `ChatMessage`（或 V2 DTO）数组，按视觉阅读顺序排列：
-  - 仅包含“气泡消息”
+  - 仅包含"气泡消息"
   - 不包含 timestamp/system
 
-## 3. PaddleOCR-VL 输出结构（我们实际用到的字段）
+## 3. Apple Vision OCR 输出结构
 
-PaddleOCR-VL `POST /layout-parsing` 返回 JSON（简化后）：
+Apple Vision 使用 `VNRecognizeTextRequest` 进行文本识别，返回 `[VNRecognizedTextObservation]`。
 
-- `result.layoutParsingResults[0].prunedResult.parsing_res_list[]`
-  - `block_bbox: [x1, y1, x2, y2]`
-  - `block_label: "text" | "image" | "table" | ...`
-  - `block_content: "..."`（识别文本）
-  - `block_order`（可选）
+### 3.1 原始输出
+
+每个 `VNRecognizedTextObservation` 包含：
+
+- `boundingBox: CGRect`（归一化坐标，原点左下角，Y 轴向上）
+- `topCandidates(maxCount: Int) -> [VNRecognizedText]`
+  - `string: String`（识别文本）
+  - `confidence: Float`（置信度 0.0~1.0）
+
+### 3.2 转换后的统一模型
 
 在代码里会映射为：
 
 - `OCRBlock(text, label, bbox: CGRect)`
-- `OCRResult(blocks: [OCRBlock], markdownText, rawText, processedAt)`
+  - `label` 统一为 `"text"`（Vision 不区分 table/formula 等）
+  - `bbox` 为**像素坐标**（已转换为原点左上角，Y 轴向下）
+- `OCRResult(blocks: [OCRBlock], markdownText, rawText, processedAt, coordinateSize)`
 
 ## 4. 坐标系与 bbox 约定
 
-- Paddle 返回的 `block_bbox` 为 **像素坐标**（单位：px）
-- 通常采用图像坐标系：`x` 向右递增，`y` 向下递增（原点在左上角）
-- SyncNos 将其直接映射为 `CGRect(x: x1, y: y1, width: x2-x1, height: y2-y1)`
+### 4.1 Vision 原始坐标系
+
+- Vision 返回的 `boundingBox` 为**归一化坐标**（0.0~1.0）
+- 原点在**左下角**，Y 轴向上（与标准图像坐标系相反）
+
+### 4.2 坐标转换流程
+
+1. 使用 `VNImageRectForNormalizedRect()` 将归一化坐标转为像素坐标
+2. **手动翻转 Y 轴**：`flippedY = imageHeight - (pixelRect.origin.y + pixelRect.height)`
+3. 最终得到标准图像坐标系：原点左上角，Y 轴向下
+
+### 4.3 代码示例
+
+```swift
+let pixelRect = VNImageRectForNormalizedRect(
+    observation.boundingBox,
+    Int(imageSize.width),
+    Int(imageSize.height)
+)
+// 手动翻转 Y 轴以匹配标准图像坐标系（原点左上角，Y 轴向下）
+let flippedY = imageSize.height - (pixelRect.origin.y + pixelRect.height)
+let finalPixelRect = CGRect(x: pixelRect.origin.x, y: flippedY, width: pixelRect.width, height: pixelRect.height)
+```
+
+### 4.4 解析算法依赖
 
 解析算法只依赖（当前私聊最小闭环）：
 
@@ -64,43 +94,37 @@ PaddleOCR-VL `POST /layout-parsing` 返回 JSON（简化后）：
 - `minY/maxY/height`
 - 相对位置（例如 `minX / imageWidth`）
 
-因此不需要转换到 SwiftUI 坐标系即可完成“方向判定/分组”。
-
-**重要踩坑**：OCR bbox 是像素（px），但图像“参考宽高”必须与 bbox 坐标系一致。
-
-- 优先使用 Paddle 返回的 `dataInfo.width/height`（OCR 处理后的坐标系尺寸）
-- 若 `dataInfo` 缺失，再回退到 `cgImage.width/height`
-
-否则会出现：bbox 的 `x` 看起来很大（例如 700+），但除以一个更大的原图像素宽度后相对位置变小，导致“我/对方”误判。
+因此不需要转换到 SwiftUI 坐标系即可完成"方向判定/分组"。
 
 ## 5. 解析总体流程（V2 推荐 Pipeline）
 
-### Step 0：OCR 请求（网络层）
+### Step 0：OCR 请求（本地处理）
 
-1. `NSImage` → JPEG（压缩质量可配置，如 0.85）
-2. Base64 编码传给 Paddle OCR
-3. 获取：
-   - `rawResponseData`：原始 JSON bytes（用于持久化/回放/排障）
+1. `NSImage` → `CGImage`
+2. 创建 `VNImageRequestHandler`
+3. 执行 `VNRecognizeTextRequest`（`.accurate` 级别）
+4. 获取：
+   - `rawResponseData`：序列化的 observations JSON（用于持久化/回放/排障）
    - `OCRResult.blocks`：结构化 blocks（用于解析）
 
 ### Step 1：Blocks 归一化（Normalization）
 
-目的：让后续解析尽可能“只处理干净数据”。
+目的：让后续解析尽可能"只处理干净数据"。
 
 典型动作：
 
 - `text` 去首尾空白
 - 过滤空字符串
-- 过滤极小 bbox（噪声点）
-- 按 `label` 过滤（例如只保留 `text/image/table` 等；由 config 控制）
+- 过滤极小 bbox（噪声点，由 `minimumTextHeight` 控制）
+- 按 `label` 过滤（例如只保留 `text`；由 config 控制）
 
 ### Step 2：噪声区域过滤（当前禁用）
 
-为保证“**不漏任何一句文本**”，当前实现**不做 top/bottom 噪声过滤**，允许会话标题/时间戳/输入栏等以普通文本进入消息列表。待私聊方向与完整性稳定后，再把过滤作为可开关能力引入。
+为保证"**不漏任何一句文本**"，当前实现**不做 top/bottom 噪声过滤**，允许会话标题/时间戳/输入栏等以普通文本进入消息列表。待私聊方向与完整性稳定后，再把过滤作为可开关能力引入。
 
 ### Step 3：稳定排序（Stable Ordering）
 
-仅按 `minY` 排序在“同一行多个块”场景会不稳定。
+仅按 `minY` 排序在"同一行多个块"场景会不稳定。
 
 推荐排序键：
 
@@ -122,8 +146,8 @@ PaddleOCR-VL `POST /layout-parsing` 返回 JSON（简化后）：
 合并的几何判据（可配置）：
 
 - **垂直邻近**：下一个 block 与当前候选的垂直间距在阈值内
-- **水平一致性**：`minX`/`maxX` 与候选的“水平范围”重叠或接近
-- **方向一致性（弱约束）**：在方向判定前，先以“左/右可能性”粗分也可（可选）
+- **水平一致性**：`minX`/`maxX` 与候选的"水平范围"重叠或接近
+- **方向一致性（弱约束）**：在方向判定前，先以"左/右可能性"粗分也可（可选）
 
 最终 `content`：
 
@@ -133,7 +157,7 @@ PaddleOCR-VL `POST /layout-parsing` 返回 JSON（简化后）：
 
 ### Step 5：方向判定（基于分布：1D 聚类）
 
-我们不再依赖固定阈值，而是使用候选消息在 X 轴的**分布**来判断“我/对方”。
+我们不再依赖固定阈值，而是使用候选消息在 X 轴的**分布**来判断"我/对方"。
 
 对每个候选消息的 bbox 计算：
 
@@ -143,28 +167,28 @@ PaddleOCR-VL `POST /layout-parsing` 返回 JSON（简化后）：
 
 直觉：
 
-- `bias` 越大，气泡越靠右（更可能是“我”）
-- `bias` 越小，气泡越靠左（更可能是“对方”）
+- `bias` 越大，气泡越靠右（更可能是"我"）
+- `bias` 越小，气泡越靠左（更可能是"对方"）
 
 判定算法（私聊）：
 
 - 对 `bias` 做 1D k-means（k=2）聚类
-- 均值更大的簇视为“我”，另一簇视为“对方”
+- 均值更大的簇视为"我"，另一簇视为"对方"
 
-> 该方法同时利用 `minX` 与 `maxX(x+width)`，对“宽消息”更鲁棒，并能随截图分辨率/缩放自适应。
+> 该方法同时利用 `minX` 与 `maxX(x+width)`，对"宽消息"更鲁棒，并能随截图分辨率/缩放自适应。
 
 ### Step 5.5：居中系统/时间戳（X 轴中间）的处理（几何 + 分布）
 
-在私聊中，时间戳与系统提示通常位于 X 轴中间（居中灰字）。我们可以在不使用关键词的前提下进行处理，并避免误把“短气泡”当成系统行：
+在私聊中，时间戳与系统提示通常位于 X 轴中间（居中灰字）。我们可以在不使用关键词的前提下进行处理，并避免误把"短气泡"当成系统行：
 
 - 为每个候选消息计算：
   - \(leftDistance = minX/width\)
   - \(rightDistance = 1 - maxX/width\)
   - \(minEdgeDistance = min(leftDistance, rightDistance)\)
 - **第一步**：对 `minEdgeDistance` 做 1D k-means（k=2）聚类：
-  - `minEdgeDistance` 更大的簇，更可能是“居中系统/时间戳”（离两侧边界都更远）
+  - `minEdgeDistance` 更大的簇，更可能是"居中系统/时间戳"（离两侧边界都更远）
 - **第二步**：在第一步的候选集合里，再对 `abs(bias)` 做 1D k-means（k=2）聚类：
-  - 取 `abs(bias)` 更小的一簇，保证系统/时间戳是“左右留白更均衡”的居中文本
+  - 取 `abs(bias)` 更小的一簇，保证系统/时间戳是"左右留白更均衡"的居中文本
 - 最后叠加 `centerX` 接近 0.5 的约束，最终标记为 `.system`
 
 UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同时不影响左右气泡消息的方向判定。
@@ -184,7 +208,7 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 ### 6.1 为什么要持久化 raw OCR JSON？
 
-- 解析算法迭代时可以**离线重解析**，无需再次请求 Paddle OCR（节省时间/成本）
+- 解析算法迭代时可以**离线重解析**，无需再次调用 OCR（节省时间）
 - 方便排查 OCR 输出变化导致的解析回归（可对比 raw JSON）
 
 ### 6.2 建议持久化的字段
@@ -195,6 +219,7 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 - `normalizedBlocksJSON: Data`（必存）
 - `ocrRequestJSON: Data`（可选，用于复现当时的 OCR options）
 - `imageWidth/imageHeight/importedAt/parsedAt`
+- `ocrEngine: String`（记录使用的 OCR 引擎，如 "Apple Vision"）
 
 > 图片本体暂不存（体积大 + 隐私），仅保存元数据。
 
@@ -202,7 +227,7 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 1. 从 store 读出 `normalizedBlocksJSON`
 2. 反序列化为 blocks
-3. 用当前版本 `ChatsOCRParserV2` 重新 parse
+3. 用当前版本 `ChatOCRParser` 重新 parse
 4. 覆盖/重写该截图对应的消息集合
 
 ## 7. 调试与可观测性
@@ -218,6 +243,63 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 ## 8. 隐私与安全
 
-- Token 存储：Keychain（现有实现保持）
+- OCR 处理：完全本地，无需网络，离线可用
 - OCR 输出：只在本地 store 持久化，不上传第三方
+- 聊天内容：加密存储（AES-256-GCM + Keychain）
 - 不保存图片本体（本轮）
+
+## 9. Apple Vision OCR 语言支持
+
+### 9.1 支持的语言
+
+Apple Vision 支持广泛的语言，包括但不限于：
+
+| 语言 | 语言代码 | 备注 |
+|------|----------|------|
+| 中文（简体） | `zh-Hans` | 默认启用 |
+| 中文（繁体） | `zh-Hant` | 默认启用 |
+| 英语 | `en-US`, `en-GB` | 默认启用 |
+| 日语 | `ja-JP` | 默认启用 |
+| 韩语 | `ko-KR` | 默认启用 |
+| 法语 | `fr-FR` | 默认启用 |
+| 德语 | `de-DE` | 默认启用 |
+| 西班牙语 | `es-ES` | 默认启用 |
+| 意大利语 | `it-IT` | 支持 |
+| 葡萄牙语 | `pt-BR` | 支持 |
+| 俄语 | `ru-RU` | 支持 |
+| 乌克兰语 | `uk-UA` | 支持 |
+| 波兰语 | `pl-PL` | 支持 |
+| 荷兰语 | `nl-NL` | 支持 |
+| 瑞典语 | `sv-SE` | 支持 |
+| 丹麦语 | `da-DK` | 支持 |
+| 芬兰语 | `fi-FI` | 支持 |
+| 挪威语 | `nb-NO` | 支持 |
+| 泰语 | `th-TH` | 支持 |
+| 越南语 | `vi-VN` | 支持 |
+| 印尼语 | `id-ID` | 支持 |
+| 马来语 | `ms-MY` | 支持 |
+| 阿拉伯语 | `ar-SA` | 支持 |
+| 希伯来语 | `he-IL` | 支持 |
+| 希腊语 | `el-GR` | 支持 |
+| 土耳其语 | `tr-TR` | 支持 |
+| 捷克语 | `cs-CZ` | 支持 |
+| 匈牙利语 | `hu-HU` | 支持 |
+| 罗马尼亚语 | `ro-RO` | 支持 |
+
+### 9.2 自动语言检测
+
+- macOS 13.0+ 支持 `automaticallyDetectsLanguage = true`
+- 启用后，Vision 会自动检测图像中的语言
+- 仍建议设置 `recognitionLanguages` 作为优先级提示
+
+### 9.3 语言组合限制
+
+**重要**：某些语言只能与特定语言组合使用：
+
+- ❌ 中文 + 日语：**不支持**同时识别
+- ✅ 中文 + 英语：支持
+- ✅ 日语 + 英语：支持
+
+如需同时处理中日文内容，可能需要分别运行两次 OCR。
+
+详见：[Apple Vision OCR 技术文档](../Docs/Apple-Vision-OCR技术文档.md)
