@@ -1,6 +1,6 @@
 # SyncNos 键盘导航技术文档
 
-version: v0.9.10
+version: v0.9.11
 上次编辑时间: 2025年12月29日 Monday
 创建时间: 2025年12月15日 14:47
 标签: docs, feat
@@ -9,6 +9,17 @@ version: v0.9.10
 # 概述
 
 SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail 视图之间切换，并在 Detail 视图中进行滚动操作。
+
+## 模块分离 (v0.9.11)
+
+从 v0.9.11 开始，键盘导航和焦点管理的代码已分离为两个独立的扩展文件：
+
+| 文件 | 职责 |
+|------|------|
+| `MainListView+KeyboardMonitor.swift` | 键盘事件监听 + 滚动控制 |
+| `MainListView+FocusManager.swift` | 焦点状态同步 + 鼠标点击监听 |
+
+这种分离使代码更易于维护和调试。
 
 ## 技术方案选型
 
@@ -42,7 +53,7 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │                              │                                   │
 │                              ▼                                   │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │ NSEvent 监听器 (MainListView+KeyboardMonitor.swift)         ││
+│  │ 键盘导航 (MainListView+KeyboardMonitor.swift)               ││
 │  │                                                             ││
 │  │ keyDownMonitor:                                             ││
 │  │   ├─ keyCode 123 (←): 切换到 List                           ││
@@ -55,9 +66,19 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │  │   ├─ keyCode 121 (Page Down): 向下翻页                      ││
 │  │   ├─ Cmd+↑/↓: 滚动到顶部/底部                               ││
 │  │   └─ Option+←/→: Chats 分类切换                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                              │                                   │
+│                              ▼                                   │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 焦点管理 (MainListView+FocusManager.swift)                  ││
 │  │                                                             ││
 │  │ mouseDownMonitor:                                           ││
 │  │   └─ syncNavigationTargetWithFocus()                        ││
+│  │                                                             ││
+│  │ 焦点切换方法:                                                ││
+│  │   ├─ focusDetailScrollViewIfPossible(window:)               ││
+│  │   ├─ focusBackToMaster(window:)                             ││
+│  │   └─ focusNotificationName(for:)                            ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -90,7 +111,8 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 | 文件路径 | 作用 |
 |---------|------|
 | `Views/Components/Main/MainListView.swift` | 主视图，定义状态变量和生命周期管理 |
-| `Views/Components/Main/MainListView+KeyboardMonitor.swift` | 键盘/鼠标事件监听器扩展 |
+| `Views/Components/Main/MainListView+KeyboardMonitor.swift` | **键盘事件监听 + 滚动控制** |
+| `Views/Components/Main/MainListView+FocusManager.swift` | **焦点状态同步 + 鼠标点击监听** |
 | `Views/Components/Keyboard/WindowReader.swift` | 获取 NSWindow 的 NSViewRepresentable |
 | `Views/Components/Keyboard/EnclosingScrollViewReader.swift` | 获取 NSScrollView 的 NSViewRepresentable |
 | `Views/Chats/ChatNotifications.swift` | Chats 相关通知名称定义 |
@@ -334,10 +356,14 @@ func startKeyboardMonitorIfNeeded() {
 }
 ```
 
-### 6. 鼠标点击焦点同步
+### 6. 焦点管理模块 (MainListView+FocusManager.swift)
+
+从 v0.9.11 开始，焦点管理相关代码已分离到独立文件 `MainListView+FocusManager.swift`。
+
+#### 鼠标点击焦点同步
 
 ```swift
-// MainListView+KeyboardMonitor.swift
+// MainListView+FocusManager.swift
 
 func startMouseDownMonitorIfNeeded() {
     guard mouseDownMonitor == nil else { return }
@@ -381,10 +407,10 @@ func syncNavigationTargetWithFocus() {
 
 **注意**：当前的 `syncNavigationTargetWithFocus()` 只更新 `keyboardNavigationTarget` 状态，不主动调用 `makeFirstResponder`。这意味着鼠标点击 DetailView 时，List 的高亮颜色不会自动变化（已知问题，见"已知问题"章节）。
 
-### 7. 焦点管理
+#### 焦点切换方法
 
 ```swift
-// MainListView+KeyboardMonitor.swift
+// MainListView+FocusManager.swift
 
 func focusDetailScrollViewIfPossible(window: NSWindow) {
     guard let scrollView = currentDetailScrollView else { return }
@@ -423,6 +449,13 @@ func focusNotificationName(for source: ContentSource) -> Notification.Name {
     }
 }
 ```
+
+### 7. 模块职责划分
+
+| 文件 | 包含的方法 | 职责 |
+|------|-----------|------|
+| `MainListView+KeyboardMonitor.swift` | `startKeyboardMonitorIfNeeded()`, `stopKeyboardMonitorIfNeeded()`, `hasSingleSelectionForCurrentSource()`, `scrollCurrentDetail(byLines:)`, `scrollCurrentDetailToTop/Bottom()`, `scrollCurrentDetailByPage(up:)` | 键盘事件监听 + 滚动控制 |
+| `MainListView+FocusManager.swift` | `startMouseDownMonitorIfNeeded()`, `stopMouseDownMonitorIfNeeded()`, `syncNavigationTargetWithFocus()`, `focusDetailScrollViewIfPossible(window:)`, `focusBackToMaster(window:)`, `focusNotificationName(for:)` | 焦点状态同步 + 鼠标点击监听 |
 
 ### 8. 滚动控制
 
@@ -587,11 +620,14 @@ struct AppleBooksDetailView: View {
     updateDataSourceSwitchViewModel()
     // 同步滑动容器与菜单状态
     syncSwipeViewModelWithContentSource()
-    // 启动键盘监听
+    // 启动键盘监听（键盘导航模块）
     startKeyboardMonitorIfNeeded()
+    // 启动鼠标监听（焦点管理模块）
+    startMouseDownMonitorIfNeeded()
 }
 .onDisappear {
     stopKeyboardMonitorIfNeeded()
+    stopMouseDownMonitorIfNeeded()
 }
 ```
 
@@ -603,6 +639,13 @@ func stopKeyboardMonitorIfNeeded() {
         NSEvent.removeMonitor(monitor)
         keyDownMonitor = nil
     }
+}
+```
+
+```swift
+// MainListView+FocusManager.swift
+
+func stopMouseDownMonitorIfNeeded() {
     if let monitor = mouseDownMonitor {
         NSEvent.removeMonitor(monitor)
         mouseDownMonitor = nil
@@ -660,7 +703,7 @@ func stopKeyboardMonitorIfNeeded() {
 2. 在 List 上添加 `.focused($isListFocused)`
 3. 在 `.onAppear` 中设置 `isListFocused = true`
 4. 监听对应的 `DataSourceSwitchedTo*` 通知并设置焦点
-5. 在 `MainListView+KeyboardMonitor.swift` 的 `focusNotificationName(for:)` 中添加映射
+5. 在 `MainListView+FocusManager.swift` 的 `focusNotificationName(for:)` 中添加映射
 
 ## 注意事项
 
@@ -676,5 +719,6 @@ func stopKeyboardMonitorIfNeeded() {
 
 | 版本 | 日期 | 更新内容 |
 | --- | --- | --- |
+| v0.9.11 | 2025-12-29 | **代码分离**：将焦点管理从 KeyboardMonitor 分离到独立的 FocusManager 模块 |
 | v0.9.10 | 2025-12-29 | 完整文档重写：添加文件结构、所有代码示例、已知问题、扩展指南 |
 | v0.9.9 | 2025-12-19 | 初始版本，键盘导航功能完成 |
