@@ -1,5 +1,11 @@
 ## v0.10.2
-**Key updates:** New Apple native OCR engine
+**Key updates:**
+- New Apple native OCR engine
+- Remove PaddleOCR API
+- Support OCR auto language detection.
+
+## v0.10.1
+**Key updates:** Fix the focus manager issue.
 
 ## v0.9.16
 **Key updates:** New group chat nickname binding feature in chat conversations
