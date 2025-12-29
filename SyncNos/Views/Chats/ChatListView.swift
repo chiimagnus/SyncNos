@@ -78,14 +78,14 @@ struct ChatListView: View {
         .listStyle(.sidebar)
         .focused($isListFocused)
         .onAppear {
-            // 延迟获取焦点，确保视图已完全加载
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // 获取焦点（避免额外延迟引入的竞态）
+            DispatchQueue.main.async {
                 isListFocused = true
             }
         }
         // 监听数据源切换通知，切换到此视图时获取焦点
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToChats")).receive(on: DispatchQueue.main)) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            DispatchQueue.main.async {
                 isListFocused = true
             }
         }
