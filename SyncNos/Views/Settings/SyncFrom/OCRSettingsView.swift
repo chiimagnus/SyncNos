@@ -66,7 +66,9 @@ struct OCRSettingsView: View {
                     } label: {
                         HStack {
                             Text("Languages")
+
                             Spacer()
+                            
                             if configStore.selectedLanguages.isEmpty {
                                 Text("None (using defaults)")
                                     .foregroundStyle(.secondary)
@@ -78,9 +80,6 @@ struct OCRSettingsView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            Image(systemName: "chevron.right")
-                        .font(.caption)
-                                .foregroundStyle(.tertiary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -105,16 +104,11 @@ struct OCRSettingsView: View {
                             .foregroundStyle(.orange)
                         Text("Test OCR Recognition")
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
                     }
                 }
                 .buttonStyle(.plain)
             } header: {
                 Text("Debug")
-            } footer: {
-                Text("Import an image to test OCR recognition and view detailed results.")
             }
         }
         .formStyle(.grouped)
@@ -156,15 +150,12 @@ private struct LanguageSelectionSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Cancel") {
-                    dismiss()
-                }
-                
-                Spacer()
-                
-                Text("Select Languages")
-                    .font(.headline)
-                
+                // Search
+                TextField("Search languages...", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+
                 Spacer()
                 
                 Button("Done") {
@@ -173,12 +164,6 @@ private struct LanguageSelectionSheet: View {
                 .buttonStyle(.borderedProminent)
             }
             .padding()
-            
-            // Search
-            TextField("Search languages...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
             
             // Selected count
             if !configStore.selectedLanguageCodes.isEmpty {
@@ -407,14 +392,6 @@ private struct OCRDebugSheet: View {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 60))
                         .foregroundStyle(.secondary)
-                    
-                    Text("Import an image to test OCR recognition")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("Drag and drop an image here, or click the button above")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                     
                     Button {
                         selectImage()

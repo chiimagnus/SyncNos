@@ -14,11 +14,6 @@ struct ChatSenderNamePickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Set Sender Name")
-                .scaledFont(.headline)
-
-            Divider()
-
             // 本对话已使用的昵称标签区
             if !usedNames.isEmpty {
                 Text("Used in this chat:")
@@ -43,15 +38,9 @@ struct ChatSenderNamePickerView: View {
                         .buttonStyle(.plain)
                     }
                 }
-
-                Divider()
             }
 
             // 输入新昵称
-            Text(usedNames.isEmpty ? "Enter sender name:" : "Or enter new name:")
-                .scaledFont(.subheadline)
-                .foregroundColor(.secondary)
-
             TextField("Enter name...", text: $inputText)
                 .textFieldStyle(.roundedBorder)
                 .focused($isInputFocused)
@@ -60,8 +49,6 @@ struct ChatSenderNamePickerView: View {
                         selectName(inputText)
                     }
                 }
-
-            Divider()
 
             // 按钮区
             HStack {
