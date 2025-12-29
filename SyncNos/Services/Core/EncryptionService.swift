@@ -185,6 +185,10 @@ final class EncryptionService: EncryptionServiceProtocol {
     /// 验证密钥健康状态
     /// - Returns: 密钥健康状态
     func validateKeyHealth() -> EncryptionKeyHealthStatus {
+        // 使用锁确保整个健康检查过程的原子性
+        keyGenerationLock.lock()
+        defer { keyGenerationLock.unlock() }
+        
         // 检查 Keychain 中是否存在密钥
         if let keyData = KeychainHelper.shared.read(service: keychainService, account: keychainAccount) {
             // 验证密钥长度（AES-256 = 32 bytes）
@@ -197,24 +201,38 @@ final class EncryptionService: EncryptionServiceProtocol {
             }
         }
         
-        // 密钥不存在，检查是否是新生成的
-        if queue.sync(execute: { keyWasNewlyGenerated }) {
+        // 密钥不存在，检查是否是新生成的（已在锁内，直接访问）
+        let wasNewlyGenerated = queue.sync(execute: { keyWasNewlyGenerated })
+        if wasNewlyGenerated {
             Self.logger.warning("[Encryption] Key health check: Key was newly generated (previous data may be unrecoverable)")
             return .newlyGenerated
         }
         
-        // 尝试生成新密钥
-        do {
-            _ = try loadOrCreateKey()
-            if queue.sync(execute: { keyWasNewlyGenerated }) {
-                Self.logger.warning("[Encryption] Key health check: New key generated (no previous key found)")
-                return .newlyGenerated
-            }
+        // 尝试生成新密钥（注意：loadOrCreateKey 内部也会尝试获取锁，
+        // 由于我们已经持有锁，需要直接执行密钥生成逻辑）
+        // 再次检查 Keychain（双重检查）
+        if KeychainHelper.shared.read(service: keychainService, account: keychainAccount) != nil {
+            // 另一个线程可能已经生成了密钥
             return .healthy
-        } catch {
-            Self.logger.error("[Encryption] Key health check: Failed to load/create key: \(error.localizedDescription)")
-            return .unavailable(reason: error.localizedDescription)
         }
+        
+        // 生成新密钥
+        Self.logger.warning("[Encryption] No key found in Keychain during health check, generating new key...")
+        let newKey = SymmetricKey(size: .bits256)
+        
+        let saved = saveKeyToKeychain(newKey)
+        if !saved {
+            Self.logger.error("[Encryption] Key health check: Failed to save new key to Keychain")
+            return .unavailable(reason: "Failed to save new key")
+        }
+        
+        queue.async(flags: .barrier) { [weak self] in
+            self?.cachedKey = newKey
+            self?.keyWasNewlyGenerated = true
+        }
+        
+        Self.logger.warning("[Encryption] Key health check: New key generated (no previous key found)")
+        return .newlyGenerated
     }
     
     /// 删除加密密钥（用于调试或重置）
