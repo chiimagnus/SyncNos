@@ -806,29 +806,203 @@ SyncNos 使用 Apple Vision 作为唯一的 OCR 引擎，满足聊天截图识�
 
 ---
 
-## 12. 参考资料
+## 12. Vision 框架完整功能列表
 
-### 12.1 Apple 官方文档
+除了文本识别（OCR），Apple Vision 框架还提供丰富的计算机视觉功能，可用于未来增强 SyncNos 的聊天截图解析能力。
 
-- [VNRecognizeTextRequest](https://developer.apple.com/documentation/vision/vnrecognizetextrequest/)
-- [VNRecognizedTextObservation](https://developer.apple.com/documentation/vision/vnrecognizedtextobservation)
-- [Recognizing Text in Images](https://developer.apple.com/documentation/vision/recognizing-text-in-images/)
-- [Locating and Displaying Recognized Text](https://developer.apple.com/documentation/vision/locating-and-displaying-recognized-text)
+### 12.1 文本与条码
 
-### 12.2 示例项目
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| **文本识别 (OCR)** | `VNRecognizeTextRequest` | 识别图片中的文字，返回 bounding box | [文档](https://developer.apple.com/documentation/vision/vnrecognizetextrequest) |
+| 文本区域检测 | `VNDetectTextRectanglesRequest` | 仅检测文本区域，不识别内容 | [文档](https://developer.apple.com/documentation/vision/vndetecttextrectanglesrequest) |
+| 条码识别 | `VNDetectBarcodesRequest` | 识别 QR 码、条形码等 | [文档](https://developer.apple.com/documentation/vision/vndetectbarcodesrequest) |
+
+### 12.2 人物与身体
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 人脸检测 | `VNDetectFaceRectanglesRequest` | 检测人脸位置 | [文档](https://developer.apple.com/documentation/vision/vndetectfacerectanglesrequest) |
+| 人脸特征点 | `VNDetectFaceLandmarksRequest` | 检测眼睛、鼻子、嘴巴等 | [文档](https://developer.apple.com/documentation/vision/vndetectfacelandmarksrequest) |
+| 人脸质量评估 | `VNDetectFaceCaptureQualityRequest` | 评估人脸照片质量 | [文档](https://developer.apple.com/documentation/vision/vndetectfacecapturequalityrequest) |
+| 人体检测 | `VNDetectHumanRectanglesRequest` | 检测人体区域 | [文档](https://developer.apple.com/documentation/vision/vndetecthumanrectanglesrequest) |
+| 人体姿态 (2D) | `VNDetectHumanBodyPoseRequest` | 检测 2D 人体关节点 | [文档](https://developer.apple.com/documentation/vision/vndetecthumanbodyposerequest) |
+| 人体姿态 (3D) | `VNDetectHumanBodyPose3DRequest` | 检测 3D 人体姿态 | [文档](https://developer.apple.com/documentation/vision/vndetecthumanbodypose3drequest) |
+| 手势检测 | `VNDetectHumanHandPoseRequest` | 检测手指关节点 | [文档](https://developer.apple.com/documentation/vision/vndetecthumanhandposerequest) |
+| 人物分割 | `VNGeneratePersonSegmentationRequest` | 分离人物与背景 | [文档](https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest) |
+| 人物实例分割 | `VNGeneratePersonInstanceMaskRequest` | 区分多个人物 | [文档](https://developer.apple.com/documentation/vision/vngeneratepersoninstancemaskrequest) |
+
+### 12.3 几何检测
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 矩形检测 | `VNDetectRectanglesRequest` | 检测图片中的矩形区域 | [文档](https://developer.apple.com/documentation/vision/vndetectrectanglesrequest) |
+| 文档分割 | `VNDetectDocumentSegmentationRequest` | 检测文档边界（扫描文档用） | [文档](https://developer.apple.com/documentation/vision/vndetectdocumentsegmentationrequest) |
+| 地平线检测 | `VNDetectHorizonRequest` | 检测图片的水平线角度 | [文档](https://developer.apple.com/documentation/vision/vndetecthorizonrequest) |
+| 轮廓检测 | `VNDetectContoursRequest` | 检测物体轮廓 | [文档](https://developer.apple.com/documentation/vision/vndetectcontoursrequest) |
+
+### 12.4 显著性与注意力
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 注意力显著性 | `VNGenerateAttentionBasedSaliencyImageRequest` | 检测人眼最可能关注的区域 | [文档](https://developer.apple.com/documentation/vision/vngenerateattentionbasedsaliencyimagerequest) |
+| 物体显著性 | `VNGenerateObjectnessBasedSaliencyImageRequest` | 检测可能是"物体"的区域 | [文档](https://developer.apple.com/documentation/vision/vngenerateobjectnessbasedsaliencyimagerequest) |
+| 图像裁剪指南 | - | 基于显著性自动裁剪 | [指南](https://developer.apple.com/documentation/vision/cropping-images-using-saliency) |
+
+### 12.5 分类与识别
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 图像分类 | `VNClassifyImageRequest` | 对图像进行分类（花、食物等） | [文档](https://developer.apple.com/documentation/vision/vnclassifyimagerequest) |
+| 动物识别 | `VNRecognizeAnimalsRequest` | 识别猫、狗等动物 | [文档](https://developer.apple.com/documentation/vision/vnrecognizeanimalsrequest) |
+| 动物姿态 | `VNDetectAnimalBodyPoseRequest` | 检测动物身体关节点 | [文档](https://developer.apple.com/documentation/vision/vndetectanimalbodyposerequest) |
+| 图像美学评分 | `VNCalculateImageAestheticsScoresRequest` | 评估图像美学质量 | [文档](https://developer.apple.com/documentation/vision/vncalculateimageaestheticsscoresrequest) |
+| 图像特征印记 | `VNGenerateImageFeaturePrintRequest` | 生成图像特征向量（用于相似度比较） | [文档](https://developer.apple.com/documentation/vision/vngenerateimagefeatureprintrequest) |
+
+### 12.6 分割与前景
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 前景分割 | `VNGenerateForegroundInstanceMaskRequest` | 分离前景与背景 | [文档](https://developer.apple.com/documentation/vision/vngenerateforegroundinstancemaskrequest) |
+
+### 12.7 跟踪与视频
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 矩形跟踪 | `VNTrackRectangleRequest` | 跟踪视频中的矩形 | [文档](https://developer.apple.com/documentation/vision/vntrackrectanglerequest) |
+| 物体跟踪 | `VNTrackObjectRequest` | 跟踪视频中的物体 | [文档](https://developer.apple.com/documentation/vision/vntrackobjectrequest) |
+| 轨迹检测 | `VNDetectTrajectoriesRequest` | 检测运动轨迹 | [文档](https://developer.apple.com/documentation/vision/vndetecttrajectoriesrequest) |
+| 光流生成 | `VNGenerateOpticalFlowRequest` | 计算帧间光流 | [文档](https://developer.apple.com/documentation/vision/vngenerateopticalflowrequest) |
+
+### 12.8 图像配准
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| 平移配准 | `VNTranslationalImageRegistrationRequest` | 计算两图像的平移偏移 | [文档](https://developer.apple.com/documentation/vision/vntranslationalimageregistrationrequest) |
+| 单应性配准 | `VNHomographicImageRegistrationRequest` | 计算两图像的单应性变换 | [文档](https://developer.apple.com/documentation/vision/vnhomographicimageregistrationrequest) |
+
+### 12.9 CoreML 集成
+
+| 功能 | API | 描述 | Apple 文档 |
+|------|-----|------|-----------|
+| CoreML 模型 | `VNCoreMLRequest` | 使用自定义 CoreML 模型进行推理 | [文档](https://developer.apple.com/documentation/vision/vncoremlrequest) |
+
+---
+
+## 13. SyncNos 未来增强方向
+
+基于 Vision 框架的能力，SyncNos 可以考虑以下增强方向：
+
+### 13.1 当前已实现 ✅
+
+| 功能 | 实现方式 |
+|------|---------|
+| 文本识别 | `VNRecognizeTextRequest` |
+| 自动语言检测 | `automaticallyDetectsLanguage = true` |
+| 多语言支持 | 30 种语言可选 |
+| BBox 返回 | 归一化坐标转换为像素坐标 |
+| 消息方向判断 | 基于 X 坐标聚类（k-means） |
+| 系统消息检测 | 基于居中位置判断 |
+
+### 13.2 短期可增强（基于现有 OCR）
+
+| 功能 | 实现方式 | 可行性 |
+|------|---------|--------|
+| 小程序卡片识别 | 检测 OCR 结果中的"小程序"文字 + 固定宽高比 | ⭐⭐⭐⭐ 高 |
+| 链接卡片识别 | 检测 URL 模式（正则匹配） | ⭐⭐⭐⭐ 高 |
+| 撤回消息识别 | 检测"撤回了一条消息"文字 | ⭐⭐⭐⭐⭐ 极高 |
+| 红包/转账识别 | 检测特定文字模式 | ⭐⭐⭐⭐ 高 |
+
+### 13.3 中期可增强（结合其他 Vision API）
+
+| 功能 | 实现方式 | 可行性 |
+|------|---------|--------|
+| 图片消息检测 | `VNDetectRectanglesRequest` 检测大面积矩形 + 无文字区域 | ⭐⭐⭐ 中等 |
+| 头像检测 | `VNDetectFaceRectanglesRequest` 检测小尺寸人脸区域 | ⭐⭐⭐ 中等 |
+| 二维码识别 | `VNDetectBarcodesRequest` 识别聊天中的二维码 | ⭐⭐⭐⭐ 高 |
+
+### 13.4 长期可考虑（需要额外资源）
+
+| 功能 | 实现方式 | 可行性 |
+|------|---------|--------|
+| 消息类型分类 | `VNCoreMLRequest` + 自定义模型 | ⭐⭐ 需训练数据 |
+| Emoji 识别 | 不支持（Vision OCR 无法识别 emoji） | ❌ |
+| 语音消息识别 | 不支持（需要音频处理） | ❌ |
+
+### 13.5 不支持的功能
+
+| 功能 | 原因 |
+|------|------|
+| Emoji 识别 | Vision OCR 专注于文字，不识别 emoji 图形 |
+| 图片中的图片检测 | Vision 无直接 API，需结合矩形检测和启发式规则 |
+| 语音/视频消息内容 | 需要不同的处理管道（AVFoundation/Speech） |
+| 版面分析 | Vision 不支持表格、公式等结构化内容 |
+
+---
+
+## 14. 参考资料
+
+### 14.1 Apple 官方文档
+
+#### Vision 框架核心
+
+- [Vision Framework](https://developer.apple.com/documentation/vision/) - Vision 框架概述
+- [VNRequest](https://developer.apple.com/documentation/vision/vnrequest) - 所有请求的基类
+- [VNImageRequestHandler](https://developer.apple.com/documentation/vision/vnimagerequesthandler) - 图像请求处理器
+- [VNObservation](https://developer.apple.com/documentation/vision/vnobservation) - 所有观察结果的基类
+
+#### 文本识别
+
+- [VNRecognizeTextRequest](https://developer.apple.com/documentation/vision/vnrecognizetextrequest/) - 文本识别请求
+- [VNRecognizedTextObservation](https://developer.apple.com/documentation/vision/vnrecognizedtextobservation) - 文本识别结果
+- [VNRecognizedText](https://developer.apple.com/documentation/vision/vnrecognizedtext) - 识别出的文本
+- [Recognizing Text in Images](https://developer.apple.com/documentation/vision/recognizing-text-in-images/) - 文本识别指南
+- [Locating and Displaying Recognized Text](https://developer.apple.com/documentation/vision/locating-and-displaying-recognized-text) - 定位和显示识别文本
+
+#### 条码识别
+
+- [VNDetectBarcodesRequest](https://developer.apple.com/documentation/vision/vndetectbarcodesrequest) - 条码检测请求
+- [VNBarcodeObservation](https://developer.apple.com/documentation/vision/vnbarcodeobservation) - 条码检测结果
+
+#### 人脸与人体
+
+- [VNDetectFaceRectanglesRequest](https://developer.apple.com/documentation/vision/vndetectfacerectanglesrequest) - 人脸检测
+- [VNDetectFaceLandmarksRequest](https://developer.apple.com/documentation/vision/vndetectfacelandmarksrequest) - 人脸特征点
+- [VNDetectHumanBodyPoseRequest](https://developer.apple.com/documentation/vision/vndetecthumanbodyposerequest) - 人体姿态
+- [VNGeneratePersonSegmentationRequest](https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest) - 人物分割
+
+#### 几何检测
+
+- [VNDetectRectanglesRequest](https://developer.apple.com/documentation/vision/vndetectrectanglesrequest) - 矩形检测
+- [VNDetectDocumentSegmentationRequest](https://developer.apple.com/documentation/vision/vndetectdocumentsegmentationrequest) - 文档分割
+- [VNDetectContoursRequest](https://developer.apple.com/documentation/vision/vndetectcontoursrequest) - 轮廓检测
+
+#### 显著性与分类
+
+- [VNGenerateAttentionBasedSaliencyImageRequest](https://developer.apple.com/documentation/vision/vngenerateattentionbasedsaliencyimagerequest) - 注意力显著性
+- [VNClassifyImageRequest](https://developer.apple.com/documentation/vision/vnclassifyimagerequest) - 图像分类
+- [Cropping Images Using Saliency](https://developer.apple.com/documentation/vision/cropping-images-using-saliency) - 显著性裁剪指南
+
+#### CoreML 集成
+
+- [VNCoreMLRequest](https://developer.apple.com/documentation/vision/vncoremlrequest) - CoreML 模型请求
+- [Classifying Images with Vision and Core ML](https://developer.apple.com/documentation/vision/classifying-images-with-vision-and-core-ml) - Vision + CoreML 指南
+
+### 14.2 示例项目
 
 - [Apple Sample Code: Locating and displaying recognized text](https://developer.apple.com/documentation/vision/locating-and-displaying-recognized-text)
 - [Apple Sample Code: Extracting phone numbers from text in images](https://developer.apple.com/documentation/vision/extracting-phone-numbers-from-text-in-images)
 
-### 12.3 WWDC 视频
+### 14.3 WWDC 视频
 
 - WWDC 2019: [Vision Framework: Understanding Images](https://developer.apple.com/videos/play/wwdc2019/222/)
 - WWDC 2021: [Extract document data using Vision](https://developer.apple.com/videos/play/wwdc2021/10041/)
 - WWDC 2024: [Discover Swift enhancements in the Vision framework](https://developer.apple.com/videos/play/wwdc2024/10163/)
 
----
+### 14.4 VisionKit 框架
 
-*文档版本: 1.0*
-*创建日期: 2025-01-29*
-*适用项目: SyncNos macOS*
+VisionKit 是 Vision 的高级封装，提供即用型 UI 组件：
 
+- [VisionKit Framework](https://developer.apple.com/documentation/visionkit/) - VisionKit 概述
+- [DataScannerViewController](https://developer.apple.com/documentation/visionkit/datascannerviewcontroller) - 实时数据扫描器（iOS）
+- [ImageAnalysisInteraction](https://developer.apple.com/documentation/visionkit/imageanalysisinteraction) - 图像分析交互
