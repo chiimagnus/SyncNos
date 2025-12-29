@@ -6,6 +6,25 @@ struct AppleBooksSettingsView: View {
 
     var body: some View {
         List {
+            // MARK: - Data Source
+            Section {
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable Apple Books source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show Apple Books in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
+            } header: {
+                Text("Data Source")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            
+            // MARK: - Sync Settings
             Section {
                 Picker(selection: $viewModel.syncMode) {
                     Text("One page per book")
@@ -33,17 +52,6 @@ struct AppleBooksSettingsView: View {
                         .scaledFont(.body)
                 }
 
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable Apple Books source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show Apple Books in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
-                }
-
                 Toggle(isOn: $viewModel.autoSync) {
                     Text("Smart Auto Sync")
                         .scaledFont(.body)
@@ -55,7 +63,7 @@ struct AppleBooksSettingsView: View {
                     viewModel.save()
                 }
 
-                // Apple Books 数据目录授权按钮（从 SettingsView 移动过来）
+                // Apple Books 数据目录授权按钮
                 Button(action: {
                     guard !isPickingBooks else { return }
                     isPickingBooks = true
@@ -77,7 +85,7 @@ struct AppleBooksSettingsView: View {
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose data folder and load notes")
             } header: {
-                Text("Notion Sync Setting")
+                Text("Sync Settings")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }

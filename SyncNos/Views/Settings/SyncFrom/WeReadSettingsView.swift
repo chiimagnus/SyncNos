@@ -5,6 +5,25 @@ struct WeReadSettingsView: View {
 
     var body: some View {
         List {
+            // MARK: - Data Source
+            Section {
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable WeRead source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show WeRead in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
+            } header: {
+                Text("Data Source")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            
+            // MARK: - Account
             Section {
                 HStack {
                     Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
@@ -34,11 +53,12 @@ struct WeReadSettingsView: View {
                     .disabled(!viewModel.isLoggedIn)
                 }
             } header: {
-                Text("WeRead Account")
+                Text("Account")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
-
+            
+            // MARK: - Sync Settings
             Section {
                 LabeledContent {
                     TextField("Notion Database ID for WeRead", text: $viewModel.weReadDbId)
@@ -49,17 +69,6 @@ struct WeReadSettingsView: View {
                 } label: {
                     Text("Database ID (optional)")
                         .scaledFont(.body)
-                }
-
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable WeRead source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show WeRead in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
@@ -73,7 +82,7 @@ struct WeReadSettingsView: View {
                     viewModel.save()
                 }
             } header: {
-                Text("Notion Sync Setting")
+                Text("Sync Settings")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
