@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 import SwiftData
 
 // MARK: - ChatChat SwiftData Models (V2 with Encryption)
@@ -12,6 +13,9 @@ import SwiftData
 // - 算法公开不影响安全性，安全性完全依赖密钥的保密性
 // - 密钥由系统 Keychain 保护，受 macOS 登录密码保护
 //
+
+/// 日志子系统（用于 Console.app 筛选）
+private let chatCacheLogger = Logger(subsystem: "com.syncnos", category: "ChatCache")
 
 // MARK: - CachedChatConversationV2
 
@@ -44,7 +48,12 @@ final class CachedChatConversationV2 {
     
     /// 对话名称（解密后）
     var name: String {
-        (try? EncryptionService.shared.decrypt(nameEncrypted)) ?? "[解密失败]"
+        do {
+            return try EncryptionService.shared.decrypt(nameEncrypted)
+        } catch {
+            chatCacheLogger.error("[ChatCache] Failed to decrypt conversation name (id: \(self.conversationId), encrypted size: \(self.nameEncrypted.count) bytes): \(error.localizedDescription)")
+            return "[解密失败]"
+        }
     }
 
     /// 使用明文初始化（自动加密）
@@ -186,13 +195,23 @@ final class CachedChatMessageV2 {
 
     /// 消息内容（解密后）
     var content: String {
-        (try? EncryptionService.shared.decrypt(contentEncrypted)) ?? "[解密失败]"
+        do {
+            return try EncryptionService.shared.decrypt(contentEncrypted)
+        } catch {
+            chatCacheLogger.error("[ChatCache] Failed to decrypt message content (id: \(self.messageId), encrypted size: \(self.contentEncrypted.count) bytes): \(error.localizedDescription)")
+            return "[解密失败]"
+        }
     }
     
     /// 发送者昵称（解密后）
     var senderName: String? {
         guard let encrypted = senderNameEncrypted else { return nil }
-        return try? EncryptionService.shared.decrypt(encrypted)
+        do {
+            return try EncryptionService.shared.decrypt(encrypted)
+        } catch {
+            chatCacheLogger.error("[ChatCache] Failed to decrypt sender name (messageId: \(self.messageId), encrypted size: \(encrypted.count) bytes): \(error.localizedDescription)")
+            return nil
+        }
     }
 
     var kind: ChatMessageKind {

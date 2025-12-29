@@ -80,6 +80,25 @@ struct SyncNosApp: App {
         // 初始化已同步高亮记录存储（用于避免遍历 Notion children）
         _ = DIContainer.shared.syncedHighlightStore
         DIContainer.shared.loggerService.info("SyncedHighlightStore initialized")
+        
+        // 检查加密密钥健康状态（用于诊断解密失败问题）
+        checkEncryptionKeyHealth()
+    }
+    
+    /// 检查加密密钥健康状态并记录日志
+    private func checkEncryptionKeyHealth() {
+        let healthStatus = EncryptionService.shared.validateKeyHealth()
+        let logger = DIContainer.shared.loggerService
+        
+        switch healthStatus {
+        case .healthy:
+            logger.info("[Encryption] Key health check passed - encryption key is available")
+        case .newlyGenerated:
+            logger.warning("[Encryption] ⚠️ New encryption key was generated - previously encrypted chat data cannot be decrypted")
+            // 可以在这里添加用户提示逻辑，告知用户数据无法恢复
+        case .unavailable(let reason):
+            logger.error("[Encryption] ❌ Encryption key unavailable: \(reason)")
+        }
     }
 
     var body: some Scene {
