@@ -44,6 +44,8 @@ struct MainListView: View {
     @State var keyboardNavigationTarget: KeyboardNavigationTarget = .list
     /// 当前 Detail 视图的 NSScrollView（用于键盘滚动）
     @State var currentDetailScrollView: NSScrollView?
+    /// Detail 侧稳定的 firstResponder “落点”（避免依赖 ScrollView 内部实现细节）
+    @State var detailFirstResponderProxyView: NSView?
     /// 保存进入 Detail 前的 firstResponder，用于返回时恢复
     @State var savedMasterFirstResponder: NSResponder?
     /// 当前窗口引用（用于过滤键盘事件）
@@ -117,12 +119,9 @@ struct MainListView: View {
                 syncSwipeViewModelWithContentSource()
                 // 启动键盘监听（键盘导航）
                 startKeyboardMonitorIfNeeded()
-                // 启动鼠标监听（焦点管理）
-                startMouseDownMonitorIfNeeded()
             }
             .onDisappear {
                 stopKeyboardMonitorIfNeeded()
-                stopMouseDownMonitorIfNeeded()
             }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
@@ -187,8 +186,35 @@ struct MainListView: View {
         } else {
             NavigationSplitView {
                 masterColumn
+                    // 鼠标点击左侧时，明确把导航目标切回 List，避免 target 状态滞留导致 ←/→ 行为异常
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            self.keyboardNavigationTarget = .list
+                        }
+                    )
             } detail: {
                 detailColumn
+                    // 提供一个稳定可聚焦的 NSView，作为 Detail 抢 firstResponder 的兜底“落点”
+                    .background(FirstResponderProxyView(view: $detailFirstResponderProxyView))
+                    // 鼠标点击右侧时，明确把导航目标切到 Detail，并抢走 firstResponder（让左侧选中高亮进入非激活态）
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            guard self.hasSingleSelectionForCurrentSource() else { return }
+                            guard let window = self.mainWindow else { return }
+                            
+                            // 避免抢走文本编辑（field editor）的 firstResponder（例如弹窗输入框/搜索框等）
+                            if window.firstResponder is NSTextView { return }
+                            
+                            if self.keyboardNavigationTarget == .list {
+                                self.savedMasterFirstResponder = window.firstResponder
+                            }
+                            
+                            self.keyboardNavigationTarget = .detail
+                            self.focusDetailScrollViewIfPossible(window: window)
+                        }
+                    )
             }
             .onChange(of: contentSourceRawValue) { _, _ in
                 // 切换数据源时重置选择和焦点状态
