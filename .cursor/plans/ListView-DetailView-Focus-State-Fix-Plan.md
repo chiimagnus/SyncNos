@@ -203,7 +203,7 @@ final class FirstResponderObserver: ObservableObject {
 
 ---
 
-## 备选方案 A（快速修复）
+## 备选方案 A（快速修复 - 已废弃）
 
 如果方案 D 实施过程中遇到问题，可以回退到方案 A：
 
@@ -229,6 +229,84 @@ func startMouseDownMonitorIfNeeded() {
     }
 }
 ```
+
+---
+
+## ⭐ 推荐方案 A3（最小改动修复）
+
+**日期**：2025-12-29
+
+### 核心思路
+
+**只处理点击 Detail 的情况，不干预点击 List 的情况**
+
+- 点击 Detail → 主动调用 `makeFirstResponder` → List 高亮变灰 ✅
+- 点击 List → 不干预，AppKit 自然处理 → List 高亮保持蓝色 ✅
+
+### 与方案 A 的区别
+
+| 对比项 | 方案 A（之前尝试） | 方案 A3（推荐） |
+|-------|-------------------|-----------------|
+| 延迟检查 | asyncAfter 0.1秒 | 无延迟 |
+| 获取位置 | mouseLocationOutsideOfEventStream | event.locationInWindow |
+| 处理 List 点击 | 尝试同步状态 | 完全不处理 |
+| 调用时机 | 延迟后 | 立即（在 async 中） |
+
+### 代码实现
+
+```swift
+// MainListView+KeyboardMonitor.swift
+
+func startMouseDownMonitorIfNeeded() {
+    guard mouseDownMonitor == nil else { return }
+    
+    mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+        // 只处理 MainListView 所在窗口的事件
+        guard let window = self.mainWindow, event.window === window else {
+            return event
+        }
+        
+        // 在事件发生时立即获取点击位置
+        let clickLocation = event.locationInWindow
+        
+        // 只处理点击 Detail 的情况
+        if let detailScrollView = self.currentDetailScrollView,
+           let detailFrame = detailScrollView.superview?.convert(detailScrollView.frame, to: nil),
+           detailFrame.contains(clickLocation) {
+            // 在下一个 runloop 切换焦点（避免干扰当前点击处理）
+            DispatchQueue.main.async {
+                self.keyboardNavigationTarget = .detail
+                _ = window.makeFirstResponder(detailScrollView.contentView)
+            }
+        }
+        // 点击 List 时不做任何处理，让 AppKit 自然处理
+        
+        return event  // 始终返回 event，不消费
+    }
+}
+```
+
+### 需要删除的代码
+
+移除 `syncNavigationTargetWithFocus()` 方法的调用（在 `startMouseDownMonitorIfNeeded()` 中）。
+
+可以选择保留或删除 `syncNavigationTargetWithFocus()` 方法本身。
+
+### 预估工作量
+
+| 任务 | 预估时间 |
+|------|----------|
+| 修改 `startMouseDownMonitorIfNeeded()` | 5 分钟 |
+| 测试所有数据源 | 15 分钟 |
+| **总计** | **20 分钟** |
+
+### 测试用例
+
+1. [ ] 点击 ChatListView item → 高亮为蓝色
+2. [ ] 点击 ChatDetailView → 高亮变灰
+3. [ ] 其他 4 个数据源同样测试
+4. [ ] 键盘 → 键 → 焦点移到 Detail，高亮变灰
+5. [ ] 键盘 ← 键 → 焦点回到 List，高亮变蓝
 
 ---
 
@@ -314,22 +392,48 @@ func startMouseDownMonitorIfNeeded() {
 2025-12-28
 
 ## 状态
-🔴 方案 D 已撤回（待重新评估）
+🟡 待实施方案 A3
 
-## 方案 D 失败记录
+---
 
-### 尝试日期
-2025-12-28
+## 历史记录
 
-### 失败原因
+### 方案 D 失败记录
 
+**尝试日期**：2025-12-28
+
+**失败原因**：
 1. **键盘导航失效** - 移除 `@FocusState` 后，ListView 无法正确获取焦点
 2. **List 点击时闪烁** - `mouseDownMonitor` 干扰了 List 的正常点击行为
 
-### 已撤回的更改
+**已撤回的更改**：所有代码更改已撤回，恢复到原始状态。
 
-所有代码更改已撤回，恢复到原始状态。
+---
 
-### 建议
+### 方案 A 尝试记录（2025-12-29）
 
-考虑使用方案 A（最小改动）：只在鼠标点击 DetailView 时添加 `makeFirstResponder` 调用，不移除任何现有代码。
+**尝试日期**：2025-12-29
+
+**尝试内容**：
+1. 使用 `asyncAfter` 延迟 0.1 秒后调用 `syncNavigationTargetWithFocus()`
+2. 使用 `mouseLocationOutsideOfEventStream` 获取鼠标位置
+3. 尝试同时处理 List 和 Detail 的点击
+
+**失败原因**：
+1. 点击 List item 时，有时会错误地把焦点切换到 Detail
+2. 延迟检查导致判断不准确
+
+**已撤回的更改**：所有代码更改已撤回。
+
+---
+
+### 下一步：实施方案 A3
+
+**日期**：2025-12-29
+
+**核心改进**：
+1. 使用 `event.locationInWindow` 立即获取点击位置（不延迟）
+2. 只处理点击 Detail 的情况（不处理点击 List）
+3. 使用 `DispatchQueue.main.async` 而不是 `asyncAfter`
+
+见上方"推荐方案 A3"章节。
