@@ -689,7 +689,7 @@ final class ChatViewModel: ObservableObject {
         return try JSONEncoder().encode(snapshots)
     }
 
-    /// 当 Paddle `dataInfo.width/height` 缺失时，用 bbox 的最大边界估算 OCR 坐标系尺寸，避免相对坐标失真导致方向误判
+    /// 当 OCR `coordinateSize` 缺失时，用 bbox 的最大边界估算 OCR 坐标系尺寸，避免相对坐标失真导致方向误判
     private func estimateCoordinateSize(from blocks: [OCRBlock]) -> CGSize? {
         var maxX: CGFloat = 0
         var maxY: CGFloat = 0

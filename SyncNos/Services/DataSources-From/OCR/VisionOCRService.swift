@@ -144,7 +144,7 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         // Vision 归一化坐标系：原点在左下角，Y 轴向上
         // VNImageRectForNormalizedRect 只做缩放，不翻转 Y 轴
         // 需要手动翻转 Y 坐标以匹配图像坐标系（原点左上角，Y 轴向下）
-        // 这样才能与 PaddleOCR 的坐标系保持一致
+        // 这样才能与标准图像坐标系保持一致
         
         let blocks = observations.compactMap { observation -> OCRBlock? in
             guard let topCandidate = observation.topCandidates(1).first else {
