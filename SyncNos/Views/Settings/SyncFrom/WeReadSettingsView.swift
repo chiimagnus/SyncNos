@@ -25,32 +25,30 @@ struct WeReadSettingsView: View {
             
             // MARK: - Account
             Section {
-                HStack {
-                    Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
-                        .scaledFont(.body)
-                    Spacer()
+                LabeledContent {
                     Text(viewModel.isLoggedIn ? "Logged In" : "Not Logged In")
                         .scaledFont(.body)
                         .foregroundColor(viewModel.isLoggedIn ? .green : .secondary)
+                } label: {
+                    Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
+                        .scaledFont(.body)
                 }
 
-                HStack {
-                    Button {
-                        viewModel.showLoginSheet = true
-                    } label: {
-                        Label("Open Login WebView", systemImage: "safari")
-                            .scaledFont(.body)
-                    }
-
-                    Spacer()
-
+                LabeledContent {
                     Button(role: .destructive) {
                         viewModel.clearLogin()
                     } label: {
-                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.forward")
+                        Text("Log Out")
                             .scaledFont(.body)
                     }
                     .disabled(!viewModel.isLoggedIn)
+                } label: {
+                    Button {
+                        viewModel.showLoginSheet = true
+                    } label: {
+                        Label("Open Login", systemImage: "safari")
+                            .scaledFont(.body)
+                    }
                 }
             } header: {
                 Text("Account")
