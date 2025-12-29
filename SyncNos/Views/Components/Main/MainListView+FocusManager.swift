@@ -14,9 +14,13 @@ extension MainListView {
         
         mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
             // 只处理 MainListView 所在窗口的事件
-            guard let window = self.mainWindow, event.window === window else {
+            // - mainWindow 可能在视图初次渲染时尚未注入；此时用 event.window 兜底，避免鼠标点击完全不生效
+            // - 若 mainWindow 已存在，则严格过滤，避免影响 Settings 等其它窗口
+            guard let eventWindow = event.window else { return event }
+            if let mainWindow = self.mainWindow, eventWindow !== mainWindow {
                 return event
             }
+            let window = self.mainWindow ?? eventWindow
             
             // 记录点击位置（窗口坐标系：原点在左下）
             let clickLocationInWindow = event.locationInWindow
@@ -61,7 +65,7 @@ extension MainListView {
         if let detailScrollView = currentDetailScrollView {
             var responder: NSResponder? = firstResponder
             while let r = responder {
-                if r === detailScrollView || r === detailScrollView.contentView {
+                if r === detailScrollView || r === detailScrollView.contentView || r === detailScrollView.documentView {
                     keyboardNavigationTarget = .detail
                     return
                 }
@@ -80,7 +84,12 @@ extension MainListView {
         guard let scrollView = currentDetailScrollView else { return }
         DispatchQueue.main.async {
             // 让 Detail 真正成为 first responder，List 的选中高亮会变为非激活（灰色）
-            _ = window.makeFirstResponder(scrollView.contentView)
+            // SwiftUI 的 ScrollView 底层实现可能导致 contentView 并不总能成为 firstResponder，
+            // 因此这里做多路兜底，优先让 NSScrollView 本身拿到 firstResponder。
+            if window.makeFirstResponder(scrollView) { return }
+            if window.makeFirstResponder(scrollView.contentView) { return }
+            if let documentView = scrollView.documentView, window.makeFirstResponder(documentView) { return }
+            _ = window.makeFirstResponder(nil)
         }
     }
     
@@ -124,17 +133,21 @@ extension MainListView {
         // 命中测试：确保点击确实落在 Detail 的 ScrollView 视图树内，
         // 避免仅靠 rect 判断在极端情况下误判（导致“点 List 也自动切到 Detail”）
         let pointInContentView = contentView.convert(locationInWindow, from: nil)
-        guard let hitView = contentView.hitTest(pointInContentView) else { return false }
-        
-        var view: NSView? = hitView
-        while let v = view {
-            if v === scrollView || v === scrollView.contentView || v === scrollView.documentView {
-                return true
+        if let hitView = contentView.hitTest(pointInContentView) {
+            var view: NSView? = hitView
+            while let v = view {
+                if v === scrollView || v === scrollView.contentView || v === scrollView.documentView {
+                    return true
+                }
+                view = v.superview
             }
-            view = v.superview
         }
         
-        return false
+        // 兜底：某些 Detail 视图会在 ScrollView 之上覆盖一层（例如 Chats 的空/加载态 ZStack），
+        // 导致 hitTest 命中的是覆盖层而不是 ScrollView 的视图树。
+        // 此时用几何范围做二次判定：点击点若落在 scrollView 的 bounds 内，也视为点击了 Detail 区域。
+        let pointInScrollView = scrollView.convert(pointInContentView, from: contentView)
+        return scrollView.bounds.contains(pointInScrollView)
     }
 }
 
