@@ -4,7 +4,7 @@ import AppKit
 /// OCR 设置视图
 struct OCRSettingsView: View {
     @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
-    @StateObject private var configStore = OCRConfigStore.shared
+    @ObservedObject private var configStore = OCRConfigStore.shared
     @State private var showingLanguageSheet = false
     @State private var showingDebugSheet = false
     
@@ -23,92 +23,43 @@ struct OCRSettingsView: View {
                 Text("Data Source")
             }
             
-            // MARK: - OCR 引擎信息
+            // MARK: - OCR 设置
             Section {
-                HStack(spacing: 12) {
-                    Image(systemName: "eye")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Apple Vision")
-                            .font(.headline)
-                        Text("Native macOS OCR • Offline • 30 languages")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Label("Ready", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.caption)
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("OCR Engine")
-            }
-            
-            // MARK: - 语言设置
-            Section {
-                // 语言模式选择
-                Picker("Detection Mode", selection: $configStore.languageMode) {
-                    ForEach(OCRLanguageMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-                
-                // 手动模式下显示语言选择
-                if configStore.languageMode == .manual {
-                    Button {
-                        showingLanguageSheet = true
-                    } label: {
-                        HStack {
-                            Text("Languages")
-
-                            Spacer()
-                            
-                            if configStore.selectedLanguages.isEmpty {
-                                Text("None (using defaults)")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(configStore.selectedLanguages.prefix(3).map(\.code).joined(separator: ", "))
-                                    .foregroundStyle(.secondary)
-                                if configStore.selectedLanguages.count > 3 {
-                                    Text("+\(configStore.selectedLanguages.count - 3)")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            } header: {
-                Text("Language")
-            } footer: {
-                if configStore.languageMode == .automatic {
-                    Text("Vision automatically detects languages in the image.")
-                } else {
-                    Text("Select specific languages for better accuracy. Note: Chinese and Japanese cannot be used together.")
-                }
-            }
-            
-            // MARK: - Debug 测试功能
-            Section {
+                // OCR Languages
                 Button {
-                    showingDebugSheet = true
+                    showingLanguageSheet = true
                 } label: {
                     HStack {
-                        Image(systemName: "ladybug")
-                            .foregroundStyle(.orange)
-                        Text("Test OCR Recognition")
+                        Text("OCR Languages")
+                        
                         Spacer()
+                        
+                        if configStore.selectedLanguages.isEmpty {
+                            Text("Auto")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(configStore.selectedLanguages.prefix(3).map(\.code).joined(separator: ", "))
+                                .foregroundStyle(.secondary)
+                            if configStore.selectedLanguages.count > 3 {
+                                Text("+\(configStore.selectedLanguages.count - 3)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
                 }
                 .buttonStyle(.plain)
-            } header: {
-                Text("Debug")
+                
+                // Test OCR Recognition
+                Button {
+                    showingDebugSheet = true
+                } label: {
+                    Text("Test OCR Recognition")
+                }
+                .buttonStyle(.plain)
             }
         }
         .formStyle(.grouped)
@@ -325,7 +276,12 @@ private struct OCRDebugSheet: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             StatRow(label: "Blocks", value: "\(result.blocks.count)")
                                             StatRow(label: "Processing Time", value: String(format: "%.2fs", processingTime))
-                                            StatRow(label: "Language Mode", value: configStore.languageMode.displayName)
+                                            StatRow(
+                                                label: "Languages",
+                                                value: configStore.selectedLanguages.isEmpty
+                                                    ? "Auto"
+                                                    : configStore.selectedLanguages.map(\.code).joined(separator: ", ")
+                                            )
                                             if !detectedScripts.isEmpty {
                                                 StatRow(label: "Detected Scripts", value: detectedScripts.joined(separator: ", "))
                                             }
@@ -545,5 +501,5 @@ private struct StatRow: View {
 
 #Preview {
     OCRSettingsView()
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 500)
 }
