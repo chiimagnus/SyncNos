@@ -87,24 +87,12 @@ final class DataSourceSwitchViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
-    /// 发送数据源切换通知，让对应的 ListView 获取焦点
+    /// 发送 List 焦点请求通知，让对应的 ListView 获取焦点
+    /// 使用 `ContentSource.listFocusRequestedNotification`，与数据源切换解耦
     private func notifyDataSourceSwitch(to source: ContentSource) {
-        let notificationName: Notification.Name
-        switch source {
-        case .appleBooks:
-            notificationName = Notification.Name("DataSourceSwitchedToAppleBooks")
-        case .goodLinks:
-            notificationName = Notification.Name("DataSourceSwitchedToGoodLinks")
-        case .weRead:
-            notificationName = Notification.Name("DataSourceSwitchedToWeRead")
-        case .dedao:
-            notificationName = Notification.Name("DataSourceSwitchedToDedao")
-        case .chats:
-            notificationName = Notification.Name("DataSourceSwitchedToChats")
-        }
         // 延迟发送，确保视图切换动画完成
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: notificationName, object: nil)
+            NotificationCenter.default.post(name: source.listFocusRequestedNotification, object: nil)
         }
     }
     

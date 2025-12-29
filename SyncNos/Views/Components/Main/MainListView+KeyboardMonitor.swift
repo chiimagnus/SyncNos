@@ -18,6 +18,11 @@ extension MainListView {
                 return event
             }
             
+            // 若用户正在文本输入框中（field editor），不拦截任何方向键，避免破坏光标移动体验
+            if window.firstResponder is NSTextView {
+                return event
+            }
+            
             // 检查修饰键
             let modifiers = event.modifierFlags
             let hasCommand = modifiers.contains(.command)

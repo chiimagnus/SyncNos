@@ -85,7 +85,7 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │  │ List(...).focused($isListFocused)                           ││
 │  │                                                             ││
 │  │ .onAppear { isListFocused = true }                          ││
-│  │ .onReceive(DataSourceSwitchedTo* 通知) { isListFocused=true }│
+│  │ .onReceive(listFocusRequestedNotification) { isListFocused=true}│
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -468,8 +468,8 @@ struct AppleBooksListView: View {
                 isListFocused = true
             }
         }
-        // 监听数据源切换通知，切换到此视图时获取焦点
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToAppleBooks")).receive(on: DispatchQueue.main)) { _ in
+        // 监听 List 焦点请求通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: ContentSource.appleBooks.listFocusRequestedNotification).receive(on: DispatchQueue.main)) { _ in
             DispatchQueue.main.async {
                 isListFocused = true
             }
@@ -628,8 +628,8 @@ func stopKeyboardMonitorIfNeeded() {
 1. 添加 `@FocusState private var isListFocused: Bool`
 2. 在 List 上添加 `.focused($isListFocused)`
 3. 在 `.onAppear` 中设置 `isListFocused = true`
-4. 监听对应的 `DataSourceSwitchedTo*` 通知并设置焦点
-5. 在 `MainListView+FocusManager.swift` 的 `focusNotificationName(for:)` 中添加映射
+4. 监听 `ContentSource.<source>.listFocusRequestedNotification` 并设置焦点
+5. `ContentSource.listFocusRequestedNotification` 已自动生成，无需额外映射
 
 ## 注意事项
 

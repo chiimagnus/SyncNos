@@ -61,6 +61,14 @@ enum ContentSource: String, Codable, CaseIterable {
     /// 数据源顺序变化通知
     static let orderChangedNotification = Notification.Name("ContentSourceOrderChanged")
     
+    // MARK: - List Focus Notifications
+    
+    /// 请求对应数据源 ListView 获取焦点的通知
+    /// 仅用于焦点请求，与数据源切换解耦
+    var listFocusRequestedNotification: Notification.Name {
+        Notification.Name("ListFocusRequested.\(rawValue)")
+    }
+    
     /// 获取用户自定义的数据源顺序（如果没有自定义，返回默认顺序）
     static var customOrder: [ContentSource] {
         get {
