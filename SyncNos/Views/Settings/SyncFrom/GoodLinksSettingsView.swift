@@ -20,7 +20,7 @@ struct GoodLinksSettingsView: View {
                 }
             } header: {
                 Text("Data Source")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -70,7 +70,7 @@ struct GoodLinksSettingsView: View {
                 .help("Choose data folder and load notes")
             } header: {
                 Text("Sync Settings")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
 

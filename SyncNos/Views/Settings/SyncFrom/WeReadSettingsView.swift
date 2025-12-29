@@ -19,7 +19,7 @@ struct WeReadSettingsView: View {
                 }
             } header: {
                 Text("Data Source")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -52,7 +52,7 @@ struct WeReadSettingsView: View {
                 }
             } header: {
                 Text("Account")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -81,7 +81,7 @@ struct WeReadSettingsView: View {
                 }
             } header: {
                 Text("Sync Settings")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
 

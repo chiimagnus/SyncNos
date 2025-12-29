@@ -21,7 +21,7 @@ struct OCRSettingsView: View {
                 .help("Show Chats in the main list")
             } header: {
                 Text("Data Source")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -71,7 +71,7 @@ struct OCRSettingsView: View {
                 .buttonStyle(.plain)
             } header: {
                 Text("Apple OCR")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
         }
