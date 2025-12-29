@@ -6,7 +6,7 @@ struct AppleBooksSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+            Section {
                 Picker(selection: $viewModel.syncMode) {
                     Text("One page per book")
                         .scaledFont(.body)
@@ -76,6 +76,10 @@ struct AppleBooksSettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose data folder and load notes")
+            } header: {
+                Text("Notion Sync Setting")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
 
             if let message = viewModel.message {

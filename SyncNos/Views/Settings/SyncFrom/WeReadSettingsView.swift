@@ -5,7 +5,7 @@ struct WeReadSettingsView: View {
 
     var body: some View {
         List {
-            Section(header: Label("WeRead Account", systemImage: "person.crop.square").scaledFont(.headline)) {
+            Section {
                 HStack {
                     Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
                         .scaledFont(.body)
@@ -33,9 +33,13 @@ struct WeReadSettingsView: View {
                     }
                     .disabled(!viewModel.isLoggedIn)
                 }
+            } header: {
+                Text("WeRead Account")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
 
-            Section(header: Label("Notion Sync Setting", systemImage: "n.square").scaledFont(.headline)) {
+            Section {
                 LabeledContent {
                     TextField("Notion Database ID for WeRead", text: $viewModel.weReadDbId)
                         .textFieldStyle(.roundedBorder)
@@ -68,6 +72,10 @@ struct WeReadSettingsView: View {
                 .onChange(of: viewModel.autoSync) { _, _ in
                     viewModel.save()
                 }
+            } header: {
+                Text("Notion Sync Setting")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
 
             if let message = viewModel.message {
