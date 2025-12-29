@@ -71,7 +71,7 @@ struct ChatDetailView: View {
             ZStack {
                 contentView(for: contact)
             }
-            // 昵称设置弹窗（锚定到内容区域中心，箭头朝左→popover在右侧）
+            // 昵称设置弹窗（锚定到内容区域中心）
             .popover(
                 isPresented: $showSenderNamePicker,
                 attachmentAnchor: .rect(.bounds),
@@ -251,8 +251,6 @@ struct ChatDetailView: View {
                     dropTargetOverlay
                 }
             }
-        } else {
-            emptySelectionView
         }
     }
 
@@ -695,18 +693,6 @@ struct ChatDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var emptySelectionView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "message")
-                .font(.system(size: 48 * fontScale))
-                .foregroundColor(.secondary)
-            Text("Select a chat")
-                .scaledFont(.title3)
-                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
