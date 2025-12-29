@@ -124,7 +124,8 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
                     let rawDict = self.observationsToDict(observations, imageSize: imageSize)
                     let rawData = (try? JSONSerialization.data(withJSONObject: rawDict)) ?? Data()
                     
-                    self.logger.info("[VisionOCR] Recognition completed: \(blocks.count) blocks")
+                    // 详细日志：每个识别结果的文本和置信度
+                    self.logRecognitionDetails(observations: observations, blocks: blocks)
                     
                     continuation.resume(returning: (
                         result: result,
@@ -221,6 +222,88 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
                 ]
             ]
         }
+    }
+    
+    /// 记录识别详情日志
+    private func logRecognitionDetails(
+        observations: [VNRecognizedTextObservation],
+        blocks: [OCRBlock]
+    ) {
+        // 统计信息
+        let totalObservations = observations.count
+        let validBlocks = blocks.count
+        
+        // 计算平均置信度
+        let confidences = observations.compactMap { $0.topCandidates(1).first?.confidence }
+        let avgConfidence = confidences.isEmpty ? 0 : confidences.reduce(0, +) / Float(confidences.count)
+        let minConfidence = confidences.min() ?? 0
+        let maxConfidence = confidences.max() ?? 0
+        
+        logger.info("[VisionOCR] ✅ Recognition completed: \(validBlocks) blocks (from \(totalObservations) observations)")
+        logger.info("[VisionOCR] 📊 Confidence: avg=\(String(format: "%.2f", avgConfidence)), min=\(String(format: "%.2f", minConfidence)), max=\(String(format: "%.2f", maxConfidence))")
+        
+        // 检测语言（通过字符范围）
+        var detectedScripts: Set<String> = []
+        for block in blocks {
+            let scripts = detectScripts(in: block.text)
+            detectedScripts.formUnion(scripts)
+        }
+        
+        if !detectedScripts.isEmpty {
+            logger.info("[VisionOCR] 🌐 Detected scripts: \(detectedScripts.sorted().joined(separator: ", "))")
+        }
+        
+        // 输出前几个识别结果（调试用）
+        let previewCount = min(5, blocks.count)
+        if previewCount > 0 {
+            logger.debug("[VisionOCR] 📝 First \(previewCount) blocks:")
+            for (index, block) in blocks.prefix(previewCount).enumerated() {
+                let truncatedText = block.text.count > 50 
+                    ? String(block.text.prefix(50)) + "..." 
+                    : block.text
+                let conf = observations[safe: index].flatMap { $0.topCandidates(1).first?.confidence } ?? 0
+                logger.debug("[VisionOCR]   [\(index + 1)] \"\(truncatedText)\" (conf: \(String(format: "%.2f", conf)))")
+            }
+        }
+    }
+    
+    /// 检测文本中使用的书写系统
+    private func detectScripts(in text: String) -> Set<String> {
+        var scripts: Set<String> = []
+        
+        for scalar in text.unicodeScalars {
+            if CharacterSet(charactersIn: "\u{4E00}"..."\u{9FFF}").contains(scalar) ||
+               CharacterSet(charactersIn: "\u{3400}"..."\u{4DBF}").contains(scalar) {
+                scripts.insert("CJK (Chinese/Japanese Kanji)")
+            } else if CharacterSet(charactersIn: "\u{3040}"..."\u{309F}").contains(scalar) {
+                scripts.insert("Hiragana (Japanese)")
+            } else if CharacterSet(charactersIn: "\u{30A0}"..."\u{30FF}").contains(scalar) {
+                scripts.insert("Katakana (Japanese)")
+            } else if CharacterSet(charactersIn: "\u{AC00}"..."\u{D7AF}").contains(scalar) ||
+                      CharacterSet(charactersIn: "\u{1100}"..."\u{11FF}").contains(scalar) {
+                scripts.insert("Hangul (Korean)")
+            } else if CharacterSet(charactersIn: "\u{0600}"..."\u{06FF}").contains(scalar) {
+                scripts.insert("Arabic")
+            } else if CharacterSet(charactersIn: "\u{0400}"..."\u{04FF}").contains(scalar) {
+                scripts.insert("Cyrillic (Russian/Ukrainian)")
+            } else if CharacterSet(charactersIn: "\u{0E00}"..."\u{0E7F}").contains(scalar) {
+                scripts.insert("Thai")
+            } else if CharacterSet.letters.contains(scalar) && 
+                      CharacterSet(charactersIn: "a"..."z").contains(scalar) ||
+                      CharacterSet(charactersIn: "A"..."Z").contains(scalar) {
+                scripts.insert("Latin (English/European)")
+            }
+        }
+        
+        return scripts
+    }
+}
+
+// MARK: - Array Safe Subscript
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }
 
