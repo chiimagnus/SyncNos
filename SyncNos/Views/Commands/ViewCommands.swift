@@ -3,7 +3,6 @@ import SwiftUI
 // MARK: - View Commands
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
-    @ObservedObject private var fontScaleManager = FontScaleManager.shared
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
@@ -471,27 +470,6 @@ struct ViewCommands: Commands {
                 }
             }
 
-        }
-        
-        // MARK: - Text Size Commands（放在 Window 菜单中）
-        CommandGroup(after: .windowSize) {
-            Button("Increase Text Size") {
-                fontScaleManager.increaseSize()
-            }
-            .keyboardShortcut("+", modifiers: .command)
-            .disabled(!fontScaleManager.canIncreaseSize)
-            
-            Button("Decrease Text Size") {
-                fontScaleManager.decreaseSize()
-            }
-            .keyboardShortcut("-", modifiers: .command)
-            .disabled(!fontScaleManager.canDecreaseSize)
-            
-            Button("Reset Text Size") {
-                fontScaleManager.reset()
-            }
-            .keyboardShortcut("0", modifiers: .command)
-            .disabled(fontScaleManager.isDefaultSize)
         }
     }
 }
