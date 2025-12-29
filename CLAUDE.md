@@ -216,8 +216,9 @@ SyncNos/
     │   │   ├── ChatExporter.swift            # 聊天记录导出（JSON/Markdown）
     │   │   └── ChatImporter.swift            # 聊天记录导入
     │   └── OCR/                  # OCR 服务
+    │       ├── VisionOCRService.swift          # Apple Vision OCR（原生，离线）
     │       ├── OCRAPIService.swift             # PaddleOCR-VL API 客户端
-    │       ├── OCRConfigStore.swift            # OCR 配置存储
+    │       ├── OCRConfigStore.swift            # OCR 配置存储（含引擎选择）
     │       └── OCRModels.swift                 # OCR 请求/响应数据模型
     ├── DataSources-To/           # 同步目标（同步到...）
     │   ├── Notion/               # Notion 集成（重构后）
@@ -330,8 +331,10 @@ DIContainer.shared.chatsCacheService
 DIContainer.shared.chatOCRParser
 
 // OCR 服务
-DIContainer.shared.ocrAPIService
-DIContainer.shared.ocrConfigStore
+DIContainer.shared.ocrAPIService        // 根据 selectedEngine 动态返回
+DIContainer.shared.visionOCRService     // Apple Vision OCR（原生）
+DIContainer.shared.paddleOCRService     // PaddleOCR-VL API
+DIContainer.shared.ocrConfigStore       // 配置存储（含引擎选择）
 ```
 
 ### 关键服务层
@@ -416,10 +419,17 @@ DIContainer.shared.ocrConfigStore
 - `ChatImporter`: 从 JSON/Markdown 导入对话
 
 **9. OCR 服务** (Services/DataSources-From/OCR/)
+- `VisionOCRService`: Apple Vision OCR（原生，离线）
+  - 使用 `VNRecognizeTextRequest` 进行文本识别
+  - 支持中文简体、繁体和英文
+  - 自动翻转 Y 坐标以匹配图像坐标系（原点左上角）
+  - 即装即用，无需配置
 - `OCRAPIService`: PaddleOCR-VL API 客户端
   - 支持图片 Base64 编码上传
   - 返回 `OCRResult` 包含 blocks 和 bbox
 - `OCRConfigStore`: OCR 配置存储
+  - `OCREngineType` 枚举：`.vision` / `.paddleOCR`
+  - 引擎选择存储在 UserDefaults
   - API URL 存储在 UserDefaults
   - Token 安全存储在 Keychain
 - `OCRModels`: OCR 请求/响应数据模型

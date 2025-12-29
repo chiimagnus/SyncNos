@@ -137,29 +137,56 @@ Vision 坐标系:                 AppKit/UIKit 坐标系:
 
 #### 4.3.1 坐标转换
 
+> ⚠️ **重要警告**：`VNImageRectForNormalizedRect` **不会翻转 Y 轴**！
+> 
+> 该函数只做简单的缩放，返回的坐标仍然是原点在左下角的坐标系。
+> 如果需要与图像坐标系（原点左上角）匹配，必须手动翻转 Y 轴。
+
+**正确的手动转换方式：**
+
 ```swift
-/// 将 Vision 归一化坐标转换为图像像素坐标
+/// 将 Vision 归一化坐标转换为图像像素坐标（原点左上角）
 func convertToImageCoordinates(
-    _ boundingBox: CGRect,
+    _ normalizedBox: CGRect,
     imageSize: CGSize
 ) -> CGRect {
-    // Vision 坐标系原点在左下角，需要翻转 Y 轴
-    let x = boundingBox.origin.x * imageSize.width
-    let y = (1 - boundingBox.origin.y - boundingBox.height) * imageSize.height
-    let width = boundingBox.width * imageSize.width
-    let height = boundingBox.height * imageSize.height
+    // Vision 坐标系原点在左下角，需要手动翻转 Y 轴
+    let x = normalizedBox.origin.x * imageSize.width
+    let y = imageSize.height * (1 - normalizedBox.origin.y - normalizedBox.height)
+    let width = normalizedBox.width * imageSize.width
+    let height = normalizedBox.height * imageSize.height
     
     return CGRect(x: x, y: y, width: width, height: height)
 }
+```
 
-/// 使用 Apple 提供的便捷函数
-import Vision
+**VNImageRectForNormalizedRect 的实际行为（仅缩放，不翻转）：**
 
-let imageRect = VNImageRectForNormalizedRect(
-    boundingBox,
-    Int(imageSize.width),
-    Int(imageSize.height)
-)
+```swift
+// ⚠️ 注意：此函数不翻转 Y 轴！
+let pixelRect = VNImageRectForNormalizedRect(boundingBox, Int(width), Int(height))
+// 结果：pixelRect.origin.y = boundingBox.origin.y * height
+// 这意味着 Y 值越大 = 距离图像底部越近（与 PaddleOCR 坐标系相反）
+```
+
+**关键区别：**
+
+| 坐标系 | Y 值含义 | 原点位置 |
+|-------|---------|---------|
+| Vision 归一化坐标 | Y=0 在底部，Y=1 在顶部 | 左下角 |
+| VNImageRectForNormalizedRect 输出 | Y=0 在底部，Y=height 在顶部 | 左下角 |
+| 图像坐标 / PaddleOCR | Y=0 在顶部，Y=height 在底部 | 左上角 |
+
+**在 SyncNos 中的实现：**
+
+`VisionOCRService.swift` 使用手动坐标转换以保证与 `ChatOCRParser` 的排序逻辑兼容：
+
+```swift
+let x = normalizedBox.origin.x * imageSize.width
+let y = imageSize.height * (1 - normalizedBox.origin.y - normalizedBox.height)
+let width = normalizedBox.width * imageSize.width
+let height = normalizedBox.height * imageSize.height
+let pixelRect = CGRect(x: x, y: y, width: width, height: height)
 ```
 
 ---
