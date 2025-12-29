@@ -66,6 +66,8 @@ struct ChatListView: View {
                     .tag(contact.id)
                     .contextMenu {
                         Button(role: .destructive) {
+                            // 如果删除的是当前选中的，先清除选择
+                            selectionIds.remove(contact.id)
                             viewModel.deleteContact(contact)
                         } label: {
                             Label("Delete", systemImage: "trash")

@@ -137,22 +137,14 @@ extension MainListView {
                 }
             )
         } else {
-            // Chats does not have sync functionality, show simple placeholder
-            VStack(spacing: 16) {
-                Image(systemName: "message")
-                    .font(.system(size: 48))
-                    .foregroundColor(.secondary)
-                if selectedChatsContactIds.isEmpty {
-                    Text("Select a chat")
-                        .scaledFont(.title3)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("\(selectedChatsContactIds.count) chats selected")
-                        .scaledFont(.title3)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Chats does not have sync functionality yet, pass nil for onSyncSelected
+            SelectionPlaceholderView(
+                source: contentSource,
+                count: selectedChatsContactIds.isEmpty ? nil : selectedChatsContactIds.count,
+                filteredCount: chatsVM.contacts.count,
+                totalCount: chatsVM.contacts.count,
+                onSyncSelected: nil
+            )
         }
     }
     
