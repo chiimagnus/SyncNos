@@ -139,7 +139,7 @@ extension MainListView {
         } else {
             // Chats does not have sync functionality, show simple placeholder
             VStack(spacing: 16) {
-                Image(systemName: "message.fill")
+                Image(systemName: "message")
                     .font(.system(size: 48))
                     .foregroundColor(.secondary)
                 if selectedChatsContactIds.isEmpty {
