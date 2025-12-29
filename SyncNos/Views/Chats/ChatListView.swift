@@ -12,7 +12,6 @@ struct ChatListView: View {
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
     
-    @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
     @Environment(\.fontScale) private var fontScale
     
     var body: some View {
@@ -46,25 +45,14 @@ struct ChatListView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            if !ocrConfigStore.isConfigured {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 40 * fontScale))
-                    .foregroundColor(.orange)
-                Text("OCR is not available")
-                    .scaledFont(.headline)
-                Text("Go to Settings → OCR Settings")
-                    .scaledFont(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                Image(systemName: "message.badge.filled.fill")
-                    .font(.system(size: 40 * fontScale))
-                    .foregroundColor(.secondary)
-                Text("No Chats")
-                    .scaledFont(.headline)
-                Text("Click \"+\" at the bottom right to create a new chat")
-                    .scaledFont(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Image(systemName: "message.badge.filled.fill")
+                .font(.system(size: 40 * fontScale))
+                .foregroundColor(.secondary)
+            Text("No Chats")
+                .scaledFont(.headline)
+            Text("Click \"+\" at the bottom right to create a new chat")
+                .scaledFont(.caption)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -74,7 +74,7 @@ struct OCRSettingsView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("OCR Settings")
+        .navigationTitle("Chats")
         .sheet(isPresented: $showingLanguageSheet) {
             LanguageSelectionSheet(configStore: configStore)
         }
