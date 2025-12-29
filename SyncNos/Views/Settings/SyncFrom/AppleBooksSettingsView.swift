@@ -90,13 +90,6 @@ struct AppleBooksSettingsView: View {
                     .foregroundStyle(.primary)
             }
 
-            if let message = viewModel.message {
-                Section {
-                    Text(message)
-                        .scaledFont(.body)
-                        .foregroundColor(.secondary)
-                }
-            }
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
