@@ -115,11 +115,14 @@ struct MainListView: View {
                 updateDataSourceSwitchViewModel()
                 // 同步滑动容器与菜单状态
                 syncSwipeViewModelWithContentSource()
-                // 启动键盘监听
+                // 启动键盘监听（键盘导航）
                 startKeyboardMonitorIfNeeded()
+                // 启动鼠标监听（焦点管理）
+                startMouseDownMonitorIfNeeded()
             }
             .onDisappear {
                 stopKeyboardMonitorIfNeeded()
+                stopMouseDownMonitorIfNeeded()
             }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
