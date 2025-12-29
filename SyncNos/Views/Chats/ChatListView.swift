@@ -14,6 +14,11 @@ struct ChatListView: View {
     
     @Environment(\.fontScale) private var fontScale
     
+    /// 加密健康检查弹窗
+    @State private var showEncryptionHealth = false
+    @State private var encryptionHealthReport = ""
+    @State private var showResetConfirmation = false
+    
     var body: some View {
         VStack(spacing: 0) {
             // 联系人列表
@@ -32,6 +37,27 @@ struct ChatListView: View {
             }
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        // 加密健康检查弹窗
+        .alert("加密服务健康检查", isPresented: $showEncryptionHealth) {
+            Button("OK", role: .cancel) {}
+            Button("重置加密和数据", role: .destructive) {
+                showResetConfirmation = true
+            }
+        } message: {
+            Text(encryptionHealthReport)
+        }
+        // 重置确认弹窗
+        .alert("⚠️ 危险操作", isPresented: $showResetConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("确认重置", role: .destructive) {
+                Task {
+                    await viewModel.resetEncryptionAndData()
+                    await viewModel.loadFromCache()
+                }
+            }
+        } message: {
+            Text("此操作将删除所有聊天数据和加密密钥，且无法恢复。\n\n请确认是否继续？")
         }
         .task {
             // 视图首次出现时从缓存加载
@@ -74,6 +100,22 @@ struct ChatListView: View {
                         }
                     }
             }
+            
+            // Debug 区域：加密健康检查
+            #if DEBUG
+            Section {
+                Button {
+                    encryptionHealthReport = viewModel.checkEncryptionHealth()
+                    showEncryptionHealth = true
+                } label: {
+                    Label("检查加密健康状态", systemImage: "lock.shield")
+                        .scaledFont(.caption)
+                }
+            } header: {
+                Text("调试工具")
+                    .scaledFont(.caption2)
+            }
+            #endif
         }
         .listStyle(.sidebar)
         .focused($isListFocused)

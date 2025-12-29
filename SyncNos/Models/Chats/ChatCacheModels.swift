@@ -44,7 +44,16 @@ final class CachedChatConversationV2 {
     
     /// 对话名称（解密后）
     var name: String {
-        (try? EncryptionService.shared.decrypt(nameEncrypted)) ?? "[解密失败]"
+        do {
+            return try EncryptionService.shared.decrypt(nameEncrypted)
+        } catch {
+            // 提供更详细的错误信息
+            if case EncryptionError.authenticationFailed = error {
+                return "[解密失败：密钥不匹配]"
+            } else {
+                return "[解密失败：\(error.localizedDescription)]"
+            }
+        }
     }
 
     /// 使用明文初始化（自动加密）
@@ -186,13 +195,27 @@ final class CachedChatMessageV2 {
 
     /// 消息内容（解密后）
     var content: String {
-        (try? EncryptionService.shared.decrypt(contentEncrypted)) ?? "[解密失败]"
+        do {
+            return try EncryptionService.shared.decrypt(contentEncrypted)
+        } catch {
+            // 提供更详细的错误信息
+            if case EncryptionError.authenticationFailed = error {
+                return "[解密失败：密钥不匹配]"
+            } else {
+                return "[解密失败：\(error.localizedDescription)]"
+            }
+        }
     }
     
     /// 发送者昵称（解密后）
     var senderName: String? {
         guard let encrypted = senderNameEncrypted else { return nil }
-        return try? EncryptionService.shared.decrypt(encrypted)
+        do {
+            return try EncryptionService.shared.decrypt(encrypted)
+        } catch {
+            // 静默失败，返回 nil
+            return nil
+        }
     }
 
     var kind: ChatMessageKind {

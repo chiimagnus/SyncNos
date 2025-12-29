@@ -46,9 +46,19 @@ final class EncryptionService: EncryptionServiceProtocol {
     /// 线程安全队列
     private let queue = DispatchQueue(label: "com.syncnos.encryption", attributes: .concurrent)
     
+    /// 日志服务（懒加载以避免循环依赖）
+    private lazy var logger: LoggerServiceProtocol = {
+        DIContainer.shared.loggerService
+    }()
+    
     // MARK: - Init
     
-    private init() {}
+    private init() {
+        // 启动时验证密钥可访问性
+        Task.detached { [weak self] in
+            await self?.validateKeyAccess()
+        }
+    }
     
     // MARK: - Public API
     
@@ -77,14 +87,26 @@ final class EncryptionService: EncryptionServiceProtocol {
     func decrypt(_ ciphertext: Data) throws -> String {
         let key = try loadOrCreateKey()
         
-        let sealedBox = try AES.GCM.SealedBox(combined: ciphertext)
-        let decryptedData = try AES.GCM.open(sealedBox, using: key)
-        
-        guard let plaintext = String(data: decryptedData, encoding: .utf8) else {
-            throw EncryptionError.decodingFailed
+        do {
+            let sealedBox = try AES.GCM.SealedBox(combined: ciphertext)
+            let decryptedData = try AES.GCM.open(sealedBox, using: key)
+            
+            guard let plaintext = String(data: decryptedData, encoding: .utf8) else {
+                logger.error("[Encryption] UTF-8 解码失败")
+                throw EncryptionError.decodingFailed
+            }
+            
+            return plaintext
+        } catch {
+            // 详细记录解密失败的原因
+            if error is CryptoKitError {
+                logger.error("[Encryption] AES-GCM 解密失败 - 可能是密钥不匹配或数据损坏: \(error.localizedDescription)")
+                throw EncryptionError.authenticationFailed
+            } else {
+                logger.error("[Encryption] 解密过程出错: \(error.localizedDescription)")
+                throw error
+            }
         }
-        
-        return plaintext
     }
     
     /// 检查加密是否可用（密钥可加载或生成）
@@ -115,6 +137,7 @@ final class EncryptionService: EncryptionServiceProtocol {
         
         // 尝试从 Keychain 加载
         if let keyData = KeychainHelper.shared.read(service: keychainService, account: keychainAccount) {
+            logger.info("[Encryption] 从 Keychain 加载密钥成功")
             let key = SymmetricKey(data: keyData)
             queue.async(flags: .barrier) { [weak self] in
                 self?.cachedKey = key
@@ -122,20 +145,53 @@ final class EncryptionService: EncryptionServiceProtocol {
             return key
         }
         
-        // 生成新密钥
+        // 密钥不存在，生成新密钥
+        logger.warning("[Encryption] Keychain 中未找到密钥，生成新密钥（这将导致已加密的数据无法解密）")
         let newKey = SymmetricKey(size: .bits256)
         
         // 保存到 Keychain
         let saved = saveKeyToKeychain(newKey)
         guard saved else {
+            logger.error("[Encryption] 保存新密钥到 Keychain 失败")
             throw EncryptionError.keySaveFailed
         }
         
+        logger.info("[Encryption] 新密钥已生成并保存到 Keychain")
         queue.async(flags: .barrier) { [weak self] in
             self?.cachedKey = newKey
         }
         
         return newKey
+    }
+    
+    /// 验证密钥可访问性（启动时调用）
+    private func validateKeyAccess() async {
+        do {
+            let key = try loadOrCreateKey()
+            // 尝试加密解密测试数据
+            let testData = "encryption_test"
+            let encrypted = try encrypt(testData)
+            let decrypted = try decrypt(encrypted)
+            
+            if decrypted == testData {
+                logger.info("[Encryption] 密钥验证成功 - 加密服务正常")
+            } else {
+                logger.error("[Encryption] 密钥验证失败 - 解密结果不匹配")
+            }
+        } catch {
+            logger.error("[Encryption] 密钥验证失败: \(error.localizedDescription)")
+        }
+    }
+    
+    /// 获取密钥指纹（用于诊断密钥是否变更）
+    func getKeyFingerprint() -> String? {
+        guard let key = try? loadOrCreateKey() else {
+            return nil
+        }
+        
+        let keyData = key.withUnsafeBytes { Data($0) }
+        let hash = SHA256.hash(data: keyData)
+        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(16).description
     }
     
     /// 将密钥保存到 Keychain（带安全属性）

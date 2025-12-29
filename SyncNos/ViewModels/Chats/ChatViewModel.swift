@@ -734,6 +734,95 @@ final class ChatViewModel: ObservableObject {
         }
         .sorted { $0.name < $1.name }
     }
+    
+    // MARK: - Encryption Diagnostics
+    
+    /// 检查加密密钥健康状态
+    func checkEncryptionHealth() -> String {
+        let service = EncryptionService.shared
+        
+        var report = "=== 加密服务健康检查 ===\n"
+        
+        // 1. 检查加密服务是否可用
+        if service.isAvailable {
+            report += "✅ 加密服务可用\n"
+        } else {
+            report += "❌ 加密服务不可用\n"
+            return report
+        }
+        
+        // 2. 获取密钥指纹
+        if let fingerprint = service.getKeyFingerprint() {
+            report += "🔑 密钥指纹: \(fingerprint)\n"
+        } else {
+            report += "⚠️ 无法获取密钥指纹\n"
+        }
+        
+        // 3. 测试加密解密
+        do {
+            let testText = "测试加密_\(Date().timeIntervalSince1970)"
+            let encrypted = try service.encrypt(testText)
+            let decrypted = try service.decrypt(encrypted)
+            
+            if decrypted == testText {
+                report += "✅ 加密/解密测试通过\n"
+            } else {
+                report += "❌ 加密/解密测试失败 - 结果不匹配\n"
+            }
+        } catch {
+            report += "❌ 加密/解密测试失败: \(error.localizedDescription)\n"
+        }
+        
+        // 4. 检查数据库中的解密状态
+        var successCount = 0
+        var failCount = 0
+        
+        for contact in contacts {
+            if contact.name.contains("[解密失败") {
+                failCount += 1
+            } else {
+                successCount += 1
+            }
+        }
+        
+        report += "\n=== 数据库解密状态 ===\n"
+        report += "成功: \(successCount) 个对话\n"
+        report += "失败: \(failCount) 个对话\n"
+        
+        if failCount > 0 {
+            report += "\n⚠️ 检测到解密失败的数据\n"
+            report += "可能原因：\n"
+            report += "1. 密钥丢失或变更\n"
+            report += "2. 数据损坏\n"
+            report += "3. Keychain 访问权限问题\n"
+        }
+        
+        return report
+    }
+    
+    /// 清除所有加密数据并重置密钥（危险操作）
+    func resetEncryptionAndData() async {
+        logger.warning("[ChatsV2] 执行重置加密和数据操作")
+        
+        // 1. 删除所有聊天数据
+        do {
+            try await cacheService.clearAllData()
+            logger.info("[ChatsV2] 已清除所有聊天数据")
+        } catch {
+            logger.error("[ChatsV2] 清除数据失败: \(error)")
+        }
+        
+        // 2. 删除加密密钥
+        EncryptionService.shared.deleteKey()
+        logger.info("[ChatsV2] 已删除加密密钥")
+        
+        // 3. 重新加载
+        contacts.removeAll()
+        conversations.removeAll()
+        paginationStates.removeAll()
+        
+        logger.info("[ChatsV2] 重置完成")
+    }
 }
 
 
