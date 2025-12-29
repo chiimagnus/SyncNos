@@ -69,6 +69,10 @@ struct OCRSettingsView: View {
                     }
                 }
                 .buttonStyle(.plain)
+            } header: {
+                Text("OCR")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
         }
         .listStyle(.sidebar)
