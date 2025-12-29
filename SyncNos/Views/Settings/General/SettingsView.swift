@@ -164,7 +164,7 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: OCRSettingsView()) {
                         HStack {
-                            Label("Chats", systemImage: "text.viewfinder")
+                            Label("Chats", systemImage: "message")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
