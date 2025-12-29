@@ -55,6 +55,7 @@ SyncNos/
 │   │   │   └── SyncQueueView.swift   # 同步队列管理视图
 │   │   ├── Keyboard/             # 键盘相关组件
 │   │   │   ├── EnclosingScrollViewReader.swift
+│   │   │   ├── FirstResponderProxyView.swift
 │   │   │   └── WindowReader.swift
 │   │   ├── Main/                 # 主界面组件
 │   │   └── Theme/                # 主题组件
@@ -72,8 +73,9 @@ SyncNos/
 │   │   ├── DedaoListView.swift
 │   │   └── DedaoDetailView.swift
 │   ├── Chats/              # 微信聊天 OCR 视图
-│   │   ├── ChatsListView.swift
-│   │   ├── ChatsDetailView.swift
+│   │   ├── ChatListView.swift
+│   │   ├── ChatDetailView.swift
+│   │   ├── ChatNotifications.swift
 │   │   └── Components/
 │   │       ├── ChatsMessageBubble.swift
 │   │       ├── ChatsSystemMessageRow.swift
