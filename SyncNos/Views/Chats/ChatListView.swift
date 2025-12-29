@@ -50,7 +50,7 @@ struct ChatListView: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 40 * fontScale))
                     .foregroundColor(.orange)
-                Text("Please configure PaddleOCR API first")
+                Text("OCR is not available")
                     .scaledFont(.headline)
                 Text("Go to Settings → OCR Settings")
                     .scaledFont(.caption)
