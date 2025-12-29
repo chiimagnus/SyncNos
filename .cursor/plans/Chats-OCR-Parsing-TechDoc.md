@@ -234,14 +234,49 @@ UI 上建议将 `.system` 以居中灰底的样式展示（类似微信），同
 
 ## 7. 调试与可观测性
 
-- Debug overlay（未实现）：
-  - 在 UI 里叠加 bbox（候选消息 unionBBox + 原始 blocks bbox）
-  - 展示方向判定结果（左/右簇中心、阈值）
-- 解析日志 ✅（2025-12-28 已实现）：
-  - 每张截图输出：输入 blocks 数、过滤后 blocks 数、候选消息数、左/右消息数
-  - 使用 `LoggerService` 输出调试日志（可在 LoggerView 查看）
-  - `ChatParseStatistics` 结构体记录所有统计指标
-  - `parseWithStatistics()` 方法输出详细日志
+### 7.1 OCR Debug 测试功能 ✅（2025-12-29 已实现）
+
+在 Settings → OCR Settings → Test OCR Recognition 中提供 Debug 测试功能：
+
+- **图片导入**：点击按钮选择图片，或拖放图片到窗口
+- **实时识别**：导入后自动执行 OCR 识别
+- **结果展示**：
+  - **Statistics**：块数量、处理时间、语言模式、检测到的书写系统
+  - **Block Details**：每个识别块的文本和 bbox 坐标
+
+### 7.2 VisionOCRService 识别日志 ✅（2025-12-29 已实现）
+
+`VisionOCRService` 输出详细的日志信息：
+
+```
+[VisionOCR] Starting recognition, image size: 1080x1920
+[VisionOCR] Language mode: automatic, languages: zh-Hans, zh-Hant, en-US
+[VisionOCR] ✅ Recognition completed: 25 blocks (from 25 observations)
+[VisionOCR] 📊 Confidence: avg=0.95, min=0.82, max=0.99
+[VisionOCR] 🌐 Detected scripts: CJK (Chinese/Japanese Kanji), Latin (English/European)
+[VisionOCR] 📝 First 5 blocks:
+[VisionOCR]   [1] "你好，今天天气真好" (conf: 0.98)
+[VisionOCR]   [2] "是啊，适合出去走走" (conf: 0.95)
+```
+
+日志内容包括：
+- 语言模式（automatic/manual）
+- 使用的语言列表
+- 识别统计（块数量、置信度分布）
+- 检测到的书写系统
+- 前 5 个识别结果预览
+
+### 7.3 解析日志 ✅（2025-12-28 已实现）
+
+- 每张截图输出：输入 blocks 数、过滤后 blocks 数、候选消息数、左/右消息数
+- 使用 `LoggerService` 输出调试日志（可在 LoggerView 查看）
+- `ChatParseStatistics` 结构体记录所有统计指标
+- `parseWithStatistics()` 方法输出详细日志
+
+### 7.4 Debug overlay（未实现）
+
+- 在 UI 里叠加 bbox（候选消息 unionBBox + 原始 blocks bbox）
+- 展示方向判定结果（左/右簇中心、阈值）
 
 ## 8. 隐私与安全
 
