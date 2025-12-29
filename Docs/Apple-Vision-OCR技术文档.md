@@ -443,28 +443,44 @@ request.automaticallyDetectsLanguage = true
 request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
 ```
 
-**支持的语言**（macOS 14 / iOS 17，18+ 种语言）：
+**支持的语言**（macOS 14 / iOS 17，Accurate 模式，共 30 种）：
 
-| 语言 | 代码 |
-|-----|------|
-| 简体中文 | `zh-Hans` |
-| 繁体中文 | `zh-Hant` |
-| 英语 | `en-US` |
-| 日语 | `ja-JP` |
-| 韩语 | `ko-KR` |
-| 法语 | `fr-FR` |
-| 德语 | `de-DE` |
-| 西班牙语 | `es-ES` |
-| 葡萄牙语 | `pt-BR` |
-| 意大利语 | `it-IT` |
-| 俄语 | `ru-RU` |
-| 乌克兰语 | `uk-UA` |
-| 波兰语 | `pl-PL` |
-| 荷兰语 | `nl-NL` |
-| 土耳其语 | `tr-TR` |
-| 泰语 | `th-TH` |
-| 越南语 | `vi-VN` |
-| 印尼语 | `id-ID` |
+> 以下列表来自 `VNRecognizeTextRequest.supportedRecognitionLanguages()` 运行时查询结果
+
+| 语言分类 | 语言 | 代码 |
+|---------|-----|------|
+| **东亚语言** | 简体中文 | `zh-Hans` |
+|  | 繁体中文 | `zh-Hant` |
+|  | 粤语（简体） | `yue-Hans` |
+|  | 粤语（繁体） | `yue-Hant` |
+|  | 日语 | `ja-JP` |
+|  | 韩语 | `ko-KR` |
+| **西欧语言** | 英语 | `en-US` |
+|  | 法语 | `fr-FR` |
+|  | 德语 | `de-DE` |
+|  | 西班牙语 | `es-ES` |
+|  | 意大利语 | `it-IT` |
+|  | 葡萄牙语（巴西） | `pt-BR` |
+|  | 荷兰语 | `nl-NL` |
+| **东欧语言** | 俄语 | `ru-RU` |
+|  | 乌克兰语 | `uk-UA` |
+|  | 波兰语 | `pl-PL` |
+|  | 捷克语 | `cs-CZ` |
+|  | 罗马尼亚语 | `ro-RO` |
+| **北欧语言** | 瑞典语 | `sv-SE` |
+|  | 丹麦语 | `da-DK` |
+|  | 挪威语 | `no-NO` |
+|  | 书面挪威语 | `nb-NO` |
+|  | 新挪威语 | `nn-NO` |
+| **东南亚语言** | 泰语 | `th-TH` |
+|  | 越南语 | `vi-VT` |
+|  | 印尼语 | `id-ID` |
+|  | 马来语 | `ms-MY` |
+| **中东语言** | 阿拉伯语 | `ar-SA` |
+|  | 阿拉伯语（纳吉迪） | `ars-SA` |
+|  | 土耳其语 | `tr-TR` |
+
+**Fast 模式只支持 6 种语言**：`en-US`, `fr-FR`, `it-IT`, `de-DE`, `es-ES`, `pt-BR`
 
 **查询支持的语言**：
 
@@ -478,8 +494,39 @@ print(supportedLanguages ?? [])
 ```
 
 **注意事项**：
-- 中文（简体/繁体）通常只能与英语混合使用
+- ⚠️ **中文与日语不能混合使用**：如果需要同时识别中日文内容，需要分两次请求
+- 中文（简体/繁体）可以与英语混合使用
 - 启用 `automaticallyDetectsLanguage` 后，系统会智能选择最佳语言模型
+
+### 6.5 SyncNos 语言配置功能
+
+SyncNos 在 Settings → OCR Settings 中提供语言配置功能：
+
+#### 自动检测模式（默认）
+
+Vision 框架自动检测图像中的语言，使用默认优先语言（中文简体、繁体、英文）作为提示。
+
+```swift
+request.automaticallyDetectsLanguage = true
+request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
+```
+
+#### 手动选择模式
+
+用户可以手动选择目标语言，适用于特定语言场景（如日语、韩语等）。
+
+```swift
+request.automaticallyDetectsLanguage = false
+request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选择的语言
+```
+
+#### 相关代码文件
+
+| 文件 | 描述 |
+|-----|------|
+| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`，30 种语言） |
+| `VisionOCRService.swift` | 根据 `OCRConfigStore` 动态设置语言参数 |
+| `OCRSettingsView.swift` | 简洁的语言选择 UI（下拉菜单 + 语言选择 Sheet） |
 
 ### 6.5 自定义词汇 (customWords)
 
@@ -620,9 +667,10 @@ Vision 框架返回的数据映射到 `OCRBlock` 结构：
 
 | 文件 | 描述 |
 |-----|------|
-| `VisionOCRService.swift` | Vision OCR 实现 |
-| `OCRConfigStore.swift` | 配置存储（Vision 始终可用） |
-| `OCRModels.swift` | 数据模型和协议定义 |
+| `VisionOCRService.swift` | Vision OCR 服务实现 |
+| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`、30 种语言） |
+| `OCRModels.swift` | 数据模型（`OCRResult`、`OCRBlock`）和协议定义 |
+| `OCRSettingsView.swift` | 设置界面（语言模式选择、语言列表） |
 | `DIContainer.swift` | 服务注册 |
 
 ### 9.2 OCRAPIServiceProtocol 协议
