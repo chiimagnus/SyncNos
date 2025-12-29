@@ -83,8 +83,8 @@ struct ChatListView: View {
                 isListFocused = true
             }
         }
-        // 监听数据源切换通知，切换到此视图时获取焦点
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DataSourceSwitchedToChats")).receive(on: DispatchQueue.main)) { _ in
+        // 监听 List 焦点请求通知，切换到此视图时获取焦点
+        .onReceive(NotificationCenter.default.publisher(for: ContentSource.chats.listFocusRequestedNotification).receive(on: DispatchQueue.main)) { _ in
             DispatchQueue.main.async {
                 isListFocused = true
             }

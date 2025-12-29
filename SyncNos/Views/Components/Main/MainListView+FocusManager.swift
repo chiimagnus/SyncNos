@@ -30,20 +30,9 @@ extension MainListView {
         }
     }
     
-    /// 获取数据源对应的焦点通知名称
+    /// 获取数据源对应的焦点请求通知名称（使用 `ContentSource.listFocusRequestedNotification`）
     func focusNotificationName(for source: ContentSource) -> Notification.Name {
-        switch source {
-        case .appleBooks:
-            return Notification.Name("DataSourceSwitchedToAppleBooks")
-        case .goodLinks:
-            return Notification.Name("DataSourceSwitchedToGoodLinks")
-        case .weRead:
-            return Notification.Name("DataSourceSwitchedToWeRead")
-        case .dedao:
-            return Notification.Name("DataSourceSwitchedToDedao")
-        case .chats:
-            return Notification.Name("DataSourceSwitchedToChats")
-        }
+        source.listFocusRequestedNotification
     }
 }
 
