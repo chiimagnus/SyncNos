@@ -504,18 +504,20 @@ SyncNos 在 Settings → OCR Settings 中提供语言配置功能：
 
 #### 自动检测模式（默认）
 
-Vision 框架自动检测图像中的语言，使用默认优先语言（中文简体、繁体、英文）作为提示。
+当用户未选择任何语言时，Vision 框架自动检测图像中的语言，使用默认优先语言（中文简体、繁体、英文）作为提示。
 
 ```swift
+// selectedLanguageCodes 为空时启用自动检测
 request.automaticallyDetectsLanguage = true
 request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
 ```
 
-#### 手动选择模式
+#### 手动选择语言
 
-用户可以手动选择目标语言，适用于特定语言场景（如日语、韩语等）。
+用户可以在 Settings → Chats → OCR Languages 中选择目标语言，适用于特定语言场景（如日语、韩语等）。
 
 ```swift
+// selectedLanguageCodes 非空时使用用户选择的语言
 request.automaticallyDetectsLanguage = false
 request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选择的语言
 ```
@@ -524,9 +526,9 @@ request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选�
 
 | 文件 | 描述 |
 |-----|------|
-| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`，30 种语言） |
+| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguage`，30 种语言） |
 | `VisionOCRService.swift` | 根据 `OCRConfigStore` 动态设置语言参数，输出详细日志 |
-| `OCRSettingsView.swift` | 简洁的语言选择 UI（下拉菜单 + 语言选择 Sheet + Debug 测试） |
+| `OCRSettingsView.swift` | 简洁的语言选择 UI（语言选择 Sheet + Debug 测试） |
 
 #### OCR 识别日志
 
@@ -534,7 +536,7 @@ request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选�
 
 ```
 [VisionOCR] Starting recognition, image size: 1080x1920
-[VisionOCR] Language mode: automatic, languages: zh-Hans, zh-Hant, en-US
+[VisionOCR] Language config: Auto (using defaults: zh-Hans, zh-Hant, en-US)
 [VisionOCR] ✅ Recognition completed: 25 blocks (from 25 observations)
 [VisionOCR] 📊 Confidence: avg=0.95, min=0.82, max=0.99
 [VisionOCR] 🌐 Detected scripts: CJK (Chinese/Japanese Kanji), Latin (English/European)
@@ -545,7 +547,7 @@ request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选�
 ```
 
 日志内容包括：
-- **语言模式**：自动检测（automatic）或手动选择（manual）
+- **语言配置**：自动检测（Auto）或用户选择的语言列表
 - **使用的语言列表**：实际传递给 Vision 的语言代码
 - **识别统计**：块数量、置信度分布（平均/最小/最大）
 - **检测到的书写系统**：CJK、Hiragana、Katakana、Hangul、Arabic、Cyrillic、Thai、Latin
@@ -702,9 +704,9 @@ Vision 框架返回的数据映射到 `OCRBlock` 结构：
 | 文件 | 描述 |
 |-----|------|
 | `VisionOCRService.swift` | Vision OCR 服务实现（含详细识别日志） |
-| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`、30 种语言） |
+| `OCRConfigStore.swift` | 语言配置存储（`OCRLanguage`、30 种语言、`selectedLanguageCodes`） |
 | `OCRModels.swift` | 数据模型（`OCRResult`、`OCRBlock`）和协议定义 |
-| `OCRSettingsView.swift` | 设置界面（语言模式选择、语言列表、Debug 测试） |
+| `OCRSettingsView.swift` | 设置界面（语言选择、Debug 测试），位于 Settings → Chats |
 | `DIContainer.swift` | 服务注册 |
 
 ### 9.2 OCRAPIServiceProtocol 协议
@@ -752,7 +754,7 @@ protocol OCRAPIServiceProtocol {
 
 ```
 [VisionOCR] Starting recognition, image size: 1080x1920
-[VisionOCR] Language mode: automatic, languages: zh-Hans, zh-Hant, en-US
+[VisionOCR] Language config: Auto (using defaults: zh-Hans, zh-Hant, en-US)
 [VisionOCR] ✅ Recognition completed: 25 blocks
 [VisionOCR] 📊 Confidence: avg=0.95, min=0.82, max=0.99
 [VisionOCR] 🌐 Detected scripts: CJK, Latin
