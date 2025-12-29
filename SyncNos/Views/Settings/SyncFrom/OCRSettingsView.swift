@@ -113,46 +113,7 @@ private struct LanguageSelectionSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                // Search
-                TextField("Search languages...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-
-                Spacer()
-                
-                Button("Done") {
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-            
-            // Selected count
-            if !configStore.selectedLanguageCodes.isEmpty {
-                HStack {
-                    Text("\(configStore.selectedLanguageCodes.count) language(s) selected")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    Spacer()
-                    
-                    Button("Clear All") {
-                        configStore.selectedLanguageCodes = []
-                    }
-                    .font(.caption)
-                    .buttonStyle(.borderless)
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 4)
-            }
-            
-            Divider()
-            
-            // Language List
+        NavigationStack {
             List {
                 ForEach(filteredGroups, id: \.0) { group in
                     Section(group.0) {
@@ -168,8 +129,33 @@ private struct LanguageSelectionSheet: View {
                 }
             }
             .listStyle(.inset)
+            .searchable(text: $searchText, prompt: "Search languages")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if !configStore.selectedLanguageCodes.isEmpty {
+                        Button("Clear All") {
+                            configStore.selectedLanguageCodes = []
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    if !configStore.selectedLanguageCodes.isEmpty {
+                        Text("\(configStore.selectedLanguageCodes.count) selected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
-        .frame(width: 420, height: 500)
+        .frame(width: 360, height: 480)
     }
 }
 
@@ -181,36 +167,14 @@ private struct LanguageToggleRow: View {
     let onToggle: () -> Void
     
     var body: some View {
-        Button {
-            onToggle()
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(language.name)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(language.localizedName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Text(language.code)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? .blue : .secondary)
-                    .font(.title3)
-            }
-            .contentShape(Rectangle())
+        Toggle(isOn: Binding(
+            get: { isSelected },
+            set: { _ in onToggle() }
+        )) {
+            Text(language.localizedName.isEmpty ? language.name : language.localizedName)
+                .font(.body)
         }
-        .buttonStyle(.plain)
+        .toggleStyle(.checkbox)
     }
 }
 
@@ -512,9 +476,4 @@ private struct StatRow: View {
         }
         .font(.caption)
     }
-}
-
-#Preview {
-    OCRSettingsView()
-        .frame(width: 500, height: 500)
 }
