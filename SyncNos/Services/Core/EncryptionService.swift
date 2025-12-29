@@ -202,9 +202,7 @@ final class EncryptionService: EncryptionServiceProtocol {
         }
         
         // 密钥不存在于 Keychain，检查内存中是否有新生成的标记
-        // 注意：由于我们已经持有 keyGenerationLock，并且这是在启动时调用的健康检查，
-        // 直接通过 queue.sync 访问是安全的（queue 不会尝试获取 keyGenerationLock）
-        let wasNewlyGenerated = queue.sync(execute: { keyWasNewlyGenerated })
+        let wasNewlyGenerated = queue.sync { keyWasNewlyGenerated }
         if wasNewlyGenerated {
             Self.logger.warning("[Encryption] Key health check: Key was newly generated (previous data may be unrecoverable)")
             return .newlyGenerated
@@ -226,8 +224,8 @@ final class EncryptionService: EncryptionServiceProtocol {
             return .unavailable(reason: "Failed to save new key")
         }
         
-        // 同步更新缓存和标记（使用 sync 确保立即生效）
-        queue.sync(flags: .barrier) { [weak self] in
+        // 通过 queue 更新缓存和标记（barrier 确保写入可见性）
+        queue.async(flags: .barrier) { [weak self] in
             self?.cachedKey = newKey
             self?.keyWasNewlyGenerated = true
         }
@@ -242,8 +240,8 @@ final class EncryptionService: EncryptionServiceProtocol {
         keyGenerationLock.lock()
         defer { keyGenerationLock.unlock() }
         
-        // 同步清除缓存，确保后续操作看到空状态
-        queue.sync(flags: .barrier) { [weak self] in
+        // 通过 queue 清除缓存（barrier 确保写入可见性）
+        queue.async(flags: .barrier) { [weak self] in
             self?.cachedKey = nil
             self?.keyWasNewlyGenerated = false
         }
@@ -263,6 +261,11 @@ final class EncryptionService: EncryptionServiceProtocol {
     // MARK: - Key Management
     
     /// 加载或创建加密密钥（线程安全）
+    ///
+    /// 同步策略：
+    /// - 快速路径：使用 `queue.sync` 读取缓存，无锁
+    /// - 慢路径：使用 `keyGenerationLock` 序列化 Keychain 访问和密钥生成
+    /// - 缓存写入：使用 `queue.async(flags: .barrier)` 确保线程安全
     private func loadOrCreateKey() throws -> SymmetricKey {
         // 快速路径：检查缓存
         if let key = queue.sync(execute: { cachedKey }) {
@@ -273,7 +276,7 @@ final class EncryptionService: EncryptionServiceProtocol {
         keyGenerationLock.lock()
         defer { keyGenerationLock.unlock() }
         
-        // 双重检查：获取锁后再次检查缓存
+        // 双重检查：获取锁后再次检查缓存（通过 queue 确保可见性）
         if let key = queue.sync(execute: { cachedKey }) {
             return key
         }
@@ -287,6 +290,7 @@ final class EncryptionService: EncryptionServiceProtocol {
             }
             
             let key = SymmetricKey(data: keyData)
+            // 异步更新缓存（barrier 确保写入可见性）
             queue.async(flags: .barrier) { [weak self] in
                 self?.cachedKey = key
                 self?.keyWasNewlyGenerated = false
@@ -306,6 +310,7 @@ final class EncryptionService: EncryptionServiceProtocol {
             throw EncryptionError.keySaveFailed
         }
         
+        // 异步更新缓存（barrier 确保写入可见性）
         queue.async(flags: .barrier) { [weak self] in
             self?.cachedKey = newKey
             self?.keyWasNewlyGenerated = true
