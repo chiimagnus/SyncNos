@@ -95,36 +95,30 @@ private struct LanguageSelectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     
-    private var filteredGroups: [(String, [OCRLanguage])] {
-        let allGroups = OCRLanguage.groupedLanguages()
+    /// 扁平化的语言列表（无分组）
+    private var filteredLanguages: [OCRLanguage] {
+        let allLanguages = OCRLanguage.allSupported
         
         if searchText.isEmpty {
-            return allGroups
+            return allLanguages
         }
         
-        return allGroups.compactMap { (groupName, languages) in
-            let filtered = languages.filter { language in
-                language.name.localizedCaseInsensitiveContains(searchText) ||
-                language.localizedName.localizedCaseInsensitiveContains(searchText) ||
-                language.code.localizedCaseInsensitiveContains(searchText)
-            }
-            return filtered.isEmpty ? nil : (groupName, filtered)
+        return allLanguages.filter { language in
+            language.name.localizedCaseInsensitiveContains(searchText) ||
+            language.localizedName.localizedCaseInsensitiveContains(searchText) ||
+            language.code.localizedCaseInsensitiveContains(searchText)
         }
     }
     
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredGroups, id: \.0) { group in
-                    Section(group.0) {
-                        ForEach(group.1) { language in
-                            LanguageToggleRow(
-                                language: language,
-                                isSelected: configStore.selectedLanguageCodes.contains(language.code)
-                            ) {
-                                configStore.toggleLanguage(language.code)
-                            }
-                        }
+                ForEach(filteredLanguages) { language in
+                    LanguageToggleRow(
+                        language: language,
+                        isSelected: configStore.selectedLanguageCodes.contains(language.code)
+                    ) {
+                        configStore.toggleLanguage(language.code)
                     }
                 }
             }
