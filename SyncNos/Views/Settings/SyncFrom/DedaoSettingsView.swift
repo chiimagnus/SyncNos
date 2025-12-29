@@ -11,6 +11,25 @@ struct DedaoSettingsView: View {
 
     var body: some View {
         List {
+            // MARK: - Data Source
+            Section {
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable Dedao source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show Dedao in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
+            } header: {
+                Text("Data Source")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            
+            // MARK: - Account
             Section {
                 HStack {
                     Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
@@ -40,11 +59,12 @@ struct DedaoSettingsView: View {
                     .disabled(!viewModel.isLoggedIn)
                 }
             } header: {
-                Text("Dedao Account")
+                Text("Account")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
-
+            
+            // MARK: - Sync Settings
             Section {
                 LabeledContent {
                     TextField("Notion Database ID for Dedao", text: $viewModel.dedaoDbId)
@@ -55,17 +75,6 @@ struct DedaoSettingsView: View {
                 } label: {
                     Text("Database ID (optional)")
                         .scaledFont(.body)
-                }
-
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable Dedao source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show Dedao in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
@@ -79,7 +88,7 @@ struct DedaoSettingsView: View {
                     viewModel.save()
                 }
             } header: {
-                Text("Notion Sync Setting")
+                Text("Sync Settings")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }

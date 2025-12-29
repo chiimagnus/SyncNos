@@ -6,6 +6,25 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
+            // MARK: - Data Source
+            Section {
+                Toggle(isOn: $viewModel.isSourceEnabled) {
+                    Text("Enable GoodLinks source")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show GoodLinks in the main list and commands")
+                .onChange(of: viewModel.isSourceEnabled) { _, _ in
+                    viewModel.save()
+                }
+            } header: {
+                Text("Data Source")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            
+            // MARK: - Sync Settings
             Section {
                 LabeledContent {
                     TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
@@ -16,17 +35,6 @@ struct GoodLinksSettingsView: View {
                 } label: {
                     Text("Database ID (optional)")
                         .scaledFont(.body)
-                }
-
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable GoodLinks source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show GoodLinks in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
@@ -40,7 +48,7 @@ struct GoodLinksSettingsView: View {
                     viewModel.save()
                 }
 
-                // GoodLinks 数据目录授权按钮（从 SettingsView 移动过来）
+                // GoodLinks 数据目录授权按钮
                 Button(action: {
                     guard !isPickingGoodLinks else { return }
                     isPickingGoodLinks = true
@@ -61,7 +69,7 @@ struct GoodLinksSettingsView: View {
                 .buttonStyle(PlainButtonStyle())
                 .help("Choose data folder and load notes")
             } header: {
-                Text("Notion Sync Setting")
+                Text("Sync Settings")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
