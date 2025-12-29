@@ -258,9 +258,6 @@ class DIContainer {
     
     // MARK: - OCR Services
     
-    private var _visionOCRService: OCRAPIServiceProtocol?
-    private var _paddleOCRService: OCRAPIServiceProtocol?
-    
     var ocrConfigStore: OCRConfigStoreProtocol {
         if _ocrConfigStore == nil {
             _ocrConfigStore = OCRConfigStore.shared
@@ -268,34 +265,12 @@ class DIContainer {
         return _ocrConfigStore!
     }
     
-    /// 根据当前选择的引擎返回对应的 OCR 服务
-    var ocrAPIService: OCRAPIServiceProtocol {
-        let engine = OCRConfigStore.shared.selectedEngine
-        switch engine {
-        case .vision:
-            return visionOCRService
-        case .paddleOCR:
-            return paddleOCRService
-        }
-    }
-    
     /// Vision OCR 服务（始终可用）
-    var visionOCRService: OCRAPIServiceProtocol {
-        if _visionOCRService == nil {
-            _visionOCRService = VisionOCRService(logger: loggerService)
+    var ocrAPIService: OCRAPIServiceProtocol {
+        if _ocrAPIService == nil {
+            _ocrAPIService = VisionOCRService(logger: loggerService)
         }
-        return _visionOCRService!
-    }
-    
-    /// PaddleOCR 云端服务（需要配置）
-    var paddleOCRService: OCRAPIServiceProtocol {
-        if _paddleOCRService == nil {
-            _paddleOCRService = OCRAPIService(
-                configStore: ocrConfigStore,
-                logger: loggerService
-            )
-        }
-        return _paddleOCRService!
+        return _ocrAPIService!
     }
     
     // MARK: - Chats Services
@@ -418,14 +393,6 @@ class DIContainer {
     
     func register(ocrAPIService: OCRAPIServiceProtocol) {
         self._ocrAPIService = ocrAPIService
-    }
-    
-    func register(visionOCRService: OCRAPIServiceProtocol) {
-        self._visionOCRService = visionOCRService
-    }
-    
-    func register(paddleOCRService: OCRAPIServiceProtocol) {
-        self._paddleOCRService = paddleOCRService
     }
     
     func register(chatsCacheService: ChatCacheServiceProtocol) {

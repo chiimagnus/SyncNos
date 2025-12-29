@@ -60,21 +60,8 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Computed
 
-    /// 当前选择的 OCR 引擎是否已配置
-    var isConfigured: Bool { OCRConfigStore.shared.isConfigured }
-    
-    /// 当前选择的 OCR 引擎类型
-    var currentEngine: OCREngineType { OCRConfigStore.shared.selectedEngine }
-    
-    /// 获取当前选择的 OCR 服务
-    private var currentOCRService: OCRAPIServiceProtocol {
-        switch OCRConfigStore.shared.selectedEngine {
-        case .vision:
-            return DIContainer.shared.visionOCRService
-        case .paddleOCR:
-            return DIContainer.shared.paddleOCRService
-        }
-    }
+    /// Vision OCR 始终可用
+    var isConfigured: Bool { true }
 
     // MARK: - Init
 
@@ -636,10 +623,8 @@ final class ChatViewModel: ObservableObject {
             }
 
             let pixelSize = try imagePixelSize(image)
-            // 使用当前选择的 OCR 引擎进行识别
-            let ocrService = currentOCRService
-            let engineName = currentEngine.displayName
-            logger.debug("[ChatsV2] Using OCR engine: \(engineName)")
+            // 使用 Apple Vision OCR 进行识别
+            let ocrService = DIContainer.shared.ocrAPIService
             
             let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .default)
 
@@ -671,7 +656,7 @@ final class ChatViewModel: ObservableObject {
                 screenshotId: screenshotId.uuidString,
                 importedAt: screenshot.importedAt,
                 imageSize: ocrCoordinateSize,
-                ocrEngine: engineName,
+                ocrEngine: "Apple Vision",
                 ocrRequestJSON: requestJSON,
                 ocrResponseJSON: rawResponse,
                 normalizedBlocksJSON: normalizedBlocksJSON,
