@@ -54,23 +54,34 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Dependencies
 
-    private let ocrService: OCRAPIServiceProtocol
     private let cacheService: ChatCacheServiceProtocol
     private let parser: ChatOCRParser
     private let logger: LoggerServiceProtocol
 
     // MARK: - Computed
 
+    /// 当前选择的 OCR 引擎是否已配置
     var isConfigured: Bool { OCRConfigStore.shared.isConfigured }
+    
+    /// 当前选择的 OCR 引擎类型
+    var currentEngine: OCREngineType { OCRConfigStore.shared.selectedEngine }
+    
+    /// 获取当前选择的 OCR 服务
+    private var currentOCRService: OCRAPIServiceProtocol {
+        switch OCRConfigStore.shared.selectedEngine {
+        case .vision:
+            return DIContainer.shared.visionOCRService
+        case .paddleOCR:
+            return DIContainer.shared.paddleOCRService
+        }
+    }
 
     // MARK: - Init
 
     init(
-        ocrService: OCRAPIServiceProtocol = DIContainer.shared.ocrAPIService,
         cacheService: ChatCacheServiceProtocol = DIContainer.shared.chatsCacheService,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
-        self.ocrService = ocrService
         self.cacheService = cacheService
         self.parser = ChatOCRParser(config: .default)
         self.logger = logger
@@ -625,7 +636,11 @@ final class ChatViewModel: ObservableObject {
             }
 
             let pixelSize = try imagePixelSize(image)
-            // 简化：回到默认 OCR 请求配置（不做场景化调参），先把私聊展示完整做稳
+            // 使用当前选择的 OCR 引擎进行识别
+            let ocrService = currentOCRService
+            let engineName = currentEngine.displayName
+            logger.debug("[ChatsV2] Using OCR engine: \(engineName)")
+            
             let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .default)
 
             let normalizedBlocksJSON = try encodeNormalizedBlocks(ocrResult.blocks)
@@ -656,7 +671,7 @@ final class ChatViewModel: ObservableObject {
                 screenshotId: screenshotId.uuidString,
                 importedAt: screenshot.importedAt,
                 imageSize: ocrCoordinateSize,
-                ocrEngine: "PaddleOCR-VL",
+                ocrEngine: engineName,
                 ocrRequestJSON: requestJSON,
                 ocrResponseJSON: rawResponse,
                 normalizedBlocksJSON: normalizedBlocksJSON,
