@@ -414,6 +414,8 @@ DIContainer.shared.ocrConfigStore       // 配置存储
   - 缓存对话和消息数据
   - 支持离线访问和快速启动
   - 本地存储加密（AES-256-GCM）
+  - 加密密钥存储在 macOS Keychain
+  - 支持分页查询以优化性能
 - `ChatExporter`: 导出对话为 JSON/Markdown 格式
 - `ChatImporter`: 从 JSON/Markdown 导入对话
 
@@ -428,9 +430,24 @@ DIContainer.shared.ocrConfigStore       // 配置存储
   - `selectedLanguageCodes`：用户选择的语言代码列表（空数组 = 自动检测）
   - 配置持久化到 `UserDefaults`
 - `OCRModels`: 数据模型（`OCRResult`、`OCRBlock`）和协议定义
-- `OCRModels`: OCR 请求/响应数据模型
 
-**10. 通用同步调度** (Services/SyncScheduling/)
+**10. 加密服务** (Services/Core/)
+- `EncryptionService`: 本地数据加密服务（AES-256-GCM + Keychain）
+  - 使用 CryptoKit 进行 AES-256-GCM 认证加密
+  - 密钥存储在 macOS Keychain（`com.syncnos.encryption` / `chats.aes.key`）
+  - 仅在设备解锁时可访问（`kSecAttrAccessibleWhenUnlocked`）
+  - 不同步到 iCloud Keychain
+  - **改进**：启动时验证密钥可访问性（`validateKeyAccess()`）
+  - **改进**：区分"密钥不存在"和"密钥存在但无法读取"
+  - **改进**：详细的日志记录，包括密钥加载、生成、解密失败等事件
+  - **新增**：`getKeyFingerprint()` 获取密钥指纹（SHA256 哈希前16位）用于诊断
+  - **新增**：`deleteKey()` 用于调试或重置（危险操作）
+- `KeychainHelper`: macOS Keychain 访问辅助类
+  - **改进**：`read()` 方法记录详细的失败原因（`SecCopyErrorMessageString`）
+  - **新增**：`exists()` 方法检查密钥是否存在（不读取数据）
+  - 更好地区分"密钥不存在"和"密钥读取失败"
+
+**11. 通用同步调度** (Services/SyncScheduling/)
 - `AutoSyncService`: 后台同步调度器（每 5 分钟触发智能增量同步）
 - `AutoSyncSourceProvider`: 自动同步协议
 - `AppleBooksAutoSyncProvider`: Apple Books 智能增量同步（基于 `maxModifiedDate`）
@@ -496,9 +513,11 @@ DIContainer.shared.ocrConfigStore       // 配置存储
 - `ChatBookListItem`: UI 列表展示模型（用于 MainListView 兼容）
 - `CachedChatConversationV2`: SwiftData 缓存的对话（加密存储）
   - `nameEncrypted: Data`（原 `name: String`）
+  - **改进**：`name` 计算属性提供详细的解密失败信息
 - `CachedChatMessageV2`: SwiftData 缓存的消息（加密存储）
   - `contentEncrypted: Data`（原 `content: String`）
   - `senderNameEncrypted: Data?`（原 `senderName: String?`）
+  - **改进**：`content` 和 `senderName` 计算属性提供详细的解密失败信息
 - `CachedChatScreenshotMeta`: SwiftData 缓存的截图元数据
 
 ## 开发模式
