@@ -525,8 +525,42 @@ request.recognitionLanguages = configStore.selectedLanguageCodes  // 用户选�
 | 文件 | 描述 |
 |-----|------|
 | `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`，30 种语言） |
-| `VisionOCRService.swift` | 根据 `OCRConfigStore` 动态设置语言参数 |
-| `OCRSettingsView.swift` | 简洁的语言选择 UI（下拉菜单 + 语言选择 Sheet） |
+| `VisionOCRService.swift` | 根据 `OCRConfigStore` 动态设置语言参数，输出详细日志 |
+| `OCRSettingsView.swift` | 简洁的语言选择 UI（下拉菜单 + 语言选择 Sheet + Debug 测试） |
+
+#### OCR 识别日志
+
+`VisionOCRService` 会输出详细的日志信息，帮助调试和验证识别结果：
+
+```
+[VisionOCR] Starting recognition, image size: 1080x1920
+[VisionOCR] Language mode: automatic, languages: zh-Hans, zh-Hant, en-US
+[VisionOCR] ✅ Recognition completed: 25 blocks (from 25 observations)
+[VisionOCR] 📊 Confidence: avg=0.95, min=0.82, max=0.99
+[VisionOCR] 🌐 Detected scripts: CJK (Chinese/Japanese Kanji), Latin (English/European)
+[VisionOCR] 📝 First 5 blocks:
+[VisionOCR]   [1] "你好，今天天气真好" (conf: 0.98)
+[VisionOCR]   [2] "是啊，适合出去走走" (conf: 0.95)
+...
+```
+
+日志内容包括：
+- **语言模式**：自动检测（automatic）或手动选择（manual）
+- **使用的语言列表**：实际传递给 Vision 的语言代码
+- **识别统计**：块数量、置信度分布（平均/最小/最大）
+- **检测到的书写系统**：CJK、Hiragana、Katakana、Hangul、Arabic、Cyrillic、Thai、Latin
+- **前 5 个识别结果预览**：文本内容和置信度
+
+#### Debug 测试功能
+
+在 Settings → OCR Settings 中提供 Debug 测试功能（"Test OCR Recognition"），支持：
+
+1. **导入图片**：点击按钮选择图片，或拖放图片到窗口
+2. **实时识别**：导入后自动执行 OCR 识别
+3. **结果展示**：
+   - 统计信息：块数量、处理时间、语言模式、检测到的书写系统
+   - 识别文本：完整的识别文本内容
+   - 块详情：每个识别块的文本和 bbox 坐标
 
 ### 6.5 自定义词汇 (customWords)
 
@@ -667,10 +701,10 @@ Vision 框架返回的数据映射到 `OCRBlock` 结构：
 
 | 文件 | 描述 |
 |-----|------|
-| `VisionOCRService.swift` | Vision OCR 服务实现 |
+| `VisionOCRService.swift` | Vision OCR 服务实现（含详细识别日志） |
 | `OCRConfigStore.swift` | 语言配置存储（`OCRLanguageMode`、`OCRLanguage`、30 种语言） |
 | `OCRModels.swift` | 数据模型（`OCRResult`、`OCRBlock`）和协议定义 |
-| `OCRSettingsView.swift` | 设置界面（语言模式选择、语言列表） |
+| `OCRSettingsView.swift` | 设置界面（语言模式选择、语言列表、Debug 测试） |
 | `DIContainer.swift` | 服务注册 |
 
 ### 9.2 OCRAPIServiceProtocol 协议
@@ -704,6 +738,27 @@ protocol OCRAPIServiceProtocol {
 4. **批量处理**：使用 `perform([request1, request2, ...])` 批量处理
 
 ### 10.3 调试技巧
+
+**使用内置 Debug 工具**
+
+1. 打开 Settings → OCR Settings
+2. 点击 "Test OCR Recognition" 按钮
+3. 导入测试图片（支持拖放）
+4. 查看识别结果、统计信息和块详情
+
+**查看日志**
+
+打开 Settings → Logs 窗口，过滤 `[VisionOCR]` 查看识别日志：
+
+```
+[VisionOCR] Starting recognition, image size: 1080x1920
+[VisionOCR] Language mode: automatic, languages: zh-Hans, zh-Hant, en-US
+[VisionOCR] ✅ Recognition completed: 25 blocks
+[VisionOCR] 📊 Confidence: avg=0.95, min=0.82, max=0.99
+[VisionOCR] 🌐 Detected scripts: CJK, Latin
+```
+
+**代码调试**
 
 ```swift
 // 打印支持的语言
