@@ -26,7 +26,6 @@ struct ChatDetailView: View {
     @State private var showSenderNamePicker = false
     @State private var messageForSenderName: ChatMessage?
     @Environment(\.fontScale) private var fontScale
-    @ObservedObject private var ocrConfigStore = OCRConfigStore.shared
 
     private var selectedContact: ChatBookListItem? {
         guard let id = selectedContactId else { return nil }
@@ -113,11 +112,6 @@ struct ChatDetailView: View {
                         Menu {
                             // 导入部分
                             Button {
-                                DIContainer.shared.loggerService.debug("[Chats] Import Screenshot button clicked, isConfigured: \(ocrConfigStore.isConfigured), isLoading: \(listViewModel.isLoading)")
-                                guard ocrConfigStore.isConfigured else {
-                                    listViewModel.errorMessage = "Please configure OCR service first"
-                                    return
-                                }
                                 guard !listViewModel.isLoading else {
                                     return
                                 }
@@ -655,11 +649,6 @@ struct ChatDetailView: View {
         
         // 图片文件 → OCR 识别
         if ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"].contains(fileExtension) {
-            guard ocrConfigStore.isConfigured else {
-                listViewModel.errorMessage = "Please configure OCR service first"
-                return
-            }
-            
             // 拖拽授予了访问权限，直接传递 URL
             await listViewModel.addScreenshots(to: contact.contactId, urls: [url])
             return
@@ -679,11 +668,6 @@ struct ChatDetailView: View {
     }
     
     private func handleDroppedImageData(_ data: Data, for contact: ChatBookListItem) async {
-        guard ocrConfigStore.isConfigured else {
-            listViewModel.errorMessage = "Please configure OCR service first"
-            return
-        }
-        
         // 直接走内存数据导入路径：无需落盘临时文件
         await listViewModel.addScreenshotData(to: contact.contactId, imageDatas: [data])
     }
@@ -701,10 +685,6 @@ struct ChatDetailView: View {
                 .foregroundColor(.secondary)
 
             Button {
-                guard ocrConfigStore.isConfigured else {
-                    listViewModel.errorMessage = "Please configure OCR service first"
-                    return
-                }
                 pendingImportContactId = contact.contactId
                 importerMode = .images
                 importerAllowedContentTypes = [.image]
@@ -715,7 +695,6 @@ struct ChatDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
-            .disabled(!ocrConfigStore.isConfigured)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
