@@ -471,10 +471,10 @@ struct ViewCommands: Commands {
                 }
             }
 
-            Divider()
-            
-            // MARK: - Text Size Commands
-            
+        }
+        
+        // MARK: - Text Size Commands（放在 Window 菜单中）
+        CommandGroup(after: .windowSize) {
             Button("Increase Text Size") {
                 fontScaleManager.increaseSize()
             }
