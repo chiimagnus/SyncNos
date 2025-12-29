@@ -1,34 +1,6 @@
 import Foundation
 import SwiftUI
 
-// MARK: - OCR Language Mode
-
-/// OCR 语言检测模式
-enum OCRLanguageMode: String, CaseIterable, Codable {
-    /// 自动检测语言（推荐）
-    case automatic = "automatic"
-    /// 手动选择语言
-    case manual = "manual"
-    
-    var displayName: String {
-        switch self {
-        case .automatic:
-            return String(localized: "Automatic Detection")
-        case .manual:
-            return String(localized: "Manual Selection")
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .automatic:
-            return String(localized: "Vision will automatically detect languages in the image")
-        case .manual:
-            return String(localized: "Select specific languages for better accuracy")
-        }
-    }
-}
-
 // MARK: - OCR Language
 
 /// 支持的 OCR 语言
@@ -48,7 +20,7 @@ struct OCRLanguage: Identifiable, Hashable, Codable {
         // 东亚语言
         OCRLanguage(code: "zh-Hans", name: "Chinese (Simplified)", localizedName: "中文（简体）"),
         OCRLanguage(code: "zh-Hant", name: "Chinese (Traditional)", localizedName: "中文（繁體）"),
-        OCRLanguage(code: "yue-Hans", name: "Cantonese (Simplified)", localizedName: "粵語（简体）"),
+        OCRLanguage(code: "yue-Hans", name: "Cantonese (Simplified)", localizedName: "粤语（简体）"),
         OCRLanguage(code: "yue-Hant", name: "Cantonese (Traditional)", localizedName: "粵語（繁體）"),
         OCRLanguage(code: "ja-JP", name: "Japanese", localizedName: "日本語"),
         OCRLanguage(code: "ko-KR", name: "Korean", localizedName: "한국어"),
@@ -112,16 +84,13 @@ protocol OCRConfigStoreProtocol: AnyObject {
     /// Vision OCR 始终可用
     var isConfigured: Bool { get }
     
-    /// 当前语言模式
-    var languageMode: OCRLanguageMode { get set }
-    
-    /// 手动选择的语言代码
+    /// 手动选择的语言代码（空数组 = 自动检测）
     var selectedLanguageCodes: [String] { get set }
     
     /// 获取当前生效的语言代码列表
     var effectiveLanguageCodes: [String] { get }
     
-    /// 是否启用自动语言检测
+    /// 是否启用自动语言检测（selectedLanguageCodes 为空时自动检测）
     var isAutoDetectEnabled: Bool { get }
 }
 
@@ -129,13 +98,13 @@ protocol OCRConfigStoreProtocol: AnyObject {
 
 /// OCR 配置存储
 /// 使用 Apple Vision 框架，支持语言配置
+/// 简化设计：selectedLanguageCodes 为空时自动检测，非空时使用指定语言
 final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     static let shared = OCRConfigStore()
     
     // MARK: - Keys
     
     private enum Keys {
-        static let languageMode = "ocr.languageMode"
         static let selectedLanguageCodes = "ocr.selectedLanguageCodes"
     }
     
@@ -146,14 +115,7 @@ final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     
     // MARK: - Published Properties
     
-    /// 语言模式
-    @Published var languageMode: OCRLanguageMode {
-        didSet {
-            UserDefaults.standard.set(languageMode.rawValue, forKey: Keys.languageMode)
-        }
-    }
-    
-    /// 手动选择的语言代码
+    /// 手动选择的语言代码（空数组 = 自动检测）
     @Published var selectedLanguageCodes: [String] {
         didSet {
             UserDefaults.standard.set(selectedLanguageCodes, forKey: Keys.selectedLanguageCodes)
@@ -165,23 +127,15 @@ final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     /// Vision OCR 始终可用
     var isConfigured: Bool { true }
     
-    /// 是否启用自动语言检测
+    /// 是否启用自动语言检测（selectedLanguageCodes 为空时自动检测）
     var isAutoDetectEnabled: Bool {
-        languageMode == .automatic
+        selectedLanguageCodes.isEmpty
     }
     
     /// 获取当前生效的语言代码列表
     var effectiveLanguageCodes: [String] {
-        switch languageMode {
-        case .automatic:
-            // 自动模式下使用默认语言作为优先级提示
-            return Self.defaultLanguageCodes
-        case .manual:
-            // 手动模式下使用用户选择的语言
-            return selectedLanguageCodes.isEmpty 
-                ? Self.defaultLanguageCodes 
-                : selectedLanguageCodes
-        }
+        // 如果用户选择了语言，使用用户选择的；否则使用默认语言作为优先级提示
+        selectedLanguageCodes.isEmpty ? Self.defaultLanguageCodes : selectedLanguageCodes
     }
     
     /// 获取当前选中的语言对象
@@ -193,17 +147,10 @@ final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
     
     private init() {
         // 从 UserDefaults 读取配置
-        if let modeRaw = UserDefaults.standard.string(forKey: Keys.languageMode),
-           let mode = OCRLanguageMode(rawValue: modeRaw) {
-            self.languageMode = mode
-        } else {
-            self.languageMode = .automatic
-        }
-        
         if let codes = UserDefaults.standard.array(forKey: Keys.selectedLanguageCodes) as? [String] {
             self.selectedLanguageCodes = codes
         } else {
-            // 初始化为空，让用户自己选择
+            // 初始化为空 = 自动检测
             self.selectedLanguageCodes = []
         }
     }
@@ -230,9 +177,8 @@ final class OCRConfigStore: OCRConfigStoreProtocol, ObservableObject {
         }
     }
     
-    /// 重置为默认配置
+    /// 重置为默认配置（清空选择 = 自动检测）
     func resetToDefaults() {
-        languageMode = .automatic
         selectedLanguageCodes = []
     }
 }
