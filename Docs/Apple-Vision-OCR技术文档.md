@@ -427,24 +427,44 @@ request.usesLanguageCorrection = true
 - `true`：启用基于自然语言处理的校正，减少误识别
 - `false`：禁用校正，适合非标准文本（代码、特殊符号）
 
-### 6.3 识别语言 (recognitionLanguages)
+### 6.3 自动语言检测 (automaticallyDetectsLanguage)
 
 ```swift
+// macOS 13+ / iOS 16+ 支持自动语言检测
+request.automaticallyDetectsLanguage = true
+```
+
+启用后，Vision 会自动检测图片中的语言，无需手动指定。**SyncNos 默认启用此功能。**
+
+### 6.4 识别语言 (recognitionLanguages)
+
+```swift
+// 作为自动检测的优先级提示和 fallback
 request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
 ```
 
-**支持的语言**（macOS 14 / iOS 17）：
+**支持的语言**（macOS 14 / iOS 17，18+ 种语言）：
 
-| 语言 | 代码 | 备注 |
-|-----|------|------|
-| 简体中文 | `zh-Hans` | 支持 |
-| 繁体中文 | `zh-Hant` | 支持 |
-| 英语 | `en-US` | 支持 |
-| 日语 | `ja-JP` | 支持 |
-| 韩语 | `ko-KR` | 支持 |
-| 法语 | `fr-FR` | 支持 |
-| 德语 | `de-DE` | 支持 |
-| 西班牙语 | `es-ES` | 支持 |
+| 语言 | 代码 |
+|-----|------|
+| 简体中文 | `zh-Hans` |
+| 繁体中文 | `zh-Hant` |
+| 英语 | `en-US` |
+| 日语 | `ja-JP` |
+| 韩语 | `ko-KR` |
+| 法语 | `fr-FR` |
+| 德语 | `de-DE` |
+| 西班牙语 | `es-ES` |
+| 葡萄牙语 | `pt-BR` |
+| 意大利语 | `it-IT` |
+| 俄语 | `ru-RU` |
+| 乌克兰语 | `uk-UA` |
+| 波兰语 | `pl-PL` |
+| 荷兰语 | `nl-NL` |
+| 土耳其语 | `tr-TR` |
+| 泰语 | `th-TH` |
+| 越南语 | `vi-VN` |
+| 印尼语 | `id-ID` |
 
 **查询支持的语言**：
 
@@ -453,13 +473,15 @@ let supportedLanguages = try? VNRecognizeTextRequest.supportedRecognitionLanguag
     for: .accurate,
     revision: VNRecognizeTextRequestRevision3
 )
+print(supportedLanguages ?? [])
+// 输出: ["en-US", "fr-FR", "it-IT", "de-DE", "es-ES", "pt-BR", "zh-Hans", "zh-Hant", "yue-Hans", "yue-Hant", "ko-KR", "ja-JP", ...]
 ```
 
-**重要限制**：
-- 中文（简体/繁体）只能与英语混合使用
-- 不能同时使用中文和日语
+**注意事项**：
+- 中文（简体/繁体）通常只能与英语混合使用
+- 启用 `automaticallyDetectsLanguage` 后，系统会智能选择最佳语言模型
 
-### 6.4 自定义词汇 (customWords)
+### 6.5 自定义词汇 (customWords)
 
 ```swift
 request.customWords = ["微信", "WeChat", "SyncNos"]
@@ -467,7 +489,7 @@ request.customWords = ["微信", "WeChat", "SyncNos"]
 
 添加领域特定词汇，提高识别准确率。仅在 `usesLanguageCorrection = true` 时生效。
 
-### 6.5 最小文字高度 (minimumTextHeight)
+### 6.6 最小文字高度 (minimumTextHeight)
 
 ```swift
 request.minimumTextHeight = 0.02  // 相对于图像高度的比例
@@ -475,7 +497,7 @@ request.minimumTextHeight = 0.02  // 相对于图像高度的比例
 
 过滤过小的文字，减少噪声。
 
-### 6.6 版本控制 (revision)
+### 6.7 版本控制 (revision)
 
 ```swift
 request.revision = VNRecognizeTextRequestRevision3

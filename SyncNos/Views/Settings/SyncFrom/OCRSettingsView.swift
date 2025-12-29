@@ -44,18 +44,25 @@ struct OCRSettingsView: View {
             } header: {
                 Text("OCR Engine")
             } footer: {
-                Text("Apple Vision uses the built-in macOS text recognition. Supports Chinese (Simplified & Traditional) and English.")
+                Text("Apple Vision uses the built-in macOS text recognition with automatic language detection.")
             }
             
             // MARK: - 支持的语言
             Section {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("Automatic language detection is enabled. The following languages are prioritized:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
+                    
                     LanguageRow(name: "Chinese (Simplified)", code: "zh-Hans")
                     LanguageRow(name: "Chinese (Traditional)", code: "zh-Hant")
                     LanguageRow(name: "English", code: "en-US")
                 }
             } header: {
-                Text("Supported Languages")
+                Text("Recognition Languages")
+            } footer: {
+                Text("Vision framework supports 18+ languages including Japanese, Korean, French, German, Spanish, Portuguese, Italian, and more. Languages are automatically detected based on content.")
             }
         }
         .formStyle(.grouped)
