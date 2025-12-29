@@ -263,7 +263,7 @@ func startKeyboardMonitorIfNeeded() {
                     return nil
                 }
             default:
-                // 其他 Cmd 组合键（如 Cmd+←/→ 切换数据源）不拦截
+                // 其他 Cmd 组合键不拦截（数据源切换已改为 ⌥⌘←/→）
                 return event
             }
         }
@@ -519,7 +519,7 @@ extension Notification.Name {
 
 | 按键 | 说明 |
 | --- | --- |
-| Cmd+←/→ | 数据源切换（由 ViewCommands 处理） |
+| ⌥⌘←/→ | 数据源切换（由 ViewCommands 处理） |
 | Control+任意键 | 传递给系统 |
 | 其他 Cmd 组合键 | 传递给系统 |
 
@@ -635,7 +635,7 @@ func stopKeyboardMonitorIfNeeded() {
 
 1. **生命周期管理**：确保在 `onDisappear` 中调用 `stopKeyboardMonitorIfNeeded()` 移除监听器
 2. **窗口过滤**：始终检查 `event.window === window` 避免影响其他窗口（如 Settings）
-3. **修饰键检查**：Cmd+←/→ 已用于切换数据源，不要拦截
+3. **修饰键检查**：⌥⌘←/→ 用于切换数据源（由 ViewCommands 处理），不要拦截
 4. **鼠标焦点入口唯一**：鼠标点击的焦点切换由 `MainListView.swift` 的 master/detail `TapGesture` 统一处理，避免多处分散判断导致竞态/误判
 5. **动态字体缩放**：滚动步长需要考虑 `fontScaleManager.scaleFactor`
 6. **Detail firstResponder 落点**：detailColumn 必须保留 `FirstResponderProxyView` 作为稳定的 firstResponder 目标
