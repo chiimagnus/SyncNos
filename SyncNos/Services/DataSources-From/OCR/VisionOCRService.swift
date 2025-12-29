@@ -52,15 +52,19 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = Constants.defaultLanguages
         request.minimumTextHeight = Constants.minimumTextHeight
         
         // 使用最新版本（macOS 14+）
         if #available(macOS 14.0, *) {
             request.revision = VNRecognizeTextRequestRevision3
+            // macOS 13+ 支持自动语言检测
+            request.automaticallyDetectsLanguage = true
         } else {
             request.revision = VNRecognizeTextRequestRevision2
         }
+        
+        // 设置识别语言（作为自动检测的 fallback 和优先级提示）
+        request.recognitionLanguages = Constants.defaultLanguages
         
         // 执行请求
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
