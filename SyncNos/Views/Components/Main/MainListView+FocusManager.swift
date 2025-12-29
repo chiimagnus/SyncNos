@@ -22,7 +22,7 @@ extension MainListView {
             let clickLocationInWindow = event.locationInWindow
             
             // 延迟检查焦点，因为点击后焦点可能还没有切换
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 // 先按当前 firstResponder 同步状态
                 self.syncNavigationTargetWithFocus()
                 
@@ -30,9 +30,18 @@ extension MainListView {
                 // 则强制让 Detail 的 NSScrollView 成为 firstResponder，
                 // 这样 List 选中高亮会立即变为非激活（灰色）。
                 guard self.keyboardNavigationTarget == .list else { return }
-                guard self.isPointInsideCurrentDetailScrollView(clickLocationInWindow, window: window) else { return }
                 
-                // 保存进入 Detail 前的 firstResponder，用于 ← 返回时恢复
+                // 检查点击是否在 Detail ScrollView 内，并且是否点击的是"被动区域"（非交互元素）
+                guard let (isInside, hitView) = self.checkPointInDetailScrollView(clickLocationInWindow, window: window),
+                      isInside else { return }
+                
+                // 如果点击的是交互控件，不强制切换焦点
+                // 允许 SwiftUI 的手势处理器和控件自然处理焦点
+                if self.isInteractiveElement(hitView) {
+                    return
+                }
+                
+                // 点击的是被动区域（如背景、padding、空白ScrollView等），强制切换焦点
                 self.savedMasterFirstResponder = window.firstResponder
                 self.keyboardNavigationTarget = .detail
                 self.focusDetailScrollViewIfPossible(window: window)
@@ -114,27 +123,65 @@ extension MainListView {
     
     // MARK: - Hit Testing Helpers
     
-    /// 判断一次点击是否发生在当前 Detail 的 NSScrollView 区域内（窗口坐标系）
-    private func isPointInsideCurrentDetailScrollView(_ locationInWindow: NSPoint, window: NSWindow) -> Bool {
-        guard let scrollView = currentDetailScrollView else { return false }
+    /// 检查点击是否在当前 Detail 的 NSScrollView 区域内，并返回命中的视图
+    /// - Returns: (isInside: Bool, hitView: NSView?)
+    private func checkPointInDetailScrollView(_ locationInWindow: NSPoint, window: NSWindow) -> (Bool, NSView?) {
+        guard let scrollView = currentDetailScrollView else { return (false, nil) }
         // 只在 scrollView 仍挂载在当前窗口时才判断，避免使用过期引用
-        guard scrollView.window === window else { return false }
-        guard let contentView = window.contentView else { return false }
+        guard scrollView.window === window else { return (false, nil) }
+        guard let contentView = window.contentView else { return (false, nil) }
         
-        // 命中测试：确保点击确实落在 Detail 的 ScrollView 视图树内，
-        // 避免仅靠 rect 判断在极端情况下误判（导致“点 List 也自动切到 Detail”）
+        // 命中测试：确保点击确实落在 Detail 的 ScrollView 视图树内
         let pointInContentView = contentView.convert(locationInWindow, from: nil)
-        guard let hitView = contentView.hitTest(pointInContentView) else { return false }
+        guard let hitView = contentView.hitTest(pointInContentView) else { return (false, nil) }
         
         var view: NSView? = hitView
         while let v = view {
             if v === scrollView || v === scrollView.contentView || v === scrollView.documentView {
-                return true
+                return (true, hitView)
             }
             view = v.superview
+        }
+        
+        return (false, nil)
+    }
+    
+    /// 判断视图是否为交互元素（按钮、文本框、可点击控件等）
+    /// 如果是交互元素，不应强制切换焦点，让元素自然处理
+    private func isInteractiveElement(_ view: NSView?) -> Bool {
+        guard let view = view else { return false }
+        
+        // 检查常见的 AppKit 交互控件
+        if view is NSButton || view is NSTextField || view is NSTextView {
+            return true
+        }
+        
+        // 检查视图类名，识别 SwiftUI 的手势响应视图
+        let className = String(describing: type(of: view))
+        
+        // SwiftUI 在交互元素上会添加特殊的内部视图类
+        // 例如：SwiftUI 的 Button、onTapGesture 会创建特定的 hosting view
+        if className.contains("Button") || 
+           className.contains("Control") || 
+           className.contains("Gesture") ||
+           className.contains("Interaction") {
+            return true
+        }
+        
+        // 检查父视图链，看是否在已知的交互容器中
+        var parent = view.superview
+        var depth = 0
+        while let p = parent, depth < 5 {  // 限制深度避免过度遍历
+            let parentClassName = String(describing: type(of: p))
+            if parentClassName.contains("Button") || 
+               parentClassName.contains("Control") ||
+               parentClassName.contains("TextField") {
+                return true
+            }
+            parent = p.superview
+            depth += 1
         }
         
         return false
     }
 }
-
