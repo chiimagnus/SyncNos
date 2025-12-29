@@ -70,7 +70,7 @@ struct OCRSettingsView: View {
                 }
                 .buttonStyle(.plain)
             } header: {
-                Text("OCR")
+                Text("Apple OCR")
                     .font(.headline)
                     .foregroundStyle(.primary)
             }
