@@ -89,7 +89,7 @@ extension MainListView {
                     // 保存进入 Detail 前的真实焦点（通常是当前 List），用于返回时恢复
                     self.savedMasterFirstResponder = window.firstResponder
                     self.keyboardNavigationTarget = .detail
-                    self.focusDetailScrollViewIfPossible(window: window)
+                    self.focusDetailIfPossible(window: window)
                     return nil
                 }
                 return event

@@ -42,7 +42,7 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │  │ - savedMasterFirstResponder: NSResponder?                   ││
 │  │ - mainWindow: NSWindow?                                     ││
 │  │ - keyDownMonitor: Any?                                      ││
-│  │ - mouseDownMonitor: Any?                                    ││
+│  │ - detailFirstResponderProxyView: NSView?                    ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                              │                                   │
 │                              ▼                                   │
@@ -66,11 +66,12 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │ 焦点管理 (MainListView+FocusManager.swift)                  ││
 │  │                                                             ││
-│  │ mouseDownMonitor:                                           ││
-│  │   └─ syncNavigationTargetWithFocus()                        ││
+│  │ 入口：MainListView.swift 的 master/detail TapGesture          ││
+│  │   ├─ master: keyboardNavigationTarget = .list               ││
+│  │   └─ detail: keyboardNavigationTarget = .detail + focusDetail││
 │  │                                                             ││
 │  │ 焦点切换方法:                                                ││
-│  │   ├─ focusDetailScrollViewIfPossible(window:)               ││
+│  │   ├─ focusDetailIfPossible(window:)                         ││
 │  │   ├─ focusBackToMaster(window:)                             ││
 │  │   └─ focusNotificationName(for:)                            ││
 │  └─────────────────────────────────────────────────────────────┘│
@@ -106,9 +107,10 @@ SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail �
 |---------|------|
 | `Views/Components/Main/MainListView.swift` | 主视图，定义状态变量和生命周期管理 |
 | `Views/Components/Main/MainListView+KeyboardMonitor.swift` | **键盘事件监听 + 滚动控制** |
-| `Views/Components/Main/MainListView+FocusManager.swift` | **焦点状态同步 + 鼠标点击监听** |
+| `Views/Components/Main/MainListView+FocusManager.swift` | **焦点切换方法（List/Detail）** |
 | `Views/Components/Keyboard/WindowReader.swift` | 获取 NSWindow 的 NSViewRepresentable |
 | `Views/Components/Keyboard/EnclosingScrollViewReader.swift` | 获取 NSScrollView 的 NSViewRepresentable |
+| `Views/Components/Keyboard/FirstResponderProxyView.swift` | Detail 侧稳定 firstResponder “落点”（透明 NSView） |
 | `Views/Chats/ChatNotifications.swift` | Chats 相关通知名称定义 |
 | `Views/AppleBooks/AppleBooksListView.swift` | Apple Books 列表视图（含 @FocusState） |
 | `Views/GoodLinks/GoodLinksListView.swift` | GoodLinks 列表视图（含 @FocusState） |
@@ -149,8 +151,8 @@ enum KeyboardNavigationTarget {
 @State var mainWindow: NSWindow?
 /// 键盘事件监听器
 @State var keyDownMonitor: Any?
-/// 鼠标点击事件监听器（用于同步焦点状态）
-@State var mouseDownMonitor: Any?
+/// Detail 侧稳定的 firstResponder 落点（透明 NSView）
+@State var detailFirstResponderProxyView: NSView?
 ```
 
 ### 3. WindowReader
@@ -308,7 +310,7 @@ func startKeyboardMonitorIfNeeded() {
             if self.keyboardNavigationTarget == .list, self.hasSingleSelectionForCurrentSource() {
                 self.savedMasterFirstResponder = window.firstResponder
                 self.keyboardNavigationTarget = .detail
-                self.focusDetailScrollViewIfPossible(window: window)
+                self.focusDetailIfPossible(window: window)
                 return nil
             }
         case 126: // ↑
@@ -345,101 +347,48 @@ func startKeyboardMonitorIfNeeded() {
         return event
     }
     
-    // 监听鼠标点击，同步焦点状态
-    startMouseDownMonitorIfNeeded()
 }
 ```
 
 ### 6. 焦点管理模块 (MainListView+FocusManager.swift)
 
-从 v0.9.11 开始，焦点管理相关代码已分离到独立文件 `MainListView+FocusManager.swift`。
+从 v0.9.12（P4）开始，鼠标焦点切换不再依赖 `mouseDownMonitor`，改为在 SwiftUI 层（`MainListView.swift`）显式处理：
 
-#### 鼠标点击焦点同步
+- **masterColumn 点击**：`keyboardNavigationTarget = .list`
+- **detailColumn 点击**：在单选时 `keyboardNavigationTarget = .detail`，并调用 `focusDetailIfPossible(window:)` 抢走 firstResponder
+
+同时，为了彻底规避「ScrollView/覆盖层点击不产生 firstResponder」的问题，引入 `FirstResponderProxyView` 作为 Detail 侧稳定 firstResponder 落点。
 
 ```swift
-// MainListView+FocusManager.swift
-
-func startMouseDownMonitorIfNeeded() {
-    guard mouseDownMonitor == nil else { return }
-    
-    mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
-        // 只处理 MainListView 所在窗口的事件
-        guard let window = self.mainWindow, event.window === window else {
-            return event
-        }
-        
-        // 延迟检查焦点，因为点击后焦点可能还没有切换
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.syncNavigationTargetWithFocus()
-        }
-        
-        return event
-    }
-}
-
-/// 根据当前 firstResponder 同步 keyboardNavigationTarget 状态
-func syncNavigationTargetWithFocus() {
-    guard let window = mainWindow else { return }
-    guard let firstResponder = window.firstResponder else { return }
-    
-    // 检查 firstResponder 是否在 Detail 的 ScrollView 中
-    if let detailScrollView = currentDetailScrollView {
-        var responder: NSResponder? = firstResponder
-        while let r = responder {
-            if r === detailScrollView || r === detailScrollView.contentView {
-                keyboardNavigationTarget = .detail
-                return
-            }
-            responder = r.nextResponder
-        }
-    }
-    
-    // 否则认为焦点在 List
-    keyboardNavigationTarget = .list
+// MainListView.swift（简化示意）
+NavigationSplitView {
+    masterColumn
+        .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded {
+            keyboardNavigationTarget = .list
+        })
+} detail: {
+    detailColumn
+        .background(FirstResponderProxyView(view: $detailFirstResponderProxyView))
+        .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded {
+            guard hasSingleSelectionForCurrentSource(), let window = mainWindow else { return }
+            if window.firstResponder is NSTextView { return }   // 避免抢走文本编辑
+            if keyboardNavigationTarget == .list { savedMasterFirstResponder = window.firstResponder }
+            keyboardNavigationTarget = .detail
+            focusDetailIfPossible(window: window)
+        })
 }
 ```
 
-**注意**：当前的 `syncNavigationTargetWithFocus()` 只更新 `keyboardNavigationTarget` 状态，不主动调用 `makeFirstResponder`。这意味着鼠标点击 DetailView 时，List 的高亮颜色不会自动变化（已知问题，见"已知问题"章节）。
-
-#### 焦点切换方法
+焦点切换方法仍集中在 `MainListView+FocusManager.swift`：
 
 ```swift
-// MainListView+FocusManager.swift
-
-func focusDetailScrollViewIfPossible(window: NSWindow) {
-    guard let scrollView = currentDetailScrollView else { return }
+// MainListView+FocusManager.swift（简化示意）
+func focusDetailIfPossible(window: NSWindow) {
     DispatchQueue.main.async {
-        // 让 Detail 真正成为 first responder，List 的选中高亮会变为非激活（灰色）
-        _ = window.makeFirstResponder(scrollView.contentView)
-    }
-}
-
-func focusBackToMaster(window: NSWindow) {
-    let responder = savedMasterFirstResponder
-    DispatchQueue.main.async {
-        if let responder, window.makeFirstResponder(responder) {
-            return
-        }
-        // 兜底：触发当前数据源 List 再次请求焦点
-        NotificationCenter.default.post(
-            name: self.focusNotificationName(for: self.contentSource),
-            object: nil
-        )
-    }
-}
-
-func focusNotificationName(for source: ContentSource) -> Notification.Name {
-    switch source {
-    case .appleBooks:
-        return Notification.Name("DataSourceSwitchedToAppleBooks")
-    case .goodLinks:
-        return Notification.Name("DataSourceSwitchedToGoodLinks")
-    case .weRead:
-        return Notification.Name("DataSourceSwitchedToWeRead")
-    case .dedao:
-        return Notification.Name("DataSourceSwitchedToDedao")
-    case .chats:
-        return Notification.Name("DataSourceSwitchedToChats")
+        guard let proxy = detailFirstResponderProxyView else { return }
+        _ = window.makeFirstResponder(proxy)
     }
 }
 ```
@@ -449,7 +398,7 @@ func focusNotificationName(for source: ContentSource) -> Notification.Name {
 | 文件 | 包含的方法 | 职责 |
 |------|-----------|------|
 | `MainListView+KeyboardMonitor.swift` | `startKeyboardMonitorIfNeeded()`, `stopKeyboardMonitorIfNeeded()`, `hasSingleSelectionForCurrentSource()`, `scrollCurrentDetail(byLines:)`, `scrollCurrentDetailToTop/Bottom()`, `scrollCurrentDetailByPage(up:)` | 键盘事件监听 + 滚动控制 |
-| `MainListView+FocusManager.swift` | `startMouseDownMonitorIfNeeded()`, `stopMouseDownMonitorIfNeeded()`, `syncNavigationTargetWithFocus()`, `focusDetailScrollViewIfPossible(window:)`, `focusBackToMaster(window:)`, `focusNotificationName(for:)` | 焦点状态同步 + 鼠标点击监听 |
+| `MainListView+FocusManager.swift` | `focusDetailIfPossible(window:)`, `focusBackToMaster(window:)`, `focusNotificationName(for:)` | 焦点切换方法（List/Detail） |
 
 ### 8. 滚动控制
 
@@ -616,12 +565,9 @@ struct AppleBooksDetailView: View {
     syncSwipeViewModelWithContentSource()
     // 启动键盘监听（键盘导航模块）
     startKeyboardMonitorIfNeeded()
-    // 启动鼠标监听（焦点管理模块）
-    startMouseDownMonitorIfNeeded()
 }
 .onDisappear {
     stopKeyboardMonitorIfNeeded()
-    stopMouseDownMonitorIfNeeded()
 }
 ```
 
@@ -636,16 +582,7 @@ func stopKeyboardMonitorIfNeeded() {
 }
 ```
 
-```swift
-// MainListView+FocusManager.swift
-
-func stopMouseDownMonitorIfNeeded() {
-    if let monitor = mouseDownMonitor {
-        NSEvent.removeMonitor(monitor)
-        mouseDownMonitor = nil
-    }
-}
-```
+> P4 方案后不再使用 `mouseDownMonitor`，因此也不需要 stopMouseDownMonitorIfNeeded。
 
 ## 数据源切换时的状态重置
 
@@ -665,16 +602,11 @@ func stopMouseDownMonitorIfNeeded() {
 
 ## 已知问题
 
-### 鼠标点击 DetailView 时 List 高亮不变化
+### 鼠标点击 DetailView 时 List 高亮不变化（✅ 已解决）
 
-**问题描述**：当用户用鼠标点击 DetailView 时，ListView 的选中项高亮颜色不会从强调色（蓝色）变为灰色。而使用键盘左右方向键导航时，高亮颜色正确变化。
-
-**根本原因**：
-1. 键盘导航正确工作是因为我们主动调用了 `window.makeFirstResponder(scrollView.contentView)`
-2. 鼠标点击时，`syncNavigationTargetWithFocus()` 只更新了 `keyboardNavigationTarget` 状态，没有调用 `makeFirstResponder`
-3. AppKit 的 `firstResponder` 决定了 List 的高亮颜色，但 SwiftUI 的 ScrollView 点击时可能不会自动成为 firstResponder
-
-**状态**：待修复（见 `.cursor/plans/ListView-DetailView-Focus-State-Fix-Plan.md`）
+该问题已通过 **P4（SwiftUI 手势 + FirstResponderProxyView）** 修复：
+- 鼠标点击 detailColumn 会在单选时主动切换 `keyboardNavigationTarget = .detail` 并将 firstResponder 设置为 `FirstResponderProxyView` 的透明 NSView；
+- 从而使 List 选中高亮进入非激活态（灰色）。
 
 ## 扩展指南
 
@@ -704,8 +636,8 @@ func stopMouseDownMonitorIfNeeded() {
 1. **生命周期管理**：确保在 `onDisappear` 中调用 `stopKeyboardMonitorIfNeeded()` 移除监听器
 2. **窗口过滤**：始终检查 `event.window === window` 避免影响其他窗口（如 Settings）
 3. **修饰键检查**：Cmd+←/→ 已用于切换数据源，不要拦截
-4. **焦点同步**：用户点击时需要通过 `syncNavigationTargetWithFocus()` 同步状态
+4. **鼠标焦点入口唯一**：鼠标点击的焦点切换由 `MainListView.swift` 的 master/detail `TapGesture` 统一处理，避免多处分散判断导致竞态/误判
 5. **动态字体缩放**：滚动步长需要考虑 `fontScaleManager.scaleFactor`
-6. **延迟检查**：`mouseDownMonitor` 使用 0.1 秒延迟，等待 AppKit 完成焦点切换后再检查
+6. **Detail firstResponder 落点**：detailColumn 必须保留 `FirstResponderProxyView` 作为稳定的 firstResponder 目标
 7. **空状态处理**：DetailView 的空状态也需要提供 ScrollView，否则键盘切换会失效
 
