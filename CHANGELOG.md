@@ -1,6 +1,9 @@
 ## v0.10.2
 **Key updates:** New Apple native OCR engine
 
+## v0.9.16
+**Key updates:** New group chat nickname binding feature in chat conversations
+
 ## v0.9.15
 
 **Key updates:**
