@@ -1,3 +1,6 @@
+## v0.10.3
+**Key updates:** Optimize OCR automatic language recognition
+
 ## v0.10.2
 **Key updates:**
 - New Apple native OCR engine
