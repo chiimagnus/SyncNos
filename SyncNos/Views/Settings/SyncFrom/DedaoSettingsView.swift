@@ -25,7 +25,7 @@ struct DedaoSettingsView: View {
                 }
             } header: {
                 Text("Data Source")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -58,7 +58,7 @@ struct DedaoSettingsView: View {
                 }
             } header: {
                 Text("Account")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -87,7 +87,7 @@ struct DedaoSettingsView: View {
                 }
             } header: {
                 Text("Sync Settings")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
 

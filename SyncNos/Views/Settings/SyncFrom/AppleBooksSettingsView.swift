@@ -20,7 +20,7 @@ struct AppleBooksSettingsView: View {
                 }
             } header: {
                 Text("Data Source")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
             
@@ -86,7 +86,7 @@ struct AppleBooksSettingsView: View {
                 .help("Choose data folder and load notes")
             } header: {
                 Text("Sync Settings")
-                    .font(.headline)
+                    .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
 

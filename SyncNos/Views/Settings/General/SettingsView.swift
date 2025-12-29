@@ -92,7 +92,7 @@ struct SettingsView: View {
                     .help("Support development and unlock Pro features")
                 } header: {
                     Text("General")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
                 .collapsible(false)
@@ -111,7 +111,7 @@ struct SettingsView: View {
                     .help("Configure Notion and run example API calls")
                 } header: {
                     Text("Sync Data To")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
                 .collapsible(false)
@@ -210,7 +210,7 @@ struct SettingsView: View {
 #endif
                 } header: {
                     Text("Get Data From")
-                        .font(.headline)
+                        .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
                 .collapsible(false)
