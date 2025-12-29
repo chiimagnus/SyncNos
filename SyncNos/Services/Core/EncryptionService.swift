@@ -135,6 +135,9 @@ final class EncryptionService: EncryptionServiceProtocol {
             return key
         }
         
+        // 检查 Keychain 中是否存在密钥
+        let keyExists = KeychainHelper.shared.exists(service: keychainService, account: keychainAccount)
+        
         // 尝试从 Keychain 加载
         if let keyData = KeychainHelper.shared.read(service: keychainService, account: keychainAccount) {
             logger.info("[Encryption] 从 Keychain 加载密钥成功")
@@ -143,6 +146,10 @@ final class EncryptionService: EncryptionServiceProtocol {
                 self?.cachedKey = key
             }
             return key
+        } else if keyExists {
+            // 密钥存在但读取失败（可能是权限问题）
+            logger.error("[Encryption] Keychain 中密钥存在但读取失败 - 可能是权限或锁定状态问题")
+            throw EncryptionError.keyNotFound
         }
         
         // 密钥不存在，生成新密钥

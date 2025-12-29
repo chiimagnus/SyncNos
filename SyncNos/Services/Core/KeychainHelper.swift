@@ -32,7 +32,14 @@ final class KeychainHelper {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else { return nil }
+        guard status == errSecSuccess, let data = item as? Data else { 
+            // 记录 Keychain 读取失败的详细错误
+            if status != errSecItemNotFound {
+                let errorMessage = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+                print("[KeychainHelper] Failed to read from Keychain: \(errorMessage) (status: \(status))")
+            }
+            return nil
+        }
         return data
     }
 
@@ -45,6 +52,18 @@ final class KeychainHelper {
         ]
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
+    }
+    
+    /// 检查 Keychain 条目是否存在
+    func exists(service: String, account: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: false
+        ]
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        return status == errSecSuccess
     }
 
     // MARK: - Trial Period Helpers
