@@ -51,7 +51,7 @@ struct ChatMessageContextMenu: View {
                 if let name = senderName, !name.isEmpty {
                     Label("Change Sender Name (\(name))...", systemImage: "person.text.rectangle")
                 } else {
-                    Label("Set Sender Name...", systemImage: "person.text.rectangle")
+                    Label("Set Sender Name", systemImage: "person.text.rectangle")
                 }
             }
 
