@@ -9,7 +9,7 @@ struct OCRSettingsView: View {
     @State private var showingDebugSheet = false
     
     var body: some View {
-        Form {
+        List {
             // MARK: - 数据源开关
             Section {
                 Toggle(isOn: $chatsSourceEnabled) {
@@ -21,6 +21,8 @@ struct OCRSettingsView: View {
                 .help("Show Chats in the main list")
             } header: {
                 Text("Data Source")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
             }
             
             // MARK: - OCR 设置
@@ -31,6 +33,7 @@ struct OCRSettingsView: View {
                 } label: {
                     HStack {
                         Text("OCR Languages")
+                            .scaledFont(.body)
                         
                         Spacer()
                         
@@ -57,12 +60,20 @@ struct OCRSettingsView: View {
                 Button {
                     showingDebugSheet = true
                 } label: {
-                    Text("Test OCR Recognition")
+                    HStack {
+                        Image(systemName: "ladybug")
+                            .foregroundStyle(.orange)
+                        Text("Test OCR Recognition")
+                            .scaledFont(.body)
+                        Spacer()
+                    }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .formStyle(.grouped)
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("OCR Settings")
         .sheet(isPresented: $showingLanguageSheet) {
             LanguageSelectionSheet(configStore: configStore)
