@@ -91,8 +91,8 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private var currentBookId: String?
     
-    /// 所有原始数据（未筛选）
-    private var allNotes: [DedaoEbookNote] = []
+    /// 所有高亮（未筛选，已转换为展示模型；避免同时持有原始模型与展示模型导致峰值翻倍）
+    private var allHighlights: [DedaoHighlightDisplay] = []
     
     /// 筛选和排序后的数据
     private var filteredHighlights: [DedaoHighlightDisplay] = []
@@ -229,7 +229,7 @@ final class DedaoDetailViewModel: ObservableObject {
     func loadHighlights(for bookId: String) async {
         guard !Task.isCancelled else { return }
         // 如果是同一本书且数据不为空，不重复加载
-        if currentBookId == bookId && !allNotes.isEmpty {
+        if currentBookId == bookId && !allHighlights.isEmpty {
             return
         }
         
@@ -243,7 +243,7 @@ final class DedaoDetailViewModel: ObservableObject {
             guard !Task.isCancelled, currentBookId == bookId else { return }
             if !cached.isEmpty {
                 // 有缓存：立即显示，不显示 Loading
-                allNotes = cached
+                allHighlights = cached.map { DedaoHighlightDisplay(from: $0) }
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false
@@ -259,7 +259,7 @@ final class DedaoDetailViewModel: ObservableObject {
         
         // 2. 没有缓存：显示 Loading，从 API 加载
         if isNewBook {
-            allNotes.removeAll(keepingCapacity: false)
+            allHighlights.removeAll(keepingCapacity: false)
             filteredHighlights.removeAll(keepingCapacity: false)
             visibleHighlights.removeAll(keepingCapacity: false)
             currentPageCount = 0
@@ -284,23 +284,24 @@ final class DedaoDetailViewModel: ObservableObject {
             // 从 API 获取最新数据
             let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: nil)
             guard !Task.isCancelled, currentBookId == bookId else { return }
+            let apiHighlights = apiNotes.map { DedaoHighlightDisplay(from: $0) }
             
             // 保存到缓存
             try await cacheService.saveHighlights(apiNotes, bookId: bookId)
             guard !Task.isCancelled, currentBookId == bookId else { return }
             
             // 如果数据有变化，更新显示
-            if apiNotes.count != allNotes.count || allNotes.isEmpty {
-                allNotes = apiNotes
+            if apiHighlights.count != allHighlights.count || allHighlights.isEmpty {
+                allHighlights = apiHighlights
                 applyFiltersAndSort()
                 resetPagination()
-                logger.info("[DedaoDetail] Synced \(apiNotes.count) highlights from API for bookId=\(bookId)")
+                logger.info("[DedaoDetail] Synced \(apiHighlights.count) highlights from API for bookId=\(bookId)")
             } else {
                 logger.debug("[DedaoDetail] No changes for bookId=\(bookId)")
             }
         } catch {
             // 如果缓存为空，需要显示错误
-            if allNotes.isEmpty {
+            if allHighlights.isEmpty {
                 logger.error("[DedaoDetail] Failed to load highlights: \(error.localizedDescription)")
             } else {
                 logger.warning("[DedaoDetail] Background sync failed: \(error.localizedDescription)")
@@ -321,7 +322,7 @@ final class DedaoDetailViewModel: ObservableObject {
         isLoading = true
         
         // 清空当前数据
-        allNotes.removeAll(keepingCapacity: false)
+        allHighlights.removeAll(keepingCapacity: false)
         filteredHighlights.removeAll(keepingCapacity: false)
         visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
@@ -334,18 +335,18 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private func applyFiltersAndSort() {
         var result: [DedaoHighlightDisplay] = []
+        result.reserveCapacity(allHighlights.count)
         
-        for note in allNotes {
+        for h in allHighlights {
             // 应用筛选
             // "仅笔记"过滤
             if noteFilter {
-                let hasNote = (note.note != nil && !note.note!.isEmpty)
+                let hasNote = (h.note?.isEmpty == false)
                 if !hasNote {
                     continue
                 }
             }
-            
-            result.append(DedaoHighlightDisplay(from: note))
+            result.append(h)
         }
         
         // 排序
