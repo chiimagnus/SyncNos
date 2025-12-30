@@ -53,53 +53,66 @@ struct DedaoDetailView: View {
     
     @ViewBuilder
     private func bookDetailView(book: DedaoBookListItem) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Top anchor used for programmatic scrolling when content changes
-                Color.clear
-                    .frame(height: 0)
-                    .id("dedaoDetailTop")
-                    .background(
-                        EnclosingScrollViewReader { scrollView in
-                            onScrollViewResolved(scrollView)
-                        }
-                    )
-                bookHeaderView(book: book)
-                highlightsContentView(book: book)
-                backgroundSyncIndicator
-                loadMoreIndicator
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Top anchor used for programmatic scrolling when content changes
+                    Color.clear
+                        .frame(height: 0)
+                        .id("dedaoDetailTop")
+                        .background(
+                            EnclosingScrollViewReader { scrollView in
+                                onScrollViewResolved(scrollView)
+                            }
+                        )
+                    bookHeaderView(book: book)
+                    highlightsContentView(book: book)
+                    backgroundSyncIndicator
+                    loadMoreIndicator
+                }
+                .padding()
             }
-            .padding()
-        }
-        .navigationTitle("Dedao")
-        .toolbar { toolbarContent(book: book) }
-        // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
-        .task(id: selectedBookId) {
-            guard let id = selectedBookId,
-                  let target = listViewModel.displayBooks.first(where: { $0.bookId == id }) else {
-                return
+            .navigationTitle("Dedao")
+            .toolbar { toolbarContent(book: book) }
+            // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
+            .onAppear {
+                DispatchQueue.main.async {
+                    proxy.scrollTo("dedaoDetailTop", anchor: .top)
+                }
             }
-            await detailViewModel.loadHighlights(for: target.bookId)
-            externalIsSyncing = listViewModel.syncingBookIds.contains(id)
-            if !externalIsSyncing { externalSyncProgress = nil }
-        }
-        .onDisappear {
-            cleanupOnDisappear()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
-        .alert("Sync Error", isPresented: $showingSyncError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(syncErrorMessage)
-        }
-        .onChange(of: detailViewModel.syncMessage) { _, newMessage in
-            if let msg = newMessage, !msg.isEmpty {
-                let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
-                let isSuccess = successKeywords.contains { msg.localizedCaseInsensitiveContains($0) }
-                if !isSuccess {
-                    syncErrorMessage = msg
-                    showingSyncError = true
+            .onChange(of: selectedBookId) { _, _ in
+                DispatchQueue.main.async {
+                    proxy.scrollTo("dedaoDetailTop", anchor: .top)
+                }
+            }
+            // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
+            .task(id: selectedBookId) {
+                guard let id = selectedBookId,
+                      let target = listViewModel.displayBooks.first(where: { $0.bookId == id }) else {
+                    return
+                }
+                await detailViewModel.loadHighlights(for: target.bookId)
+                externalIsSyncing = listViewModel.syncingBookIds.contains(id)
+                if !externalIsSyncing { externalSyncProgress = nil }
+            }
+            .onDisappear {
+                cleanupOnDisappear()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
+            .alert("Sync Error", isPresented: $showingSyncError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(syncErrorMessage)
+            }
+            .onChange(of: detailViewModel.syncMessage) { _, newMessage in
+                if let msg = newMessage, !msg.isEmpty {
+                    let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
+                    let isSuccess = successKeywords.contains { msg.localizedCaseInsensitiveContains($0) }
+                    if !isSuccess {
+                        syncErrorMessage = msg
+                        showingSyncError = true
+                    }
                 }
             }
         }
@@ -112,6 +125,7 @@ struct DedaoDetailView: View {
         InfoHeaderCardView(
             title: book.title,
             subtitle: book.author.isEmpty ? nil : book.author,
+            overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             timestamps: TimestampInfo(
                 addedAt: nil,
                 modifiedAt: nil,
