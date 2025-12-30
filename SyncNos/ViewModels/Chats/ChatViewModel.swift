@@ -37,6 +37,9 @@ final class ChatViewModel: ObservableObject {
 
     /// 联系人/对话列表（左侧列表）
     @Published var contacts: [ChatBookListItem] = []
+
+    /// 内存态对话（用于导出/详情展示）
+    @Published private(set) var conversations: [UUID: ChatConversation] = [:]
     
     /// 分页状态（每个对话独立管理）
     @Published private(set) var paginationStates: [UUID: ChatPaginationState] = [:]
@@ -81,15 +84,30 @@ final class ChatViewModel: ObservableObject {
         do {
             let cachedContacts = try await cacheService.fetchAllConversations()
             contacts = cachedContacts
+
+            var dict: [UUID: ChatConversation] = [:]
             var states: [UUID: ChatPaginationState] = [:]
+            dict.reserveCapacity(cachedContacts.count)
             states.reserveCapacity(cachedContacts.count)
 
             for item in cachedContacts {
+                // 只创建对话结构，不加载消息（消息在选中时分页加载）
+                let contact = ChatContact(
+                    id: item.contactId,
+                    name: item.name,
+                    lastMessage: item.lastMessage,
+                    lastMessageTime: item.lastMessageTime,
+                    messageCount: item.messageCount
+                )
+                dict[item.contactId] = ChatConversation(contact: contact, messages: [])
+                
                 // 初始化分页状态，设置总数
                 var state = ChatPaginationState()
                 state.totalCount = item.messageCount
                 states[item.contactId] = state
             }
+
+            conversations = dict
             paginationStates = states
             logger.info("[ChatsV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
         } catch {
@@ -102,6 +120,8 @@ final class ChatViewModel: ObservableObject {
     @discardableResult
     func createConversation(name: String) -> UUID {
         let contact = ChatContact(name: name)
+        let conversation = ChatConversation(contact: contact, messages: [])
+        conversations[contact.id] = conversation
         
         // 初始化分页状态
         var state = ChatPaginationState()
@@ -129,7 +149,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 向指定对话追加截图
     func addScreenshots(to contactId: UUID, urls: [URL]) async {
-        guard paginationStates[contactId] != nil || contacts.contains(where: { $0.contactId == contactId }) else {
+        guard conversations[contactId] != nil else {
             errorMessage = "对话不存在"
             return
         }
@@ -145,7 +165,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 向指定对话追加截图（来自拖拽/剪贴板等“内存数据”，无需落盘）
     func addScreenshotData(to contactId: UUID, imageDatas: [Data]) async {
-        guard paginationStates[contactId] != nil || contacts.contains(where: { $0.contactId == contactId }) else {
+        guard conversations[contactId] != nil else {
             errorMessage = "对话不存在"
             return
         }
@@ -159,6 +179,14 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    func getConversation(for contactId: UUID) -> ChatConversation? {
+        conversations[contactId]
+    }
+
+    func getMessages(for contactId: UUID) -> [ChatMessage] {
+        conversations[contactId]?.messages ?? []
+    }
+    
     // MARK: - Pagination (分页加载)
     
     /// 获取已分页加载的消息（供 DetailView 使用）
@@ -168,7 +196,7 @@ final class ChatViewModel: ObservableObject {
     
     /// 获取对话中已使用的发送者昵称列表（去重，按出现顺序）
     func getUsedSenderNames(for contactId: UUID) -> [String] {
-        let allMessages = paginationStates[contactId]?.loadedMessages ?? []
+        let allMessages = conversations[contactId]?.messages ?? []
         var seen = Set<String>()
         var result: [String] = []
         
@@ -742,23 +770,6 @@ final class ChatViewModel: ObservableObject {
             contacts.append(newContact)
             contacts.sort { $0.name < $1.name }
         }
-    }
-}
-
-// MARK: - Memory Purge
-
-extension ChatViewModel: MemoryPurgeable {
-    /// 主动释放 Chats 相关的内存占用（切换到其它数据源时调用）。
-    ///
-    /// Chats 的潜在大头主要来自已分页加载的消息数组；这里采用激进策略：全部清空，回到 Chats 时再从缓存重建。
-    func purgeMemory() {
-        contacts = []
-        conversations = [:]
-        paginationStates = [:]
-        
-        processingScreenshotIds.removeAll()
-        errorMessage = nil
-        isLoading = false
     }
 }
 

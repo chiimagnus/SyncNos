@@ -125,17 +125,17 @@ struct AppleBooksListView: View {
             }
         }
         .onAppear {
-            // 获取焦点（避免额外延迟引入的竞态）
-            DispatchQueue.main.async {
-                isListFocused = true
-            }
-        }
-        .task {
             // 切换到 Apple Books 时，确保第一帧进入加载态，然后异步加载/重算
             viewModel.triggerRecompute()
             _ = viewModel.restoreBookmarkAndConfigureRoot()
             if viewModel.books.isEmpty {
-                await viewModel.loadBooks()
+                Task {
+                    await viewModel.loadBooks()
+                }
+            }
+            // 获取焦点（避免额外延迟引入的竞态）
+            DispatchQueue.main.async {
+                isListFocused = true
             }
         }
         // 监听 List 焦点请求通知，切换到此视图时获取焦点
@@ -145,7 +145,7 @@ struct AppleBooksListView: View {
             }
         }
         .onDisappear {
-            viewModel.purgeMemory()
+            viewModel.stopAccessingIfNeeded()
         }
         // 只监听 AppleBooksContainerSelected（用户选择数据库路径时）
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected")).receive(on: DispatchQueue.main)) { notification in
