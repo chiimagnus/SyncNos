@@ -39,116 +39,57 @@
   - `SyncNos/Views/Components/Cards/HighlightCardView.swift`
   - `SyncNos/Views/Components/Cards/ArticleContentCardView.swift`
 
-## 关键问题归因（按“会导致内存无法释放/峰值不受控”的严重性排序）
+## 当前代码状态（基于 2025-12-30 最新代码）
 
-### A. 未绑定 SwiftUI 生命周期的 `Task { ... }`（P1）
+### 已确认落地的关键内存治理策略（✅）
 
-多个 DetailView 在 `.onAppear` / `.onChange` 中直接创建 `Task { ... }`：
+- **生命周期绑定加载**：
+  - AppleBooks/GoodLinks/WeRead/Dedao：Detail 加载已统一使用 `.task(id:)` 绑定到 selectionId。
+  - Chats：首次消息加载使用 `.task(id: contactId)`，并且在切换对话/离开 Detail 时卸载已加载消息。
+- **可取消加载 + 过期结果丢弃**：
+  - AppleBooks：`currentLoadTask` 指向真正的可取消 fetch task，并用 `currentLoadId` 避免“旧任务回写新状态”；切书时 `session.close()` + `removeAll(keepingCapacity:false)`。
+  - GoodLinks：`highlightsFetchTask` / `contentFetchTask` 可取消，且用 `currentLinkId` 丢弃过期结果；`clear()` 会释放数组 capacity 并置空 `content`。
+  - WeRead/Dedao：加载逻辑在同一个 async task 内串行执行（缓存 → 后台同步），并在关键节点用 `Task.isCancelled` + `currentBookId == bookId` 避免过期回写。
+  - Chats：分页加载使用 `paginationLoadTokens` 防串台；`unloadMessages` 会先失效 token 再清空数组，避免“旧任务把消息复活”。
+- **主动释放大数组的 capacity**：
+  - 已普遍改为 `removeAll(keepingCapacity:false)`（AppleBooks/GoodLinks/WeRead/Dedao/Chats）。
+- **Chats 已完成“只保留 metadata，消息懒加载”**：
+  - `ChatViewModel` 不再持有 `conversations[UUID].messages` 这类双份结构；导出“当前看到的数据”优先使用分页消息，“导出全部”从缓存拉全量（用户主动动作允许一次性峰值）。
 
-- 这类 Task **不会因为 View 消失而自动取消**（区别于 `.task(id:)` 修饰符）。
-- Task 会强引用其捕获对象（尤其是 `@StateObject` 的 detailViewModel），从而导致：
-  - Detail 退场后仍被 Task 持有 → **deinit 不触发** → 内存残留
-  - 快速切换条目时旧 Task 继续跑 → **叠加后台工作** → 峰值上升、结果回写错位
+### 仍值得关注 / 尚未完全解决的点（⚠️）
 
-### B. “取消加载任务”实现无效（AppleBooks 特别严重，P1）
+#### 1) GoodLinks 全文内容依然是“进入详情就加载 + 折叠也常驻”（P2.1）
 
-`AppleBooksDetailViewModel` 目前用 `currentLoadTask: Task<Void, Never>?` 试图取消加载，但实际 DB fetch 使用的是另一个 `Task<[HighlightRow]?, Never>`，取消 `currentLoadTask` 并不会取消真正的 fetch task → **切书/退出 Detail 后仍可能继续读取数据库并持有 session/数据**。
+- `GoodLinksDetailView` 会在 `.task(id:)` 中同时调用 `loadHighlights` + `loadContent`。
+- `ArticleContentCardView` 的“折叠/展开”仅改变 `lineLimit`，**不会释放** `contentText` 的内存占用。
 
-### C. DetailViewModel 同时持有多份大数组（WeRead/Dedao/Chats，P2）
+**风险**：当某些文章 content 极大时，Detail 峰值仍会被“全文字符串”撑高，即使 UI 处于折叠态。
 
-- WeRead：`allBookmarks`（原始） + `filteredHighlights`（转换后） + `visibleHighlights`（分页可见）
-- Dedao：`allNotes`（原始） + `filteredHighlights`（转换后） + `visibleHighlights`
-- Chats：分页 `loadedMessages` 之外，还维护 `conversations[UUID].messages`，并在导入/更新时对两份数组分别 append，存在“写时复制 + 双份增长”的风险。
+#### 2) 少量非生命周期绑定的 `Task { ... }` 仍存在（低优先级）
 
-这些结构在数据量大时会放大峰值；即使 Swift Array 有 COW，也会在多处 mutation 时触发复制。
+- 例如 GoodLinks 的 `RefreshBooksRequested` 监听里会启动 unstructured `Task { ... }`。
+- 这类任务若在触发后用户快速切换/退出 Detail，可能短暂延迟 detailViewModel 的 deinit（直到任务结束/被 ViewModel 内部取消）。
 
-### D. GoodLinks 全文内容（`contentText`）可能非常大（P2）
+#### 3) WeRead/Dedao 仍会持有 `allHighlights` + `filteredHighlights` + `visibleHighlights`（可选优化）
 
-`GoodLinksDetailViewModel.loadContent()` 会在进入详情时直接加载全文，`content` 在内存中保持大字符串；即使 UI 处于折叠态也不释放 → **峰值容易被“全文”撑爆**。
-
-### E. 重复/分散的“宽度 debounce Task”与同步通知处理（P2）
-
-各 DetailView 都有类似的 `layoutWidthDebounceTask`，通常没有在 `onDisappear` 中统一 cancel；同步通知/错误弹窗处理也有大量重复代码，适合抽象/删除冗余。
+- 目前已避免“原始模型 + 展示模型”双份持有，但依然存在展示模型在不同数组间的复制（可通过“索引过滤/按需 slice”进一步降低峰值）。
 
 ---
 
-## Plan A（按 P1 → P2 → P3 执行；每完成一个 P 都 `xcodebuild`）
+## Plan A（以“当前代码真实状态”为基准）
 
-## P1（最高优先级）：让 Detail “能退出、能取消、能释放”
+### P1（已完成）：让 Detail “能退出、能取消、能释放”
 
-**目标**：任何 Detail 在以下事件发生时，都必须满足：
+> 下面条目为“Plan A 的核心兜底策略”。在最新代码中，这些已完成并可作为未来新增数据源/新 Detail 的硬规范。
 
-- 旧加载任务被取消（或其结果被丢弃）
-- 大对象/大数组被清理（不保留 capacity）
-- 数据源会话（如 AppleBooks DB session）被关闭
-- DetailViewModel 不被悬挂任务持有，能触发 deinit
+- [x] **P1.1 生命周期绑定加载**：Detail 加载统一用 `.task(id:)` 绑定 selectionId（或同等语义的可取消任务）。
+- [x] **P1.2 AppleBooks 真取消 + 真清理**：可取消 fetch task + `session.close()` + `removeAll(keepingCapacity:false)` + 过期结果丢弃。
+- [x] **P1.3 GoodLinks 可取消 + 过期结果丢弃 + 清理容量**：`highlightsFetchTask`/`contentFetchTask` + `currentLinkId` 校验 + `clear()` 释放。
+- [x] **P1.4 WeRead/Dedao 串行任务 + 过期结果丢弃 + 清理容量**：缓存优先 + 后台同步（同 task 内）+ `Task.isCancelled` 与 bookId 校验。
+- [x] **P1.5 Chats 激进释放**：切换对话/离开 Detail 时卸载已加载消息；分页任务用 token 防串台。
+- [x] **P1.6 宽度 debounce 任务清理**：各 Detail 在 `onDisappear` cancel `layoutWidthDebounceTask`。
 
-### P1.1 统一把 Detail 的加载改成“生命周期绑定任务”
-
-对以下文件进行改造：  
-`AppleBooksDetailView.swift` / `GoodLinksDetailView.swift` / `WeReadDetailView.swift` / `DedaoDetailView.swift`
-
-- 把 `.onAppear { Task { ... } }`、`.onChange { Task { ... } }` 改为：
-  - `.task(id: selectedId) { ... }`（当 selectedId 变化或 View 消失时自动 cancel）
-  - 或者显式存储 `Task` handle，并在 `onDisappear` + `onChange` 时 cancel（更不推荐）
-
-> Chats 目前已经对首次加载用了 `.task(id:)`，P1 仅需要补齐“切换对话时卸载旧消息/取消旧加载”。
-
-### P1.2 AppleBooks：修复“取消无效” + 强制释放数组容量
-
-文件：`AppleBooksDetailViewModel.swift`
-
-- 把 `currentLoadTask` 改成真正的 fetch task（或把 fetch task 放到一个可取消的 `Task<Void, Never>` 内部并持有它）
-- 在切书/退出时：
-  - `currentLoadTask?.cancel()`
-  - `session?.close(); session = nil`
-  - `highlights.removeAll(keepingCapacity: false)`
-
-### P1.3 GoodLinks：为 highlights/content 加入可取消与过期结果丢弃
-
-文件：`GoodLinksDetailViewModel.swift`
-
-实现要点：
-
-- 增加 `currentLoadTask: Task<Void, Never>?`（或拆成 `highlightsTask`/`contentTask`）
-- 每次开始加载前先 cancel 旧 task
-- 每次 await 返回后校验 `currentLinkId` 是否仍是本次请求的 linkId，若不一致则直接丢弃结果
-- `clear()` 内部改为 `removeAll(keepingCapacity: false)`，并将 `content = nil`
-
-### P1.4 WeRead/Dedao：后台同步任务可取消 + 过期结果丢弃 + 清空容量
-
-文件：`WeReadDetailViewModel.swift`、`DedaoDetailViewModel.swift`
-
-- 增加 `currentLoadTask` / `currentSyncTask`（或统一 `currentTask`）
-- `loadHighlights(for:)` 若切书：
-  - cancel 前一个任务
-  - 清空 `allBookmarks/allNotes`、`filteredHighlights`、`visibleHighlights`（`keepingCapacity: false`）
-- `performBackgroundSync` / `fullFetchFromAPI` 完成后必须校验当前 bookId 仍匹配，否则不回写
-
-### P1.5 Chats：Detail 退场/切换对话时卸载消息（只保留当前对话）
-
-文件：`ChatViewModel.swift` + `ChatDetailView.swift` + `MainListView+DetailViews.swift`
-
-新增能力：
-
-- `unloadMessages(for contactId: UUID)`：清空该对话的 `paginationStates[contactId].loadedMessages` 并重置 `hasInitiallyLoaded`（让下次选中能重新分页加载），同时**不要**破坏 messageCount（totalCount 从缓存再取即可）。
-- `unloadAllMessages(except keepId: UUID?)`：只保留当前对话消息，其余全清空。
-
-触发点：
-
-- `ChatDetailView`：`onChange(of: selectedContactId)` 里对旧 contact 调用卸载（或在 `.task(id:)` 切换前后做）
-- `MainListView`：切换数据源/选择清空时，对 chats 调用 `unloadAllMessages(except: nil)`（释放 Detail 内存）
-
-> 由于你明确“不需要优化切换性能”，所以这里选择“激进释放”：只要离开当前对话就丢弃已加载消息，最大化回收。
-
-### P1.6 取消 `layoutWidthDebounceTask`（防止后台悬挂）
-
-文件：所有 DetailView（AppleBooks/GoodLinks/WeRead/Dedao）
-
-- `.onDisappear { layoutWidthDebounceTask?.cancel(); layoutWidthDebounceTask = nil }`
-- 或者把宽度 debounce 抽到一个复用组件/Modifier（P2 做去冗余）
-
-### P1 验证（必须执行）
+#### P1 验证（建议保留为“回归步骤”）
 
 1. `xcodebuild -scheme SyncNos -configuration Debug build`
 2. 手工验证（建议步骤）：
@@ -158,82 +99,81 @@
 
 ---
 
-## P2（第二优先级）：降峰值 + 去冗余（更激进但收益大）
+### P2（仍有收益）：降峰值 + 去冗余（更激进但收益大）
 
-### P2.1 GoodLinks：全文内容延迟加载 + 折叠即释放
+#### P2.1 GoodLinks：全文内容延迟加载 + 折叠即释放（最高优先级）
 
 文件：`GoodLinksDetailView.swift`、`GoodLinksDetailViewModel.swift`、`ArticleContentCardView.swift`
 
-策略：
+目标：
 
-- 仅在用户点击“Expand/Load Article”时才加载全文
-- 折叠时把 `content` 置空（释放大字符串）
-- （可选）只保留一个短摘要/前 N 字用于折叠态展示
+- **进入详情时只加载 highlights，不加载全文**（降低峰值/首屏压力）
+- **用户展开全文时才加载 content**
+- **用户折叠全文时释放 content（置空）**，只保留必要的摘要/提示（可选）
 
-### P2.2 WeRead/Dedao：删除“原始大数组”或删除“展示大数组”（二选一）
+建议实现（破坏性允许，择一）：
 
-文件：`WeReadDetailViewModel.swift`、`DedaoDetailViewModel.swift`
+- 方案 A（最小侵入）：保留 `ArticleContentCardView`，在 `GoodLinksDetailView` 中：
+  - 初次 `.task(id: linkId)` 只调用 `loadHighlights(for:)`
+  - 当 `articleIsExpanded == true` 且 `content == nil` 时再触发 `loadContent(for:)`
+  - 当 `articleIsExpanded == false` 时调用 `detailViewModel.clearContent()`（新增方法，仅置 `content = nil`）
+- 方案 B（更彻底）：让 `ArticleContentCardView` 支持 `onExpand`/`onCollapse` 回调，或接受 “content provider” closure，以便做到 “Expand → load / Collapse → release” 的完整闭环。
 
-建议做法（更激进、更省内存）：
+验收：
 
-- 仅保留一种主数据：
-  - 方案 A：只保留 `[Display]`（已经是 UI 需要的数据），不再保留 `[WeReadBookmark]/[DedaoEbookNote]`
-  - 方案 B：只保留原始数组，`visibleHighlights` 用“slice + 即时转换”生成（避免全量转换）
+- 打开大文章（content 很长）：
+  - 初次进入 Detail 不应立刻把全文拉入内存
+  - 展开时加载一次，折叠后 `content` 被释放（可用 Instruments/Memory Graph 验证）
 
-### P2.3 Chats：移除 `conversations[UUID].messages`（只保留 metadata）
+#### P2.2 WeRead/Dedao：进一步降低展示模型复制（可选）
 
-文件：`ChatViewModel.swift`（可能涉及 `Models/Chats/*`）
+现状：已避免“原始模型 + 展示模型”双份持有（✅），但仍有 `allHighlights`/`filteredHighlights`/`visibleHighlights` 的复制。
 
-- `conversations` 只保存 `ChatConversation(contact: ...)` 的 metadata，不再持有 messages
-- 导出：
-  - 优先用当前分页 `loadedMessages`
-  - “导出全部”仍从 cache 拉全量（允许一次性高峰，但这是用户主动动作）
-- 导入/分类更新：只更新分页态数据 + 落库，不再维护第二份 messages
+可选方向：
 
-### P2.4 抽象复用：统一的 Detail 生命周期管理与清理协议
+- 使用“索引数组”表达筛选结果：`filteredIndices: [Int]`，并用 indices 生成可见页，减少复制。
+- 或仅保留 `allHighlights`，`visibleHighlights` 通过 slice + 即时过滤/排序生成（注意性能权衡）。
+
+#### P2.3 Chats：保持“消息懒加载 + 离开即卸载”的策略（已完成 ✅）
+
+继续的约束：
+
+- 对话列表不要再引入任何“常驻 messages 数组”
+- “导出全部”允许一次性峰值，但必须是用户显式触发
+
+#### P2.4 抽象复用：统一 Detail 的清理与任务管理（可选）
 
 目的：删除重复的 “Task 管理/清理数组/宽度 debounce/同步进度通知” 代码。
 
-可以引入：
+可引入：
 
-- `protocol DetailMemoryReleasable { func cleanupForReuse(); func cleanupForDisappear() }`
 - `DetailTaskBag`（集中持有/取消 Task）
-- （可选）统一的 `DebouncedWidthTracker` ViewModifier
-
-> 这一步是去冗余的关键：你偏“激进”，P2 会把现在分散在各 Detail 的重复实现合并并删掉。
-
-### P2 验证
-
-1. `xcodebuild -scheme SyncNos -configuration Debug build`
-2. 手工：GoodLinks 打开大文章 → 展开/折叠 → 切换文章 → 确保内容不会串、不会长期常驻。
+- `DebouncedWidthTracker` ViewModifier（统一宽度 debounce）
+- （可选）`protocol DetailMemoryReleasable { func cleanupForReuse(); func cleanupForDisappear() }`
 
 ---
 
-## P3（第三优先级）：渲染/布局优化（可选，但对极大数据有帮助）
+### P3（可选）：渲染/布局优化（极大数据时更明显）
 
-### P3.1 `WaterfallLayout` 加缓存（Layout cache）避免频繁全量 sizeThatFits
+#### P3.1 `WaterfallLayout` 加缓存（Layout cache）避免频繁全量 sizeThatFits
 
 文件：`WaterfallLayout.swift`
 
 - 使用 Layout 的 `Cache` 存储上次计算结果（positions/columnWidth/height）
 - 仅当宽度/子视图数量变化时重算
 
-### P3.2 进一步虚拟化
+#### P3.2 进一步虚拟化
 
 如果未来出现“单条目高亮上千条”的极端场景：
 
 - 考虑用 `LazyVGrid` + 分页（替代 waterfall），或改用 `List`（macOS 更成熟的复用机制）
 
-### P3 验证
-
-同样 `xcodebuild`，并观察滚动/窗口 resize 是否更稳。
-
 ---
 
 ## 执行顺序建议（强约束：每完成一个 P 就 build）
 
-1. 先做 P1（生命周期绑定 + 真取消 + 真清理）→ **立刻 build**
-2. 再做 P2（删除冗余 + 降峰值）→ **再 build**
-3. 最后视情况做 P3（布局/虚拟化）→ **再 build**
-
+1. P1 已完成：作为“硬规范”长期保留
+2. 下一步优先做 P2.1（GoodLinks 全文延迟加载 + 折叠释放）→ **build**
+3. 视需求再做 P2.2 / P2.4 → **build**
+4. 最后视情况做 P3 → **build**
 

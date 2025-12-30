@@ -587,6 +587,21 @@ protocol NotionServiceProtocol {
 - **同步队列**: 基于 `SyncQueueStore` 的任务队列管理
 - **活动监控**: `SyncActivityMonitor` 统一监控所有同步活动
 
+### DetailView 内存释放与生命周期规范（重要）
+
+> 背景：Detail（右侧详情）往往持有最大的数据（全文/高亮大数组/聊天消息），并且最容易因为“非生命周期绑定的异步任务”导致对象无法及时释放。
+
+- **生命周期绑定加载**：Detail 的数据加载必须绑定 SwiftUI 生命周期，优先使用 `.task(id: selectionId)`；如必须使用 `Task { ... }`，必须由 ViewModel 持有任务句柄并可取消，且需要“过期结果丢弃”防串台。
+- **切换/退出时强制释放**：selection 变化或退出 Detail 时必须做到：
+  - 取消任务（或让结果可被丢弃）
+  - 关闭数据会话（例如 SQLite read-only session）
+  - 大数组使用 `removeAll(keepingCapacity: false)`（避免保留 capacity 导致“看似清空但内存不降”）
+- **防串台（旧任务回写新状态）**：对分页/长任务使用 token 或 id 校验（例如 `currentLoadId`、`paginationLoadTokens`），确保旧任务完成后不会覆盖新 selection 的状态。
+- **重内容按需加载**：对 GoodLinks 全文等“可能极大”的内容，采用“展开才加载 / 折叠或离开即释放”的策略，避免折叠态仍常驻大字符串。
+- **Chats 约束**：对话列表只保存 metadata；消息在 Detail 中分页懒加载，并在切换对话/离开 Detail 时卸载已加载消息以释放内存。
+
+- **参考执行清单**：`.cursor/plans/MemoryReleasePlan_A.md`（Detail 内存释放 Plan A，随代码演进持续更新）
+
 ## 开发工作流
 
 ### 添加新数据源流程
