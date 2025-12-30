@@ -171,16 +171,17 @@ struct AppleBooksDetailView: View {
             }
         }
         .onChange(of: selectedBookId) { oldId, newId in
-            // 内存清理策略：
-            // - 取消选择 (newId == nil)：调用 clear() 释放所有数据
-            // - 切换到新书籍：resetAndLoadFirstPage 内部会清理旧数据并加载新数据
-            if newId == nil {
-                viewModel.clear()
-            } else if let book = selectedBook {
+            // 内存清理策略：无论新ID是什么，都先调用 clear() 释放旧数据
+            // 这确保状态（如 isSyncing、syncMessage）被正确重置
+            viewModel.clear()
+            
+            // 如果有新书籍被选中，加载新数据
+            if let book = selectedBook {
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
                 }
             }
+            
             // 切换到某个 item 时，依据 ViewModel 中的 syncing 集合立即更新外部同步显示
             if let id = selectedBookId {
                 externalIsSyncing = viewModelList.syncingBookIds.contains(id)
