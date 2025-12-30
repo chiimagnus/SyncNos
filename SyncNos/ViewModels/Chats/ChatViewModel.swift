@@ -37,9 +37,6 @@ final class ChatViewModel: ObservableObject {
 
     /// 联系人/对话列表（左侧列表）
     @Published var contacts: [ChatBookListItem] = []
-
-    /// 内存态对话（用于导出/详情展示）
-    @Published private(set) var conversations: [UUID: ChatConversation] = [:]
     
     /// 分页状态（每个对话独立管理）
     @Published private(set) var paginationStates: [UUID: ChatPaginationState] = [:]
@@ -88,29 +85,16 @@ final class ChatViewModel: ObservableObject {
             let cachedContacts = try await cacheService.fetchAllConversations()
             contacts = cachedContacts
 
-            var dict: [UUID: ChatConversation] = [:]
             var states: [UUID: ChatPaginationState] = [:]
-            dict.reserveCapacity(cachedContacts.count)
             states.reserveCapacity(cachedContacts.count)
 
             for item in cachedContacts {
-                // 只创建对话结构，不加载消息（消息在选中时分页加载）
-                let contact = ChatContact(
-                    id: item.contactId,
-                    name: item.name,
-                    lastMessage: item.lastMessage,
-                    lastMessageTime: item.lastMessageTime,
-                    messageCount: item.messageCount
-                )
-                dict[item.contactId] = ChatConversation(contact: contact, messages: [])
-                
                 // 初始化分页状态，设置总数
                 var state = ChatPaginationState()
                 state.totalCount = item.messageCount
                 states[item.contactId] = state
             }
 
-            conversations = dict
             paginationStates = states
             logger.info("[ChatsV2] Loaded \(cachedContacts.count) conversations from cache (messages lazy-loaded)")
         } catch {
@@ -123,8 +107,6 @@ final class ChatViewModel: ObservableObject {
     @discardableResult
     func createConversation(name: String) -> UUID {
         let contact = ChatContact(name: name)
-        let conversation = ChatConversation(contact: contact, messages: [])
-        conversations[contact.id] = conversation
         
         // 初始化分页状态
         var state = ChatPaginationState()
@@ -152,7 +134,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 向指定对话追加截图
     func addScreenshots(to contactId: UUID, urls: [URL]) async {
-        guard conversations[contactId] != nil else {
+        guard paginationStates[contactId] != nil else {
             errorMessage = "对话不存在"
             return
         }
@@ -168,7 +150,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 向指定对话追加截图（来自拖拽/剪贴板等“内存数据”，无需落盘）
     func addScreenshotData(to contactId: UUID, imageDatas: [Data]) async {
-        guard conversations[contactId] != nil else {
+        guard paginationStates[contactId] != nil else {
             errorMessage = "对话不存在"
             return
         }
@@ -182,14 +164,6 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    func getConversation(for contactId: UUID) -> ChatConversation? {
-        conversations[contactId]
-    }
-
-    func getMessages(for contactId: UUID) -> [ChatMessage] {
-        conversations[contactId]?.messages ?? []
-    }
-    
     // MARK: - Pagination (分页加载)
     
     /// 获取已分页加载的消息（供 DetailView 使用）
@@ -199,7 +173,7 @@ final class ChatViewModel: ObservableObject {
     
     /// 获取对话中已使用的发送者昵称列表（去重，按出现顺序）
     func getUsedSenderNames(for contactId: UUID) -> [String] {
-        let allMessages = conversations[contactId]?.messages ?? []
+        let allMessages = paginationStates[contactId]?.loadedMessages ?? []
         var seen = Set<String>()
         var result: [String] = []
         
@@ -301,12 +275,6 @@ final class ChatViewModel: ObservableObject {
             
             paginationStates[contactId] = state
             
-            // 同步更新 conversations（供导出等功能使用）
-            if var conversation = conversations[contactId] {
-                conversation.messages = state.loadedMessages
-                conversations[contactId] = conversation
-            }
-            
             logger.info("[ChatsV2] Loaded \(newMessages.count) messages (total: \(state.loadedMessages.count)/\(state.totalCount)) for \(contactId)")
         } catch {
             logger.error("[ChatsV2] Failed to load messages page: \(error)")
@@ -337,11 +305,6 @@ final class ChatViewModel: ObservableObject {
             state.hasInitiallyLoaded = false
             paginationStates[contactId] = state
         }
-        
-        if var conversation = conversations[contactId] {
-            conversation.messages.removeAll(keepingCapacity: false)
-            conversations[contactId] = conversation
-        }
     }
     
     /// 卸载所有对话的已加载消息（可选保留一个）
@@ -354,8 +317,8 @@ final class ChatViewModel: ObservableObject {
 
     func deleteContact(_ contact: ChatBookListItem) {
         contacts.removeAll { $0.id == contact.id }
-        conversations.removeValue(forKey: contact.contactId)
         paginationStates.removeValue(forKey: contact.contactId)
+        paginationLoadTokens.removeValue(forKey: contact.contactId)
 
         Task {
             do {
@@ -376,10 +339,10 @@ final class ChatViewModel: ObservableObject {
     /// - Returns: 导出的字符串内容
     func exportConversation(_ contactId: UUID, format: ChatExportFormat) -> String? {
         // 优先使用分页加载的消息（用户当前看到的数据）
-        let messages = paginationStates[contactId]?.loadedMessages ?? conversations[contactId]?.messages ?? []
+        let messages = paginationStates[contactId]?.loadedMessages ?? []
         guard !messages.isEmpty else { return nil }
         
-        let contactName = conversations[contactId]?.contact.name ?? "Unknown"
+        let contactName = contacts.first(where: { $0.contactId == contactId })?.name ?? "Unknown"
         return ChatExporter.export(messages: messages, contactName: contactName, format: format)
     }
     
@@ -388,7 +351,7 @@ final class ChatViewModel: ObservableObject {
         // 加载全部消息
         do {
             let allMessages = try await cacheService.fetchAllMessages(conversationId: contactId.uuidString)
-            let contactName = conversations[contactId]?.contact.name ?? "Unknown"
+            let contactName = contacts.first(where: { $0.contactId == contactId })?.name ?? "Unknown"
             return ChatExporter.export(messages: allMessages, contactName: contactName, format: format)
         } catch {
             logger.error("[ChatsV2] Failed to fetch all messages for export: \(error)")
@@ -399,7 +362,7 @@ final class ChatViewModel: ObservableObject {
     
     /// 生成导出文件名
     func generateExportFileName(for contactId: UUID, format: ChatExportFormat) -> String {
-        let contactName = conversations[contactId]?.contact.name ?? "Chat"
+        let contactName = contacts.first(where: { $0.contactId == contactId })?.name ?? "Chat"
         return ChatExporter.generateFileName(contactName: contactName, format: format)
     }
     
@@ -425,23 +388,19 @@ final class ChatViewModel: ObservableObject {
         
         let contactId: UUID
         
-        if let existingId = existingContactId, conversations[existingId] != nil {
+        if let existingId = existingContactId, paginationStates[existingId] != nil {
             // 追加到现有对话
             contactId = existingId
             
             // 调整 order
             let adjustedMessages = adjustOrders(result.messages, for: existingId)
             
-            // 更新内存
-            if var conversation = conversations[existingId] {
-                conversation.messages.append(contentsOf: adjustedMessages)
-                conversations[existingId] = conversation
-            }
-            
             // 更新分页状态
             if var state = paginationStates[existingId] {
                 state.loadedMessages.append(contentsOf: adjustedMessages)
                 state.totalCount += adjustedMessages.count
+                state.currentOffset = state.loadedMessages.count
+                state.hasInitiallyLoaded = true
                 paginationStates[existingId] = state
             }
             
@@ -455,8 +414,6 @@ final class ChatViewModel: ObservableObject {
         } else {
             // 创建新对话
             let contact = ChatContact(name: result.contactName)
-            let conversation = ChatConversation(contact: contact, messages: result.messages)
-            conversations[contact.id] = conversation
             contactId = contact.id
             
             // 初始化分页状态
@@ -464,7 +421,11 @@ final class ChatViewModel: ObservableObject {
             state.loadedMessages = result.messages
             state.totalCount = result.messages.count
             state.hasInitiallyLoaded = true
+            state.currentOffset = state.loadedMessages.count
             paginationStates[contact.id] = state
+            
+            // 立即更新 UI（新对话）
+            updateContactsListImmediately(newContact: ChatBookListItem(from: contact))
             
             // 保存对话和消息
             try await cacheService.saveConversation(contact)
@@ -496,20 +457,6 @@ final class ChatViewModel: ObservableObject {
     }
 
     func renameConversation(_ contactId: UUID, newName: String) {
-        guard var conversation = conversations[contactId] else { return }
-
-        var contact = conversation.contact
-        contact = ChatContact(
-            id: contact.id,
-            name: newName,
-            lastMessage: contact.lastMessage,
-            lastMessageTime: contact.lastMessageTime,
-            messageCount: contact.messageCount
-        )
-
-        conversation.contact = contact
-        conversations[contactId] = conversation
-
         Task {
             do {
                 try await cacheService.renameConversation(id: contactId.uuidString, newName: newName)
@@ -542,14 +489,7 @@ final class ChatViewModel: ObservableObject {
             )
         }
         
-        // 1. 更新 conversations 内存
-        if var conversation = conversations[contactId],
-           let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
-            conversation.messages[index] = createUpdatedMessage(from: conversation.messages[index])
-            conversations[contactId] = conversation
-        }
-        
-        // 2. 更新 paginationStates 内存
+        // 1. 更新 paginationStates 内存
         if var state = paginationStates[contactId],
            let index = state.loadedMessages.firstIndex(where: { $0.id == messageId }) {
             state.loadedMessages[index] = createUpdatedMessage(from: state.loadedMessages[index])
@@ -590,21 +530,14 @@ final class ChatViewModel: ObservableObject {
             )
         }
         
-        // 1. 更新 conversations 内存
-        if var conversation = conversations[contactId],
-           let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
-            conversation.messages[index] = createUpdatedMessage(from: conversation.messages[index])
-            conversations[contactId] = conversation
-        }
-        
-        // 2. 更新 paginationStates 内存
+        // 1. 更新 paginationStates 内存
         if var state = paginationStates[contactId],
            let index = state.loadedMessages.firstIndex(where: { $0.id == messageId }) {
             state.loadedMessages[index] = createUpdatedMessage(from: state.loadedMessages[index])
             paginationStates[contactId] = state
         }
         
-        // 3. 持久化
+        // 2. 持久化
         Task {
             do {
                 try await cacheService.updateMessageSenderName(
@@ -620,20 +553,15 @@ final class ChatViewModel: ObservableObject {
     
     /// 删除指定消息
     func deleteMessage(messageId: UUID, for contactId: UUID) {
-        // 1. 更新 conversations 内存
-        if var conversation = conversations[contactId] {
-            conversation.messages.removeAll { $0.id == messageId }
-            conversations[contactId] = conversation
-        }
-        
-        // 2. 更新 paginationStates 内存
+        // 1. 更新 paginationStates 内存
         if var state = paginationStates[contactId] {
             state.loadedMessages.removeAll { $0.id == messageId }
             state.totalCount = max(0, state.totalCount - 1)
+            state.currentOffset = state.loadedMessages.count
             paginationStates[contactId] = state
         }
         
-        // 3. 持久化删除
+        // 2. 持久化删除
         Task {
             do {
                 try await cacheService.deleteMessage(messageId: messageId.uuidString)
@@ -711,16 +639,13 @@ final class ChatViewModel: ObservableObject {
 
             // 内存更新：调整 order 连续
             let adjusted = adjustOrders(parsedMessages, for: contactId)
-
-            if var conversation = conversations[contactId] {
-                conversation.messages.append(contentsOf: adjusted)
-                conversations[contactId] = conversation
-            }
             
             // 更新分页状态：将新消息追加到已加载列表末尾
             if var state = paginationStates[contactId] {
                 state.loadedMessages.append(contentsOf: adjusted)
                 state.totalCount += adjusted.count
+                state.currentOffset = state.loadedMessages.count
+                state.hasInitiallyLoaded = true
                 paginationStates[contactId] = state
             }
 
@@ -765,7 +690,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func adjustOrders(_ messages: [ChatMessage], for contactId: UUID) -> [ChatMessage] {
-        let existingMax = conversations[contactId]?.messages.map(\.order).max() ?? -1
+        let existingMax = paginationStates[contactId]?.loadedMessages.map(\.order).max() ?? -1
         let start = existingMax + 1
         return messages.enumerated().map { idx, msg in
             ChatMessage(
