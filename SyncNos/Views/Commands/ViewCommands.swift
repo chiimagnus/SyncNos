@@ -4,6 +4,9 @@ import SwiftUI
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    /// 监听数据源自定义顺序变化，用于触发 Commands 重建（更新 cmd+1... 的绑定）
+    /// 注意：这里不直接解析 data，而是通过 `ContentSource.customOrder` 读取；该字段只用于驱动 SwiftUI 刷新。
+    @AppStorage(ContentSource.orderKey) private var dataSourceOrderData: Data?
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
@@ -31,7 +34,9 @@ struct ViewCommands: Commands {
     }
 
     private var enabledContentSources: [ContentSource] {
-        ContentSource.orderedEnabledSources(isEnabled: isDataSourceEnabled)
+        // 显式读取 orderKey 对应的 @AppStorage，确保拖拽排序时 Commands 会重算
+        _ = dataSourceOrderData
+        return ContentSource.orderedEnabledSources(isEnabled: isDataSourceEnabled)
     }
 
     private func isDataSourceEnabled(_ source: ContentSource) -> Bool {
@@ -69,6 +74,12 @@ struct ViewCommands: Commands {
         case 8: return "9"
         default: return nil
         }
+    }
+    
+    /// 用于强制 SwiftUI 重建对应的 NSMenuItem，确保 keyboardShortcut 的 keyEquivalent 在顺序变化后能真正更新
+    private func menuItemIdentity(for source: ContentSource) -> String {
+        let idx = indexForSource(source) ?? -1
+        return "datasource.command.\(source.rawValue).\(idx)"
     }
 
     // MARK: - Data Source Navigation (Circular)
@@ -135,11 +146,13 @@ struct ViewCommands: Commands {
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .appleBooks)
+                    .id(menuItemIdentity(for: .appleBooks))
                 } else {
                     Button("Apple Books", systemImage: "book") {
                         contentSourceRawValue = ContentSource.appleBooks.rawValue
                     }
                     .disabled(currentSource == .appleBooks)
+                    .id(menuItemIdentity(for: .appleBooks))
                 }
             }
 
@@ -150,11 +163,13 @@ struct ViewCommands: Commands {
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .goodLinks)
+                    .id(menuItemIdentity(for: .goodLinks))
                 } else {
                     Button("GoodLinks", systemImage: "bookmark") {
                         contentSourceRawValue = ContentSource.goodLinks.rawValue
                     }
                     .disabled(currentSource == .goodLinks)
+                    .id(menuItemIdentity(for: .goodLinks))
                 }
             }
 
@@ -165,11 +180,13 @@ struct ViewCommands: Commands {
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .weRead)
+                    .id(menuItemIdentity(for: .weRead))
                 } else {
                     Button("WeRead", systemImage: "w.square") {
                         contentSourceRawValue = ContentSource.weRead.rawValue
                     }
                     .disabled(currentSource == .weRead)
+                    .id(menuItemIdentity(for: .weRead))
                 }
             }
 
@@ -180,11 +197,13 @@ struct ViewCommands: Commands {
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .dedao)
+                    .id(menuItemIdentity(for: .dedao))
                 } else {
                     Button("Dedao", systemImage: "d.square") {
                         contentSourceRawValue = ContentSource.dedao.rawValue
                     }
                     .disabled(currentSource == .dedao)
+                    .id(menuItemIdentity(for: .dedao))
                 }
             }
 
@@ -195,11 +214,13 @@ struct ViewCommands: Commands {
                     }
                     .keyboardShortcut(key, modifiers: .command)
                     .disabled(currentSource == .chats)
+                    .id(menuItemIdentity(for: .chats))
                 } else {
                     Button("Chats", systemImage: "message") {
                         contentSourceRawValue = ContentSource.chats.rawValue
                     }
                     .disabled(currentSource == .chats)
+                    .id(menuItemIdentity(for: .chats))
                 }
             }
 
