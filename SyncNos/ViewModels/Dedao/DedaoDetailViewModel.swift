@@ -296,8 +296,10 @@ final class DedaoDetailViewModel: ObservableObject {
                 isLoading = false
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
                 
-                // 后台异步同步（不阻塞）
-                await performBackgroundSync(bookId: bookId)
+                // 后台异步同步（不阻塞 - 在独立 Task 中运行）
+                Task { [weak self] in
+                    await self?.performBackgroundSync(bookId: bookId)
+                }
                 return
             }
         } catch {

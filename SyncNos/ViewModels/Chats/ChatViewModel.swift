@@ -325,8 +325,8 @@ final class ChatViewModel: ObservableObject {
         // 获取有消息数据的对话数量
         let loadedConversations = paginationStates.filter { $0.value.hasInitiallyLoaded }
         
-        // 如果已加载的对话数量未超过阈值，不需要淘汰
-        guard loadedConversations.count >= ChatPaginationConfig.maxCachedConversations else {
+        // 如果已加载的对话数量未超过阈值，不需要淘汰（允许 maxCachedConversations 个对话）
+        guard loadedConversations.count > ChatPaginationConfig.maxCachedConversations else {
             return
         }
         
@@ -335,8 +335,8 @@ final class ChatViewModel: ObservableObject {
             .filter { $0.key != excludingContactId } // 排除当前正在访问的对话
             .sorted { $0.value < $1.value } // 按时间升序（最早访问的在前）
         
-        // 计算需要淘汰的对话数量
-        let evictionCount = loadedConversations.count - ChatPaginationConfig.maxCachedConversations + 1
+        // 计算需要淘汰的对话数量（保留 maxCachedConversations 个）
+        let evictionCount = max(0, loadedConversations.count - ChatPaginationConfig.maxCachedConversations)
         
         for (index, (contactId, _)) in sortedByAccessTime.enumerated() {
             if index >= evictionCount { break }
