@@ -4,9 +4,9 @@ import SwiftUI
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
-    /// 监听数据源自定义顺序变化，用于触发 Commands 重建（更新 cmd+1... 的绑定）
-    /// 注意：这里不直接解析 data，而是通过 `ContentSource.customOrder` 读取；该字段只用于驱动 SwiftUI 刷新。
-    @AppStorage(ContentSource.orderKey) private var dataSourceOrderData: Data?
+    /// 数据源自定义顺序（V2：String/RawRepresentable）
+    /// 破坏性：不读取旧 Data(JSON) 顺序；首次升级会回退默认顺序，需用户重新拖拽一次
+    @AppStorage(ContentSource.orderKey) private var dataSourceOrder: ContentSourceOrder = .default
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
@@ -34,9 +34,7 @@ struct ViewCommands: Commands {
     }
 
     private var enabledContentSources: [ContentSource] {
-        // 显式读取 orderKey 对应的 @AppStorage，确保拖拽排序时 Commands 会重算
-        _ = dataSourceOrderData
-        return ContentSource.orderedEnabledSources(isEnabled: isDataSourceEnabled)
+        dataSourceOrder.sources.filter { isDataSourceEnabled($0) }
     }
 
     private func isDataSourceEnabled(_ source: ContentSource) -> Bool {
@@ -59,27 +57,11 @@ struct ViewCommands: Commands {
         enabledContentSources.firstIndex(of: source)
     }
 
-    /// 根据"第几个启用的数据源"返回对应的快捷键（cmd+1 到 cmd+9）
-    private func shortcutKey(for source: ContentSource) -> KeyEquivalent? {
-        guard let index = indexForSource(source) else { return nil }
-        switch index {
-        case 0: return "1"
-        case 1: return "2"
-        case 2: return "3"
-        case 3: return "4"
-        case 4: return "5"
-        case 5: return "6"
-        case 6: return "7"
-        case 7: return "8"
-        case 8: return "9"
-        default: return nil
-        }
-    }
-    
-    /// 用于强制 SwiftUI 重建对应的 NSMenuItem，确保 keyboardShortcut 的 keyEquivalent 在顺序变化后能真正更新
-    private func menuItemIdentity(for source: ContentSource) -> String {
-        let idx = indexForSource(source) ?? -1
-        return "datasource.command.\(source.rawValue).\(idx)"
+    /// 根据索引返回对应的快捷键（cmd+1 到 cmd+9）
+    private func shortcutKey(for index: Int) -> KeyEquivalent? {
+        let value = index + 1
+        guard (1...9).contains(value) else { return nil }
+        return KeyEquivalent(Character(String(value)))
     }
 
     // MARK: - Data Source Navigation (Circular)
@@ -137,91 +119,16 @@ struct ViewCommands: Commands {
 
             Divider()
 
-            // 数据源切换（cmd+1 / cmd+2 / cmd+3 绑定到"第 1/2/3 个启用的数据源"）
+            // 数据源切换（cmd+1 / cmd+2 / ... 绑定到“第 1/2/... 个启用的数据源”）
             // 通知由 DataSourceSwitchViewModel.switchTo() 统一发送
-            if isDataSourceEnabled(.appleBooks) {
-                if let key = shortcutKey(for: .appleBooks) {
-                    Button("Apple Books", systemImage: "book") {
-                        contentSourceRawValue = ContentSource.appleBooks.rawValue
-                    }
-                    .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .appleBooks)
-                    .id(menuItemIdentity(for: .appleBooks))
-                } else {
-                    Button("Apple Books", systemImage: "book") {
-                        contentSourceRawValue = ContentSource.appleBooks.rawValue
-                    }
-                    .disabled(currentSource == .appleBooks)
-                    .id(menuItemIdentity(for: .appleBooks))
+            ForEach(Array(enabledContentSources.enumerated()), id: \.element) { index, source in
+                Button(source.displayName, systemImage: source.icon) {
+                    contentSourceRawValue = source.rawValue
                 }
-            }
-
-            if isDataSourceEnabled(.goodLinks) {
-                if let key = shortcutKey(for: .goodLinks) {
-                    Button("GoodLinks", systemImage: "bookmark") {
-                        contentSourceRawValue = ContentSource.goodLinks.rawValue
-                    }
-                    .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .goodLinks)
-                    .id(menuItemIdentity(for: .goodLinks))
-                } else {
-                    Button("GoodLinks", systemImage: "bookmark") {
-                        contentSourceRawValue = ContentSource.goodLinks.rawValue
-                    }
-                    .disabled(currentSource == .goodLinks)
-                    .id(menuItemIdentity(for: .goodLinks))
-                }
-            }
-
-            if isDataSourceEnabled(.weRead) {
-                if let key = shortcutKey(for: .weRead) {
-                    Button("WeRead", systemImage: "w.square") {
-                        contentSourceRawValue = ContentSource.weRead.rawValue
-                    }
-                    .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .weRead)
-                    .id(menuItemIdentity(for: .weRead))
-                } else {
-                    Button("WeRead", systemImage: "w.square") {
-                        contentSourceRawValue = ContentSource.weRead.rawValue
-                    }
-                    .disabled(currentSource == .weRead)
-                    .id(menuItemIdentity(for: .weRead))
-                }
-            }
-
-            if isDataSourceEnabled(.dedao) {
-                if let key = shortcutKey(for: .dedao) {
-                    Button("Dedao", systemImage: "d.square") {
-                        contentSourceRawValue = ContentSource.dedao.rawValue
-                    }
-                    .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .dedao)
-                    .id(menuItemIdentity(for: .dedao))
-                } else {
-                    Button("Dedao", systemImage: "d.square") {
-                        contentSourceRawValue = ContentSource.dedao.rawValue
-                    }
-                    .disabled(currentSource == .dedao)
-                    .id(menuItemIdentity(for: .dedao))
-                }
-            }
-
-            if isDataSourceEnabled(.chats) {
-                if let key = shortcutKey(for: .chats) {
-                    Button("Chats", systemImage: "message") {
-                        contentSourceRawValue = ContentSource.chats.rawValue
-                    }
-                    .keyboardShortcut(key, modifiers: .command)
-                    .disabled(currentSource == .chats)
-                    .id(menuItemIdentity(for: .chats))
-                } else {
-                    Button("Chats", systemImage: "message") {
-                        contentSourceRawValue = ContentSource.chats.rawValue
-                    }
-                    .disabled(currentSource == .chats)
-                    .id(menuItemIdentity(for: .chats))
-                }
+                .disabled(currentSource == source)
+                .applyKeyboardShortcut(shortcutKey(for: index), modifiers: .command)
+                // 命令项 identity = (source, index)；当顺序变化时强制重建对应 NSMenuItem，以确保快捷键立即刷新
+                .id("datasource.command.\(source.rawValue).\(index)")
             }
 
             Divider()
@@ -491,6 +398,18 @@ struct ViewCommands: Commands {
                 }
             }
 
+        }
+    }
+}
+
+private extension View {
+    /// 条件性应用 keyboardShortcut（避免在 `ForEach` 中写分支导致 View 类型不一致）
+    @ViewBuilder
+    func applyKeyboardShortcut(_ key: KeyEquivalent?, modifiers: EventModifiers) -> some View {
+        if let key {
+            self.keyboardShortcut(key, modifiers: modifiers)
+        } else {
+            self
         }
     }
 }

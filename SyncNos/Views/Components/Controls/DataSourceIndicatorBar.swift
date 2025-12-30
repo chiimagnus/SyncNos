@@ -6,6 +6,9 @@ import SwiftUI
 struct DataSourceIndicatorBar: View {
     @ObservedObject var viewModel: DataSourceSwitchViewModel
     
+    /// 数据源自定义顺序（V2：String/RawRepresentable）
+    @AppStorage(ContentSource.orderKey) private var storedOrder: ContentSourceOrder = .default
+    
     /// 当前正在拖拽的数据源
     @State private var draggingSource: ContentSource?
     /// 拖拽时的临时顺序（用于预览效果）
@@ -39,7 +42,8 @@ struct DataSourceIndicatorBar: View {
                     sources: viewModel.enabledDataSources,
                     draggingSource: $draggingSource,
                     draggedOrder: $draggedOrder,
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    storedOrder: $storedOrder
                 ))
             }
         }
@@ -57,6 +61,7 @@ private struct DataSourceDropDelegate: DropDelegate {
     @Binding var draggingSource: ContentSource?
     @Binding var draggedOrder: [ContentSource]?
     let viewModel: DataSourceSwitchViewModel
+    @Binding var storedOrder: ContentSourceOrder
     
     func dropEntered(info: DropInfo) {
         guard let dragging = draggingSource, dragging != source else { return }
@@ -120,7 +125,7 @@ private struct DataSourceDropDelegate: DropDelegate {
     /// 保存新的数据源顺序
     private func saveNewOrder(_ enabledOrder: [ContentSource]) {
         // 获取当前完整的自定义顺序
-        let fullOrder = ContentSource.customOrder
+        let fullOrder = storedOrder.sources
         
         // 根据新的启用顺序重新排列
         // 思路：将启用的数据源按新顺序排列，未启用的保持原位置
@@ -155,10 +160,10 @@ private struct DataSourceDropDelegate: DropDelegate {
             newFullOrder.append(source)
         }
         
-        // 保存到 UserDefaults（会触发 orderChangedNotification，供 ViewCommands 等组件使用）
-        ContentSource.customOrder = newFullOrder
-        // 确保偏好设置及时落盘（防止用户拖拽后立刻退出应用导致未写入）
-        UserDefaults.standard.synchronize()
+        // 保存到 AppStorage / UserDefaults（V2）
+        storedOrder = ContentSourceOrder.encode(newFullOrder)
+        // 破坏性：清理旧 key（Data(JSON)），避免后续困惑
+        UserDefaults.standard.removeObject(forKey: ContentSource.legacyOrderKey)
         
         // 直接更新 ViewModel（updateEnabledDataSources 会自动保持当前活动的数据源）
         viewModel.updateEnabledDataSources(enabledOrder)

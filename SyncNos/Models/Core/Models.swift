@@ -55,11 +55,11 @@ enum ContentSource: String, Codable, CaseIterable {
     
     // MARK: - Custom Order
     
-    /// UserDefaults 键：数据源自定义顺序
-    static let orderKey = "datasource.customOrder"
+    /// UserDefaults 键：数据源自定义顺序（V2：String 存储，不向后兼容旧 Data(JSON)）
+    static let orderKey = "datasource.customOrder.v2"
     
-    /// 数据源顺序变化通知
-    static let orderChangedNotification = Notification.Name("ContentSourceOrderChanged")
+    /// 旧版本顺序 key（Data(JSON)），V2 不读取；写入 V2 时会清理
+    static let legacyOrderKey = "datasource.customOrder"
     
     // MARK: - List Focus Notifications
     
@@ -72,29 +72,82 @@ enum ContentSource: String, Codable, CaseIterable {
     /// 获取用户自定义的数据源顺序（如果没有自定义，返回默认顺序）
     static var customOrder: [ContentSource] {
         get {
-            guard let data = UserDefaults.standard.data(forKey: orderKey),
-                  let rawValues = try? JSONDecoder().decode([String].self, from: data) else {
-                return ContentSource.allCases.map { $0 }
-            }
-            // 从存储的 rawValue 数组恢复 ContentSource 数组
-            let stored = rawValues.compactMap { ContentSource(rawValue: $0) }
-            // 确保所有数据源都包含在内（处理新增数据源的情况）
-            let missing = ContentSource.allCases.filter { !stored.contains($0) }
-            return stored + missing
+            let raw = UserDefaults.standard.string(forKey: orderKey) ?? ""
+            return ContentSourceOrder(rawValue: raw).sources
         }
         set {
-            let rawValues = newValue.map { $0.rawValue }
-            if let data = try? JSONEncoder().encode(rawValues) {
-                UserDefaults.standard.set(data, forKey: orderKey)
-                // 发送通知，通知其他组件顺序已变化
-                NotificationCenter.default.post(name: orderChangedNotification, object: nil)
-            }
+            let raw = ContentSourceOrder.encode(newValue).rawValue
+            UserDefaults.standard.set(raw, forKey: orderKey)
+            // 破坏性：不做迁移，写入 V2 时清理旧 key（避免后续困惑）
+            UserDefaults.standard.removeObject(forKey: legacyOrderKey)
         }
+    }
+    
+    /// 默认顺序（用于首次启动/未设置时回退）
+    static var defaultOrder: [ContentSource] {
+        ContentSource.allCases
+    }
+    
+    /// 将输入顺序规范化：去重、并补齐缺失的数据源
+    static func normalizedOrder(_ order: [ContentSource]) -> [ContentSource] {
+        var seen = Set<ContentSource>()
+        var result: [ContentSource] = []
+        result.reserveCapacity(ContentSource.allCases.count)
+        
+        for s in order where seen.insert(s).inserted {
+            result.append(s)
+        }
+        
+        for s in ContentSource.allCases where !seen.contains(s) {
+            result.append(s)
+        }
+        
+        return result
     }
     
     /// 按自定义顺序过滤已启用的数据源
     static func orderedEnabledSources(isEnabled: (ContentSource) -> Bool) -> [ContentSource] {
         customOrder.filter { isEnabled($0) }
+    }
+}
+
+/// 存储 ContentSource 顺序的可持久化类型（V2：String）
+/// - 不向后兼容旧 Data(JSON) 格式：旧值将被忽略并回退到默认顺序
+struct ContentSourceOrder: RawRepresentable, Equatable, Sendable {
+    let rawValue: String
+    
+    init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+    
+    /// 从 rawValue 解析并规范化后的顺序
+    var sources: [ContentSource] {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return ContentSource.defaultOrder }
+        
+        let parts = trimmed.split(separator: ",")
+        var parsed: [ContentSource] = []
+        parsed.reserveCapacity(parts.count)
+        
+        for p in parts {
+            let token = p.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let s = ContentSource(rawValue: token) {
+                parsed.append(s)
+            }
+        }
+        
+        guard !parsed.isEmpty else { return ContentSource.defaultOrder }
+        return ContentSource.normalizedOrder(parsed)
+    }
+    
+    static var `default`: ContentSourceOrder {
+        ContentSourceOrder.encode(ContentSource.defaultOrder)
+    }
+    
+    static func encode(_ sources: [ContentSource]) -> ContentSourceOrder {
+        let normalized = ContentSource.normalizedOrder(sources)
+        let raw = normalized.map { $0.rawValue }.joined(separator: ",")
+        return ContentSourceOrder(rawValue: raw)
     }
 }
 
