@@ -11,7 +11,6 @@ struct ChatDetailView: View {
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
 
-    @State private var showOCRPayloadSheet = false
     @State private var showImporter = false
     @State private var importerMode: ImporterMode?
     @State private var importerAllowedContentTypes: [UTType] = []
@@ -157,23 +156,8 @@ struct ChatDetailView: View {
                             Label("Import/Export", systemImage: "arrow.up.arrow.down.circle")
                         }
                         .help("Import or export chat records")
-                        
-#if DEBUG
-                        Button {
-                            showOCRPayloadSheet = true
-                        } label: {
-                            Label("OCR JSON", systemImage: "doc.text.magnifyingglass")
-                        }
-                        .disabled(contact.messageCount == 0)
-                        .help("View OCR raw data")
-#endif
                     }
                 }
-#if DEBUG
-                .sheet(isPresented: $showOCRPayloadSheet) {
-                    ChatOCRPayloadSheet(conversationId: contact.id, conversationName: contact.name)
-                }
-#endif
             // 导出文件保存器
             .fileExporter(
                 isPresented: $showExportSavePanel,
