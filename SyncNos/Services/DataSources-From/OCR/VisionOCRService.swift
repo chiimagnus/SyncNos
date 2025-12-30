@@ -17,6 +17,20 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
     private enum Constants {
         /// 最小文字高度比例（相对于图像高度）
         static let minimumTextHeight: Float = 0.01
+        
+        /// 长图片分片处理阈值（像素）
+        /// 超过此高度的图片会被分片处理，避免 Vision OCR 返回空结果
+        /// Apple Silicon Mac 支持最大纹理尺寸约 16384x16384
+        /// 设置为 16000px，接近 GPU 纹理限制但保留一些余量
+        static let sliceThresholdHeight: CGFloat = 16000
+        
+        /// 分片最大高度（像素）
+        /// 设置为 8000px，确保每个分片都在 Vision OCR 的安全处理范围内
+        static let sliceMaxHeight: CGFloat = 8000
+        
+        /// 分片重叠区域（像素）
+        /// 用于处理跨片文字，避免边界处文字丢失或重复
+        static let sliceOverlap: CGFloat = 200
     }
     
     // MARK: - Init
@@ -55,6 +69,12 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         
         logger.info("[VisionOCR] Starting recognition, image size: \(Int(imageSize.width))x\(Int(imageSize.height))")
         logger.debug("[VisionOCR] Language mode: \(isAutoDetect ? "automatic" : "manual"), languages: \(languageCodes.joined(separator: ", "))")
+        
+        // 检查是否需要分片处理
+        if imageSize.height > Constants.sliceThresholdHeight {
+            logger.info("[VisionOCR] 🔪 Image height \(Int(imageSize.height))px exceeds threshold \(Int(Constants.sliceThresholdHeight))px, using slice processing")
+            return try await recognizeWithSlicing(cgImage: cgImage, imageSize: imageSize, languageCodes: languageCodes, isAutoDetect: isAutoDetect)
+        }
         
         // 创建识别请求
         let request = VNRecognizeTextRequest()
@@ -145,6 +165,201 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         // Vision 框架始终可用，无需连接测试
         logger.info("[VisionOCR] Connection test: Always available (native framework)")
         return true
+    }
+    
+    // MARK: - Slice Processing (长图片分片处理)
+    
+    /// 对超长图片进行分片 OCR 处理
+    /// - Parameters:
+    ///   - cgImage: 原始 CGImage
+    ///   - imageSize: 图像尺寸
+    ///   - languageCodes: 语言代码
+    ///   - isAutoDetect: 是否自动检测语言
+    /// - Returns: 合并后的 OCR 结果
+    private func recognizeWithSlicing(
+        cgImage: CGImage,
+        imageSize: CGSize,
+        languageCodes: [String],
+        isAutoDetect: Bool
+    ) async throws -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
+        // 计算分片
+        let slices = calculateSlices(imageHeight: imageSize.height)
+        logger.info("[VisionOCR] 🔪 Slicing image into \(slices.count) parts")
+        
+        var allBlocks: [OCRBlock] = []
+        var allRawDicts: [[String: Any]] = []
+        var allObservations: [VNRecognizedTextObservation] = []
+        
+        for (index, slice) in slices.enumerated() {
+            logger.debug("[VisionOCR] 🔪 Processing slice \(index + 1)/\(slices.count): y=\(Int(slice.y)), height=\(Int(slice.height))")
+            
+            // 裁剪图片
+            guard let slicedImage = cropImage(cgImage, rect: slice, imageWidth: Int(imageSize.width)) else {
+                logger.warning("[VisionOCR] ⚠️ Failed to crop slice \(index + 1)")
+                continue
+            }
+            
+            // 对分片进行 OCR
+            let sliceSize = CGSize(width: imageSize.width, height: slice.height)
+            let (observations, blocks) = try await recognizeSingleImage(
+                cgImage: slicedImage,
+                imageSize: sliceSize,
+                languageCodes: languageCodes,
+                isAutoDetect: isAutoDetect
+            )
+            
+            // 调整 bbox 的 Y 坐标（加上分片的起始 Y 偏移）
+            let adjustedBlocks = blocks.map { block -> OCRBlock in
+                let adjustedBbox = CGRect(
+                    x: block.bbox.origin.x,
+                    y: block.bbox.origin.y + slice.y,  // 加上分片的 Y 偏移
+                    width: block.bbox.width,
+                    height: block.bbox.height
+                )
+                return OCRBlock(text: block.text, label: block.label, bbox: adjustedBbox)
+            }
+            
+            allBlocks.append(contentsOf: adjustedBlocks)
+            allObservations.append(contentsOf: observations)
+            
+            // 构造 raw dict（调整 Y 坐标）
+            let rawDicts = observationsToDict(observations, imageSize: sliceSize).map { dict -> [String: Any] in
+                var adjusted = dict
+                if var bbox = dict["boundingBox"] as? [String: CGFloat] {
+                    bbox["y"] = (bbox["y"] ?? 0) + slice.y
+                    adjusted["boundingBox"] = bbox
+                }
+                return adjusted
+            }
+            allRawDicts.append(contentsOf: rawDicts)
+        }
+        
+        // 去重：处理重叠区域可能产生的重复文本块
+        let deduplicatedBlocks = deduplicateBlocks(allBlocks)
+        
+        logger.info("[VisionOCR] 🔪 Slice processing completed: \(allBlocks.count) blocks → \(deduplicatedBlocks.count) after deduplication")
+        
+        // 构造最终结果
+        let result = OCRResult(
+            rawText: deduplicatedBlocks.map(\.text).joined(separator: "\n"),
+            markdownText: nil,
+            blocks: deduplicatedBlocks,
+            processedAt: Date(),
+            coordinateSize: imageSize
+        )
+        
+        let rawData = (try? JSONSerialization.data(withJSONObject: allRawDicts)) ?? Data()
+        
+        // 日志
+        logRecognitionDetails(observations: allObservations, blocks: deduplicatedBlocks)
+        
+        return (result: result, rawResponse: rawData, requestJSON: Data())
+    }
+    
+    /// 计算分片区域
+    /// - Parameter imageHeight: 图像高度
+    /// - Returns: 分片区域数组 (y, height)
+    private func calculateSlices(imageHeight: CGFloat) -> [(y: CGFloat, height: CGFloat)] {
+        var slices: [(y: CGFloat, height: CGFloat)] = []
+        var currentY: CGFloat = 0
+        
+        while currentY < imageHeight {
+            let remainingHeight = imageHeight - currentY
+            let sliceHeight = min(Constants.sliceMaxHeight, remainingHeight)
+            slices.append((y: currentY, height: sliceHeight))
+            
+            // 下一个分片的起始位置（减去重叠区域）
+            currentY += sliceHeight - Constants.sliceOverlap
+            
+            // 如果剩余高度小于重叠区域，直接结束
+            if currentY >= imageHeight - Constants.sliceOverlap {
+                break
+            }
+        }
+        
+        return slices
+    }
+    
+    /// 裁剪图片
+    private func cropImage(_ cgImage: CGImage, rect: (y: CGFloat, height: CGFloat), imageWidth: Int) -> CGImage? {
+        let cropRect = CGRect(
+            x: 0,
+            y: rect.y,
+            width: CGFloat(imageWidth),
+            height: rect.height
+        )
+        return cgImage.cropping(to: cropRect)
+    }
+    
+    /// 对单张图片进行 OCR（不分片）
+    private func recognizeSingleImage(
+        cgImage: CGImage,
+        imageSize: CGSize,
+        languageCodes: [String],
+        isAutoDetect: Bool
+    ) async throws -> (observations: [VNRecognizedTextObservation], blocks: [OCRBlock]) {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.minimumTextHeight = Constants.minimumTextHeight
+        
+        if #available(macOS 14.0, *) {
+            request.revision = VNRecognizeTextRequestRevision3
+            request.automaticallyDetectsLanguage = isAutoDetect
+        } else {
+            request.revision = VNRecognizeTextRequestRevision2
+        }
+        
+        request.recognitionLanguages = languageCodes
+        
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else {
+                    continuation.resume(throwing: OCRServiceError.invalidResponse)
+                    return
+                }
+                
+                do {
+                    try handler.perform([request])
+                    
+                    let observations = request.results ?? []
+                    let blocks = self.convertToOCRBlocks(observations: observations, imageSize: imageSize)
+                    
+                    continuation.resume(returning: (observations: observations, blocks: blocks))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    /// 去重：移除重叠区域产生的重复文本块
+    /// 使用文本内容 + 近似位置判断是否为重复
+    private func deduplicateBlocks(_ blocks: [OCRBlock]) -> [OCRBlock] {
+        var result: [OCRBlock] = []
+        
+        for block in blocks {
+            let isDuplicate = result.contains { existing in
+                // 文本完全相同
+                guard existing.text == block.text else { return false }
+                
+                // Y 坐标接近（在重叠区域内）
+                let yDifference = abs(existing.bbox.midY - block.bbox.midY)
+                guard yDifference < Constants.sliceOverlap else { return false }
+                
+                // X 坐标接近
+                let xDifference = abs(existing.bbox.midX - block.bbox.midX)
+                return xDifference < 50  // 允许 50px 的水平偏差
+            }
+            
+            if !isDuplicate {
+                result.append(block)
+            }
+        }
+        
+        return result
     }
     
     // MARK: - Private Methods
