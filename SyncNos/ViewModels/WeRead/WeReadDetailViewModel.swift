@@ -106,6 +106,11 @@ final class WeReadDetailViewModel: ObservableObject {
     private var filteredHighlights: [WeReadHighlightDisplay] = []
 
     private var cancellables = Set<AnyCancellable>()
+    
+    /// 当前加载任务，用于在切换书籍时取消
+    private var currentLoadTask: Task<Void, Never>?
+    /// 当前同步任务，用于在切换书籍时取消
+    private var currentSyncTask: Task<Void, Never>?
 
     // MARK: - Initialization
     
@@ -242,6 +247,12 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 清理所有数据，释放内存（在切换书籍或视图销毁时调用）
     func clear() {
+        // 取消正在进行的任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        currentSyncTask?.cancel()
+        currentSyncTask = nil
+        
         // 清理数据
         currentBookId = nil
         allBookmarks = []
@@ -267,6 +278,10 @@ final class WeReadDetailViewModel: ObservableObject {
             return
         }
         
+        // 取消之前的加载任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        
         currentBookId = bookId
         isLoading = true
         
@@ -278,7 +293,14 @@ final class WeReadDetailViewModel: ObservableObject {
         
         // 1. 先从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
         do {
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             let cached = try await cacheService.getHighlights(bookId: bookId)
+            
+            // 再次检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             if !cached.isEmpty {
                 allBookmarks = cached
                 applyFiltersAndSort()
@@ -287,6 +309,7 @@ final class WeReadDetailViewModel: ObservableObject {
                 logger.info("[WeReadDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
             }
         } catch {
+            guard !Task.isCancelled else { return }
             logger.warning("[WeReadDetail] Cache load failed: \(error.localizedDescription)")
         }
         

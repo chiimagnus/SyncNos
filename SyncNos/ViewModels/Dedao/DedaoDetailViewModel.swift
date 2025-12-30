@@ -99,6 +99,11 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     
+    /// 当前加载任务，用于在切换书籍时取消
+    private var currentLoadTask: Task<Void, Never>?
+    /// 当前同步任务，用于在切换书籍时取消
+    private var currentSyncTask: Task<Void, Never>?
+    
     // MARK: - Initialization
     
     init(
@@ -227,6 +232,12 @@ final class DedaoDetailViewModel: ObservableObject {
     
     /// 清理所有数据，释放内存（在切换书籍或视图销毁时调用）
     func clear() {
+        // 取消正在进行的任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        currentSyncTask?.cancel()
+        currentSyncTask = nil
+        
         // 清理数据
         currentBookId = nil
         allNotes = []
@@ -252,13 +263,24 @@ final class DedaoDetailViewModel: ObservableObject {
             return
         }
         
+        // 取消之前的加载任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        
         let isNewBook = currentBookId != bookId
         currentBookId = bookId
         
         // 1. 先尝试从缓存加载（不清空现有数据，避免闪烁）
         do {
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             // cacheService.getHighlights 现在直接返回 [DedaoEbookNote]
             let cached = try await cacheService.getHighlights(bookId: bookId)
+            
+            // 再次检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             if !cached.isEmpty {
                 // 有缓存：立即显示，不显示 Loading
                 allNotes = cached
@@ -268,12 +290,13 @@ final class DedaoDetailViewModel: ObservableObject {
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
                 
                 // 后台异步同步（不阻塞）
-                Task {
+                currentLoadTask = Task {
                     await performBackgroundSync(bookId: bookId)
                 }
                 return
             }
         } catch {
+            guard !Task.isCancelled else { return }
             logger.warning("[DedaoDetail] Cache load failed: \(error.localizedDescription)")
         }
         
