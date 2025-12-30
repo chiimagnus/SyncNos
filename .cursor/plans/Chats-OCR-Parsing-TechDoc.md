@@ -316,3 +316,60 @@ Apple Vision（macOS 14，Accurate 模式）支持 **30 种语言**：
 - ✅ 日语 + 英语：支持
 
 详见：[Apple Vision OCR 技术文档](../Docs/Apple-Vision-OCR技术文档.md)
+
+## 10. 长图片分片处理 ✅（2025-12-30 已实现）
+
+### 10.1 问题背景
+
+Vision OCR 在处理超长图片（如微信长截图）时可能返回空结果或识别不完整。这可能是由于 GPU 纹理尺寸限制或 Vision 框架的内部限制导致。
+
+### 10.2 解决方案
+
+SyncNos 在 `VisionOCRService` 中实现了自动分片处理机制：
+
+| 参数 | 值 | 说明 |
+|-----|-----|------|
+| `sliceThresholdHeight` | 16000px | 超过此高度才启用分片 |
+| `sliceMaxHeight` | 8000px | 每个分片的最大高度 |
+| `sliceOverlap` | 200px | 分片重叠区域（约 4-5 行文字） |
+
+### 10.3 处理流程
+
+1. **检测**：图像高度是否超过阈值 (16000px)
+2. **分片**：计算分片区域（带 200px 重叠）
+3. **OCR**：对每个分片进行独立识别
+4. **偏移**：调整 bbox 的 Y 坐标（加上分片偏移）
+5. **去重**：移除重叠区域产生的重复文本块（通过文本内容 + 近似位置判断）
+6. **合并**：合并所有分片的结果
+
+### 10.4 日志输出
+
+```
+[VisionOCR] 🔪 Image height 20000px exceeds threshold 16000px, using slice processing
+[VisionOCR] 🔪 Slicing image into 3 parts
+[VisionOCR] 🔪 Processing slice 1/3: y=0, height=8000
+[VisionOCR] 🔪 Processing slice 2/3: y=7800, height=8000
+[VisionOCR] 🔪 Processing slice 3/3: y=15600, height=4400
+[VisionOCR] 🔪 Slice processing completed: 150 blocks → 145 after deduplication
+```
+
+## 11. 多图片上传顺序 ✅（2025-12-30 已修复）
+
+### 11.1 问题背景
+
+用户通过拖拽上传多张截图时，原实现使用并行异步处理，导致图片处理顺序不可控。
+
+### 11.2 解决方案
+
+修改 `ChatDetailView.handleDrop()` 方法，改为串行处理：
+
+1. 收集所有拖拽的图片 URL/Data（保持 providers 顺序）
+2. 统一调用 `addScreenshots()` 和 `addScreenshotData()`（内部是串行 await）
+3. 确保消息按照用户拖入的顺序追加
+
+### 11.3 顺序保证
+
+| 上传方式 | 顺序来源 | 处理方式 | 顺序可预测 |
+|---------|---------|---------|-----------|
+| fileImporter | 文件对话框排序 | 串行 await | ✅ |
+| 拖拽（修复后） | providers 数组顺序 | 串行 await | ✅ |
