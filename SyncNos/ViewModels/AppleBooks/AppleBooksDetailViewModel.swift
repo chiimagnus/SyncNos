@@ -37,7 +37,9 @@ final class AppleBooksDetailViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     
     /// 当前加载任务，用于在切换书籍时取消
-    private var currentLoadTask: Task<Void, Never>?
+    private var currentLoadTask: Task<[HighlightRow]?, Never>?
+    /// 当前加载任务的唯一标识，用于避免“旧任务回写新状态”
+    private var currentLoadId: UUID = UUID()
 
     init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
          syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
@@ -184,12 +186,14 @@ final class AppleBooksDetailViewModel: ObservableObject {
         // 取消之前的加载任务，避免竞态条件
         currentLoadTask?.cancel()
         currentLoadTask = nil
+        currentLoadId = UUID()
+        isLoadingPage = false
         
         // 等待一小段时间，确保之前的任务有机会响应取消
         try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
         
         closeSession()
-        highlights = []
+        highlights.removeAll(keepingCapacity: false)
         currentOffset = 0
         currentAssetId = assetId
         self.expectedTotalCount = expectedTotalCount
@@ -216,7 +220,12 @@ final class AppleBooksDetailViewModel: ObservableObject {
     }
 
     private func loadNextPage(dbPath: String?, assetId: String, reset: Bool) async {
-        if isLoadingPage { return }
+        // reset 表示切换书籍/筛选/排序导致的“重新加载”：允许打断当前加载
+        if isLoadingPage, !reset { return }
+        if reset {
+            currentLoadTask?.cancel()
+            currentLoadTask = nil
+        }
         if !reset && highlights.count >= expectedTotalCount { return }
 
         if currentAssetId == nil {
@@ -233,10 +242,13 @@ final class AppleBooksDetailViewModel: ObservableObject {
         guard let s = session, let asset = currentAssetId else { return }
 
         if reset {
-            highlights = []
+            highlights.removeAll(keepingCapacity: false)
             currentOffset = 0
         }
 
+        // 为本次加载生成唯一 id，防止旧任务完成后回写
+        let loadId = UUID()
+        currentLoadId = loadId
         isLoadingPage = true
 
         // Capture state for background fetch to avoid main-actor blocking and race conditions
@@ -247,7 +259,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
         let selectedStylesLocal = self.selectedStyles
         let pageSizeLocal = self.pageSize
 
-        // 创建可取消的后台加载任务
+        // 创建可取消的后台加载任务（注意：必须保存该 Task 才能真正 cancel）
         let loadTask = Task<[HighlightRow]?, Never> {
             // 检查任务是否被取消
             guard !Task.isCancelled else { return nil }
@@ -287,23 +299,30 @@ final class AppleBooksDetailViewModel: ObservableObject {
             }
         }
         
-        // 保存任务引用以便取消
-        currentLoadTask = Task {
-            _ = await loadTask.value
-        }
+        // 保存任务引用以便取消（⚠️ 取消必须打到真正的 fetch task 上）
+        currentLoadTask = loadTask
         
         // 等待结果
-        guard let rows = await loadTask.value else {
+        let rowsOrNil = await withTaskCancellationHandler {
+            await loadTask.value
+        } onCancel: {
+            loadTask.cancel()
+        }
+        
+        // 若在等待期间又触发了新的加载，则忽略本次结果/状态回写
+        guard currentLoadId == loadId else { return }
+        
+        guard let rows = rowsOrNil else {
             // 任务被取消或出错
-            if !Task.isCancelled {
-                isLoadingPage = false
-            }
+            isLoadingPage = false
+            currentLoadTask = nil
             return
         }
 
         // If the current asset changed during the fetch, ignore these results
         guard asset == currentAssetId, !Task.isCancelled else {
             isLoadingPage = false
+            currentLoadTask = nil
             return
         }
 
@@ -325,6 +344,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
         }
         currentOffset = currentOffsetLocal + page.count
         isLoadingPage = false
+        currentLoadTask = nil
     }
     
     private func closeSession() {

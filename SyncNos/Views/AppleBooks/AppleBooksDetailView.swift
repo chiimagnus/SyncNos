@@ -6,7 +6,6 @@ struct AppleBooksDetailView: View {
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var viewModel = AppleBooksDetailViewModel()
-    @State private var isSyncing = false
     @Environment(\.openWindow) private var openWindow
     // 使用 debounce 延迟更新布局宽度，避免窗口调整大小时频繁重新计算
     @State private var measuredLayoutWidth: CGFloat = 0
@@ -159,31 +158,24 @@ struct AppleBooksDetailView: View {
             }
         }
         .frame(minWidth: 400, idealWidth: 600)
-        .onAppear {
-            if let book = selectedBook {
-                Task {
-                    await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
-                }
-                // 若返回时该 book 正在批量同步，立即显示外部同步状态
-                if let id = selectedBookId, viewModelList.syncingBookIds.contains(id) {
-                    externalIsSyncing = true
-                }
+        // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
+        .task(id: selectedBookId) {
+            guard let id = selectedBookId,
+                  let book = viewModelList.displayBooks.first(where: { $0.bookId == id }) else {
+                return
             }
-        }
-        .onChange(of: selectedBookId) { _, _ in
-            if let book = selectedBook {
-                Task {
-                    await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
-                }
-            }
+            await viewModel.resetAndLoadFirstPage(
+                dbPath: viewModelList.annotationDatabasePath,
+                assetId: book.bookId,
+                expectedTotalCount: book.highlightCount
+            )
             // 切换到某个 item 时，依据 ViewModel 中的 syncing 集合立即更新外部同步显示
-            if let id = selectedBookId {
-                externalIsSyncing = viewModelList.syncingBookIds.contains(id)
-                if !externalIsSyncing { externalSyncProgress = nil }
-            } else {
-                externalIsSyncing = false
-                externalSyncProgress = nil
-            }
+            externalIsSyncing = viewModelList.syncingBookIds.contains(id)
+            if !externalIsSyncing { externalSyncProgress = nil }
+        }
+        .onDisappear {
+            layoutWidthDebounceTask?.cancel()
+            layoutWidthDebounceTask = nil
         }
         .navigationTitle("Apple Books")
         .toolbar {
@@ -256,11 +248,6 @@ struct AppleBooksDetailView: View {
                     showingSyncError = true
                 }
             }
-        }
-        .onChange(of: selectedBookId) { _, _ in
-            // 切换选中项时清理外部同步显示，避免遗留状态影响新选中项
-            externalIsSyncing = false
-            externalSyncProgress = nil
         }
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
