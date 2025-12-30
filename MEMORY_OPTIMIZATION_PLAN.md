@@ -433,3 +433,49 @@ private func evictOldestConversation() {
 3. **P3（优化增强）**：可选实施，进一步优化
 
 预计 P1 完成后可解决 70% 的内存问题，P2 完成后可达到 90% 的优化效果。
+
+---
+
+## 实施状态
+
+### ✅ 已完成
+
+#### P1 - 关键修复
+- [x] `AppleBooksDetailViewModel` - 添加 `clear()` 方法，关闭 session 并释放数据
+- [x] `WeReadDetailViewModel` - 添加 `clear()` 方法，释放 allBookmarks 和状态
+- [x] `DedaoDetailViewModel` - 添加 `clear()` 方法，释放 allNotes 和状态
+- [x] `GoodLinksDetailViewModel` - 增强 `clear()` 方法，包含 loading/syncing 状态重置
+- [x] 所有 DetailView 在切换书籍时调用 `clear()` 或 `resetAndLoadFirstPage()`
+
+#### P2 - 重要改进
+- [x] `WeReadDetailViewModel` - 添加 `currentLoadTask` 管理异步任务
+- [x] `DedaoDetailViewModel` - 添加 `currentLoadTask` 管理异步任务
+- [x] 在 `loadHighlights` 方法中取消之前的任务
+- [x] 在 `performBackgroundSync` 和 `fullFetchFromAPI` 中添加 `Task.isCancelled` 检查
+- [x] 后台同步任务在切换书籍时可正确取消
+
+#### P3 - 优化增强
+- [x] `ChatViewModel` - 添加 `maxCachedConversations` 配置（默认 5 个）
+- [x] 实现 LRU 缓存淘汰策略
+- [x] 跟踪对话访问时间 (`conversationAccessTime`)
+- [x] 在加载新对话时自动淘汰最久未访问的对话消息
+
+### 🔄 未实施（可选）
+
+#### P2.3 - 统一 DetailViewModel 管理
+- [ ] 将 DetailViewModel 提升到 MainListView 统一管理（较大重构，暂缓）
+
+#### P3.1 - 分页数据滑动窗口
+- [ ] 实现滑动窗口限制分页数据量（复杂度高，暂缓）
+
+#### P3.3 - 列表 ViewModel 优化
+- [ ] 优化 `books` 和 `displayBooks` 内存使用（低优先级）
+
+---
+
+## 更新日志
+
+- **2024-XX-XX**: 初始实施 P1、P2、P3 核心功能
+- 添加 `clear()` 方法到所有 DetailViewModel
+- 添加 Task 取消机制
+- 添加 ChatViewModel LRU 缓存淘汰
