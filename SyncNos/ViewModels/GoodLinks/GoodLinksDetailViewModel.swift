@@ -340,8 +340,11 @@ final class GoodLinksDetailViewModel: ObservableObject {
         visibleHighlights.removeAll(keepingCapacity: false)
         allFilteredHighlights.removeAll(keepingCapacity: false)
         currentPage = 0
+        
+        // 清空同步状态（当 View 消失时，UI 应显示无同步状态）
         syncProgressText = nil
         syncMessage = nil
+        isSyncing = false
     }
     
     // MARK: - Filter & Sort

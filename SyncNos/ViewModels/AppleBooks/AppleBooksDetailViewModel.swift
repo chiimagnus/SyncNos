@@ -199,10 +199,10 @@ final class AppleBooksDetailViewModel: ObservableObject {
         expectedTotalCount = 0
         isLoadingPage = false
         
-        // 清空同步状态
+        // 清空同步状态（当 View 消失时，UI 应显示无同步状态）
         syncProgressText = nil
         syncMessage = nil
-        // 注意：不重置 isSyncing，因为同步可能仍在后台进行
+        isSyncing = false
     }
     
     func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) async {
