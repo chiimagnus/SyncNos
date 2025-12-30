@@ -109,15 +109,15 @@ struct DedaoListView: View {
             }
         }
         .onAppear {
-            viewModel.triggerRecompute()
-            if viewModel.books.isEmpty && viewModel.isLoggedIn {
-                Task {
-                    await viewModel.loadBooks()
-                }
-            }
             // 获取焦点（避免额外延迟引入的竞态）
             DispatchQueue.main.async {
                 isListFocused = true
+            }
+        }
+        .task(id: viewModel.isLoggedIn) {
+            viewModel.triggerRecompute()
+            if viewModel.books.isEmpty && viewModel.isLoggedIn {
+                await viewModel.loadBooks()
             }
         }
         // 监听 List 焦点请求通知，切换到此视图时获取焦点
@@ -133,6 +133,9 @@ struct DedaoListView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NotificationCenter.default.post(name: Notification.Name("NavigateToDedaoLogin"), object: nil)
             }
+        }
+        .onDisappear {
+            viewModel.purgeMemory()
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {
             DedaoLoginView(viewModel: DedaoLoginViewModel(

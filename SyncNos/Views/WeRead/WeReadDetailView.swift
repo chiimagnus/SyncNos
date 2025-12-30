@@ -240,23 +240,11 @@ struct WeReadDetailView: View {
                 }
             }
         }
-        .onAppear {
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-                // 如果该书正在批量同步，显示外部同步状态
-                if let id = selectedBookId, listViewModel.syncingBookIds.contains(id) {
-                    externalIsSyncing = true
-                }
-            }
+        .task(id: selectedBookId) {
+            guard let book = selectedBook else { return }
+            await detailViewModel.loadHighlights(for: book.bookId)
         }
         .onChange(of: selectedBookId) { _, _ in
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-            }
             // 切换时更新外部同步状态
             if let id = selectedBookId {
                 externalIsSyncing = listViewModel.syncingBookIds.contains(id)

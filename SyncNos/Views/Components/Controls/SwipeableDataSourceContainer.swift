@@ -35,21 +35,16 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             // 滑动区域
-            if viewModel.hasEnabledSources {
-                GeometryReader { geometry in
-                    HStack(spacing: 0) {
-                        ForEach(Array(viewModel.enabledDataSources.enumerated()), id: \.offset) { _, source in
-                            dataSourceView(for: source)
-                                .frame(width: geometry.size.width)
-                                .safeAreaInset(edge: .bottom) {
-                                    // 底部空间，避免被底部栏遮挡
-                                    Color.clear.frame(height: bottomBarHeight)
-                                }
-                        }
+            if let source = viewModel.currentDataSource {
+                dataSourceView(for: source)
+                    // 底部空间，避免被底部栏遮挡
+                    .safeAreaInset(edge: .bottom) {
+                        Color.clear.frame(height: bottomBarHeight)
                     }
-                    .offset(x: -CGFloat(viewModel.activeIndex) * geometry.size.width)
+                    // 切换数据源时强制创建新的 ListView 实例，避免离屏视图常驻内存
+                    .id(source)
+                    .transition(.opacity)
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: viewModel.activeIndex)
-                }
             } else {
                 emptyStateView
             }
@@ -266,6 +261,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         selectedLinkIds.removeAll()
         selectedWeReadBookIds.removeAll()
         selectedDedaoBookIds.removeAll()
+        selectedChatsContactIds.removeAll()
     }
 }
 

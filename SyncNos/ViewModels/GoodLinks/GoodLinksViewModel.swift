@@ -337,6 +337,24 @@ final class GoodLinksViewModel: ObservableObject {
     }
 }
 
+// MARK: - Memory Purge
+
+extension GoodLinksViewModel: MemoryPurgeable {
+    /// 主动释放 GoodLinks 列表相关的内存占用（切换到其它数据源时调用）。
+    func purgeMemory() {
+        // 释放大数组
+        links = []
+        displayLinks = []
+        visibleLinks = []
+        currentPageSize = 0
+        
+        // 清理错误与加载状态
+        errorMessage = nil
+        isLoading = false
+        isComputingList = false
+    }
+}
+
 // MARK: - Batch Sync
 
 extension GoodLinksViewModel {
