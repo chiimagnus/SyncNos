@@ -58,12 +58,14 @@
 
 ### 仍值得关注 / 尚未完全解决的点（⚠️）
 
-#### 1) GoodLinks 全文内容依然是“进入详情就加载 + 折叠也常驻”（P2.1）
+#### 1) GoodLinks 全文内容依然是“进入详情就加载 + 折叠也常驻”（已明确取消 P2.1）
 
 - `GoodLinksDetailView` 会在 `.task(id:)` 中同时调用 `loadHighlights` + `loadContent`。
 - `ArticleContentCardView` 的“折叠/展开”仅改变 `lineLimit`，**不会释放** `contentText` 的内存占用。
 
 **风险**：当某些文章 content 极大时，Detail 峰值仍会被“全文字符串”撑高，即使 UI 处于折叠态。
+
+**决策**：该优化项（P2.1：延迟加载/折叠释放）已按当前需求评估并 **明确取消**，后续不再推进。
 
 #### 2) 少量非生命周期绑定的 `Task { ... }` 仍存在（低优先级）
 
@@ -99,31 +101,9 @@
 
 ---
 
-### P2（仍有收益）：降峰值 + 去冗余（更激进但收益大）
+### P2（可选）：进一步降峰值（当前仅保留“可选项”）
 
-#### P2.1 GoodLinks：全文内容延迟加载 + 折叠即释放（最高优先级）
-
-文件：`GoodLinksDetailView.swift`、`GoodLinksDetailViewModel.swift`、`ArticleContentCardView.swift`
-
-目标：
-
-- **进入详情时只加载 highlights，不加载全文**（降低峰值/首屏压力）
-- **用户展开全文时才加载 content**
-- **用户折叠全文时释放 content（置空）**，只保留必要的摘要/提示（可选）
-
-建议实现（破坏性允许，择一）：
-
-- 方案 A（最小侵入）：保留 `ArticleContentCardView`，在 `GoodLinksDetailView` 中：
-  - 初次 `.task(id: linkId)` 只调用 `loadHighlights(for:)`
-  - 当 `articleIsExpanded == true` 且 `content == nil` 时再触发 `loadContent(for:)`
-  - 当 `articleIsExpanded == false` 时调用 `detailViewModel.clearContent()`（新增方法，仅置 `content = nil`）
-- 方案 B（更彻底）：让 `ArticleContentCardView` 支持 `onExpand`/`onCollapse` 回调，或接受 “content provider” closure，以便做到 “Expand → load / Collapse → release” 的完整闭环。
-
-验收：
-
-- 打开大文章（content 很长）：
-  - 初次进入 Detail 不应立刻把全文拉入内存
-  - 展开时加载一次，折叠后 `content` 被释放（可用 Instruments/Memory Graph 验证）
+> 说明：P2.1（GoodLinks 全文延迟加载/折叠释放）已明确取消；P2.4（抽象复用）也已明确取消。
 
 #### P2.2 WeRead/Dedao：进一步降低展示模型复制（可选）
 
@@ -163,7 +143,6 @@
 ## 执行顺序建议（强约束：每完成一个 P 就 build）
 
 1. P1 已完成：作为“硬规范”长期保留
-2. 下一步优先做 P2.1（GoodLinks 全文延迟加载 + 折叠释放）→ **build**
-3. 视需求再做 P2.2（WeRead/Dedao 进一步降峰值）→ **build**
-4. 最后视情况做 P3 → **build**
+2. 如未来需要进一步降峰值：优先评估 P2.2（WeRead/Dedao 进一步降峰值）→ **build**
+3. 最后视情况做 P3 → **build**
 

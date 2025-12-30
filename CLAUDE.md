@@ -597,7 +597,7 @@ protocol NotionServiceProtocol {
   - 关闭数据会话（例如 SQLite read-only session）
   - 大数组使用 `removeAll(keepingCapacity: false)`（避免保留 capacity 导致“看似清空但内存不降”）
 - **防串台（旧任务回写新状态）**：对分页/长任务使用 token 或 id 校验（例如 `currentLoadId`、`paginationLoadTokens`），确保旧任务完成后不会覆盖新 selection 的状态。
-- **重内容按需加载**：对 GoodLinks 全文等“可能极大”的内容，采用“展开才加载 / 折叠或离开即释放”的策略，避免折叠态仍常驻大字符串。
+- **重内容按需加载（可选优化）**：如未来需要进一步降低峰值，可对 GoodLinks 全文等“可能极大”的内容采用“展开才加载 / 折叠或离开即释放”的策略，避免折叠态仍常驻大字符串。
 - **Chats 约束**：对话列表只保存 metadata；消息在 Detail 中分页懒加载，并在切换对话/离开 Detail 时卸载已加载消息以释放内存。
 
 - **参考执行清单**：`.cursor/plans/MemoryReleasePlan_A.md`（Detail 内存释放 Plan A，随代码演进持续更新）
