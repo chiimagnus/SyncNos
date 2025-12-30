@@ -575,6 +575,69 @@ final class ChatViewModel: ObservableObject {
             }
         }
     }
+    
+    // MARK: - Delete Message
+    
+    /// 删除单条消息
+    func deleteMessage(messageId: UUID, for contactId: UUID) {
+        // 1. 更新 conversations 内存
+        if var conversation = conversations[contactId] {
+            conversation.messages.removeAll { $0.id == messageId }
+            conversations[contactId] = conversation
+        }
+        
+        // 2. 更新 paginationStates 内存
+        if var state = paginationStates[contactId] {
+            state.loadedMessages.removeAll { $0.id == messageId }
+            state.totalCount = max(0, state.totalCount - 1)
+            paginationStates[contactId] = state
+        }
+        
+        // 3. 持久化并刷新列表
+        Task {
+            do {
+                try await cacheService.deleteMessage(messageId: messageId.uuidString)
+                await refreshContactsListFromCache()
+                logger.info("[ChatsV2] Deleted message: \(messageId)")
+            } catch {
+                logger.error("[ChatsV2] Failed to delete message: \(error)")
+                errorMessage = "删除消息失败: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    /// 批量删除消息
+    func deleteMessages(messageIds: [UUID], for contactId: UUID) {
+        guard !messageIds.isEmpty else { return }
+        
+        let idsToDelete = Set(messageIds)
+        
+        // 1. 更新 conversations 内存
+        if var conversation = conversations[contactId] {
+            conversation.messages.removeAll { idsToDelete.contains($0.id) }
+            conversations[contactId] = conversation
+        }
+        
+        // 2. 更新 paginationStates 内存
+        if var state = paginationStates[contactId] {
+            let removedCount = state.loadedMessages.filter { idsToDelete.contains($0.id) }.count
+            state.loadedMessages.removeAll { idsToDelete.contains($0.id) }
+            state.totalCount = max(0, state.totalCount - removedCount)
+            paginationStates[contactId] = state
+        }
+        
+        // 3. 持久化并刷新列表
+        Task {
+            do {
+                try await cacheService.deleteMessages(messageIds: messageIds.map(\.uuidString))
+                await refreshContactsListFromCache()
+                logger.info("[ChatsV2] Deleted \(messageIds.count) messages")
+            } catch {
+                logger.error("[ChatsV2] Failed to delete messages: \(error)")
+                errorMessage = "删除消息失败: \(error.localizedDescription)"
+            }
+        }
+    }
 
     // MARK: - Private
 
