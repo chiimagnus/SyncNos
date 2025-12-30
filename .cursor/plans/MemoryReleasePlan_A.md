@@ -141,16 +141,6 @@
 - 对话列表不要再引入任何“常驻 messages 数组”
 - “导出全部”允许一次性峰值，但必须是用户显式触发
 
-#### P2.4 抽象复用：统一 Detail 的清理与任务管理（可选）
-
-目的：删除重复的 “Task 管理/清理数组/宽度 debounce/同步进度通知” 代码。
-
-可引入：
-
-- `DetailTaskBag`（集中持有/取消 Task）
-- `DebouncedWidthTracker` ViewModifier（统一宽度 debounce）
-- （可选）`protocol DetailMemoryReleasable { func cleanupForReuse(); func cleanupForDisappear() }`
-
 ---
 
 ### P3（可选）：渲染/布局优化（极大数据时更明显）
@@ -174,6 +164,6 @@
 
 1. P1 已完成：作为“硬规范”长期保留
 2. 下一步优先做 P2.1（GoodLinks 全文延迟加载 + 折叠释放）→ **build**
-3. 视需求再做 P2.2 / P2.4 → **build**
+3. 视需求再做 P2.2（WeRead/Dedao 进一步降峰值）→ **build**
 4. 最后视情况做 P3 → **build**
 
