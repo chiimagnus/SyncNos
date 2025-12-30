@@ -76,15 +76,36 @@ private struct DataSourceDropDelegate: DropDelegate {
     }
     
     func performDrop(info: DropInfo) -> Bool {
-        // 保存新顺序到 UserDefaults
-        if let newOrder = draggedOrder {
-            saveNewOrder(newOrder)
+        defer {
+            // 重置拖拽状态
+            draggingSource = nil
+            draggedOrder = nil
         }
         
-        // 重置拖拽状态
-        draggingSource = nil
-        draggedOrder = nil
+        // 优先使用拖拽过程中构建的临时顺序（预览顺序）
+        if let newOrder = draggedOrder {
+            saveNewOrder(newOrder)
+            return true
+        }
         
+        // 兜底：某些边界操作（例如直接拖到最左/最右，未触发 dropEntered）可能导致 draggedOrder 为 nil
+        // 此时仍尽力根据 draggingSource 与当前 drop target 计算一次 move 并持久化
+        guard let dragging = draggingSource, dragging != source else {
+            return true
+        }
+        
+        var currentOrder = sources
+        guard let fromIndex = currentOrder.firstIndex(of: dragging),
+              let toIndex = currentOrder.firstIndex(of: source) else {
+            return true
+        }
+        
+        currentOrder.move(
+            fromOffsets: IndexSet(integer: fromIndex),
+            toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+        )
+        
+        saveNewOrder(currentOrder)
         return true
     }
     
@@ -136,6 +157,8 @@ private struct DataSourceDropDelegate: DropDelegate {
         
         // 保存到 UserDefaults（会触发 orderChangedNotification，供 ViewCommands 等组件使用）
         ContentSource.customOrder = newFullOrder
+        // 确保偏好设置及时落盘（防止用户拖拽后立刻退出应用导致未写入）
+        UserDefaults.standard.synchronize()
         
         // 直接更新 ViewModel（updateEnabledDataSources 会自动保持当前活动的数据源）
         viewModel.updateEnabledDataSources(enabledOrder)
