@@ -351,6 +351,9 @@ struct ChatDetailView: View {
                                         },
                                         onClearSenderName: {
                                             handleClearSenderName(message, for: contact)
+                                        },
+                                        onDelete: {
+                                            handleDeleteMessage(message, for: contact)
                                         }
                                     )
                                 default:
@@ -366,6 +369,9 @@ struct ChatDetailView: View {
                                         },
                                         onClearSenderName: {
                                             handleClearSenderName(message, for: contact)
+                                        },
+                                        onDelete: {
+                                            handleDeleteMessage(message, for: contact)
                                         }
                                     )
                                 }
@@ -553,6 +559,17 @@ struct ChatDetailView: View {
             senderName: nil,
             for: contact.contactId
         )
+    }
+    
+    // MARK: - Delete Message Handler
+    
+    private func handleDeleteMessage(_ message: ChatMessage, for contact: ChatBookListItem) {
+        listViewModel.deleteMessage(messageId: message.id, for: contact.contactId)
+        
+        // 清除选中状态（如果删除的是当前选中的消息）
+        if selectedMessageId == message.id {
+            selectedMessageId = nil
+        }
     }
 
     // MARK: - Export Helper
