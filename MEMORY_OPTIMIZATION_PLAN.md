@@ -444,12 +444,14 @@ private func evictOldestConversation() {
 - [x] `AppleBooksDetailViewModel` - 添加 `clear()` 方法，关闭 session 并释放数据
 - [x] `WeReadDetailViewModel` - 添加 `clear()` 方法，释放 allBookmarks 和状态
 - [x] `DedaoDetailViewModel` - 添加 `clear()` 方法，释放 allNotes 和状态
-- [x] `GoodLinksDetailViewModel` - 增强 `clear()` 方法，包含 loading/syncing 状态重置
+- [x] `GoodLinksDetailViewModel` - 增强 `clear()` 方法，包含 loading/syncing 状态重置和任务取消
 - [x] 所有 DetailView 在切换书籍时调用 `clear()` 或 `resetAndLoadFirstPage()`
 
 #### P2 - 重要改进
+- [x] `AppleBooksDetailViewModel` - 添加 `currentLoadTask` 管理异步任务（已有 `deinit` 处理）
 - [x] `WeReadDetailViewModel` - 添加 `currentLoadTask` 管理异步任务
 - [x] `DedaoDetailViewModel` - 添加 `currentLoadTask` 管理异步任务
+- [x] `GoodLinksDetailViewModel` - 添加 `currentLoadTask` 和 `currentContentTask` 管理异步任务
 - [x] 在 `loadHighlights` 方法中取消之前的任务
 - [x] 在 `performBackgroundSync` 和 `fullFetchFromAPI` 中添加 `Task.isCancelled` 检查
 - [x] 后台同步任务在切换书籍时可正确取消
@@ -473,8 +475,43 @@ private func evictOldestConversation() {
 
 ---
 
+## 审计验证记录
+
+### 2024-12-30 审计
+
+**审计范围**：验证 P1、P2、P3 核心功能实现是否正确
+
+**审计结果**：
+
+| ViewModel | clear() 方法 | Task 取消机制 | View 调用 clear() | 状态 |
+|-----------|-------------|--------------|------------------|------|
+| AppleBooksDetailViewModel | ✅ | ✅ (currentLoadTask + deinit) | ✅ | 完整 |
+| GoodLinksDetailViewModel | ✅ | ✅ (currentLoadTask + currentContentTask) | ✅ | 完整 |
+| WeReadDetailViewModel | ✅ | ✅ (currentLoadTask) | ✅ | 完整 |
+| DedaoDetailViewModel | ✅ | ✅ (currentLoadTask) | ✅ | 完整 |
+| ChatViewModel | ✅ (LRU eviction) | N/A | N/A | 完整 |
+
+**发现的问题及修复**：
+
+1. **GoodLinksDetailViewModel 缺少 Task 取消机制**
+   - 原状态：未实现 `currentLoadTask` 机制
+   - 修复：添加 `currentLoadTask` 和 `currentContentTask` 属性
+   - 修复：重构 `loadHighlights()` 和 `loadContent()` 方法支持任务取消
+   - 修复：在 `clear()` 方法中取消所有进行中的任务
+
+**代码变更清单**：
+- `ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`
+  - 添加 `currentLoadTask: Task<Void, Never>?` 属性
+  - 添加 `currentContentTask: Task<Void, Never>?` 属性
+  - 重构 `loadHighlights()` 方法，添加任务管理和取消检查
+  - 重构 `loadContent()` 方法，添加任务管理和取消检查
+  - 更新 `clear()` 方法，添加任务取消逻辑
+
+---
+
 ## 更新日志
 
+- **2024-12-30**: 审计验证并修复 GoodLinksDetailViewModel Task 取消机制缺失问题
 - **2024-XX-XX**: 初始实施 P1、P2、P3 核心功能
 - 添加 `clear()` 方法到所有 DetailViewModel
 - 添加 Task 取消机制

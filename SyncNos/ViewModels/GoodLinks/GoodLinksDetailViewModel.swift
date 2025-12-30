@@ -92,6 +92,10 @@ final class GoodLinksDetailViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var currentLinkId: String?
     
+    /// 当前加载任务，用于在切换 link 时取消
+    private var currentLoadTask: Task<Void, Never>?
+    private var currentContentTask: Task<Void, Never>?
+    
     // MARK: - Initialization
     
     init(
@@ -228,6 +232,22 @@ final class GoodLinksDetailViewModel: ObservableObject {
             return
         }
         
+        // 取消之前的加载任务
+        currentLoadTask?.cancel()
+        
+        // 创建新的加载任务
+        let loadTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performLoadHighlights(for: linkId)
+        }
+        currentLoadTask = loadTask
+        
+        // 等待任务完成
+        await loadTask.value
+    }
+    
+    /// 实际执行加载的内部方法
+    private func performLoadHighlights(for linkId: String) async {
         currentLinkId = linkId
         isLoading = true
         errorMessage = nil
@@ -236,11 +256,17 @@ final class GoodLinksDetailViewModel: ObservableObject {
         let loggerForTask = logger
         
         do {
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             let rows = try await Task.detached(priority: .userInitiated) { () throws -> [GoodLinksHighlightRow] in
                 loggerForTask.info("[GoodLinksDetail] 开始加载高亮，linkId=\(linkId)")
                 let dbPath = serviceForTask.resolveDatabasePath()
                 return try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: 500, offset: 0)
             }.value
+            
+            // 再次检查任务是否被取消
+            guard !Task.isCancelled else { return }
             
             highlights = rows
             loggerForTask.info("[GoodLinksDetail] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
@@ -249,6 +275,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
             initializePagination()
             isLoading = false
         } catch {
+            guard !Task.isCancelled else { return }
             let desc = error.localizedDescription
             loggerForTask.error("[GoodLinksDetail] loadHighlights error: \(desc)")
             errorMessage = desc
@@ -258,15 +285,37 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     /// 加载全文内容
     func loadContent(for linkId: String) async {
+        // 取消之前的内容加载任务
+        currentContentTask?.cancel()
+        
+        // 创建新的加载任务
+        let contentTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performLoadContent(for: linkId)
+        }
+        currentContentTask = contentTask
+        
+        // 等待任务完成
+        await contentTask.value
+    }
+    
+    /// 实际执行内容加载的内部方法
+    private func performLoadContent(for linkId: String) async {
         let serviceForTask = service
         let loggerForTask = logger
         
         do {
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return }
+            
             let contentRow = try await Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
                 loggerForTask.info("[GoodLinksDetail] 开始加载全文内容，linkId=\(linkId)")
                 let dbPath = serviceForTask.resolveDatabasePath()
                 return try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
             }.value
+            
+            // 再次检查任务是否被取消
+            guard !Task.isCancelled else { return }
             
             content = contentRow
             if let c = contentRow {
@@ -275,6 +324,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
                 loggerForTask.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
         } catch {
+            guard !Task.isCancelled else { return }
             let desc = error.localizedDescription
             loggerForTask.error("[GoodLinksDetail] loadContent error: \(desc)")
             errorMessage = desc
@@ -283,6 +333,13 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     /// 清空当前数据（切换 link 时调用）
     func clear() {
+        // 取消正在进行的任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        currentContentTask?.cancel()
+        currentContentTask = nil
+        
+        // 清理数据
         currentLinkId = nil
         highlights = []
         content = nil
