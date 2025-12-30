@@ -448,9 +448,6 @@ final class ChatViewModel: ObservableObject {
             importedAt: Date(),
             imageSize: .zero,  // 导入的消息无原始图片
             ocrEngine: "Import",
-            ocrRequestJSON: nil,
-            ocrResponseJSON: Data("{}".utf8),
-            normalizedBlocksJSON: Data("[]".utf8),
             parsedAt: Date(),
             messages: messages
         )
@@ -624,18 +621,18 @@ final class ChatViewModel: ObservableObject {
 
         do {
             if let sourceName {
-                logger.info("[ChatsV2] Processing screenshot: \(sourceName)")
+                logger.info("[ChatsV3] Processing screenshot: \(sourceName)")
             } else {
-                logger.info("[ChatsV2] Processing screenshot")
+                logger.info("[ChatsV3] Processing screenshot")
             }
 
             let pixelSize = try imagePixelSize(image)
             // 使用 Apple Vision OCR 进行识别
             let ocrService = DIContainer.shared.ocrAPIService
             
-            let (ocrResult, rawResponse, requestJSON) = try await ocrService.recognizeWithRaw(image, config: .default)
+            // V3: 不再保存 rawResponse 和 requestJSON，只使用 ocrResult
+            let (ocrResult, _, _) = try await ocrService.recognizeWithRaw(image, config: .default)
 
-            let normalizedBlocksJSON = try encodeNormalizedBlocks(ocrResult.blocks)
             let ocrCoordinateSize = ocrResult.coordinateSize
                 ?? estimateCoordinateSize(from: ocrResult.blocks)
                 ?? pixelSize
@@ -656,16 +653,13 @@ final class ChatViewModel: ObservableObject {
                 paginationStates[contactId] = state
             }
 
-            // 落库：截图 raw + blocks + parsed messages
+            // 落库：仅保存元数据 + parsed messages（不保存 OCR 原始数据）
             try await cacheService.appendScreenshot(
                 conversationId: contactId.uuidString,
                 screenshotId: screenshotId.uuidString,
                 importedAt: screenshot.importedAt,
                 imageSize: ocrCoordinateSize,
                 ocrEngine: "Apple Vision",
-                ocrRequestJSON: requestJSON,
-                ocrResponseJSON: rawResponse,
-                normalizedBlocksJSON: normalizedBlocksJSON,
                 parsedAt: Date(),
                 messages: adjusted
             )
@@ -673,29 +667,11 @@ final class ChatViewModel: ObservableObject {
             // 从缓存刷新列表（确保 messageCount 和 lastMessage 正确）
             await refreshContactsListFromCache()
 
-            logger.info("[ChatsV2] Imported screenshot -> \(adjusted.count) messages")
+            logger.info("[ChatsV3] Imported screenshot -> \(adjusted.count) messages")
         } catch {
-            logger.error("[ChatsV2] OCR/parse failed: \(error)")
+            logger.error("[ChatsV3] OCR/parse failed: \(error)")
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func encodeNormalizedBlocks(_ blocks: [OCRBlock]) throws -> Data {
-        let snapshots: [ChatOCRBlockSnapshot] = blocks.compactMap { block in
-            let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
-            return ChatOCRBlockSnapshot(
-                text: text,
-                label: block.label,
-                bbox: ChatRectSnapshot(
-                    x: Double(block.bbox.origin.x),
-                    y: Double(block.bbox.origin.y),
-                    width: Double(block.bbox.size.width),
-                    height: Double(block.bbox.size.height)
-                )
-            )
-        }
-        return try JSONEncoder().encode(snapshots)
     }
 
     /// 当 OCR `coordinateSize` 缺失时，用 bbox 的最大边界估算 OCR 坐标系尺寸，避免相对坐标失真导致方向误判

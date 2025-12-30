@@ -87,6 +87,11 @@ final class CachedChatConversationV2 {
 // MARK: - CachedChatScreenshotV2
 
 /// 每张导入截图一条记录（不保存图片本体）
+/// 
+/// **V3 变更（2025-12-30）**：
+/// - 删除 `ocrRequestJSON`、`ocrResponseJSON`、`normalizedBlocksJSON` 字段
+/// - 这些字段包含明文消息内容，与加密策略冲突
+/// - 离线重解析功能已放弃，不再需要保存 OCR 原始数据
 @Model
 final class CachedChatScreenshotV2 {
     /// 截图唯一标识（UUID 字符串）
@@ -105,15 +110,6 @@ final class CachedChatScreenshotV2 {
     /// OCR 引擎标识（便于后续扩展）
     var ocrEngine: String
 
-    /// OCR 请求参数（JSON bytes，可选）
-    var ocrRequestJSON: Data?
-
-    /// OCR 原始响应（JSON bytes，必存：用于回放/排障）
-    var ocrResponseJSON: Data
-
-    /// 归一化后的 blocks（JSON bytes，必存：用于离线重解析）
-    var normalizedBlocksJSON: Data
-
     /// 本地解析完成时间
     var parsedAt: Date
 
@@ -128,9 +124,6 @@ final class CachedChatScreenshotV2 {
         imageWidth: Double,
         imageHeight: Double,
         ocrEngine: String,
-        ocrRequestJSON: Data? = nil,
-        ocrResponseJSON: Data,
-        normalizedBlocksJSON: Data,
         parsedAt: Date
     ) {
         self.screenshotId = screenshotId
@@ -139,9 +132,6 @@ final class CachedChatScreenshotV2 {
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
         self.ocrEngine = ocrEngine
-        self.ocrRequestJSON = ocrRequestJSON
-        self.ocrResponseJSON = ocrResponseJSON
-        self.normalizedBlocksJSON = normalizedBlocksJSON
         self.parsedAt = parsedAt
     }
 }
@@ -305,20 +295,11 @@ final class CachedChatMessageV2 {
     }
 }
 
-// MARK: - Normalized Block Snapshot (for persistence & replay)
-
-/// 归一化 blocks：仅保留解析所需字段，便于离线重解析
-struct ChatOCRBlockSnapshot: Codable, Hashable, Sendable {
-    var text: String
-    var label: String
-    var bbox: ChatRectSnapshot
-}
-
-struct ChatRectSnapshot: Codable, Hashable, Sendable {
-    var x: Double
-    var y: Double
-    var width: Double
-    var height: Double
-}
+// MARK: - Deprecated: Normalized Block Snapshot
+//
+// ChatOCRBlockSnapshot 和 ChatRectSnapshot 已移除（2025-12-30）
+// - 离线重解析功能已放弃
+// - OCR 原始数据不再持久化
+// - 这些类型与加密策略冲突
 
 
