@@ -614,61 +614,80 @@ struct ChatDetailView: View {
     }
     
     private func handleDrop(_ providers: [NSItemProvider], for contact: ChatBookListItem) {
-        for provider in providers {
-            // 优先处理文件 URL
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
-                    guard let data = item as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                        return
+        // 使用单个 Task 确保串行处理，避免多张图片并行导致顺序不可控
+        Task { @MainActor in
+            // 收集所有图片 URL 和数据（保持 providers 的顺序）
+            var imageUrls: [URL] = []
+            var imageDatas: [Data] = []
+            var conversationFileUrl: URL?
+            
+            for provider in providers {
+                // 优先处理文件 URL
+                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                    if let url = await loadDroppedURL(from: provider) {
+                        let ext = url.pathExtension.lowercased()
+                        if ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"].contains(ext) {
+                            imageUrls.append(url)
+                        } else if ["json", "md", "markdown"].contains(ext) {
+                            // 对话文件只取第一个
+                            if conversationFileUrl == nil {
+                                conversationFileUrl = url
+                            }
+                        }
                     }
-                    
-                    Task { @MainActor in
-                        await handleDroppedFileURL(url, for: contact)
+                }
+                // 处理直接拖入的图片（非文件 URL）
+                else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    if let data = await loadDroppedImageData(from: provider) {
+                        imageDatas.append(data)
                     }
                 }
             }
-            // 处理直接拖入的图片（非文件 URL）
-            else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
-                    guard let data else { return }
-                    Task { @MainActor in
-                        await handleDroppedImageData(data, for: contact)
-                    }
+            
+            // 串行处理图片 URL
+            if !imageUrls.isEmpty {
+                await listViewModel.addScreenshots(to: contact.contactId, urls: imageUrls)
+            }
+            
+            // 串行处理图片数据
+            if !imageDatas.isEmpty {
+                await listViewModel.addScreenshotData(to: contact.contactId, imageDatas: imageDatas)
+            }
+            
+            // 处理对话文件
+            if let fileUrl = conversationFileUrl {
+                do {
+                    try await listViewModel.importConversation(from: fileUrl, appendTo: contact.contactId)
+                } catch {
+                    listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
                 }
             }
         }
     }
     
-    /// 处理拖拽的文件 URL
-    /// 拖拽操作授予了对文件的访问权限，可以直接读取
-    private func handleDroppedFileURL(_ url: URL, for contact: ChatBookListItem) async {
-        let fileExtension = url.pathExtension.lowercased()
-        
-        // 图片文件 → OCR 识别
-        if ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"].contains(fileExtension) {
-            // 拖拽授予了访问权限，直接传递 URL
-            await listViewModel.addScreenshots(to: contact.contactId, urls: [url])
-            return
-        }
-        
-        // JSON/MD 文件 → 导入
-        if ["json", "md", "markdown"].contains(fileExtension) {
-            do {
-                try await listViewModel.importConversation(from: url, appendTo: contact.contactId)
-            } catch {
-                listViewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+    /// 异步加载拖拽的文件 URL
+    private func loadDroppedURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                if let data = item as? Data,
+                   let url = URL(dataRepresentation: data, relativeTo: nil) {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(returning: nil)
+                }
             }
-            return
         }
-        
-        listViewModel.errorMessage = "Unsupported file type: .\(fileExtension)"
     }
     
-    private func handleDroppedImageData(_ data: Data, for contact: ChatBookListItem) async {
-        // 直接走内存数据导入路径：无需落盘临时文件
-        await listViewModel.addScreenshotData(to: contact.contactId, imageDatas: [data])
+    /// 异步加载拖拽的图片数据
+    private func loadDroppedImageData(from provider: NSItemProvider) async -> Data? {
+        await withCheckedContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                continuation.resume(returning: data)
+            }
+        }
     }
+    
 
     // MARK: - Empty States
 
