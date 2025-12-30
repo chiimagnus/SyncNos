@@ -99,6 +99,9 @@ final class WeReadDetailViewModel: ObservableObject {
 
     private var currentBookId: String?
     
+    /// 防串台 token：每次切换书籍时更新，加载完成后校验，避免旧任务回写
+    private var currentLoadToken: UUID = UUID()
+    
     /// 所有高亮（未筛选，已转换为展示模型；避免同时持有原始模型与展示模型导致峰值翻倍）
     private var allHighlights: [WeReadHighlightDisplay] = []
     
@@ -197,6 +200,7 @@ final class WeReadDetailViewModel: ObservableObject {
     /// 清空当前数据并释放资源（切换书籍或退出 DetailView 时调用）
     func clear() {
         currentBookId = nil
+        currentLoadToken = UUID()  // 失效旧加载任务
         
         // 释放数据（不保留容量）
         allHighlights.removeAll(keepingCapacity: false)
@@ -271,6 +275,10 @@ final class WeReadDetailViewModel: ObservableObject {
             return
         }
         
+        // 生成新 token，使旧任务失效
+        let loadToken = UUID()
+        currentLoadToken = loadToken
+        
         currentBookId = bookId
         isLoading = true
         
@@ -283,7 +291,7 @@ final class WeReadDetailViewModel: ObservableObject {
         // 1. 先从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
         do {
             let cached = try await cacheService.getHighlights(bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             if !cached.isEmpty {
                 allHighlights = cached.map { WeReadHighlightDisplay(from: $0) }
                 applyFiltersAndSort()
@@ -296,23 +304,23 @@ final class WeReadDetailViewModel: ObservableObject {
         }
         
         // 2. 后台增量同步
-        await performBackgroundSync(bookId: bookId)
+        await performBackgroundSync(bookId: bookId, loadToken: loadToken)
     }
     
     /// 执行后台同步
-    private func performBackgroundSync(bookId: String) async {
-        guard !Task.isCancelled, currentBookId == bookId else { return }
+    private func performBackgroundSync(bookId: String, loadToken: UUID) async {
+        guard !Task.isCancelled, currentLoadToken == loadToken else { return }
         isBackgroundSyncing = true
         defer {
-            // 仅当仍停留在同一本书时才回写 UI 状态，避免旧任务覆盖新任务状态
-            if currentBookId == bookId {
+            // 仅当 token 仍然有效时才回写 UI 状态，避免旧任务覆盖新任务状态
+            if currentLoadToken == loadToken {
                 isBackgroundSyncing = false
                 isLoading = false
             }
         }
         do {
             let result = try await incrementalSyncService.syncHighlights(bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             
             switch result {
             case .noChanges:
@@ -321,18 +329,19 @@ final class WeReadDetailViewModel: ObservableObject {
                 logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
                 // 重新从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
                 let refreshed = try await cacheService.getHighlights(bookId: bookId)
-                guard !Task.isCancelled, currentBookId == bookId else { return }
+                guard !Task.isCancelled, currentLoadToken == loadToken else { return }
                 allHighlights = refreshed.map { WeReadHighlightDisplay(from: $0) }
                 applyFiltersAndSort()
                 resetPagination()
             case .fullSyncRequired:
                 // 全量拉取
-                await fullFetchFromAPI(bookId: bookId)
+                await fullFetchFromAPI(bookId: bookId, loadToken: loadToken)
             }
         } catch {
+            guard currentLoadToken == loadToken else { return }
             // 如果缓存为空，需要全量拉取
             if allHighlights.isEmpty {
-                await fullFetchFromAPI(bookId: bookId)
+                await fullFetchFromAPI(bookId: bookId, loadToken: loadToken)
             } else {
                 logger.error("[WeReadDetail] Incremental sync failed: \(error.localizedDescription)")
             }
@@ -340,18 +349,18 @@ final class WeReadDetailViewModel: ObservableObject {
     }
     
     /// 全量从 API 拉取
-    private func fullFetchFromAPI(bookId: String) async {
+    private func fullFetchFromAPI(bookId: String, loadToken: UUID) async {
         do {
             // 使用合并 API 获取高亮（已包含关联的想法）
             let mergedBookmarks = try await apiService.fetchMergedHighlights(bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             
             // 保存合并后的数据
             allHighlights = mergedBookmarks.map { WeReadHighlightDisplay(from: $0) }
             
             // 保存到缓存
             try await cacheService.saveHighlights(mergedBookmarks, bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             
             // 应用筛选和排序
             applyFiltersAndSort()
@@ -395,8 +404,12 @@ final class WeReadDetailViewModel: ObservableObject {
         visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
         
+        // 生成新 token
+        let loadToken = UUID()
+        currentLoadToken = loadToken
+        
         // 重新加载
-        await performBackgroundSync(bookId: bookId)
+        await performBackgroundSync(bookId: bookId, loadToken: loadToken)
     }
     
     // MARK: - Filtering and Sorting
@@ -498,14 +511,5 @@ final class WeReadDetailViewModel: ObservableObject {
 
     private func checkNotionConfig() -> Bool {
         notionConfig.isConfigured
-    }
-}
-
-// MARK: - Legacy Compatibility
-
-extension WeReadDetailViewModel {
-    /// 兼容旧代码：返回所有高亮（不推荐使用，应使用 visibleHighlights）
-    var highlights: [WeReadHighlightDisplay] {
-        visibleHighlights
     }
 }

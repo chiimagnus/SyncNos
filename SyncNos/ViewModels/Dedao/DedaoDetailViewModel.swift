@@ -91,6 +91,9 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private var currentBookId: String?
     
+    /// 防串台 token：每次切换书籍时更新，加载完成后校验，避免旧任务回写
+    private var currentLoadToken: UUID = UUID()
+    
     /// 所有高亮（未筛选，已转换为展示模型；避免同时持有原始模型与展示模型导致峰值翻倍）
     private var allHighlights: [DedaoHighlightDisplay] = []
     
@@ -182,6 +185,7 @@ final class DedaoDetailViewModel: ObservableObject {
     /// 清空当前数据并释放资源（切换书籍或退出 DetailView 时调用）
     func clear() {
         currentBookId = nil
+        currentLoadToken = UUID()  // 失效旧加载任务
         
         // 释放数据（不保留容量）
         allHighlights.removeAll(keepingCapacity: false)
@@ -256,6 +260,10 @@ final class DedaoDetailViewModel: ObservableObject {
             return
         }
         
+        // 生成新 token，使旧任务失效
+        let loadToken = UUID()
+        currentLoadToken = loadToken
+        
         let isNewBook = currentBookId != bookId
         currentBookId = bookId
         
@@ -263,7 +271,7 @@ final class DedaoDetailViewModel: ObservableObject {
         do {
             // cacheService.getHighlights 现在直接返回 [DedaoEbookNote]
             let cached = try await cacheService.getHighlights(bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             if !cached.isEmpty {
                 // 有缓存：立即显示，不显示 Loading
                 allHighlights = cached.map { DedaoHighlightDisplay(from: $0) }
@@ -273,7 +281,7 @@ final class DedaoDetailViewModel: ObservableObject {
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
                 
                 // 后台同步（仍保持在同一个 async task 中，便于取消/丢弃过期结果）
-                await performBackgroundSync(bookId: bookId)
+                await performBackgroundSync(bookId: bookId, loadToken: loadToken)
                 return
             }
         } catch {
@@ -288,16 +296,16 @@ final class DedaoDetailViewModel: ObservableObject {
             currentPageCount = 0
         }
         isLoading = true
-        await performBackgroundSync(bookId: bookId)
+        await performBackgroundSync(bookId: bookId, loadToken: loadToken)
     }
     
     /// 执行后台同步
-    private func performBackgroundSync(bookId: String) async {
-        guard !Task.isCancelled, currentBookId == bookId else { return }
+    private func performBackgroundSync(bookId: String, loadToken: UUID) async {
+        guard !Task.isCancelled, currentLoadToken == loadToken else { return }
         isBackgroundSyncing = true
         defer {
-            // 仅当仍停留在同一本书时才回写 UI 状态，避免旧任务覆盖新任务状态
-            if currentBookId == bookId {
+            // 仅当 token 仍然有效时才回写 UI 状态，避免旧任务覆盖新任务状态
+            if currentLoadToken == loadToken {
                 isBackgroundSyncing = false
                 isLoading = false
             }
@@ -306,12 +314,12 @@ final class DedaoDetailViewModel: ObservableObject {
         do {
             // 从 API 获取最新数据
             let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: nil)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             let apiHighlights = apiNotes.map { DedaoHighlightDisplay(from: $0) }
             
             // 保存到缓存
             try await cacheService.saveHighlights(apiNotes, bookId: bookId)
-            guard !Task.isCancelled, currentBookId == bookId else { return }
+            guard !Task.isCancelled, currentLoadToken == loadToken else { return }
             
             // 如果数据有变化，更新显示
             if apiHighlights.count != allHighlights.count || allHighlights.isEmpty {
@@ -323,6 +331,7 @@ final class DedaoDetailViewModel: ObservableObject {
                 logger.debug("[DedaoDetail] No changes for bookId=\(bookId)")
             }
         } catch {
+            guard currentLoadToken == loadToken else { return }
             // 如果缓存为空，需要显示错误
             if allHighlights.isEmpty {
                 logger.error("[DedaoDetail] Failed to load highlights: \(error.localizedDescription)")
@@ -350,8 +359,12 @@ final class DedaoDetailViewModel: ObservableObject {
         visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
         
+        // 生成新 token
+        let loadToken = UUID()
+        currentLoadToken = loadToken
+        
         // 重新加载
-        await performBackgroundSync(bookId: bookId)
+        await performBackgroundSync(bookId: bookId, loadToken: loadToken)
     }
     
     // MARK: - Filtering and Sorting
@@ -457,56 +470,6 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private func checkNotionConfig() -> Bool {
         notionConfig.isConfigured
-    }
-    
-    /// 将缓存的高亮转换为 API 模型
-    private func cachedToNote(_ cached: CachedDedaoHighlight) -> DedaoEbookNote {
-        return DedaoEbookNote(
-            noteId: nil,
-            noteIdStr: cached.highlightId,
-            noteIdHazy: nil,
-            uid: nil,
-            isFromMe: 1,
-            notesOwner: nil,
-            noteType: nil,
-            sourceType: nil,
-            note: cached.note,
-            noteTitle: nil,
-            noteLine: cached.text,
-            noteLineStyle: nil,
-            createTime: cached.createdAt.map { Int64($0.timeIntervalSince1970) },
-            updateTime: cached.updatedAt.map { Int64($0.timeIntervalSince1970) },
-            tips: nil,
-            shareUrl: nil,
-            extra: DedaoNoteExtra(
-                title: cached.chapterTitle,
-                sourceType: nil,
-                sourceTypeName: nil,
-                bookId: nil,
-                bookName: nil,
-                bookSection: cached.bookSection,
-                bookStartPos: nil,
-                bookOffset: nil,
-                bookAuthor: nil
-            ),
-            notesCount: nil,
-            canEdit: nil,
-            isPermission: nil,
-            originNoteIdHazy: nil,
-            rootNoteId: nil,
-            rootNoteIdHazy: nil,
-            originContentType: nil,
-            contentType: nil,
-            noteClass: nil,
-            highlights: nil,
-            rootHighlights: nil,
-            state: nil,
-            auditState: nil,
-            lesson: nil,
-            ddurl: nil,
-            video: nil,
-            notesLikeCount: nil
-        )
     }
 }
 
