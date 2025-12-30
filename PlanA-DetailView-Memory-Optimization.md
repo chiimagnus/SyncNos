@@ -2,6 +2,22 @@
 
 > 目标：优化 DetailView 的内存管理，确保切换书籍/对话时能够及时释放内存，同时不影响 Notion 同步功能。
 
+## ✅ 实施完成状态
+
+| 优先级 | 任务 | 状态 |
+|--------|------|------|
+| P1 | 统一 DetailViewModel 清理方法 | ✅ 完成 |
+| P2 | 后台任务取消与防串台保护 | ✅ 完成 |
+| P3 | 删除冗余代码 | ✅ 完成 |
+
+### 已实施改动
+
+1. **AppleBooksDetailViewModel**: 添加 `clear()` 方法，View 在 `onDisappear` 时调用
+2. **WeReadDetailViewModel**: 添加 `clear()` 方法 + `currentLoadToken` 防串台，移除未使用的 `highlights` 属性
+3. **DedaoDetailViewModel**: 添加 `clear()` 方法 + `currentLoadToken` 防串台，移除未使用的 `cachedToNote()` 方法
+4. **GoodLinksDetailViewModel**: 增强现有 `clear()` 方法，添加 `isSyncing = false`
+5. **所有 DetailView**: `onDisappear` 时调用 ViewModel 的 `clear()` 方法
+
 ## 📊 现状分析
 
 ### 已有良好实践（可复用）
