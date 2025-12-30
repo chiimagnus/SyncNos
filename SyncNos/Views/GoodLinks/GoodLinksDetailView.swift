@@ -300,29 +300,13 @@ struct GoodLinksDetailView: View {
                         }
                     }
                 }
-                .onAppear {
-                    Task {
-                        await detailViewModel.loadHighlights(for: linkId)
-                        await detailViewModel.loadContent(for: linkId)
-                    }
-                    if let id = selectedLinkId, viewModel.syncingLinkIds.contains(id) {
-                        externalIsSyncing = true
-                    }
-                }
-                .onChange(of: linkId) { _, newLinkId in
-                    // 清空并重新加载
+                // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
+                .task(id: linkId) {
                     detailViewModel.clear()
-                    Task {
-                        await detailViewModel.loadHighlights(for: newLinkId)
-                        await detailViewModel.loadContent(for: newLinkId)
-                    }
-                    if let id = selectedLinkId {
-                        externalIsSyncing = viewModel.syncingLinkIds.contains(id)
-                        if !externalIsSyncing { externalSyncProgress = nil }
-                    } else {
-                        externalIsSyncing = false
-                        externalSyncProgress = nil
-                    }
+                    await detailViewModel.loadHighlights(for: linkId)
+                    await detailViewModel.loadContent(for: linkId)
+                    externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
+                    if !externalIsSyncing { externalSyncProgress = nil }
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {
@@ -388,6 +372,10 @@ struct GoodLinksDetailView: View {
             }
         }
         .frame(minWidth: 400, idealWidth: 600)
+        .onDisappear {
+            layoutWidthDebounceTask?.cancel()
+            layoutWidthDebounceTask = nil
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
                 detailViewModel.clear()
