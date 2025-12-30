@@ -600,8 +600,6 @@ protocol NotionServiceProtocol {
 - **重内容按需加载（可选优化）**：如未来需要进一步降低峰值，可对 GoodLinks 全文等“可能极大”的内容采用“展开才加载 / 折叠或离开即释放”的策略，避免折叠态仍常驻大字符串。
 - **Chats 约束**：对话列表只保存 metadata；消息在 Detail 中分页懒加载，并在切换对话/离开 Detail 时卸载已加载消息以释放内存。
 
-- **参考执行清单**：`.cursor/plans/MemoryReleasePlan_A.md`（Detail 内存释放 Plan A，随代码演进持续更新）
-
 ## 开发工作流
 
 ### 添加新数据源流程
