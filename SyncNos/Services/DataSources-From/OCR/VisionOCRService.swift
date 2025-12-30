@@ -9,6 +9,8 @@ import AppKit
 /// 适用于 macOS 14.0+ / iOS 17.0+
 final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
     
+    // MARK: - Dependencies
+    
     private let logger: LoggerServiceProtocol
     private let configStore: OCRConfigStoreProtocol
     
@@ -31,6 +33,9 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         /// 分片重叠区域（像素）
         /// 用于处理跨片文字，避免边界处文字丢失或重复
         static let sliceOverlap: CGFloat = 200
+        
+        /// 去重时允许的水平偏差（像素）
+        static let deduplicateXTolerance: CGFloat = 50
     }
     
     // MARK: - Init
@@ -58,48 +63,55 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
             throw OCRServiceError.invalidImage
         }
         
-        let imageSize = CGSize(
-            width: CGFloat(cgImage.width),
-            height: CGFloat(cgImage.height)
-        )
-        
-        // 获取语言配置
+        let imageSize = CGSize(width: CGFloat(cgImage.width), height: CGFloat(cgImage.height))
         let languageCodes = configStore.effectiveLanguageCodes
         let isAutoDetect = configStore.isAutoDetectEnabled
         
         logger.info("[VisionOCR] Starting recognition, image size: \(Int(imageSize.width))x\(Int(imageSize.height))")
         logger.debug("[VisionOCR] Language mode: \(isAutoDetect ? "automatic" : "manual"), languages: \(languageCodes.joined(separator: ", "))")
         
-        // 检查是否需要分片处理
+        // 根据图像高度决定处理方式
         if imageSize.height > Constants.sliceThresholdHeight {
             logger.info("[VisionOCR] 🔪 Image height \(Int(imageSize.height))px exceeds threshold \(Int(Constants.sliceThresholdHeight))px, using slice processing")
-            return try await recognizeWithSlicing(cgImage: cgImage, imageSize: imageSize, languageCodes: languageCodes, isAutoDetect: isAutoDetect)
+            return try await recognizeWithSlicing(
+                cgImage: cgImage,
+                imageSize: imageSize,
+                languageCodes: languageCodes,
+                isAutoDetect: isAutoDetect
+            )
         }
         
-        // 创建识别请求
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.minimumTextHeight = Constants.minimumTextHeight
-        
-        // 使用最新版本（macOS 14+）
-        if #available(macOS 14.0, *) {
-            request.revision = VNRecognizeTextRequestRevision3
-            // 根据配置决定是否启用自动语言检测
-            request.automaticallyDetectsLanguage = isAutoDetect
-        } else {
-            request.revision = VNRecognizeTextRequestRevision2
-        }
-        
-        // 设置识别语言
-        request.recognitionLanguages = languageCodes
-        
-        // 执行请求
+        return try await recognizeStandard(
+            cgImage: cgImage,
+            imageSize: imageSize,
+            languageCodes: languageCodes,
+            isAutoDetect: isAutoDetect
+        )
+    }
+    
+    func testConnection() async throws -> Bool {
+        logger.info("[VisionOCR] Connection test: Always available (native framework)")
+        return true
+    }
+}
+
+// MARK: - Standard Recognition (标准识别)
+
+private extension VisionOCRService {
+    
+    /// 标准 OCR 识别（不分片）
+    func recognizeStandard(
+        cgImage: CGImage,
+        imageSize: CGSize,
+        languageCodes: [String],
+        isAutoDetect: Bool
+    ) async throws -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
+        let request = createTextRecognitionRequest(languageCodes: languageCodes, isAutoDetect: isAutoDetect)
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else {
+                guard let self else {
                     continuation.resume(throwing: OCRServiceError.invalidResponse)
                     return
                 }
@@ -109,49 +121,15 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
                     
                     guard let observations = request.results else {
                         self.logger.warning("[VisionOCR] No observations returned")
-                        // 返回空结果而不是抛出错误（图片可能确实没有文字）
-                        let emptyResult = OCRResult(
-                            rawText: "",
-                            markdownText: nil,
-                            blocks: [],
-                            processedAt: Date(),
-                            coordinateSize: imageSize
-                        )
-                        continuation.resume(returning: (
-                            result: emptyResult,
-                            rawResponse: Data(),
-                            requestJSON: Data()
-                        ))
+                        continuation.resume(returning: self.createEmptyResult(imageSize: imageSize))
                         return
                     }
                     
-                    // 转换为 OCRBlock
-                    let blocks = self.convertToOCRBlocks(
+                    let result = self.buildResult(
                         observations: observations,
                         imageSize: imageSize
                     )
-                    
-                    // 构造结果
-                    let result = OCRResult(
-                        rawText: blocks.map(\.text).joined(separator: "\n"),
-                        markdownText: nil,
-                        blocks: blocks,
-                        processedAt: Date(),
-                        coordinateSize: imageSize
-                    )
-                    
-                    // 构造 raw response（用于调试和持久化）
-                    let rawDict = self.observationsToDict(observations, imageSize: imageSize)
-                    let rawData = (try? JSONSerialization.data(withJSONObject: rawDict)) ?? Data()
-                    
-                    // 详细日志：每个识别结果的文本和置信度
-                    self.logRecognitionDetails(observations: observations, blocks: blocks)
-                    
-                    continuation.resume(returning: (
-                        result: result,
-                        rawResponse: rawData,
-                        requestJSON: Data()
-                    ))
+                    continuation.resume(returning: result)
                     
                 } catch {
                     self.logger.error("[VisionOCR] Recognition failed: \(error.localizedDescription)")
@@ -161,28 +139,47 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         }
     }
     
-    func testConnection() async throws -> Bool {
-        // Vision 框架始终可用，无需连接测试
-        logger.info("[VisionOCR] Connection test: Always available (native framework)")
-        return true
+    /// 对单张图片进行 OCR（用于分片处理）
+    func recognizeSingle(
+        cgImage: CGImage,
+        imageSize: CGSize,
+        languageCodes: [String],
+        isAutoDetect: Bool
+    ) async throws -> (observations: [VNRecognizedTextObservation], blocks: [OCRBlock]) {
+        let request = createTextRecognitionRequest(languageCodes: languageCodes, isAutoDetect: isAutoDetect)
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: OCRServiceError.invalidResponse)
+                    return
+                }
+                
+                do {
+                    try handler.perform([request])
+                    let observations = request.results ?? []
+                    let blocks = self.convertToOCRBlocks(observations: observations, imageSize: imageSize)
+                    continuation.resume(returning: (observations, blocks))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
-    
-    // MARK: - Slice Processing (长图片分片处理)
+}
+
+// MARK: - Slice Processing (长图片分片处理)
+
+private extension VisionOCRService {
     
     /// 对超长图片进行分片 OCR 处理
-    /// - Parameters:
-    ///   - cgImage: 原始 CGImage
-    ///   - imageSize: 图像尺寸
-    ///   - languageCodes: 语言代码
-    ///   - isAutoDetect: 是否自动检测语言
-    /// - Returns: 合并后的 OCR 结果
-    private func recognizeWithSlicing(
+    func recognizeWithSlicing(
         cgImage: CGImage,
         imageSize: CGSize,
         languageCodes: [String],
         isAutoDetect: Bool
     ) async throws -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
-        // 计算分片
         let slices = calculateSlices(imageHeight: imageSize.height)
         logger.info("[VisionOCR] 🔪 Slicing image into \(slices.count) parts")
         
@@ -193,53 +190,33 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         for (index, slice) in slices.enumerated() {
             logger.debug("[VisionOCR] 🔪 Processing slice \(index + 1)/\(slices.count): y=\(Int(slice.y)), height=\(Int(slice.height))")
             
-            // 裁剪图片
-            guard let slicedImage = cropImage(cgImage, rect: slice, imageWidth: Int(imageSize.width)) else {
+            guard let slicedImage = cropImage(cgImage, slice: slice, imageWidth: Int(imageSize.width)) else {
                 logger.warning("[VisionOCR] ⚠️ Failed to crop slice \(index + 1)")
                 continue
             }
             
-            // 对分片进行 OCR
             let sliceSize = CGSize(width: imageSize.width, height: slice.height)
-            let (observations, blocks) = try await recognizeSingleImage(
+            let (observations, blocks) = try await recognizeSingle(
                 cgImage: slicedImage,
                 imageSize: sliceSize,
                 languageCodes: languageCodes,
                 isAutoDetect: isAutoDetect
             )
             
-            // 调整 bbox 的 Y 坐标（加上分片的起始 Y 偏移）
-            let adjustedBlocks = blocks.map { block -> OCRBlock in
-                let adjustedBbox = CGRect(
-                    x: block.bbox.origin.x,
-                    y: block.bbox.origin.y + slice.y,  // 加上分片的 Y 偏移
-                    width: block.bbox.width,
-                    height: block.bbox.height
-                )
-                return OCRBlock(text: block.text, label: block.label, bbox: adjustedBbox)
-            }
-            
+            // 调整 Y 坐标并收集结果
+            let adjustedBlocks = adjustBlocksYOffset(blocks, yOffset: slice.y)
             allBlocks.append(contentsOf: adjustedBlocks)
             allObservations.append(contentsOf: observations)
             
-            // 构造 raw dict（调整 Y 坐标）
-            let rawDicts = observationsToDict(observations, imageSize: sliceSize).map { dict -> [String: Any] in
-                var adjusted = dict
-                if var bbox = dict["boundingBox"] as? [String: CGFloat] {
-                    bbox["y"] = (bbox["y"] ?? 0) + slice.y
-                    adjusted["boundingBox"] = bbox
-                }
-                return adjusted
-            }
+            let rawDicts = observationsToDict(observations, imageSize: sliceSize)
+                .map { adjustRawDictYOffset($0, yOffset: slice.y) }
             allRawDicts.append(contentsOf: rawDicts)
         }
         
-        // 去重：处理重叠区域可能产生的重复文本块
+        // 去重并构建结果
         let deduplicatedBlocks = deduplicateBlocks(allBlocks)
-        
         logger.info("[VisionOCR] 🔪 Slice processing completed: \(allBlocks.count) blocks → \(deduplicatedBlocks.count) after deduplication")
         
-        // 构造最终结果
         let result = OCRResult(
             rawText: deduplicatedBlocks.map(\.text).joined(separator: "\n"),
             markdownText: nil,
@@ -249,17 +226,13 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         )
         
         let rawData = (try? JSONSerialization.data(withJSONObject: allRawDicts)) ?? Data()
-        
-        // 日志
         logRecognitionDetails(observations: allObservations, blocks: deduplicatedBlocks)
         
         return (result: result, rawResponse: rawData, requestJSON: Data())
     }
     
     /// 计算分片区域
-    /// - Parameter imageHeight: 图像高度
-    /// - Returns: 分片区域数组 (y, height)
-    private func calculateSlices(imageHeight: CGFloat) -> [(y: CGFloat, height: CGFloat)] {
+    func calculateSlices(imageHeight: CGFloat) -> [(y: CGFloat, height: CGFloat)] {
         var slices: [(y: CGFloat, height: CGFloat)] = []
         var currentY: CGFloat = 0
         
@@ -268,10 +241,8 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
             let sliceHeight = min(Constants.sliceMaxHeight, remainingHeight)
             slices.append((y: currentY, height: sliceHeight))
             
-            // 下一个分片的起始位置（减去重叠区域）
             currentY += sliceHeight - Constants.sliceOverlap
             
-            // 如果剩余高度小于重叠区域，直接结束
             if currentY >= imageHeight - Constants.sliceOverlap {
                 break
             }
@@ -281,77 +252,47 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
     }
     
     /// 裁剪图片
-    private func cropImage(_ cgImage: CGImage, rect: (y: CGFloat, height: CGFloat), imageWidth: Int) -> CGImage? {
-        let cropRect = CGRect(
-            x: 0,
-            y: rect.y,
-            width: CGFloat(imageWidth),
-            height: rect.height
-        )
+    func cropImage(_ cgImage: CGImage, slice: (y: CGFloat, height: CGFloat), imageWidth: Int) -> CGImage? {
+        let cropRect = CGRect(x: 0, y: slice.y, width: CGFloat(imageWidth), height: slice.height)
         return cgImage.cropping(to: cropRect)
     }
     
-    /// 对单张图片进行 OCR（不分片）
-    private func recognizeSingleImage(
-        cgImage: CGImage,
-        imageSize: CGSize,
-        languageCodes: [String],
-        isAutoDetect: Bool
-    ) async throws -> (observations: [VNRecognizedTextObservation], blocks: [OCRBlock]) {
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.minimumTextHeight = Constants.minimumTextHeight
-        
-        if #available(macOS 14.0, *) {
-            request.revision = VNRecognizeTextRequestRevision3
-            request.automaticallyDetectsLanguage = isAutoDetect
-        } else {
-            request.revision = VNRecognizeTextRequestRevision2
-        }
-        
-        request.recognitionLanguages = languageCodes
-        
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else {
-                    continuation.resume(throwing: OCRServiceError.invalidResponse)
-                    return
-                }
-                
-                do {
-                    try handler.perform([request])
-                    
-                    let observations = request.results ?? []
-                    let blocks = self.convertToOCRBlocks(observations: observations, imageSize: imageSize)
-                    
-                    continuation.resume(returning: (observations: observations, blocks: blocks))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+    /// 调整 blocks 的 Y 坐标偏移
+    func adjustBlocksYOffset(_ blocks: [OCRBlock], yOffset: CGFloat) -> [OCRBlock] {
+        blocks.map { block in
+            let adjustedBbox = CGRect(
+                x: block.bbox.origin.x,
+                y: block.bbox.origin.y + yOffset,
+                width: block.bbox.width,
+                height: block.bbox.height
+            )
+            return OCRBlock(text: block.text, label: block.label, bbox: adjustedBbox)
         }
     }
     
+    /// 调整 raw dict 的 Y 坐标偏移
+    func adjustRawDictYOffset(_ dict: [String: Any], yOffset: CGFloat) -> [String: Any] {
+        var adjusted = dict
+        if var bbox = dict["boundingBox"] as? [String: CGFloat] {
+            bbox["y"] = (bbox["y"] ?? 0) + yOffset
+            adjusted["boundingBox"] = bbox
+        }
+        return adjusted
+    }
+    
     /// 去重：移除重叠区域产生的重复文本块
-    /// 使用文本内容 + 近似位置判断是否为重复
-    private func deduplicateBlocks(_ blocks: [OCRBlock]) -> [OCRBlock] {
+    func deduplicateBlocks(_ blocks: [OCRBlock]) -> [OCRBlock] {
         var result: [OCRBlock] = []
         
         for block in blocks {
             let isDuplicate = result.contains { existing in
-                // 文本完全相同
                 guard existing.text == block.text else { return false }
                 
-                // Y 坐标接近（在重叠区域内）
                 let yDifference = abs(existing.bbox.midY - block.bbox.midY)
                 guard yDifference < Constants.sliceOverlap else { return false }
                 
-                // X 坐标接近
                 let xDifference = abs(existing.bbox.midX - block.bbox.midX)
-                return xDifference < 50  // 允许 50px 的水平偏差
+                return xDifference < Constants.deduplicateXTolerance
             }
             
             if !isDuplicate {
@@ -361,73 +302,106 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         
         return result
     }
+}
+
+// MARK: - Request & Result Building (请求与结果构建)
+
+private extension VisionOCRService {
     
-    // MARK: - Private Methods
+    /// 创建文本识别请求
+    func createTextRecognitionRequest(languageCodes: [String], isAutoDetect: Bool) -> VNRecognizeTextRequest {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.minimumTextHeight = Constants.minimumTextHeight
+        request.recognitionLanguages = languageCodes
+        
+        if #available(macOS 14.0, *) {
+            request.revision = VNRecognizeTextRequestRevision3
+            request.automaticallyDetectsLanguage = isAutoDetect
+        } else {
+            request.revision = VNRecognizeTextRequestRevision2
+        }
+        
+        return request
+    }
+    
+    /// 构建 OCR 结果
+    func buildResult(
+        observations: [VNRecognizedTextObservation],
+        imageSize: CGSize
+    ) -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
+        let blocks = convertToOCRBlocks(observations: observations, imageSize: imageSize)
+        
+        let result = OCRResult(
+            rawText: blocks.map(\.text).joined(separator: "\n"),
+            markdownText: nil,
+            blocks: blocks,
+            processedAt: Date(),
+            coordinateSize: imageSize
+        )
+        
+        let rawDict = observationsToDict(observations, imageSize: imageSize)
+        let rawData = (try? JSONSerialization.data(withJSONObject: rawDict)) ?? Data()
+        
+        logRecognitionDetails(observations: observations, blocks: blocks)
+        
+        return (result: result, rawResponse: rawData, requestJSON: Data())
+    }
+    
+    /// 创建空结果
+    func createEmptyResult(imageSize: CGSize) -> (result: OCRResult, rawResponse: Data, requestJSON: Data) {
+        let emptyResult = OCRResult(
+            rawText: "",
+            markdownText: nil,
+            blocks: [],
+            processedAt: Date(),
+            coordinateSize: imageSize
+        )
+        return (result: emptyResult, rawResponse: Data(), requestJSON: Data())
+    }
+}
+
+// MARK: - Coordinate Conversion (坐标转换)
+
+private extension VisionOCRService {
     
     /// 将 VNRecognizedTextObservation 转换为 OCRBlock
-    private func convertToOCRBlocks(
+    /// Vision 归一化坐标系：原点在左下角，Y 轴向上
+    /// 需要手动翻转 Y 坐标以匹配图像坐标系（原点左上角，Y 轴向下）
+    func convertToOCRBlocks(
         observations: [VNRecognizedTextObservation],
         imageSize: CGSize
     ) -> [OCRBlock] {
-        // Vision 归一化坐标系：原点在左下角，Y 轴向上
-        // VNImageRectForNormalizedRect 只做缩放，不翻转 Y 轴
-        // 需要手动翻转 Y 坐标以匹配图像坐标系（原点左上角，Y 轴向下）
-        // 这样才能与标准图像坐标系保持一致
-        
-        let blocks = observations.compactMap { observation -> OCRBlock? in
-            guard let topCandidate = observation.topCandidates(1).first else {
-                return nil
-            }
+        observations.compactMap { observation -> OCRBlock? in
+            guard let topCandidate = observation.topCandidates(1).first else { return nil }
             
             let text = topCandidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
             
-            let normalizedBox = observation.boundingBox
-            
-            // 手动将 Vision 归一化坐标转换为图像坐标（原点左上角）
-            // Y 轴翻转公式：newY = imageHeight - (normalizedY + normalizedHeight) * imageHeight
-            //            = imageHeight * (1 - normalizedY - normalizedHeight)
-            let x = normalizedBox.origin.x * imageSize.width
-            let y = imageSize.height * (1 - normalizedBox.origin.y - normalizedBox.height)
-            let width = normalizedBox.width * imageSize.width
-            let height = normalizedBox.height * imageSize.height
-            
-            let pixelRect = CGRect(x: x, y: y, width: width, height: height)
-            
-            return OCRBlock(
-                text: text,
-                label: "text",  // Vision 只返回文本类型
-                bbox: pixelRect
-            )
+            let pixelRect = convertNormalizedToPixelRect(observation.boundingBox, imageSize: imageSize)
+            return OCRBlock(text: text, label: "text", bbox: pixelRect)
         }
-        
-        return blocks
     }
     
     /// 将 observations 转换为字典（用于 rawResponse）
-    private func observationsToDict(
+    func observationsToDict(
         _ observations: [VNRecognizedTextObservation],
         imageSize: CGSize
     ) -> [[String: Any]] {
-        return observations.compactMap { obs -> [String: Any]? in
+        observations.compactMap { obs -> [String: Any]? in
             guard let text = obs.topCandidates(1).first else { return nil }
             
-            let normalizedBox = obs.boundingBox
-            
-            // 手动将 Vision 归一化坐标转换为图像坐标（原点左上角）
-            let x = normalizedBox.origin.x * imageSize.width
-            let y = imageSize.height * (1 - normalizedBox.origin.y - normalizedBox.height)
-            let width = normalizedBox.width * imageSize.width
-            let height = normalizedBox.height * imageSize.height
+            let pixelRect = convertNormalizedToPixelRect(obs.boundingBox, imageSize: imageSize)
             
             return [
                 "text": text.string,
                 "confidence": text.confidence,
                 "boundingBox": [
-                    "x": x,
-                    "y": y,
-                    "width": width,
-                    "height": height
+                    "x": pixelRect.origin.x,
+                    "y": pixelRect.origin.y,
+                    "width": pixelRect.width,
+                    "height": pixelRect.height
                 ],
                 "normalizedBoundingBox": [
                     "x": obs.boundingBox.origin.x,
@@ -439,16 +413,28 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         }
     }
     
+    /// 将 Vision 归一化坐标转换为像素坐标（原点左上角）
+    func convertNormalizedToPixelRect(_ normalizedBox: CGRect, imageSize: CGSize) -> CGRect {
+        let x = normalizedBox.origin.x * imageSize.width
+        let y = imageSize.height * (1 - normalizedBox.origin.y - normalizedBox.height)
+        let width = normalizedBox.width * imageSize.width
+        let height = normalizedBox.height * imageSize.height
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+}
+
+// MARK: - Logging & Script Detection (日志与语言检测)
+
+private extension VisionOCRService {
+    
     /// 记录识别详情日志
-    private func logRecognitionDetails(
+    func logRecognitionDetails(
         observations: [VNRecognizedTextObservation],
         blocks: [OCRBlock]
     ) {
-        // 统计信息
         let totalObservations = observations.count
         let validBlocks = blocks.count
         
-        // 计算平均置信度
         let confidences = observations.compactMap { $0.topCandidates(1).first?.confidence }
         let avgConfidence = confidences.isEmpty ? 0 : confidences.reduce(0, +) / Float(confidences.count)
         let minConfidence = confidences.min() ?? 0
@@ -457,60 +443,67 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
         logger.info("[VisionOCR] ✅ Recognition completed: \(validBlocks) blocks (from \(totalObservations) observations)")
         logger.info("[VisionOCR] 📊 Confidence: avg=\(String(format: "%.2f", avgConfidence)), min=\(String(format: "%.2f", minConfidence)), max=\(String(format: "%.2f", maxConfidence))")
         
-        // 检测语言（通过字符范围）
-        var detectedScripts: Set<String> = []
-        for block in blocks {
-            let scripts = detectScripts(in: block.text)
-            detectedScripts.formUnion(scripts)
+        let detectedScripts = blocks.reduce(into: Set<String>()) { result, block in
+            result.formUnion(detectScripts(in: block.text))
         }
         
         if !detectedScripts.isEmpty {
             logger.info("[VisionOCR] 🌐 Detected scripts: \(detectedScripts.sorted().joined(separator: ", "))")
         }
         
-        // 输出前几个识别结果（调试用）
+        logBlockPreview(blocks: blocks, observations: observations)
+    }
+    
+    /// 输出前几个识别结果预览
+    func logBlockPreview(blocks: [OCRBlock], observations: [VNRecognizedTextObservation]) {
         let previewCount = min(5, blocks.count)
-        if previewCount > 0 {
-            logger.debug("[VisionOCR] 📝 First \(previewCount) blocks:")
-            for (index, block) in blocks.prefix(previewCount).enumerated() {
-                let truncatedText = block.text.count > 50 
-                    ? String(block.text.prefix(50)) + "..." 
-                    : block.text
-                let conf = observations[safe: index].flatMap { $0.topCandidates(1).first?.confidence } ?? 0
-                logger.debug("[VisionOCR]   [\(index + 1)] \"\(truncatedText)\" (conf: \(String(format: "%.2f", conf)))")
-            }
+        guard previewCount > 0 else { return }
+        
+        logger.debug("[VisionOCR] 📝 First \(previewCount) blocks:")
+        for (index, block) in blocks.prefix(previewCount).enumerated() {
+            let truncatedText = block.text.count > 50
+                ? String(block.text.prefix(50)) + "..."
+                : block.text
+            let conf = observations[safe: index].flatMap { $0.topCandidates(1).first?.confidence } ?? 0
+            logger.debug("[VisionOCR]   [\(index + 1)] \"\(truncatedText)\" (conf: \(String(format: "%.2f", conf)))")
         }
     }
     
     /// 检测文本中使用的书写系统
-    private func detectScripts(in text: String) -> Set<String> {
+    func detectScripts(in text: String) -> Set<String> {
         var scripts: Set<String> = []
         
         for scalar in text.unicodeScalars {
-            if CharacterSet(charactersIn: "\u{4E00}"..."\u{9FFF}").contains(scalar) ||
-               CharacterSet(charactersIn: "\u{3400}"..."\u{4DBF}").contains(scalar) {
-                scripts.insert("CJK (Chinese/Japanese Kanji)")
-            } else if CharacterSet(charactersIn: "\u{3040}"..."\u{309F}").contains(scalar) {
-                scripts.insert("Hiragana (Japanese)")
-            } else if CharacterSet(charactersIn: "\u{30A0}"..."\u{30FF}").contains(scalar) {
-                scripts.insert("Katakana (Japanese)")
-            } else if CharacterSet(charactersIn: "\u{AC00}"..."\u{D7AF}").contains(scalar) ||
-                      CharacterSet(charactersIn: "\u{1100}"..."\u{11FF}").contains(scalar) {
-                scripts.insert("Hangul (Korean)")
-            } else if CharacterSet(charactersIn: "\u{0600}"..."\u{06FF}").contains(scalar) {
-                scripts.insert("Arabic")
-            } else if CharacterSet(charactersIn: "\u{0400}"..."\u{04FF}").contains(scalar) {
-                scripts.insert("Cyrillic (Russian/Ukrainian)")
-            } else if CharacterSet(charactersIn: "\u{0E00}"..."\u{0E7F}").contains(scalar) {
-                scripts.insert("Thai")
-            } else if CharacterSet.letters.contains(scalar) && 
-                      CharacterSet(charactersIn: "a"..."z").contains(scalar) ||
-                      CharacterSet(charactersIn: "A"..."Z").contains(scalar) {
-                scripts.insert("Latin (English/European)")
+            if let script = detectScript(for: scalar) {
+                scripts.insert(script)
             }
         }
         
         return scripts
+    }
+    
+    /// 检测单个字符的书写系统
+    func detectScript(for scalar: Unicode.Scalar) -> String? {
+        switch scalar.value {
+        case 0x4E00...0x9FFF, 0x3400...0x4DBF:
+            return "CJK (Chinese/Japanese Kanji)"
+        case 0x3040...0x309F:
+            return "Hiragana (Japanese)"
+        case 0x30A0...0x30FF:
+            return "Katakana (Japanese)"
+        case 0xAC00...0xD7AF, 0x1100...0x11FF:
+            return "Hangul (Korean)"
+        case 0x0600...0x06FF:
+            return "Arabic"
+        case 0x0400...0x04FF:
+            return "Cyrillic (Russian/Ukrainian)"
+        case 0x0E00...0x0E7F:
+            return "Thai"
+        case 0x0041...0x005A, 0x0061...0x007A:
+            return "Latin (English/European)"
+        default:
+            return nil
+        }
     }
 }
 
@@ -518,7 +511,7 @@ final class VisionOCRService: OCRAPIServiceProtocol, @unchecked Sendable {
 
 private extension Array {
     subscript(safe index: Index) -> Element? {
-        return indices.contains(index) ? self[index] : nil
+        indices.contains(index) ? self[index] : nil
     }
 }
 
