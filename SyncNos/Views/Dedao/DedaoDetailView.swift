@@ -73,7 +73,9 @@ struct DedaoDetailView: View {
         }
         .navigationTitle("Dedao")
         .toolbar { toolbarContent(book: book) }
-        .onAppear { loadHighlightsForBook(book) }
+        .task(id: book.bookId) {
+            await detailViewModel.loadHighlights(for: book.bookId)
+        }
         .onChange(of: selectedBookId) { _, newId in handleBookIdChange(newId: newId) }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
@@ -286,20 +288,8 @@ struct DedaoDetailView: View {
     
     // MARK: - Helper Methods
     
-    private func loadHighlightsForBook(_ book: DedaoBookListItem) {
-        Task {
-            await detailViewModel.loadHighlights(for: book.bookId)
-        }
-        if listViewModel.syncingBookIds.contains(book.bookId) {
-            externalIsSyncing = true
-        }
-    }
-    
     private func handleBookIdChange(newId: String?) {
         if let id = newId {
-            Task {
-                await detailViewModel.loadHighlights(for: id)
-            }
             externalIsSyncing = listViewModel.syncingBookIds.contains(id)
             if !externalIsSyncing { externalSyncProgress = nil }
         } else {
