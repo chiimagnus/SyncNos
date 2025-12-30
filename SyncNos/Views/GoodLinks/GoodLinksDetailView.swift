@@ -300,29 +300,15 @@ struct GoodLinksDetailView: View {
                         }
                     }
                 }
-                .onAppear {
-                    Task {
-                        await detailViewModel.loadHighlights(for: linkId)
-                        await detailViewModel.loadContent(for: linkId)
-                    }
-                    if let id = selectedLinkId, viewModel.syncingLinkIds.contains(id) {
-                        externalIsSyncing = true
-                    }
-                }
-                .onChange(of: linkId) { _, newLinkId in
-                    // 清空并重新加载
+                .task(id: linkId) {
+                    // 清空并重新加载（task 会在 linkId 变化/视图消失时自动取消）
                     detailViewModel.clear()
-                    Task {
-                        await detailViewModel.loadHighlights(for: newLinkId)
-                        await detailViewModel.loadContent(for: newLinkId)
-                    }
-                    if let id = selectedLinkId {
-                        externalIsSyncing = viewModel.syncingLinkIds.contains(id)
-                        if !externalIsSyncing { externalSyncProgress = nil }
-                    } else {
-                        externalIsSyncing = false
-                        externalSyncProgress = nil
-                    }
+                    await detailViewModel.loadHighlights(for: linkId)
+                    await detailViewModel.loadContent(for: linkId)
+                    
+                    // 切换到某个 item 时，依据 ViewModel 中的 syncing 集合立即更新外部同步显示
+                    externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
+                    if !externalIsSyncing { externalSyncProgress = nil }
                 }
                 .navigationTitle("GoodLinks")
                 .toolbar {

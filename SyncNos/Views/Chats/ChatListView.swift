@@ -39,6 +39,9 @@ struct ChatListView: View {
                 await viewModel.loadFromCache()
             }
         }
+        .onDisappear {
+            viewModel.purgeMemory()
+        }
     }
     
     // MARK: - Empty State

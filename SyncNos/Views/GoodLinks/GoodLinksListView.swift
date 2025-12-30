@@ -127,16 +127,16 @@ struct GoodLinksListView: View {
             }
         }
         .onAppear {
-            // 切换到 GoodLinks 时，确保第一帧进入加载态，然后异步加载/重算
-            viewModel.triggerRecompute()
-            if viewModel.links.isEmpty {
-                Task {
-                    await viewModel.loadRecentLinks()
-                }
-            }
             // 获取焦点（避免额外延迟引入的竞态）
             DispatchQueue.main.async {
                 isListFocused = true
+            }
+        }
+        .task {
+            // 切换到 GoodLinks 时，确保第一帧进入加载态，然后异步加载/重算
+            viewModel.triggerRecompute()
+            if viewModel.links.isEmpty {
+                await viewModel.loadRecentLinks()
             }
         }
         // 监听 List 焦点请求通知，切换到此视图时获取焦点
@@ -149,6 +149,9 @@ struct GoodLinksListView: View {
             Task {
                 await viewModel.loadRecentLinks()
             }
+        }
+        .onDisappear {
+            viewModel.purgeMemory()
         }
         // 注意：不要在 onDisappear 中强制关闭 GoodLinks 的安全范围访问，
         // 以免在自动同步或后台同步仍在访问数据库时导致权限被撤销（authorization denied）。
