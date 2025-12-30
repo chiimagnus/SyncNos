@@ -520,25 +520,3 @@ final class WeReadViewModel: ObservableObject {
         return result
     }
 }
-
-// MARK: - Memory Purge
-
-extension WeReadViewModel: MemoryPurgeable {
-    /// 主动释放 WeRead 列表相关的内存占用（切换到其它数据源时调用）。
-    func purgeMemory() {
-        // 释放大数组
-        books = []
-        displayBooks = []
-        visibleBooks = []
-        currentPageSize = 0
-        
-        // 清理错误与加载状态
-        errorMessage = nil
-        isLoading = false
-        isComputingList = false
-        isSyncing = false
-        
-        // 关闭可能悬挂的登录 Sheet（避免切换数据源后仍保持弹窗状态）
-        showLoginSheet = false
-    }
-}
