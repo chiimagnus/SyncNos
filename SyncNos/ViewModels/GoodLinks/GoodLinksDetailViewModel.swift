@@ -92,6 +92,11 @@ final class GoodLinksDetailViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var currentLinkId: String?
     
+    /// 当前高亮加载任务（用于切换 link / Detail 退场时取消）
+    private var highlightsFetchTask: Task<[GoodLinksHighlightRow], Error>?
+    /// 当前全文加载任务（用于切换 link / Detail 退场时取消）
+    private var contentFetchTask: Task<GoodLinksContentRow?, Error>?
+    
     // MARK: - Initialization
     
     init(
@@ -235,12 +240,29 @@ final class GoodLinksDetailViewModel: ObservableObject {
         let serviceForTask = service
         let loggerForTask = logger
         
+        // 取消上一次高亮加载
+        highlightsFetchTask?.cancel()
+        highlightsFetchTask = nil
+        
         do {
-            let rows = try await Task.detached(priority: .userInitiated) { () throws -> [GoodLinksHighlightRow] in
+            let task = Task.detached(priority: .userInitiated) { () throws -> [GoodLinksHighlightRow] in
+                guard !Task.isCancelled else { return [] }
                 loggerForTask.info("[GoodLinksDetail] 开始加载高亮，linkId=\(linkId)")
                 let dbPath = serviceForTask.resolveDatabasePath()
-                return try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: 500, offset: 0)
-            }.value
+                let rows = try serviceForTask.fetchHighlightsForLink(dbPath: dbPath, linkId: linkId, limit: 500, offset: 0)
+                guard !Task.isCancelled else { return [] }
+                return rows
+            }
+            highlightsFetchTask = task
+            
+            let rows = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            
+            // 任务取消或 link 已切换：丢弃结果，避免旧结果回写导致内存残留/内容串台
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
             
             highlights = rows
             loggerForTask.info("[GoodLinksDetail] 加载到 \(rows.count) 条高亮，linkId=\(linkId)")
@@ -248,11 +270,15 @@ final class GoodLinksDetailViewModel: ObservableObject {
             // 初始化分页
             initializePagination()
             isLoading = false
+            highlightsFetchTask = nil
         } catch {
             let desc = error.localizedDescription
             loggerForTask.error("[GoodLinksDetail] loadHighlights error: \(desc)")
+            // 如果已经切换 link 或任务被取消，不提示错误
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
             errorMessage = desc
             isLoading = false
+            highlightsFetchTask = nil
         }
     }
     
@@ -261,12 +287,29 @@ final class GoodLinksDetailViewModel: ObservableObject {
         let serviceForTask = service
         let loggerForTask = logger
         
+        // 取消上一次全文加载
+        contentFetchTask?.cancel()
+        contentFetchTask = nil
+        
         do {
-            let contentRow = try await Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
+            let task = Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
+                guard !Task.isCancelled else { return nil }
                 loggerForTask.info("[GoodLinksDetail] 开始加载全文内容，linkId=\(linkId)")
                 let dbPath = serviceForTask.resolveDatabasePath()
-                return try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
-            }.value
+                let row = try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
+                guard !Task.isCancelled else { return nil }
+                return row
+            }
+            contentFetchTask = task
+            
+            let contentRow = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            
+            // 任务取消或 link 已切换：丢弃结果
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
             
             content = contentRow
             if let c = contentRow {
@@ -274,20 +317,28 @@ final class GoodLinksDetailViewModel: ObservableObject {
             } else {
                 loggerForTask.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
+            contentFetchTask = nil
         } catch {
             let desc = error.localizedDescription
             loggerForTask.error("[GoodLinksDetail] loadContent error: \(desc)")
+            // 如果已经切换 link 或任务被取消，不提示错误
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
             errorMessage = desc
+            contentFetchTask = nil
         }
     }
     
     /// 清空当前数据（切换 link 时调用）
     func clear() {
+        highlightsFetchTask?.cancel()
+        highlightsFetchTask = nil
+        contentFetchTask?.cancel()
+        contentFetchTask = nil
         currentLinkId = nil
-        highlights = []
+        highlights.removeAll(keepingCapacity: false)
         content = nil
-        visibleHighlights = []
-        allFilteredHighlights = []
+        visibleHighlights.removeAll(keepingCapacity: false)
+        allFilteredHighlights.removeAll(keepingCapacity: false)
         currentPage = 0
         syncProgressText = nil
         syncMessage = nil
