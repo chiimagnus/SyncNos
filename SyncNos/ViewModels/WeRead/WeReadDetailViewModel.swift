@@ -238,6 +238,26 @@ final class WeReadDetailViewModel: ObservableObject {
         isLoadingMore = false
     }
 
+    // MARK: - Memory Management
+    
+    /// 清理所有数据，释放内存（在切换书籍或视图销毁时调用）
+    func clear() {
+        // 清理数据
+        currentBookId = nil
+        allBookmarks = []
+        filteredHighlights = []
+        visibleHighlights = []
+        currentPageCount = 0
+        
+        // 清理状态
+        isLoading = false
+        isLoadingMore = false
+        isBackgroundSyncing = false
+        isSyncing = false
+        syncProgressText = nil
+        syncMessage = nil
+    }
+
     // MARK: - Data Loading
     
     /// 加载高亮（优先缓存，后台增量同步）

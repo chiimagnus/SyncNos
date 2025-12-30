@@ -331,6 +331,31 @@ final class AppleBooksDetailViewModel: ObservableObject {
         session?.close()
         session = nil
     }
+    
+    // MARK: - Memory Management
+    
+    /// 清理所有数据，释放内存（在切换书籍或视图销毁时调用）
+    func clear() {
+        // 取消正在进行的加载任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        
+        // 关闭数据库 session
+        closeSession()
+        
+        // 清理数据
+        highlights = []
+        currentAssetId = nil
+        currentOffset = 0
+        expectedTotalCount = 0
+        
+        // 清理状态
+        errorMessage = nil
+        syncMessage = nil
+        syncProgressText = nil
+        isLoadingPage = false
+        isSyncing = false
+    }
 
     // MARK: - Notion Sync
     // 统一入口：智能同步（创建/补齐/更新）

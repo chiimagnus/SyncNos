@@ -251,7 +251,12 @@ struct WeReadDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _, _ in
+        .onChange(of: selectedBookId) { oldId, newId in
+            // 先清理旧数据（释放内存）
+            if oldId != newId {
+                detailViewModel.clear()
+            }
+            
             if let book = selectedBook {
                 Task {
                     await detailViewModel.loadHighlights(for: book.bookId)

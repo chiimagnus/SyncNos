@@ -289,8 +289,14 @@ final class GoodLinksDetailViewModel: ObservableObject {
         visibleHighlights = []
         allFilteredHighlights = []
         currentPage = 0
+        
+        // 清理状态
+        isLoading = false
+        isLoadingMore = false
+        isSyncing = false
         syncProgressText = nil
         syncMessage = nil
+        errorMessage = nil
     }
     
     // MARK: - Filter & Sort

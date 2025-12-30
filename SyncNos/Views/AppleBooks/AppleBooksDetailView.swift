@@ -170,7 +170,12 @@ struct AppleBooksDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _, _ in
+        .onChange(of: selectedBookId) { _, newId in
+            // 先清理旧数据（释放内存）
+            if newId == nil {
+                viewModel.clear()
+            }
+            
             if let book = selectedBook {
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)

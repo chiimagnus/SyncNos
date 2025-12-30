@@ -296,6 +296,9 @@ struct DedaoDetailView: View {
     }
     
     private func handleBookIdChange(newId: String?) {
+        // 先清理旧数据（释放内存）
+        detailViewModel.clear()
+        
         if let id = newId {
             Task {
                 await detailViewModel.loadHighlights(for: id)
