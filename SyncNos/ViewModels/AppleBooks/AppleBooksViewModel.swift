@@ -507,28 +507,3 @@ extension AppleBooksViewModel {
         return notionConfig.isConfigured
     }
 }
-
-// MARK: - Memory Purge
-
-extension AppleBooksViewModel: MemoryPurgeable {
-    /// 主动释放 Apple Books 列表相关的内存占用（切换到其它数据源时调用）。
-    func purgeMemory() {
-        // 结束安全作用域访问（避免长期持有文件句柄/权限）
-        stopAccessingIfNeeded()
-        
-        // 释放大数组
-        books = []
-        displayBooks = []
-        visibleBooks = []
-        currentPageSize = 0
-        
-        // 释放路径与错误状态（下次进入会重新解析/加载）
-        annotationDBPath = nil
-        booksDBPath = nil
-        errorMessage = nil
-        
-        // 重置加载状态，避免 UI 残留“Loading…”
-        isLoading = false
-        isComputingList = false
-    }
-}
