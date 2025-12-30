@@ -24,6 +24,8 @@ struct ChatDetailView: View {
     @State private var isDragTargeted = false
     @State private var showSenderNamePicker = false
     @State private var messageForSenderName: ChatMessage?
+    @State private var selectedMessageIds: Set<UUID> = []  // 多选消息 ID
+    @State private var lastSelectedMessageId: UUID?  // 用于 Shift+Click 区域选择的锚点
     @Environment(\.fontScale) private var fontScale
 
     private var selectedContact: ChatBookListItem? {
@@ -341,8 +343,10 @@ struct ChatDetailView: View {
                                 case .system:
                                     ChatSystemMessageRow(
                                         message: message,
-                                        isSelected: selectedMessageId == message.id,
-                                        onTap: { selectedMessageId = message.id },
+                                        isSelected: selectedMessageIds.contains(message.id),
+                                        onTap: { event in
+                                            handleMessageTap(message, event: event)
+                                        },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
                                         },
@@ -351,13 +355,18 @@ struct ChatDetailView: View {
                                         },
                                         onClearSenderName: {
                                             handleClearSenderName(message, for: contact)
+                                        },
+                                        onDelete: {
+                                            handleDeleteMessage(message, for: contact)
                                         }
                                     )
                                 default:
                                     ChatMessageBubble(
                                         message: message,
-                                        isSelected: selectedMessageId == message.id,
-                                        onTap: { selectedMessageId = message.id },
+                                        isSelected: selectedMessageIds.contains(message.id),
+                                        onTap: { event in
+                                            handleMessageTap(message, event: event)
+                                        },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
                                         },
@@ -366,6 +375,9 @@ struct ChatDetailView: View {
                                         },
                                         onClearSenderName: {
                                             handleClearSenderName(message, for: contact)
+                                        },
+                                        onDelete: {
+                                            handleDeleteMessage(message, for: contact)
                                         }
                                     )
                                 }
@@ -382,6 +394,8 @@ struct ChatDetailView: View {
                 }
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
+                    selectedMessageIds.removeAll()
+                    lastSelectedMessageId = nil
                 }
                 // 监听来自 MainListView 的消息导航通知
                 .onReceive(NotificationCenter.default.publisher(for: .chatsNavigateMessage).receive(on: DispatchQueue.main)) { notification in
@@ -498,6 +512,9 @@ struct ChatDetailView: View {
             guard newIndex != currentIndex else { return }
             let newMessage = messages[newIndex]
             selectedMessageId = newMessage.id
+            // 键盘导航时单选
+            selectedMessageIds = [newMessage.id]
+            lastSelectedMessageId = newMessage.id
             withAnimation(.easeInOut(duration: 0.2)) {
                 proxy.scrollTo(compositeId(for: newMessage), anchor: .center)
             }
@@ -506,6 +523,8 @@ struct ChatDetailView: View {
             let message = messages.last
             selectedMessageId = message?.id
             if let message {
+                selectedMessageIds = [message.id]
+                lastSelectedMessageId = message.id
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(compositeId(for: message), anchor: .center)
                 }
@@ -553,6 +572,71 @@ struct ChatDetailView: View {
             senderName: nil,
             for: contact.contactId
         )
+    }
+    
+    private func handleDeleteMessage(_ message: ChatMessage, for contact: ChatBookListItem) {
+        // 如果是多选，删除所有选中的消息
+        if selectedMessageIds.count > 1 && selectedMessageIds.contains(message.id) {
+            let idsToDelete = Array(selectedMessageIds)
+            selectedMessageIds.removeAll()
+            selectedMessageId = nil
+            lastSelectedMessageId = nil
+            listViewModel.deleteMessages(messageIds: idsToDelete, for: contact.contactId)
+        } else {
+            // 单条删除
+            selectedMessageIds.remove(message.id)
+            if selectedMessageId == message.id {
+                selectedMessageId = nil
+            }
+            listViewModel.deleteMessage(messageId: message.id, for: contact.contactId)
+        }
+    }
+    
+    // MARK: - Multi-Selection Handling
+    
+    /// 处理消息点击（支持多选）
+    /// - Cmd+Click: 切换单个消息的选中状态（多选/取消选中）
+    /// - Shift+Click: 区域选择（从上次选中的消息到当前消息）
+    /// - 普通点击: 单选（清除其他选中，只选中当前消息）
+    private func handleMessageTap(_ message: ChatMessage, event: NSEvent?) {
+        let modifiers = event?.modifierFlags ?? []
+        
+        if modifiers.contains(.command) {
+            // Cmd+Click: 切换选中状态
+            if selectedMessageIds.contains(message.id) {
+                selectedMessageIds.remove(message.id)
+            } else {
+                selectedMessageIds.insert(message.id)
+            }
+            lastSelectedMessageId = message.id
+            
+        } else if modifiers.contains(.shift), let anchorId = lastSelectedMessageId {
+            // Shift+Click: 区域选择
+            guard let anchorIndex = messages.firstIndex(where: { $0.id == anchorId }),
+                  let targetIndex = messages.firstIndex(where: { $0.id == message.id }) else {
+                // 找不到锚点或目标，退回单选
+                selectedMessageIds = [message.id]
+                lastSelectedMessageId = message.id
+                return
+            }
+            
+            let start = min(anchorIndex, targetIndex)
+            let end = max(anchorIndex, targetIndex)
+            
+            // 选中范围内的所有消息
+            for i in start...end {
+                selectedMessageIds.insert(messages[i].id)
+            }
+            // 注意：Shift+Click 不更新 lastSelectedMessageId，保持锚点不变
+            
+        } else {
+            // 普通点击: 单选
+            selectedMessageIds = [message.id]
+            lastSelectedMessageId = message.id
+        }
+        
+        // 更新单选 ID（用于键盘导航等）
+        selectedMessageId = message.id
     }
 
     // MARK: - Export Helper
