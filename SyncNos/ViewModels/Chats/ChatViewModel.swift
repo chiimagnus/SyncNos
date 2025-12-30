@@ -57,6 +57,9 @@ final class ChatViewModel: ObservableObject {
     private let cacheService: ChatCacheServiceProtocol
     private let parser: ChatOCRParser
     private let logger: LoggerServiceProtocol
+    
+    /// 分页加载的“防串台 token”（用于在切换对话/卸载消息时丢弃旧加载结果）
+    private var paginationLoadTokens: [UUID: UUID] = [:]
 
     // MARK: - Computed
 
@@ -249,6 +252,12 @@ final class ChatViewModel: ObservableObject {
     
     /// 核心分页加载逻辑
     private func loadMessages(for contactId: UUID, reset: Bool) async {
+        guard !Task.isCancelled else { return }
+        
+        // 为本次加载生成 token（后续 await 回来时校验，避免旧任务回写）
+        let token = UUID()
+        paginationLoadTokens[contactId] = token
+        
         // 初始化或获取当前状态
         var state = paginationStates[contactId] ?? ChatPaginationState()
         
@@ -262,6 +271,7 @@ final class ChatViewModel: ObservableObject {
             // 获取总数（首次加载时）
             if reset || state.totalCount == 0 {
                 let totalCount = try await cacheService.fetchMessageCount(conversationId: contactId.uuidString)
+                guard !Task.isCancelled, paginationLoadTokens[contactId] == token else { return }
                 state.totalCount = totalCount
             }
             
@@ -275,6 +285,7 @@ final class ChatViewModel: ObservableObject {
                 limit: limit,
                 offset: offset
             )
+            guard !Task.isCancelled, paginationLoadTokens[contactId] == token else { return }
             
             if reset {
                 // 重置：用新消息替换
@@ -299,6 +310,7 @@ final class ChatViewModel: ObservableObject {
             logger.info("[ChatsV2] Loaded \(newMessages.count) messages (total: \(state.loadedMessages.count)/\(state.totalCount)) for \(contactId)")
         } catch {
             logger.error("[ChatsV2] Failed to load messages page: \(error)")
+            guard !Task.isCancelled, paginationLoadTokens[contactId] == token else { return }
             state.isLoadingMore = false
             paginationStates[contactId] = state
             errorMessage = "加载消息失败: \(error.localizedDescription)"
@@ -307,7 +319,37 @@ final class ChatViewModel: ObservableObject {
     
     /// 重置分页状态（用于新消息导入后刷新）
     func resetPaginationState(for contactId: UUID) {
+        paginationLoadTokens[contactId] = UUID()
         paginationStates[contactId] = nil
+    }
+    
+    // MARK: - Memory Release (Detail Memory Optimization)
+    
+    /// 卸载指定对话的已加载消息（释放 Detail 内存；下次选中时重新分页加载）
+    func unloadMessages(for contactId: UUID) {
+        // 失效旧加载（避免旧任务回写把消息“复活”）
+        paginationLoadTokens[contactId] = UUID()
+        
+        if var state = paginationStates[contactId] {
+            state.loadedMessages.removeAll(keepingCapacity: false)
+            state.currentOffset = 0
+            state.isLoadingMore = false
+            state.hasInitiallyLoaded = false
+            paginationStates[contactId] = state
+        }
+        
+        if var conversation = conversations[contactId] {
+            conversation.messages.removeAll(keepingCapacity: false)
+            conversations[contactId] = conversation
+        }
+    }
+    
+    /// 卸载所有对话的已加载消息（可选保留一个）
+    func unloadAllMessages(except keepContactId: UUID? = nil) {
+        let keys = Array(paginationStates.keys)
+        for id in keys where id != keepContactId {
+            unloadMessages(for: id)
+        }
     }
 
     func deleteContact(_ contact: ChatBookListItem) {
