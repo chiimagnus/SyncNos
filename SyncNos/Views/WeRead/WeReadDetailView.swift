@@ -56,6 +56,7 @@ struct WeReadDetailView: View {
                         InfoHeaderCardView(
                             title: book.title,
                             subtitle: book.author.isEmpty ? nil : book.author,
+                            overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                             timestamps: TimestampInfo(
                                 addedAt: book.createdAt,
                                 modifiedAt: book.updatedAt,
