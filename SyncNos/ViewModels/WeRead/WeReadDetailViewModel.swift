@@ -99,8 +99,8 @@ final class WeReadDetailViewModel: ObservableObject {
 
     private var currentBookId: String?
     
-    /// 所有原始数据（未筛选）
-    private var allBookmarks: [WeReadBookmark] = []
+    /// 所有高亮（未筛选，已转换为展示模型；避免同时持有原始模型与展示模型导致峰值翻倍）
+    private var allHighlights: [WeReadHighlightDisplay] = []
     
     /// 筛选和排序后的数据
     private var filteredHighlights: [WeReadHighlightDisplay] = []
@@ -244,7 +244,7 @@ final class WeReadDetailViewModel: ObservableObject {
     func loadHighlights(for bookId: String) async {
         guard !Task.isCancelled else { return }
         // 如果是同一本书，不重复加载
-        if currentBookId == bookId && !allBookmarks.isEmpty {
+        if currentBookId == bookId && !allHighlights.isEmpty {
             return
         }
         
@@ -252,7 +252,7 @@ final class WeReadDetailViewModel: ObservableObject {
         isLoading = true
         
         // 重置数据
-        allBookmarks.removeAll(keepingCapacity: false)
+        allHighlights.removeAll(keepingCapacity: false)
         filteredHighlights.removeAll(keepingCapacity: false)
         visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
@@ -262,7 +262,7 @@ final class WeReadDetailViewModel: ObservableObject {
             let cached = try await cacheService.getHighlights(bookId: bookId)
             guard !Task.isCancelled, currentBookId == bookId else { return }
             if !cached.isEmpty {
-                allBookmarks = cached
+                allHighlights = cached.map { WeReadHighlightDisplay(from: $0) }
                 applyFiltersAndSort()
                 resetPagination()
                 isLoading = false
@@ -297,8 +297,9 @@ final class WeReadDetailViewModel: ObservableObject {
             case .updated(let added, let removed):
                 logger.info("[WeReadDetail] Synced: +\(added) -\(removed) highlights for bookId=\(bookId)")
                 // 重新从缓存加载（getHighlights 直接返回 [WeReadBookmark]）
-                allBookmarks = try await cacheService.getHighlights(bookId: bookId)
+                let refreshed = try await cacheService.getHighlights(bookId: bookId)
                 guard !Task.isCancelled, currentBookId == bookId else { return }
+                allHighlights = refreshed.map { WeReadHighlightDisplay(from: $0) }
                 applyFiltersAndSort()
                 resetPagination()
             case .fullSyncRequired:
@@ -307,7 +308,7 @@ final class WeReadDetailViewModel: ObservableObject {
             }
         } catch {
             // 如果缓存为空，需要全量拉取
-            if allBookmarks.isEmpty {
+            if allHighlights.isEmpty {
                 await fullFetchFromAPI(bookId: bookId)
             } else {
                 logger.error("[WeReadDetail] Incremental sync failed: \(error.localizedDescription)")
@@ -323,7 +324,7 @@ final class WeReadDetailViewModel: ObservableObject {
             guard !Task.isCancelled, currentBookId == bookId else { return }
             
             // 保存合并后的数据
-            allBookmarks = mergedBookmarks
+            allHighlights = mergedBookmarks.map { WeReadHighlightDisplay(from: $0) }
             
             // 保存到缓存
             try await cacheService.saveHighlights(mergedBookmarks, bookId: bookId)
@@ -366,7 +367,7 @@ final class WeReadDetailViewModel: ObservableObject {
         }
         
         // 清空当前数据
-        allBookmarks.removeAll(keepingCapacity: false)
+        allHighlights.removeAll(keepingCapacity: false)
         filteredHighlights.removeAll(keepingCapacity: false)
         visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
@@ -379,25 +380,22 @@ final class WeReadDetailViewModel: ObservableObject {
     
     private func applyFiltersAndSort() {
         var result: [WeReadHighlightDisplay] = []
+        result.reserveCapacity(allHighlights.count)
         
-        // 转换合并后的 bookmarks（已包含 reviewContents）
-        for bm in allBookmarks {
-            // 应用筛选
+        for h in allHighlights {
             // "仅笔记"过滤：检查是否有 note 或 reviewContents（关联的想法）
             if noteFilter {
-                let hasNote = (bm.note != nil && !bm.note!.isEmpty)
-                let hasReviews = !bm.reviewContents.isEmpty
-                if !hasNote && !hasReviews {
-                    continue
-                }
+                let hasNote = (h.note != nil && !(h.note?.isEmpty ?? true))
+                let hasReviews = !h.reviewContents.isEmpty
+                if !hasNote && !hasReviews { continue }
             }
             
             // 颜色筛选
-            if !selectedStyles.isEmpty, let style = bm.colorIndex, !selectedStyles.contains(style) {
+            if !selectedStyles.isEmpty, let style = h.colorIndex, !selectedStyles.contains(style) {
                 continue
             }
             
-            result.append(WeReadHighlightDisplay(from: bm))
+            result.append(h)
         }
         
         // 排序（WeRead 只有 createdAt）
