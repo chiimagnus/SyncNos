@@ -1,9 +1,13 @@
 import Foundation
 import SwiftData
 
-// MARK: - Chats Model Container Factory (V2 with Encryption)
+// MARK: - Chats Model Container Factory (V3 Minimal)
 
-/// Chats v2 ModelContainer 工厂（独立 store 文件，支持加密字段）
+/// Chats v3 ModelContainer 工厂（独立 store 文件，支持加密字段，不存储 OCR JSON）
+///
+/// **V3 变更（2025-12-30）**：
+/// - 删除 `ocrRequestJSON`、`ocrResponseJSON`、`normalizedBlocksJSON` 字段
+/// - 使用新 store 文件 `chats_v3_minimal.store`（破坏性升级，用户需重新导入）
 enum ChatModelContainerFactory {
     static func createContainer() throws -> ModelContainer {
         let schema = Schema([
@@ -12,13 +16,11 @@ enum ChatModelContainerFactory {
             CachedChatMessageV2.self
         ])
 
-        // 破坏性升级：使用全新 store 文件（v2_encrypted），因为字段类型变更
-        // - name -> nameEncrypted (String -> Data)
-        // - content -> contentEncrypted (String -> Data)
-        // - senderName -> senderNameEncrypted (String? -> Data?)
+        // 破坏性升级：使用全新 store 文件（v3_minimal），因为 Schema 变更
+        // - 删除 CachedChatScreenshotV2 的 ocrRequestJSON, ocrResponseJSON, normalizedBlocksJSON
         let storeURL = URL.applicationSupportDirectory
             .appendingPathComponent("SyncNos", isDirectory: true)
-            .appendingPathComponent("chats_v2_encrypted.store")
+            .appendingPathComponent("chats_v3_minimal.store")
 
         // 确保目录存在
         let directory = storeURL.deletingLastPathComponent()
@@ -80,26 +82,19 @@ protocol ChatCacheServiceProtocol: Actor {
         senderName: String?
     ) throws
 
-    // 截图导入（持久化 raw OCR + blocks + parsed messages）
+    // 截图导入（持久化元数据 + parsed messages，不存储 OCR 原始数据）
     func appendScreenshot(
         conversationId: String,
         screenshotId: String,
         importedAt: Date,
         imageSize: CGSize,
         ocrEngine: String,
-        ocrRequestJSON: Data?,
-        ocrResponseJSON: Data,
-        normalizedBlocksJSON: Data,
         parsedAt: Date,
         messages: [ChatMessage]
     ) throws
 
     // 清理
     func clearAllData() throws
-
-    // Debug: OCR Payload Inspect
-    func fetchRecentOcrPayloads(limit: Int) throws -> [ChatOcrPayloadSummary]
-    func fetchOcrPayload(screenshotId: String) throws -> ChatOcrPayloadDetail?
 }
 
 // MARK: - Chats Cache Service (V2)
@@ -331,9 +326,6 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         importedAt: Date,
         imageSize: CGSize,
         ocrEngine: String,
-        ocrRequestJSON: Data?,
-        ocrResponseJSON: Data,
-        normalizedBlocksJSON: Data,
         parsedAt: Date,
         messages: [ChatMessage]
     ) throws {
@@ -346,10 +338,10 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         convDescriptor.fetchLimit = 1
 
         guard let conversation = try modelContext.fetch(convDescriptor).first else {
-            throw NSError(domain: "ChatCacheV2", code: 404, userInfo: [NSLocalizedDescriptionKey: "对话不存在"])
+            throw NSError(domain: "ChatCacheV3", code: 404, userInfo: [NSLocalizedDescriptionKey: "对话不存在"])
         }
 
-        // 2) 插入截图记录（raw OCR + blocks）
+        // 2) 插入截图记录（仅元数据，不存储 OCR 原始数据）
         let screenshot = CachedChatScreenshotV2(
             screenshotId: screenshotId,
             conversationId: conversationId,
@@ -357,9 +349,6 @@ actor ChatCacheService: ChatCacheServiceProtocol {
             imageWidth: imageSize.width,
             imageHeight: imageSize.height,
             ocrEngine: ocrEngine,
-            ocrRequestJSON: ocrRequestJSON,
-            ocrResponseJSON: ocrResponseJSON,
-            normalizedBlocksJSON: normalizedBlocksJSON,
             parsedAt: parsedAt
         )
         screenshot.conversation = conversation
@@ -397,7 +386,7 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         conversation.updatedAt = Date()
 
         try modelContext.save()
-        logger.info("[ChatCacheV2] Appended screenshot(\(screenshotId)) + \(messages.count) messages")
+        logger.info("[ChatCacheV3] Appended screenshot(\(screenshotId)) + \(messages.count) messages")
     }
 
     // MARK: Cleanup
@@ -422,49 +411,7 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         }
 
         try modelContext.save()
-        logger.info("[ChatCacheV2] Cleared all data")
-    }
-
-    // MARK: Debug - OCR Payload Inspect
-
-    func fetchRecentOcrPayloads(limit: Int) throws -> [ChatOcrPayloadSummary] {
-        var descriptor = FetchDescriptor<CachedChatScreenshotV2>(
-            sortBy: [SortDescriptor(\.importedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = max(0, limit)
-
-        let screenshots = try modelContext.fetch(descriptor)
-        return screenshots.map {
-            ChatOcrPayloadSummary(
-                screenshotId: $0.screenshotId,
-                conversationId: $0.conversationId,
-                importedAt: $0.importedAt,
-                parsedAt: $0.parsedAt,
-                responseBytes: $0.ocrResponseJSON.count,
-                blocksBytes: $0.normalizedBlocksJSON.count
-            )
-        }
-    }
-
-    func fetchOcrPayload(screenshotId: String) throws -> ChatOcrPayloadDetail? {
-        let targetId = screenshotId
-        let predicate = #Predicate<CachedChatScreenshotV2> { shot in
-            shot.screenshotId == targetId
-        }
-        var descriptor = FetchDescriptor<CachedChatScreenshotV2>(predicate: predicate)
-        descriptor.fetchLimit = 1
-
-        guard let shot = try modelContext.fetch(descriptor).first else { return nil }
-
-        return ChatOcrPayloadDetail(
-            screenshotId: shot.screenshotId,
-            conversationId: shot.conversationId,
-            importedAt: shot.importedAt,
-            parsedAt: shot.parsedAt,
-            requestJSON: shot.ocrRequestJSON.flatMap { String(data: $0, encoding: .utf8) },
-            responseJSON: String(data: shot.ocrResponseJSON, encoding: .utf8) ?? "<non-utf8 data>",
-            normalizedBlocksJSON: String(data: shot.normalizedBlocksJSON, encoding: .utf8) ?? "<non-utf8 data>"
-        )
+        logger.info("[ChatCacheV3] Cleared all data")
     }
 }
 
@@ -484,27 +431,10 @@ private extension CachedChatMessageV2 {
     }
 }
 
-// MARK: - Debug DTOs (Sendable)
-
-struct ChatOcrPayloadSummary: Identifiable, Hashable, Sendable {
-    var id: String { screenshotId }
-
-    let screenshotId: String
-    let conversationId: String
-    let importedAt: Date
-    let parsedAt: Date
-    let responseBytes: Int
-    let blocksBytes: Int
-}
-
-struct ChatOcrPayloadDetail: Sendable {
-    let screenshotId: String
-    let conversationId: String
-    let importedAt: Date
-    let parsedAt: Date
-    let requestJSON: String?
-    let responseJSON: String
-    let normalizedBlocksJSON: String
-}
+// MARK: - Deprecated: Debug DTOs
+//
+// ChatOcrPayloadSummary 和 ChatOcrPayloadDetail 已移除（2025-12-30）
+// - OCR 原始数据不再持久化
+// - 调试功能已移除
 
 
