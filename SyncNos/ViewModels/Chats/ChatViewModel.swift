@@ -575,6 +575,35 @@ final class ChatViewModel: ObservableObject {
             }
         }
     }
+    
+    /// 删除指定消息
+    func deleteMessage(messageId: UUID, for contactId: UUID) {
+        // 1. 更新 conversations 内存
+        if var conversation = conversations[contactId] {
+            conversation.messages.removeAll { $0.id == messageId }
+            conversations[contactId] = conversation
+        }
+        
+        // 2. 更新 paginationStates 内存
+        if var state = paginationStates[contactId] {
+            state.loadedMessages.removeAll { $0.id == messageId }
+            state.totalCount = max(0, state.totalCount - 1)
+            paginationStates[contactId] = state
+        }
+        
+        // 3. 持久化删除
+        Task {
+            do {
+                try await cacheService.deleteMessage(messageId: messageId.uuidString)
+                // 从缓存刷新列表（确保 messageCount 和 lastMessage 正确）
+                await refreshContactsListFromCache()
+                logger.info("[ChatsV2] Deleted message: \(messageId)")
+            } catch {
+                logger.error("[ChatsV2] Failed to delete message: \(error)")
+                errorMessage = "删除消息失败: \(error.localizedDescription)"
+            }
+        }
+    }
 
     // MARK: - Private
 
