@@ -8,6 +8,7 @@ enum ChatPaginationConfig {
     static let pageSize = 100                   // 每页消息数
     static let preloadThreshold = 10            // 距离顶部多少条时预加载
     static let initialLoadSize = 100            // 首次加载数量
+    static let maxCachedConversations = 5       // 最多缓存的对话消息数量（P3 内存优化）
 }
 
 // MARK: - Pagination State
@@ -47,6 +48,11 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var processingScreenshotIds: Set<UUID> = []
+    
+    // MARK: - Memory Management (P3)
+    
+    /// 记录对话的最后访问时间，用于缓存淘汰
+    private var conversationAccessTime: [UUID: Date] = [:]
 
     // MARK: - Display Books (for MainListView compatibility)
 
@@ -249,6 +255,12 @@ final class ChatViewModel: ObservableObject {
     
     /// 核心分页加载逻辑
     private func loadMessages(for contactId: UUID, reset: Bool) async {
+        // 更新访问时间（用于缓存淘汰）
+        conversationAccessTime[contactId] = Date()
+        
+        // 检查是否需要淘汰旧对话的消息（P3 内存优化）
+        evictOldConversationsIfNeeded(excludingContactId: contactId)
+        
         // 初始化或获取当前状态
         var state = paginationStates[contactId] ?? ChatPaginationState()
         
@@ -305,15 +317,65 @@ final class ChatViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Memory Management (P3)
+    
+    /// 淘汰最久未访问的对话消息，释放内存
+    /// 只清理消息数据（paginationStates 和 conversations.messages），保留对话元数据
+    private func evictOldConversationsIfNeeded(excludingContactId: UUID) {
+        // 获取有消息数据的对话数量
+        let loadedConversations = paginationStates.filter { $0.value.hasInitiallyLoaded }
+        
+        // 如果已加载的对话数量未超过阈值，不需要淘汰
+        guard loadedConversations.count >= ChatPaginationConfig.maxCachedConversations else {
+            return
+        }
+        
+        // 按最后访问时间排序，找出最久未访问的对话
+        let sortedByAccessTime = conversationAccessTime
+            .filter { $0.key != excludingContactId } // 排除当前正在访问的对话
+            .sorted { $0.value < $1.value } // 按时间升序（最早访问的在前）
+        
+        // 计算需要淘汰的对话数量
+        let evictionCount = loadedConversations.count - ChatPaginationConfig.maxCachedConversations + 1
+        
+        for (index, (contactId, _)) in sortedByAccessTime.enumerated() {
+            if index >= evictionCount { break }
+            
+            // 只清理已加载消息的对话
+            guard paginationStates[contactId]?.hasInitiallyLoaded == true else { continue }
+            
+            // 清理分页状态中的消息数据，但保留 totalCount 以便重新加载
+            if var state = paginationStates[contactId] {
+                let totalCount = state.totalCount
+                state.loadedMessages = []
+                state.currentOffset = 0
+                state.hasInitiallyLoaded = false
+                state.isLoadingMore = false
+                state.totalCount = totalCount // 保留总数，便于 UI 显示
+                paginationStates[contactId] = state
+            }
+            
+            // 清理 conversations 中的消息
+            if var conversation = conversations[contactId] {
+                conversation.messages = []
+                conversations[contactId] = conversation
+            }
+            
+            logger.info("[ChatsV2] Evicted messages for conversation \(contactId) to free memory")
+        }
+    }
+    
     /// 重置分页状态（用于新消息导入后刷新）
     func resetPaginationState(for contactId: UUID) {
         paginationStates[contactId] = nil
+        conversationAccessTime.removeValue(forKey: contactId)
     }
 
     func deleteContact(_ contact: ChatBookListItem) {
         contacts.removeAll { $0.id == contact.id }
         conversations.removeValue(forKey: contact.contactId)
         paginationStates.removeValue(forKey: contact.contactId)
+        conversationAccessTime.removeValue(forKey: contact.contactId)
 
         Task {
             do {
