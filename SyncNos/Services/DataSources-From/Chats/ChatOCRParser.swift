@@ -174,69 +174,78 @@ private struct DirectedCandidate {
 private extension ChatOCRParser {
     /// 识别位于 X 轴中间的系统/时间戳文本（不做关键词识别）
     ///
-    /// 思路：中心文本通常同时满足：
-    /// - 与左右边界距离都较大（minEdgeDistance 大）
-    /// - centerX 接近 0.5
-    ///
-    /// 为了避免误把“短气泡”当成系统消息：
-    /// - 第一步：对 minEdgeDistance 做 2-means 分布聚类，取“更大的一簇”作为系统候选（更居中）
-    /// - 第二步：在系统候选中，再对 abs(bias) 做 2-means（取更小的一簇），确保“左右留白均衡”才算系统/时间戳
-    /// - 最后：叠加 centerX 接近 0.5 的约束
+    /// 改进版算法（2025-12-30）：
+    /// 使用绝对几何特征直接检测居中文本，不依赖聚类
+    /// 原因：聚类算法在边界情况下不稳定，同样位置的时间戳可能被分到不同簇
     func classifyCenteredSystemFlags(_ candidates: [MessageCandidate], imageWidth: CGFloat) -> [Bool] {
         guard !candidates.isEmpty, imageWidth > 0 else { return [] }
 
-        let minEdgeDistances: [Double] = candidates.map { cand in
+        var flags = Array(repeating: false, count: candidates.count)
+        
+        // 计算所有候选的几何特征
+        var allBiases: [Double] = []
+        allBiases.reserveCapacity(candidates.count)
+        
+        for (i, cand) in candidates.enumerated() {
             let left = Double(cand.bbox.minX / imageWidth)
             let right = Double(1 - cand.bbox.maxX / imageWidth)
-            return min(left, right)
-        }
-
-        let centerXs: [Double] = candidates.map { cand in
-            Double(cand.bbox.midX / imageWidth)
-        }
-
-        let biases: [Double] = candidates.map { cand in
-            Double((cand.bbox.minX + cand.bbox.maxX) / imageWidth) - 1.0
-        }
-
-        // Step 1: minEdgeDistance 聚类（更大的簇更可能是“居中系统/时间戳”）
-        let (edgeAssignments, edgeCenters) = kMeans2(values: minEdgeDistances, iterations: 6)
-        let centeredCluster = edgeCenters.0 >= edgeCenters.1 ? 0 : 1
-        let minCenter = min(edgeCenters.0, edgeCenters.1)
-        let maxCenter = max(edgeCenters.0, edgeCenters.1)
-
-        // 若两簇分离不明显，则不标记系统消息（避免误判导致“漏气泡”）
-        let hasClearSplit = (maxCenter - minCenter) >= 0.12 && maxCenter >= 0.18
-        guard hasClearSplit else {
-            return Array(repeating: false, count: candidates.count)
-        }
-
-        // Step 2: 在“居中簇”里，再用 abs(bias) 聚类（更小的一簇才是真系统/时间戳）
-        var candidateIndices: [Int] = []
-        candidateIndices.reserveCapacity(candidates.count)
-
-        for i in candidates.indices {
-            let centered = abs(centerXs[i] - 0.5) <= 0.12
-            if edgeAssignments[i] == centeredCluster, centered {
-                candidateIndices.append(i)
+            let centerX = Double(cand.bbox.midX / imageWidth)
+            let bias = Double((cand.bbox.minX + cand.bbox.maxX) / imageWidth) - 1.0
+            let relativeWidth = Double(cand.bbox.width / imageWidth)
+            
+            allBiases.append(bias)
+            
+            // 直接使用绝对阈值检测居中文本
+            // 条件1：centerX 接近 0.5（误差 ±0.1）
+            let isCentered = abs(centerX - 0.5) <= 0.10
+            
+            // 条件2：左右留白差异小（bias 接近 0，误差 ±0.1）
+            let isBalanced = abs(bias) <= 0.10
+            
+            // 条件3：两侧都有明显留白（至少 25% 的边距）
+            // 这区分了居中文本和靠边的气泡
+            let hasMargins = min(left, right) >= 0.25
+            
+            // 条件4：宽度较窄（相对宽度 < 0.5）
+            // 时间戳和系统消息通常比气泡窄
+            let isNarrow = relativeWidth < 0.50
+            
+            if isCentered && isBalanced && hasMargins && isNarrow {
+                flags[i] = true
             }
         }
-
-        guard !candidateIndices.isEmpty else {
-            return Array(repeating: false, count: candidates.count)
-        }
-
-        let absBiasValues: [Double] = candidateIndices.map { abs(biases[$0]) }
-        let (biasAssignments, biasCenters) = kMeans2(values: absBiasValues, iterations: 6)
-        let systemBiasCluster = biasCenters.0 <= biasCenters.1 ? 0 : 1
-
-        var flags = Array(repeating: false, count: candidates.count)
-        for (j, idx) in candidateIndices.enumerated() {
-            if biasAssignments[j] == systemBiasCluster {
-                flags[idx] = true
+        
+        // 额外检查：如果存在明显的左右气泡分布，对于 bias 接近 0 的候选额外放宽检测
+        // 这处理了聚类边界效应
+        if let minBias = allBiases.min(), let maxBias = allBiases.max() {
+            // 存在明显的左右分布（bias 范围 > 0.5）
+            let hasLeftRightDistribution = (maxBias - minBias) > 0.5
+            
+            if hasLeftRightDistribution {
+                for (i, cand) in candidates.enumerated() {
+                    // 已经标记的跳过
+                    if flags[i] { continue }
+                    
+                    let bias = allBiases[i]
+                    let centerX = Double(cand.bbox.midX / imageWidth)
+                    let relativeWidth = Double(cand.bbox.width / imageWidth)
+                    
+                    // 如果 bias 明显小于左右气泡（接近 0），且位置居中
+                    // 这捕获了那些被聚类边界效应漏掉的时间戳
+                    let isBiasNearZero = abs(bias) <= 0.15
+                    let isCentered = abs(centerX - 0.5) <= 0.12
+                    let isNarrow = relativeWidth < 0.50
+                    
+                    // bias 必须明显小于左右气泡的 bias
+                    let isDistinctFromBubbles = abs(bias) < (maxBias - minBias) * 0.3
+                    
+                    if isBiasNearZero && isCentered && isNarrow && isDistinctFromBubbles {
+                        flags[i] = true
+                    }
+                }
             }
         }
-
+        
         return flags
     }
 }
