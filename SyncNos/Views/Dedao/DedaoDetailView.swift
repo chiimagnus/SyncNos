@@ -73,8 +73,19 @@ struct DedaoDetailView: View {
         }
         .navigationTitle("Dedao")
         .toolbar { toolbarContent(book: book) }
-        .onAppear { loadHighlightsForBook(book) }
-        .onChange(of: selectedBookId) { _, newId in handleBookIdChange(newId: newId) }
+        // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
+        .task(id: selectedBookId) {
+            guard let id = selectedBookId,
+                  let target = listViewModel.displayBooks.first(where: { $0.bookId == id }) else {
+                return
+            }
+            await detailViewModel.loadHighlights(for: target.bookId)
+            externalIsSyncing = listViewModel.syncingBookIds.contains(id)
+            if !externalIsSyncing { externalSyncProgress = nil }
+        }
+        .onDisappear {
+            cleanupOnDisappear()
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
         .alert("Sync Error", isPresented: $showingSyncError) {
@@ -286,28 +297,6 @@ struct DedaoDetailView: View {
     
     // MARK: - Helper Methods
     
-    private func loadHighlightsForBook(_ book: DedaoBookListItem) {
-        Task {
-            await detailViewModel.loadHighlights(for: book.bookId)
-        }
-        if listViewModel.syncingBookIds.contains(book.bookId) {
-            externalIsSyncing = true
-        }
-    }
-    
-    private func handleBookIdChange(newId: String?) {
-        if let id = newId {
-            Task {
-                await detailViewModel.loadHighlights(for: id)
-            }
-            externalIsSyncing = listViewModel.syncingBookIds.contains(id)
-            if !externalIsSyncing { externalSyncProgress = nil }
-        } else {
-            externalIsSyncing = false
-            externalSyncProgress = nil
-        }
-    }
-    
     private func handleSyncProgressUpdate(_ notification: Notification) {
         guard let userInfo = notification.userInfo as? [String: Any],
               let bookId = userInfo["bookId"] as? String,
@@ -341,5 +330,12 @@ struct DedaoDetailView: View {
                 debouncedLayoutWidth = width
             }
         }
+    }
+    
+    // MARK: - Lifecycle
+    
+    private func cleanupOnDisappear() {
+        layoutWidthDebounceTask?.cancel()
+        layoutWidthDebounceTask = nil
     }
 }

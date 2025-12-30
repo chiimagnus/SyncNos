@@ -227,6 +227,7 @@ final class DedaoDetailViewModel: ObservableObject {
     
     /// 加载高亮（优先缓存，后台同步）
     func loadHighlights(for bookId: String) async {
+        guard !Task.isCancelled else { return }
         // 如果是同一本书且数据不为空，不重复加载
         if currentBookId == bookId && !allNotes.isEmpty {
             return
@@ -239,6 +240,7 @@ final class DedaoDetailViewModel: ObservableObject {
         do {
             // cacheService.getHighlights 现在直接返回 [DedaoEbookNote]
             let cached = try await cacheService.getHighlights(bookId: bookId)
+            guard !Task.isCancelled, currentBookId == bookId else { return }
             if !cached.isEmpty {
                 // 有缓存：立即显示，不显示 Loading
                 allNotes = cached
@@ -247,10 +249,8 @@ final class DedaoDetailViewModel: ObservableObject {
                 isLoading = false
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
                 
-                // 后台异步同步（不阻塞）
-                Task {
-                    await performBackgroundSync(bookId: bookId)
-                }
+                // 后台同步（仍保持在同一个 async task 中，便于取消/丢弃过期结果）
+                await performBackgroundSync(bookId: bookId)
                 return
             }
         } catch {
@@ -259,9 +259,9 @@ final class DedaoDetailViewModel: ObservableObject {
         
         // 2. 没有缓存：显示 Loading，从 API 加载
         if isNewBook {
-            allNotes = []
-            filteredHighlights = []
-            visibleHighlights = []
+            allNotes.removeAll(keepingCapacity: false)
+            filteredHighlights.removeAll(keepingCapacity: false)
+            visibleHighlights.removeAll(keepingCapacity: false)
             currentPageCount = 0
         }
         isLoading = true
@@ -270,14 +270,24 @@ final class DedaoDetailViewModel: ObservableObject {
     
     /// 执行后台同步
     private func performBackgroundSync(bookId: String) async {
+        guard !Task.isCancelled, currentBookId == bookId else { return }
         isBackgroundSyncing = true
+        defer {
+            // 仅当仍停留在同一本书时才回写 UI 状态，避免旧任务覆盖新任务状态
+            if currentBookId == bookId {
+                isBackgroundSyncing = false
+                isLoading = false
+            }
+        }
         
         do {
             // 从 API 获取最新数据
             let apiNotes = try await apiService.fetchEbookNotes(ebookEnid: bookId, bookTitle: nil)
+            guard !Task.isCancelled, currentBookId == bookId else { return }
             
             // 保存到缓存
             try await cacheService.saveHighlights(apiNotes, bookId: bookId)
+            guard !Task.isCancelled, currentBookId == bookId else { return }
             
             // 如果数据有变化，更新显示
             if apiNotes.count != allNotes.count || allNotes.isEmpty {
@@ -296,9 +306,6 @@ final class DedaoDetailViewModel: ObservableObject {
                 logger.warning("[DedaoDetail] Background sync failed: \(error.localizedDescription)")
             }
         }
-        
-        isBackgroundSyncing = false
-        isLoading = false
     }
     
     func reloadCurrent() async {
@@ -314,9 +321,9 @@ final class DedaoDetailViewModel: ObservableObject {
         isLoading = true
         
         // 清空当前数据
-        allNotes = []
-        filteredHighlights = []
-        visibleHighlights = []
+        allNotes.removeAll(keepingCapacity: false)
+        filteredHighlights.removeAll(keepingCapacity: false)
+        visibleHighlights.removeAll(keepingCapacity: false)
         currentPageCount = 0
         
         // 重新加载
