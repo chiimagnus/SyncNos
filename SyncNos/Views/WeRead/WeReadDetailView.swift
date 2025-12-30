@@ -240,31 +240,19 @@ struct WeReadDetailView: View {
                 }
             }
         }
-        .onAppear {
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-                // 如果该书正在批量同步，显示外部同步状态
-                if let id = selectedBookId, listViewModel.syncingBookIds.contains(id) {
-                    externalIsSyncing = true
-                }
+        // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
+        .task(id: selectedBookId) {
+            guard let id = selectedBookId,
+                  let book = listViewModel.displayBooks.first(where: { $0.bookId == id }) else {
+                return
             }
+            await detailViewModel.loadHighlights(for: book.bookId)
+            externalIsSyncing = listViewModel.syncingBookIds.contains(id)
+            if !externalIsSyncing { externalSyncProgress = nil }
         }
-        .onChange(of: selectedBookId) { _, _ in
-            if let book = selectedBook {
-                Task {
-                    await detailViewModel.loadHighlights(for: book.bookId)
-                }
-            }
-            // 切换时更新外部同步状态
-            if let id = selectedBookId {
-                externalIsSyncing = listViewModel.syncingBookIds.contains(id)
-                if !externalIsSyncing { externalSyncProgress = nil }
-            } else {
-                externalIsSyncing = false
-                externalSyncProgress = nil
-            }
+        .onDisappear {
+            layoutWidthDebounceTask?.cancel()
+            layoutWidthDebounceTask = nil
         }
         // 监听批量同步进度更新
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
