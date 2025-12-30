@@ -170,13 +170,12 @@ struct AppleBooksDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedBookId) { _, newId in
-            // 先清理旧数据（释放内存）
+        .onChange(of: selectedBookId) { oldId, newId in
+            // 如果切换到 nil（取消选择），清理旧数据释放内存
             if newId == nil {
                 viewModel.clear()
-            }
-            
-            if let book = selectedBook {
+            } else if let book = selectedBook {
+                // 切换到新书籍时，resetAndLoadFirstPage 内部会清理旧数据
                 Task {
                     await viewModel.resetAndLoadFirstPage(dbPath: viewModelList.annotationDatabasePath, assetId: book.bookId, expectedTotalCount: book.highlightCount)
                 }

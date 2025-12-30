@@ -265,8 +265,19 @@ final class DedaoDetailViewModel: ObservableObject {
         
         // 取消之前的加载任务
         currentLoadTask?.cancel()
-        currentLoadTask = nil
         
+        // 创建新的加载任务
+        let loadTask = Task { [weak self] in
+            await self?.performLoadHighlights(for: bookId)
+        }
+        currentLoadTask = loadTask
+        
+        // 等待任务完成
+        await loadTask.value
+    }
+    
+    /// 实际执行加载的内部方法
+    private func performLoadHighlights(for bookId: String) async {
         let isNewBook = currentBookId != bookId
         currentBookId = bookId
         
@@ -290,9 +301,7 @@ final class DedaoDetailViewModel: ObservableObject {
                 logger.info("[DedaoDetail] Loaded \(cached.count) highlights from cache for bookId=\(bookId)")
                 
                 // 后台异步同步（不阻塞）
-                currentLoadTask = Task {
-                    await performBackgroundSync(bookId: bookId)
-                }
+                await performBackgroundSync(bookId: bookId)
                 return
             }
         } catch {
