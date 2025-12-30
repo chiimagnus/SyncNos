@@ -28,12 +28,17 @@ struct EditCommands: Commands {
 
             Divider()
 
-            // 自定义的 Select All（用于列表视图选择）
+            // 自定义的 Select All（优先尝试系统文本全选，失败时回退到列表选择）
             Button("Select All", systemImage: "character.textbox") {
-                selectionCommands?.selectAll()
+                // 先尝试系统的文本全选（针对 TextField、TextEditor 等）
+                let handled = NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                
+                // 如果系统没有处理（没有活跃的文本字段），则执行列表全选
+                if !handled {
+                    selectionCommands?.selectAll()
+                }
             }
             .keyboardShortcut("a", modifiers: [.command])
-            .disabled(!(selectionCommands?.canSelectAll() ?? false))
 
             // 自定义的 Deselect（用于列表视图）
             Button("Deselect", systemImage: "character.textbox.badge.sparkles") {
