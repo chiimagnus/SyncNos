@@ -129,11 +129,15 @@ final class ChatViewModel: ObservableObject {
         state.totalCount = 0
         paginationStates[contact.id] = state
         
-        updateContactsList()
+        // 立即更新 UI（新对话消息数为 0）
+        let listItem = ChatBookListItem(from: contact)
+        updateContactsListImmediately(newContact: listItem)
 
         Task {
             do {
                 try await cacheService.saveConversation(contact)
+                // 保存后从缓存刷新（确保数据一致性）
+                await refreshContactsListFromCache()
                 logger.info("[ChatsV2] Created and saved new conversation: \(name)")
             } catch {
                 logger.error("[ChatsV2] Failed to save conversation: \(error)")
@@ -402,7 +406,8 @@ final class ChatViewModel: ObservableObject {
             // 保存到缓存
             try await saveImportedMessages(adjustedMessages, to: existingId)
             
-            updateContactsList()
+            // 从缓存刷新列表（确保 messageCount 和 lastMessage 正确）
+            await refreshContactsListFromCache()
             
             logger.info("[ChatsV2] Imported \(adjustedMessages.count) messages to existing conversation")
         } else {
@@ -423,7 +428,8 @@ final class ChatViewModel: ObservableObject {
             try await cacheService.saveConversation(contact)
             try await saveImportedMessages(result.messages, to: contact.id)
             
-            updateContactsList()
+            // 从缓存刷新列表（确保 messageCount 和 lastMessage 正确）
+            await refreshContactsListFromCache()
             
             logger.info("[ChatsV2] Imported new conversation '\(result.contactName)' with \(result.messages.count) messages")
         }
@@ -464,11 +470,12 @@ final class ChatViewModel: ObservableObject {
 
         conversation.contact = contact
         conversations[contactId] = conversation
-        updateContactsList()
 
         Task {
             do {
                 try await cacheService.renameConversation(id: contactId.uuidString, newName: newName)
+                // 从缓存刷新列表（确保数据一致性）
+                await refreshContactsListFromCache()
                 logger.info("[ChatsV2] Renamed conversation to: \(newName)")
             } catch {
                 logger.error("[ChatsV2] Failed to rename conversation: \(error)")
@@ -640,7 +647,6 @@ final class ChatViewModel: ObservableObject {
             if var conversation = conversations[contactId] {
                 conversation.messages.append(contentsOf: adjusted)
                 conversations[contactId] = conversation
-                updateContactsList()
             }
             
             // 更新分页状态：将新消息追加到已加载列表末尾
@@ -663,6 +669,9 @@ final class ChatViewModel: ObservableObject {
                 parsedAt: Date(),
                 messages: adjusted
             )
+            
+            // 从缓存刷新列表（确保 messageCount 和 lastMessage 正确）
+            await refreshContactsListFromCache()
 
             logger.info("[ChatsV2] Imported screenshot -> \(adjusted.count) messages")
         } catch {
@@ -724,15 +733,38 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    private func updateContactsList() {
-        contacts = conversations.values.map { conversation in
-            var contact = conversation.contact
-            contact.messageCount = conversation.messages.count
-            contact.lastMessage = conversation.messages.sorted(by: { $0.order < $1.order }).last?.content
-            contact.lastMessageTime = nil
-            return ChatBookListItem(from: contact)
+    /// 从缓存重新加载联系人列表（确保数据一致性）
+    /// 在任何修改操作（创建、重命名、删除、导入截图）后调用
+    private func refreshContactsListFromCache() async {
+        do {
+            let cachedContacts = try await cacheService.fetchAllConversations()
+            contacts = cachedContacts
+            
+            // 同步更新 paginationStates 的 totalCount（用于懒加载前的正确显示）
+            for item in cachedContacts {
+                if paginationStates[item.contactId] == nil {
+                    var state = ChatPaginationState()
+                    state.totalCount = item.messageCount
+                    paginationStates[item.contactId] = state
+                } else {
+                    paginationStates[item.contactId]?.totalCount = item.messageCount
+                }
+            }
+            
+            logger.info("[ChatsV2] Refreshed contacts list from cache: \(cachedContacts.count) items")
+        } catch {
+            logger.error("[ChatsV2] Failed to refresh contacts list: \(error)")
         }
-        .sorted { $0.name < $1.name }
+    }
+    
+    /// 同步更新联系人列表（仅用于需要立即更新 UI 的场景，如创建新对话）
+    /// 注意：这是临时状态，之后会被 refreshContactsListFromCache 覆盖
+    private func updateContactsListImmediately(newContact: ChatBookListItem) {
+        // 添加新联系人到列表
+        if !contacts.contains(where: { $0.contactId == newContact.contactId }) {
+            contacts.append(newContact)
+            contacts.sort { $0.name < $1.name }
+        }
     }
 }
 
