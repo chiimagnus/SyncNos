@@ -109,8 +109,6 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 当前加载任务，用于在切换书籍时取消
     private var currentLoadTask: Task<Void, Never>?
-    /// 当前同步任务，用于在切换书籍时取消
-    private var currentSyncTask: Task<Void, Never>?
 
     // MARK: - Initialization
     
@@ -247,11 +245,9 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 清理所有数据，释放内存（在切换书籍或视图销毁时调用）
     func clear() {
-        // 取消正在进行的任务
+        // 取消正在进行的任务（Task.isCancelled 会在后台方法中检查）
         currentLoadTask?.cancel()
         currentLoadTask = nil
-        currentSyncTask?.cancel()
-        currentSyncTask = nil
         
         // 清理数据
         currentBookId = nil
@@ -330,9 +326,18 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 执行后台同步
     private func performBackgroundSync(bookId: String) async {
+        // 检查任务是否已被取消
+        guard !Task.isCancelled else { return }
+        
         isBackgroundSyncing = true
         do {
             let result = try await incrementalSyncService.syncHighlights(bookId: bookId)
+            
+            // 检查任务是否已被取消
+            guard !Task.isCancelled else {
+                isBackgroundSyncing = false
+                return
+            }
             
             switch result {
             case .noChanges:
@@ -348,6 +353,12 @@ final class WeReadDetailViewModel: ObservableObject {
                 await fullFetchFromAPI(bookId: bookId)
             }
         } catch {
+            // 检查任务是否已被取消
+            guard !Task.isCancelled else {
+                isBackgroundSyncing = false
+                return
+            }
+            
             // 如果缓存为空，需要全量拉取
             if allBookmarks.isEmpty {
                 await fullFetchFromAPI(bookId: bookId)
@@ -361,9 +372,15 @@ final class WeReadDetailViewModel: ObservableObject {
     
     /// 全量从 API 拉取
     private func fullFetchFromAPI(bookId: String) async {
+        // 检查任务是否已被取消
+        guard !Task.isCancelled else { return }
+        
         do {
             // 使用合并 API 获取高亮（已包含关联的想法）
             let mergedBookmarks = try await apiService.fetchMergedHighlights(bookId: bookId)
+            
+            // 检查任务是否已被取消
+            guard !Task.isCancelled else { return }
             
             // 保存合并后的数据
             allBookmarks = mergedBookmarks
@@ -377,6 +394,7 @@ final class WeReadDetailViewModel: ObservableObject {
             
             logger.info("[WeReadDetail] Fetched \(mergedBookmarks.count) highlights from API for bookId=\(bookId)")
         } catch {
+            guard !Task.isCancelled else { return }
             let desc = error.localizedDescription
             logger.error("[WeReadDetail] loadHighlights error: \(desc)")
         }
