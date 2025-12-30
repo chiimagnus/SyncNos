@@ -81,10 +81,6 @@ protocol ChatCacheServiceProtocol: Actor {
         messageId: String,
         senderName: String?
     ) throws
-    
-    // 消息删除
-    func deleteMessage(messageId: String) throws
-    func deleteMessages(messageIds: [String]) throws
 
     // 截图导入（持久化元数据 + parsed messages，不存储 OCR 原始数据）
     func appendScreenshot(
@@ -320,45 +316,6 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         
         try modelContext.save()
         logger.info("[ChatCacheV2] Updated message sender name: \(messageId) -> \(senderName ?? "nil")")
-    }
-    
-    // MARK: Delete Message
-    
-    func deleteMessage(messageId: String) throws {
-        let targetId = messageId
-        let predicate = #Predicate<CachedChatMessageV2> { msg in
-            msg.messageId == targetId
-        }
-        var descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
-        descriptor.fetchLimit = 1
-        
-        guard let message = try modelContext.fetch(descriptor).first else {
-            logger.warning("[ChatCacheV2] Message not found for deletion: \(messageId)")
-            return
-        }
-        
-        modelContext.delete(message)
-        try modelContext.save()
-        logger.info("[ChatCacheV2] Deleted message: \(messageId)")
-    }
-    
-    func deleteMessages(messageIds: [String]) throws {
-        guard !messageIds.isEmpty else { return }
-        
-        // 批量删除
-        let targetIds = messageIds
-        let predicate = #Predicate<CachedChatMessageV2> { msg in
-            targetIds.contains(msg.messageId)
-        }
-        let descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
-        
-        let messages = try modelContext.fetch(descriptor)
-        for message in messages {
-            modelContext.delete(message)
-        }
-        
-        try modelContext.save()
-        logger.info("[ChatCacheV2] Deleted \(messages.count) messages")
     }
 
     // MARK: Append Screenshot

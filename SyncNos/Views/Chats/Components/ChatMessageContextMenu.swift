@@ -16,7 +16,6 @@ struct ChatMessageContextMenu: View {
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
     let onClearSenderName: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
         // 分类（业务菜单）
@@ -77,16 +76,6 @@ struct ChatMessageContextMenu: View {
 
         ShareLink(item: text) {
             Label("Share…", systemImage: "square.and.arrow.up")
-        }
-        
-        Divider()
-        
-        Button(role: .destructive) {
-            // 注意：删除操作不调用 onSelect，以保留多选状态
-            // onSelect 会将 selectedMessageIds 重置为单选，破坏多选删除功能
-            onDelete()
-        } label: {
-            Label("Delete Message", systemImage: "trash")
         }
     }
 

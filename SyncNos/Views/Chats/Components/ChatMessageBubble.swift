@@ -3,11 +3,10 @@ import SwiftUI
 struct ChatMessageBubble: View {
     let message: ChatMessage
     let isSelected: Bool
-    let onTap: (_ event: NSEvent?) -> Void  // 传递事件以检测修饰键
+    let onTap: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
     let onClearSenderName: () -> Void
-    let onDelete: () -> Void
 
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 WeChat green
     private let otherBubbleColor = Color.white
@@ -56,23 +55,17 @@ struct ChatMessageBubble: View {
             .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
             .frame(maxWidth: maxBubbleWidth, alignment: message.isFromMe ? .trailing : .leading)
             .contentShape(RoundedRectangle(cornerRadius: 8))
-            .simultaneousGesture(
-                TapGesture().modifiers([])
-                    .onEnded { _ in
-                        onTap(NSApp.currentEvent)
-                    }
-            )
+            .onTapGesture { onTap() }
             .contextMenu {
                 ChatMessageContextMenu(
                     text: messageContent,
                     isFromMe: message.isFromMe,
                     kind: message.kind,
                     senderName: message.senderName,
-                    onSelect: { onTap(nil) },  // 右键菜单不需要修饰键
+                    onSelect: onTap,
                     onClassify: onClassify,
                     onSetSenderName: onSetSenderName,
-                    onClearSenderName: onClearSenderName,
-                    onDelete: onDelete
+                    onClearSenderName: onClearSenderName
                 )
             }
     }
