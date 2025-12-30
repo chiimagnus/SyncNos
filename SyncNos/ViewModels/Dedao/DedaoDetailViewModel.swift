@@ -264,7 +264,8 @@ final class DedaoDetailViewModel: ObservableObject {
         
         // 创建新的加载任务
         let loadTask = Task { [weak self] in
-            await self?.performLoadHighlights(for: bookId)
+            guard let self else { return }
+            await self.performLoadHighlights(for: bookId)
         }
         currentLoadTask = loadTask
         
