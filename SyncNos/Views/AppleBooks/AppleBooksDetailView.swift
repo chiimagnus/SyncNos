@@ -176,6 +176,8 @@ struct AppleBooksDetailView: View {
         .onDisappear {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
+            // 释放 DetailViewModel 持有的数据，允许内存回收
+            viewModel.clear()
         }
         .navigationTitle("Apple Books")
         .toolbar {

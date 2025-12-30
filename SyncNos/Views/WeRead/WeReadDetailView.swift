@@ -254,6 +254,8 @@ struct WeReadDetailView: View {
         .onDisappear {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
+            // 释放 DetailViewModel 持有的数据，允许内存回收
+            detailViewModel.clear()
         }
         // 监听批量同步进度更新
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in

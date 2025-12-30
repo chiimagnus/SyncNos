@@ -375,6 +375,8 @@ struct GoodLinksDetailView: View {
         .onDisappear {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
+            // 释放 DetailViewModel 持有的数据，允许内存回收
+            detailViewModel.clear()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {

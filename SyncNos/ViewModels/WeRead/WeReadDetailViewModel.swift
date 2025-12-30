@@ -192,6 +192,29 @@ final class WeReadDetailViewModel: ObservableObject {
         .store(in: &cancellables)
     }
     
+    // MARK: - Memory Release
+    
+    /// 清空当前数据并释放资源（切换书籍或退出 DetailView 时调用）
+    func clear() {
+        currentBookId = nil
+        
+        // 释放数据（不保留容量）
+        allHighlights.removeAll(keepingCapacity: false)
+        filteredHighlights.removeAll(keepingCapacity: false)
+        visibleHighlights.removeAll(keepingCapacity: false)
+        currentPageCount = 0
+        
+        // 重置状态
+        isLoading = false
+        isLoadingMore = false
+        isBackgroundSyncing = false
+        
+        // 清空同步状态
+        syncProgressText = nil
+        syncMessage = nil
+        // 注意：不重置 isSyncing，因为同步可能仍在后台进行
+    }
+    
     // MARK: - Pagination Methods
     
     /// 重置分页状态

@@ -180,6 +180,31 @@ final class AppleBooksDetailViewModel: ObservableObject {
         session?.close()
     }
     
+    // MARK: - Memory Release
+    
+    /// 清空当前数据并释放资源（切换书籍或退出 DetailView 时调用）
+    func clear() {
+        // 取消正在进行的加载任务
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
+        currentLoadId = UUID()  // 失效旧加载
+        
+        // 关闭数据库会话
+        closeSession()
+        
+        // 释放数据（不保留容量）
+        highlights.removeAll(keepingCapacity: false)
+        currentAssetId = nil
+        currentOffset = 0
+        expectedTotalCount = 0
+        isLoadingPage = false
+        
+        // 清空同步状态
+        syncProgressText = nil
+        syncMessage = nil
+        // 注意：不重置 isSyncing，因为同步可能仍在后台进行
+    }
+    
     func resetAndLoadFirstPage(dbPath: String?, assetId: String, expectedTotalCount: Int) async {
         errorMessage = nil
         
