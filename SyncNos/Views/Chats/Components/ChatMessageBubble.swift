@@ -7,6 +7,7 @@ struct ChatMessageBubble: View {
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
     let onClearSenderName: () -> Void
+    let onDelete: () -> Void
 
     private let myBubbleColor = Color(red: 0.58, green: 0.92, blue: 0.41) // #95EC69 WeChat green
     private let otherBubbleColor = Color.white
@@ -65,7 +66,8 @@ struct ChatMessageBubble: View {
                     onSelect: onTap,
                     onClassify: onClassify,
                     onSetSenderName: onSetSenderName,
-                    onClearSenderName: onClearSenderName
+                    onClearSenderName: onClearSenderName,
+                    onDelete: onDelete
                 )
             }
     }

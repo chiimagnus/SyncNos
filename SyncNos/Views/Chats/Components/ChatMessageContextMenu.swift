@@ -16,6 +16,7 @@ struct ChatMessageContextMenu: View {
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
     let onClearSenderName: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         // 分类（业务菜单）
@@ -76,6 +77,15 @@ struct ChatMessageContextMenu: View {
 
         ShareLink(item: text) {
             Label("Share…", systemImage: "square.and.arrow.up")
+        }
+        
+        Divider()
+        
+        Button(role: .destructive) {
+            onSelect()
+            onDelete()
+        } label: {
+            Label("Delete Message", systemImage: "trash")
         }
     }
 
