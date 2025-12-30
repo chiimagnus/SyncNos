@@ -24,6 +24,8 @@ struct ChatDetailView: View {
     @State private var isDragTargeted = false
     @State private var showSenderNamePicker = false
     @State private var messageForSenderName: ChatMessage?
+    /// 用于在切换对话时卸载旧对话消息，确保 Detail 内存可释放
+    @State private var lastContactUUID: UUID?
     @Environment(\.fontScale) private var fontScale
 
     private var selectedContact: ChatBookListItem? {
@@ -234,6 +236,22 @@ struct ChatDetailView: View {
                 if isDragTargeted {
                     dropTargetOverlay
                 }
+            }
+            .onAppear {
+                lastContactUUID = contact.contactId
+            }
+            .onChange(of: selectedContactId) { _, newValue in
+                let newUUID = newValue.flatMap { UUID(uuidString: $0) }
+                if let old = lastContactUUID, old != newUUID {
+                    listViewModel.unloadMessages(for: old)
+                }
+                lastContactUUID = newUUID
+                selectedMessageId = nil
+            }
+            .onDisappear {
+                // 激进释放：离开 Detail 时卸载所有已加载消息（允许下次重新分页加载）
+                listViewModel.unloadAllMessages(except: nil)
+                lastContactUUID = nil
             }
         }
     }
