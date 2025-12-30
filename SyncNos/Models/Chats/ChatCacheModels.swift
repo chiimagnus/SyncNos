@@ -293,6 +293,11 @@ final class CachedChatMessageV2 {
             self.senderNameEncrypted = nil
         }
     }
+    
+    /// 更新消息内容（加密后存储）
+    func updateContent(_ newContent: String) throws {
+        self.contentEncrypted = try EncryptionService.shared.encrypt(newContent)
+    }
 }
 
 // MARK: - Deprecated: Normalized Block Snapshot

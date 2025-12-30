@@ -24,6 +24,9 @@ struct ChatDetailView: View {
     @State private var isDragTargeted = false
     @State private var showSenderNamePicker = false
     @State private var messageForSenderName: ChatMessage?
+    @State private var editingMessageId: UUID?
+    @State private var showStatisticsPanel = false
+    @State private var showBatchSenderNamePicker = false
     @Environment(\.fontScale) private var fontScale
 
     private var selectedContact: ChatBookListItem? {
@@ -31,8 +34,14 @@ struct ChatDetailView: View {
         return listViewModel.contacts.first { $0.id == id }
     }
 
-    /// 使用分页加载的消息（已按 order 排序）
+    /// 使用分页加载和过滤后的消息（已按 order 排序）
     private var messages: [ChatMessage] {
+        guard let contact = selectedContact else { return [] }
+        return listViewModel.getFilteredMessages(for: contact.contactId)
+    }
+    
+    /// 原始消息列表（未过滤，用于统计）
+    private var allMessages: [ChatMessage] {
         guard let contact = selectedContact else { return [] }
         return listViewModel.getLoadedMessages(for: contact.contactId)
     }
@@ -106,6 +115,25 @@ struct ChatDetailView: View {
                             ProgressView()
                                 .scaleEffect(0.7)
                         }
+                        
+                        // 批量选择模式切换按钮
+                        Button {
+                            listViewModel.toggleBatchSelectionMode()
+                        } label: {
+                            Label(
+                                listViewModel.batchSelectionMode ? "Cancel Selection" : "Select Messages",
+                                systemImage: listViewModel.batchSelectionMode ? "checkmark.circle.fill" : "checkmark.circle"
+                            )
+                        }
+                        .help(listViewModel.batchSelectionMode ? "Exit selection mode" : "Enter selection mode")
+                        
+                        // 统计面板切换按钮
+                        Button {
+                            showStatisticsPanel.toggle()
+                        } label: {
+                            Label("Statistics", systemImage: showStatisticsPanel ? "chart.bar.fill" : "chart.bar")
+                        }
+                        .help("Show message statistics")
 
                         // 统一的导入/导出菜单
                         Menu {

@@ -82,6 +82,12 @@ protocol ChatCacheServiceProtocol: Actor {
         senderName: String?
     ) throws
     
+    // 消息内容更新
+    func updateMessageContent(
+        messageId: String,
+        newContent: String
+    ) throws
+    
     // 消息删除
     func deleteMessage(messageId: String) throws
 
@@ -319,6 +325,30 @@ actor ChatCacheService: ChatCacheServiceProtocol {
         
         try modelContext.save()
         logger.info("[ChatCacheV2] Updated message sender name: \(messageId) -> \(senderName ?? "nil")")
+    }
+    
+    // MARK: Update Message Content
+    
+    func updateMessageContent(
+        messageId: String,
+        newContent: String
+    ) throws {
+        let targetId = messageId
+        let predicate = #Predicate<CachedChatMessageV2> { msg in
+            msg.messageId == targetId
+        }
+        var descriptor = FetchDescriptor<CachedChatMessageV2>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        
+        guard let message = try modelContext.fetch(descriptor).first else {
+            logger.warning("[ChatCacheV2] Message not found for content update: \(messageId)")
+            return
+        }
+        
+        try message.updateContent(newContent)
+        
+        try modelContext.save()
+        logger.info("[ChatCacheV2] Updated message content: \(messageId)")
     }
     
     // MARK: Delete Message

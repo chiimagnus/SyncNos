@@ -47,6 +47,17 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var processingScreenshotIds: Set<UUID> = []
+    
+    // MARK: - Search and Filter
+    
+    @Published var searchText: String = ""
+    @Published var filterSender: String?
+    @Published var filterKind: ChatMessageKind?
+    
+    // MARK: - Batch Selection
+    
+    @Published var batchSelectionMode: Bool = false
+    @Published var selectedMessageIds: Set<UUID> = []
 
     // MARK: - Display Books (for MainListView compatibility)
 
@@ -769,6 +780,217 @@ final class ChatViewModel: ObservableObject {
         if !contacts.contains(where: { $0.contactId == newContact.contactId }) {
             contacts.append(newContact)
             contacts.sort { $0.name < $1.name }
+        }
+    }
+    
+    // MARK: - Search and Filter
+    
+    /// Get filtered messages based on search and filter criteria
+    func getFilteredMessages(for contactId: UUID) -> [ChatMessage] {
+        var messages = getLoadedMessages(for: contactId)
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            let searchLower = searchText.lowercased()
+            messages = messages.filter { message in
+                message.content.lowercased().contains(searchLower) ||
+                (message.senderName?.lowercased().contains(searchLower) ?? false)
+            }
+        }
+        
+        // Apply sender filter
+        if let sender = filterSender {
+            messages = messages.filter { message in
+                if sender == "Me" {
+                    return message.isFromMe
+                } else {
+                    return message.senderName == sender
+                }
+            }
+        }
+        
+        // Apply kind filter
+        if let kind = filterKind {
+            messages = messages.filter { $0.kind == kind }
+        }
+        
+        return messages
+    }
+    
+    /// Get all unique sender names (including "Me")
+    func getAllSenders(for contactId: UUID) -> [String] {
+        let messages = getLoadedMessages(for: contactId)
+        var senders = Set<String>()
+        
+        for message in messages {
+            if message.kind != .system {
+                if message.isFromMe {
+                    senders.insert("Me")
+                } else if let name = message.senderName {
+                    senders.insert(name)
+                }
+            }
+        }
+        
+        return Array(senders).sorted()
+    }
+    
+    // MARK: - Batch Operations
+    
+    /// Toggle batch selection mode
+    func toggleBatchSelectionMode() {
+        batchSelectionMode.toggle()
+        if !batchSelectionMode {
+            selectedMessageIds.removeAll()
+        }
+    }
+    
+    /// Toggle selection of a message
+    func toggleMessageSelection(_ messageId: UUID) {
+        if selectedMessageIds.contains(messageId) {
+            selectedMessageIds.remove(messageId)
+        } else {
+            selectedMessageIds.insert(messageId)
+        }
+    }
+    
+    /// Select all messages in the current conversation
+    func selectAllMessages(for contactId: UUID) {
+        let messages = getLoadedMessages(for: contactId)
+        selectedMessageIds = Set(messages.map(\.id))
+    }
+    
+    /// Deselect all messages
+    func deselectAllMessages() {
+        selectedMessageIds.removeAll()
+    }
+    
+    /// Batch delete selected messages
+    func batchDeleteMessages(for contactId: UUID) {
+        let idsToDelete = Array(selectedMessageIds)
+        
+        // 1. Update conversations memory
+        if var conversation = conversations[contactId] {
+            conversation.messages.removeAll { idsToDelete.contains($0.id) }
+            conversations[contactId] = conversation
+        }
+        
+        // 2. Update paginationStates memory
+        if var state = paginationStates[contactId] {
+            state.loadedMessages.removeAll { idsToDelete.contains($0.id) }
+            state.totalCount = max(0, state.totalCount - idsToDelete.count)
+            paginationStates[contactId] = state
+        }
+        
+        // 3. Persist deletion
+        Task {
+            do {
+                for messageId in idsToDelete {
+                    try await cacheService.deleteMessage(messageId: messageId.uuidString)
+                }
+                // Refresh from cache
+                await refreshContactsListFromCache()
+                logger.info("[ChatsV2] Batch deleted \(idsToDelete.count) messages")
+            } catch {
+                logger.error("[ChatsV2] Failed to batch delete messages: \(error)")
+                errorMessage = "批量删除失败: \(error.localizedDescription)"
+            }
+        }
+        
+        // Clear selection
+        selectedMessageIds.removeAll()
+    }
+    
+    /// Batch classify selected messages
+    func batchClassifyMessages(isFromMe: Bool, kind: ChatMessageKind, for contactId: UUID) {
+        let idsToUpdate = Array(selectedMessageIds)
+        
+        // Update each message
+        for messageId in idsToUpdate {
+            updateMessageClassification(
+                messageId: messageId,
+                isFromMe: isFromMe,
+                kind: kind,
+                for: contactId
+            )
+        }
+        
+        // Clear selection
+        selectedMessageIds.removeAll()
+    }
+    
+    /// Batch set sender name for selected messages
+    func batchSetSenderName(_ senderName: String?, for contactId: UUID) {
+        let idsToUpdate = Array(selectedMessageIds)
+        
+        // Update each message
+        for messageId in idsToUpdate {
+            updateMessageSenderName(
+                messageId: messageId,
+                senderName: senderName,
+                for: contactId
+            )
+        }
+        
+        // Clear selection
+        selectedMessageIds.removeAll()
+    }
+    
+    /// Export selected messages
+    func exportSelectedMessages(for contactId: UUID, format: ChatExportFormat) -> String? {
+        let messagesToExport = getLoadedMessages(for: contactId)
+            .filter { selectedMessageIds.contains($0.id) }
+            .sorted { $0.order < $1.order }
+        
+        guard !messagesToExport.isEmpty else { return nil }
+        
+        let contactName = conversations[contactId]?.contact.name ?? "Chat"
+        return ChatExporter.export(messages: messagesToExport, contactName: contactName, format: format)
+    }
+    
+    // MARK: - Message Editing
+    
+    /// Update message content
+    func updateMessageContent(messageId: UUID, newContent: String, for contactId: UUID) {
+        // Create updated message
+        func createUpdatedMessage(from oldMessage: ChatMessage) -> ChatMessage {
+            ChatMessage(
+                id: oldMessage.id,
+                content: newContent,
+                isFromMe: oldMessage.isFromMe,
+                senderName: oldMessage.senderName,
+                kind: oldMessage.kind,
+                bbox: oldMessage.bbox,
+                order: oldMessage.order
+            )
+        }
+        
+        // 1. Update conversations memory
+        if var conversation = conversations[contactId],
+           let index = conversation.messages.firstIndex(where: { $0.id == messageId }) {
+            conversation.messages[index] = createUpdatedMessage(from: conversation.messages[index])
+            conversations[contactId] = conversation
+        }
+        
+        // 2. Update paginationStates memory
+        if var state = paginationStates[contactId],
+           let index = state.loadedMessages.firstIndex(where: { $0.id == messageId }) {
+            state.loadedMessages[index] = createUpdatedMessage(from: state.loadedMessages[index])
+            paginationStates[contactId] = state
+        }
+        
+        // 3. Persist update
+        Task {
+            do {
+                try await cacheService.updateMessageContent(
+                    messageId: messageId.uuidString,
+                    newContent: newContent
+                )
+                logger.info("[ChatsV2] Updated message content: \(messageId)")
+            } catch {
+                logger.error("[ChatsV2] Failed to update message content: \(error)")
+                errorMessage = "更新消息失败: \(error.localizedDescription)"
+            }
         }
     }
 }
