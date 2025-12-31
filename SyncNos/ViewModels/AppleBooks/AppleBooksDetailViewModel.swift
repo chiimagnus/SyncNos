@@ -13,9 +13,6 @@ final class AppleBooksDetailViewModel: ObservableObject {
     @Published var highlights: [Highlight] = []
     @Published var isLoadingPage = false
     @Published var errorMessage: String?
-    @Published var syncMessage: String?
-    @Published var syncProgressText: String?
-    @Published var isSyncing: Bool = false
 
     // Sorting and filtering state for highlights - field + direction, with UserDefaults persistence
     @Published var sortField: HighlightSortField = .created
@@ -27,8 +24,6 @@ final class AppleBooksDetailViewModel: ObservableObject {
     var canLoadMore: Bool { expectedTotalCount > highlights.count }
 
     private let databaseService: DatabaseServiceProtocol
-    private let syncEngine: NotionSyncEngine
-    private let notionConfig: NotionConfigStoreProtocol
     private var session: DatabaseReadOnlySessionProtocol?
     private var currentAssetId: String?
     private var currentOffset = 0
@@ -41,12 +36,8 @@ final class AppleBooksDetailViewModel: ObservableObject {
     /// 当前加载任务的唯一标识，用于避免“旧任务回写新状态”
     private var currentLoadId: UUID = UUID()
 
-    init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService,
-         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
-         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore) {
+    init(databaseService: DatabaseServiceProtocol = DIContainer.shared.databaseService) {
         self.databaseService = databaseService
-        self.syncEngine = syncEngine
-        self.notionConfig = notionConfig
 
         // Load initial values from UserDefaults
         if let savedFieldRaw = UserDefaults.standard.string(forKey: "detail_sort_field"),
@@ -352,50 +343,4 @@ final class AppleBooksDetailViewModel: ObservableObject {
         session = nil
     }
 
-    // MARK: - Notion Sync
-    // 统一入口：智能同步（创建/补齐/更新）
-    func syncSmart(book: BookListItem, dbPath: String?) {
-        guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
-            return
-        }
-        syncMessage = nil
-        syncProgressText = nil
-        isSyncing = true
-        Task {
-            let limiter = DIContainer.shared.syncConcurrencyLimiter
-            await limiter.withPermit {
-                do {
-                    NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "started"])
-                    let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: self.notionConfig)
-                    try await self.syncEngine.syncSmart(source: adapter) { progress in
-                        Task { @MainActor in self.syncProgressText = progress }
-                    }
-                    await MainActor.run {
-                        self.syncMessage = String(localized: "Sync completed")
-                        self.syncProgressText = nil
-                        self.isSyncing = false
-                        NotificationCenter.default.post(name: Notification.Name("SyncBookStatusChanged"), object: nil, userInfo: ["bookId": book.bookId, "status": "succeeded"])                
-                    }
-                } catch {
-                    let errorInfo = SyncErrorInfo.from(error)
-                    await MainActor.run {
-                        self.errorMessage = error.localizedDescription
-                        self.syncProgressText = nil
-                        self.isSyncing = false
-                        NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
-                            object: nil,
-                            userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Configuration Validation
-    private func checkNotionConfig() -> Bool {
-        return notionConfig.isConfigured
-    }
 }
