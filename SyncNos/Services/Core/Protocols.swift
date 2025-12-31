@@ -256,6 +256,8 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func fetchRecentLinks(dbPath: String, limit: Int) throws -> [GoodLinksLinkRow]
     func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
     func fetchContent(dbPath: String, linkId: String) throws -> GoodLinksContentRow?
+    /// 获取内容预览（只取前 N 个字符，避免加载完整大字符串）
+    func fetchContentPreview(dbPath: String, linkId: String, previewLength: Int) throws -> GoodLinksContentRow?
 }
 
 // MARK: - Auto Sync Service Protocol
