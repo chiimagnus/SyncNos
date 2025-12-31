@@ -267,7 +267,9 @@ struct MainListView: View {
                 )
                 .ignoresSafeArea()
             }
-            .toolbarBackground(.hidden, for: .windowToolbar)
+            // 使用 .automatic 让系统根据上下文自动选择合适的工具栏背景
+            // 在 macOS 26+ 全屏模式下，.hidden 会导致顶部出现黑边
+            .toolbarBackground(.automatic, for: .windowToolbar)
             // MARK: - Chats New Chat Alert
             .alert("New Chat", isPresented: $showNewConversationAlert) {
                 TextField("Chat Name", text: $newConversationName)
