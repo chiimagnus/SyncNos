@@ -10,6 +10,7 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var queuedCount: Int = 0
     @Published private(set) var failedCount: Int = 0
     @Published private(set) var isAutoSyncRunning: Bool = false
+    @Published private(set) var nextSyncTime: Date?
     // 注：showNotionConfigAlert 已移至 MainListView 统一处理
 
     // MARK: - Dependencies
@@ -30,6 +31,7 @@ final class MenuBarViewModel: ObservableObject {
         self.autoSyncAppleBooks = UserDefaults.standard.bool(forKey: "autoSync.appleBooks")
         self.autoSyncGoodLinks = UserDefaults.standard.bool(forKey: "autoSync.goodLinks")
         self.isAutoSyncRunning = autoSyncService.isRunning
+        self.nextSyncTime = autoSyncService.nextSyncTime
 
         // 订阅队列变更以汇总数量
         queueStore.tasksPublisher
@@ -45,6 +47,25 @@ final class MenuBarViewModel: ObservableObject {
                 self?.failedCount = failed
             }
             .store(in: &cancellables)
+        
+        // 订阅下次同步时间变更
+        autoSyncService.nextSyncTimePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] time in
+                self?.nextSyncTime = time
+                self?.isAutoSyncRunning = self?.autoSyncService.isRunning ?? false
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Computed Properties
+    
+    /// Formatted string for next sync time display
+    var nextSyncTimeFormatted: String? {
+        guard let time = nextSyncTime else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: time)
     }
 
     // MARK: - Actions

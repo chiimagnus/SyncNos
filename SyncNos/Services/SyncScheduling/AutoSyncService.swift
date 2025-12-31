@@ -60,6 +60,9 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     /// 全局自动同步间隔（智能增量同步：检查一次，只同步有变更的内容）
     /// TODO: 测试完成后改回 5 * 60（5 分钟）
     private let intervalSeconds: TimeInterval
+    
+    /// Subject for next sync time updates
+    private let nextSyncTimeSubject = CurrentValueSubject<Date?, Never>(nil)
 
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
@@ -92,6 +95,24 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     var isRunning: Bool {
         timerCancellable != nil
     }
+    
+    var nextSyncTime: Date? {
+        nextSyncTimeSubject.value
+    }
+    
+    var nextSyncTimePublisher: AnyPublisher<Date?, Never> {
+        nextSyncTimeSubject.eraseToAnyPublisher()
+    }
+    
+    /// Update the next sync time based on current time + interval
+    private func updateNextSyncTime() {
+        nextSyncTimeSubject.send(Date().addingTimeInterval(intervalSeconds))
+    }
+    
+    /// Clear the next sync time (when service stops)
+    private func clearNextSyncTime() {
+        nextSyncTimeSubject.send(nil)
+    }
 
     func start() {
         guard timerCancellable == nil else { return }
@@ -113,11 +134,15 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             .sink { [weak self] _ in
                 self?.triggerSyncNow()
             }
+        
+        // Set initial next sync time
+        updateNextSyncTime()
     }
 
     func stop() {
         timerCancellable?.cancel(); timerCancellable = nil
         notificationCancellable?.cancel(); notificationCancellable = nil
+        clearNextSyncTime()
         logger.info("[SmartSync] AutoSyncService stopped")
     }
 
@@ -128,6 +153,10 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         }
         for provider in providers.values {
             provider.triggerScheduledSyncIfEnabled()
+        }
+        // Update next sync time after triggering sync
+        if isRunning {
+            updateNextSyncTime()
         }
     }
 
