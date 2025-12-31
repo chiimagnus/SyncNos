@@ -4,7 +4,7 @@ import SwiftUI
 
 /// 文章内容加载状态（驱动 ArticleContentCardView 渲染）
 enum ArticleLoadState: Equatable {
-    /// 未加载（折叠状态，等待用户展开）
+    /// 未加载（初始状态，预览自动加载中）
     case notLoaded
     /// 预览状态（显示前 N 个字符，等待用户展开加载完整内容）
     case preview(content: String, wordCount: Int)
@@ -33,9 +33,10 @@ enum ArticleLoadState: Equatable {
 /// 展示文章全文的内容卡片（状态驱动）。
 /// 
 /// 支持以下状态：
-/// - `notLoaded`: 折叠状态，显示"点击展开"提示
-/// - `loading`: 加载中，显示 ProgressView
-/// - `loaded`: 已加载，显示全文内容（可折叠/展开）
+/// - `notLoaded`: 初始状态，显示加载指示器（预览自动加载）
+/// - `preview`: 预览状态，显示前 N 个字符 + Expand 按钮
+/// - `loadingFull`: 加载完整内容中
+/// - `loaded`: 已加载完整内容 + Collapse 按钮
 /// - `empty`: 无内容，提示用户在 GoodLinks 中重新下载
 /// - `error`: 加载失败，显示错误信息和重试按钮
 struct ArticleContentCardView: View {
