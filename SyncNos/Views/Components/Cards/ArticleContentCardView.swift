@@ -279,23 +279,23 @@ struct ArticleContentCardView: View {
     private var shouldShowToggle: Bool {
         switch loadState {
         case .notLoaded:
-            // 未加载时不显示按钮（应该自动加载预览）
+            // 未加载时不显示按钮
             return false
         case .preview:
             // 预览时显示 Expand 按钮
             return true
         case .loadingFull:
-            // 加载完整内容中显示 Collapse 按钮（允许用户取消）
+            // 加载完整内容中显示 Collapse 按钮
             return true
         case .loaded(let content, _):
-            // 已加载完整内容时显示 Collapse 按钮
+            // 已加载完整内容时显示 Collapse 按钮（内容足够长时）
             return content.count > 200
         case .empty:
-            // 空内容时显示 Collapse 按钮
-            return true
+            // 空内容时不显示按钮（没有内容可以展开/折叠）
+            return false
         case .error:
-            // 错误时显示 Collapse 按钮
-            return true
+            // 错误时不显示按钮
+            return false
         }
     }
 }
