@@ -59,12 +59,6 @@ final class GoodLinksDetailViewModel: ObservableObject {
     @Published var sortField: HighlightSortField = .created
     @Published var isAscending: Bool = false
     
-    // MARK: - Sync Properties
-    
-    @Published var isSyncing: Bool = false
-    @Published var syncProgressText: String?
-    @Published var syncMessage: String?
-    
     // MARK: - Pagination Properties
     
     private let pageSize: Int = 50
@@ -84,10 +78,8 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
-    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
-    private let notionConfig: NotionConfigStoreProtocol
     
     private var cancellables = Set<AnyCancellable>()
     private var currentLinkId: String?
@@ -101,16 +93,12 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-        syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
-        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
+        syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.service = service
-        self.syncEngine = syncEngine
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
-        self.notionConfig = notionConfig
         
         loadUserDefaults()
         setupNotificationSubscriptions()
@@ -340,8 +328,6 @@ final class GoodLinksDetailViewModel: ObservableObject {
         visibleHighlights.removeAll(keepingCapacity: false)
         allFilteredHighlights.removeAll(keepingCapacity: false)
         currentPage = 0
-        syncProgressText = nil
-        syncMessage = nil
     }
     
     // MARK: - Filter & Sort
@@ -435,78 +421,10 @@ final class GoodLinksDetailViewModel: ObservableObject {
         isLoadingMore = false
     }
     
-    // MARK: - Notion Sync
-    
-    /// 同步当前 link 的高亮到 Notion
-    func syncSmart(link: GoodLinksLinkRow, pageSize: Int = NotionSyncConfig.goodLinksPageSize) {
-        guard !isSyncing else { return }
-        guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
-            return
-        }
-        
-        isSyncing = true
-        syncMessage = nil
-        syncProgressText = nil
-        
-        Task {
-            defer { Task { @MainActor in self.isSyncing = false } }
-            
-            let limiter = DIContainer.shared.syncConcurrencyLimiter
-            await limiter.withPermit {
-                // 发布开始通知
-                NotificationCenter.default.post(
-                    name: Notifications.syncBookStatusChanged,
-                    object: self,
-                    userInfo: ["bookId": link.id, "status": "started"]
-                )
-                
-                do {
-                    let dbPath = self.service.resolveDatabasePath()
-                    let adapter = try GoodLinksNotionAdapter.create(
-                        link: link,
-                        dbPath: dbPath,
-                        databaseService: self.service
-                    )
-                    try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
-                        Task { @MainActor in self?.syncProgressText = progressText }
-                    }
-                    
-                    await MainActor.run {
-                        self.syncMessage = String(localized: "Sync completed")
-                        self.syncProgressText = nil
-                        NotificationCenter.default.post(
-                            name: Notifications.syncBookStatusChanged,
-                            object: self,
-                            userInfo: ["bookId": link.id, "status": "succeeded"]
-                        )
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    logger.error("[GoodLinksDetail] syncSmart error: \(desc)")
-                    let errorInfo = SyncErrorInfo.from(error)
-                    await MainActor.run {
-                        self.errorMessage = desc
-                        self.syncProgressText = nil
-                        NotificationCenter.default.post(
-                            name: Notifications.syncBookStatusChanged,
-                            object: self,
-                            userInfo: ["bookId": link.id, "status": "failed", "errorInfo": errorInfo]
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
     // MARK: - Helpers
     
     func lastSync(for linkId: String) -> Date? {
         syncTimestampStore.getLastSyncTime(for: linkId)
-    }
-    
-    private func checkNotionConfig() -> Bool {
-        notionConfig.isConfigured
     }
 }
 
