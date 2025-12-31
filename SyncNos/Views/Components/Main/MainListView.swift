@@ -270,7 +270,7 @@ struct MainListView: View {
             .toolbarBackground(.hidden, for: .windowToolbar)
             // MARK: - Chats New Chat Alert
             .alert("New Chat", isPresented: $showNewConversationAlert) {
-                TextField("Contact Name", text: $newConversationName)
+                TextField("Chat Name", text: $newConversationName)
                 Button("Create") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                     let contactId = chatsVM.createConversation(
@@ -282,8 +282,6 @@ struct MainListView: View {
                 Button("Cancel", role: .cancel) {
                     newConversationName = ""
                 }
-            } message: {
-                Text("Enter contact name")
             }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗
