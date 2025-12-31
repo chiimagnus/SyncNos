@@ -57,12 +57,11 @@ macOS 26 Tahoe 在全屏模式下对 `.hiddenTitleBar` 和 `.toolbarBackground(.
 
 **修改方案**:
 
-在 macOS 15+ 上，`.toolbarBackground(.hidden)` 会导致工具栏区域完全透明，但在全屏模式下这可能导致问题。替换为使用条件性的工具栏可见性设置：
+在 macOS 15+ 上，`.toolbarBackground(.hidden)` 会导致工具栏区域完全透明，但在全屏模式下这可能导致问题。使用 `.automatic` 让系统根据上下文自动选择合适的工具栏背景：
 
 ```swift
-// 替换 .toolbarBackground(.hidden, for: .windowToolbar)
-// 使用 .visible 保持工具栏始终可见，同时使用自动材质背景
-.toolbarVisibility(.visible, for: .windowToolbar)
+// 使用 .automatic 让系统根据上下文自动选择合适的工具栏背景
+// 在 macOS 26+ 全屏模式下，.hidden 会导致顶部出现黑边
 .toolbarBackground(.automatic, for: .windowToolbar)
 ```
 

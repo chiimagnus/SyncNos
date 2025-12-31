@@ -267,7 +267,9 @@ struct MainListView: View {
                 )
                 .ignoresSafeArea()
             }
+            // Use .automatic to let the system choose the appropriate toolbar background based on context
             // 使用 .automatic 让系统根据上下文自动选择合适的工具栏背景
+            // On macOS 26+, using .hidden causes a black bar at the top in fullscreen mode
             // 在 macOS 26+ 全屏模式下，.hidden 会导致顶部出现黑边
             .toolbarBackground(.automatic, for: .windowToolbar)
             // MARK: - Chats New Chat Alert
