@@ -98,20 +98,29 @@ struct UnifiedHighlight: Identifiable, Equatable {
     /// - Parameters:
     ///   - message: 聊天消息
     ///   - contactName: 对话联系人名称（用于填充发送者信息）
+    /// 
+    /// **设计说明**：为实现 "Sender Name 作为主块，消息内容作为子块" 的格式，
+    /// 将 sender name 存储在 `text` 字段（通用逻辑将其作为父块），
+    /// 将消息内容存储在 `note` 字段（通用逻辑将其作为子块）。
+    /// 这样无需修改 NotionHelperMethods，通用逻辑自动产生正确格式。
     init(from message: ChatMessage, contactName: String) {
         self.uuid = message.id.uuidString
-        self.text = message.content
-        // 直接存储发送者名称（不带前缀），便于 Notion 展示
+        
+        // text 存储 sender name（将作为 Notion 中的父块）
         if let senderName = message.senderName, !senderName.isEmpty {
-            self.note = senderName
+            self.text = senderName
         } else if message.isFromMe {
-            self.note = "Me"
+            self.text = "Me"
         } else {
-            self.note = contactName
+            self.text = contactName
         }
-        // Chats 不需要颜色索引，设为 nil
+        
+        // note 存储消息内容（将作为 Notion 中的子块）
+        self.note = message.content
+        
+        // Chats 不需要颜色索引、时间戳等字段
         self.colorIndex = nil
-        self.dateAdded = nil  // 聊天消息没有精确时间戳
+        self.dateAdded = nil
         self.dateModified = nil
         self.location = nil
         self.source = .chats

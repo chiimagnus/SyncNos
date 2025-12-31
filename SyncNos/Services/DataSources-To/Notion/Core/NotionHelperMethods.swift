@@ -216,64 +216,11 @@ class NotionHelperMethods {
 
     // buildBulletedListItemBlock(for:bookId:maxTextLength:)：构建并返回一个完整的 Notion 列表项 block（现在使用数字列表），
     // 父级 rich_text 包含高亮文本，children 包含 note 与 metadata 子块。
-    // 对于 Chats 数据源，使用简化格式：发送者名称为主块，消息内容为子块
     func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [String: Any] {
-        // Chats 数据源使用特殊格式：Sender Name 作为主块，消息内容作为子块
-        if source == "chats" {
-            return buildChatsBulletedListItemBlock(for: highlight, maxTextLength: maxTextLength)
-        }
-        
         let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength, source: source)
         let numbered: [String: Any] = [
             "rich_text": parentRt,
             "children": childBlocks
-        ]
-        return [
-            "object": "block",
-            "numbered_list_item": numbered
-        ]
-    }
-    
-    /// 为 Chats 数据源构建简化的消息块
-    /// 格式：Sender Name 作为主 bullet，消息内容作为 child bullet
-    /// 不包含 modified time 和 style color（这些字段在 Chats 的 UnifiedHighlight 中为 nil）
-    private func buildChatsBulletedListItemBlock(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any] {
-        // note 字段直接存储 sender name（无需解析前缀）
-        let senderName = highlight.note ?? "Unknown"
-        
-        // 父块：发送者名称 + 只包含 UUID（用于增量同步识别）
-        let uuidLine = "[uuid:\(highlight.uuid)]\n"
-        var parentRt: [[String: Any]] = [
-            [
-                "text": ["content": uuidLine],
-                "annotations": ["color": "gray_background"]
-            ],
-            [
-                "text": ["content": senderName]
-            ]
-        ]
-        
-        // 子块：消息内容
-        var children: [[String: Any]] = []
-        
-        // 消息文本作为子块
-        let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
-        let chunks = chunkText(highlight.text, chunkSize: chunkSize)
-        
-        for chunk in chunks {
-            children.append([
-                "object": "block",
-                "bulleted_list_item": [
-                    "rich_text": [[
-                        "text": ["content": chunk]
-                    ]]
-                ]
-            ])
-        }
-        
-        let numbered: [String: Any] = [
-            "rich_text": parentRt,
-            "children": children
         ]
         return [
             "object": "block",
