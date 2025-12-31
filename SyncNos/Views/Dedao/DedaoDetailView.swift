@@ -105,16 +105,6 @@ struct DedaoDetailView: View {
             } message: {
                 Text(syncErrorMessage)
             }
-            .onChange(of: detailViewModel.syncMessage) { _, newMessage in
-                if let msg = newMessage, !msg.isEmpty {
-                    let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
-                    let isSuccess = successKeywords.contains { msg.localizedCaseInsensitiveContains($0) }
-                    if !isSuccess {
-                        syncErrorMessage = msg
-                        showingSyncError = true
-                    }
-                }
-            }
         }
     }
     
@@ -292,16 +282,10 @@ struct DedaoDetailView: View {
                     .scaledFont(.caption)
             }
             .help("Sync in progress")
-        } else if detailViewModel.isSyncing {
-            HStack(spacing: 8) {
-                ProgressView().scaleEffect(0.8)
-                Text(detailViewModel.syncProgressText ?? "Syncing...")
-                    .scaledFont(.caption)
-            }
-            .help("Sync in progress")
         } else {
             Button {
-                detailViewModel.syncSmart(book: book)
+                // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
+                listViewModel.batchSync(bookIds: Set([book.bookId]))
             } label: {
                 Label("Sync", systemImage: "arrow.triangle.2.circlepath")
             }
@@ -327,9 +311,16 @@ struct DedaoDetailView: View {
         switch status {
         case "started":
             externalIsSyncing = true
-        case "succeeded", "failed", "skipped":
+        case "succeeded", "skipped":
             externalIsSyncing = false
             externalSyncProgress = nil
+        case "failed":
+            externalIsSyncing = false
+            externalSyncProgress = nil
+            if let errorInfo = userInfo["errorInfo"] as? SyncErrorInfo {
+                syncErrorMessage = errorInfo.details ?? errorInfo.message
+                showingSyncError = true
+            }
         default:
             break
         }

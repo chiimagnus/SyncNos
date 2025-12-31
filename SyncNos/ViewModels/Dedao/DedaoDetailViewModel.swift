@@ -59,10 +59,6 @@ final class DedaoDetailViewModel: ObservableObject {
     @Published var sortField: HighlightSortField = .created
     @Published var isAscending: Bool = false
     
-    // 同步状态
-    @Published var isSyncing: Bool = false
-    @Published var syncProgressText: String?
-    @Published var syncMessage: String?
     // MARK: - Pagination Properties
     
     /// 每页大小
@@ -85,9 +81,7 @@ final class DedaoDetailViewModel: ObservableObject {
     
     private let apiService: DedaoAPIServiceProtocol
     private let cacheService: DedaoCacheServiceProtocol
-    private let syncEngine: NotionSyncEngine
     private let logger: LoggerServiceProtocol
-    private let notionConfig: NotionConfigStoreProtocol
     
     private var currentBookId: String?
     
@@ -104,15 +98,11 @@ final class DedaoDetailViewModel: ObservableObject {
     init(
         apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
         cacheService: DedaoCacheServiceProtocol = DIContainer.shared.dedaoCacheService,
-        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
-        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
         self.apiService = apiService
         self.cacheService = cacheService
-        self.syncEngine = syncEngine
         self.logger = logger
-        self.notionConfig = notionConfig
         
         setupNotificationSubscriptions()
         setupFilterSortSubscriptions()
@@ -372,69 +362,7 @@ final class DedaoDetailViewModel: ObservableObject {
         filteredHighlights = result
     }
     
-    // MARK: - Notion Sync
-    
-    func syncSmart(book: DedaoBookListItem) {
-        guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
-            return
-        }
-        if isSyncing { return }
-        
-        isSyncing = true
-        syncMessage = nil
-        syncProgressText = nil
-        
-        let limiter = DIContainer.shared.syncConcurrencyLimiter
-        
-        Task {
-            await limiter.withPermit {
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
-                    object: self,
-                    userInfo: ["bookId": book.bookId, "status": "started"]
-                )
-                do {
-                    let adapter = DedaoNotionAdapter.create(book: book, preferCache: false)
-                    try await syncEngine.syncSmart(source: adapter) { [weak self] progressText in
-                        Task { @MainActor in
-                            self?.syncProgressText = progressText
-                        }
-                    }
-                    await MainActor.run {
-                        self.isSyncing = false
-                        self.syncMessage = String(localized: "Sync completed")
-                        self.syncProgressText = nil
-                        NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
-                            object: self,
-                            userInfo: ["bookId": book.bookId, "status": "succeeded"]
-                        )
-                    }
-                } catch {
-                    let desc = error.localizedDescription
-                    let errorInfo = SyncErrorInfo.from(error)
-                    await MainActor.run {
-                        self.logger.error("[DedaoDetail] syncSmart error: \(desc)")
-                        self.isSyncing = false
-                        self.syncMessage = desc
-                        self.syncProgressText = nil
-                        NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
-                            object: self,
-                            userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
     // MARK: - Helpers
-    
-    private func checkNotionConfig() -> Bool {
-        notionConfig.isConfigured
-    }
     
     /// 将缓存的高亮转换为 API 模型
     private func cachedToNote(_ cached: CachedDedaoHighlight) -> DedaoEbookNote {
