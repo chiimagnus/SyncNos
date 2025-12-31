@@ -6,6 +6,8 @@ final class BookmarkStore: BookmarkStoreProtocol {
 
     private let bookmarkDefaultsKey = "SelectedBooksFolderBookmark"
     private var currentlyAccessingURL: URL?
+    private var accessCount: Int = 0
+    private let queue = DispatchQueue(label: "AppleBooksBookmarkStore.serial")
 
     private init() {}
     
@@ -44,21 +46,56 @@ final class BookmarkStore: BookmarkStoreProtocol {
     
     @discardableResult
     func startAccessing(url: URL) -> Bool {
-        let started = url.startAccessingSecurityScopedResource()
-        if started {
-            // Stop previous one if different
-            if let current = currentlyAccessingURL, current != url {
-                current.stopAccessingSecurityScopedResource()
+        queue.sync {
+            let normalized = url.standardizedFileURL
+            if let current = currentlyAccessingURL {
+                // Same target → increase OS refcount and our own count
+                if current.standardizedFileURL == normalized {
+                    let started = normalized.startAccessingSecurityScopedResource()
+                    if started { accessCount += 1 }
+                    return started
+                }
+
+                // Different target → attempt to start new first; if succeeded, stop previous fully
+                let started = normalized.startAccessingSecurityScopedResource()
+                if started {
+                    // Drain previous access count to 0
+                    while accessCount > 0 {
+                        current.stopAccessingSecurityScopedResource()
+                        accessCount -= 1
+                    }
+                    currentlyAccessingURL = normalized
+                    accessCount = 1
+                    return true
+                } else {
+                    // Keep previous access; report failure
+                    return false
+                }
+            } else {
+                // No current → start and set count
+                let started = normalized.startAccessingSecurityScopedResource()
+                if started {
+                    currentlyAccessingURL = normalized
+                    accessCount = 1
+                }
+                return started
             }
-            currentlyAccessingURL = url
         }
-        return started
     }
     
     func stopAccessingIfNeeded() {
-        if let current = currentlyAccessingURL {
+        queue.sync {
+            guard let current = currentlyAccessingURL else { return }
+            guard accessCount > 0 else {
+                currentlyAccessingURL = nil
+                return
+            }
+            // 仅减少一次引用计数，不是清空所有
             current.stopAccessingSecurityScopedResource()
-            currentlyAccessingURL = nil
+            accessCount -= 1
+            if accessCount == 0 {
+                currentlyAccessingURL = nil
+            }
         }
     }
 }
