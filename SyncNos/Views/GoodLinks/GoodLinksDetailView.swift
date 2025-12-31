@@ -132,36 +132,8 @@ struct GoodLinksDetailView: View {
                             }
                         }
                         
-                        // 全文内容
-                        if let contentRow = detailViewModel.content, 
-                           let fullText = contentRow.content, 
-                           !fullText.isEmpty {
-                            ArticleContentCardView(
-                                wordCount: contentRow.wordCount,
-                                contentText: fullText,
-                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
-                                measuredWidth: $measuredLayoutWidth,
-                                isExpanded: $articleIsExpanded
-                            )
-                        } else if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                            ArticleContentCardView(
-                                wordCount: 0,
-                                overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
-                                measuredWidth: $measuredLayoutWidth,
-                                revealThreshold: nil,
-                                customSlot: AnyView(
-                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                        Text("No article content detected. Please")
-                                        if let url = URL(string: link.openInGoodLinksURLString) {
-                                            Link("Open in GoodLinks", destination: url)
-                                                .foregroundColor(.blue)
-                                        }
-                                        Text("and re-download this article.")
-                                    }
-                                ),
-                                isExpanded: $articleIsExpanded
-                            )
-                        }
+                        // 全文内容 - 根据加载状态显示不同 UI
+                        articleContentSection(linkId: linkId)
 
                         // 高亮列表
                         VStack(alignment: .leading, spacing: 8) {
@@ -285,9 +257,16 @@ struct GoodLinksDetailView: View {
                         }
                         .padding()
                     }
-                    // when the article collapses, ensure we scroll to top to avoid empty space
+                    // 监听展开/折叠状态变化，按需加载/卸载全文内容
                     .onChange(of: articleIsExpanded) { _, expanded in
-                        if !expanded {
+                        if expanded {
+                            // 展开时按需加载全文
+                            Task {
+                                await detailViewModel.loadContentOnDemand()
+                            }
+                        } else {
+                            // 折叠时卸载全文，释放内存
+                            detailViewModel.unloadContent()
                             withAnimation {
                                 proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                             }
@@ -301,10 +280,10 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
+                // 注意：全文内容采用按需加载策略，不在此处加载
                 .task(id: linkId) {
                     detailViewModel.clear()
                     await detailViewModel.loadHighlights(for: linkId)
-                    await detailViewModel.loadContent(for: linkId)
                     externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
@@ -367,10 +346,15 @@ struct GoodLinksDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
+                // 保存当前展开状态
+                let wasExpanded = articleIsExpanded
                 detailViewModel.clear()
                 Task {
                     await detailViewModel.loadHighlights(for: linkId)
-                    await detailViewModel.loadContent(for: linkId)
+                    // 如果刷新前是展开状态，重新加载全文；否则保持按需加载策略
+                    if wasExpanded {
+                        await detailViewModel.loadContentOnDemand()
+                    }
                 }
             }
         }
@@ -381,6 +365,7 @@ struct GoodLinksDetailView: View {
         }
         .onChange(of: selectedLinkId) { _, _ in
             articleIsExpanded = false
+            detailViewModel.unloadContent()  // 切换时卸载全文，释放内存
             externalIsSyncing = false
             externalSyncProgress = nil
         }
@@ -440,5 +425,47 @@ struct GoodLinksDetailView: View {
         formatter.timeStyle = .short
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter.string(from: date)
+    }
+    
+    // MARK: - Article Content Section (按需加载)
+    
+    /// 将 ViewModel 的 ContentLoadState 映射为 ArticleLoadState
+    private func mapToArticleLoadState(linkId: String) -> ArticleLoadState {
+        switch detailViewModel.contentLoadState {
+        case .notLoaded:
+            return .notLoaded
+            
+        case .loading:
+            return .loading
+            
+        case .loaded:
+            if let contentRow = detailViewModel.content,
+               let fullText = contentRow.content,
+               !fullText.isEmpty {
+                return .loaded(content: fullText, wordCount: contentRow.wordCount)
+            } else {
+                // 已加载但无内容
+                let link = viewModel.links.first(where: { $0.id == linkId })
+                let openURL = link.flatMap { URL(string: $0.openInGoodLinksURLString) }
+                return .empty(openURL: openURL)
+            }
+            
+        case .error(let message):
+            return .error(message: message)
+        }
+    }
+    
+    /// 渲染全文内容卡片
+    @ViewBuilder
+    private func articleContentSection(linkId: String) -> some View {
+        ArticleContentCardView(
+            loadState: mapToArticleLoadState(linkId: linkId),
+            isExpanded: $articleIsExpanded,
+            overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
+            measuredWidth: $measuredLayoutWidth,
+            onRetry: { [weak detailViewModel] in
+                await detailViewModel?.loadContentOnDemand()
+            }
+        )
     }
 }
