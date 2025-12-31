@@ -152,12 +152,16 @@ struct ArticleContentCardView: View {
     
     // MARK: - State-specific Content Views
     
+    /// 加载中状态（预览自动加载）
     private var notLoadedContent: some View {
-        Text("Click \"Expand\" to load article content")
-            .scaledFont(.body)
-            .foregroundColor(.secondary)
-            .italic()
-            .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 8) {
+            ProgressView()
+                .scaleEffect(0.8)
+            Text("Loading...")
+                .scaledFont(.body)
+                .foregroundColor(.secondary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
     
     /// 预览状态：显示预览内容，提示用户展开查看完整内容
