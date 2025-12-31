@@ -1,6 +1,21 @@
 import Foundation
 import Combine
 
+// MARK: - Content Load State
+
+/// 全文内容加载状态
+enum ContentLoadState: Equatable {
+    case notLoaded          // 未加载（默认状态）
+    case loading            // 加载中
+    case loaded             // 已加载
+    case error(String)      // 加载失败
+    
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
+    }
+}
+
 // MARK: - GoodLinksDetailViewModel
 
 /// GoodLinks 详情页 ViewModel
@@ -39,6 +54,9 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     /// 当前 link 的全文内容
     @Published var content: GoodLinksContentRow?
+    
+    /// 全文内容加载状态（用于按需加载/卸载）
+    @Published var contentLoadState: ContentLoadState = .notLoaded
     
     /// 分页后的可见高亮
     @Published var visibleHighlights: [GoodLinksHighlightRow] = []
@@ -270,14 +288,17 @@ final class GoodLinksDetailViewModel: ObservableObject {
         }
     }
     
-    /// 加载全文内容
-    func loadContent(for linkId: String) async {
+    /// 加载全文内容（私有方法，供 loadContentOnDemand 调用）
+    private func loadContent(for linkId: String) async {
         let serviceForTask = service
         let loggerForTask = logger
         
         // 取消上一次全文加载
         contentFetchTask?.cancel()
         contentFetchTask = nil
+        
+        // 更新加载状态
+        contentLoadState = .loading
         
         do {
             let task = Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
@@ -300,6 +321,8 @@ final class GoodLinksDetailViewModel: ObservableObject {
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             
             content = contentRow
+            contentLoadState = .loaded
+            
             if let c = contentRow {
                 loggerForTask.info("[GoodLinksDetail] 加载到全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
             } else {
@@ -311,9 +334,28 @@ final class GoodLinksDetailViewModel: ObservableObject {
             loggerForTask.error("[GoodLinksDetail] loadContent error: \(desc)")
             // 如果已经切换 link 或任务被取消，不提示错误
             guard !Task.isCancelled, currentLinkId == linkId else { return }
-            errorMessage = desc
+            contentLoadState = .error(desc)
             contentFetchTask = nil
         }
+    }
+    
+    // MARK: - 按需加载/卸载全文
+    
+    /// 按需加载全文（仅在展开时调用）
+    func loadContentOnDemand() async {
+        guard let linkId = currentLinkId else { return }
+        // 如果已经加载或正在加载，不重复操作
+        guard contentLoadState == .notLoaded || contentLoadState.isError else { return }
+        await loadContent(for: linkId)
+    }
+    
+    /// 卸载全文内容，释放内存
+    func unloadContent() {
+        contentFetchTask?.cancel()
+        contentFetchTask = nil
+        content = nil
+        contentLoadState = .notLoaded
+        logger.debug("[GoodLinksDetail] 已卸载全文内容，释放内存")
     }
     
     /// 清空当前数据（切换 link 时调用）
@@ -325,6 +367,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
         currentLinkId = nil
         highlights.removeAll(keepingCapacity: false)
         content = nil
+        contentLoadState = .notLoaded
         visibleHighlights.removeAll(keepingCapacity: false)
         allFilteredHighlights.removeAll(keepingCapacity: false)
         currentPage = 0
