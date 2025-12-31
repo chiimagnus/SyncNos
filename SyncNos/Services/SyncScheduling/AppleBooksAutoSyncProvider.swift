@@ -43,9 +43,11 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
 
     // MARK: - Private
 
-    /// 从 bookmark 中恢复 Apple Books 根目录
+    /// 从 bookmark 中恢复 Apple Books 根目录，并确保安全范围访问已开启
     private var booksRootPath: String? {
         if let url = bookmarkStore.restore() {
+            // 确保安全范围访问已开启，否则后续 SQLite 操作会得到 rc=23
+            _ = bookmarkStore.startAccessing(url: url)
             let selectedPath = url.path
             return DatabasePathHelper.determineDatabaseRoot(from: selectedPath)
         }

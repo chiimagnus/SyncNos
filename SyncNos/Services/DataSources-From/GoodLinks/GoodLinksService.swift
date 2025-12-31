@@ -184,11 +184,16 @@ final class GoodLinksBookmarkStore {
 
     func stopAccessingIfNeeded() {
         queue.sync {
-            if let current = currentlyAccessingURL {
-                while accessCount > 0 {
-                    current.stopAccessingSecurityScopedResource()
-                    accessCount -= 1
-                }
+            guard let current = currentlyAccessingURL else { return }
+            guard accessCount > 0 else {
+                currentlyAccessingURL = nil
+                return
+            }
+            // 仅减少一次引用计数，不是清空所有
+            // 这样其他并发任务仍可继续使用安全范围访问
+            current.stopAccessingSecurityScopedResource()
+            accessCount -= 1
+            if accessCount == 0 {
                 currentlyAccessingURL = nil
             }
         }
