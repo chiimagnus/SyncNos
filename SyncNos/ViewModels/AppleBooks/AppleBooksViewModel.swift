@@ -192,11 +192,6 @@ final class AppleBooksViewModel: ObservableObject {
         return started
     }
     
-    /// 结束对当前安全作用域目录的访问
-    func stopAccessingIfNeeded() {
-        bookmarkStore.stopAccessingIfNeeded()
-    }
-    
     /// 供视图查询上次同步时间，避免视图直接依赖存储实现
     func lastSync(for bookId: String) -> Date? {
         syncTimestampStore.getLastSyncTime(for: bookId)

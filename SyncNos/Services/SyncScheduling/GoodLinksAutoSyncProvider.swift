@@ -57,10 +57,6 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             guard let self else { return }
             defer {
                 self.isSyncing = false
-                // 注意：不要在这里调用 stopAccessingIfNeeded()！
-                // 用户可能同时在进行手动同步（batchSync），提前关闭安全范围访问会导致
-                // 后续 SQLite 操作得到 rc=23 (authorization denied)。
-                // 安全范围访问由 GoodLinksBookmarkStore 的引用计数机制自动管理。
                 self.logger.info("[SmartSync] GoodLinks: finished")
             }
             do {

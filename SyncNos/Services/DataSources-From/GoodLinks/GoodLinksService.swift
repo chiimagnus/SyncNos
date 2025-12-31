@@ -111,8 +111,6 @@ final class GoodLinksBookmarkStore {
 
     private let bookmarkDefaultsKey = "SelectedGoodLinksFolderBookmark"
     private var currentlyAccessingURL: URL?
-    private var accessCount: Int = 0
-    private let queue = DispatchQueue(label: "GoodLinksBookmarkStore.serial")
 
     private init() {}
 
@@ -145,58 +143,21 @@ final class GoodLinksBookmarkStore {
 
     @discardableResult
     func startAccessing(url: URL) -> Bool {
-        queue.sync {
-            let normalized = url.standardizedFileURL
-            if let current = currentlyAccessingURL {
-                // Same target → increase OS refcount and our own count
-                if current.standardizedFileURL == normalized {
-                    let started = normalized.startAccessingSecurityScopedResource()
-                    if started { accessCount += 1 }
-                    return started
-                }
-
-                // Different target → attempt to start new first; if succeeded, stop previous fully
-                let started = normalized.startAccessingSecurityScopedResource()
-                if started {
-                    // Drain previous access count to 0
-                    while accessCount > 0 {
-                        current.stopAccessingSecurityScopedResource()
-                        accessCount -= 1
-                    }
-                    currentlyAccessingURL = normalized
-                    accessCount = 1
-                    return true
-                } else {
-                    // Keep previous access; report failure
-                    return false
-                }
-            } else {
-                // No current → start and set count
-                let started = normalized.startAccessingSecurityScopedResource()
-                if started {
-                    currentlyAccessingURL = normalized
-                    accessCount = 1
-                }
-                return started
-            }
+        let normalized = url.standardizedFileURL
+        // 如果已经在访问同一个 URL，直接返回 true
+        if let current = currentlyAccessingURL, current.standardizedFileURL == normalized {
+            return true
         }
-    }
-
-    func stopAccessingIfNeeded() {
-        queue.sync {
-            guard let current = currentlyAccessingURL else { return }
-            guard accessCount > 0 else {
-                currentlyAccessingURL = nil
-                return
+        
+        let started = normalized.startAccessingSecurityScopedResource()
+        if started {
+            // 如果之前在访问其他 URL，先停止
+            if let current = currentlyAccessingURL, current.standardizedFileURL != normalized {
+                current.stopAccessingSecurityScopedResource()
             }
-            // 仅减少一次引用计数，不是清空所有
-            // 这样其他并发任务仍可继续使用安全范围访问
-            current.stopAccessingSecurityScopedResource()
-            accessCount -= 1
-            if accessCount == 0 {
-                currentlyAccessingURL = nil
-            }
+            currentlyAccessingURL = normalized
         }
+        return started
     }
 }
 
