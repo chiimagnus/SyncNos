@@ -6,6 +6,7 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
     case goodLinks
     case weRead
     case dedao
+    case chats
     
     /// 显示名称
     var displayName: String {
@@ -14,6 +15,7 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
         case .goodLinks: return "GoodLinks"
         case .weRead: return "WeRead"
         case .dedao: return "Dedao"
+        case .chats: return "Chats"
         }
     }
     
@@ -24,6 +26,7 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
         case .goodLinks: return "bookmark"
         case .weRead: return "w.square"
         case .dedao: return "d.square"
+        case .chats: return "message"
         }
     }
     
@@ -34,6 +37,7 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
         case .goodLinks: return Color("BrandGoodLinks")
         case .weRead: return Color("BrandWeRead")
         case .dedao: return Color("BrandDedao")
+        case .chats: return .green
         }
     }
     
@@ -44,6 +48,7 @@ enum SyncSource: String, Codable, CaseIterable, Sendable {
         case .goodLinks: return 0.12
         case .weRead: return 0.14
         case .dedao: return 0.14
+        case .chats: return 0.14
         }
     }
 }  

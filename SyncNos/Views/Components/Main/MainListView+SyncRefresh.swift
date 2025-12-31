@@ -30,7 +30,7 @@ extension MainListView {
         case .dedao:
             dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .chats:
-            break // Chats does not support sync to Notion
+            chatsVM.batchSync(contactIds: selectedChatsContactIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
     }
     
@@ -78,7 +78,13 @@ extension MainListView {
                     return nil
                 }
             case .chats:
-                return // Chats does not support sync
+                sourceKey = "chats"
+                selectedItems = selectedChatsContactIds.compactMap { id in
+                    if let contact = chatsVM.contacts.first(where: { $0.id == id }) {
+                        return (id: id, title: contact.name)
+                    }
+                    return nil
+                }
             }
             
             // 清除每个选中项的本地记录
@@ -112,7 +118,7 @@ extension MainListView {
             case .dedao:
                 await dedaoVM.loadBooks()
             case .chats:
-                break // Chats does not have refresh operation
+                await chatsVM.loadFromCache()
             }
         }
     }

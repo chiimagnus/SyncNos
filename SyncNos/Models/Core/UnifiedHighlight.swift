@@ -94,6 +94,34 @@ struct UnifiedHighlight: Identifiable, Equatable {
         self.source = .dedao
     }
     
+    /// 从 ChatMessage 转换（微信聊天消息）
+    /// - Parameters:
+    ///   - message: 聊天消息
+    ///   - contactName: 对话联系人名称（用于填充发送者信息）
+    init(from message: ChatMessage, contactName: String) {
+        self.uuid = message.id.uuidString
+        self.text = message.content
+        // 使用发送者昵称作为笔记（便于在 Notion 中识别发送者）
+        if let senderName = message.senderName, !senderName.isEmpty {
+            self.note = "Sender: \(senderName)"
+        } else if message.isFromMe {
+            self.note = "Sender: Me"
+        } else {
+            self.note = "Sender: \(contactName)"
+        }
+        // 颜色索引：0=我的消息(蓝色), 1=对方消息(绿色), 2=系统消息(灰色)
+        switch message.kind {
+        case .system:
+            self.colorIndex = 2
+        default:
+            self.colorIndex = message.isFromMe ? 0 : 1
+        }
+        self.dateAdded = nil  // 聊天消息没有精确时间戳
+        self.dateModified = nil
+        self.location = nil
+        self.source = .chats
+    }
+    
     /// 通用初始化器
     init(
         uuid: String,
@@ -197,6 +225,16 @@ struct UnifiedSyncItem: Identifiable, Equatable {
         self.url = nil
         self.source = .dedao
         self.highlightCount = book.highlightCount
+    }
+    
+    /// 从 ChatBookListItem 转换（微信聊天对话）
+    init(from chat: ChatBookListItem) {
+        self.itemId = chat.id
+        self.title = chat.name
+        self.author = ""  // 聊天对话没有作者概念
+        self.url = nil
+        self.source = .chats
+        self.highlightCount = chat.messageCount
     }
     
     /// 通用初始化器

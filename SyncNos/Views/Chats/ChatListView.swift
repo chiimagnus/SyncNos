@@ -74,9 +74,20 @@ struct ChatListView: View {
     private var contactList: some View {
         List(selection: $selectionIds) {
             ForEach(viewModel.contacts) { contact in
-                ContactRow(contact: contact)
+                ContactRow(
+                    contact: contact,
+                    isSyncing: viewModel.syncingContactIds.contains(contact.id)
+                )
                     .tag(contact.id)
                     .contextMenu {
+                        Button {
+                            viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
+                        } label: {
+                            Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                        }
+                        
+                        Divider()
+                        
                         Button(role: .destructive) {
                             // 如果删除的是当前选中的，先清除选择
                             selectionIds.remove(contact.id)
@@ -108,6 +119,7 @@ struct ChatListView: View {
 
 private struct ContactRow: View {
     let contact: ChatBookListItem
+    let isSyncing: Bool
     @Environment(\.fontScale) private var fontScale
     
     var body: some View {
@@ -119,6 +131,13 @@ private struct ContactRow: View {
                     .lineLimit(1)
                 
                 Spacer()
+                
+                // Syncing indicator
+                if isSyncing {
+                    Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                        .foregroundColor(.yellow)
+                        .help("Syncing...")
+                }
                 
                 // Time
                 if let time = contact.lastMessageTime {

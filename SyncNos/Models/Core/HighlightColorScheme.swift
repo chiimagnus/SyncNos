@@ -5,6 +5,7 @@ enum HighlightSource: String {
     case goodLinks
     case weRead
     case dedao
+    case chats
 }
 
 struct HighlightColorDefinition {
@@ -47,6 +48,13 @@ enum HighlightColorScheme {
             return [
                 HighlightColorDefinition(index: 0, notionName: "orange", displayName: "Default")
             ]
+        case .chats:
+            // Chats 使用消息方向区分颜色：我的消息用蓝色，对方消息用绿色，系统消息用灰色
+            return [
+                HighlightColorDefinition(index: 0, notionName: "blue", displayName: "From Me"),
+                HighlightColorDefinition(index: 1, notionName: "green", displayName: "From Others"),
+                HighlightColorDefinition(index: 2, notionName: "gray", displayName: "System")
+            ]
         }
     }
 
@@ -65,6 +73,8 @@ enum HighlightColorScheme {
             return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
         case .dedao:
             return HighlightColorDefinition(index: index, notionName: "orange", displayName: "Default")
+        case .chats:
+            return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Unknown")
         }
     }
 }

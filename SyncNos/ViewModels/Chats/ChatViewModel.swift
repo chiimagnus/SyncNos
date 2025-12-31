@@ -44,6 +44,14 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var processingScreenshotIds: Set<UUID> = []
+    
+    // MARK: - Sync State
+    
+    /// 正在同步的对话 ID
+    @Published var syncingContactIds: Set<String> = []
+    
+    /// 同步进度文本（contactId -> 进度文本）
+    @Published var syncProgress: [String: String] = [:]
 
     // MARK: - Display Books (for MainListView compatibility)
 
@@ -54,6 +62,9 @@ final class ChatViewModel: ObservableObject {
     private let cacheService: ChatCacheServiceProtocol
     private let parser: ChatOCRParser
     private let logger: LoggerServiceProtocol
+    private let syncEngine: NotionSyncEngine
+    private let syncQueueStore: SyncQueueStoreProtocol
+    private let timestampStore: SyncTimestampStoreProtocol
     
     /// 分页加载的“防串台 token”（用于在切换对话/卸载消息时丢弃旧加载结果）
     private var paginationLoadTokens: [UUID: UUID] = [:]
@@ -67,11 +78,17 @@ final class ChatViewModel: ObservableObject {
 
     init(
         cacheService: ChatCacheServiceProtocol = DIContainer.shared.chatsCacheService,
-        logger: LoggerServiceProtocol = DIContainer.shared.loggerService
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
+        syncQueueStore: SyncQueueStoreProtocol = DIContainer.shared.syncQueueStore,
+        timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.cacheService = cacheService
         self.parser = ChatOCRParser(config: .default)
         self.logger = logger
+        self.syncEngine = syncEngine
+        self.syncQueueStore = syncQueueStore
+        self.timestampStore = timestampStore
     }
 
     // MARK: - Public
@@ -737,6 +754,72 @@ final class ChatViewModel: ObservableObject {
             contacts.append(newContact)
             contacts.sort { $0.name < $1.name }
         }
+    }
+    
+    // MARK: - Sync to Notion
+    
+    /// 同步单个对话到 Notion
+    /// - Parameter contact: 要同步的对话
+    func syncConversation(_ contact: ChatBookListItem) async {
+        let contactId = contact.id
+        
+        // 防止重复同步
+        guard !syncingContactIds.contains(contactId) else { return }
+        
+        syncingContactIds.insert(contactId)
+        syncProgress[contactId] = NSLocalizedString("Preparing...", comment: "")
+        
+        defer {
+            syncingContactIds.remove(contactId)
+            syncProgress.removeValue(forKey: contactId)
+        }
+        
+        do {
+            let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
+            
+            try await syncEngine.syncSmart(source: adapter) { [weak self] progress in
+                Task { @MainActor in
+                    self?.syncProgress[contactId] = progress
+                }
+            }
+            
+            logger.info("[ChatsSync] Successfully synced conversation: \(contact.name)")
+        } catch {
+            logger.error("[ChatsSync] Failed to sync conversation \(contact.name): \(error.localizedDescription)")
+            errorMessage = "Sync failed: \(error.localizedDescription)"
+        }
+    }
+    
+    /// 批量同步对话到 Notion（通过同步队列）
+    /// - Parameters:
+    ///   - contactIds: 对话 ID 集合
+    ///   - concurrency: 并发数
+    func batchSync(contactIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
+        let items = contactIds.compactMap { id -> SyncEnqueueItem? in
+            guard let contact = contacts.first(where: { $0.id == id }) else { return nil }
+            return SyncEnqueueItem(id: contact.id, title: contact.name, subtitle: nil)
+        }
+        
+        guard !items.isEmpty else {
+            logger.warning("[ChatsSync] No valid contacts found for batch sync")
+            return
+        }
+        
+        // 通过 SyncQueueStore 入队任务
+        syncQueueStore.enqueue(items: items, source: .chats, executor: { [weak self] taskId in
+            guard let self else { return }
+            guard let contact = self.contacts.first(where: { $0.id == taskId }) else { return }
+            await self.syncConversation(contact)
+        })
+        
+        logger.info("[ChatsSync] Enqueued \(items.count) conversations for sync")
+    }
+    
+    /// 获取上次同步时间
+    /// - Parameter contactId: 对话 ID
+    /// - Returns: 上次同步时间（如果有）
+    func getLastSyncTime(for contactId: String) -> Date? {
+        timestampStore.getLastSyncTime(for: contactId)
     }
 }
 

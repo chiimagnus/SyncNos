@@ -108,6 +108,24 @@ struct ChatDetailView: View {
                             ProgressView()
                                 .scaleEffect(0.7)
                         }
+                        
+                        // 同步按钮
+                        Button {
+                            Task {
+                                await listViewModel.syncConversation(contact)
+                            }
+                        } label: {
+                            if listViewModel.syncingContactIds.contains(contact.id) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            } else {
+                                Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                            }
+                        }
+                        .disabled(listViewModel.syncingContactIds.contains(contact.id) || contact.messageCount == 0)
+                        .help(listViewModel.syncingContactIds.contains(contact.id)
+                              ? (listViewModel.syncProgress[contact.id] ?? "Syncing...")
+                              : "Sync this conversation to Notion")
 
                         // 统一的导入/导出菜单
                         Menu {
