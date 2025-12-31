@@ -132,4 +132,42 @@ final class GoodLinksQueryService: Sendable {
         }
         return nil
     }
+    
+    /// 获取内容预览（只取前 N 个字符，避免加载完整大字符串）
+    /// - Parameters:
+    ///   - db: 数据库连接
+    ///   - linkId: 链接 ID
+    ///   - previewLength: 预览长度（字符数）
+    /// - Returns: 包含预览内容的 GoodLinksContentRow
+    func fetchContentPreview(db: OpaquePointer, linkId: String, previewLength: Int = 300) throws -> GoodLinksContentRow? {
+        // 使用 SUBSTR 只获取前 N 个字符，避免加载完整的大字符串
+        let sql = "SELECT id, SUBSTR(content, 1, ?), wordCount, videoDuration, LENGTH(content) FROM content WHERE id=?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1106, userInfo: [NSLocalizedDescriptionKey: "prepare content preview failed: \(errMsg)"])
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, Int64(previewLength))
+        let ns = linkId as NSString
+        sqlite3_bind_text(stmt, 2, ns.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            guard let c0 = sqlite3_column_text(stmt, 0) else { return nil }
+            let id = String(cString: c0)
+            var preview = sqlite3_column_text(stmt, 1).map { String(cString: $0) }
+            let wordCount = Int(sqlite3_column_int64(stmt, 2))
+            let videoDuration: Int? = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 3))
+            let totalLength = Int(sqlite3_column_int64(stmt, 4))
+            
+            // 如果内容被截断，添加省略号
+            if let p = preview, totalLength > previewLength {
+                preview = p + "..."
+            }
+            
+            return GoodLinksContentRow(id: id, content: preview, wordCount: wordCount, videoDuration: videoDuration)
+        }
+        return nil
+    }
 }

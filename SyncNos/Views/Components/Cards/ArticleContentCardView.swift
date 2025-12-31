@@ -6,9 +6,11 @@ import SwiftUI
 enum ArticleLoadState: Equatable {
     /// 未加载（折叠状态，等待用户展开）
     case notLoaded
-    /// 加载中
-    case loading
-    /// 已加载（有内容）
+    /// 预览状态（显示前 N 个字符，等待用户展开加载完整内容）
+    case preview(content: String, wordCount: Int)
+    /// 正在加载完整内容
+    case loadingFull
+    /// 已加载完整内容
     case loaded(content: String, wordCount: Int)
     /// 已加载但无内容（需要用户在 GoodLinks 中重新下载）
     case empty(openURL: URL?)
@@ -20,13 +22,9 @@ enum ArticleLoadState: Equatable {
         return false
     }
     
-    var isExpanded: Bool {
-        switch self {
-        case .notLoaded:
-            return false
-        case .loading, .loaded, .empty, .error:
-            return true
-        }
+    var isPreview: Bool {
+        if case .preview = self { return true }
+        return false
     }
 }
 
@@ -128,8 +126,11 @@ struct ArticleContentCardView: View {
             case .notLoaded:
                 notLoadedContent
                 
-            case .loading:
-                loadingContent
+            case .preview(let content, _):
+                previewContent(content)
+                
+            case .loadingFull:
+                loadingFullContent
                 
             case .loaded(let content, _):
                 loadedContent(content)
@@ -159,13 +160,25 @@ struct ArticleContentCardView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
     
-    private var loadingContent: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .scaleEffect(0.8)
-            Text("Loading article content...")
-                .scaledFont(.body)
-                .foregroundColor(.secondary)
+    /// 预览状态：显示预览内容，提示用户展开查看完整内容
+    private func previewContent(_ content: String) -> some View {
+        Text(content)
+            .scaledFont(.body)
+            .foregroundColor(.primary)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+    
+    /// 正在加载完整内容
+    private var loadingFullContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Loading full content...")
+                    .scaledFont(.body)
+                    .foregroundColor(.secondary)
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -256,7 +269,7 @@ struct ArticleContentCardView: View {
     
     private var wordCount: Int {
         switch loadState {
-        case .loaded(_, let count):
+        case .preview(_, let count), .loaded(_, let count):
             return count
         default:
             return 0
@@ -266,13 +279,16 @@ struct ArticleContentCardView: View {
     private var shouldShowToggle: Bool {
         switch loadState {
         case .notLoaded:
-            // 未加载时显示 Expand 按钮
+            // 未加载时不显示按钮（应该自动加载预览）
+            return false
+        case .preview:
+            // 预览时显示 Expand 按钮
             return true
-        case .loading:
-            // 加载中显示 Collapse 按钮（允许用户取消/折叠）
+        case .loadingFull:
+            // 加载完整内容中显示 Collapse 按钮（允许用户取消）
             return true
         case .loaded(let content, _):
-            // 已加载时：内容足够长才显示按钮
+            // 已加载完整内容时显示 Collapse 按钮
             return content.count > 200
         case .empty:
             // 空内容时显示 Collapse 按钮

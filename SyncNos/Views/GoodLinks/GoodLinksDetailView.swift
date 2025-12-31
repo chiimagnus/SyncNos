@@ -280,10 +280,11 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
-                // 注意：全文内容采用按需加载策略，不在此处加载
+                // 加载高亮和内容预览（完整内容在用户展开时按需加载）
                 .task(id: linkId) {
                     detailViewModel.clear()
                     await detailViewModel.loadHighlights(for: linkId)
+                    await detailViewModel.loadContentPreview(for: linkId)
                     externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
@@ -351,7 +352,8 @@ struct GoodLinksDetailView: View {
                 detailViewModel.clear()
                 Task {
                     await detailViewModel.loadHighlights(for: linkId)
-                    // 如果刷新前是展开状态，重新加载全文；否则保持按需加载策略
+                    await detailViewModel.loadContentPreview(for: linkId)
+                    // 如果刷新前是展开状态，重新加载完整内容
                     if wasExpanded {
                         await detailViewModel.loadContentOnDemand()
                     }
@@ -435,8 +437,11 @@ struct GoodLinksDetailView: View {
         case .notLoaded:
             return .notLoaded
             
-        case .loading:
-            return .loading
+        case .preview(let content, let wordCount):
+            return .preview(content: content, wordCount: wordCount)
+            
+        case .loadingFull:
+            return .loadingFull
             
         case .loaded:
             if let contentRow = detailViewModel.content,
