@@ -154,7 +154,8 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         for provider in providers.values {
             provider.triggerScheduledSyncIfEnabled()
         }
-        // Update next sync time after triggering sync
+        // Update next sync time after triggering sync (only if service is running)
+        // Note: triggerSyncNow can be called from notifications even when service is stopped
         if isRunning {
             updateNextSyncTime()
         }
