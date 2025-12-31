@@ -38,29 +38,30 @@ struct FormattedArticleText: View {
         }
     }
     
-    /// Process content to handle HTML and normalize whitespace
-    private var processedContent: String {
+    // MARK: - Private Helpers
+    
+    /// Check if content appears to be HTML
+    private var isHTMLContent: Bool {
+        content.contains("<") && content.contains(">")
+    }
+    
+    /// Process content: strip HTML if needed and normalize whitespace
+    private var cleanedContent: String {
         var text = content
-        
-        // Check if content looks like HTML
-        if text.contains("<") && text.contains(">") {
+        if isHTMLContent {
             text = stripHTMLTags(text)
         }
-        
-        // Normalize whitespace while preserving paragraph breaks
-        text = normalizeWhitespace(text)
-        
         return text
     }
     
-    /// Split content into paragraphs for proper rendering
+    /// Process content to handle HTML and normalize whitespace (for collapsed mode)
+    private var processedContent: String {
+        normalizeWhitespace(cleanedContent)
+    }
+    
+    /// Split content into paragraphs for proper rendering (for expanded mode)
     private var paragraphs: [String] {
-        var text = content
-        
-        // Check if content looks like HTML
-        if text.contains("<") && text.contains(">") {
-            text = stripHTMLTags(text)
-        }
+        let text = cleanedContent
         
         // Split by double newlines (paragraph breaks)
         let rawParagraphs = text.components(separatedBy: "\n\n")
@@ -71,7 +72,7 @@ struct FormattedArticleText: View {
                 // Normalize whitespace within paragraph
                 paragraph
                     .replacingOccurrences(of: "\n", with: " ")
-                    .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
             }
             .filter { !$0.isEmpty }
@@ -91,7 +92,7 @@ struct FormattedArticleText: View {
         text = text.replacingOccurrences(of: "</li>", with: "\n", options: .caseInsensitive)
         
         // Remove all remaining HTML tags
-        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
         
         // Decode common HTML entities
         text = text.replacingOccurrences(of: "&nbsp;", with: " ")
@@ -108,10 +109,10 @@ struct FormattedArticleText: View {
     /// Normalize whitespace while preserving paragraph structure
     private func normalizeWhitespace(_ text: String) -> String {
         // Replace multiple newlines with double newline (paragraph break)
-        var result = text.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+        var result = text.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
         
         // Replace multiple spaces with single space
-        result = result.replacingOccurrences(of: " {2,}", with: " ", options: .regularExpression)
+        result = result.replacingOccurrences(of: #" {2,}"#, with: " ", options: .regularExpression)
         
         // Trim leading/trailing whitespace
         result = result.trimmingCharacters(in: .whitespacesAndNewlines)
