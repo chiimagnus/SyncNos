@@ -165,26 +165,25 @@ init(from message: ChatMessage, contactName: String) {
     self.uuid = message.id.uuidString
     self.text = message.content
     
-    // 发送者信息作为 note
+    // 直接存储发送者名称（无前缀），便于 Notion 展示
     if let senderName = message.senderName, !senderName.isEmpty {
-        self.note = "Sender: \(senderName)"
+        self.note = senderName
     } else if message.isFromMe {
-        self.note = "Sender: Me"
+        self.note = "Me"
     } else {
-        self.note = "Sender: \(contactName)"
+        self.note = contactName
     }
     
-    // 颜色映射
-    switch message.kind {
-    case .system:
-        self.colorIndex = 2  // gray
-    default:
-        self.colorIndex = message.isFromMe ? 0 : 1  // blue : green
-    }
-    
+    // Chats 不需要以下字段（简化设计）
+    self.colorIndex = nil      // 不需要颜色标识
+    self.dateAdded = nil       // 聊天消息没有精确时间戳
+    self.dateModified = nil    // 不需要修改时间
+    self.location = nil
     self.source = .chats
 }
 ```
+
+> **设计说明**：Chats 数据源的 UnifiedHighlight 只使用 `uuid`、`text`、`note`（存储 sender name）和 `source` 字段。其他字段（colorIndex、dateAdded、dateModified）设为 nil，因为 Notion 展示不需要这些信息。这种简化设计使得 NotionHelperMethods 无需解析字符串前缀来提取发送者名称。
 
 ### 5.2 ChatBookListItem → UnifiedSyncItem
 
@@ -205,9 +204,8 @@ init(from chat: ChatBookListItem) {
 
 每条消息的 contentHash 基于以下内容计算 SHA-256 前 16 位：
 - 消息文本 (text)
-- 发送者信息 (note)
-- 颜色/样式 (style)
-- 添加时间 (dateAdded)
+- 发送者名称 (note)
+- 其他字段为空（Chats 不使用 style、dateAdded 等）
 - 修改时间 (modified)
 - 位置信息 (location)
 

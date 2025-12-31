@@ -101,21 +101,16 @@ struct UnifiedHighlight: Identifiable, Equatable {
     init(from message: ChatMessage, contactName: String) {
         self.uuid = message.id.uuidString
         self.text = message.content
-        // 使用发送者昵称作为笔记（便于在 Notion 中识别发送者）
+        // 直接存储发送者名称（不带前缀），便于 Notion 展示
         if let senderName = message.senderName, !senderName.isEmpty {
-            self.note = "Sender: \(senderName)"
+            self.note = senderName
         } else if message.isFromMe {
-            self.note = "Sender: Me"
+            self.note = "Me"
         } else {
-            self.note = "Sender: \(contactName)"
+            self.note = contactName
         }
-        // 颜色索引：0=我的消息(蓝色), 1=对方消息(绿色), 2=系统消息(灰色)
-        switch message.kind {
-        case .system:
-            self.colorIndex = 2
-        default:
-            self.colorIndex = message.isFromMe ? 0 : 1
-        }
+        // Chats 不需要颜色索引，设为 nil
+        self.colorIndex = nil
         self.dateAdded = nil  // 聊天消息没有精确时间戳
         self.dateModified = nil
         self.location = nil

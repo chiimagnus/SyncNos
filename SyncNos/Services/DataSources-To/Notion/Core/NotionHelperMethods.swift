@@ -236,15 +236,10 @@ class NotionHelperMethods {
     
     /// 为 Chats 数据源构建简化的消息块
     /// 格式：Sender Name 作为主 bullet，消息内容作为 child bullet
-    /// 不包含 modified time 和 style color
+    /// 不包含 modified time 和 style color（这些字段在 Chats 的 UnifiedHighlight 中为 nil）
     private func buildChatsBulletedListItemBlock(for highlight: HighlightRow, maxTextLength: Int? = nil) -> [String: Any] {
-        // 从 note 中提取发送者名称（格式为 "Sender: xxx"）
-        let senderName: String
-        if let note = highlight.note, note.hasPrefix("Sender: ") {
-            senderName = String(note.dropFirst("Sender: ".count))
-        } else {
-            senderName = highlight.note ?? "Unknown"
-        }
+        // note 字段直接存储 sender name（无需解析前缀）
+        let senderName = highlight.note ?? "Unknown"
         
         // 父块：发送者名称 + 只包含 UUID（用于增量同步识别）
         let uuidLine = "[uuid:\(highlight.uuid)]\n"
