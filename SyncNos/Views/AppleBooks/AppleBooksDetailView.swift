@@ -208,22 +208,11 @@ struct AppleBooksDetailView: View {
                         }
                     }
                     .help("Sync in progress")
-                } else if viewModel.isSyncing {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        if let progress = viewModel.syncProgressText {
-                            Text(progress).scaledFont(.caption)
-                        } else {
-                            Text("Syncing...").scaledFont(.caption)
-                        }
-                    }
-                    .help("Sync in progress")
                 } else {
                     if let book = selectedBook {
                         Button {
-                            Task {
-                                viewModel.syncSmart(book: book, dbPath: viewModelList.annotationDatabasePath)
-                            }
+                            // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
+                            viewModelList.batchSync(bookIds: Set([book.bookId]))
                         } label: {
                             Label("Sync", systemImage: "arrow.triangle.2.circlepath")
                         }
@@ -238,17 +227,6 @@ struct AppleBooksDetailView: View {
             Text(syncErrorMessage)
         }
         // Notion 配置弹窗已移至 MainListView 统一处理
-        .onChange(of: viewModel.syncMessage) { _, newMessage in
-            if let message = newMessage {
-                // 仅在消息明显是错误时弹窗；"Sync completed" 等成功文案不提示
-                let successKeywords = ["Sync completed", "Incremental sync completed", "Full sync completed"]
-                let isSuccess = successKeywords.contains { message.localizedCaseInsensitiveContains($0) }
-                if !isSuccess {
-                    syncErrorMessage = message
-                    showingSyncError = true
-                }
-            }
-        }
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
@@ -261,8 +239,18 @@ struct AppleBooksDetailView: View {
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
             if bookId == (selectedBookId ?? "") {
                 switch status {
-                case "started": externalIsSyncing = true
-                case "succeeded", "failed", "skipped": externalIsSyncing = false; externalSyncProgress = nil
+                case "started":
+                    externalIsSyncing = true
+                case "succeeded", "skipped":
+                    externalIsSyncing = false
+                    externalSyncProgress = nil
+                case "failed":
+                    externalIsSyncing = false
+                    externalSyncProgress = nil
+                    if let errorInfo = info["errorInfo"] as? SyncErrorInfo {
+                        syncErrorMessage = errorInfo.details ?? errorInfo.message
+                        showingSyncError = true
+                    }
                 default: break
                 }
             }
