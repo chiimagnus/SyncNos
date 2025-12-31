@@ -53,6 +53,18 @@ struct ChatListView: View {
             Text("Click \"+\" at the bottom right to create a new chat")
                 .scaledFont(.caption)
                 .foregroundColor(.secondary)
+            
+            // Screenshot tip
+            HStack(spacing: 6) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                Text("Tip: For best OCR results, expand the chat area to fill your screen before taking a screenshot.")
+                    .scaledFont(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

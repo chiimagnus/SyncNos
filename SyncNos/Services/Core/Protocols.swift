@@ -263,6 +263,10 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
 // MARK: - Auto Sync Service Protocol
 protocol AutoSyncServiceProtocol: AnyObject {
     var isRunning: Bool { get }
+    /// The next scheduled sync time (nil if smart sync is not running)
+    var nextSyncTime: Date? { get }
+    /// Publisher for next sync time updates
+    var nextSyncTimePublisher: AnyPublisher<Date?, Never> { get }
     func start()
     func stop()
     func triggerSyncNow()
