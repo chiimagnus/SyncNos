@@ -65,48 +65,43 @@
 
 ## 3. 消息在 Notion 中的展示
 
-### 3.1 消息块格式 (Bulleted List Item)
+### 3.1 消息块格式 (Numbered List Item)
 
-每条消息作为一个 `bulleted_list_item` 块，包含：
+每条消息作为一个 `numbered_list_item` 块，采用简洁的层级结构：
 
-1. **Header 行**（灰色背景）
-   - UUID 标识：`[uuid:消息ID]`
-   - 元数据：`style:颜色 | modified:内容哈希`
+**父块**：发送者名称
+- 仅包含 UUID（灰色背景，用于增量同步识别）
+- 发送者名称（如 "Me"、"朋友"、"System"）
 
-2. **消息正文**
-   - 消息文本内容
+**子块**：消息内容
+- 嵌套的 bulleted_list_item，显示实际消息文本
 
-3. **发送者信息**（作为子块）
-   - 嵌套的 bulleted_list_item，显示发送者
+> **设计说明**：根据用户反馈，简化了消息格式，移除了 `modified time` 和 `style color`，使展示更加清晰简洁。
 
-### 3.2 颜色标识
-
-| 颜色 | 含义 | Notion Color |
-|------|------|--------------|
-| 蓝色 (blue) | 我发送的消息 | `blue` |
-| 绿色 (green) | 对方发送的消息 | `green` |
-| 灰色 (gray) | 系统消息/时间戳 | `gray` |
-
-### 3.3 示例展示
+### 3.2 示例展示
 
 在 Notion 中的实际效果：
 
 ```
-• [uuid:123e4567-e89b-12d3-a456-426614174000]
-  style:blue | modified:a1b2c3d4
-  你好，今天天气真好
-    • Sender: Me
+1. [uuid:123e4567-e89b-12d3-a456-426614174000]
+   Me
+     • 你好，今天天气真好
 
-• [uuid:223e4567-e89b-12d3-a456-426614174001]
-  style:green | modified:e5f6g7h8
-  是啊，适合出去走走
-    • Sender: 朋友
+2. [uuid:223e4567-e89b-12d3-a456-426614174001]
+   朋友
+     • 是啊，适合出去走走
 
-• [uuid:323e4567-e89b-12d3-a456-426614174002]
-  style:gray | modified:i9j0k1l2
-  下午 3:00
-    • Sender: System
+3. [uuid:323e4567-e89b-12d3-a456-426614174002]
+   System
+     • 下午 3:00
 ```
+
+### 3.3 视觉结构说明
+
+| 层级 | 内容 | 格式 |
+|------|------|------|
+| 父块 | `[uuid:xxx]` + 发送者名称 | numbered_list_item |
+| 子块 | 消息文本内容 | bulleted_list_item |
 
 ## 4. 同步流程
 
