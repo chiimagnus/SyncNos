@@ -298,6 +298,11 @@ func startKeyboardMonitorIfNeeded() {
             return event
         }
         
+        // ⌥⌘←/→ 用于数据源切换（由 ViewCommands 处理），不拦截
+        if hasOption && hasCommand {
+            return event
+        }
+        
         // 普通方向键处理
         switch event.keyCode {
         case 123: // ←

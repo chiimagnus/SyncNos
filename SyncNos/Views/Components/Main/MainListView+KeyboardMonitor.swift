@@ -81,6 +81,11 @@ extension MainListView {
                 return event
             }
             
+            // ⌥⌘←/→ 用于数据源切换（由 ViewCommands 处理），不拦截
+            if hasOption && hasCommand {
+                return event
+            }
+            
             switch event.keyCode {
             case 123: // ←
                 if self.keyboardNavigationTarget == .detail {
