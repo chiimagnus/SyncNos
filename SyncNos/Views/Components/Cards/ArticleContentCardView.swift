@@ -81,16 +81,11 @@ struct ArticleContentCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header
+            // Header (包含展开/折叠按钮)
             headerSection
             
             // Content (根据状态渲染)
             contentSection
-            
-            // Toggle Button
-            if shouldShowToggle {
-                toggleButton
-            }
         }
         .overlay(widthMeasurer)
         .frame(maxWidth: overrideWidth, alignment: .leading)
@@ -113,6 +108,11 @@ struct ArticleContentCardView: View {
                 .foregroundColor(.secondary)
             
             Spacer()
+            
+            // 展开/折叠按钮（放在标题栏右侧）
+            if shouldShowToggle {
+                toggleButton
+            }
         }
         .padding(.bottom, 4)
     }
