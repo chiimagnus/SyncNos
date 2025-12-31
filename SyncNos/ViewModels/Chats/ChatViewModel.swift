@@ -795,8 +795,11 @@ final class ChatViewModel: ObservableObject {
     ///   - contactIds: 对话 ID 集合
     ///   - concurrency: 并发数
     func batchSync(contactIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
+        // 创建 id -> contact 字典以优化查找性能
+        let contactDict = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
+        
         let items = contactIds.compactMap { id -> SyncEnqueueItem? in
-            guard let contact = contacts.first(where: { $0.id == id }) else { return nil }
+            guard let contact = contactDict[id] else { return nil }
             return SyncEnqueueItem(id: contact.id, title: contact.name, subtitle: nil)
         }
         
@@ -808,6 +811,7 @@ final class ChatViewModel: ObservableObject {
         // 通过 SyncQueueStore 入队任务
         syncQueueStore.enqueue(items: items, source: .chats, executor: { [weak self] taskId in
             guard let self else { return }
+            // 执行器内使用字典或线性查找（contacts 可能已更新）
             guard let contact = self.contacts.first(where: { $0.id == taskId }) else { return }
             await self.syncConversation(contact)
         })
