@@ -13,6 +13,15 @@ struct MenuBarView: View {
         
         Divider()
         
+        // MARK: - Smart Sync Status
+        if viewModel.isAutoSyncRunning, let nextSyncFormatted = viewModel.nextSyncTimeFormatted {
+            Label("Next sync: \(nextSyncFormatted)", systemImage: "clock.arrow.circlepath")
+                .scaledFont(.caption)
+                .foregroundStyle(.secondary)
+            
+            Divider()
+        }
+        
         // MARK: - Sync Queue Status
         Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
             .scaledFont(.caption)
@@ -39,4 +48,3 @@ struct MenuBarView: View {
         NSApp.terminate(nil)
     }
 }
-
