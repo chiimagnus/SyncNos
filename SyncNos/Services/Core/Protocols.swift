@@ -122,7 +122,6 @@ protocol BookmarkStoreProtocol {
     func save(folderURL: URL)
     func restore() -> URL?
     func startAccessing(url: URL) -> Bool
-    func stopAccessingIfNeeded()
 }
 
 // MARK: - Notion Config Store Protocol
