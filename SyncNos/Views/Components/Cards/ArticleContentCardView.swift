@@ -167,10 +167,7 @@ struct ArticleContentCardView: View {
     
     /// 预览状态：显示预览内容，提示用户展开查看完整内容
     private func previewContent(_ content: String) -> some View {
-        Text(content)
-            .scaledFont(.body)
-            .foregroundColor(.primary)
-            .textSelection(.enabled)
+        FormattedArticleText(content, lineLimit: collapsedLineLimit)
             .fixedSize(horizontal: false, vertical: true)
     }
     
@@ -189,12 +186,7 @@ struct ArticleContentCardView: View {
     }
     
     private func loadedContent(_ content: String) -> some View {
-        Text(content)
-            .scaledFont(.body)
-            .foregroundColor(.primary)
-            .textSelection(.enabled)
-            .lineLimit(isExpanded ? nil : collapsedLineLimit)
-            .fixedSize(horizontal: false, vertical: isExpanded)
+        FormattedArticleText(content, lineLimit: isExpanded ? nil : collapsedLineLimit)
     }
     
     private func emptyContent(openURL: URL?) -> some View {
