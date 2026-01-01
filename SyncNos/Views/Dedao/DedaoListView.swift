@@ -73,7 +73,7 @@ struct DedaoListView: View {
                             }
                             Spacer()
                             if viewModel.syncingBookIds.contains(book.bookId) {
-                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90.circle.fill")
                                     .foregroundColor(.yellow)
                                     .help("Syncing...")
                             } else if viewModel.syncedBookIds.contains(book.bookId) {
@@ -91,7 +91,7 @@ struct DedaoListView: View {
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                             }
 
                             Divider()

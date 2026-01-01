@@ -10,7 +10,7 @@ struct FileCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: .command)
 
-            Button("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle") {
+            Button("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle") {
                 NotificationCenter.default.post(name: Notification.Name("SyncSelectedToNotionRequested"), object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .option])

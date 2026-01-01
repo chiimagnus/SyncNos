@@ -23,7 +23,7 @@ struct MenuBarView: View {
         }
         
         // MARK: - Sync Queue Status
-        Label("\(viewModel.runningCount) Running", systemImage: "arrow.triangle.2.circlepath")
+        Label("\(viewModel.runningCount) Running", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
             .scaledFont(.caption)
             .foregroundStyle(.secondary)
         Label("\(viewModel.queuedCount) Waiting", systemImage: "clock")

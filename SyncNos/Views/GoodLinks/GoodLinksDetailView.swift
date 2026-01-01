@@ -331,7 +331,7 @@ struct GoodLinksDetailView: View {
                                     // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
                                     viewModel.batchSync(linkIds: Set([link.id]))
                                 } label: {
-                                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                                    Label("Sync", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                                 }
                                 .help("Sync highlights to Notion")
                             }

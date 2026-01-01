@@ -83,7 +83,7 @@ struct ChatListView: View {
                         Button {
                             viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                         } label: {
-                            Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                            Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                         }
                         .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
                         
@@ -135,7 +135,7 @@ private struct ContactRow: View {
                 
                 // Syncing indicator
                 if isSyncing {
-                    Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                    Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90.circle.fill")
                         .foregroundColor(.yellow)
                         .help("Syncing...")
                 }
