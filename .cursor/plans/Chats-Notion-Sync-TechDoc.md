@@ -1,9 +1,11 @@
 # Chats 同步到 Notion 技术文档（SyncNos）
 
-> **状态**：✅ V1 核心功能已实现
-> **日期**：2025-12-31
+> **状态**：✅ V1 核心功能已实现（P1 + P2 完成）
+> **更新日期**：2026-01-01
 
-本文档描述 SyncNos 中"微信聊天对话同步到 Notion"的完整技术方案，包括数据结构、同步流程、增量更新机制等。
+本文档描述 SyncNos 中"微信聊天对话同步到 Notion"的完整技术方案，包括数据结构、同步流程、增量更新机制和实现状态。
+
+---
 
 ## 1. 概述
 
@@ -17,9 +19,71 @@
 - **增量更新**：基于 UUID + contentHash 实现智能增量同步，避免重复上传
 - **本地记录优先**：优先使用本地 UUID → blockId 映射，减少 Notion API 调用
 
-## 2. Notion 数据库结构
+### 1.3 Chats 的特殊性
 
-### 2.1 数据库位置
+与其他数据源不同，Chats 数据：
+- **完全由用户本地管理**：数据来源于用户导入的截图，而非外部应用/服务
+- **无外部变化源**：不像其他数据源可能有外部更新
+- **适合手动同步**：用户在编辑完消息分类后手动触发同步更合理
+
+---
+
+## 2. 实现状态
+
+### 2.1 已完成 ✅
+
+| 模块 | 文件 | 状态 |
+|------|------|------|
+| **数据模型** | | |
+| `HighlightSource.chats` | `Models/Core/HighlightColorScheme.swift` | ✅ |
+| `SyncSource.chats` | `Models/Sync/SyncQueueModels.swift` | ✅ |
+| `ContentSource.chats` | `Models/Core/Models.swift` | ✅ |
+| `UnifiedHighlight.init(from:contactName:)` | `Models/Core/UnifiedHighlight.swift` | ✅ |
+| `UnifiedSyncItem.init(from: ChatBookListItem)` | `Models/Core/UnifiedHighlight.swift` | ✅ |
+| **同步适配器** | | |
+| `ChatsNotionAdapter` | `Services/DataSources-To/Notion/SyncEngine/Adapters/ChatsNotionAdapter.swift` | ✅ |
+| **ViewModel** | | |
+| `ChatViewModel.batchSync()` 处理单个和批量同步 | `ViewModels/Chats/ChatViewModel.swift` | ✅ |
+| `ChatViewModel.getLastSyncTime()` | `ViewModels/Chats/ChatViewModel.swift` | ✅ |
+| **Views** | | |
+| `ChatListView` (含焦点管理) | `Views/Chats/ChatListView.swift` | ✅ |
+| `ChatDetailView` (含 onScrollViewResolved) | `Views/Chats/ChatDetailView.swift` | ✅ |
+| 同步按钮和进度显示 | `Views/Chats/ChatDetailView.swift` | ✅ |
+| **MainListView 集成** | | |
+| `chatsSourceEnabled` AppStorage | `MainListView.swift` | ✅ |
+| `selectedChatsContactIds` State | `MainListView.swift` | ✅ |
+| `chatsVM` StateObject | `MainListView.swift` | ✅ |
+| `chatsDetailView` | `MainListView+DetailViews.swift` | ✅ |
+| `syncSelectedChats()` | `MainListView+DetailViews.swift` | ✅ |
+| 键盘导航支持 | `MainListView+KeyboardMonitor.swift` | ✅ |
+| **AutoSync** | | |
+| `ChatsAutoSyncProvider` | `Services/SyncScheduling/ChatsAutoSyncProvider.swift` | ✅ |
+| Smart Auto Sync UI 开关 | `Views/Settings/SyncFrom/OCRSettingsView.swift` | ✅ |
+| **Settings** | | |
+| Chats 设置入口 | `SettingsView.swift` | ✅ |
+| `OCRSettingsView` | `Views/Settings/SyncFrom/OCRSettingsView.swift` | ✅ |
+
+### 2.2 已修复的问题 ✅
+
+| 问题 | 优先级 | 文件 | 状态 |
+|------|--------|------|------|
+| `SyncQueueTaskSelected` 通知不处理 Chats | P1 | `MainListView.swift` | ✅ |
+| 切换数据源时 `selectedChatsContactIds` 未清空 | P1 | `MainListView.swift` | ✅ |
+
+### 2.3 待实现（低优先级）
+
+| 功能 | 优先级 | 说明 |
+|------|--------|------|
+| Chats 排序筛选菜单完善 | P3 | 按名称/消息数量/最后同步时间排序 |
+| 支持 PerBook 模式 | P4 | 每个对话独立数据库 |
+| 支持图片消息同步 | P4 | 需 Notion 文件 API |
+| 支持双向同步 | P4 | 从 Notion 读取变更 |
+
+---
+
+## 3. Notion 数据库结构
+
+### 3.1 数据库位置
 
 ```
 用户选择的 Notion 父页面
@@ -31,7 +95,7 @@
     └── ...
 ```
 
-### 2.2 数据库属性
+### 3.2 数据库属性
 
 | 属性名 | 类型 | 说明 |
 |--------|------|------|
@@ -42,7 +106,7 @@
 | Last Sync Time | Date | 最后同步时间 |
 | Asset ID | Rich Text | 对话唯一标识 (UUID) |
 
-### 2.3 页面内容结构
+### 3.3 页面内容结构
 
 每个对话页面内部结构：
 
@@ -50,7 +114,6 @@
 📄 联系人名称
 ├── [系统属性区] Name, Contact, Message Count, Last Sync Time
 └── [内容区]
-    ├── 🔘 Heading: "Highlights" (可选)
     └── 🔘 消息列表 (Numbered List Items)
         ├── 1. [uuid:xxx]
         │     Me
@@ -63,9 +126,11 @@
               └── • 系统消息内容
 ```
 
-## 3. 消息在 Notion 中的展示
+---
 
-### 3.1 消息块格式 (Numbered List Item)
+## 4. 消息在 Notion 中的展示
+
+### 4.1 消息块格式 (Numbered List Item)
 
 每条消息作为一个 `numbered_list_item` 块，采用简洁的层级结构：
 
@@ -76,11 +141,7 @@
 **子块**：消息内容
 - 嵌套的 bulleted_list_item，显示实际消息文本
 
-> **设计说明**：根据用户反馈，简化了消息格式，移除了 `modified time` 和 `style color`，使展示更加清晰简洁。
-
-### 3.2 示例展示
-
-在 Notion 中的实际效果：
+### 4.2 示例展示
 
 ```
 1. [uuid:123e4567-e89b-12d3-a456-426614174000]
@@ -96,16 +157,18 @@
      • 下午 3:00
 ```
 
-### 3.3 视觉结构说明
+### 4.3 视觉结构说明
 
 | 层级 | 内容 | 格式 |
 |------|------|------|
 | 父块 | `[uuid:xxx]` + 发送者名称 | numbered_list_item |
 | 子块 | 消息文本内容 | bulleted_list_item |
 
-## 4. 同步流程
+---
 
-### 4.1 首次同步（全量同步）
+## 5. 同步流程
+
+### 5.1 首次同步（全量同步）
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -123,7 +186,7 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 增量同步
+### 5.2 增量同步
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -144,7 +207,7 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 新消息添加位置
+### 5.3 新消息添加位置
 
 **新消息追加到页面底部**（与聊天的阅读顺序一致）。
 
@@ -152,13 +215,15 @@
 - Notion API 的 `append_block_children` 只支持追加到末尾
 - 这与聊天记录的自然阅读顺序一致（旧消息在上，新消息在下）
 
-### 4.4 消息更新
+### 5.4 消息更新
 
 已存在的消息如果内容发生变化（如用户修改了发送者昵称），会通过 `PATCH /blocks/{block_id}` 原地更新，不改变位置。
 
-## 5. 数据模型转换
+---
 
-### 5.1 ChatMessage → UnifiedHighlight
+## 6. 数据模型转换
+
+### 6.1 ChatMessage → UnifiedHighlight
 
 ```swift
 init(from message: ChatMessage, contactName: String) {
@@ -189,9 +254,9 @@ init(from message: ChatMessage, contactName: String) {
 > - `text` → 父块内容（存储 sender name）
 > - `note` → 子块内容（存储消息内容）
 > 
-> 这种设计**无需修改 NotionHelperMethods**，通用逻辑自动产生正确格式。其他字段（colorIndex、dateAdded、dateModified）设为 nil，因为 Chats 不需要这些信息。
+> 这种设计**无需修改 NotionHelperMethods**，通用逻辑自动产生正确格式。
 
-### 5.2 ChatBookListItem → UnifiedSyncItem
+### 6.2 ChatBookListItem → UnifiedSyncItem
 
 ```swift
 init(from chat: ChatBookListItem) {
@@ -204,9 +269,11 @@ init(from chat: ChatBookListItem) {
 }
 ```
 
-## 6. 增量更新机制
+---
 
-### 6.1 contentHash 计算
+## 7. 增量更新机制
+
+### 7.1 contentHash 计算
 
 每条消息的 contentHash 基于以下内容计算 SHA-256 前 16 位：
 - 发送者名称 (text)
@@ -219,7 +286,7 @@ let digest = SHA256.hash(data: payload.data(using: .utf8)!)
 let contentHash = String(digest.prefix(16))  // 取前16位
 ```
 
-### 6.2 本地记录存储
+### 7.2 本地记录存储
 
 同步完成后，保存 UUID → blockId 映射到本地 SQLite：
 
@@ -231,7 +298,7 @@ let contentHash = String(digest.prefix(16))  // 取前16位
 | sourceKey | String | 数据源标识 ("chats") |
 | bookId | String | 对话 ID |
 
-### 6.3 增量判定逻辑
+### 7.3 增量判定逻辑
 
 ```
 对于每条本地消息：
@@ -242,40 +309,44 @@ let contentHash = String(digest.prefix(16))  // 取前16位
      └── 未找到 → 加入追加列表
 ```
 
-## 7. API 调用模式
+---
 
-### 7.1 首次同步 API 调用
+## 8. API 调用模式
+
+### 8.1 首次同步 API 调用
 
 1. `POST /databases/{db_id}/query` - 检查页面是否存在
 2. `POST /pages` - 创建新页面
 3. `PATCH /pages/{page_id}` - 更新页面属性
 4. `PATCH /blocks/{page_id}/children` - 批量追加消息块
 
-### 7.2 增量同步 API 调用
+### 8.2 增量同步 API 调用
 
 1. `POST /databases/{db_id}/query` - 查找现有页面
 2. `GET /blocks/{page_id}/children` - 获取现有块（仅回退路径）
 3. `PATCH /blocks/{block_id}` - 更新已变化的块
 4. `PATCH /blocks/{page_id}/children` - 追加新消息
 
-### 7.3 速率限制
+### 8.3 速率限制
 
 - 读取：8 RPS
 - 写入：3 RPS
 - 自动重试：429 和 409 错误时指数退避
 
-## 8. 使用方式
+---
 
-### 8.1 单个对话同步
+## 9. 使用方式
+
+### 9.1 单个对话同步
 
 在 ChatDetailView 工具栏点击同步按钮：
 
 ```swift
-// 内部调用
-await chatViewModel.syncConversation(contact)
+// 内部调用 - 统一使用 batchSync 确保任务入队到 SyncQueueStore
+chatViewModel.batchSync(contactIds: Set([contact.id]))
 ```
 
-### 8.2 批量同步
+### 9.2 批量同步
 
 在 ChatListView 右键菜单选择"Sync Selected to Notion"：
 
@@ -287,25 +358,29 @@ chatViewModel.batchSync(
 )
 ```
 
-### 8.3 通过 MainListView 快捷键
+### 9.3 通过 MainListView 快捷键
 
 - `⌘⇧S` - 同步选中项到 Notion
 
-## 9. 同步状态追踪
+---
 
-### 9.1 UI 状态显示
+## 10. 同步状态追踪
 
-- **ChatListView**：联系人行显示黄色旋转图标表示正在同步
+### 10.1 UI 状态显示
+
+- **ChatListView**：联系人行显示同步图标表示正在同步
 - **ChatDetailView**：工具栏按钮显示 ProgressView 和进度提示
 
-### 9.2 ViewModel 状态
+### 10.2 ViewModel 状态
 
 ```swift
 @Published var syncingContactIds: Set<String>  // 正在同步的对话ID
 @Published var syncProgress: [String: String]  // 进度文本映射
 ```
 
-## 10. 错误处理
+---
+
+## 11. 错误处理
 
 | 错误类型 | 处理方式 |
 |----------|----------|
@@ -314,33 +389,25 @@ chatViewModel.batchSync(
 | API 限流 (429) | 自动指数退避重试 |
 | 认证失败 (401) | 弹窗提示重新授权 |
 
-## 11. 未来扩展
-
-### 11.1 潜在增强
-
-- [ ] 支持 PerBook 模式（每个对话独立数据库）
-- [ ] 支持图片消息同步（需 Notion 文件 API）
-- [ ] 支持自动同步（Smart Sync）
-- [ ] 支持双向同步（从 Notion 读取变更）
-
-### 11.2 Smart Sync 集成
-
-未来可添加 `ChatsAutoSyncProvider` 实现自动增量同步：
-
-```swift
-protocol AutoSyncSourceProvider {
-    var sourceKey: String { get }
-    var isEnabled: Bool { get }
-    func detectChanges() async throws -> Bool
-    func performSync() async throws
-}
-```
+---
 
 ## 12. 相关文件
 
-- `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/ChatsNotionAdapter.swift`
-- `SyncNos/ViewModels/Chats/ChatViewModel.swift`
-- `SyncNos/Models/Core/UnifiedHighlight.swift`
-- `SyncNos/Models/Core/HighlightColorScheme.swift`
-- `SyncNos/Views/Chats/ChatDetailView.swift`
-- `SyncNos/Views/Chats/ChatListView.swift`
+### 核心实现
+
+- `Services/DataSources-To/Notion/SyncEngine/Adapters/ChatsNotionAdapter.swift` - 同步适配器
+- `ViewModels/Chats/ChatViewModel.swift` - ViewModel
+- `Models/Core/UnifiedHighlight.swift` - 统一数据模型
+- `Services/SyncScheduling/ChatsAutoSyncProvider.swift` - 自动同步 Provider
+
+### Views
+
+- `Views/Chats/ChatDetailView.swift` - 详情视图
+- `Views/Chats/ChatListView.swift` - 列表视图
+- `Views/Settings/SyncFrom/OCRSettingsView.swift` - 设置视图
+
+### 模型定义
+
+- `Models/Core/HighlightColorScheme.swift` - 颜色方案
+- `Models/Sync/SyncQueueModels.swift` - 同步队列模型
+- `Models/Core/Models.swift` - 核心模型
