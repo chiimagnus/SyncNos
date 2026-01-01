@@ -120,7 +120,7 @@ struct SelectionPlaceholderView: View {
                         Button {
                             onSyncSelected?()
                         } label: {
-                            Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Sync Selected (\(count)) to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
                         .scaledFont(.body)
                         .padding(.bottom, 16)

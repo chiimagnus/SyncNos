@@ -119,7 +119,7 @@ struct ChatDetailView: View {
                                 ProgressView()
                                     .scaleEffect(0.7)
                             } else {
-                                Label("Sync to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                                Label("Sync to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                             }
                         }
                         .disabled(listViewModel.syncingContactIds.contains(contact.id) || contact.messageCount == 0)

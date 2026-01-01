@@ -80,7 +80,7 @@ struct GoodLinksListView: View {
                             Spacer()
                             // Sync status icon (与 AppleBooksListView 保持一致)
                             if viewModel.syncingLinkIds.contains(link.id) {
-                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90.circle.fill")
                                     .foregroundColor(.yellow)
                                     .help("Syncing...")
                             } else if viewModel.syncedLinkIds.contains(link.id) {
@@ -108,7 +108,7 @@ struct GoodLinksListView: View {
                             Button {
                                 viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
+                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
                             }
 
                             // 显示上次同步时间（针对当前右键的行）
