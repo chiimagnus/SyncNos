@@ -1,7 +1,8 @@
 # Chats 同步到 Notion 功能完善计划
 
 > **创建日期**：2026-01-01
-> **状态**：进行中
+> **完成日期**：2026-01-01
+> **状态**：✅ 已完成（P1 + P2）
 
 ## 1. 当前实现状态分析
 
@@ -37,21 +38,21 @@
 | Chats 设置入口 | `SettingsView.swift` | ✅ |
 | `OCRSettingsView` | `Views/Settings/SyncFrom/OCRSettingsView.swift` | ✅ |
 
-### 1.2 需要修复 🔧
+### 1.2 已修复 ✅
 
-| 问题 | 优先级 | 文件 |
-|------|--------|------|
-| `SyncQueueTaskSelected` 通知不处理 Chats | P1 | `MainListView.swift` |
-| 切换数据源时 `selectedChatsContactIds` 未清空 | P1 | `MainListView.swift` |
+| 问题 | 优先级 | 文件 | 状态 |
+|------|--------|------|------|
+| `SyncQueueTaskSelected` 通知不处理 Chats | P1 | `MainListView.swift` | ✅ 已修复 |
+| 切换数据源时 `selectedChatsContactIds` 未清空 | P1 | `MainListView.swift` | ✅ 已修复 |
 
-### 1.3 需要实现 ❌
+### 1.3 已实现 ✅
 
-| 功能 | 优先级 | 所需文件 |
-|------|--------|----------|
-| `ChatsAutoSyncProvider` | P2 | 新建 `Services/SyncScheduling/ChatsAutoSyncProvider.swift` |
-| `AutoSyncService` 添加 Chats provider | P2 | `Services/SyncScheduling/AutoSyncService.swift` |
-| `AutoSyncServiceProtocol` 添加 `triggerChatsNow()` | P2 | `Services/Core/Protocols.swift` |
-| Chats 排序筛选菜单完善（可选） | P3 | `MainListView+FilterMenus.swift` |
+| 功能 | 优先级 | 所需文件 | 状态 |
+|------|--------|----------|------|
+| `ChatsAutoSyncProvider` | P2 | `Services/SyncScheduling/ChatsAutoSyncProvider.swift` | ✅ 已创建 |
+| `AutoSyncService` 添加 Chats provider | P2 | `Services/SyncScheduling/AutoSyncService.swift` | ✅ 已更新 |
+| `AutoSyncServiceProtocol` 添加 `triggerChatsNow()` | P2 | `Services/Core/Protocols.swift` | ✅ 已更新 |
+| Chats 排序筛选菜单完善（可选） | P3 | `MainListView+FilterMenus.swift` | ⏳ 暂不实现 |
 
 ---
 
@@ -204,18 +205,18 @@ func triggerChatsNow()
 
 ## 3. 验证清单
 
-### P1 验证
-- [ ] 在同步队列中点击 Chats 任务，能正确跳转到对应对话
-- [ ] 切换到其他数据源后再切回 Chats，选中状态正确重置
-- [ ] 编译无错误，运行无崩溃
+### P1 验证 ✅
+- [x] 在同步队列中点击 Chats 任务，能正确跳转到对应对话
+- [x] 切换到其他数据源后再切回 Chats，选中状态正确重置
+- [x] 编译无错误，运行无崩溃
 
-### P2 验证
-- [ ] `ChatsAutoSyncProvider` 正确初始化
-- [ ] `AutoSyncService` 包含 Chats provider
-- [ ] 调用 `triggerChatsNow()` 不报错（即使是空实现）
-- [ ] 编译无错误
+### P2 验证 ✅
+- [x] `ChatsAutoSyncProvider` 正确初始化
+- [x] `AutoSyncService` 包含 Chats provider
+- [x] 调用 `triggerChatsNow()` 不报错（即使是空实现）
+- [x] 编译无错误
 
-### P3 验证
+### P3 验证（暂不实现）
 - [ ] 排序菜单正确显示（如果实现）
 - [ ] 排序功能正常工作（如果实现）
 
