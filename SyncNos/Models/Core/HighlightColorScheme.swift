@@ -33,7 +33,8 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 2, notionName: "blue", displayName: "Blue"),
                 HighlightColorDefinition(index: 3, notionName: "red", displayName: "Red"),
                 HighlightColorDefinition(index: 4, notionName: "purple", displayName: "Purple"),
-                HighlightColorDefinition(index: 5, notionName: "mint", displayName: "Mint")
+                // Notion 不支持 mint，使用 brown 替代
+                HighlightColorDefinition(index: 5, notionName: "brown", displayName: "Brown")
             ]
         case .weRead:
             return [
@@ -49,8 +50,8 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 0, notionName: "orange", displayName: "Default")
             ]
         case .chats:
-            // Chats 颜色定义（当前未使用，UnifiedHighlight 中 colorIndex 设为 nil）
-            // 保留定义以备将来需要颜色区分时使用
+            // Chats 颜色定义：根据消息方向区分
+            // 0 = 我发送 (blue), 1 = 对方发送 (green), 2 = 系统消息 (gray)
             return [
                 HighlightColorDefinition(index: 0, notionName: "blue", displayName: "From Me"),
                 HighlightColorDefinition(index: 1, notionName: "green", displayName: "From Others"),
@@ -67,7 +68,8 @@ enum HighlightColorScheme {
         // Fallbacks align with previous behavior
         switch source {
         case .goodLinks:
-            return HighlightColorDefinition(index: index, notionName: "mint", displayName: "Mint")
+            // Notion 不支持 mint，使用 brown 替代
+            return HighlightColorDefinition(index: index, notionName: "brown", displayName: "Brown")
         case .appleBooks:
             return HighlightColorDefinition(index: index, notionName: "gray", displayName: "Gray")
         case .weRead:
