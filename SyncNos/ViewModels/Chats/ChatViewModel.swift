@@ -44,6 +44,14 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var processingScreenshotIds: Set<UUID> = []
+    
+    // MARK: - Sync State
+    
+    /// 正在同步的对话 ID
+    @Published var syncingContactIds: Set<String> = []
+    
+    /// 同步进度文本（contactId -> 进度文本）
+    @Published var syncProgress: [String: String] = [:]
 
     // MARK: - Display Books (for MainListView compatibility)
 
@@ -54,6 +62,10 @@ final class ChatViewModel: ObservableObject {
     private let cacheService: ChatCacheServiceProtocol
     private let parser: ChatOCRParser
     private let logger: LoggerServiceProtocol
+    private let syncEngine: NotionSyncEngine
+    private let syncQueueStore: SyncQueueStoreProtocol
+    private let timestampStore: SyncTimestampStoreProtocol
+    private let notionConfig: NotionConfigStoreProtocol
     
     /// 分页加载的“防串台 token”（用于在切换对话/卸载消息时丢弃旧加载结果）
     private var paginationLoadTokens: [UUID: UUID] = [:]
@@ -67,11 +79,19 @@ final class ChatViewModel: ObservableObject {
 
     init(
         cacheService: ChatCacheServiceProtocol = DIContainer.shared.chatsCacheService,
-        logger: LoggerServiceProtocol = DIContainer.shared.loggerService
+        logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
+        syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
+        syncQueueStore: SyncQueueStoreProtocol = DIContainer.shared.syncQueueStore,
+        timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
+        notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
         self.cacheService = cacheService
         self.parser = ChatOCRParser(config: .default)
         self.logger = logger
+        self.syncEngine = syncEngine
+        self.syncQueueStore = syncQueueStore
+        self.timestampStore = timestampStore
+        self.notionConfig = notionConfig
     }
 
     // MARK: - Public
@@ -737,6 +757,156 @@ final class ChatViewModel: ObservableObject {
             contacts.append(newContact)
             contacts.sort { $0.name < $1.name }
         }
+    }
+    
+    // MARK: - Sync to Notion
+    
+    /// 同步单个对话到 Notion
+    /// - Parameter contact: 要同步的对话
+    func syncConversation(_ contact: ChatBookListItem) async {
+        guard checkNotionConfig() else {
+            await MainActor.run {
+                NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            }
+            return
+        }
+        
+        let contactId = contact.id
+        
+        // 防止重复同步
+        guard !syncingContactIds.contains(contactId) else { return }
+        
+        syncingContactIds.insert(contactId)
+        syncProgress[contactId] = NSLocalizedString("Preparing...", comment: "")
+        
+        defer {
+            syncingContactIds.remove(contactId)
+            syncProgress.removeValue(forKey: contactId)
+        }
+        
+        do {
+            let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
+            
+            try await syncEngine.syncSmart(source: adapter) { [weak self] progress in
+                Task { @MainActor in
+                    self?.syncProgress[contactId] = progress
+                }
+            }
+            
+            logger.info("[ChatsSync] Successfully synced conversation: \(contact.name)")
+        } catch {
+            logger.error("[ChatsSync] Failed to sync conversation \(contact.name): \(error.localizedDescription)")
+            errorMessage = "Sync failed: \(error.localizedDescription)"
+        }
+    }
+    
+    /// 批量同步对话到 Notion（通过同步队列）
+    /// - Parameters:
+    ///   - contactIds: 对话 ID 集合
+    ///   - concurrency: 并发数
+    func batchSync(contactIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
+        guard !contactIds.isEmpty else { return }
+        guard checkNotionConfig() else {
+            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            return
+        }
+        
+        // 创建 id -> contact 字典以优化查找性能
+        let contactDict = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
+        
+        let enqueueItems = contactIds.compactMap { id -> SyncEnqueueItem? in
+            guard let contact = contactDict[id] else { return nil }
+            return SyncEnqueueItem(id: contact.id, title: contact.name, subtitle: nil)
+        }
+        
+        // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
+        let acceptedIds = syncQueueStore.enqueue(source: .chats, items: enqueueItems)
+        guard !acceptedIds.isEmpty else {
+            logger.debug("[ChatsSync] No tasks accepted by SyncQueueStore, skip")
+            return
+        }
+        
+        // 更新本地 UI 状态
+        for id in acceptedIds {
+            syncingContactIds.insert(id)
+        }
+        
+        let ids = Array(acceptedIds)
+        let itemsById = contactDict
+        let limiter = DIContainer.shared.syncConcurrencyLimiter
+        let syncEngine = self.syncEngine
+        let cacheService = self.cacheService
+        
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for id in ids {
+                    guard let contact = itemsById[id] else { continue }
+                    group.addTask { [weak self] in
+                        guard let self else { return }
+                        await limiter.withPermit {
+                            // 发送开始通知
+                            await MainActor.run {
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("SyncBookStatusChanged"),
+                                    object: self,
+                                    userInfo: ["bookId": id, "status": "started"]
+                                )
+                            }
+                            do {
+                                let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
+                                try await syncEngine.syncSmart(source: adapter) { progressText in
+                                    Task { @MainActor in
+                                        self.syncProgress[id] = progressText
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("SyncProgressUpdated"),
+                                            object: self,
+                                            userInfo: ["bookId": id, "progress": progressText]
+                                        )
+                                    }
+                                }
+                                await MainActor.run {
+                                    _ = self.syncingContactIds.remove(id)
+                                    self.syncProgress.removeValue(forKey: id)
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "succeeded"]
+                                    )
+                                }
+                            } catch {
+                                let errorInfo = SyncErrorInfo.from(error)
+                                await MainActor.run {
+                                    self.logger.error("[ChatsSync] batchSync error for id=\(id): \(error.localizedDescription)")
+                                    _ = self.syncingContactIds.remove(id)
+                                    self.syncProgress.removeValue(forKey: id)
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        object: self,
+                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                await group.waitForAll()
+            }
+        }
+        
+        logger.info("[ChatsSync] Enqueued \(acceptedIds.count) conversations for sync")
+    }
+    
+    // MARK: - Helpers
+    
+    private func checkNotionConfig() -> Bool {
+        notionConfig.isConfigured
+    }
+    
+    /// 获取上次同步时间
+    /// - Parameter contactId: 对话 ID
+    /// - Returns: 上次同步时间（如果有）
+    func getLastSyncTime(for contactId: String) -> Date? {
+        timestampStore.getLastSyncTime(for: contactId)
     }
 }
 
