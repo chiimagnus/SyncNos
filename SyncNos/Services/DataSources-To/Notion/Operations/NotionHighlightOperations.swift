@@ -41,11 +41,11 @@ class NotionHighlightOperations {
         let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: source)
         _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
 
-        // 构建并替换子块（高亮续块 + note 多块），metadata 已上移至父块第二行
+        // 构建并替换子块（高亮续块 + note 多块，带背景颜色）
         var childBlocks: [[String: Any]] = []
         let chunkSize = NotionSyncConfig.maxTextLengthPrimary
         childBlocks.append(contentsOf: helperMethods.buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
-        childBlocks.append(contentsOf: helperMethods.buildNoteChildren(for: highlight, chunkSize: chunkSize))
+        childBlocks.append(contentsOf: helperMethods.buildNoteChildren(for: highlight, chunkSize: chunkSize, source: source))
 
         // 使用 pageOperations.replacePageChildren 来替换指定 block 的 children（适用于 block 的 children endpoint）
         try await pageOperations.replacePageChildren(pageId: blockId, with: childBlocks)

@@ -209,8 +209,8 @@ class NotionHelperMethods {
         var blocks: [[String: Any]] = []
         // 1) 高亮续块（从第二段起）使用 paragraph 子块
         blocks.append(contentsOf: buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize))
-        // 2) note 切分为多个兄弟 bulleted_list_item
-        blocks.append(contentsOf: buildNoteChildren(for: highlight, chunkSize: chunkSize))
+        // 2) note 切分为多个兄弟 bulleted_list_item（带背景颜色）
+        blocks.append(contentsOf: buildNoteChildren(for: highlight, chunkSize: chunkSize, source: source))
         return (parent, blocks)
     }
 
@@ -290,17 +290,34 @@ class NotionHelperMethods {
         return children
     }
 
-    /// 将 note 切分为多个兄弟 bulleted_list_item 子块（斜体）
-    func buildNoteChildren(for highlight: HighlightRow, chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary) -> [[String: Any]] {
+    /// 将 note 切分为多个兄弟 bulleted_list_item 子块（斜体 + 背景颜色）
+    /// - Parameters:
+    ///   - highlight: 高亮数据
+    ///   - chunkSize: 每块最大字符数
+    ///   - source: 数据源标识符（用于颜色映射）
+    /// - Returns: Notion block 数组
+    func buildNoteChildren(
+        for highlight: HighlightRow,
+        chunkSize: Int = NotionSyncConfig.maxTextLengthPrimary,
+        source: String = "appleBooks"
+    ) -> [[String: Any]] {
         guard let note = highlight.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty else { return [] }
+        
         let chunks = chunkText(note, chunkSize: chunkSize)
+        let bgColor = backgroundColorName(for: highlight.style, source: source)
+        
         return chunks.map { chunk in
-            [
+            var annotations: [String: Any] = ["italic": true]
+            if let color = bgColor {
+                annotations["color"] = color
+            }
+            
+            return [
                 "object": "block",
                 "bulleted_list_item": [
                     "rich_text": [[
                         "text": ["content": chunk],
-                        "annotations": ["italic": true]
+                        "annotations": annotations
                     ]]
                 ]
             ]
@@ -339,10 +356,25 @@ class NotionHelperMethods {
             src = .goodLinks
         case "weRead":
             src = .weRead
+        case "dedao":
+            src = .dedao
+        case "chats":
+            src = .chats
         default:
             src = .appleBooks
         }
         let def = HighlightColorScheme.definition(for: style, source: src)
         return def.notionName
+    }
+    
+    /// 获取 Notion 背景颜色名（添加 _background 后缀）
+    /// - Parameters:
+    ///   - style: 颜色索引
+    ///   - source: 数据源标识符
+    /// - Returns: Notion 背景颜色名，如 "blue_background"；如果 style 为 nil 则返回 nil
+    func backgroundColorName(for style: Int?, source: String) -> String? {
+        guard let style = style else { return nil }
+        let colorName = styleName(for: style, source: source)
+        return "\(colorName)_background"
     }
 }
