@@ -118,8 +118,15 @@ struct UnifiedHighlight: Identifiable, Equatable {
         // note 存储消息内容（将作为 Notion 中的子块）
         self.note = message.content
         
-        // Chats 不需要颜色索引、时间戳等字段
-        self.colorIndex = nil
+        // 根据消息类型设置颜色索引（用于 Notion 背景颜色）
+        // 0 = blue (From Me), 1 = green (From Others), 2 = gray (System)
+        switch message.kind {
+        case .system:
+            self.colorIndex = 2  // gray
+        case .text, .image, .voice, .card:
+            self.colorIndex = message.isFromMe ? 0 : 1  // blue or green
+        }
+        
         self.dateAdded = nil
         self.dateModified = nil
         self.location = nil
