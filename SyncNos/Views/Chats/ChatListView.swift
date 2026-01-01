@@ -85,6 +85,7 @@ struct ChatListView: View {
                         } label: {
                             Label("Sync Selected to Notion", systemImage: "arrow.triangle.2.circlepath.circle")
                         }
+                        .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
                         
                         Divider()
                         

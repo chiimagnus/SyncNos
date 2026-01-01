@@ -51,16 +51,16 @@
 ├── [系统属性区] Name, Contact, Message Count, Last Sync Time
 └── [内容区]
     ├── 🔘 Heading: "Highlights" (可选)
-    └── 🔘 消息列表 (Bulleted List Items)
-        ├── • [uuid:xxx] style:blue | modified:abc123
-        │     消息内容1
-        │     └── Sender: Me
-        ├── • [uuid:yyy] style:green | modified:def456
-        │     消息内容2
-        │     └── Sender: 联系人名
-        └── • [uuid:zzz] style:gray | modified:ghi789
-              系统消息内容
-              └── Sender: System
+    └── 🔘 消息列表 (Numbered List Items)
+        ├── 1. [uuid:xxx]
+        │     Me
+        │     └── • 消息内容1
+        ├── 2. [uuid:yyy]
+        │     朋友
+        │     └── • 消息内容2
+        └── 3. [uuid:zzz]
+              System
+              └── • 系统消息内容
 ```
 
 ## 3. 消息在 Notion 中的展示

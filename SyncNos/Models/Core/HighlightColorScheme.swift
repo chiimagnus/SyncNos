@@ -49,7 +49,8 @@ enum HighlightColorScheme {
                 HighlightColorDefinition(index: 0, notionName: "orange", displayName: "Default")
             ]
         case .chats:
-            // Chats 使用消息方向区分颜色：我的消息用蓝色，对方消息用绿色，系统消息用灰色
+            // Chats 颜色定义（当前未使用，UnifiedHighlight 中 colorIndex 设为 nil）
+            // 保留定义以备将来需要颜色区分时使用
             return [
                 HighlightColorDefinition(index: 0, notionName: "blue", displayName: "From Me"),
                 HighlightColorDefinition(index: 1, notionName: "green", displayName: "From Others"),
