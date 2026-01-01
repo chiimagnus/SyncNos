@@ -761,45 +761,6 @@ final class ChatViewModel: ObservableObject {
     
     // MARK: - Sync to Notion
     
-    /// 同步单个对话到 Notion
-    /// - Parameter contact: 要同步的对话
-    func syncConversation(_ contact: ChatBookListItem) async {
-        guard checkNotionConfig() else {
-            await MainActor.run {
-                NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
-            }
-            return
-        }
-        
-        let contactId = contact.id
-        
-        // 防止重复同步
-        guard !syncingContactIds.contains(contactId) else { return }
-        
-        syncingContactIds.insert(contactId)
-        syncProgress[contactId] = NSLocalizedString("Preparing...", comment: "")
-        
-        defer {
-            syncingContactIds.remove(contactId)
-            syncProgress.removeValue(forKey: contactId)
-        }
-        
-        do {
-            let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
-            
-            try await syncEngine.syncSmart(source: adapter) { [weak self] progress in
-                Task { @MainActor in
-                    self?.syncProgress[contactId] = progress
-                }
-            }
-            
-            logger.info("[ChatsSync] Successfully synced conversation: \(contact.name)")
-        } catch {
-            logger.error("[ChatsSync] Failed to sync conversation \(contact.name): \(error.localizedDescription)")
-            errorMessage = "Sync failed: \(error.localizedDescription)"
-        }
-    }
-    
     /// 批量同步对话到 Notion（通过同步队列）
     /// - Parameters:
     ///   - contactIds: 对话 ID 集合
@@ -909,5 +870,3 @@ final class ChatViewModel: ObservableObject {
         timestampStore.getLastSyncTime(for: contactId)
     }
 }
-
-
