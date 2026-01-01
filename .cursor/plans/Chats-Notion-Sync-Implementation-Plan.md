@@ -52,6 +52,7 @@
 | `ChatsAutoSyncProvider` | P2 | `Services/SyncScheduling/ChatsAutoSyncProvider.swift` | ✅ 已创建 |
 | `AutoSyncService` 添加 Chats provider | P2 | `Services/SyncScheduling/AutoSyncService.swift` | ✅ 已更新 |
 | `AutoSyncServiceProtocol` 添加 `triggerChatsNow()` | P2 | `Services/Core/Protocols.swift` | ✅ 已更新 |
+| Smart Auto Sync UI 开关 | P2 | `Views/Settings/SyncFrom/OCRSettingsView.swift` | ✅ 已添加 |
 | Chats 排序筛选菜单完善（可选） | P3 | `MainListView+FilterMenus.swift` | ⏳ 暂不实现 |
 
 ---
@@ -224,19 +225,20 @@ func triggerChatsNow()
 
 ## 4. 文件修改汇总
 
-### 需要修改的文件
+### 已修改的文件
 
-| 文件 | 修改内容 | 优先级 |
-|------|----------|--------|
-| `Views/Components/Main/MainListView.swift` | 添加 Chats case 到 SyncQueueTaskSelected 处理；清空 selectedChatsContactIds | P1 |
-| `Services/SyncScheduling/AutoSyncService.swift` | 添加 ChatsAutoSyncProvider；添加 triggerChatsNow() | P2 |
-| `Services/Core/Protocols.swift` | 在 AutoSyncServiceProtocol 中添加 triggerChatsNow() | P2 |
+| 文件 | 修改内容 | 优先级 | 状态 |
+|------|----------|--------|------|
+| `Views/Components/Main/MainListView.swift` | 添加 Chats case 到 SyncQueueTaskSelected 处理；清空 selectedChatsContactIds | P1 | ✅ |
+| `Services/SyncScheduling/AutoSyncService.swift` | 添加 ChatsAutoSyncProvider；添加 triggerChatsNow() | P2 | ✅ |
+| `Services/Core/Protocols.swift` | 在 AutoSyncServiceProtocol 中添加 triggerChatsNow() | P2 | ✅ |
+| `Views/Settings/SyncFrom/OCRSettingsView.swift` | 添加 Smart Auto Sync 开关 | P2 | ✅ |
 
-### 需要新建的文件
+### 已新建的文件
 
-| 文件 | 说明 | 优先级 |
-|------|------|--------|
-| `Services/SyncScheduling/ChatsAutoSyncProvider.swift` | Chats 自动同步 Provider | P2 |
+| 文件 | 说明 | 优先级 | 状态 |
+|------|------|--------|------|
+| `Services/SyncScheduling/ChatsAutoSyncProvider.swift` | Chats 自动同步 Provider | P2 | ✅ |
 
 ---
 

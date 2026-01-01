@@ -4,6 +4,7 @@ import AppKit
 /// OCR 设置视图
 struct OCRSettingsView: View {
     @AppStorage("datasource.chats.enabled") private var chatsSourceEnabled: Bool = false
+    @AppStorage("autoSync.chats") private var autoSyncEnabled: Bool = false
     @ObservedObject private var configStore = OCRConfigStore.shared
     @State private var showingLanguageSheet = false
     @State private var showingDebugSheet = false
@@ -21,6 +22,21 @@ struct OCRSettingsView: View {
                 .help("Show Chats in the main list")
             } header: {
                 Text("Data Source")
+                    .scaledFont(.headline)
+                    .foregroundStyle(.primary)
+            }
+            
+            // MARK: - Sync Settings
+            Section {
+                Toggle(isOn: $autoSyncEnabled) {
+                    Text("Smart Auto Sync")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Sync every 5 minutes")
+            } header: {
+                Text("Sync Settings")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
