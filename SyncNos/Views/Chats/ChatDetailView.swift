@@ -109,11 +109,9 @@ struct ChatDetailView: View {
                                 .scaleEffect(0.7)
                         }
                         
-                        // 同步按钮
+                        // 同步按钮 - 使用 batchSync 以确保任务入队到 SyncQueueStore
                         Button {
-                            Task {
-                                await listViewModel.syncConversation(contact)
-                            }
+                            listViewModel.batchSync(contactIds: Set([contact.id]))
                         } label: {
                             if listViewModel.syncingContactIds.contains(contact.id) {
                                 ProgressView()
