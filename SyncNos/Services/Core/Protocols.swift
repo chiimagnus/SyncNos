@@ -275,6 +275,7 @@ protocol AutoSyncServiceProtocol: AnyObject {
     func triggerGoodLinksNow()
     func triggerWeReadNow()
     func triggerDedaoNow()
+    func triggerChatsNow()
 }
 
 // MARK: - Sync Timestamp Store Protocol

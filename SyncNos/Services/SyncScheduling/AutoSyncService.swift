@@ -81,11 +81,13 @@ final class AutoSyncService: AutoSyncServiceProtocol {
             let goodLinks = GoodLinksAutoSyncProvider(logger: logger)
             let weRead = WeReadAutoSyncProvider(logger: logger)
             let dedao = DedaoAutoSyncProvider(logger: logger)
+            let chats = ChatsAutoSyncProvider(logger: logger)
             self.providers = [
                 .appleBooks: apple,
                 .goodLinks: goodLinks,
                 .weRead: weRead,
-                .dedao: dedao
+                .dedao: dedao,
+                .chats: chats
             ]
         }
     }
@@ -177,5 +179,9 @@ final class AutoSyncService: AutoSyncServiceProtocol {
 
     func triggerDedaoNow() {
         providers[.dedao]?.triggerManualSyncNow()
+    }
+
+    func triggerChatsNow() {
+        providers[.chats]?.triggerManualSyncNow()
     }
 }
