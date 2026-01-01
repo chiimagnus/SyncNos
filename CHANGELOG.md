@@ -1,3 +1,6 @@
+## v0.10.5
+**Key updates:** Chat logs are synchronized to the notion database with support for automatic and manual synchronization.
+
 ## v0.10.4
 **Key updates:** Fix the focus manager issue, again and finally.😢
 
