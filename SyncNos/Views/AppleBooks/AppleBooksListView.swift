@@ -79,7 +79,7 @@ struct AppleBooksListView: View {
                             Spacer()
                             // Sync status icon
                             if viewModel.syncingBookIds.contains(book.bookId) {
-                                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90.circle.fill")
+                                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                                     .foregroundColor(.yellow)
                                     .help("Syncing...")
                             } else if viewModel.syncedBookIds.contains(book.bookId) {
@@ -106,7 +106,7 @@ struct AppleBooksListView: View {
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90.circle")
+                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
                             // 显示上次同步时间（针对当前右键的行）
