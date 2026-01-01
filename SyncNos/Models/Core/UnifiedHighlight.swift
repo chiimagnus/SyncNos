@@ -94,6 +94,38 @@ struct UnifiedHighlight: Identifiable, Equatable {
         self.source = .dedao
     }
     
+    /// 从 ChatMessage 转换（微信聊天消息）
+    /// - Parameters:
+    ///   - message: 聊天消息
+    ///   - contactName: 对话联系人名称（用于填充发送者信息）
+    /// 
+    /// **设计说明**：为实现 "Sender Name 作为主块，消息内容作为子块" 的格式，
+    /// 将 sender name 存储在 `text` 字段（通用逻辑将其作为父块），
+    /// 将消息内容存储在 `note` 字段（通用逻辑将其作为子块）。
+    /// 这样无需修改 NotionHelperMethods，通用逻辑自动产生正确格式。
+    init(from message: ChatMessage, contactName: String) {
+        self.uuid = message.id.uuidString
+        
+        // text 存储 sender name（将作为 Notion 中的父块）
+        if let senderName = message.senderName, !senderName.isEmpty {
+            self.text = senderName
+        } else if message.isFromMe {
+            self.text = "Me"
+        } else {
+            self.text = contactName
+        }
+        
+        // note 存储消息内容（将作为 Notion 中的子块）
+        self.note = message.content
+        
+        // Chats 不需要颜色索引、时间戳等字段
+        self.colorIndex = nil
+        self.dateAdded = nil
+        self.dateModified = nil
+        self.location = nil
+        self.source = .chats
+    }
+    
     /// 通用初始化器
     init(
         uuid: String,
@@ -197,6 +229,16 @@ struct UnifiedSyncItem: Identifiable, Equatable {
         self.url = nil
         self.source = .dedao
         self.highlightCount = book.highlightCount
+    }
+    
+    /// 从 ChatBookListItem 转换（微信聊天对话）
+    init(from chat: ChatBookListItem) {
+        self.itemId = chat.id
+        self.title = chat.name
+        self.author = ""  // 聊天对话没有作者概念
+        self.url = nil
+        self.source = .chats
+        self.highlightCount = chat.messageCount
     }
     
     /// 通用初始化器
