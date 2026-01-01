@@ -220,6 +220,7 @@ struct MainListView: View {
                 selectedLinkIds.removeAll()
                 selectedWeReadBookIds.removeAll()
                 selectedDedaoBookIds.removeAll()
+                selectedChatsContactIds.removeAll()
                 keyboardNavigationTarget = .list
                 currentDetailScrollView = nil
             }
@@ -230,25 +231,36 @@ struct MainListView: View {
                     selectedLinkIds.removeAll()
                     selectedWeReadBookIds.removeAll()
                     selectedDedaoBookIds.removeAll()
+                    selectedChatsContactIds.removeAll()
                     selectedBookIds = Set([id])
                 } else if source == ContentSource.goodLinks.rawValue {
                     contentSourceRawValue = ContentSource.goodLinks.rawValue
                     selectedBookIds.removeAll()
                     selectedWeReadBookIds.removeAll()
                     selectedDedaoBookIds.removeAll()
+                    selectedChatsContactIds.removeAll()
                     selectedLinkIds = Set([id])
                 } else if source == ContentSource.weRead.rawValue {
                     contentSourceRawValue = ContentSource.weRead.rawValue
                     selectedBookIds.removeAll()
                     selectedLinkIds.removeAll()
                     selectedDedaoBookIds.removeAll()
+                    selectedChatsContactIds.removeAll()
                     selectedWeReadBookIds = Set([id])
                 } else if source == ContentSource.dedao.rawValue {
                     contentSourceRawValue = ContentSource.dedao.rawValue
                     selectedBookIds.removeAll()
                     selectedLinkIds.removeAll()
                     selectedWeReadBookIds.removeAll()
+                    selectedChatsContactIds.removeAll()
                     selectedDedaoBookIds = Set([id])
+                } else if source == ContentSource.chats.rawValue {
+                    contentSourceRawValue = ContentSource.chats.rawValue
+                    selectedBookIds.removeAll()
+                    selectedLinkIds.removeAll()
+                    selectedWeReadBookIds.removeAll()
+                    selectedDedaoBookIds.removeAll()
+                    selectedChatsContactIds = Set([id])
                 }
             }
             .background {
