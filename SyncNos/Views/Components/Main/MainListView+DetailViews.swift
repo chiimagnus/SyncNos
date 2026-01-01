@@ -137,13 +137,12 @@ extension MainListView {
                 }
             )
         } else {
-            // Chats does not have sync functionality yet, pass nil for onSyncSelected
             SelectionPlaceholderView(
                 source: contentSource,
                 count: selectedChatsContactIds.isEmpty ? nil : selectedChatsContactIds.count,
                 filteredCount: chatsVM.contacts.count,
                 totalCount: chatsVM.contacts.count,
-                onSyncSelected: nil
+                onSyncSelected: selectedChatsContactIds.isEmpty ? nil : { syncSelectedChats() }
             )
         }
     }
@@ -168,6 +167,11 @@ extension MainListView {
     /// 同步选中的 Dedao
     func syncSelectedDedao() {
         dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+    }
+    
+    /// 同步选中的 Chats
+    func syncSelectedChats() {
+        chatsVM.batchSync(contactIds: selectedChatsContactIds, concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
 
