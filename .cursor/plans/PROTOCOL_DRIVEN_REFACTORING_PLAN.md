@@ -63,6 +63,12 @@
 
 **已创建**: `Models/Core/NotificationNames.swift`
 
+**完成内容**:
+- 定义了 42+ 个统一的通知名称常量
+- 更新了 40+ 个文件，替换所有硬编码的 `Notification.Name("...")`
+- 删除了 `Views/Chats/ChatNotifications.swift`（已合并到 NotificationNames.swift）
+- 更新了相关文档（键盘导航技术文档、添加新数据源完整指南）
+
 ---
 
 ### P2: 统一 ContentSource 和 SyncSource ⏱️ 约 30 分钟
