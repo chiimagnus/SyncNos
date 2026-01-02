@@ -417,7 +417,7 @@ struct SyncQueueView: View {
     
     private func selectTask(_ task: SyncQueueTask) {
         NotificationCenter.default.post(
-            name: Notification.Name("SyncQueueTaskSelected"),
+            name: .syncQueueTaskSelected,
             object: nil,
             userInfo: ["source": task.source.rawValue, "id": task.rawId]
         )

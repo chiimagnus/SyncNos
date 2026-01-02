@@ -151,10 +151,10 @@ extension Notification.Name {
     // MARK: - Chats 通知
     
     /// 导航到聊天消息
-    static let chatNavigateMessage = Notification.Name("ChatNavigateMessage")
+    static let chatsNavigateMessage = Notification.Name("ChatsNavigateMessage")
     
     /// 循环切换消息分类
-    static let chatCycleClassification = Notification.Name("ChatCycleClassification")
+    static let chatsCycleClassification = Notification.Name("ChatsCycleClassification")
 }
 
 // MARK: - ContentSource 通知扩展

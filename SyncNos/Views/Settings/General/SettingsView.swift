@@ -242,23 +242,23 @@ struct SettingsView: View {
             // 视图出现时刷新状态，监听系统设置中的变化
             loginItemVM.refreshStatus()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNotionSettings"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToNotionSettings)) { _ in
             navigationPath.append("notion")
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToWeReadLogin"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadLogin)) { _ in
             // 先导航到 WeReadSettingsView，然后它会自动打开登录 Sheet
             navigationPath.append("weread")
             // 延迟发送通知，等待 WeReadSettingsView 加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NotificationCenter.default.post(name: Notification.Name("WeReadSettingsShowLoginSheet"), object: nil)
+                NotificationCenter.default.post(name: .weReadSettingsShowLoginSheet, object: nil)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoLogin"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin)) { _ in
             // 先导航到 DedaoSettingsView，然后它会自动打开登录 Sheet
             navigationPath.append("dedao")
             // 延迟发送通知，等待 DedaoSettingsView 加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NotificationCenter.default.post(name: Notification.Name("DedaoSettingsShowLoginSheet"), object: nil)
+                NotificationCenter.default.post(name: .dedaoSettingsShowLoginSheet, object: nil)
             }
         }
         // 应用字体缩放到整个视图层级

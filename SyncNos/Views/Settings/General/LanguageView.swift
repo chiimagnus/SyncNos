@@ -71,7 +71,7 @@ struct LanguageView: View {
             let response = alert.runModal()
             guard response == .alertSecondButtonReturn else { return }
             // 避免接下来 NSApp.terminate(nil) 再次弹窗
-            NotificationCenter.default.post(name: Notification.Name("BypassQuitConfirmationOnce"), object: nil)
+            NotificationCenter.default.post(name: .bypassQuitConfirmationOnce, object: nil)
         }
 
         // 使用 open -n 启动新实例
