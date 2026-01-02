@@ -30,7 +30,7 @@ final class IAPViewModel: ObservableObject {
         self.iap = iap
 
         NotificationCenter.default
-            .publisher(for: IAPService.statusChangedNotification)
+            .publisher(for: .iapServiceStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task { @MainActor in
