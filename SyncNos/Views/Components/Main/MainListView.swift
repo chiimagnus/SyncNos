@@ -18,11 +18,8 @@ struct MainListView: View {
     
     // MARK: - Selection State (internal for extensions)
     
-    @State var selectedBookIds: Set<String> = []
-    @State var selectedLinkIds: Set<String> = []
-    @State var selectedWeReadBookIds: Set<String> = []
-    @State var selectedDedaoBookIds: Set<String> = []
-    @State var selectedChatsContactIds: Set<String> = []
+    /// 统一选择状态管理器（替代 5 个独立的 @State 变量）
+    @State var selectionState = SelectionState()
     
     // MARK: - Chats State (internal for extensions)
     
@@ -216,11 +213,7 @@ struct MainListView: View {
             }
             .onChange(of: contentSourceRawValue) { _, _ in
                 // 切换数据源时重置选择和焦点状态
-                selectedBookIds.removeAll()
-                selectedLinkIds.removeAll()
-                selectedWeReadBookIds.removeAll()
-                selectedDedaoBookIds.removeAll()
-                selectedChatsContactIds.removeAll()
+                selectionState.clearAll()
                 keyboardNavigationTarget = .list
                 currentDetailScrollView = nil
             }
@@ -257,7 +250,7 @@ struct MainListView: View {
                     let contactId = chatsVM.createConversation(
                         name: newConversationName.trimmingCharacters(in: .whitespaces)
                     )
-                    selectedChatsContactIds = [contactId.uuidString]
+                    selectionState.setSelection(for: .chats, ids: [contactId.uuidString])
                     newConversationName = ""
                 }
                 Button("Cancel", role: .cancel) {
@@ -355,11 +348,7 @@ struct MainListView: View {
             weReadVM: weReadVM,
             dedaoVM: dedaoVM,
             chatsVM: chatsVM,
-            selectedBookIds: $selectedBookIds,
-            selectedLinkIds: $selectedLinkIds,
-            selectedWeReadBookIds: $selectedWeReadBookIds,
-            selectedDedaoBookIds: $selectedDedaoBookIds,
-            selectedChatsContactIds: $selectedChatsContactIds,
+            selectionState: selectionState,
             filterMenu: { dataSourceToolbarMenu }
         )
         .navigationSplitViewColumnWidth(min: 220, ideal: 320, max: 400)
