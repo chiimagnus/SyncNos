@@ -49,9 +49,9 @@ final class IAPService: IAPServiceProtocol {
     private let trialDays = 30
     private var updatesTask: Task<Void, Never>?
 
-    static let statusChangedNotification = Notification.Name("IAPServiceStatusChanged")
-    static let showWelcomeNotification = Notification.Name("IAPServiceShowWelcome")
-    static let showTrialReminderNotification = Notification.Name("IAPServiceShowTrialReminder")
+    static let statusChangedNotification: Notification.Name = .iapServiceStatusChanged
+    static let showWelcomeNotification: Notification.Name = .iapServiceShowWelcome
+    static let showTrialReminderNotification: Notification.Name = .iapServiceShowTrialReminder
 
     var isProUnlocked: Bool {
         // Pro unlocked if either purchased or in trial period

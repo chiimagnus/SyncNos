@@ -6,7 +6,7 @@ import SwiftUI
 
     override init() {
         super.init()
-        bypassObserver = NotificationCenter.default.addObserver(forName: Notification.Name("BypassQuitConfirmationOnce"), object: nil, queue: .main) { _ in
+        bypassObserver = NotificationCenter.default.addObserver(forName: .bypassQuitConfirmationOnce, object: nil, queue: .main) { _ in
             Self.bypassNextTerminationOnce = true
         }
     }

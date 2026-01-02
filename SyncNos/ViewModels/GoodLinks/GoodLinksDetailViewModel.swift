@@ -31,10 +31,10 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Notification Names
     
     private enum Notifications {
-        static let highlightSortChanged = Notification.Name("HighlightSortChanged")
-        static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
-        static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-        static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
+        static let highlightSortChanged: Notification.Name = .highlightSortChanged
+        static let highlightFilterChanged: Notification.Name = .highlightFilterChanged
+        static let syncBookStatusChanged: Notification.Name = .syncBookStatusChanged
+        static let syncProgressUpdated: Notification.Name = .syncProgressUpdated
     }
     
     // MARK: - UserDefaults Keys

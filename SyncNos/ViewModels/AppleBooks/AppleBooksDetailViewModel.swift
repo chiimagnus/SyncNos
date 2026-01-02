@@ -3,9 +3,9 @@ import Combine
 
 // Centralized notification names to avoid typos and improve maintainability
 private enum ABNotifications {
-    static let highlightSortChanged = Notification.Name("HighlightSortChanged")
-    static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
-    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+    static let highlightSortChanged: Notification.Name = .highlightSortChanged
+    static let highlightFilterChanged: Notification.Name = .highlightFilterChanged
+    static let syncBookStatusChanged: Notification.Name = .syncBookStatusChanged
 }
 
 @MainActor
