@@ -55,7 +55,7 @@ struct MainListView: View {
     
     // MARK: - App Storage
     
-    @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
+    @AppStorage("contentSource") var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     @AppStorage("datasource.appleBooks.enabled") private var appleBooksSourceEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") private var goodLinksSourceEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") private var weReadSourceEnabled: Bool = false
@@ -225,43 +225,12 @@ struct MainListView: View {
                 currentDetailScrollView = nil
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
-                guard let info = n.userInfo as? [String: Any], let source = info["source"] as? String, let id = info["id"] as? String else { return }
-                if source == ContentSource.appleBooks.rawValue {
-                    contentSourceRawValue = ContentSource.appleBooks.rawValue
-                    selectedLinkIds.removeAll()
-                    selectedWeReadBookIds.removeAll()
-                    selectedDedaoBookIds.removeAll()
-                    selectedChatsContactIds.removeAll()
-                    selectedBookIds = Set([id])
-                } else if source == ContentSource.goodLinks.rawValue {
-                    contentSourceRawValue = ContentSource.goodLinks.rawValue
-                    selectedBookIds.removeAll()
-                    selectedWeReadBookIds.removeAll()
-                    selectedDedaoBookIds.removeAll()
-                    selectedChatsContactIds.removeAll()
-                    selectedLinkIds = Set([id])
-                } else if source == ContentSource.weRead.rawValue {
-                    contentSourceRawValue = ContentSource.weRead.rawValue
-                    selectedBookIds.removeAll()
-                    selectedLinkIds.removeAll()
-                    selectedDedaoBookIds.removeAll()
-                    selectedChatsContactIds.removeAll()
-                    selectedWeReadBookIds = Set([id])
-                } else if source == ContentSource.dedao.rawValue {
-                    contentSourceRawValue = ContentSource.dedao.rawValue
-                    selectedBookIds.removeAll()
-                    selectedLinkIds.removeAll()
-                    selectedWeReadBookIds.removeAll()
-                    selectedChatsContactIds.removeAll()
-                    selectedDedaoBookIds = Set([id])
-                } else if source == ContentSource.chats.rawValue {
-                    contentSourceRawValue = ContentSource.chats.rawValue
-                    selectedBookIds.removeAll()
-                    selectedLinkIds.removeAll()
-                    selectedWeReadBookIds.removeAll()
-                    selectedDedaoBookIds.removeAll()
-                    selectedChatsContactIds = Set([id])
-                }
+                guard let info = n.userInfo as? [String: Any],
+                      let sourceRaw = info["source"] as? String,
+                      let id = info["id"] as? String,
+                      let source = ContentSource(rawValue: sourceRaw) else { return }
+                
+                handleSyncQueueTaskSelection(source: source, id: id)
             }
             .background {
                 LinearGradient(
