@@ -1,12 +1,6 @@
 import Foundation
 import Combine
 
-// Centralized notification names to avoid typos and improve maintainability
-private enum ABNotifications {
-    static let highlightSortChanged: Notification.Name = .highlightSortChanged
-    static let highlightFilterChanged: Notification.Name = .highlightFilterChanged
-    static let syncBookStatusChanged: Notification.Name = .syncBookStatusChanged
-}
 
 @MainActor
 final class AppleBooksDetailViewModel: ObservableObject {
@@ -73,7 +67,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
         }
 
         // Subscribe to global highlight sort changes from AppCommands
-        NotificationCenter.default.publisher(for: ABNotifications.highlightSortChanged)
+        NotificationCenter.default.publisher(for: .highlightSortChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -88,7 +82,7 @@ final class AppleBooksDetailViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Subscribe to global highlight filter changes from AppCommands
-        NotificationCenter.default.publisher(for: ABNotifications.highlightFilterChanged)
+        NotificationCenter.default.publisher(for: .highlightFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
