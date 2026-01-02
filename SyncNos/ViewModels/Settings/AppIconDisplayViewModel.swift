@@ -41,7 +41,7 @@ final class AppIconDisplayViewModel: ObservableObject {
         
         // 发送通知，让 MenuBarExtra 根据需要显示/隐藏
         NotificationCenter.default.post(
-            name: Notification.Name("AppIconDisplayModeChanged"),
+            name: .appIconDisplayModeChanged,
             object: mode
         )
     }
