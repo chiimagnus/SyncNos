@@ -47,7 +47,7 @@ struct RootView: View {
                 checkTrialStatus()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: IAPService.statusChangedNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .iapServiceStatusChanged)) { _ in
             if hasCompletedOnboarding {
                 let logger = DIContainer.shared.loggerService
                 logger.debug("IAP status changed notification received, rechecking trial status")
