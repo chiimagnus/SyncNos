@@ -145,7 +145,7 @@ struct AppleBooksListView: View {
             }
         }
         // 只监听 AppleBooksContainerSelected（用户选择数据库路径时）
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected")).receive(on: DispatchQueue.main)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .appleBooksContainerSelected).receive(on: DispatchQueue.main)) { notification in
             guard let selectedPath = notification.object as? String else { return }
             let rootCandidate = viewModel.determineDatabaseRoot(from: selectedPath)
             viewModel.setDbRootOverride(rootCandidate)

@@ -417,7 +417,7 @@ extension AppleBooksViewModel {
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            NotificationCenter.default.post(name: .showNotionConfigAlert, object: nil)
             return
         }
         guard let dbPath = self.annotationDatabasePath else {

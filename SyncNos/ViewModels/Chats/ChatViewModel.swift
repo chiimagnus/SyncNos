@@ -768,7 +768,7 @@ final class ChatViewModel: ObservableObject {
     func batchSync(contactIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !contactIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            NotificationCenter.default.post(name: .showNotionConfigAlert, object: nil)
             return
         }
         
@@ -808,7 +808,7 @@ final class ChatViewModel: ObservableObject {
                             // 发送开始通知
                             await MainActor.run {
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncBookStatusChanged"),
+                                    name: .syncBookStatusChanged,
                                     object: self,
                                     userInfo: ["bookId": id, "status": "started"]
                                 )
@@ -819,7 +819,7 @@ final class ChatViewModel: ObservableObject {
                                     Task { @MainActor in
                                         self.syncProgress[id] = progressText
                                         NotificationCenter.default.post(
-                                            name: Notification.Name("SyncProgressUpdated"),
+                                            name: .syncProgressUpdated,
                                             object: self,
                                             userInfo: ["bookId": id, "progress": progressText]
                                         )
@@ -829,7 +829,7 @@ final class ChatViewModel: ObservableObject {
                                     _ = self.syncingContactIds.remove(id)
                                     self.syncProgress.removeValue(forKey: id)
                                     NotificationCenter.default.post(
-                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        name: .syncBookStatusChanged,
                                         object: self,
                                         userInfo: ["bookId": id, "status": "succeeded"]
                                     )
@@ -841,7 +841,7 @@ final class ChatViewModel: ObservableObject {
                                     _ = self.syncingContactIds.remove(id)
                                     self.syncProgress.removeValue(forKey: id)
                                     NotificationCenter.default.post(
-                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        name: .syncBookStatusChanged,
                                         object: self,
                                         userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                                     )

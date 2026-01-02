@@ -121,10 +121,10 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         logger.info("[SmartSync] AutoSyncService starting…")
 
         // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books、GoodLinks、WeRead）
-        notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("WeReadLoginSucceeded")))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
+        notificationCancellable = NotificationCenter.default.publisher(for: .appleBooksContainerSelected)
+            .merge(with: NotificationCenter.default.publisher(for: .goodLinksFolderSelected))
+            .merge(with: NotificationCenter.default.publisher(for: .weReadLoginSucceeded))
+            .merge(with: NotificationCenter.default.publisher(for: .refreshBooksRequested))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.triggerSyncNow()
