@@ -493,15 +493,20 @@ struct AppleBooksListView: View {
 ### 10. Chats 特有的通知
 
 ```swift
-// Views/Chats/ChatNotifications.swift
+// Models/Core/NotificationNames.swift（统一定义）
 
 extension Notification.Name {
-    static let chatsNavigateMessage = Notification.Name("ChatNavigateMessage")
-    static let chatsCycleClassification = Notification.Name("ChatCycleClassification")
+    /// 导航到聊天消息
+    static let chatsNavigateMessage = Notification.Name("ChatsNavigateMessage")
+    
+    /// 循环切换消息分类
+    static let chatsCycleClassification = Notification.Name("ChatsCycleClassification")
 }
 ```
 
 这些通知由 `MainListView+KeyboardMonitor.swift` 发送，由 `ChatDetailView.swift` 接收处理。
+
+> **注意**：所有通知名称现已统一定义在 `Models/Core/NotificationNames.swift` 中，不再在各自文件中重复定义。
 
 ## 快捷键映射
 
