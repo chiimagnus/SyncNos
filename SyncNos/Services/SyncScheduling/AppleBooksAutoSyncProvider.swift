@@ -3,7 +3,7 @@ import Foundation
 /// Apple Books 自动同步提供者，实现基于数据库的智能增量同步逻辑
 /// 通过比较「高亮修改时间」与「上次同步时间」判断是否需要同步
 final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .appleBooks
+    let id: ContentSource = .appleBooks
     let autoSyncUserDefaultsKey: String = "autoSync.appleBooks"
 
     private let logger: LoggerServiceProtocol
