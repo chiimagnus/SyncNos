@@ -25,7 +25,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         // 注意：入队现在通过 enqueue() 方法直接调用，不再监听 SyncTasksEnqueued 通知
 
         // 运行状态事件（started/succeeded/failed）
-        notificationCenter.publisher(for: Notification.Name("SyncBookStatusChanged"))
+        notificationCenter.publisher(for: .syncBookStatusChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .sink { [weak self] info in
                 guard let self else { return }
@@ -34,7 +34,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             .store(in: &cancellables)
 
         // 进度更新事件
-        notificationCenter.publisher(for: Notification.Name("SyncProgressUpdated"))
+        notificationCenter.publisher(for: .syncProgressUpdated)
             .compactMap { $0.userInfo as? [String: Any] }
             .sink { [weak self] info in
                 guard let self else { return }
@@ -152,7 +152,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             publish()
             // 发送取消通知，以便 SyncActivityMonitor 等组件感知
             notificationCenter.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": rawId, "status": "cancelled"]
             )
@@ -191,7 +191,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             // 批量发送取消通知
             for rawId in cancelledRawIds {
                 notificationCenter.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
+                    name: .syncBookStatusChanged,
                     object: nil,
                     userInfo: ["bookId": rawId, "status": "cancelled"]
                 )

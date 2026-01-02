@@ -44,7 +44,7 @@ struct MenuBarView: View {
     }
     
     private func quitApplication() {
-        NotificationCenter.default.post(name: Notification.Name("BypassQuitConfirmationOnce"), object: nil)
+        NotificationCenter.default.post(name: .bypassQuitConfirmationOnce, object: nil)
         NSApp.terminate(nil)
     }
 }

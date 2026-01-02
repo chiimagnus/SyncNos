@@ -127,11 +127,11 @@ struct DedaoListView: View {
             }
         }
         // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoSettings")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoSettings).receive(on: DispatchQueue.main)) { _ in
             // 打开设置窗口
             openWindow(id: "setting")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NotificationCenter.default.post(name: Notification.Name("NavigateToDedaoLogin"), object: nil)
+                NotificationCenter.default.post(name: .navigateToDedaoLogin, object: nil)
             }
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {
