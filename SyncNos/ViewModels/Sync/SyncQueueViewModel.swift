@@ -104,7 +104,7 @@ final class SyncQueueViewModel: ObservableObject {
     }
     
     /// 取消指定来源的所有等待任务
-    func cancelAllQueued(source: SyncSource) {
+    func cancelAllQueued(source: ContentSource) {
         store.cancelAllQueued(source: source)
     }
     

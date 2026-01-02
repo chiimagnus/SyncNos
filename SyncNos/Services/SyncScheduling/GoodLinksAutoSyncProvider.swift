@@ -3,7 +3,7 @@ import Foundation
 /// GoodLinks 自动同步提供者，实现基于本地数据库的智能增量同步逻辑
 /// 通过比较「文章修改时间」与「上次同步时间」判断是否需要同步
 final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .goodLinks
+    let id: ContentSource = .goodLinks
     let autoSyncUserDefaultsKey: String = "autoSync.goodLinks"
 
     private let logger: LoggerServiceProtocol

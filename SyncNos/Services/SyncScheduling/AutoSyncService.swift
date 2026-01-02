@@ -52,7 +52,7 @@ final class DatabasePathHelper {
 final class AutoSyncService: AutoSyncServiceProtocol {
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
-    private let providers: [SyncSource: AutoSyncSourceProvider]
+    private let providers: [ContentSource: AutoSyncSourceProvider]
 
     private var timerCancellable: AnyCancellable?
     private var notificationCancellable: AnyCancellable?
@@ -67,7 +67,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        providers: [SyncSource: AutoSyncSourceProvider]? = nil,
+        providers: [ContentSource: AutoSyncSourceProvider]? = nil,
         intervalSeconds: TimeInterval = 5 * 60  // 5分钟
     ) {
         self.logger = logger
