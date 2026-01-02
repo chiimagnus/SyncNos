@@ -114,7 +114,7 @@ final class WeReadViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // 订阅来自 ViewCommands 的 WeRead 排序/筛选通知
-        NotificationCenter.default.publisher(for: Notification.Name("WeReadFilterChanged"))
+        NotificationCenter.default.publisher(for: .weReadFilterChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
@@ -134,7 +134,7 @@ final class WeReadViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // 订阅登录状态变化通知（退出登录时触发 UI 更新）
-        NotificationCenter.default.publisher(for: Notification.Name("WeReadLoginStatusChanged"))
+        NotificationCenter.default.publisher(for: .weReadLoginStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
@@ -215,7 +215,7 @@ final class WeReadViewModel: ObservableObject {
                    case .sessionExpiredWithRefreshFailure(let reason) = apiError {
                     // 发送会话过期通知到 MainListView
                     NotificationCenter.default.post(
-                        name: Notification.Name("ShowSessionExpiredAlert"),
+                        name: .showSessionExpiredAlert,
                         object: nil,
                         userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
                     )
@@ -268,7 +268,7 @@ final class WeReadViewModel: ObservableObject {
             if case .sessionExpiredWithRefreshFailure(let reason) = error {
                 // Cookie 刷新失败，发送会话过期通知到 MainListView
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowSessionExpiredAlert"),
+                    name: .showSessionExpiredAlert,
                     object: nil,
                     userInfo: ["source": ContentSource.weRead.rawValue, "reason": reason]
                 )
@@ -351,7 +351,7 @@ final class WeReadViewModel: ObservableObject {
     func batchSync(bookIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !bookIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            NotificationCenter.default.post(name: .showNotionConfigAlert, object: nil)
             return
         }
         
@@ -389,7 +389,7 @@ final class WeReadViewModel: ObservableObject {
                             // 发送开始通知（syncingBookIds 已在外部同步设置）
                             await MainActor.run {
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncBookStatusChanged"),
+                                    name: .syncBookStatusChanged,
                                     object: self,
                                     userInfo: ["bookId": id, "status": "started"]
                                 )
@@ -399,7 +399,7 @@ final class WeReadViewModel: ObservableObject {
                                 try await syncEngine.syncSmart(source: adapter) { progressText in
                                     Task { @MainActor in
                                         NotificationCenter.default.post(
-                                            name: Notification.Name("SyncProgressUpdated"),
+                                            name: .syncProgressUpdated,
                                             object: self,
                                             userInfo: ["bookId": id, "progress": progressText]
                                         )
@@ -409,7 +409,7 @@ final class WeReadViewModel: ObservableObject {
                                     _ = self.syncingBookIds.remove(id)
                                     _ = self.syncedBookIds.insert(id)
                                     NotificationCenter.default.post(
-                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        name: .syncBookStatusChanged,
                                         object: self,
                                         userInfo: ["bookId": id, "status": "succeeded"]
                                     )
@@ -420,7 +420,7 @@ final class WeReadViewModel: ObservableObject {
                                     self.logger.error("[WeRead] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
-                                        name: Notification.Name("SyncBookStatusChanged"),
+                                        name: .syncBookStatusChanged,
                                         object: self,
                                         userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                                     )
@@ -437,7 +437,7 @@ final class WeReadViewModel: ObservableObject {
     // MARK: - Sync status subscription
 
     private func subscribeSyncStatusNotifications() {
-        NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged"))
+        NotificationCenter.default.publisher(for: .syncBookStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
