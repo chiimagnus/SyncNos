@@ -145,7 +145,7 @@ struct GoodLinksListView: View {
                 isListFocused = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .goodLinksFolderSelected).receive(on: DispatchQueue.main)) { _ in
             Task {
                 await viewModel.loadRecentLinks()
             }

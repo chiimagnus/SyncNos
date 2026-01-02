@@ -98,8 +98,8 @@ struct DedaoDetailView: View {
             .onDisappear {
                 cleanupOnDisappear()
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
+            .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
+            .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
             .alert("Sync Error", isPresented: $showingSyncError) {
                 Button("OK", role: .cancel) { }
             } message: {

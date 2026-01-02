@@ -10,7 +10,7 @@ final class SyncActivityMonitor: SyncActivityMonitorProtocol {
 
     init(notificationCenter: NotificationCenter = .default) {
         // 监听统一状态事件（ViewModels/AutoSyncService 均会发送）
-        notificationCenter.publisher(for: Notification.Name("SyncBookStatusChanged"))
+        notificationCenter.publisher(for: .syncBookStatusChanged)
             .sink { [weak self] note in
                 guard let self else { return }
                 guard let info = note.userInfo as? [String: Any],
@@ -28,12 +28,12 @@ final class SyncActivityMonitor: SyncActivityMonitorProtocol {
             .store(in: &cancellables)
 
         // 兼容 AutoSyncService 的开始/结束事件
-        notificationCenter.publisher(for: Notification.Name("SyncBookStarted"))
+        notificationCenter.publisher(for: .syncBookStarted)
             .compactMap { $0.object as? String }
             .sink { [weak self] id in self?.addActive(id: id) }
             .store(in: &cancellables)
 
-        notificationCenter.publisher(for: Notification.Name("SyncBookFinished"))
+        notificationCenter.publisher(for: .syncBookFinished)
             .compactMap { $0.object as? String }
             .sink { [weak self] id in self?.removeActive(id: id) }
             .store(in: &cancellables)

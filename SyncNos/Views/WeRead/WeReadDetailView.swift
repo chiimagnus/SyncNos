@@ -246,7 +246,7 @@ struct WeReadDetailView: View {
             layoutWidthDebounceTask = nil
         }
         // 监听批量同步进度更新
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
+        .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
             if bookId == (selectedBookId ?? "") {
                 externalIsSyncing = true
@@ -254,7 +254,7 @@ struct WeReadDetailView: View {
             }
         }
         // 监听同步状态变化
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
+        .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
             if bookId == (selectedBookId ?? "") {
                 switch status {

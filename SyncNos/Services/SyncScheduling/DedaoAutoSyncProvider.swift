@@ -111,7 +111,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
             // 情况 3：书籍无变更 → 跳过
             logger.debug("[SmartSync] Dedao: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": book.bookId, "status": "skipped"]
             )
@@ -157,11 +157,11 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
                     await limiter.withPermit {
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStarted"),
+                            name: .syncBookStarted,
                             object: book.bookId
                         )
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
+                            name: .syncBookStatusChanged,
                             object: nil,
                             userInfo: ["bookId": book.bookId, "status": "started"]
                         )
@@ -173,13 +173,13 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                             )
                             try await syncEngine.syncSmart(source: adapter) { progressMessage in
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncProgressUpdated"),
+                                    name: .syncProgressUpdated,
                                     object: nil,
                                     userInfo: ["bookId": book.bookId, "progress": progressMessage]
                                 )
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
@@ -188,13 +188,13 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                             logger.error("[SmartSync] Dedao: \(bookLabel) - failed: \(error.localizedDescription)")
                             let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookFinished"),
+                            name: .syncBookFinished,
                             object: book.bookId
                         )
                     }

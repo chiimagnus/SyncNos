@@ -340,7 +340,7 @@ extension GoodLinksViewModel {
     func batchSync(linkIds: Set<String>, concurrency: Int = NotionSyncConfig.batchConcurrency) {
         guard !linkIds.isEmpty else { return }
         guard checkNotionConfig() else {
-            NotificationCenter.default.post(name: Notification.Name("ShowNotionConfigAlert"), object: nil)
+            NotificationCenter.default.post(name: .showNotionConfigAlert, object: nil)
             return
         }
         
