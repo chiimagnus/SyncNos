@@ -27,7 +27,7 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: .appleBooks)
         if selectedIds.count == 1 {
             let singleBookBinding = Binding<String?>(
-                get: { selectedIds.first },
+                get: { [selectionState] in selectionState.singleSelectedId(for: .appleBooks) },
                 set: { [selectionState] new in
                     selectionState.setSelection(for: .appleBooks, ids: new.map { Set([$0]) } ?? [])
                 }
@@ -55,7 +55,7 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: .goodLinks)
         if selectedIds.count == 1 {
             let singleLinkBinding = Binding<String?>(
-                get: { selectedIds.first },
+                get: { [selectionState] in selectionState.singleSelectedId(for: .goodLinks) },
                 set: { [selectionState] new in
                     selectionState.setSelection(for: .goodLinks, ids: new.map { Set([$0]) } ?? [])
                 }
@@ -83,7 +83,7 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: .weRead)
         if selectedIds.count == 1 {
             let singleWeReadBinding = Binding<String?>(
-                get: { selectedIds.first },
+                get: { [selectionState] in selectionState.singleSelectedId(for: .weRead) },
                 set: { [selectionState] new in
                     selectionState.setSelection(for: .weRead, ids: new.map { Set([$0]) } ?? [])
                 }
@@ -111,7 +111,7 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: .dedao)
         if selectedIds.count == 1 {
             let singleDedaoBookBinding = Binding<String?>(
-                get: { selectedIds.first },
+                get: { [selectionState] in selectionState.singleSelectedId(for: .dedao) },
                 set: { [selectionState] new in
                     selectionState.setSelection(for: .dedao, ids: new.map { Set([$0]) } ?? [])
                 }
@@ -139,7 +139,7 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: .chats)
         if selectedIds.count == 1 {
             let singleContactBinding = Binding<String?>(
-                get: { selectedIds.first },
+                get: { [selectionState] in selectionState.singleSelectedId(for: .chats) },
                 set: { [selectionState] new in
                     selectionState.setSelection(for: .chats, ids: new.map { Set([$0]) } ?? [])
                 }
