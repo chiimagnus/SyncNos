@@ -224,7 +224,7 @@ struct MainListView: View {
                 keyboardNavigationTarget = .list
                 currentDetailScrollView = nil
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncQueueTaskSelected")).receive(on: DispatchQueue.main)) { n in
+            .onReceive(NotificationCenter.default.publisher(for: .syncQueueTaskSelected).receive(on: DispatchQueue.main)) { n in
                 guard let info = n.userInfo as? [String: Any],
                       let sourceRaw = info["source"] as? String,
                       let id = info["id"] as? String,
@@ -270,7 +270,7 @@ struct MainListView: View {
                 Button("Go to Settings") {
                     openWindow(id: "setting")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        NotificationCenter.default.post(name: Notification.Name("NavigateToNotionSettings"), object: nil)
+                        NotificationCenter.default.post(name: .navigateToNotionSettings, object: nil)
                     }
                 }
                 Button("Cancel", role: .cancel) { }
@@ -293,11 +293,11 @@ struct MainListView: View {
             }
             // MARK: - Centralized Notification Listeners
             // 监听 Notion 配置弹窗通知
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNotionConfigAlert")).receive(on: DispatchQueue.main)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .showNotionConfigAlert).receive(on: DispatchQueue.main)) { _ in
                 showNotionConfigAlert = true
             }
             // 监听会话过期弹窗通知
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowSessionExpiredAlert")).receive(on: DispatchQueue.main)) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .showSessionExpiredAlert).receive(on: DispatchQueue.main)) { notification in
                 if let userInfo = notification.userInfo,
                    let sourceRaw = userInfo["source"] as? String,
                    let source = ContentSource(rawValue: sourceRaw),
@@ -308,15 +308,15 @@ struct MainListView: View {
                 }
             }
             // 监听同步选中项通知
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncSelectedToNotionRequested")).receive(on: DispatchQueue.main)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .syncSelectedToNotionRequested).receive(on: DispatchQueue.main)) { _ in
                 syncSelectedForCurrentSource()
             }
             // 监听完整重新同步通知
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("FullResyncSelectedRequested")).receive(on: DispatchQueue.main)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .fullResyncSelectedRequested).receive(on: DispatchQueue.main)) { _ in
                 fullResyncSelectedForCurrentSource()
             }
             // 监听刷新请求通知
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .refreshBooksRequested).receive(on: DispatchQueue.main)) { _ in
                 refreshCurrentSource()
             }
         }
