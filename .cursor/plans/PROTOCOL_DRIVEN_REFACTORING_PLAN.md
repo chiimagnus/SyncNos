@@ -1,322 +1,499 @@
-# 协议驱动数据源 UI 配置重构计划
+# 协议驱动数据源 UI 配置重构计划（破坏性重构版）
 
-> **目标**: 将分散在多个文件中的数据源 UI 配置（通知名称、菜单配置、排序选项等）统一为协议驱动的设计，实现"添加新数据源只需修改一个地方"的目标。
+> **目标**: 采用**协议驱动设计**，将每个数据源封装为独立的"UI 配置类"，实现"添加新数据源只需新增一个文件"的目标。**破坏性重构**：允许删除/重命名现有结构，不需要向后兼容。
 
 ## 现状分析
 
 ### 当前问题
 
-1. **通知名称分散定义**: 157 处使用 `Notification.Name(...)`，分布在 44 个文件中
-2. **switch/if-else 链**: 34 处使用数据源相关的 switch 语句
-3. **重复的菜单配置**: `ViewCommands.swift` 和 `MainListView+FilterMenus.swift` 中有重复的筛选菜单代码
-4. **添加新数据源需修改多个文件**: 目前添加新数据源需要在 10+ 个位置添加 case
+1. **两个功能重叠的枚举**: `ContentSource`（UI 层）和 `SyncSource`（同步层）定义了相同的数据源
+2. **switch 语句分散**: 34+ 处使用数据源相关的 switch 语句
+3. **5 个独立的选择状态变量**: `selectedBookIds`, `selectedLinkIds`, `selectedWeReadBookIds`, `selectedDedaoBookIds`, `selectedChatsContactIds`
+4. **重复的菜单配置**: `ViewCommands.swift` 和 `MainListView+FilterMenus.swift` 中有几乎相同的筛选菜单代码
+5. **添加新数据源需修改 15+ 个文件**
 
-### 受影响的核心文件
+### Switch 语句热点分析
 
-| 文件 | switch/if-else 数量 | 主要用途 |
-|------|---------------------|---------|
-| `Views/Commands/ViewCommands.swift` | 10 | 菜单命令筛选菜单 |
-| `Views/Components/Main/MainListView+SyncRefresh.swift` | 5 | 同步/刷新/导航逻辑 |
-| `Views/Components/Main/MainListView+DetailViews.swift` | 1 | Detail 视图切换 |
-| `Views/Components/Main/MainListView+FilterMenus.swift` | 5 | 工具栏筛选菜单 |
-| `Views/Components/Controls/SwipeableDataSourceContainer.swift` | 2 | ListView 切换、SelectionCommands |
-| `Models/Core/Models.swift` | 5 | ContentSource 枚举属性 |
-| `Models/Core/HighlightColorScheme.swift` | 2 | 颜色主题 |
+| 文件 | switch 数量 | 场景 |
+|------|------------|------|
+| `MainListView+SyncRefresh.swift` | 4 | 同步/刷新/导航/选择 |
+| `MainListView+DetailViews.swift` | 1 | Detail 视图切换 |
+| `MainListView+FilterMenus.swift` | 5 (隐式) | 每个数据源的筛选菜单 |
+| `MainListView+KeyboardMonitor.swift` | 1 | 单选检查 |
+| `MainListView.swift` | 3 | 筛选菜单/启用检查/工具栏 |
+| `ViewCommands.swift` | 3 | 筛选菜单/启用检查/颜色主题 |
+| `SwipeableDataSourceContainer.swift` | 1 | ListView 切换 |
 
 ---
 
 ## 重构方案
 
-### 核心设计
+### 核心设计：协议驱动的数据源 UI 配置
 
-1. **保留 `ContentSource` 枚举**: 作为数据源标识符，不删除
-2. **扩展 `ContentSource`**: 添加 UI 相关配置属性
-3. **新建 `Notification.Name` 扩展**: 统一定义所有通知名称
-4. **新建 `DataSourceUIConfig` 协议**: 定义数据源 UI 配置的统一接口（可选，P3）
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   DataSourceUIProvider 协议                      │
+│  - source: ContentSource                                         │
+│  - displayName, icon, accentColor                               │
+│  - filterNotification, highlightColorTheme                       │
+│  - sortKeys, hasFilterMenu, supportsSync                         │
+│  - enabledStorageKey (for @AppStorage)                          │
+│  - makeListView(), makeDetailView(), makeFilterMenu()           │
+└─────────────────────────────────────────────────────────────────┘
+              ▲         ▲         ▲         ▲         ▲
+              │         │         │         │         │
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│AppleBooks│ │GoodLinks │ │ WeRead   │ │  Dedao   │ │  Chats   │
+│UIProvider│ │UIProvider│ │UIProvider│ │UIProvider│ │UIProvider│
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
 
-### 架构兼容性
+### 架构变更
 
-✅ **完全符合现有 MVVM 架构**:
-- 配置属性属于 **Model 层** 的扩展
-- 不改变 View/ViewModel 的职责边界
-- 与现有的 `NotionSyncSourceProtocol` 适配器模式类似
+1. **统一枚举**: 删除 `SyncSource`，保留并扩展 `ContentSource`
+2. **统一选择状态**: 用 `SelectionState` 类替代 5 个独立变量
+3. **协议驱动 UI**: 每个数据源实现 `DataSourceUIProvider` 协议
+4. **注册表模式**: `DataSourceRegistry` 管理所有数据源配置
 
 ---
 
 ## 优先级任务列表
 
-### P1: 统一通知名称定义 ⏱️ 约 30 分钟
+### P1: 统一通知名称定义 ✅ 已完成
 
-**目标**: 创建类型安全的通知名称定义，消除字符串硬编码
+**已创建**: `Models/Core/NotificationNames.swift`
 
-**新建文件**:
-- `Models/Core/NotificationNames.swift`
+---
 
-**内容**:
-```swift
-// MARK: - 数据源筛选变更通知
-extension Notification.Name {
-    // Apple Books
-    static let appleBooksFilterChanged = Notification.Name("AppleBooksFilterChanged")
-    
-    // GoodLinks
-    static let goodLinksFilterChanged = Notification.Name("GoodLinksFilterChanged")
-    
-    // WeRead
-    static let weReadFilterChanged = Notification.Name("WeReadFilterChanged")
-    
-    // Dedao
-    static let dedaoFilterChanged = Notification.Name("DedaoFilterChanged")
-    
-    // Chats
-    static let chatsFilterChanged = Notification.Name("ChatsFilterChanged")
-    
-    // MARK: - 高亮排序/筛选
-    static let highlightSortChanged = Notification.Name("HighlightSortChanged")
-    static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
-    
-    // MARK: - 同步状态
-    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-    static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
-    
-    // MARK: - 全局操作
-    static let syncQueueTaskSelected = Notification.Name("SyncQueueTaskSelected")
-    static let syncSelectedToNotionRequested = Notification.Name("SyncSelectedToNotionRequested")
-    static let fullResyncSelectedRequested = Notification.Name("FullResyncSelectedRequested")
-    static let refreshBooksRequested = Notification.Name("RefreshBooksRequested")
-    static let showNotionConfigAlert = Notification.Name("ShowNotionConfigAlert")
-    static let showSessionExpiredAlert = Notification.Name("ShowSessionExpiredAlert")
-    static let navigateToNotionSettings = Notification.Name("NavigateToNotionSettings")
-}
+### P2: 统一 ContentSource 和 SyncSource ⏱️ 约 30 分钟
 
-// MARK: - ContentSource 通知扩展
-extension ContentSource {
-    /// 该数据源的筛选变更通知名称
-    var filterChangedNotification: Notification.Name {
-        switch self {
-        case .appleBooks: return .appleBooksFilterChanged
-        case .goodLinks: return .goodLinksFilterChanged
-        case .weRead: return .weReadFilterChanged
-        case .dedao: return .dedaoFilterChanged
-        case .chats: return .chatsFilterChanged
-        }
-    }
-}
-```
+**目标**: 删除 `SyncSource` 枚举，统一使用 `ContentSource`
 
-**修改文件** (替换字符串为常量):
-- `ViewCommands.swift`
-- `MainListView+FilterMenus.swift`
-- `AppleBooksViewModel.swift`
-- `GoodLinksViewModel.swift`
-- `WeReadViewModel.swift`
-- `DedaoViewModel.swift`
-- `MainListView.swift`
-- 其他使用通知的文件
+**当前状态**:
+- `SyncSource` 在 `Models/Sync/SyncQueueModels.swift` 中定义
+- `ContentSource` 在 `Models/Core/Models.swift` 中定义
+- 两者有相同的 case 和部分相同的属性（displayName, iconName, brandColor）
+
+**变更**:
+
+1. **删除 `SyncSource` 枚举**（在 `SyncQueueModels.swift` 中）
+2. **扩展 `ContentSource`**，添加 `SyncSource` 的属性：
+   - `brandBackgroundOpacity: Double`
+3. **更新 `SyncQueueTask`**，使用 `ContentSource` 替代 `SyncSource`
+4. **全局替换**: `SyncSource` → `ContentSource`
+
+**受影响文件**:
+- `Models/Sync/SyncQueueModels.swift` - 删除 SyncSource，修改 SyncQueueTask
+- `Services/SyncScheduling/SyncQueueStore.swift` - 更新类型引用
+- `Views/Components/Controls/SyncQueueView.swift` - 更新类型引用
+- `ViewModels/Sync/SyncQueueViewModel.swift` - 更新类型引用
+- 所有使用 `SyncSource` 的文件
 
 **验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
-### P2: 扩展 ContentSource 枚举属性 ⏱️ 约 45 分钟
+### P3: 创建 DataSourceUIProvider 协议 ⏱️ 约 1 小时
 
-**目标**: 将菜单配置、排序键类型等 UI 相关属性集中到 `ContentSource` 枚举
+**目标**: 定义数据源 UI 配置的统一接口
 
-**修改文件**:
-- `Models/Core/Models.swift` (扩展 ContentSource)
+**新建文件**: `Models/Core/DataSourceUIProvider.swift`
 
-**添加属性**:
 ```swift
-extension ContentSource {
-    // MARK: - Menu Configuration
+import SwiftUI
+
+/// 数据源 UI 配置协议
+/// 每个数据源（Apple Books、GoodLinks 等）实现此协议以提供 UI 相关配置
+protocol DataSourceUIProvider {
     
-    /// 菜单标题（"Books" / "Articles" / "Chats"）
-    var menuTitle: LocalizedStringResource {
-        switch self {
-        case .appleBooks: return "Books"
-        case .goodLinks: return "Articles"
-        case .weRead: return "Books"
-        case .dedao: return "Books"
-        case .chats: return "Chats"
-        }
-    }
+    // MARK: - 基础属性
     
-    /// 该数据源可用的排序键
-    var availableBookListSortKeys: [BookListSortKey] {
-        switch self {
-        case .appleBooks:
-            return BookListSortKey.allCases
-        case .goodLinks:
-            return [] // GoodLinks 使用 GoodLinksSortKey
-        case .weRead, .dedao:
-            return [.title, .highlightCount, .lastSync]
-        case .chats:
-            return [] // Chats 不支持排序
-        }
-    }
+    /// 数据源标识符
+    var source: ContentSource { get }
+    
+    /// 显示名称
+    var displayName: String { get }
+    
+    /// SF Symbol 图标名称
+    var iconName: String { get }
+    
+    /// 品牌强调色
+    var accentColor: Color { get }
+    
+    // MARK: - 通知配置
+    
+    /// 筛选变更通知名称
+    var filterChangedNotification: Notification.Name { get }
+    
+    // MARK: - 功能配置
     
     /// 是否有筛选菜单
-    var hasFilterMenu: Bool {
-        switch self {
-        case .chats: return false
-        default: return true
-        }
-    }
+    var hasFilterMenu: Bool { get }
     
     /// 是否支持高亮颜色筛选
-    var supportsHighlightColors: Bool {
-        switch self {
-        case .chats: return false
-        default: return true
-        }
-    }
+    var supportsHighlightColors: Bool { get }
+    
+    /// 是否支持同步到 Notion
+    var supportsSync: Bool { get }
     
     /// 高亮颜色主题
-    var highlightColorTheme: HighlightColorTheme {
-        switch self {
-        case .appleBooks: return .appleBooks
-        case .goodLinks: return .goodLinks
-        case .weRead: return .weRead
-        case .dedao: return .dedao
-        case .chats: return .appleBooks // Fallback
-        }
-    }
+    var highlightColorTheme: HighlightColorTheme? { get }
+    
+    // MARK: - 排序配置
+    
+    /// 可用的排序键类型（返回 any 以支持不同枚举）
+    var sortKeyType: any SortKeyType.Type { get }
+    
+    /// 菜单标题（如 "Books", "Articles"）
+    var menuTitle: LocalizedStringKey { get }
+}
+
+/// 排序键协议
+protocol SortKeyType: CaseIterable, Hashable, RawRepresentable where RawValue == String {
+    var displayName: String { get }
+}
+
+extension BookListSortKey: SortKeyType {}
+extension GoodLinksSortKey: SortKeyType {}
+
+/// 空排序键（用于不支持排序的数据源如 Chats）
+enum NoSortKey: String, SortKeyType, CaseIterable {
+    var displayName: String { "" }
 }
 ```
-
-**重构 ViewCommands.swift**:
-- 使用 `currentSource.menuTitle` 替代硬编码的 "Books" / "Articles"
-- 使用 `currentSource.availableBookListSortKeys` 替代重复的数组定义
 
 **验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
-### P3: 创建 DataSourceUIConfig 协议（可选）⏱️ 约 1 小时
+### P4: 实现各数据源的 UIProvider ⏱️ 约 1.5 小时
 
-**目标**: 如果 P2 后 ContentSource 扩展变得太长，可以将 UI 配置提取为独立的协议和结构体
+**目标**: 为每个数据源创建 UIProvider 实现
+
+**新建目录**: `Models/DataSourceProviders/`
 
 **新建文件**:
-- `Models/Core/DataSourceUIConfig.swift`
+- `Models/DataSourceProviders/AppleBooksUIProvider.swift`
+- `Models/DataSourceProviders/GoodLinksUIProvider.swift`
+- `Models/DataSourceProviders/WeReadUIProvider.swift`
+- `Models/DataSourceProviders/DedaoUIProvider.swift`
+- `Models/DataSourceProviders/ChatsUIProvider.swift`
 
-**设计**:
+**示例** (`AppleBooksUIProvider.swift`):
+
 ```swift
-/// 数据源 UI 配置协议
-protocol DataSourceUIConfigProvider {
-    var source: ContentSource { get }
-    var menuTitle: LocalizedStringResource { get }
-    var filterNotification: Notification.Name { get }
-    var supportsFilterMenu: Bool { get }
-    var availableSortKeys: [any SortKeyProtocol] { get }
+import SwiftUI
+
+struct AppleBooksUIProvider: DataSourceUIProvider {
+    let source: ContentSource = .appleBooks
+    let displayName = "Apple Books"
+    let iconName = "book"
+    var accentColor: Color { Color("BrandAppleBooks") }
+    
+    let filterChangedNotification: Notification.Name = .appleBooksFilterChanged
+    
+    let hasFilterMenu = true
+    let supportsHighlightColors = true
+    let supportsSync = true
+    let highlightColorTheme: HighlightColorTheme? = .appleBooks
+    
+    var sortKeyType: any SortKeyType.Type { BookListSortKey.self }
+    let menuTitle: LocalizedStringKey = "Books"
 }
-
-/// 排序键协议（统一 BookListSortKey 和 GoodLinksSortKey）
-protocol SortKeyProtocol: CaseIterable, Hashable, RawRepresentable where RawValue == String {
-    var displayName: LocalizedStringResource { get }
-}
-
-extension BookListSortKey: SortKeyProtocol {}
-extension GoodLinksSortKey: SortKeyProtocol {}
-
-/// 各数据源配置
-struct AppleBooksUIConfig: DataSourceUIConfigProvider { ... }
-struct GoodLinksUIConfig: DataSourceUIConfigProvider { ... }
-struct WeReadUIConfig: DataSourceUIConfigProvider { ... }
-struct DedaoUIConfig: DataSourceUIConfigProvider { ... }
-struct ChatsUIConfig: DataSourceUIConfigProvider { ... }
 ```
 
-**注意**: 这个优先级较低，因为 P2 可能已经足够满足需求。只有当 ContentSource 扩展变得难以维护时才需要实现。
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
-### P4: 重构选择状态管理 ⏱️ 约 1.5 小时
+### P5: 创建 DataSourceRegistry ⏱️ 约 30 分钟
 
-**目标**: 将分散的 `selectedBookIds`, `selectedLinkIds` 等统一为字典结构
+**目标**: 创建注册表，集中管理所有数据源配置
 
-**当前问题**:
+**新建文件**: `Models/Core/DataSourceRegistry.swift`
+
 ```swift
-// 目前有 5 个独立的选择状态变量
-@State var selectedBookIds: Set<String> = []
-@State var selectedLinkIds: Set<String> = []
-@State var selectedWeReadBookIds: Set<String> = []
-@State var selectedDedaoBookIds: Set<String> = []
-@State var selectedChatsContactIds: Set<String> = []
+import SwiftUI
+
+/// 数据源注册表
+/// 集中管理所有数据源的 UI 配置，消除 switch 语句
+@MainActor
+final class DataSourceRegistry {
+    
+    static let shared = DataSourceRegistry()
+    
+    /// 所有注册的数据源配置（按 ContentSource 索引）
+    private var providers: [ContentSource: any DataSourceUIProvider] = [:]
+    
+    private init() {
+        register(AppleBooksUIProvider())
+        register(GoodLinksUIProvider())
+        register(WeReadUIProvider())
+        register(DedaoUIProvider())
+        register(ChatsUIProvider())
+    }
+    
+    /// 注册数据源配置
+    func register(_ provider: any DataSourceUIProvider) {
+        providers[provider.source] = provider
+    }
+    
+    /// 获取数据源配置
+    func provider(for source: ContentSource) -> (any DataSourceUIProvider)? {
+        providers[source]
+    }
+    
+    /// 获取所有已注册的数据源
+    var allSources: [ContentSource] {
+        Array(providers.keys).sorted { $0.rawValue < $1.rawValue }
+    }
+}
+
+// MARK: - ContentSource 扩展（代理到 Registry）
+
+extension ContentSource {
+    /// 获取该数据源的 UI 配置
+    var uiProvider: (any DataSourceUIProvider)? {
+        DataSourceRegistry.shared.provider(for: self)
+    }
+    
+    /// 筛选变更通知（从 uiProvider 获取，提供默认值）
+    var filterChangedNotification: Notification.Name {
+        uiProvider?.filterChangedNotification ?? Notification.Name("UnknownFilterChanged")
+    }
+    
+    /// 高亮颜色主题（从 uiProvider 获取）
+    var highlightColorTheme: HighlightColorTheme? {
+        uiProvider?.highlightColorTheme
+    }
+}
 ```
 
-**重构为**:
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+
+---
+
+### P6: 统一选择状态管理 ⏱️ 约 1 小时
+
+**目标**: 用 `SelectionState` 类替代 5 个独立的选择变量
+
+**新建文件**: `Models/Core/SelectionState.swift`
+
 ```swift
+import SwiftUI
+
 /// 统一选择状态管理器
+/// 替代 MainListView 中的 5 个独立 @State 变量
 @Observable
-class SelectionState {
-    var selections: [ContentSource: Set<String>] = [:]
+final class SelectionState {
     
+    /// 每个数据源的选择状态
+    private var selections: [ContentSource: Set<String>] = [:]
+    
+    /// 获取指定数据源的选择
     func selection(for source: ContentSource) -> Set<String> {
         selections[source] ?? []
     }
     
-    mutating func setSelection(for source: ContentSource, ids: Set<String>) {
+    /// 获取指定数据源选择的 Binding
+    func selectionBinding(for source: ContentSource) -> Binding<Set<String>> {
+        Binding(
+            get: { self.selections[source] ?? [] },
+            set: { self.selections[source] = $0 }
+        )
+    }
+    
+    /// 设置指定数据源的选择
+    func setSelection(for source: ContentSource, ids: Set<String>) {
         selections[source] = ids
     }
     
+    /// 清除所有选择
     func clearAll() {
         selections.removeAll()
     }
     
+    /// 清除指定数据源的选择
     func clear(for source: ContentSource) {
         selections[source] = []
+    }
+    
+    /// 当前数据源是否有单选
+    func hasSingleSelection(for source: ContentSource) -> Bool {
+        selection(for: source).count == 1
+    }
+    
+    /// 获取当前数据源的选中数量
+    func selectionCount(for source: ContentSource) -> Int {
+        selection(for: source).count
     }
 }
 ```
 
-**受影响文件**:
-- `MainListView.swift`
-- `MainListView+SyncRefresh.swift`
-- `MainListView+DetailViews.swift`
-- `SwipeableDataSourceContainer.swift`
+**修改文件**:
+- `MainListView.swift` - 替换 5 个 @State 为 `@State var selectionState = SelectionState()`
+- `MainListView+SyncRefresh.swift` - 使用 `selectionState.selection(for:)`
+- `MainListView+DetailViews.swift` - 使用 `selectionState.selectionBinding(for:)`
+- `SwipeableDataSourceContainer.swift` - 接收 `SelectionState` 而非 5 个 Binding
 
-**注意**: 这个重构改动较大，需要仔细测试。建议在完成 P1、P2 后再进行。
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
-### P5: 重构 ViewModel 排序/筛选接口 ⏱️ 约 2 小时
+### P7: 重构 Switch 语句为协议调用 ⏱️ 约 2 小时
 
-**目标**: 统一 ViewModel 的排序/筛选接口，减少 FilterMenus 中的重复代码
+**目标**: 使用 `DataSourceRegistry` 和 `SelectionState` 消除大部分 switch 语句
 
-**当前问题**:
-- 每个 ViewModel 有不同的排序属性名称和类型
-- `AppleBooksViewModel.sortKey: BookListSortKey`
-- `GoodLinksViewModel.sortKey: GoodLinksSortKey`
-- 筛选菜单需要为每个数据源写独立的代码
+**重构示例**:
 
-**解决方案**: 定义 `FilterableListViewModel` 协议
+**Before** (`MainListView+SyncRefresh.swift`):
 ```swift
-protocol FilterableListViewModel: ObservableObject {
-    associatedtype SortKey: SortKeyProtocol
-    var sortKey: SortKey { get set }
-    var sortAscending: Bool { get set }
-    var filterNotification: Notification.Name { get }
-}
-
-extension AppleBooksViewModel: FilterableListViewModel {
-    var filterNotification: Notification.Name { .appleBooksFilterChanged }
+func syncSelectedForCurrentSource() {
+    switch contentSource {
+    case .appleBooks:
+        appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: ...)
+    case .goodLinks:
+        goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: ...)
+    // ... 5 个 case
+    }
 }
 ```
 
-**注意**: 这个重构涉及 ViewModel 层，改动较大。建议作为后续优化。
+**After**:
+```swift
+func syncSelectedForCurrentSource() {
+    let selectedIds = selectionState.selection(for: contentSource)
+    viewModel(for: contentSource)?.batchSync(ids: selectedIds, concurrency: ...)
+}
+
+// 需要统一 ViewModel 的 batchSync 接口
+protocol BatchSyncable {
+    func batchSync(ids: Set<String>, concurrency: Int)
+}
+```
+
+**受影响文件**:
+- `MainListView+SyncRefresh.swift` - 4 处 switch
+- `MainListView+DetailViews.swift` - 1 处 switch
+- `MainListView.swift` - 2 处 switch
+- `SwipeableDataSourceContainer.swift` - 1 处 switch
+- `ViewCommands.swift` - 2 处 switch
+
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+
+---
+
+### P8: 重构 FilterMenus 为通用组件 ⏱️ 约 1.5 小时
+
+**目标**: 创建通用的筛选菜单组件，消除重复代码
+
+**新建文件**: `Views/Components/Controls/DataSourceFilterMenu.swift`
+
+```swift
+import SwiftUI
+
+/// 通用数据源筛选菜单
+/// 根据 DataSourceUIProvider 动态生成排序和筛选选项
+struct DataSourceFilterMenu<SortKey: SortKeyType>: View {
+    let provider: any DataSourceUIProvider
+    @Binding var sortKey: SortKey
+    @Binding var sortAscending: Bool
+    var additionalFilters: (() -> AnyView)? = nil
+    
+    var body: some View {
+        Menu(provider.menuTitle) {
+            Section("Sort") {
+                ForEach(Array(SortKey.allCases), id: \.self) { key in
+                    Button {
+                        sortKey = key
+                        NotificationCenter.default.post(
+                            name: provider.filterChangedNotification,
+                            object: nil,
+                            userInfo: ["sortKey": key.rawValue]
+                        )
+                    } label: {
+                        if sortKey == key {
+                            Label(key.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(key.displayName)
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                Button {
+                    sortAscending.toggle()
+                    NotificationCenter.default.post(
+                        name: provider.filterChangedNotification,
+                        object: nil,
+                        userInfo: ["sortAscending": sortAscending]
+                    )
+                } label: {
+                    Label("Ascending", systemImage: sortAscending ? "checkmark" : "xmark")
+                }
+            }
+            
+            if let filters = additionalFilters {
+                Section("Filter") {
+                    filters()
+                }
+            }
+        }
+    }
+}
+```
+
+**重构**:
+- `ViewCommands.swift` - 使用 `DataSourceFilterMenu`
+- `MainListView+FilterMenus.swift` - 使用 `DataSourceFilterMenu`
+
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
 ## 实施顺序
 
 ```
-P1 (通知名称) → 验证 → P2 (ContentSource 扩展) → 验证 → [可选 P3/P4/P5]
+P1 ✅ (已完成)
+    ↓
+P2 (统一枚举) → 验证
+    ↓
+P3 (协议定义) → 验证
+    ↓
+P4 (实现 Providers) → 验证
+    ↓
+P5 (Registry) → 验证
+    ↓
+P6 (SelectionState) → 验证
+    ↓
+P7 (重构 Switch) → 验证
+    ↓
+P8 (通用 FilterMenu) → 验证
 ```
 
-每完成一个优先级后必须运行:
-```bash
-xcodebuild -scheme SyncNos -configuration Debug build
-```
+---
+
+## 破坏性变更清单
+
+| 变更项 | 描述 | 影响 |
+|--------|------|------|
+| 删除 `SyncSource` | 统一使用 `ContentSource` | 所有使用 `SyncSource` 的文件 |
+| 删除 5 个选择变量 | 统一为 `SelectionState` | `MainListView` 及其扩展 |
+| 新增 `DataSourceUIProvider` | 协议驱动设计 | 新增文件，不破坏现有 |
+| 新增 `DataSourceRegistry` | 注册表模式 | 新增文件 |
+| 新增 `SelectionState` | 统一选择状态 | 替换现有变量 |
+
+---
+
+## 预期收益
+
+完成后:
+- ✅ **添加新数据源只需 1 个文件**: 新建 `XxxUIProvider.swift` 并注册
+- ✅ **消除 80%+ 的 switch 语句**: 使用协议和注册表
+- ✅ **统一选择状态管理**: 1 个类替代 5 个变量
+- ✅ **类型安全**: 编译期检查，避免运行时错误
+- ✅ **更好的可测试性**: 协议支持 Mock
 
 ---
 
@@ -324,30 +501,13 @@ xcodebuild -scheme SyncNos -configuration Debug build
 
 | 优先级 | 风险 | 影响范围 | 回滚难度 |
 |--------|------|---------|---------|
-| P1 | 低 | 仅替换字符串常量 | 简单 |
-| P2 | 低 | 新增扩展属性 | 简单 |
-| P3 | 中 | 新增协议和结构体 | 简单（可删除） |
-| P4 | 高 | 改变状态管理方式 | 复杂 |
-| P5 | 高 | 改变 ViewModel 接口 | 复杂 |
+| P2 | 中 | 全局类型替换 | 中等（Git 回滚） |
+| P3-P5 | 低 | 新增文件 | 简单（删除文件） |
+| P6 | 高 | MainListView 核心状态 | 复杂 |
+| P7-P8 | 中 | UI 层重构 | 中等 |
 
 ---
 
-## 预期收益
-
-完成 P1 + P2 后:
-- ✅ 类型安全的通知名称（自动补全，避免拼写错误）
-- ✅ 集中管理数据源 UI 配置
-- ✅ 添加新数据源只需在 2-3 个地方添加代码（枚举 case + 扩展属性）
-- ✅ 减少约 50% 的 switch case 重复代码
-
-完成 P4 + P5 后:
-- ✅ 统一的选择状态管理
-- ✅ 统一的 ViewModel 筛选接口
-- ✅ 添加新数据源只需在 1 个地方添加代码（新的 UIConfig）
-
----
-
-**文档版本**: 1.0  
-**创建时间**: 2026-01-02  
+**文档版本**: 2.0（破坏性重构版）  
+**更新时间**: 2026-01-02  
 **作者**: AI Assistant
-
