@@ -3,12 +3,8 @@ import Combine
 
 // MARK: - AppleBooksViewModel
 
-// Centralized notification names to avoid typos and allow self-decoupling filters
-private enum ABVMNotifications {
-    static let appleBooksFilterChanged = Notification.Name("AppleBooksFilterChanged")
-    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-    static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
-}
+// 使用 NotificationNames.swift 中定义的统一通知名称常量
+// 已删除私有 ABVMNotifications 枚举
 
 @MainActor
 final class AppleBooksViewModel: ObservableObject {
@@ -79,7 +75,7 @@ final class AppleBooksViewModel: ObservableObject {
         self.showWithTitleOnly = UserDefaults.standard.bool(forKey: Keys.showWithTitleOnly)
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
-        NotificationCenter.default.publisher(for: ABVMNotifications.appleBooksFilterChanged)
+        NotificationCenter.default.publisher(for: .appleBooksFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -230,7 +226,7 @@ final class AppleBooksViewModel: ObservableObject {
         
     // MARK: - Private Methods
     private func subscribeSyncStatusNotifications() {
-        NotificationCenter.default.publisher(for: ABVMNotifications.syncBookStatusChanged)
+        NotificationCenter.default.publisher(for: .syncBookStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
@@ -462,20 +458,20 @@ extension AppleBooksViewModel {
                         await limiter.withPermit {
                             // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
                             await MainActor.run {
-                                NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
+                                NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
                             }
                             do {
                                 let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
                                 try await syncEngine.syncSmart(source: adapter) { progress in
                                     // 广播该书的同步进度，供详情页监听并显示
                                     Task { @MainActor in
-                                        NotificationCenter.default.post(name: ABVMNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                        NotificationCenter.default.post(name: .syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                     }
                                 }
                                 await MainActor.run {
                                     self.syncingBookIds.remove(id)
                                     self.syncedBookIds.insert(id)
-                                    NotificationCenter.default.post(name: ABVMNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
+                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
                                 }
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
@@ -483,7 +479,7 @@ extension AppleBooksViewModel {
                                     self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
-                                        name: ABVMNotifications.syncBookStatusChanged,
+                                        name: .syncBookStatusChanged,
                                         object: self,
                                         userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                                     )

@@ -142,7 +142,7 @@ struct ViewCommands: Commands {
                     ForEach(HighlightSortField.allCases, id: \.self) { k in
                         Button {
                             highlightSortField = k.rawValue
-                            NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            NotificationCenter.default.post(name: .highlightSortChanged, object: nil, userInfo: ["sortKey": k.rawValue])
                         } label: {
                             if highlightSortField == k.rawValue {
                                 Label(k.displayName, systemImage: "checkmark")
@@ -156,7 +156,7 @@ struct ViewCommands: Commands {
 
                     Button {
                         highlightSortAscending.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortAscending": highlightSortAscending])
+                        NotificationCenter.default.post(name: .highlightSortChanged, object: nil, userInfo: ["sortAscending": highlightSortAscending])
                     } label: {
                         if highlightSortAscending {
                             Label("Ascending", systemImage: "checkmark")
@@ -169,7 +169,7 @@ struct ViewCommands: Commands {
                 Section("Filter") {
                     Button {
                         highlightHasNotes.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("HighlightFilterChanged"), object: nil, userInfo: ["hasNotes": highlightHasNotes])
+                        NotificationCenter.default.post(name: .highlightFilterChanged, object: nil, userInfo: ["hasNotes": highlightHasNotes])
                     } label: {
                         if highlightHasNotes {
                             Label("Has Notes", systemImage: "checkmark")
@@ -230,7 +230,7 @@ struct ViewCommands: Commands {
                                 highlightSelectedMask = mask
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("HighlightFilterChanged"),
+                                name: .highlightFilterChanged,
                                 object: nil,
                                 userInfo: ["selectedStyles": arr]
                             )
@@ -280,7 +280,7 @@ private extension ViewCommands {
                     Button {
                         bookListSortKey = k.rawValue
                         NotificationCenter.default.post(
-                            name: Notification.Name("AppleBooksFilterChanged"),
+                            name: .appleBooksFilterChanged,
                             object: nil,
                             userInfo: ["sortKey": k.rawValue]
                         )
@@ -298,7 +298,7 @@ private extension ViewCommands {
                 Button {
                     bookListSortAscending.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
+                        name: .appleBooksFilterChanged,
                         object: nil,
                         userInfo: ["sortAscending": bookListSortAscending]
                     )
@@ -315,7 +315,7 @@ private extension ViewCommands {
                 Button {
                     bookListShowWithTitleOnly.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
+                        name: .appleBooksFilterChanged,
                         object: nil,
                         userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly]
                     )
@@ -340,7 +340,7 @@ private extension ViewCommands {
                     Button {
                         goodlinksSortKey = k.rawValue
                         NotificationCenter.default.post(
-                            name: Notification.Name("GoodLinksFilterChanged"),
+                            name: .goodLinksFilterChanged,
                             object: nil,
                             userInfo: ["sortKey": k.rawValue]
                         )
@@ -358,7 +358,7 @@ private extension ViewCommands {
                 Button {
                     goodlinksSortAscending.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
+                        name: .goodLinksFilterChanged,
                         object: nil,
                         userInfo: ["sortAscending": goodlinksSortAscending]
                     )
@@ -375,7 +375,7 @@ private extension ViewCommands {
                 Button {
                     goodlinksShowStarredOnly.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
+                        name: .goodLinksFilterChanged,
                         object: nil,
                         userInfo: ["showStarredOnly": goodlinksShowStarredOnly]
                     )
@@ -402,7 +402,7 @@ private extension ViewCommands {
                     Button {
                         bookListSortKey = k.rawValue
                         NotificationCenter.default.post(
-                            name: Notification.Name("WeReadFilterChanged"),
+                            name: .weReadFilterChanged,
                             object: nil,
                             userInfo: ["sortKey": k.rawValue]
                         )
@@ -420,7 +420,7 @@ private extension ViewCommands {
                 Button {
                     bookListSortAscending.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("WeReadFilterChanged"),
+                        name: .weReadFilterChanged,
                         object: nil,
                         userInfo: ["sortAscending": bookListSortAscending]
                     )
@@ -447,7 +447,7 @@ private extension ViewCommands {
                     Button {
                         bookListSortKey = k.rawValue
                         NotificationCenter.default.post(
-                            name: Notification.Name("DedaoFilterChanged"),
+                            name: .dedaoFilterChanged,
                             object: nil,
                             userInfo: ["sortKey": k.rawValue]
                         )
@@ -465,7 +465,7 @@ private extension ViewCommands {
                 Button {
                     bookListSortAscending.toggle()
                     NotificationCenter.default.post(
-                        name: Notification.Name("DedaoFilterChanged"),
+                        name: .dedaoFilterChanged,
                         object: nil,
                         userInfo: ["sortAscending": bookListSortAscending]
                     )
