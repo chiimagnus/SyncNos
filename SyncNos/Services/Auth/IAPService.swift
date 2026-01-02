@@ -49,10 +49,6 @@ final class IAPService: IAPServiceProtocol {
     private let trialDays = 30
     private var updatesTask: Task<Void, Never>?
 
-    static let statusChangedNotification: Notification.Name = .iapServiceStatusChanged
-    static let showWelcomeNotification: Notification.Name = .iapServiceShowWelcome
-    static let showTrialReminderNotification: Notification.Name = .iapServiceShowTrialReminder
-
     var isProUnlocked: Bool {
         // Pro unlocked if either purchased or in trial period
         hasPurchased || isInTrialPeriod
@@ -272,7 +268,7 @@ final class IAPService: IAPServiceProtocol {
                 if wasUnlocked && !isUnlocked {
                     await MainActor.run {
                         NotificationCenter.default.post(
-                            name: Self.statusChangedNotification,
+                            name: .iapServiceStatusChanged,
                             object: nil
                         )
                     }
@@ -294,7 +290,7 @@ final class IAPService: IAPServiceProtocol {
         guard current != newValue else { return }
         
         UserDefaults.standard.set(newValue, forKey: key)
-        NotificationCenter.default.post(name: Self.statusChangedNotification, object: nil)
+        NotificationCenter.default.post(name: .iapServiceStatusChanged, object: nil)
     }
 
     private func keyForProduct(_ productId: String) -> String {
@@ -462,7 +458,7 @@ extension IAPService {
         
         Task { @MainActor in
             NotificationCenter.default.post(
-                name: Self.statusChangedNotification,
+                name: .iapServiceStatusChanged,
                 object: nil
             )
         }
@@ -513,7 +509,7 @@ extension IAPService {
         
         Task { @MainActor in
             NotificationCenter.default.post(
-                name: Self.statusChangedNotification,
+                name: .iapServiceStatusChanged,
                 object: nil
             )
         }

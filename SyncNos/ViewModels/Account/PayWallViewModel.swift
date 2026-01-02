@@ -47,7 +47,7 @@ final class PayWallViewModel: ObservableObject {
         
         // 监听 IAP 状态变化
         NotificationCenter.default
-            .publisher(for: IAPService.statusChangedNotification)
+            .publisher(for: .iapServiceStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateStatus()
