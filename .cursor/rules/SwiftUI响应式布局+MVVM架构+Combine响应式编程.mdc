@@ -8,6 +8,7 @@ alwaysApply: true
 
 ### 核心技术栈
 - **架构模式**: MVVM (Model-View-ViewModel)
+- **编程范式**: Protocol-Oriented Programming (POP，协议驱动开发)
 - **UI框架**: SwiftUI (iOS 17+, iPadOS 17+, macOS 14+)
 - **响应式编程**: Combine
 - **数据持久化**: SwiftData
@@ -76,6 +77,61 @@ Feature/
 - **ViewModels**: 处理业务逻辑、数据转换、状态管理
 - **Models**: 数据结构定义和简单数据处理
 - **Services**: 网络请求、数据存储等基础设施逻辑
+- **Protocols**: 定义接口契约，实现依赖反转
+
+## 协议驱动开发 (Protocol-Oriented Programming)
+
+### 设计原则
+
+1. **面向协议而非实现**: 优先定义协议，然后实现具体类型
+2. **消除 switch 语句**: 当需要根据类型执行不同逻辑时，使用协议代替 switch
+3. **可扩展性**: 添加新类型只需实现协议，不需要修改现有代码
+
+### 协议设计规范
+
+```swift
+// ✅ 正确：使用协议定义统一接口
+protocol DataSourceUIProvider {
+    var source: ContentSource { get }
+    var displayName: String { get }
+    var filterChangedNotification: Notification.Name { get }
+    var hasFilterMenu: Bool { get }
+}
+
+// ✅ 正确：为每个数据源实现协议
+struct AppleBooksUIProvider: DataSourceUIProvider {
+    let source: ContentSource = .appleBooks
+    let displayName = "Apple Books"
+    let filterChangedNotification: Notification.Name = .appleBooksFilterChanged
+    let hasFilterMenu = true
+}
+```
+
+### 避免的模式
+
+```swift
+// ❌ 错误：在多处使用 switch 根据类型执行不同逻辑
+switch source {
+case .appleBooks: // 处理 AppleBooks
+case .goodLinks: // 处理 GoodLinks
+case .weRead: // 处理 WeRead
+// 每添加新类型都需要修改所有 switch
+}
+
+// ✅ 正确：通过协议统一处理
+func process(_ provider: DataSourceUIProvider) {
+    // 使用协议属性，无需 switch
+    let name = provider.displayName
+    NotificationCenter.default.post(name: provider.filterChangedNotification, object: nil)
+}
+```
+
+### 适用场景
+
+- **数据源配置**: 每个数据源的 UI 配置（通知、菜单、排序选项）
+- **同步引擎**: `NotionSyncSourceProtocol` 适配器模式
+- **服务协议**: `DatabaseServiceProtocol`、`NotionServiceProtocol`
+- **可测试性**: 使用协议便于 Mock 和单元测试
 
 ## ViewModel 实例化策略
 
@@ -216,6 +272,27 @@ class MyViewModel: ObservableObject {
 - 避免在 View 层处理复杂错误逻辑
 
 ## 通知与事件管理
+
+### 统一通知名称定义
+
+所有通知名称必须在 `Models/**/NotificationNames.swift` 中统一定义：
+
+```swift
+// ✅ 正确：在 NotificationNames.swift 中统一定义
+extension Notification.Name {
+    static let refreshBooksRequested = Notification.Name("RefreshBooksRequested")
+    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+}
+
+// ✅ 正确：使用统一定义的通知名称
+NotificationCenter.default.post(name: .refreshBooksRequested, object: nil)
+NotificationCenter.default.publisher(for: .syncBookStatusChanged)
+```
+
+```swift
+// ❌ 错误：在各处硬编码通知名称
+NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
+```
 
 ### 唯一入口原则
 
