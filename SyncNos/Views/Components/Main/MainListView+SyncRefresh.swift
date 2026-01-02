@@ -17,6 +17,39 @@ extension MainListView {
         }
     }
     
+    // MARK: - Sync Queue Task Selection
+    
+    /// 处理同步队列任务选择（使用 switch 替代 if-else 链）
+    func handleSyncQueueTaskSelection(source: ContentSource, id: String) {
+        // 先清除所有选择
+        clearAllSelections()
+        
+        // 切换到对应数据源并选中指定项
+        contentSourceRawValue = source.rawValue
+        
+        switch source {
+        case .appleBooks:
+            selectedBookIds = Set([id])
+        case .goodLinks:
+            selectedLinkIds = Set([id])
+        case .weRead:
+            selectedWeReadBookIds = Set([id])
+        case .dedao:
+            selectedDedaoBookIds = Set([id])
+        case .chats:
+            selectedChatsContactIds = Set([id])
+        }
+    }
+    
+    /// 清除所有数据源的选择状态
+    private func clearAllSelections() {
+        selectedBookIds.removeAll()
+        selectedLinkIds.removeAll()
+        selectedWeReadBookIds.removeAll()
+        selectedDedaoBookIds.removeAll()
+        selectedChatsContactIds.removeAll()
+    }
+    
     // MARK: - Sync Selected
     
     func syncSelectedForCurrentSource() {
