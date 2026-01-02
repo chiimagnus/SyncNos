@@ -4,7 +4,7 @@ import SwiftUI
 
 /// 数据源标签徽章（可复用）
 struct SyncSourceBadge: View {
-    let source: SyncSource
+    let source: ContentSource
     
     var body: some View {
         Label(source.displayName, systemImage: source.iconName)

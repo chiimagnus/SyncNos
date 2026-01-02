@@ -1,10 +1,6 @@
 import Foundation
 import SwiftUI
 
-// MARK: - SyncSource 类型别名（兼容过渡，将逐步移除）
-// SyncSource 已统一到 ContentSource（定义在 Models/Core/Models.swift）
-typealias SyncSource = ContentSource
-
 enum SyncTaskState: String, Codable, Sendable {
     case queued
     case running
@@ -75,7 +71,7 @@ struct SyncEnqueueItem: Sendable {
 struct SyncQueueTask: Identifiable, Equatable, Sendable {
     let id: String
     let rawId: String
-    let source: SyncSource
+    let source: ContentSource
     var title: String
     var subtitle: String?
     var state: SyncTaskState
@@ -92,7 +88,7 @@ struct SyncQueueTask: Identifiable, Equatable, Sendable {
 
     init(
         rawId: String,
-        source: SyncSource,
+        source: ContentSource,
         title: String,
         subtitle: String?,
         state: SyncTaskState = .queued,

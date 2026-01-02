@@ -3,7 +3,7 @@ import Foundation
 /// WeRead 自动同步提供者，实现基于 API 的智能增量同步逻辑
 /// 通过比较「书籍更新时间」与「上次同步时间」判断是否需要同步
 final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .weRead
+    let id: ContentSource = .weRead
     let autoSyncUserDefaultsKey: String = "autoSync.weRead"
 
     private let logger: LoggerServiceProtocol

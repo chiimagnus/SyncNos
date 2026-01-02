@@ -3,7 +3,7 @@ import Foundation
 /// Dedao 自动同步提供者，实现基于本地缓存的智能增量同步逻辑
 /// 通过比较「高亮修改时间」与「上次同步时间」判断是否需要同步
 final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .dedao
+    let id: ContentSource = .dedao
     let autoSyncUserDefaultsKey: String = "autoSync.dedao"
     
     private let logger: LoggerServiceProtocol
