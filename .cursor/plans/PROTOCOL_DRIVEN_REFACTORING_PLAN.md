@@ -71,278 +71,84 @@
 
 ---
 
-### P2: 统一 ContentSource 和 SyncSource ⏱️ 约 30 分钟
+### P2: 统一 ContentSource 和 SyncSource ✅ 已完成
 
 **目标**: 删除 `SyncSource` 枚举，统一使用 `ContentSource`
 
-**当前状态**:
-- `SyncSource` 在 `Models/Sync/SyncQueueModels.swift` 中定义
-- `ContentSource` 在 `Models/Core/Models.swift` 中定义
-- 两者有相同的 case 和部分相同的属性（displayName, iconName, brandColor）
-
-**变更**:
-
-1. **删除 `SyncSource` 枚举**（在 `SyncQueueModels.swift` 中）
-2. **扩展 `ContentSource`**，添加 `SyncSource` 的属性：
-   - `brandBackgroundOpacity: Double`
-3. **更新 `SyncQueueTask`**，使用 `ContentSource` 替代 `SyncSource`
-4. **全局替换**: `SyncSource` → `ContentSource`
+**完成内容**:
+- ✅ 在 `ContentSource` 中添加了 `brandBackgroundOpacity`、`iconName`、`brandColor` 属性
+- ✅ 删除了 `SyncSource` 枚举（原 `typealias SyncSource = ContentSource` 过渡方案已移除）
+- ✅ 更新了 `SyncQueueTask` 使用 `ContentSource`
+- ✅ 更新了所有 AutoSyncProvider 使用 `ContentSource`
+- ✅ 更新了 `AutoSyncService` 中的 providers 字典类型
 
 **受影响文件**:
-- `Models/Sync/SyncQueueModels.swift` - 删除 SyncSource，修改 SyncQueueTask
-- `Services/SyncScheduling/SyncQueueStore.swift` - 更新类型引用
+- `Models/Sync/SyncQueueModels.swift` - 删除 SyncSource typealias，修改 SyncQueueTask
+- `Models/Core/Models.swift` - 添加 brandBackgroundOpacity、iconName、brandColor
+- `Services/SyncScheduling/AutoSyncService.swift` - 更新类型引用
+- `Services/SyncScheduling/*AutoSyncProvider.swift` - 更新类型引用
 - `Views/Components/Controls/SyncQueueView.swift` - 更新类型引用
-- `ViewModels/Sync/SyncQueueViewModel.swift` - 更新类型引用
-- 所有使用 `SyncSource` 的文件
-
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
 
 ---
 
-### P3: 创建 DataSourceUIProvider 协议 ⏱️ 约 1 小时
+### P3: 创建 DataSourceUIProvider 协议 ✅ 已完成
 
 **目标**: 定义数据源 UI 配置的统一接口
 
-**新建文件**: `Models/Core/DataSourceUIProvider.swift`
-
-```swift
-import SwiftUI
-
-/// 数据源 UI 配置协议
-/// 每个数据源（Apple Books、GoodLinks 等）实现此协议以提供 UI 相关配置
-protocol DataSourceUIProvider {
-    
-    // MARK: - 基础属性
-    
-    /// 数据源标识符
-    var source: ContentSource { get }
-    
-    /// 显示名称
-    var displayName: String { get }
-    
-    /// SF Symbol 图标名称
-    var iconName: String { get }
-    
-    /// 品牌强调色
-    var accentColor: Color { get }
-    
-    // MARK: - 通知配置
-    
-    /// 筛选变更通知名称
-    var filterChangedNotification: Notification.Name { get }
-    
-    // MARK: - 功能配置
-    
-    /// 是否有筛选菜单
-    var hasFilterMenu: Bool { get }
-    
-    /// 是否支持高亮颜色筛选
-    var supportsHighlightColors: Bool { get }
-    
-    /// 是否支持同步到 Notion
-    var supportsSync: Bool { get }
-    
-    /// 高亮颜色主题
-    var highlightColorTheme: HighlightColorTheme? { get }
-    
-    // MARK: - 排序配置
-    
-    /// 可用的排序键类型（返回 any 以支持不同枚举）
-    var sortKeyType: any SortKeyType.Type { get }
-    
-    /// 菜单标题（如 "Books", "Articles"）
-    var menuTitle: LocalizedStringKey { get }
-}
-
-/// 排序键协议
-protocol SortKeyType: CaseIterable, Hashable, RawRepresentable where RawValue == String {
-    var displayName: String { get }
-}
-
-extension BookListSortKey: SortKeyType {}
-extension GoodLinksSortKey: SortKeyType {}
-
-/// 空排序键（用于不支持排序的数据源如 Chats）
-enum NoSortKey: String, SortKeyType, CaseIterable {
-    var displayName: String { "" }
-}
-```
-
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+**完成内容**:
+- ✅ 创建了 `Models/Core/DataSourceUIProvider.swift`
+- ✅ 定义了 `DataSourceUIProvider` 协议（source, displayName, iconName, accentColor, filterChangedNotification, hasFilterMenu, supportsHighlightColors, supportsSync, highlightSource, menuTitle）
+- ✅ 定义了 `SortKeyType` 协议并扩展到 `BookListSortKey` 和 `GoodLinksSortKey`
+- ✅ 创建了 `NoSortKey` 空排序键
 
 ---
 
-### P4: 实现各数据源的 UIProvider ⏱️ 约 1.5 小时
+### P4: 实现各数据源的 UIProvider ✅ 已完成
 
 **目标**: 为每个数据源创建 UIProvider 实现
 
-**新建目录**: `Models/DataSourceProviders/`
-
-**新建文件**:
-- `Models/DataSourceProviders/AppleBooksUIProvider.swift`
-- `Models/DataSourceProviders/GoodLinksUIProvider.swift`
-- `Models/DataSourceProviders/WeReadUIProvider.swift`
-- `Models/DataSourceProviders/DedaoUIProvider.swift`
-- `Models/DataSourceProviders/ChatsUIProvider.swift`
-
-**示例** (`AppleBooksUIProvider.swift`):
-
-```swift
-import SwiftUI
-
-struct AppleBooksUIProvider: DataSourceUIProvider {
-    let source: ContentSource = .appleBooks
-    let displayName = "Apple Books"
-    let iconName = "book"
-    var accentColor: Color { Color("BrandAppleBooks") }
-    
-    let filterChangedNotification: Notification.Name = .appleBooksFilterChanged
-    
-    let hasFilterMenu = true
-    let supportsHighlightColors = true
-    let supportsSync = true
-    let highlightColorTheme: HighlightColorTheme? = .appleBooks
-    
-    var sortKeyType: any SortKeyType.Type { BookListSortKey.self }
-    let menuTitle: LocalizedStringKey = "Books"
-}
-```
-
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+**完成内容**:
+- ✅ 创建了 `Models/DataSourceProviders/` 目录
+- ✅ `AppleBooksUIProvider.swift` - Apple Books UI 配置
+- ✅ `GoodLinksUIProvider.swift` - GoodLinks UI 配置
+- ✅ `WeReadUIProvider.swift` - 微信读书 UI 配置
+- ✅ `DedaoUIProvider.swift` - 得到 UI 配置
+- ✅ `ChatsUIProvider.swift` - 对话截图 UI 配置
 
 ---
 
-### P5: 创建 DataSourceRegistry ⏱️ 约 30 分钟
+### P5: 创建 DataSourceRegistry ✅ 已完成
 
 **目标**: 创建注册表，集中管理所有数据源配置
 
-**新建文件**: `Models/Core/DataSourceRegistry.swift`
-
-```swift
-import SwiftUI
-
-/// 数据源注册表
-/// 集中管理所有数据源的 UI 配置，消除 switch 语句
-@MainActor
-final class DataSourceRegistry {
-    
-    static let shared = DataSourceRegistry()
-    
-    /// 所有注册的数据源配置（按 ContentSource 索引）
-    private var providers: [ContentSource: any DataSourceUIProvider] = [:]
-    
-    private init() {
-        register(AppleBooksUIProvider())
-        register(GoodLinksUIProvider())
-        register(WeReadUIProvider())
-        register(DedaoUIProvider())
-        register(ChatsUIProvider())
-    }
-    
-    /// 注册数据源配置
-    func register(_ provider: any DataSourceUIProvider) {
-        providers[provider.source] = provider
-    }
-    
-    /// 获取数据源配置
-    func provider(for source: ContentSource) -> (any DataSourceUIProvider)? {
-        providers[source]
-    }
-    
-    /// 获取所有已注册的数据源
-    var allSources: [ContentSource] {
-        Array(providers.keys).sorted { $0.rawValue < $1.rawValue }
-    }
-}
-
-// MARK: - ContentSource 扩展（代理到 Registry）
-
-extension ContentSource {
-    /// 获取该数据源的 UI 配置
-    var uiProvider: (any DataSourceUIProvider)? {
-        DataSourceRegistry.shared.provider(for: self)
-    }
-    
-    /// 筛选变更通知（从 uiProvider 获取，提供默认值）
-    var filterChangedNotification: Notification.Name {
-        uiProvider?.filterChangedNotification ?? Notification.Name("UnknownFilterChanged")
-    }
-    
-    /// 高亮颜色主题（从 uiProvider 获取）
-    var highlightColorTheme: HighlightColorTheme? {
-        uiProvider?.highlightColorTheme
-    }
-}
-```
-
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+**完成内容**:
+- ✅ 创建了 `Models/Core/DataSourceRegistry.swift`
+- ✅ 实现了单例注册表 `DataSourceRegistry.shared`
+- ✅ 注册了所有 5 个 UIProvider
+- ✅ 添加了 `ContentSource.uiProvider` 扩展
 
 ---
 
-### P6: 统一选择状态管理 ⏱️ 约 1 小时
+### P6: 统一选择状态管理 ✅ 已完成（基础部分）
 
 **目标**: 用 `SelectionState` 类替代 5 个独立的选择变量
 
-**新建文件**: `Models/Core/SelectionState.swift`
+**完成内容**:
+- ✅ 创建了 `Models/Core/SelectionState.swift`
+- ✅ 实现了 `@Observable` 的 `SelectionState` 类
+- ✅ 提供了 `selection(for:)`, `selectionBinding(for:)`, `setSelection(for:ids:)` 等方法
+- ✅ 提供了辅助方法：`hasSingleSelection`, `selectionCount`, `singleSelectedId`, `hasSelection`
 
-```swift
-import SwiftUI
+**⚠️ 集成工作待完成（P6-Integration）**:
 
-/// 统一选择状态管理器
-/// 替代 MainListView 中的 5 个独立 @State 变量
-@Observable
-final class SelectionState {
-    
-    /// 每个数据源的选择状态
-    private var selections: [ContentSource: Set<String>] = [:]
-    
-    /// 获取指定数据源的选择
-    func selection(for source: ContentSource) -> Set<String> {
-        selections[source] ?? []
-    }
-    
-    /// 获取指定数据源选择的 Binding
-    func selectionBinding(for source: ContentSource) -> Binding<Set<String>> {
-        Binding(
-            get: { self.selections[source] ?? [] },
-            set: { self.selections[source] = $0 }
-        )
-    }
-    
-    /// 设置指定数据源的选择
-    func setSelection(for source: ContentSource, ids: Set<String>) {
-        selections[source] = ids
-    }
-    
-    /// 清除所有选择
-    func clearAll() {
-        selections.removeAll()
-    }
-    
-    /// 清除指定数据源的选择
-    func clear(for source: ContentSource) {
-        selections[source] = []
-    }
-    
-    /// 当前数据源是否有单选
-    func hasSingleSelection(for source: ContentSource) -> Bool {
-        selection(for: source).count == 1
-    }
-    
-    /// 获取当前数据源的选中数量
-    func selectionCount(for source: ContentSource) -> Int {
-        selection(for: source).count
-    }
-}
-```
-
-**修改文件**:
+以下文件需要使用 `SelectionState` 替换独立的选择变量：
 - `MainListView.swift` - 替换 5 个 @State 为 `@State var selectionState = SelectionState()`
 - `MainListView+SyncRefresh.swift` - 使用 `selectionState.selection(for:)`
 - `MainListView+DetailViews.swift` - 使用 `selectionState.selectionBinding(for:)`
+- `MainListView+KeyboardMonitor.swift` - 更新选择检查逻辑
 - `SwipeableDataSourceContainer.swift` - 接收 `SelectionState` 而非 5 个 Binding
 
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+**注意**: 此集成工作影响范围较大，建议在单独的会话中完成，以便充分测试。
 
 ---
 
@@ -463,19 +269,21 @@ struct DataSourceFilterMenu<SortKey: SortKeyType>: View {
 ```
 P1 ✅ (已完成)
     ↓
-P2 (统一枚举) → 验证
+P2 ✅ (已完成 - 统一枚举)
     ↓
-P3 (协议定义) → 验证
+P3 ✅ (已完成 - 协议定义)
     ↓
-P4 (实现 Providers) → 验证
+P4 ✅ (已完成 - 实现 Providers)
     ↓
-P5 (Registry) → 验证
+P5 ✅ (已完成 - Registry)
     ↓
-P6 (SelectionState) → 验证
+P6 ✅ (基础完成 - SelectionState 类已创建)
     ↓
-P7 (重构 Switch) → 验证
+P6-Integration ⏳ (待完成 - 集成到 MainListView)
     ↓
-P8 (通用 FilterMenu) → 验证
+P7 ⏳ (待完成 - 重构 Switch)
+    ↓
+P8 ⏳ (待完成 - 通用 FilterMenu)
 ```
 
 ---
@@ -514,6 +322,27 @@ P8 (通用 FilterMenu) → 验证
 
 ---
 
-**文档版本**: 2.0（破坏性重构版）  
+**文档版本**: 2.1  
 **更新时间**: 2026-01-02  
 **作者**: AI Assistant
+
+---
+
+## 变更日志
+
+### 2026-01-02 (v2.1)
+- ✅ 完成 P2: 删除 `SyncSource` 枚举，统一到 `ContentSource`
+- ✅ 完成 P3: 创建 `DataSourceUIProvider` 协议
+- ✅ 完成 P4: 实现 5 个 UIProvider（AppleBooks, GoodLinks, WeRead, Dedao, Chats）
+- ✅ 完成 P5: 创建 `DataSourceRegistry` 注册表
+- ✅ 完成 P6 基础部分: 创建 `SelectionState` 类
+
+### 新增文件
+- `Models/Core/DataSourceUIProvider.swift`
+- `Models/Core/DataSourceRegistry.swift`
+- `Models/Core/SelectionState.swift`
+- `Models/DataSourceProviders/AppleBooksUIProvider.swift`
+- `Models/DataSourceProviders/GoodLinksUIProvider.swift`
+- `Models/DataSourceProviders/WeReadUIProvider.swift`
+- `Models/DataSourceProviders/DedaoUIProvider.swift`
+- `Models/DataSourceProviders/ChatsUIProvider.swift`
