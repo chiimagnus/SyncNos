@@ -1,12 +1,8 @@
 import Foundation
 import Combine
 
-// Localized notification name definitions to avoid stringly-typed usage
-private enum GLNotifications {
-    static let goodLinksFilterChanged = Notification.Name("GoodLinksFilterChanged")
-    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-    static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
-}
+// 使用 NotificationNames.swift 中定义的统一通知名称常量
+// 已删除私有 GLNotifications 枚举
 
 // MARK: - GoodLinksViewModel (List)
 
@@ -96,7 +92,7 @@ final class GoodLinksViewModel: ObservableObject {
     
     private func setupNotificationSubscriptions() {
         // 订阅同步状态通知
-        NotificationCenter.default.publisher(for: GLNotifications.syncBookStatusChanged)
+        NotificationCenter.default.publisher(for: .syncBookStatusChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
@@ -123,7 +119,7 @@ final class GoodLinksViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
-        NotificationCenter.default.publisher(for: GLNotifications.goodLinksFilterChanged)
+        NotificationCenter.default.publisher(for: .goodLinksFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -382,7 +378,7 @@ extension GoodLinksViewModel {
                         await limiter.withPermit {
                             // 发送开始通知
                             await MainActor.run {
-                                NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
+                                NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
                             }
                             do {
                                 // 创建适配器并使用统一同步引擎
@@ -393,20 +389,20 @@ extension GoodLinksViewModel {
                                 )
                                 try await syncEngine.syncSmart(source: adapter) { progress in
                                     Task { @MainActor in
-                                        NotificationCenter.default.post(name: GLNotifications.syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                        NotificationCenter.default.post(name: .syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
                                     }
                                 }
                                 await MainActor.run {
                                     _ = self.syncingLinkIds.remove(id)
                                     _ = self.syncedLinkIds.insert(id)
-                                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
+                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
                                 }
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
                                     self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingLinkIds.remove(id)
-                                    NotificationCenter.default.post(name: GLNotifications.syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo])
+                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo])
                                 }
                             }
                         }

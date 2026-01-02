@@ -13,7 +13,7 @@ extension MainListView {
                 Button {
                     appleBooksVM.sortKey = key
                     NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
+                        name: .appleBooksFilterChanged,
                         object: nil,
                         userInfo: ["sortKey": key.rawValue]
                     )
@@ -31,7 +31,7 @@ extension MainListView {
             Button {
                 appleBooksVM.sortAscending.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("AppleBooksFilterChanged"),
+                    name: .appleBooksFilterChanged,
                     object: nil,
                     userInfo: ["sortAscending": appleBooksVM.sortAscending]
                 )
@@ -48,7 +48,7 @@ extension MainListView {
             Button {
                 appleBooksVM.showWithTitleOnly.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("AppleBooksFilterChanged"),
+                    name: .appleBooksFilterChanged,
                     object: nil,
                     userInfo: ["showWithTitleOnly": appleBooksVM.showWithTitleOnly]
                 )
@@ -69,7 +69,7 @@ extension MainListView {
                 Button {
                     goodLinksVM.sortKey = key
                     NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
+                        name: .goodLinksFilterChanged,
                         object: nil,
                         userInfo: ["sortKey": key.rawValue]
                     )
@@ -87,7 +87,7 @@ extension MainListView {
             Button {
                 goodLinksVM.sortAscending.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("GoodLinksFilterChanged"),
+                    name: .goodLinksFilterChanged,
                     object: nil,
                     userInfo: ["sortAscending": goodLinksVM.sortAscending]
                 )
@@ -104,7 +104,7 @@ extension MainListView {
             Button {
                 goodLinksVM.showStarredOnly.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("GoodLinksFilterChanged"),
+                    name: .goodLinksFilterChanged,
                     object: nil,
                     userInfo: ["showStarredOnly": goodLinksVM.showStarredOnly]
                 )
@@ -126,7 +126,7 @@ extension MainListView {
                 Button {
                     weReadVM.sortKey = key
                     NotificationCenter.default.post(
-                        name: Notification.Name("WeReadFilterChanged"),
+                        name: .weReadFilterChanged,
                         object: nil,
                         userInfo: ["sortKey": key.rawValue]
                     )
@@ -144,7 +144,7 @@ extension MainListView {
             Button {
                 weReadVM.sortAscending.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("WeReadFilterChanged"),
+                    name: .weReadFilterChanged,
                     object: nil,
                     userInfo: ["sortAscending": weReadVM.sortAscending]
                 )
@@ -166,7 +166,7 @@ extension MainListView {
                 Button {
                     dedaoVM.sortKey = key
                     NotificationCenter.default.post(
-                        name: Notification.Name("DedaoFilterChanged"),
+                        name: .dedaoFilterChanged,
                         object: nil,
                         userInfo: ["sortKey": key.rawValue]
                     )
@@ -184,7 +184,7 @@ extension MainListView {
             Button {
                 dedaoVM.sortAscending.toggle()
                 NotificationCenter.default.post(
-                    name: Notification.Name("DedaoFilterChanged"),
+                    name: .dedaoFilterChanged,
                     object: nil,
                     userInfo: ["sortAscending": dedaoVM.sortAscending]
                 )
