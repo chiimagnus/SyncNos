@@ -48,6 +48,23 @@ enum ContentSource: String, Codable, CaseIterable {
         }
     }
     
+    /// 品牌颜色背景透明度（用于 SyncQueueView 等）
+    var brandBackgroundOpacity: Double {
+        switch self {
+        case .appleBooks: return 0.18
+        case .goodLinks: return 0.12
+        case .weRead: return 0.14
+        case .dedao: return 0.14
+        case .chats: return 0.14
+        }
+    }
+    
+    /// SF Symbol 图标名称（别名，与 icon 相同）
+    var iconName: String { icon }
+    
+    /// 品牌颜色（别名，与 accentColor 相同）
+    var brandColor: Color { accentColor }
+    
     /// UserDefaults 启用状态键
     var enabledKey: String {
         "datasource.\(rawValue).enabled"

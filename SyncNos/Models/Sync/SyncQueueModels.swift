@@ -1,57 +1,9 @@
 import Foundation
 import SwiftUI
 
-enum SyncSource: String, Codable, CaseIterable, Sendable {
-    case appleBooks
-    case goodLinks
-    case weRead
-    case dedao
-    case chats
-    
-    /// 显示名称
-    var displayName: String {
-        switch self {
-        case .appleBooks: return "Apple Books"
-        case .goodLinks: return "GoodLinks"
-        case .weRead: return "WeRead"
-        case .dedao: return "Dedao"
-        case .chats: return "Chats"
-        }
-    }
-    
-    /// SF Symbol 图标
-    var iconName: String {
-        switch self {
-        case .appleBooks: return "book"
-        case .goodLinks: return "bookmark"
-        case .weRead: return "w.square"
-        case .dedao: return "d.square"
-        case .chats: return "message"
-        }
-    }
-    
-    /// 品牌颜色
-    var brandColor: Color {
-        switch self {
-        case .appleBooks: return Color("BrandAppleBooks")
-        case .goodLinks: return Color("BrandGoodLinks")
-        case .weRead: return Color("BrandWeRead")
-        case .dedao: return Color("BrandDedao")
-        case .chats: return .green
-        }
-    }
-    
-    /// 品牌颜色背景透明度
-    var brandBackgroundOpacity: Double {
-        switch self {
-        case .appleBooks: return 0.18
-        case .goodLinks: return 0.12
-        case .weRead: return 0.14
-        case .dedao: return 0.14
-        case .chats: return 0.14
-        }
-    }
-}  
+// MARK: - SyncSource 类型别名（兼容过渡，将逐步移除）
+// SyncSource 已统一到 ContentSource（定义在 Models/Core/Models.swift）
+typealias SyncSource = ContentSource
 
 enum SyncTaskState: String, Codable, Sendable {
     case queued
