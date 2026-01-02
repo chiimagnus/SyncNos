@@ -129,7 +129,7 @@
 
 ---
 
-### P6: 统一选择状态管理 ✅ 已完成（基础部分）
+### P6: 统一选择状态管理 ✅ 已完成
 
 **目标**: 用 `SelectionState` 类替代 5 个独立的选择变量
 
@@ -139,16 +139,19 @@
 - ✅ 提供了 `selection(for:)`, `selectionBinding(for:)`, `setSelection(for:ids:)` 等方法
 - ✅ 提供了辅助方法：`hasSingleSelection`, `selectionCount`, `singleSelectedId`, `hasSelection`
 
-**⚠️ 集成工作待完成（P6-Integration）**:
+**✅ 集成工作已完成（P6-Integration）**:
 
-以下文件需要使用 `SelectionState` 替换独立的选择变量：
-- `MainListView.swift` - 替换 5 个 @State 为 `@State var selectionState = SelectionState()`
-- `MainListView+SyncRefresh.swift` - 使用 `selectionState.selection(for:)`
-- `MainListView+DetailViews.swift` - 使用 `selectionState.selectionBinding(for:)`
-- `MainListView+KeyboardMonitor.swift` - 更新选择检查逻辑
-- `SwipeableDataSourceContainer.swift` - 接收 `SelectionState` 而非 5 个 Binding
+已完成以下文件的重构：
+- ✅ `MainListView.swift` - 替换 5 个 @State 为 `@State var selectionState = SelectionState()`
+- ✅ `MainListView+SyncRefresh.swift` - 使用 `selectionState.selection(for:)`
+- ✅ `MainListView+DetailViews.swift` - 使用 `selectionState.selectionBinding(for:)` 和相关方法
+- ✅ `MainListView+KeyboardMonitor.swift` - 使用 `selectionState.hasSingleSelection(for:)`（从 12 行 switch 简化为 1 行）
+- ✅ `SwipeableDataSourceContainer.swift` - 接收 `SelectionState` 替代 5 个 Binding
 
-**注意**: 此集成工作影响范围较大，建议在单独的会话中完成，以便充分测试。
+**重构收益**:
+- 减少了约 50 行重复的选择状态代码
+- 消除了 3 处数据源相关的 switch 语句
+- 统一的选择状态 API，便于后续扩展
 
 ---
 
@@ -277,9 +280,7 @@ P4 ✅ (已完成 - 实现 Providers)
     ↓
 P5 ✅ (已完成 - Registry)
     ↓
-P6 ✅ (基础完成 - SelectionState 类已创建)
-    ↓
-P6-Integration ⏳ (待完成 - 集成到 MainListView)
+P6 ✅ (已完成 - SelectionState 类及集成)
     ↓
 P7 ⏳ (待完成 - 重构 Switch)
     ↓
@@ -335,7 +336,10 @@ P8 ⏳ (待完成 - 通用 FilterMenu)
 - ✅ 完成 P3: 创建 `DataSourceUIProvider` 协议
 - ✅ 完成 P4: 实现 5 个 UIProvider（AppleBooks, GoodLinks, WeRead, Dedao, Chats）
 - ✅ 完成 P5: 创建 `DataSourceRegistry` 注册表
-- ✅ 完成 P6 基础部分: 创建 `SelectionState` 类
+- ✅ 完成 P6: 创建 `SelectionState` 类并集成到 MainListView
+  - 替换 `MainListView` 中 5 个独立的选择状态变量为统一的 `SelectionState`
+  - 更新 `MainListView+SyncRefresh.swift`、`MainListView+DetailViews.swift`、`MainListView+KeyboardMonitor.swift`
+  - 更新 `SwipeableDataSourceContainer.swift` 接收 `SelectionState` 替代 5 个 Binding
 
 ### 新增文件
 - `Models/Core/DataSourceUIProvider.swift`
@@ -346,3 +350,10 @@ P8 ⏳ (待完成 - 通用 FilterMenu)
 - `Models/DataSourceProviders/WeReadUIProvider.swift`
 - `Models/DataSourceProviders/DedaoUIProvider.swift`
 - `Models/DataSourceProviders/ChatsUIProvider.swift`
+
+### 修改文件（P6-Integration）
+- `Views/Components/Main/MainListView.swift`
+- `Views/Components/Main/MainListView+SyncRefresh.swift`
+- `Views/Components/Main/MainListView+DetailViews.swift`
+- `Views/Components/Main/MainListView+KeyboardMonitor.swift`
+- `Views/Components/Controls/SwipeableDataSourceContainer.swift`
