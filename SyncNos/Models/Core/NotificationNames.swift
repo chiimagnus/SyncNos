@@ -66,6 +66,19 @@ extension Notification.Name {
     // MARK: - 字体缩放通知
     /// 字体缩放变更
     static let fontScaleChanged = Notification.Name("FontScaleChanged")
+    
+    // MARK: - 登录状态通知
+    
+    /// WeRead 登录状态变更
+    static let weReadLoginStatusChanged = Notification.Name("WeReadLoginStatusChanged")
+    
+    /// Dedao 登录状态变更
+    static let dedaoLoginStatusChanged = Notification.Name("DedaoLoginStatusChanged")
+    
+    // MARK: - 数据源顺序通知
+    
+    /// 数据源顺序变更
+    static let dataSourceOrderChanged = Notification.Name("DataSourceOrderChanged")
 }
 
 // MARK: - ContentSource 通知扩展
