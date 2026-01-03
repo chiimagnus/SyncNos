@@ -1,3 +1,6 @@
+## v0.11.0
+**Key updates:** Optimize the code architecture, adopt protocol-driven development.
+
 ## v0.10.5
 **Key updates:** Chat logs are synchronized to the notion database with support for automatic and manual synchronization.
 

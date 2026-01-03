@@ -47,7 +47,7 @@ sed -i '' 's/"目标字符串" : {/"目标字符串" : {\
       },/' Resource/Localizable.xcstrings
 
 # 步骤 2: 压缩格式（可选，统一风格）
-python3 .cursor/rules/compact_xcstrings.py
+python3 .cursor/scripts/compact_xcstrings.py
 
 # 步骤 3: 验证
 python3 -m json.tool Resource/Localizable.xcstrings > /dev/null && echo "✅ JSON valid"
@@ -105,7 +105,7 @@ sed -i '' 's/"Active" : {/"Active" : {\
 ### 步骤 4：运行格式压缩脚本
 
 ```bash
-python3 .cursor/rules/compact_xcstrings.py
+python3 .cursor/scripts/compact_xcstrings.py
 ```
 
 **功能：**
@@ -127,19 +127,19 @@ xcodebuild -scheme SyncNos -configuration Debug build -quiet
 
 ## 格式压缩脚本
 
-位置：`.cursor/rules/compact_xcstrings.py`
+位置：`.cursor/scripts/compact_xcstrings.py`
 
 ### 使用方法
 
 ```bash
 # 方式 1：默认处理 Resource/Localizable.xcstrings
-python3 .cursor/rules/compact_xcstrings.py
+python3 .cursor/scripts/compact_xcstrings.py
 
 # 方式 2：指定自定义路径
-python3 .cursor/rules/compact_xcstrings.py path/to/file.xcstrings
+python3 .cursor/scripts/compact_xcstrings.py path/to/file.xcstrings
 
 # 方式 3：直接执行
-./.cursor/rules/compact_xcstrings.py
+./.cursor/scripts/compact_xcstrings.py
 ```
 
 ### 压缩效果
@@ -241,7 +241,7 @@ sed -i '' 's/"YOUR_STRING" : {/"YOUR_STRING" : {\
 cd /Users/chii_magnus/Github_OpenSource/SyncNos && \
 sed -i '' 's/"String1" : {/.../' Resource/Localizable.xcstrings && \
 sed -i '' 's/"String2" : {/.../' Resource/Localizable.xcstrings && \
-python3 .cursor/rules/compact_xcstrings.py
+python3 .cursor/scripts/compact_xcstrings.py
 ```
 
 ---
@@ -309,7 +309,7 @@ git checkout -- Resource/Localizable.xcstrings
 | 文件 | 路径 |
 |-----|------|
 | **Localizable.xcstrings** | `Resource/Localizable.xcstrings` |
-| **格式压缩脚本** | `.cursor/rules/compact_xcstrings.py` |
+| **格式压缩脚本** | `.cursor/scripts/compact_xcstrings.py` |
 | **本指南** | `.cursor/rules/国际化翻译流程指南.mdc` |
 
 ---

@@ -345,7 +345,7 @@ struct GoodLinksDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .refreshBooksRequested).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
                 // 保存当前展开状态
                 let wasExpanded = articleIsExpanded
@@ -381,14 +381,14 @@ struct GoodLinksDetailView: View {
         .onChange(of: detailViewModel.selectedStyles) { _, _ in
             detailViewModel.reapplyFilters()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncProgressUpdated")).receive(on: DispatchQueue.main)) { n in
+        .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
             if bookId == (selectedLinkId ?? "") {
                 externalIsSyncing = true
                 externalSyncProgress = info["progress"] as? String
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncBookStatusChanged")).receive(on: DispatchQueue.main)) { n in
+        .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
             if bookId == (selectedLinkId ?? "") {
                 switch status {

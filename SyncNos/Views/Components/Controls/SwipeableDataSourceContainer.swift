@@ -13,12 +13,8 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     @ObservedObject var dedaoVM: DedaoViewModel
     @ObservedObject var chatsVM: ChatViewModel
     
-    // 选择状态绑定
-    @Binding var selectedBookIds: Set<String>
-    @Binding var selectedLinkIds: Set<String>
-    @Binding var selectedWeReadBookIds: Set<String>
-    @Binding var selectedDedaoBookIds: Set<String>
-    @Binding var selectedChatsContactIds: Set<String>
+    // 统一选择状态管理
+    var selectionState: SelectionState
     
     // Filter 菜单
     @ViewBuilder var filterMenu: () -> FilterMenu
@@ -135,93 +131,44 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             )
         }
         
+        // 使用 SelectionState 统一处理选择逻辑
+        let allIds: Set<String>
+        let totalCount: Int
+        
         switch currentSource {
         case .appleBooks:
-            return SelectionCommands(
-                selectAll: {
-                    let all = Set(appleBooksVM.displayBooks.map { $0.bookId })
-                    if !all.isEmpty { selectedBookIds = all }
-                },
-                deselectAll: {
-                    selectedBookIds.removeAll()
-                },
-                canSelectAll: {
-                    let total = appleBooksVM.displayBooks.count
-                    return total > 0 && selectedBookIds.count < total
-                },
-                canDeselect: {
-                    !selectedBookIds.isEmpty
-                }
-            )
+            allIds = Set(appleBooksVM.displayBooks.map { $0.bookId })
+            totalCount = appleBooksVM.displayBooks.count
         case .goodLinks:
-            return SelectionCommands(
-                selectAll: {
-                    let all = Set(goodLinksVM.displayLinks.map { $0.id })
-                    if !all.isEmpty { selectedLinkIds = all }
-                },
-                deselectAll: {
-                    selectedLinkIds.removeAll()
-                },
-                canSelectAll: {
-                    let total = goodLinksVM.displayLinks.count
-                    return total > 0 && selectedLinkIds.count < total
-                },
-                canDeselect: {
-                    !selectedLinkIds.isEmpty
-                }
-            )
+            allIds = Set(goodLinksVM.displayLinks.map { $0.id })
+            totalCount = goodLinksVM.displayLinks.count
         case .weRead:
-            return SelectionCommands(
-                selectAll: {
-                    let all = Set(weReadVM.displayBooks.map { $0.bookId })
-                    if !all.isEmpty { selectedWeReadBookIds = all }
-                },
-                deselectAll: {
-                    selectedWeReadBookIds.removeAll()
-                },
-                canSelectAll: {
-                    let total = weReadVM.displayBooks.count
-                    return total > 0 && selectedWeReadBookIds.count < total
-                },
-                canDeselect: {
-                    !selectedWeReadBookIds.isEmpty
-                }
-            )
+            allIds = Set(weReadVM.displayBooks.map { $0.bookId })
+            totalCount = weReadVM.displayBooks.count
         case .dedao:
-            return SelectionCommands(
-                selectAll: {
-                    let all = Set(dedaoVM.displayBooks.map { $0.bookId })
-                    if !all.isEmpty { selectedDedaoBookIds = all }
-                },
-                deselectAll: {
-                    selectedDedaoBookIds.removeAll()
-                },
-                canSelectAll: {
-                    let total = dedaoVM.displayBooks.count
-                    return total > 0 && selectedDedaoBookIds.count < total
-                },
-                canDeselect: {
-                    !selectedDedaoBookIds.isEmpty
-                }
-            )
+            allIds = Set(dedaoVM.displayBooks.map { $0.bookId })
+            totalCount = dedaoVM.displayBooks.count
         case .chats:
-            return SelectionCommands(
-                selectAll: {
-                    let all = Set(chatsVM.contacts.map { $0.id })
-                    if !all.isEmpty { selectedChatsContactIds = all }
-                },
-                deselectAll: {
-                    selectedChatsContactIds.removeAll()
-                },
-                canSelectAll: {
-                    let total = chatsVM.contacts.count
-                    return total > 0 && selectedChatsContactIds.count < total
-                },
-                canDeselect: {
-                    !selectedChatsContactIds.isEmpty
-                }
-            )
+            allIds = Set(chatsVM.contacts.map { $0.id })
+            totalCount = chatsVM.contacts.count
         }
+        
+        return SelectionCommands(
+            selectAll: { [selectionState] in
+                if !allIds.isEmpty {
+                    selectionState.setSelection(for: currentSource, ids: allIds)
+                }
+            },
+            deselectAll: { [selectionState] in
+                selectionState.clear(for: currentSource)
+            },
+            canSelectAll: { [selectionState] in
+                totalCount > 0 && selectionState.selectionCount(for: currentSource) < totalCount
+            },
+            canDeselect: { [selectionState] in
+                selectionState.hasSelection(for: currentSource)
+            }
+        )
     }
     
     // MARK: - Private Views
@@ -230,15 +177,15 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     private func dataSourceView(for source: ContentSource) -> some View {
         switch source {
         case .appleBooks:
-            AppleBooksListView(viewModel: appleBooksVM, selectionIds: $selectedBookIds)
+            AppleBooksListView(viewModel: appleBooksVM, selectionIds: selectionState.selectionBinding(for: .appleBooks))
         case .goodLinks:
-            GoodLinksListView(viewModel: goodLinksVM, selectionIds: $selectedLinkIds)
+            GoodLinksListView(viewModel: goodLinksVM, selectionIds: selectionState.selectionBinding(for: .goodLinks))
         case .weRead:
-            WeReadListView(viewModel: weReadVM, selectionIds: $selectedWeReadBookIds)
+            WeReadListView(viewModel: weReadVM, selectionIds: selectionState.selectionBinding(for: .weRead))
         case .dedao:
-            DedaoListView(viewModel: dedaoVM, selectionIds: $selectedDedaoBookIds)
+            DedaoListView(viewModel: dedaoVM, selectionIds: selectionState.selectionBinding(for: .dedao))
         case .chats:
-            ChatListView(viewModel: chatsVM, selectionIds: $selectedChatsContactIds)
+            ChatListView(viewModel: chatsVM, selectionIds: selectionState.selectionBinding(for: .chats))
         }
     }
     
@@ -262,10 +209,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     
     /// 清空所有数据源的选择
     private func clearAllSelections() {
-        selectedBookIds.removeAll()
-        selectedLinkIds.removeAll()
-        selectedWeReadBookIds.removeAll()
-        selectedDedaoBookIds.removeAll()
+        selectionState.clearAll()
     }
 }
 
@@ -456,9 +400,3 @@ private struct WindowAccessor: NSViewRepresentable {
         }
     }
 }
-
-// Preview disabled due to dependency injection requirements
-// #Preview {
-//     SwipeableDataSourceContainer(...)
-// }
-

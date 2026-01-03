@@ -52,7 +52,7 @@ final class DatabasePathHelper {
 final class AutoSyncService: AutoSyncServiceProtocol {
     private let logger: LoggerServiceProtocol
     private let notionConfig: NotionConfigStoreProtocol
-    private let providers: [SyncSource: AutoSyncSourceProvider]
+    private let providers: [ContentSource: AutoSyncSourceProvider]
 
     private var timerCancellable: AnyCancellable?
     private var notificationCancellable: AnyCancellable?
@@ -67,7 +67,7 @@ final class AutoSyncService: AutoSyncServiceProtocol {
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        providers: [SyncSource: AutoSyncSourceProvider]? = nil,
+        providers: [ContentSource: AutoSyncSourceProvider]? = nil,
         intervalSeconds: TimeInterval = 5 * 60  // 5分钟
     ) {
         self.logger = logger
@@ -121,10 +121,10 @@ final class AutoSyncService: AutoSyncServiceProtocol {
         logger.info("[SmartSync] AutoSyncService starting…")
 
         // 监听数据源选择完成或刷新事件，触发一次同步（Apple Books、GoodLinks、WeRead）
-        notificationCancellable = NotificationCenter.default.publisher(for: Notification.Name("AppleBooksContainerSelected"))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("GoodLinksFolderSelected")))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("WeReadLoginSucceeded")))
-            .merge(with: NotificationCenter.default.publisher(for: Notification.Name("RefreshBooksRequested")))
+        notificationCancellable = NotificationCenter.default.publisher(for: .appleBooksContainerSelected)
+            .merge(with: NotificationCenter.default.publisher(for: .goodLinksFolderSelected))
+            .merge(with: NotificationCenter.default.publisher(for: .weReadLoginSucceeded))
+            .merge(with: NotificationCenter.default.publisher(for: .refreshBooksRequested))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.triggerSyncNow()

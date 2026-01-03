@@ -171,18 +171,7 @@ extension MainListView {
     }
     
     func hasSingleSelectionForCurrentSource() -> Bool {
-        switch contentSource {
-        case .appleBooks:
-            return selectedBookIds.count == 1
-        case .goodLinks:
-            return selectedLinkIds.count == 1
-        case .weRead:
-            return selectedWeReadBookIds.count == 1
-        case .dedao:
-            return selectedDedaoBookIds.count == 1
-        case .chats:
-            return selectedChatsContactIds.count == 1
-        }
+        selectionState.hasSingleSelection(for: contentSource)
     }
     
     // MARK: - Scroll Helpers
