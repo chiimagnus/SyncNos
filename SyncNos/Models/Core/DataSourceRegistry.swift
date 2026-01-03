@@ -62,5 +62,29 @@ extension ContentSource {
     var uiProvider: (any DataSourceUIProvider)? {
         DataSourceRegistry.shared.provider(for: self)
     }
+    
+    /// 筛选变更通知名称
+    @MainActor
+    var filterChangedNotification: Notification.Name {
+        uiProvider?.filterChangedNotification ?? Notification.Name("UnknownFilterChanged")
+    }
+    
+    /// 高亮颜色主题（可选，Chats 等不支持的返回 nil）
+    @MainActor
+    var highlightColorTheme: HighlightColorTheme? {
+        uiProvider?.highlightColorTheme
+    }
+    
+    /// 高亮颜色来源
+    @MainActor
+    var highlightSource: HighlightSource {
+        uiProvider?.highlightSource ?? .appleBooks
+    }
+    
+    /// UserDefaults 启用状态存储键
+    @MainActor
+    var enabledStorageKey: String {
+        uiProvider?.enabledStorageKey ?? "datasource.\(rawValue).enabled"
+    }
 }
 

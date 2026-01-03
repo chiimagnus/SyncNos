@@ -54,13 +54,15 @@ extension MainListView {
         let selectedIds = selectionState.selection(for: contentSource)
         
         Task {
-            // 根据当前数据源获取选中的 ID、书名和 sourceKey
-            let sourceKey: String
+            // 使用协议驱动获取 sourceKey，消除部分 switch 语句
+            let sourceKey = contentSource.sourceKey
+            
+            // 根据当前数据源获取选中的 ID 和书名
+            // 注：此 switch 保留是因为各 ViewModel 的数据集合类型和属性不同
             let selectedItems: [(id: String, title: String)]
             
             switch contentSource {
             case .appleBooks:
-                sourceKey = "appleBooks"
                 selectedItems = selectedIds.compactMap { id in
                     if let book = appleBooksVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.bookTitle)
@@ -68,7 +70,6 @@ extension MainListView {
                     return nil
                 }
             case .goodLinks:
-                sourceKey = "goodLinks"
                 selectedItems = selectedIds.compactMap { id in
                     if let link = goodLinksVM.links.first(where: { $0.id == id }) {
                         return (id: id, title: link.title ?? "Unknown")
@@ -76,7 +77,6 @@ extension MainListView {
                     return nil
                 }
             case .weRead:
-                sourceKey = "weRead"
                 selectedItems = selectedIds.compactMap { id in
                     if let book = weReadVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
@@ -84,7 +84,6 @@ extension MainListView {
                     return nil
                 }
             case .dedao:
-                sourceKey = "dedao"
                 selectedItems = selectedIds.compactMap { id in
                     if let book = dedaoVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
@@ -92,7 +91,6 @@ extension MainListView {
                     return nil
                 }
             case .chats:
-                sourceKey = "chats"
                 selectedItems = selectedIds.compactMap { id in
                     if let contact = chatsVM.contacts.first(where: { $0.id == id }) {
                         return (id: id, title: contact.name)
