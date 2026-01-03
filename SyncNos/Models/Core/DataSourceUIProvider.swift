@@ -48,6 +48,16 @@ protocol DataSourceUIProvider {
     
     /// 菜单标题（如 "Books", "Articles"）
     var menuTitle: LocalizedStringKey { get }
+    
+    // MARK: - 存储配置
+    
+    /// UserDefaults 启用状态键（如 "datasource.appleBooks.enabled"）
+    var enabledStorageKey: String { get }
+    
+    // MARK: - 高亮颜色
+    
+    /// 高亮颜色主题（用于 ViewCommands 颜色筛选，不支持高亮颜色的数据源返回 nil）
+    var highlightColorTheme: HighlightColorTheme? { get }
 }
 
 // MARK: - SortKeyType 协议

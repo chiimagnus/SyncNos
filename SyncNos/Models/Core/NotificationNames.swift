@@ -160,16 +160,7 @@ extension Notification.Name {
 // MARK: - ContentSource 通知扩展
 
 extension ContentSource {
-    /// 该数据源的筛选变更通知名称
-    var filterChangedNotification: Notification.Name {
-        switch self {
-        case .appleBooks: return .appleBooksFilterChanged
-        case .goodLinks: return .goodLinksFilterChanged
-        case .weRead: return .weReadFilterChanged
-        case .dedao: return .dedaoFilterChanged
-        case .chats: return .chatsFilterChanged
-        }
-    }
+    // 注：filterChangedNotification 已迁移至 DataSourceRegistry.swift（协议驱动）
     
     /// 该数据源的 List 焦点请求通知名称
     var listFocusRequestedNotification: Notification.Name {

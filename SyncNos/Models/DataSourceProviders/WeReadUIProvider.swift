@@ -24,5 +24,13 @@ struct WeReadUIProvider: DataSourceUIProvider {
     // MARK: - 菜单配置
     
     let menuTitle: LocalizedStringKey = "Books"
+    
+    // MARK: - 存储配置
+    
+    let enabledStorageKey = "datasource.weRead.enabled"
+    
+    // MARK: - 高亮颜色
+    
+    let highlightColorTheme: HighlightColorTheme? = .weRead
 }
 
