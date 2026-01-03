@@ -5,7 +5,7 @@ import Foundation
 /// 智能增量同步：只同步有变更的内容，通过比较「内容修改时间」与「上次同步时间」判断
 protocol AutoSyncSourceProvider: AnyObject {
     /// 对应的同步来源标识
-    var id: SyncSource { get }
+    var id: ContentSource { get }
     /// 控制该来源自动同步的 UserDefaults key（例如 `"autoSync.appleBooks"`）
     var autoSyncUserDefaultsKey: String { get }
 

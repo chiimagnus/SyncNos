@@ -48,10 +48,31 @@ enum ContentSource: String, Codable, CaseIterable {
         }
     }
     
+    /// 品牌颜色背景透明度（用于 SyncQueueView 等）
+    var brandBackgroundOpacity: Double {
+        switch self {
+        case .appleBooks: return 0.18
+        case .goodLinks: return 0.12
+        case .weRead: return 0.14
+        case .dedao: return 0.14
+        case .chats: return 0.14
+        }
+    }
+    
+    /// SF Symbol 图标名称（别名，与 icon 相同）
+    var iconName: String { icon }
+    
+    /// 品牌颜色（别名，与 accentColor 相同）
+    var brandColor: Color { accentColor }
+    
     /// UserDefaults 启用状态键
     var enabledKey: String {
         "datasource.\(rawValue).enabled"
     }
+    
+    /// 同步记录存储键（用于 SyncedHighlightStore）
+    /// 与 rawValue 相同，提供语义化访问
+    var sourceKey: String { rawValue }
     
     // MARK: - Custom Order
     
@@ -60,14 +81,6 @@ enum ContentSource: String, Codable, CaseIterable {
     
     /// 旧版本顺序 key（Data(JSON)），V2 不读取；写入 V2 时会清理
     static let legacyOrderKey = "datasource.customOrder"
-    
-    // MARK: - List Focus Notifications
-    
-    /// 请求对应数据源 ListView 获取焦点的通知
-    /// 仅用于焦点请求，与数据源切换解耦
-    var listFocusRequestedNotification: Notification.Name {
-        Notification.Name("ListFocusRequested.\(rawValue)")
-    }
     
     /// 获取用户自定义的数据源顺序（如果没有自定义，返回默认顺序）
     static var customOrder: [ContentSource] {

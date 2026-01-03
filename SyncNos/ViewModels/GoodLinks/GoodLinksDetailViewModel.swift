@@ -28,15 +28,6 @@ enum ContentLoadState: Equatable {
 /// 管理单个 link 的高亮数据、筛选、排序、同步
 @MainActor
 final class GoodLinksDetailViewModel: ObservableObject {
-    // MARK: - Notification Names
-    
-    private enum Notifications {
-        static let highlightSortChanged = Notification.Name("HighlightSortChanged")
-        static let highlightFilterChanged = Notification.Name("HighlightFilterChanged")
-        static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-        static let syncProgressUpdated = Notification.Name("SyncProgressUpdated")
-    }
-    
     // MARK: - UserDefaults Keys
     
     private enum Keys {
@@ -157,7 +148,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     private func setupNotificationSubscriptions() {
         // Subscribe to global highlight sort changes from AppCommands
-        NotificationCenter.default.publisher(for: Notifications.highlightSortChanged)
+        NotificationCenter.default.publisher(for: .highlightSortChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in
@@ -173,7 +164,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // Subscribe to global highlight filter changes from AppCommands
-        NotificationCenter.default.publisher(for: Notifications.highlightFilterChanged)
+        NotificationCenter.default.publisher(for: .highlightFilterChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] userInfo in

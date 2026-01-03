@@ -4,7 +4,7 @@ import SwiftUI
 
 /// 数据源标签徽章（可复用）
 struct SyncSourceBadge: View {
-    let source: SyncSource
+    let source: ContentSource
     
     var body: some View {
         Label(source.displayName, systemImage: source.iconName)
@@ -417,7 +417,7 @@ struct SyncQueueView: View {
     
     private func selectTask(_ task: SyncQueueTask) {
         NotificationCenter.default.post(
-            name: Notification.Name("SyncQueueTaskSelected"),
+            name: .syncQueueTaskSelected,
             object: nil,
             userInfo: ["source": task.source.rawValue, "id": task.rawId]
         )

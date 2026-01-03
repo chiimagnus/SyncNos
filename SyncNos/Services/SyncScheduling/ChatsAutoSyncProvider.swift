@@ -12,7 +12,7 @@ import Foundation
 /// - 定时同步触发时不执行实际同步（因为没有外部变化需要检测）
 /// - 仅提供手动触发接口，供未来扩展使用
 final class ChatsAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .chats
+    let id: ContentSource = .chats
     let autoSyncUserDefaultsKey: String = "autoSync.chats"
     
     private let logger: LoggerServiceProtocol

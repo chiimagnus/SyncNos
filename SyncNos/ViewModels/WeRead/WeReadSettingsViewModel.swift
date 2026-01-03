@@ -81,7 +81,7 @@ final class WeReadSettingsViewModel: ObservableObject {
                 refreshLoginStatus()
                 message = String(localized: "Logged Out")
                 // 发送登录状态变化通知，让 WeReadListView/WeReadViewModel 更新 UI
-                NotificationCenter.default.post(name: Notification.Name("WeReadLoginStatusChanged"), object: nil)
+                NotificationCenter.default.post(name: .weReadLoginStatusChanged, object: nil)
             }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {

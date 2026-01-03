@@ -25,7 +25,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         // 注意：入队现在通过 enqueue() 方法直接调用，不再监听 SyncTasksEnqueued 通知
 
         // 运行状态事件（started/succeeded/failed）
-        notificationCenter.publisher(for: Notification.Name("SyncBookStatusChanged"))
+        notificationCenter.publisher(for: .syncBookStatusChanged)
             .compactMap { $0.userInfo as? [String: Any] }
             .sink { [weak self] info in
                 guard let self else { return }
@@ -34,7 +34,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             .store(in: &cancellables)
 
         // 进度更新事件
-        notificationCenter.publisher(for: Notification.Name("SyncProgressUpdated"))
+        notificationCenter.publisher(for: .syncProgressUpdated)
             .compactMap { $0.userInfo as? [String: Any] }
             .sink { [weak self] info in
                 guard let self else { return }
@@ -62,7 +62,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     ///   - items: 待入队的任务列表
     /// - Returns: 实际被接受入队的任务 ID 集合
     @MainActor
-    func enqueue(source: SyncSource, items: [SyncEnqueueItem]) -> Set<String> {
+    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> Set<String> {
         var acceptedIds: Set<String> = []
         
         stateQueue.sync {
@@ -105,7 +105,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     }
     
     /// 检查任务是否正在处理（queued 或 running）
-    func isTaskActive(source: SyncSource, rawId: String) -> Bool {
+    func isTaskActive(source: ContentSource, rawId: String) -> Bool {
         let taskId = "\(source.rawValue):\(rawId)"
         return stateQueue.sync {
             guard let task = tasksById[taskId] else { return false }
@@ -114,7 +114,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     }
     
     /// 批量检查，返回正在处理的任务 ID
-    func activeTaskIds(source: SyncSource, rawIds: Set<String>) -> Set<String> {
+    func activeTaskIds(source: ContentSource, rawIds: Set<String>) -> Set<String> {
         stateQueue.sync {
             rawIds.filter { rawId in
                 let taskId = "\(source.rawValue):\(rawId)"
@@ -132,7 +132,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     ///   - rawId: 任务原始 ID
     /// - Returns: 是否成功取消
     @discardableResult
-    func cancelTask(source: SyncSource, rawId: String) -> Bool {
+    func cancelTask(source: ContentSource, rawId: String) -> Bool {
         let taskId = "\(source.rawValue):\(rawId)"
         var cancelled = false
         
@@ -152,7 +152,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             publish()
             // 发送取消通知，以便 SyncActivityMonitor 等组件感知
             notificationCenter.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": rawId, "status": "cancelled"]
             )
@@ -165,7 +165,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     /// - Parameter source: 数据源类型，nil 表示所有来源
     /// - Returns: 取消的任务数量
     @discardableResult
-    func cancelAllQueued(source: SyncSource? = nil) -> Int {
+    func cancelAllQueued(source: ContentSource? = nil) -> Int {
         var cancelledCount = 0
         var cancelledRawIds: [String] = []
         
@@ -191,7 +191,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             // 批量发送取消通知
             for rawId in cancelledRawIds {
                 notificationCenter.post(
-                    name: Notification.Name("SyncBookStatusChanged"),
+                    name: .syncBookStatusChanged,
                     object: nil,
                     userInfo: ["bookId": rawId, "status": "cancelled"]
                 )

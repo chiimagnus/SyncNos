@@ -3,7 +3,7 @@ import Foundation
 /// Apple Books 自动同步提供者，实现基于数据库的智能增量同步逻辑
 /// 通过比较「高亮修改时间」与「上次同步时间」判断是否需要同步
 final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .appleBooks
+    let id: ContentSource = .appleBooks
     let autoSyncUserDefaultsKey: String = "autoSync.appleBooks"
 
     private let logger: LoggerServiceProtocol
@@ -151,7 +151,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             // 情况 3：书籍无变更 → 跳过
             logger.debug("[SmartSync] AppleBooks: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": id, "status": "skipped"]
             )
@@ -209,11 +209,11 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
                     await limiter.withPermit {
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStarted"),
+                            name: .syncBookStarted,
                             object: id
                         )
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
+                            name: .syncBookStatusChanged,
                             object: nil,
                             userInfo: ["bookId": id, "status": "started"]
                         )
@@ -221,13 +221,13 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                             let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
                             try await syncEngine.syncSmart(source: adapter) { progressMessage in
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncProgressUpdated"),
+                                    name: .syncProgressUpdated,
                                     object: nil,
                                     userInfo: ["bookId": id, "progress": progressMessage]
                                 )
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
@@ -236,13 +236,13 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                             logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
                             let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookFinished"),
+                            name: .syncBookFinished,
                             object: id
                         )
                     }

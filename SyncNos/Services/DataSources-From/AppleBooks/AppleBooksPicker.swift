@@ -25,7 +25,7 @@ public struct AppleBooksPicker {
             let selectedPath = url.path
             // Determine root and notify other views
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("AppleBooksContainerSelected"), object: selectedPath)
+                NotificationCenter.default.post(name: .appleBooksContainerSelected, object: selectedPath)
             }
         }
     }

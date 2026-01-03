@@ -142,7 +142,7 @@ struct ViewCommands: Commands {
                     ForEach(HighlightSortField.allCases, id: \.self) { k in
                         Button {
                             highlightSortField = k.rawValue
-                            NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortKey": k.rawValue])
+                            NotificationCenter.default.post(name: .highlightSortChanged, object: nil, userInfo: ["sortKey": k.rawValue])
                         } label: {
                             if highlightSortField == k.rawValue {
                                 Label(k.displayName, systemImage: "checkmark")
@@ -156,7 +156,7 @@ struct ViewCommands: Commands {
 
                     Button {
                         highlightSortAscending.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("HighlightSortChanged"), object: nil, userInfo: ["sortAscending": highlightSortAscending])
+                        NotificationCenter.default.post(name: .highlightSortChanged, object: nil, userInfo: ["sortAscending": highlightSortAscending])
                     } label: {
                         if highlightSortAscending {
                             Label("Ascending", systemImage: "checkmark")
@@ -169,7 +169,7 @@ struct ViewCommands: Commands {
                 Section("Filter") {
                     Button {
                         highlightHasNotes.toggle()
-                        NotificationCenter.default.post(name: Notification.Name("HighlightFilterChanged"), object: nil, userInfo: ["hasNotes": highlightHasNotes])
+                        NotificationCenter.default.post(name: .highlightFilterChanged, object: nil, userInfo: ["hasNotes": highlightHasNotes])
                     } label: {
                         if highlightHasNotes {
                             Label("Has Notes", systemImage: "checkmark")
@@ -179,15 +179,8 @@ struct ViewCommands: Commands {
                     }
 
                     // 颜色筛选（与 FilterSortBar 的行为一致）
-                    let theme: HighlightColorTheme = {
-                        switch currentSource {
-                        case .appleBooks: return .appleBooks
-                        case .goodLinks: return .goodLinks
-                        case .weRead: return .weRead
-                        case .dedao: return .dedao
-                        case .chats: return .appleBooks // Chats does not use highlight colors
-                        }
-                    }()
+                    // 使用协议驱动获取高亮颜色主题，消除 switch 语句
+                    let theme: HighlightColorTheme = currentSource.highlightColorTheme ?? .appleBooks
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）
                     let currentSet: Set<Int> = {
                         if highlightSelectedMask == 0 { return [] }
@@ -230,7 +223,7 @@ struct ViewCommands: Commands {
                                 highlightSelectedMask = mask
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("HighlightFilterChanged"),
+                                name: .highlightFilterChanged,
                                 object: nil,
                                 userInfo: ["selectedStyles": arr]
                             )
@@ -271,61 +264,22 @@ private extension ViewCommands {
     }
     
     // MARK: - Apple Books Filter Menu
+    // 使用 DataSourceFilterSections 统一组件 + Menu 包装
     
     @ViewBuilder
     var appleBooksFilterMenu: some View {
         Menu("Books") {
-            Section("Sort") {
-                ForEach(BookListSortKey.allCases, id: \.self) { k in
-                    Button {
-                        bookListSortKey = k.rawValue
-                        NotificationCenter.default.post(
-                            name: Notification.Name("AppleBooksFilterChanged"),
-                            object: nil,
-                            userInfo: ["sortKey": k.rawValue]
-                        )
-                    } label: {
-                        if bookListSortKey == k.rawValue {
-                            Label(k.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(k.displayName)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    bookListSortAscending.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortAscending": bookListSortAscending]
-                    )
-                } label: {
-                    if bookListSortAscending {
-                        Label("Ascending", systemImage: "checkmark")
-                    } else {
-                        Label("Ascending", systemImage: "xmark")
-                    }
-                }
-            }
-
-            Section("Filter") {
-                Button {
-                    bookListShowWithTitleOnly.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
-                        object: nil,
-                        userInfo: ["showWithTitleOnly": bookListShowWithTitleOnly]
-                    )
-                } label: {
-                    if bookListShowWithTitleOnly {
-                        Label("Titles only", systemImage: "checkmark")
-                    } else {
-                        Text("Titles only")
-                    }
-                }
+            DataSourceFilterSections<BookListSortKey>(
+                filterNotification: .appleBooksFilterChanged,
+                sortKeyRaw: $bookListSortKey,
+                sortAscending: $bookListSortAscending
+            ) {
+                FilterToggleButton(
+                    title: "Titles only",
+                    isOn: $bookListShowWithTitleOnly,
+                    notificationName: .appleBooksFilterChanged,
+                    userInfoKey: "showWithTitleOnly"
+                )
             }
         }
     }
@@ -335,57 +289,17 @@ private extension ViewCommands {
     @ViewBuilder
     var goodLinksFilterMenu: some View {
         Menu("Articles") {
-            Section("Sort") {
-                ForEach(GoodLinksSortKey.allCases, id: \.self) { k in
-                    Button {
-                        goodlinksSortKey = k.rawValue
-                        NotificationCenter.default.post(
-                            name: Notification.Name("GoodLinksFilterChanged"),
-                            object: nil,
-                            userInfo: ["sortKey": k.rawValue]
-                        )
-                    } label: {
-                        if goodlinksSortKey == k.rawValue {
-                            Label(k.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(k.displayName)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    goodlinksSortAscending.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortAscending": goodlinksSortAscending]
-                    )
-                } label: {
-                    if goodlinksSortAscending {
-                        Label("Ascending", systemImage: "checkmark")
-                    } else {
-                        Label("Ascending", systemImage: "xmark")
-                    }
-                }
-            }
-
-            Section("Filter") {
-                Button {
-                    goodlinksShowStarredOnly.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
-                        object: nil,
-                        userInfo: ["showStarredOnly": goodlinksShowStarredOnly]
-                    )
-                } label: {
-                    if goodlinksShowStarredOnly {
-                        Label("Starred only", systemImage: "checkmark")
-                    } else {
-                        Text("Starred only")
-                    }
-                }
+            DataSourceFilterSections<GoodLinksSortKey>(
+                filterNotification: .goodLinksFilterChanged,
+                sortKeyRaw: $goodlinksSortKey,
+                sortAscending: $goodlinksSortAscending
+            ) {
+                FilterToggleButton(
+                    title: "Starred only",
+                    isOn: $goodlinksShowStarredOnly,
+                    notificationName: .goodLinksFilterChanged,
+                    userInfoKey: "showStarredOnly"
+                )
             }
         }
     }
@@ -394,44 +308,14 @@ private extension ViewCommands {
     
     @ViewBuilder
     var weReadFilterMenu: some View {
+        // WeRead 只支持部分排序键
         Menu("Books") {
-            Section("Sort") {
-                // WeRead 只支持 title, highlightCount, lastSync
-                let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
-                ForEach(availableKeys, id: \.self) { k in
-                    Button {
-                        bookListSortKey = k.rawValue
-                        NotificationCenter.default.post(
-                            name: Notification.Name("WeReadFilterChanged"),
-                            object: nil,
-                            userInfo: ["sortKey": k.rawValue]
-                        )
-                    } label: {
-                        if bookListSortKey == k.rawValue {
-                            Label(k.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(k.displayName)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    bookListSortAscending.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("WeReadFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortAscending": bookListSortAscending]
-                    )
-                } label: {
-                    if bookListSortAscending {
-                        Label("Ascending", systemImage: "checkmark")
-                    } else {
-                        Label("Ascending", systemImage: "xmark")
-                    }
-                }
-            }
+            DataSourceFilterSections<BookListSortKey>(
+                filterNotification: .weReadFilterChanged,
+                availableSortKeys: [.title, .highlightCount, .lastSync],
+                sortKeyRaw: $bookListSortKey,
+                sortAscending: $bookListSortAscending
+            )
         }
     }
     
@@ -439,44 +323,14 @@ private extension ViewCommands {
     
     @ViewBuilder
     var dedaoFilterMenu: some View {
+        // Dedao 只支持部分排序键
         Menu("Books") {
-            Section("Sort") {
-                // Dedao 只支持 title, highlightCount, lastSync
-                let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
-                ForEach(availableKeys, id: \.self) { k in
-                    Button {
-                        bookListSortKey = k.rawValue
-                        NotificationCenter.default.post(
-                            name: Notification.Name("DedaoFilterChanged"),
-                            object: nil,
-                            userInfo: ["sortKey": k.rawValue]
-                        )
-                    } label: {
-                        if bookListSortKey == k.rawValue {
-                            Label(k.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(k.displayName)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    bookListSortAscending.toggle()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("DedaoFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortAscending": bookListSortAscending]
-                    )
-                } label: {
-                    if bookListSortAscending {
-                        Label("Ascending", systemImage: "checkmark")
-                    } else {
-                        Label("Ascending", systemImage: "xmark")
-                    }
-                }
-            }
+            DataSourceFilterSections<BookListSortKey>(
+                filterNotification: .dedaoFilterChanged,
+                availableSortKeys: [.title, .highlightCount, .lastSync],
+                sortKeyRaw: $bookListSortKey,
+                sortAscending: $bookListSortAscending
+            )
         }
     }
 }

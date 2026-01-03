@@ -200,7 +200,7 @@ public struct GoodLinksPicker {
             _ = GoodLinksBookmarkStore.shared.startAccessing(url: url)
             let selectedPath = url.path
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: Notification.Name("GoodLinksFolderSelected"), object: selectedPath)
+                NotificationCenter.default.post(name: .goodLinksFolderSelected, object: selectedPath)
             }
         }
     }

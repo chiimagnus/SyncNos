@@ -1,58 +1,6 @@
 import Foundation
 import SwiftUI
 
-enum SyncSource: String, Codable, CaseIterable, Sendable {
-    case appleBooks
-    case goodLinks
-    case weRead
-    case dedao
-    case chats
-    
-    /// 显示名称
-    var displayName: String {
-        switch self {
-        case .appleBooks: return "Apple Books"
-        case .goodLinks: return "GoodLinks"
-        case .weRead: return "WeRead"
-        case .dedao: return "Dedao"
-        case .chats: return "Chats"
-        }
-    }
-    
-    /// SF Symbol 图标
-    var iconName: String {
-        switch self {
-        case .appleBooks: return "book"
-        case .goodLinks: return "bookmark"
-        case .weRead: return "w.square"
-        case .dedao: return "d.square"
-        case .chats: return "message"
-        }
-    }
-    
-    /// 品牌颜色
-    var brandColor: Color {
-        switch self {
-        case .appleBooks: return Color("BrandAppleBooks")
-        case .goodLinks: return Color("BrandGoodLinks")
-        case .weRead: return Color("BrandWeRead")
-        case .dedao: return Color("BrandDedao")
-        case .chats: return .green
-        }
-    }
-    
-    /// 品牌颜色背景透明度
-    var brandBackgroundOpacity: Double {
-        switch self {
-        case .appleBooks: return 0.18
-        case .goodLinks: return 0.12
-        case .weRead: return 0.14
-        case .dedao: return 0.14
-        case .chats: return 0.14
-        }
-    }
-}  
-
 enum SyncTaskState: String, Codable, Sendable {
     case queued
     case running
@@ -123,7 +71,7 @@ struct SyncEnqueueItem: Sendable {
 struct SyncQueueTask: Identifiable, Equatable, Sendable {
     let id: String
     let rawId: String
-    let source: SyncSource
+    let source: ContentSource
     var title: String
     var subtitle: String?
     var state: SyncTaskState
@@ -140,7 +88,7 @@ struct SyncQueueTask: Identifiable, Equatable, Sendable {
 
     init(
         rawId: String,
-        source: SyncSource,
+        source: ContentSource,
         title: String,
         subtitle: String?,
         state: SyncTaskState = .queued,

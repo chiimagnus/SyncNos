@@ -127,7 +127,7 @@ final class WeReadDetailViewModel: ObservableObject {
     
     private func setupNotificationSubscriptions() {
         // 订阅来自 ViewCommands 的高亮排序/筛选通知
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightSortChanged"))
+        NotificationCenter.default.publisher(for: .highlightSortChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }
@@ -146,7 +146,7 @@ final class WeReadDetailViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        NotificationCenter.default.publisher(for: Notification.Name("HighlightFilterChanged"))
+        NotificationCenter.default.publisher(for: .highlightFilterChanged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
                 guard let self else { return }

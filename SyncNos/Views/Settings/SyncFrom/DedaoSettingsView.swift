@@ -104,15 +104,15 @@ struct DedaoSettingsView: View {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
                 if viewModel.isLoggedIn {
-                    NotificationCenter.default.post(name: Notification.Name("DedaoLoginSucceeded"), object: nil)
+                    NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDedaoLogin")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin).receive(on: DispatchQueue.main)) { _ in
             // 自动打开登录页面（当会话过期时）
             viewModel.showLoginSheet = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DedaoSettingsShowLoginSheet")).receive(on: DispatchQueue.main)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .dedaoSettingsShowLoginSheet).receive(on: DispatchQueue.main)) { _ in
             // 从 SettingsView 导航过来后，打开登录 Sheet
             viewModel.showLoginSheet = true
         }

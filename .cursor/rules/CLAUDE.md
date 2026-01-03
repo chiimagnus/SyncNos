@@ -41,7 +41,6 @@ SyncNos/
 ├── AppDelegate.swift             # 应用生命周期管理
 ├── Views/                        # SwiftUI 视图（UI 层）
 │   ├── RootView.swift            # 根视图：管理 Onboarding/PayWall/MainListView 切换
-│   ├── MainListView.swift        # 主列表视图
 │   ├── Components/               # 可复用 UI 组件
 │   │   ├── Cards/                # 卡片组件
 │   │   │   ├── ArticleContentCardView.swift
@@ -49,6 +48,7 @@ SyncNos/
 │   │   │   ├── InfoHeaderCardView.swift
 │   │   │   └── WaterfallLayout.swift # 瀑布流布局
 │   │   ├── Controls/             # 控制组件
+│   │   │   ├── DataSourceFilterMenu.swift   # 通用数据源筛选菜单组件
 │   │   │   ├── DataSourceIndicatorBar.swift
 │   │   │   ├── FilterSortBar.swift   # 统一筛选排序栏
 │   │   │   ├── SwipeableDataSourceContainer.swift
@@ -58,6 +58,12 @@ SyncNos/
 │   │   │   ├── FirstResponderProxyView.swift
 │   │   │   └── WindowReader.swift
 │   │   ├── Main/                 # 主界面组件
+│   │   │   ├── MainListView.swift
+│   │   │   ├── MainListView+DetailViews.swift
+│   │   │   ├── MainListView+FilterMenus.swift
+│   │   │   ├── MainListView+FocusManager.swift
+│   │   │   ├── MainListView+KeyboardMonitor.swift
+│   │   │   └── MainListView+SyncRefresh.swift
 │   │   └── Theme/                # 主题组件
 │   │       └── AppTheme.swift    # 应用主题和样式
 │   ├── AppleBooks/
@@ -75,11 +81,11 @@ SyncNos/
 │   ├── Chats/              # 微信聊天 OCR 视图
 │   │   ├── ChatListView.swift
 │   │   ├── ChatDetailView.swift
-│   │   ├── ChatNotifications.swift
 │   │   └── Components/
-│   │       ├── ChatsMessageBubble.swift
-│   │       ├── ChatsSystemMessageRow.swift
-│   │       ├── ChatsMessageContextMenu.swift
+│   │       ├── ChatMessageBubble.swift
+│   │       ├── ChatSystemMessageRow.swift
+│   │       ├── ChatMessageContextMenu.swift
+│   │       ├── ChatSenderNamePickerView.swift
 │   │       └── ChatExportDocument.swift
 │   └── Settings/
 │       ├── General/
@@ -110,7 +116,8 @@ SyncNos/
 │           ├── FileCommands.swift
 │           ├── HelpCommands.swift
 │           ├── SelectionCommands.swift
-│           └── ViewCommands.swift
+│           ├── ViewCommands.swift
+│           └── WindowCommands.swift
 ├── ViewModels/                   # ObservableObject 视图模型
 │   ├── AppleBooks/
 │   │   ├── AppleBooksViewModel.swift         # 使用 NotionSyncEngine + Adapter
@@ -131,20 +138,19 @@ SyncNos/
 │   │   ├── DedaoLoginViewModel.swift
 │   │   └── DedaoSettingsViewModel.swift
 │   ├── Chats/
-│   │   └── ChatsViewModel.swift         # 微信聊天 OCR 视图模型
+│   │   └── ChatViewModel.swift          # 微信聊天 OCR 视图模型
 │   ├── Account/
 │   │   ├── AccountViewModel.swift
 │   │   ├── AppleSignInViewModel.swift
 │   │   ├── IAPViewModel.swift
 │   │   └── PayWallViewModel.swift
-│   ├── MenuBar/
-│   │   └── MenuBarViewModel.swift
 │   ├── Notion/
 │   │   └── NotionIntegrationViewModel.swift
-│   ├── Onboarding/
-│   │   └── OnboardingViewModel.swift
 │   ├── Settings/
-│   │   └── LoginItemViewModel.swift
+│   │   ├── AppIconDisplayViewModel.swift
+│   │   ├── LoginItemViewModel.swift
+│   │   ├── MenuBarViewModel.swift
+│   │   └── OnboardingViewModel.swift
 │   ├── Sidebar/
 │   │   └── DataSourceSwitchViewModel.swift
 │   ├── Sync/
@@ -152,14 +158,25 @@ SyncNos/
 │   └── LogViewModel.swift
 ├── Models/                       # 数据模型
 │   ├── Core/                     # 核心通用模型
-│   │   ├── Models.swift          # BookRow, Highlight, HighlightRow 等
+│   │   ├── Models.swift          # ContentSource, BookRow, Highlight 等
 │   │   ├── UnifiedHighlight.swift # 统一高亮模型（用于 SyncEngine）
-│   │   └── HighlightColorScheme.swift # 高亮颜色管理
+│   │   ├── HighlightColorScheme.swift # 高亮颜色管理
+│   │   ├── DataSourceUIProvider.swift # 数据源 UI 配置协议
+│   │   ├── DataSourceRegistry.swift   # 数据源注册表（协议驱动）
+│   │   ├── SelectionState.swift       # 统一选择状态管理
+│   │   ├── NotificationNames.swift    # 通知名称定义
+│   │   └── AppIconDisplayMode.swift   # 应用图标显示模式
+│   ├── DataSourceProviders/      # 数据源 UI 配置实现
+│   │   ├── AppleBooksUIProvider.swift
+│   │   ├── GoodLinksUIProvider.swift
+│   │   ├── WeReadUIProvider.swift
+│   │   ├── DedaoUIProvider.swift
+│   │   └── ChatsUIProvider.swift
 │   ├── Account/                  # 账户相关模型
 │   │   ├── AccountModels.swift   # 认证令牌、登录方法、账户配置
 │   │   └── IAPDebugModels.swift  # IAP 调试模型
 │   ├── Sync/                     # 同步相关模型
-│   │   ├── SyncQueueModels.swift # 同步队列任务模型
+│   │   ├── SyncQueueModels.swift # 同步队列任务模型（使用 ContentSource）
 │   │   └── SyncedHighlightRecord.swift # 已同步高亮记录（本地 UUID 记录）
 │   ├── WeRead/                   # 微信读书模型
 │   │   ├── WeReadModels.swift    # API DTO 模型
@@ -177,10 +194,11 @@ SyncNos/
     ├── Core/                     # 核心服务
     │   ├── ConcurrencyLimiter.swift
     │   ├── DIContainer.swift     # 依赖注入容器
+    │   ├── EncryptionService.swift # 本地数据加密服务
     │   ├── EnvironmentDetector.swift
     │   ├── FontScaleManager.swift
-    │   ├── LoggerService.swift
     │   ├── KeychainHelper.swift
+    │   ├── LoggerService.swift
     │   ├── LoginItemService.swift
     │   └── Protocols.swift       # 服务协议定义
     ├── DataSources-From/         # 数据源（从...获取）
@@ -257,6 +275,7 @@ SyncNos/
         ├── GoodLinksAutoSyncProvider.swift  # GoodLinks 自动同步
         ├── WeReadAutoSyncProvider.swift     # WeRead 自动同步
         ├── DedaoAutoSyncProvider.swift      # Dedao 自动同步
+        ├── ChatsAutoSyncProvider.swift      # Chats 自动同步
         ├── SyncActivityMonitor.swift       # 同步活动监控
         ├── SyncedHighlightStore.swift      # 已同步高亮记录存储
         └── SyncQueueStore.swift            # 同步队列存储
@@ -437,6 +456,7 @@ DIContainer.shared.ocrConfigStore       // 配置存储
 - `GoodLinksAutoSyncProvider`: GoodLinks 智能增量同步（基于 `modifiedAt`）
 - `WeReadAutoSyncProvider`: WeRead 智能增量同步（基于 `updatedAt`）
 - `DedaoAutoSyncProvider`: Dedao 智能增量同步（基于本地缓存 `maxHighlightUpdatedAt`）
+- `ChatsAutoSyncProvider`: Chats 智能增量同步
 - `SyncActivityMonitor`: 统一同步活动监控（退出拦截）
 - `SyncedHighlightStore`: 已同步高亮记录存储（本地 UUID → blockId 映射）
 - `SyncQueueStore`: 同步队列存储（任务排队和状态管理）
@@ -456,17 +476,28 @@ DIContainer.shared.ocrConfigStore       // 配置存储
 ### 数据模型
 
 **核心模型**（Models/Core/）：
+- `ContentSource`: 统一数据源枚举（同时用于 UI 和同步队列）
 - `HighlightRow`: 带关联书籍 ID 的高亮（用于内部处理）
 - `UnifiedHighlight`: 统一高亮模型（用于 SyncEngine，跨数据源通用）
 - `BookListItem`: 书籍元数据
 - `HighlightColorScheme`: 高亮颜色方案管理
+- `DataSourceUIProvider`: 数据源 UI 配置协议（协议驱动设计）
+- `DataSourceRegistry`: 数据源注册表（消除 switch 语句）
+- `SelectionState`: 统一选择状态管理（替代多个独立 @State 变量）
+
+**数据源 UI 配置**（Models/DataSourceProviders/）：
+- `AppleBooksUIProvider`: Apple Books UI 配置
+- `GoodLinksUIProvider`: GoodLinks UI 配置
+- `WeReadUIProvider`: WeRead UI 配置
+- `DedaoUIProvider`: Dedao UI 配置
+- `ChatsUIProvider`: Chats UI 配置
 
 **账户模型**（Models/Account/）：
 - `AccountModels`: 认证令牌、登录方法、账户配置
 - `IAPDebugModels`: IAP 购买类型、调试信息、错误类型
 
 **同步模型**（Models/Sync/）：
-- `SyncQueueTask`: 同步任务实体
+- `SyncQueueTask`: 同步任务实体（使用 `ContentSource` 替代旧的 `SyncSource`）
 - `SyncedHighlightRecord`: 已同步高亮记录（本地 UUID → blockId 映射）
 
 **WeRead 模型**（Models/WeRead/）：

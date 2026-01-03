@@ -182,12 +182,6 @@ final class FontScaleManager: ObservableObject {
     }
 }
 
-// MARK: - Notification Extension
-
-extension Notification.Name {
-    static let fontScaleDidChange = Notification.Name("SyncNos.FontScaleDidChange")
-}
-
 // MARK: - Environment Key
 
 /// 字体缩放环境键

@@ -416,13 +416,13 @@ protocol SyncQueueStoreProtocol: AnyObject {
     ///   - items: 待入队的任务列表
     /// - Returns: 实际被接受入队的任务 ID 集合
     @MainActor
-    func enqueue(source: SyncSource, items: [SyncEnqueueItem]) -> Set<String>
+    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> Set<String>
     
     /// 检查任务是否正在处理（queued 或 running）
-    func isTaskActive(source: SyncSource, rawId: String) -> Bool
+    func isTaskActive(source: ContentSource, rawId: String) -> Bool
     
     /// 批量检查，返回正在处理的任务 ID
-    func activeTaskIds(source: SyncSource, rawIds: Set<String>) -> Set<String>
+    func activeTaskIds(source: ContentSource, rawIds: Set<String>) -> Set<String>
     
     // MARK: - 取消任务 API
     
@@ -432,13 +432,13 @@ protocol SyncQueueStoreProtocol: AnyObject {
     ///   - rawId: 任务原始 ID
     /// - Returns: 是否成功取消
     @discardableResult
-    func cancelTask(source: SyncSource, rawId: String) -> Bool
+    func cancelTask(source: ContentSource, rawId: String) -> Bool
     
     /// 取消所有等待中的任务（指定来源）
     /// - Parameter source: 数据源类型，nil 表示所有来源
     /// - Returns: 取消的任务数量
     @discardableResult
-    func cancelAllQueued(source: SyncSource?) -> Int
+    func cancelAllQueued(source: ContentSource?) -> Int
     
     /// 清除所有已完成的任务（succeeded/failed/cancelled）
     func clearCompleted()

@@ -3,7 +3,7 @@ import Foundation
 /// WeRead 自动同步提供者，实现基于 API 的智能增量同步逻辑
 /// 通过比较「书籍更新时间」与「上次同步时间」判断是否需要同步
 final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .weRead
+    let id: ContentSource = .weRead
     let autoSyncUserDefaultsKey: String = "autoSync.weRead"
 
     private let logger: LoggerServiceProtocol
@@ -114,7 +114,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
             // 情况 3：书籍无变更 → 跳过
             logger.debug("[SmartSync] WeRead: \(bookLabel) - skipped (no changes)")
             NotificationCenter.default.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": book.bookId, "status": "skipped"]
             )
@@ -159,11 +159,11 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
                     await limiter.withPermit {
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStarted"),
+                            name: .syncBookStarted,
                             object: book.bookId
                         )
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
+                            name: .syncBookStatusChanged,
                             object: nil,
                             userInfo: ["bookId": book.bookId, "status": "started"]
                         )
@@ -174,13 +174,13 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                             )
                             try await syncEngine.syncSmart(source: adapter) { progressMessage in
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncProgressUpdated"),
+                                    name: .syncProgressUpdated,
                                     object: nil,
                                     userInfo: ["bookId": book.bookId, "progress": progressMessage]
                                 )
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "succeeded"]
                             )
@@ -189,13 +189,13 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                             logger.error("[SmartSync] WeRead: \(bookLabel) - failed: \(error.localizedDescription)")
                             let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookFinished"),
+                            name: .syncBookFinished,
                             object: book.bookId
                         )
                     }
