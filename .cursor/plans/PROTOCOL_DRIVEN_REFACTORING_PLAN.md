@@ -198,72 +198,40 @@ protocol BatchSyncable {
 
 ---
 
-### P8: 重构 FilterMenus 为通用组件 ⏱️ 约 1.5 小时
+### P8: 重构 FilterMenus 为通用组件 ⏱️ 约 1.5 小时 ✅ 已完成
 
 **目标**: 创建通用的筛选菜单组件，消除重复代码
 
 **新建文件**: `Views/Components/Controls/DataSourceFilterMenu.swift`
 
-```swift
-import SwiftUI
+**实际实现**:
+只保留 `DataSourceFilterSections<SortKey>` 一个组件，支持两种绑定方式：
+- 类型安全绑定（`sortKey: Binding<SortKey>`）- 用于 ViewModel
+- String 绑定（`sortKeyRaw: Binding<String>`）- 用于 @AppStorage
 
-/// 通用数据源筛选菜单
-/// 根据 DataSourceUIProvider 动态生成排序和筛选选项
-struct DataSourceFilterMenu<SortKey: SortKeyType>: View {
-    let provider: any DataSourceUIProvider
-    @Binding var sortKey: SortKey
+```swift
+/// 通用数据源筛选 Section（不包含 Menu 包装）
+struct DataSourceFilterSections<SortKey: SortKeyType>: View {
+    let filterNotification: Notification.Name
+    let availableSortKeys: [SortKey]
+    // 支持两种绑定方式
+    private var sortKeyBinding: Binding<SortKey>?      // ViewModel
+    private var sortKeyRawBinding: Binding<String>?    // @AppStorage
     @Binding var sortAscending: Bool
     var additionalFilters: (() -> AnyView)? = nil
-    
-    var body: some View {
-        Menu(provider.menuTitle) {
-            Section("Sort") {
-                ForEach(Array(SortKey.allCases), id: \.self) { key in
-                    Button {
-                        sortKey = key
-                        NotificationCenter.default.post(
-                            name: provider.filterChangedNotification,
-                            object: nil,
-                            userInfo: ["sortKey": key.rawValue]
-                        )
-                    } label: {
-                        if sortKey == key {
-                            Label(key.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(key.displayName)
-                        }
-                    }
-                }
-                
-                Divider()
-                
-                Button {
-                    sortAscending.toggle()
-                    NotificationCenter.default.post(
-                        name: provider.filterChangedNotification,
-                        object: nil,
-                        userInfo: ["sortAscending": sortAscending]
-                    )
-                } label: {
-                    Label("Ascending", systemImage: sortAscending ? "checkmark" : "xmark")
-                }
-            }
-            
-            if let filters = additionalFilters {
-                Section("Filter") {
-                    filters()
-                }
-            }
-        }
-    }
+    // ...
 }
+
+/// 通用筛选切换按钮
+struct FilterToggleButton: View { ... }
+struct VMFilterToggleButton: View { ... }
 ```
 
 **重构**:
-- `ViewCommands.swift` - 使用 `DataSourceFilterMenu`
-- `MainListView+FilterMenus.swift` - 使用 `DataSourceFilterMenu`
+- `ViewCommands.swift` - 使用 `Menu { DataSourceFilterSections(...) }`
+- `MainListView+FilterMenus.swift` - 使用 `DataSourceFilterSections(...)`
 
-**验证**: `xcodebuild -scheme SyncNos -configuration Debug build`
+**验证**: `xcodebuild -scheme SyncNos -configuration Debug build` ✅
 
 ---
 
