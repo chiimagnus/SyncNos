@@ -3,7 +3,7 @@ import Foundation
 /// GoodLinks 自动同步提供者，实现基于本地数据库的智能增量同步逻辑
 /// 通过比较「文章修改时间」与「上次同步时间」判断是否需要同步
 final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
-    let id: SyncSource = .goodLinks
+    let id: ContentSource = .goodLinks
     let autoSyncUserDefaultsKey: String = "autoSync.goodLinks"
 
     private let logger: LoggerServiceProtocol
@@ -111,7 +111,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             // 情况 3：文章无变更 → 跳过
             logger.debug("[SmartSync] GoodLinks: \(articleLabel) - skipped (no changes)")
             NotificationCenter.default.post(
-                name: Notification.Name("SyncBookStatusChanged"),
+                name: .syncBookStatusChanged,
                 object: nil,
                 userInfo: ["bookId": id, "status": "skipped"]
             )
@@ -170,7 +170,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
                     await limiter.withPermit {
                         NotificationCenter.default.post(
-                            name: Notification.Name("SyncBookStatusChanged"),
+                            name: .syncBookStatusChanged,
                             object: nil,
                             userInfo: ["bookId": id, "status": "started"]
                         )
@@ -183,13 +183,13 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                             )
                             try await self.syncEngine.syncSmart(source: adapter) { progress in
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("SyncProgressUpdated"),
+                                    name: .syncProgressUpdated,
                                     object: nil,
                                     userInfo: ["bookId": id, "progress": progress]
                                 )
                             }
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": id, "status": "succeeded"]
                             )
@@ -198,7 +198,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                             self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
                             let errorInfo = SyncErrorInfo.from(error)
                             NotificationCenter.default.post(
-                                name: Notification.Name("SyncBookStatusChanged"),
+                                name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
                             )

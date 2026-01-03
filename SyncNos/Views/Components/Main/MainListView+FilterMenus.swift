@@ -5,201 +5,91 @@ import SwiftUI
 extension MainListView {
     
     // MARK: - Filter Menus
+    // 使用 DataSourceFilterSections 通用组件重构，消除重复代码
     
     @ViewBuilder
     var appleBooksFilterMenu: some View {
-        Section("Sort") {
-            ForEach(BookListSortKey.allCases, id: \.self) { key in
-                Button {
-                    appleBooksVM.sortKey = key
-                    NotificationCenter.default.post(
-                        name: Notification.Name("AppleBooksFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortKey": key.rawValue]
-                    )
-                } label: {
-                    if appleBooksVM.sortKey == key {
-                        Label(key.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(key.displayName)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                appleBooksVM.sortAscending.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("AppleBooksFilterChanged"),
-                    object: nil,
-                    userInfo: ["sortAscending": appleBooksVM.sortAscending]
-                )
-            } label: {
-                if appleBooksVM.sortAscending {
-                    Label("Ascending", systemImage: "checkmark")
-                } else {
-                    Label("Ascending", systemImage: "xmark")
-                }
-            }
-        }
-
-        Section("Filter") {
-            Button {
-                appleBooksVM.showWithTitleOnly.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("AppleBooksFilterChanged"),
-                    object: nil,
-                    userInfo: ["showWithTitleOnly": appleBooksVM.showWithTitleOnly]
-                )
-            } label: {
-                if appleBooksVM.showWithTitleOnly {
-                    Label("Titles only", systemImage: "checkmark")
-                } else {
-                    Text("Titles only")
-                }
-            }
+        DataSourceFilterSections<BookListSortKey>(
+            filterNotification: .appleBooksFilterChanged,
+            sortKey: Binding(
+                get: { appleBooksVM.sortKey },
+                set: { appleBooksVM.sortKey = $0 }
+            ),
+            sortAscending: Binding(
+                get: { appleBooksVM.sortAscending },
+                set: { appleBooksVM.sortAscending = $0 }
+            )
+        ) {
+            VMFilterToggleButton(
+                title: "Titles only",
+                isOn: appleBooksVM.showWithTitleOnly,
+                action: { appleBooksVM.showWithTitleOnly.toggle() },
+                notificationName: .appleBooksFilterChanged,
+                userInfoKey: "showWithTitleOnly"
+            )
         }
     }
     
     @ViewBuilder
     var goodLinksFilterMenu: some View {
-        Section("Sort") {
-            ForEach(GoodLinksSortKey.allCases, id: \.self) { key in
-                Button {
-                    goodLinksVM.sortKey = key
-                    NotificationCenter.default.post(
-                        name: Notification.Name("GoodLinksFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortKey": key.rawValue]
-                    )
-                } label: {
-                    if goodLinksVM.sortKey == key {
-                        Label(key.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(key.displayName)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                goodLinksVM.sortAscending.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("GoodLinksFilterChanged"),
-                    object: nil,
-                    userInfo: ["sortAscending": goodLinksVM.sortAscending]
-                )
-            } label: {
-                if goodLinksVM.sortAscending {
-                    Label("Ascending", systemImage: "checkmark")
-                } else {
-                    Label("Ascending", systemImage: "xmark")
-                }
-            }
-        }
-
-        Section("Filter") {
-            Button {
-                goodLinksVM.showStarredOnly.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("GoodLinksFilterChanged"),
-                    object: nil,
-                    userInfo: ["showStarredOnly": goodLinksVM.showStarredOnly]
-                )
-            } label: {
-                if goodLinksVM.showStarredOnly {
-                    Label("Starred only", systemImage: "checkmark")
-                } else {
-                    Text("Starred only")
-                }
-            }
+        DataSourceFilterSections<GoodLinksSortKey>(
+            filterNotification: .goodLinksFilterChanged,
+            sortKey: Binding(
+                get: { goodLinksVM.sortKey },
+                set: { goodLinksVM.sortKey = $0 }
+            ),
+            sortAscending: Binding(
+                get: { goodLinksVM.sortAscending },
+                set: { goodLinksVM.sortAscending = $0 }
+            )
+        ) {
+            VMFilterToggleButton(
+                title: "Starred only",
+                isOn: goodLinksVM.showStarredOnly,
+                action: { goodLinksVM.showStarredOnly.toggle() },
+                notificationName: .goodLinksFilterChanged,
+                userInfoKey: "showStarredOnly"
+            )
         }
     }
     
     @ViewBuilder
     var weReadFilterMenu: some View {
-        Section("Sort") {
-            let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
-            ForEach(availableKeys, id: \.self) { key in
-                Button {
-                    weReadVM.sortKey = key
-                    NotificationCenter.default.post(
-                        name: Notification.Name("WeReadFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortKey": key.rawValue]
-                    )
-                } label: {
-                    if weReadVM.sortKey == key {
-                        Label(key.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(key.displayName)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                weReadVM.sortAscending.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("WeReadFilterChanged"),
-                    object: nil,
-                    userInfo: ["sortAscending": weReadVM.sortAscending]
-                )
-            } label: {
-                if weReadVM.sortAscending {
-                    Label("Ascending", systemImage: "checkmark")
-                } else {
-                    Label("Ascending", systemImage: "xmark")
-                }
-            }
-        }
+        // WeRead 只支持部分排序键
+        DataSourceFilterSections<BookListSortKey>(
+            filterNotification: .weReadFilterChanged,
+            availableSortKeys: [.title, .highlightCount, .lastSync],
+            sortKey: Binding(
+                get: { weReadVM.sortKey },
+                set: { weReadVM.sortKey = $0 }
+            ),
+            sortAscending: Binding(
+                get: { weReadVM.sortAscending },
+                set: { weReadVM.sortAscending = $0 }
+            )
+        )
     }
     
     @ViewBuilder
     var dedaoFilterMenu: some View {
-        Section("Sort") {
-            let availableKeys: [BookListSortKey] = [.title, .highlightCount, .lastSync]
-            ForEach(availableKeys, id: \.self) { key in
-                Button {
-                    dedaoVM.sortKey = key
-                    NotificationCenter.default.post(
-                        name: Notification.Name("DedaoFilterChanged"),
-                        object: nil,
-                        userInfo: ["sortKey": key.rawValue]
-                    )
-                } label: {
-                    if dedaoVM.sortKey == key {
-                        Label(key.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(key.displayName)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                dedaoVM.sortAscending.toggle()
-                NotificationCenter.default.post(
-                    name: Notification.Name("DedaoFilterChanged"),
-                    object: nil,
-                    userInfo: ["sortAscending": dedaoVM.sortAscending]
-                )
-            } label: {
-                if dedaoVM.sortAscending {
-                    Label("Ascending", systemImage: "checkmark")
-                } else {
-                    Label("Ascending", systemImage: "xmark")
-                }
-            }
-        }
+        // Dedao 只支持部分排序键
+        DataSourceFilterSections<BookListSortKey>(
+            filterNotification: .dedaoFilterChanged,
+            availableSortKeys: [.title, .highlightCount, .lastSync],
+            sortKey: Binding(
+                get: { dedaoVM.sortKey },
+                set: { dedaoVM.sortKey = $0 }
+            ),
+            sortAscending: Binding(
+                get: { dedaoVM.sortAscending },
+                set: { dedaoVM.sortAscending = $0 }
+            )
+        )
     }
     
     @ViewBuilder
     var chatsFilterMenu: some View {
+        // Chats 不支持排序/筛选，只有"新建对话"按钮
         Button {
             showNewConversationAlert = true
         } label: {

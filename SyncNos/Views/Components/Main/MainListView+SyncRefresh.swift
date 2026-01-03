@@ -19,51 +19,31 @@ extension MainListView {
     
     // MARK: - Sync Queue Task Selection
     
-    /// 处理同步队列任务选择（使用 switch 替代 if-else 链）
+    /// 处理同步队列任务选择
     func handleSyncQueueTaskSelection(source: ContentSource, id: String) {
         // 先清除所有选择
-        clearAllSelections()
+        selectionState.clearAll()
         
         // 切换到对应数据源并选中指定项
         contentSourceRawValue = source.rawValue
-        
-        switch source {
-        case .appleBooks:
-            selectedBookIds = Set([id])
-        case .goodLinks:
-            selectedLinkIds = Set([id])
-        case .weRead:
-            selectedWeReadBookIds = Set([id])
-        case .dedao:
-            selectedDedaoBookIds = Set([id])
-        case .chats:
-            selectedChatsContactIds = Set([id])
-        }
-    }
-    
-    /// 清除所有数据源的选择状态
-    private func clearAllSelections() {
-        selectedBookIds.removeAll()
-        selectedLinkIds.removeAll()
-        selectedWeReadBookIds.removeAll()
-        selectedDedaoBookIds.removeAll()
-        selectedChatsContactIds.removeAll()
+        selectionState.setSelection(for: source, ids: [id])
     }
     
     // MARK: - Sync Selected
     
     func syncSelectedForCurrentSource() {
+        let selectedIds = selectionState.selection(for: contentSource)
         switch contentSource {
         case .appleBooks:
-            appleBooksVM.batchSync(bookIds: selectedBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+            appleBooksVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .goodLinks:
-            goodLinksVM.batchSync(linkIds: selectedLinkIds, concurrency: NotionSyncConfig.batchConcurrency)
+            goodLinksVM.batchSync(linkIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .weRead:
-            weReadVM.batchSync(bookIds: selectedWeReadBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+            weReadVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .dedao:
-            dedaoVM.batchSync(bookIds: selectedDedaoBookIds, concurrency: NotionSyncConfig.batchConcurrency)
+            dedaoVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
         case .chats:
-            chatsVM.batchSync(contactIds: selectedChatsContactIds, concurrency: NotionSyncConfig.batchConcurrency)
+            chatsVM.batchSync(contactIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
         }
     }
     
@@ -71,48 +51,47 @@ extension MainListView {
     func fullResyncSelectedForCurrentSource() {
         let syncedHighlightStore = DIContainer.shared.syncedHighlightStore
         let logger = DIContainer.shared.loggerService
+        let selectedIds = selectionState.selection(for: contentSource)
         
         Task {
-            // 根据当前数据源获取选中的 ID、书名和 sourceKey
-            let sourceKey: String
+            // 使用协议驱动获取 sourceKey，消除部分 switch 语句
+            let sourceKey = contentSource.sourceKey
+            
+            // 根据当前数据源获取选中的 ID 和书名
+            // 注：此 switch 保留是因为各 ViewModel 的数据集合类型和属性不同
             let selectedItems: [(id: String, title: String)]
             
             switch contentSource {
             case .appleBooks:
-                sourceKey = "appleBooks"
-                selectedItems = selectedBookIds.compactMap { id in
+                selectedItems = selectedIds.compactMap { id in
                     if let book = appleBooksVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.bookTitle)
                     }
                     return nil
                 }
             case .goodLinks:
-                sourceKey = "goodLinks"
-                selectedItems = selectedLinkIds.compactMap { id in
+                selectedItems = selectedIds.compactMap { id in
                     if let link = goodLinksVM.links.first(where: { $0.id == id }) {
                         return (id: id, title: link.title ?? "Unknown")
                     }
                     return nil
                 }
             case .weRead:
-                sourceKey = "weRead"
-                selectedItems = selectedWeReadBookIds.compactMap { id in
+                selectedItems = selectedIds.compactMap { id in
                     if let book = weReadVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
                     }
                     return nil
                 }
             case .dedao:
-                sourceKey = "dedao"
-                selectedItems = selectedDedaoBookIds.compactMap { id in
+                selectedItems = selectedIds.compactMap { id in
                     if let book = dedaoVM.books.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
                     }
                     return nil
                 }
             case .chats:
-                sourceKey = "chats"
-                selectedItems = selectedChatsContactIds.compactMap { id in
+                selectedItems = selectedIds.compactMap { id in
                     if let contact = chatsVM.contacts.first(where: { $0.id == id }) {
                         return (id: id, title: contact.name)
                     }

@@ -4,6 +4,8 @@
 
 SyncNos 实现了完整的键盘导航功能，允许用户在 List 和 Detail 视图之间切换，并在 Detail 视图中进行滚动操作。
 
+> **兼容性说明**: 本键盘导航系统已完全兼容协议驱动重构（Protocol-Driven Refactoring），支持统一的选择状态管理（`SelectionState`）和数据源 UI 配置协议（`DataSourceUIProvider`）。所有功能在最新的架构下正常工作。
+
 ## 模块分离 (v0.9.11)
 
 从 v0.9.11 开始，键盘导航和焦点管理的代码已分离为两个独立的扩展文件：
@@ -493,15 +495,20 @@ struct AppleBooksListView: View {
 ### 10. Chats 特有的通知
 
 ```swift
-// Views/Chats/ChatNotifications.swift
+// Models/Core/NotificationNames.swift（统一定义）
 
 extension Notification.Name {
-    static let chatsNavigateMessage = Notification.Name("ChatNavigateMessage")
-    static let chatsCycleClassification = Notification.Name("ChatCycleClassification")
+    /// 导航到聊天消息
+    static let chatsNavigateMessage = Notification.Name("ChatsNavigateMessage")
+    
+    /// 循环切换消息分类
+    static let chatsCycleClassification = Notification.Name("ChatsCycleClassification")
 }
 ```
 
 这些通知由 `MainListView+KeyboardMonitor.swift` 发送，由 `ChatDetailView.swift` 接收处理。
+
+> **注意**：所有通知名称现已统一定义在 `Models/Core/NotificationNames.swift` 中，不再在各自文件中重复定义。
 
 ## 快捷键映射
 
@@ -596,14 +603,14 @@ func stopKeyboardMonitorIfNeeded() {
 
 .onChange(of: contentSourceRawValue) { _, _ in
     // 切换数据源时重置选择和焦点状态
-    selectedBookIds.removeAll()
-    selectedLinkIds.removeAll()
-    selectedWeReadBookIds.removeAll()
-    selectedDedaoBookIds.removeAll()
+    // 注意：协议驱动重构后，选择状态统一由 SelectionState 管理
+    selectionState.clearAll()
     keyboardNavigationTarget = .list
     currentDetailScrollView = nil
 }
 ```
+
+> **协议驱动重构说明**: 原先使用 5 个独立的 `@State` 变量（`selectedBookIds`、`selectedLinkIds` 等）管理各数据源的选择状态，现已统一为 `SelectionState` 类管理。详见 `Models/Core/SelectionState.swift`。
 
 ## 已知问题
 
@@ -645,4 +652,12 @@ func stopKeyboardMonitorIfNeeded() {
 5. **动态字体缩放**：滚动步长需要考虑 `fontScaleManager.scaleFactor`
 6. **Detail firstResponder 落点**：detailColumn 必须保留 `FirstResponderProxyView` 作为稳定的 firstResponder 目标
 7. **空状态处理**：DetailView 的空状态也需要提供 ScrollView，否则键盘切换会失效
+
+---
+
+**最后更新**: 2026-01-03
+**更新内容**:
+- 兼容协议驱动重构（Protocol-Driven Refactoring）
+- 更新选择状态管理说明（SelectionState 统一管理）
+- 确认所有功能与最新架构兼容
 
