@@ -282,9 +282,11 @@ P5 ✅ (已完成 - Registry)
     ↓
 P6 ✅ (已完成 - SelectionState 类及集成)
     ↓
-P7 ⏳ (待完成 - 重构 Switch)
+P7 ✅ (已完成 - 协议驱动消除 switch)
     ↓
-P8 ⏳ (待完成 - 通用 FilterMenu)
+P8 ✅ (已完成 - 通用 FilterMenu 组件)
+
+🎉 全部完成！
 ```
 
 ---
@@ -340,6 +342,17 @@ P8 ⏳ (待完成 - 通用 FilterMenu)
   - 替换 `MainListView` 中 5 个独立的选择状态变量为统一的 `SelectionState`
   - 更新 `MainListView+SyncRefresh.swift`、`MainListView+DetailViews.swift`、`MainListView+KeyboardMonitor.swift`
   - 更新 `SwipeableDataSourceContainer.swift` 接收 `SelectionState` 替代 5 个 Binding
+- ✅ 完成 P7: 重构 Switch 语句为协议调用
+  - 添加 `ContentSource.sourceKey`、`ContentSource.highlightColorTheme`、`ContentSource.filterChangedNotification` 扩展
+  - 更新 `ViewCommands.swift` 使用协议驱动的 `highlightColorTheme`
+  - 更新 `MainListView+SyncRefresh.swift` 使用 `contentSource.sourceKey`
+  - 移除 `NotificationNames.swift` 中冗余的 `filterChangedNotification` switch
+- ✅ 完成 P8: 重构 FilterMenus 为通用组件
+  - 创建 `DataSourceFilterMenu<SortKey>` 组件（带 Menu 包装）
+  - 创建 `DataSourceFilterSections<SortKey>` 组件（不带 Menu 包装）
+  - 创建 `FilterToggleButton` 和 `VMFilterToggleButton` 辅助组件
+  - 重构 `ViewCommands.swift` 使用通用组件
+  - 重构 `MainListView+FilterMenus.swift` 使用通用组件
 
 ### 新增文件
 - `Models/Core/DataSourceUIProvider.swift`
@@ -350,6 +363,7 @@ P8 ⏳ (待完成 - 通用 FilterMenu)
 - `Models/DataSourceProviders/WeReadUIProvider.swift`
 - `Models/DataSourceProviders/DedaoUIProvider.swift`
 - `Models/DataSourceProviders/ChatsUIProvider.swift`
+- `Views/Components/Controls/DataSourceFilterMenu.swift`
 
 ### 修改文件（P6-Integration）
 - `Views/Components/Main/MainListView.swift`
@@ -357,3 +371,9 @@ P8 ⏳ (待完成 - 通用 FilterMenu)
 - `Views/Components/Main/MainListView+DetailViews.swift`
 - `Views/Components/Main/MainListView+KeyboardMonitor.swift`
 - `Views/Components/Controls/SwipeableDataSourceContainer.swift`
+
+### 修改文件（P7-P8）
+- `Models/Core/Models.swift` - 添加 `sourceKey` 属性
+- `Models/Core/NotificationNames.swift` - 移除冗余扩展
+- `Views/Commands/ViewCommands.swift` - 使用协议驱动和通用组件
+- `Views/Components/Main/MainListView+FilterMenus.swift` - 使用通用组件
