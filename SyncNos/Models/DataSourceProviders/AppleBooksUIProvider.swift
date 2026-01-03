@@ -24,5 +24,13 @@ struct AppleBooksUIProvider: DataSourceUIProvider {
     // MARK: - 菜单配置
     
     let menuTitle: LocalizedStringKey = "Books"
+    
+    // MARK: - 存储配置
+    
+    let enabledStorageKey = "datasource.appleBooks.enabled"
+    
+    // MARK: - 高亮颜色
+    
+    let highlightColorTheme: HighlightColorTheme? = .appleBooks
 }
 

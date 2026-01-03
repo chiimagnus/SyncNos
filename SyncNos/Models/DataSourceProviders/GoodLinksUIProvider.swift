@@ -24,5 +24,13 @@ struct GoodLinksUIProvider: DataSourceUIProvider {
     // MARK: - 菜单配置
     
     let menuTitle: LocalizedStringKey = "Articles"
+    
+    // MARK: - 存储配置
+    
+    let enabledStorageKey = "datasource.goodLinks.enabled"
+    
+    // MARK: - 高亮颜色
+    
+    let highlightColorTheme: HighlightColorTheme? = .goodLinks
 }
 

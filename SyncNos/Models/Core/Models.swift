@@ -70,6 +70,10 @@ enum ContentSource: String, Codable, CaseIterable {
         "datasource.\(rawValue).enabled"
     }
     
+    /// 同步记录存储键（用于 SyncedHighlightStore）
+    /// 与 rawValue 相同，提供语义化访问
+    var sourceKey: String { rawValue }
+    
     // MARK: - Custom Order
     
     /// UserDefaults 键：数据源自定义顺序（V2：String 存储，不向后兼容旧 Data(JSON)）

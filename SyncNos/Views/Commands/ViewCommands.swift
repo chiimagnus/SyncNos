@@ -179,15 +179,8 @@ struct ViewCommands: Commands {
                     }
 
                     // 颜色筛选（与 FilterSortBar 的行为一致）
-                    let theme: HighlightColorTheme = {
-                        switch currentSource {
-                        case .appleBooks: return .appleBooks
-                        case .goodLinks: return .goodLinks
-                        case .weRead: return .weRead
-                        case .dedao: return .dedao
-                        case .chats: return .appleBooks // Chats does not use highlight colors
-                        }
-                    }()
+                    // 使用协议驱动获取高亮颜色主题，消除 switch 语句
+                    let theme: HighlightColorTheme = currentSource.highlightColorTheme ?? .appleBooks
                     // 从位掩码恢复当前集合（0 表示空集 => 全选）
                     let currentSet: Set<Int> = {
                         if highlightSelectedMask == 0 { return [] }
