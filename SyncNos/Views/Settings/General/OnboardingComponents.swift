@@ -42,7 +42,7 @@ struct OnboardingWelcomeView: View {
     private var orbitRadius: CGFloat { 120 * fontScaleManager.scaleFactor }
     private var satelliteSources: [(icon: String, color: Color, angle: Double)] {
         [
-            (icon: "books", color: Color("BrandAppleBooks"), angle: -90),
+            (icon: "book", color: Color("BrandAppleBooks"), angle: -90),
             (icon: "bookmark", color: Color("BrandGoodLinks"), angle: -18),
             (icon: "w.square", color: Color("BrandWeRead"), angle: 54),
             (icon: "d.square", color: Color("BrandDedao"), angle: 126),
@@ -334,13 +334,7 @@ struct OnboardingSourcesView: View {
     }
 
     private func onboardingIconName(for source: ContentSource) -> String {
-        switch source {
-        case .appleBooks:
-            // Onboarding 里沿用既有展示样式
-            return "books"
-        default:
-            return source.icon
-        }
+        source.icon
     }
 }
 
