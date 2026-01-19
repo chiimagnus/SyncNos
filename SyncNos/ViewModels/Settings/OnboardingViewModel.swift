@@ -25,6 +25,8 @@ final class OnboardingViewModel: ObservableObject {
     @AppStorage("datasource.appleBooks.enabled") var appleBooksEnabled: Bool = true
     @AppStorage("datasource.goodLinks.enabled") var goodLinksEnabled: Bool = false
     @AppStorage("datasource.weRead.enabled") var weReadEnabled: Bool = false
+    @AppStorage("datasource.dedao.enabled") var dedaoEnabled: Bool = false
+    @AppStorage("datasource.chats.enabled") var chatsEnabled: Bool = false
     
     // Notion State
     @Published var isNotionConnected: Bool = false
@@ -68,7 +70,7 @@ final class OnboardingViewModel: ObservableObject {
     
     func nextStep() {
         if currentStep == .enableSources {
-            guard appleBooksEnabled || goodLinksEnabled || weReadEnabled else {
+            guard appleBooksEnabled || goodLinksEnabled || weReadEnabled || dedaoEnabled || chatsEnabled else {
                 sourceSelectionError = "Please open at least one synchronization source"
                 return
             }
@@ -135,4 +137,3 @@ final class OnboardingViewModel: ObservableObject {
         completeOnboarding()
     }
 }
-
