@@ -240,20 +240,17 @@ struct OnboardingSourcesView: View {
         VStack {
             Spacer()
 
-            // 中央区域 - 三个数据源卡片，根据字体缩放级别切换布局
-            Group {
-                if fontScaleManager.isAccessibilitySize {
-                    // 辅助功能大小时使用垂直布局
-                    VStack(spacing: 16) {
-                        sourceCards
-                    }
-                } else {
-                    // 标准大小时使用水平布局
-                    HStack(spacing: 24) {
-                        sourceCards
-                    }
+            // 中央区域 - 数据源卡片网格（确保完整展示所有已支持数据源）
+            LazyVGrid(
+                columns: sourceGridColumns,
+                alignment: .center,
+                spacing: fontScaleManager.isAccessibilitySize ? 16 : 20
+            ) {
+                ForEach(ContentSource.allCases, id: \.self) { source in
+                    sourceCardView(for: source)
                 }
             }
+            .padding(.horizontal, 40)
 
             Spacer()
 
@@ -271,7 +268,7 @@ struct OnboardingSourcesView: View {
                         .scaledFont(.title2, weight: .bold)
                         .foregroundStyle(Color("OnboardingTextColor"))
 
-                    Text("Select at least one source to sync your highlights.")
+                    Text("Select at least one source to sync your highlights: Apple Books, GoodLinks, WeRead, Dedao, and Chats.")
                         .scaledFont(.subheadline)
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                         .lineLimit(3)
@@ -289,32 +286,60 @@ struct OnboardingSourcesView: View {
         }
     }
 
+    private var sourceGridColumns: [GridItem] {
+        if fontScaleManager.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+
+        return [GridItem(.adaptive(minimum: 140 * fontScaleManager.scaleFactor), spacing: 24)]
+    }
+
     @ViewBuilder
-    private var sourceCards: some View {
-        SourceCard(
-            icon: "books",
-            color: .orange,
-            title: "Apple Books",
-            isOn: $viewModel.appleBooksEnabled
-        )
-
-        SourceCard(
-            icon: "bookmark",
-            color: .red,
-            title: "GoodLinks",
-            isOn: $viewModel.goodLinksEnabled
-        )
-
-        SourceCard(
-            icon: "w.square",
-            color: .blue,
-            title: "WeRead",
-            isOn: $viewModel.weReadEnabled
-        )
-        .onChange(of: viewModel.weReadEnabled) { _, newValue in
-            if newValue && !viewModel.isWeReadLoggedIn {
-                // We could show a tip here
+    private func sourceCardView(for source: ContentSource) -> some View {
+        if source == .weRead {
+            SourceCard(
+                icon: onboardingIconName(for: source),
+                color: source.accentColor,
+                title: source.title,
+                isOn: binding(for: source)
+            )
+            .onChange(of: viewModel.weReadEnabled) { _, newValue in
+                if newValue && !viewModel.isWeReadLoggedIn {
+                    // We could show a tip here
+                }
             }
+        } else {
+            SourceCard(
+                icon: onboardingIconName(for: source),
+                color: source.accentColor,
+                title: source.title,
+                isOn: binding(for: source)
+            )
+        }
+    }
+
+    private func binding(for source: ContentSource) -> Binding<Bool> {
+        switch source {
+        case .appleBooks:
+            return $viewModel.appleBooksEnabled
+        case .goodLinks:
+            return $viewModel.goodLinksEnabled
+        case .weRead:
+            return $viewModel.weReadEnabled
+        case .dedao:
+            return $viewModel.dedaoEnabled
+        case .chats:
+            return $viewModel.chatsEnabled
+        }
+    }
+
+    private func onboardingIconName(for source: ContentSource) -> String {
+        switch source {
+        case .appleBooks:
+            // Onboarding 里沿用既有展示样式
+            return "books"
+        default:
+            return source.icon
         }
     }
 }
