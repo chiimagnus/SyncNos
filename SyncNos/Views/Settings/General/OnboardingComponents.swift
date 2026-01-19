@@ -40,6 +40,15 @@ struct OnboardingWelcomeView: View {
     private var satelliteIconSize: CGFloat { 20 * fontScaleManager.scaleFactor }
     private var satelliteIconPadding: CGFloat { 12 * fontScaleManager.scaleFactor }
     private var orbitRadius: CGFloat { 120 * fontScaleManager.scaleFactor }
+    private var satelliteSources: [(icon: String, color: Color, angle: Double)] {
+        [
+            (icon: "books", color: Color("BrandAppleBooks"), angle: -90),
+            (icon: "bookmark", color: Color("BrandGoodLinks"), angle: -18),
+            (icon: "w.square", color: Color("BrandWeRead"), angle: 54),
+            (icon: "d.square", color: Color("BrandDedao"), angle: 126),
+            (icon: "message", color: .green, angle: 198)
+        ]
+    }
 
     var body: some View {
         ZStack {
@@ -52,9 +61,9 @@ struct OnboardingWelcomeView: View {
                     .frame(width: logoSize, height: logoSize)
 
                 // Satellite Icons
-                satelliteIcon("books", color: Color("BrandAppleBooks"), angle: -90) // Apple Books
-                satelliteIcon("bookmark", color: Color("BrandGoodLinks"), angle: 30) // GoodLinks
-                satelliteIcon("w.square", color: Color("BrandWeRead"), angle: 150) // WeRead
+                ForEach(Array(satelliteSources.enumerated()), id: \.offset) { _, source in
+                    satelliteIcon(source.icon, color: source.color, angle: source.angle)
+                }
             }
 
             // 底部区域 - 文字 + 箭头按钮
@@ -68,7 +77,7 @@ struct OnboardingWelcomeView: View {
                             .scaledFont(.title2, weight: .bold)
                             .foregroundStyle(Color("OnboardingTextColor"))
 
-                        Text("Sync Apple Books, GoodLinks, and WeRead highlights directly to your Notion database.")
+                        Text("Sync Apple Books, GoodLinks, WeRead, Dedao, and Chats highlights directly to your Notion database.")
                             .scaledFont(.subheadline)
                             .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                             .lineLimit(3)
