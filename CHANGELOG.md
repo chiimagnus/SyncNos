@@ -1,4 +1,7 @@
 ## v0.11.0
+**Key updates:** Updating the Data Source Enablement in the Welcome Page
+
+## v0.11.0
 **Key updates:** Optimize the code architecture, adopt protocol-driven development.
 
 ## v0.10.5
