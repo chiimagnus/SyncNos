@@ -2,25 +2,21 @@
 """
 Localizable.xcstrings 格式压缩脚本
 
-将 xcstrings 文件中的语言条目从多行格式压缩为更紧凑的单行格式，
-提高可读性并减小文件体积。
+将 xcstrings 文件中的常见多行结构压缩为更紧凑的单行格式，
+减少 diff 噪音并提升可读性。
 
 使用方法:
-    python3 .cursor/rules/compact_xcstrings.py
-    # 或
-    ./.cursor/rules/compact_xcstrings.py
+    # 默认处理 Resource/Localizable.xcstrings
+    python3 .codex/scripts/compact_xcstrings.py
 
-压缩前:
-    "nl": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "..."
-      }
-    }
+    # 处理指定文件（可多个）
+    python3 .codex/scripts/compact_xcstrings.py Resource/Localizable.xcstrings other.xcstrings
 
-压缩后:
-    "nl": { "stringUnit" : { "state" : "translated", "value" : "..." } }
+    # 处理目录（递归寻找 *.xcstrings）
+    python3 .codex/scripts/compact_xcstrings.py .codex/i18n/xcstrings_parts
 """
+
+from __future__ import annotations
 
 import json
 import re
@@ -28,94 +24,100 @@ import sys
 from pathlib import Path
 
 
-def compact_xcstrings(file_path: str) -> bool:
-    """
-    压缩 xcstrings 文件，将 stringUnit 条目压缩为单行。
-    
-    参数:
-        file_path: xcstrings 文件路径
-        
-    返回:
-        成功返回 True，失败返回 False
-    """
+_STRING_UNIT_PATTERN = re.compile(
+    r'"stringUnit"\s*:\s*\{\s*\n'
+    r'\s*"state"\s*:\s*"([^"]+)",\s*\n'
+    r'\s*"value"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*\n'
+    r'\s*\}',
+    re.MULTILINE,
+)
+
+_LANG_ENTRY_PATTERN = re.compile(
+    r'"([a-z]{2}(?:-[A-Za-z]+)?)"\s*:\s*\{\s*\n'
+    r'\s*("stringUnit"\s*:\s*\{\s*"state"\s*:\s*"[^"]+",\s*"value"\s*:\s*"[^"\\]*(?:\\.[^"\\]*)*"\s*\})\s*\n'
+    r'\s*\}',
+    re.MULTILINE,
+)
+
+
+def _compact_xcstrings_text(data: dict) -> str:
+    output = json.dumps(data, ensure_ascii=False, indent=2)
+
+    def string_unit_replacer(match: re.Match) -> str:
+        state = match.group(1)
+        value = match.group(2)
+        return f'"stringUnit" : {{ "state" : "{state}", "value" : "{value}" }}'
+
+    output = _STRING_UNIT_PATTERN.sub(string_unit_replacer, output)
+
+    def lang_replacer(match: re.Match) -> str:
+        lang = match.group(1)
+        string_unit = match.group(2)
+        string_unit = re.sub(r'"stringUnit"\s*:\s*', '"stringUnit" : ', string_unit)
+        return f'"{lang}": {{ {string_unit} }}'
+
+    output = _LANG_ENTRY_PATTERN.sub(lang_replacer, output)
+
+    return output + "\n"
+
+
+def compact_xcstrings(path: Path) -> bool:
     try:
-        # 读取并解析 JSON
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 处理前验证 JSON 格式
-        data = json.loads(content)
-        
-        # 第一步：使用标准 2 空格缩进导出
-        output = json.dumps(data, ensure_ascii=False, indent=2)
-        
-        # 第二步：将 stringUnit 块压缩为单行
-        # 匹配模式: "stringUnit" : {\n..."state" : "...",\n..."value" : "..."\n...}
-        string_unit_pattern = r'"stringUnit"\s*:\s*\{\s*\n\s*"state"\s*:\s*"([^"]+)",\s*\n\s*"value"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*\n\s*\}'
-        
-        def string_unit_replacer(match):
-            state = match.group(1)
-            value = match.group(2)
-            return f'"stringUnit" : {{ "state" : "{state}", "value" : "{value}" }}'
-        
-        output = re.sub(string_unit_pattern, string_unit_replacer, output)
-        
-        # 第三步：将语言条目压缩为单行
-        # 匹配模式: "langCode": {\n..."stringUnit" : { ... }\n...}
-        lang_pattern = r'"([a-z]{2}(?:-[A-Za-z]+)?)": \{\s*\n\s*("stringUnit" : \{ "state" : "[^"]+", "value" : "[^"\\]*(?:\\.[^"\\]*)*" \})\s*\n\s*\}'
-        
-        def lang_replacer(match):
-            lang = match.group(1)
-            string_unit = match.group(2)
-            return f'"{lang}": {{ {string_unit} }}'
-        
-        output = re.sub(lang_pattern, lang_replacer, output)
-        
-        # 写回文件
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(output)
-        
-        # 处理后验证 JSON 格式
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        output = _compact_xcstrings_text(data)
+        path.write_text(output, encoding="utf-8")
+
+        with path.open("r", encoding="utf-8") as f:
             json.load(f)
-        
+
         return True
-        
     except json.JSONDecodeError as e:
-        print(f"错误: JSON 格式无效 - {e}", file=sys.stderr)
+        print(f"错误: JSON 格式无效 - {path}: {e}", file=sys.stderr)
         return False
     except Exception as e:
-        print(f"错误: {e}", file=sys.stderr)
+        print(f"错误: {path}: {e}", file=sys.stderr)
         return False
 
 
-def main():
-    # 脚本位置的相对路径（.cursor/rules -> 项目根目录）
-    script_dir = Path(__file__).parent.parent.parent
-    default_path = script_dir / "Resource" / "Localizable.xcstrings"
-    
-    # 支持命令行参数指定自定义路径
-    if len(sys.argv) > 1:
-        file_path = sys.argv[1]
-    else:
-        file_path = str(default_path)
-    
-    if not Path(file_path).exists():
-        print(f"错误: 文件不存在: {file_path}", file=sys.stderr)
+def _expand_paths(args: list[str], repo_root: Path) -> list[Path]:
+    if not args:
+        return [repo_root / "Resource" / "Localizable.xcstrings"]
+
+    expanded: list[Path] = []
+    for raw in args:
+        path = Path(raw)
+        if path.is_dir():
+            expanded.extend(sorted(path.rglob("*.xcstrings")))
+        else:
+            expanded.append(path)
+
+    return [p for p in expanded if p.exists()]
+
+
+def main() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    targets = _expand_paths(sys.argv[1:], repo_root)
+
+    if not targets:
+        print("错误: 未找到任何 xcstrings 文件", file=sys.stderr)
         sys.exit(1)
-    
-    print(f"正在压缩: {file_path}")
-    
-    if compact_xcstrings(file_path):
-        print("✅ 完成 - xcstrings 文件压缩成功")
-        print("   - stringUnit 块已压缩为单行")
-        print("   - 语言条目已压缩为单行")
-        print("   - JSON 格式验证通过")
-    else:
-        print("❌ xcstrings 文件压缩失败", file=sys.stderr)
+
+    failures: list[Path] = []
+    for target in targets:
+        print(f"正在压缩: {target}")
+        if not compact_xcstrings(target):
+            failures.append(target)
+
+    if failures:
+        print("❌ xcstrings 文件压缩失败:", file=sys.stderr)
+        for path in failures:
+            print(f"   - {path}", file=sys.stderr)
         sys.exit(1)
+
+    print("✅ 完成 - xcstrings 文件压缩成功")
 
 
 if __name__ == "__main__":
     main()
-
