@@ -19,7 +19,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
+          body: |
+            **Download:** https://apps.apple.com/app/syncnos/id6755133888
           generate_release_notes: true
+          append_body: true
           draft: false
           prerelease: false
         env:
