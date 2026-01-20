@@ -1,7 +1,3 @@
----
-alwaysApply: true
----
-
 # 最佳实践指南：SwiftUI响应式布局 + MVVM架构 + Combine响应式编程
 
 ## 项目架构要求
