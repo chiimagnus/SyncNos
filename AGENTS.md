@@ -1,85 +1,69 @@
-# SyncNos 项目导航
+# 仓库指南
 
-**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead、Dedao（得到）和微信聊天 OCR 中的读书高亮和笔记同步到 Notion 数据库。
-
----
+SyncNos 是一款 macOS 应用，将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
 
 ## 项目结构
 
 ```
 SyncNos/
-├── AGENTS.md                    # 👈 你在这里（项目入口）
-├── SyncNos/                     # 源代码目录
-│   ├── AGENTS.md                # 🔥 核心：架构规范 + 业务说明
-│   ├── Models/                  # 数据模型
-│   ├── ViewModels/              # 视图模型
-│   ├── Views/                   # 视图
-│   │   └── Components/Main/
-│   │       └── AGENTS.md        # 键盘导航技术文档
-│   └── Services/                # 服务层
-│       ├── AGENTS.md            # SwiftData/@ModelActor 规范
-│       ├── Core/
-│       │   └── AGENTS.md        # 动态字体 + DIContainer
-│       └── DataSources-From/
-│           └── OCR/
-│               └── AGENTS.md    # Apple Vision OCR 技术文档
+├── SyncNos/                     # 源代码
+│   ├── Models/                  # 数据模型（DTO、缓存模型）
+│   ├── ViewModels/              # MVVM 视图模型
+│   ├── Views/                   # SwiftUI 视图
+│   └── Services/                # 业务服务层
+│       ├── Core/                # 核心服务（DI、日志、加密）
+│       ├── DataSources-From/    # 数据源适配器
+│       └── DataSources-To/      # 同步目标适配器
 ├── .codex/docs/                 # 开发指南文档
 └── Resource/                    # 资源文件
 ```
 
----
+## 构建与运行
 
-## 核心规范文档
+```bash
+open SyncNos.xcodeproj           # 打开项目
+xcodebuild -scheme SyncNos build # 构建
+```
 
-| 文档 | 路径 | 内容 |
-|------|------|------|
-| **项目架构** | `SyncNos/AGENTS.md` | MVVM 规范、同步架构、依赖注入、协议驱动开发 |
-| **SwiftData 规范** | `SyncNos/Services/AGENTS.md` | @ModelActor 后台服务实现规范 |
-| **动态字体** | `SyncNos/Services/Core/AGENTS.md` | 字体缩放、DIContainer、日志服务 |
-| **OCR 技术** | `SyncNos/Services/DataSources-From/OCR/AGENTS.md` | Apple Vision OCR 集成 |
-| **键盘导航** | `SyncNos/Views/Components/Main/AGENTS.md` | 键盘快捷键、焦点管理 |
+目标平台：macOS 14.0+，Swift 6.0+
 
----
+## 代码风格
+
+- **架构**：MVVM + Protocol-Oriented Programming
+- **缩进**：4 空格
+- **命名**：Swift API Design Guidelines（驼峰命名）
+- **注释**：中文注释，`// MARK:` 分隔代码区块
+- **协议优先**：所有服务通过协议定义，通过 `DIContainer` 注入
+
+## 核心规范
+
+| 规范 | 路径 |
+|------|------|
+| 架构与业务 | `SyncNos/AGENTS.md` |
+| SwiftData 后台服务 | `SyncNos/Services/AGENTS.md` |
+| 动态字体 | `SyncNos/Services/Core/AGENTS.md` |
+| OCR 技术 | `SyncNos/Services/DataSources-From/OCR/AGENTS.md` |
+| 键盘导航 | `SyncNos/Views/Components/Main/AGENTS.md` |
 
 ## 开发指南
 
-| 文档 | 路径 | 用途 |
-|------|------|------|
-| 添加新数据源 | `.codex/docs/添加新数据源完整指南.md` | 完整的数据源开发流程 |
-| 添加新同步目标 | `.codex/docs/添加新同步目标完整指南.md` | 添加 Obsidian、Lark 等目标 |
-| 国际化翻译 | `.codex/docs/国际化翻译流程指南.md` | i18n 操作流程 |
+| 指南 | 路径 |
+|------|------|
+| 添加新数据源 | `.codex/docs/添加新数据源完整指南.md` |
+| 添加新同步目标 | `.codex/docs/添加新同步目标完整指南.md` |
+| 国际化翻译 | `.codex/docs/国际化翻译流程指南.md` |
 
----
+## 提交规范
 
-## 技术栈
+遵循 Conventional Commits：
 
-- **架构**: MVVM + Protocol-Oriented Programming
-- **UI**: SwiftUI (macOS 14+)
-- **响应式**: Combine
-- **数据持久化**: SwiftData
-- **语言**: Swift 5.9+ / Swift 6.0+
-
----
-
-## 快速开始
-
-```bash
-# 打开项目
-open SyncNos.xcodeproj
-
-# 构建
-xcodebuild -scheme SyncNos -configuration Debug build
+```
+feat: 添加 Obsidian 同步支持
+fix: 修复 WeRead 登录超时问题
+docs: 更新 AGENTS.md 文档
+refactor: 重构 NotionSyncEngine
 ```
 
----
+## 测试
 
-## 核心功能
-
-- ✅ Apple Books 高亮同步
-- ✅ GoodLinks 文章同步
-- ✅ WeRead（微信读书）同步
-- ✅ Dedao（得到）同步
-- ✅ 微信聊天 OCR 识别
-- ✅ Notion 数据库同步
-- ✅ 智能增量自动同步
-- ✅ 16 种语言国际化
+当前无自动化测试套件。服务层通过协议定义，支持依赖注入，便于后续添加单元测试。
