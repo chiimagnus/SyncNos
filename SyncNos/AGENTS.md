@@ -1,79 +1,164 @@
-# 最佳实践指南：SwiftUI响应式布局 + MVVM架构 + Combine响应式编程
+# SyncNos 项目规范与架构指南
 
-## 项目架构要求
+## 项目概述
+
+**SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead、Dedao（得到）和微信聊天 OCR 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
+
+### 核心功能
+- ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
+- ✅ **智能分页**：大量数据的分页处理，确保性能优化，支持增量加载
+- ✅ **GoodLinks 同步**：文章内容、标签和高亮笔记的完整同步
+- ✅ **WeRead 集成**：微信读书完整支持，包括 Cookie 自动刷新和透明认证
+- ✅ **Dedao 集成**：得到电子书完整支持，包括 WebView 登录和令牌桶限流防反爬
+- ✅ **Chats OCR 集成**：微信聊天截图 OCR 识别，支持智能消息方向判断、本地存储加密和解析统计日志
+- ✅ **Notion 数据库同步**，支持两种策略：
+  - **单一数据库模式**：所有内容在一个 Notion 数据库中
+  - **每本书独立模式**：每本书/文章有独立的数据库
+- ✅ **同步队列管理**：实时同步进度显示，任务排队和状态跟踪
+- ✅ **智能增量自动同步**：每 5 分钟检查一次，只同步有变更的内容
+- ✅ **国际化支持**：16 种语言
+
+---
+
+## 架构规范
 
 ### 核心技术栈
 - **架构模式**: MVVM (Model-View-ViewModel)
 - **编程范式**: Protocol-Oriented Programming (POP，协议驱动开发)
-- **UI框架**: SwiftUI (iOS 17+, iPadOS 17+, macOS 14+)
+- **UI框架**: SwiftUI (macOS 14+)
 - **响应式编程**: Combine
 - **数据持久化**: SwiftData
 - **语言版本**: Swift 5.9+ / Swift 6.0+
 
-### 平台支持
-- iOS 17.0+
-- iPadOS 17.0+
-- macOS 14.0+
+### 文件结构
+```
+SyncNos/
+├── Models/                    # 数据模型
+│   ├── Core/                  # 核心模型（ContentSource、UnifiedHighlight 等）
+│   ├── DataSourceProviders/   # 数据源 UI 配置协议实现
+│   ├── WeRead/                # WeRead 相关模型
+│   ├── Dedao/                 # Dedao 相关模型
+│   ├── Chats/                 # Chats 相关模型
+│   └── Sync/                  # 同步相关模型
+├── ViewModels/                # 视图模型
+├── Views/                     # 视图
+│   ├── Components/            # 通用组件
+│   ├── Commands/              # 菜单命令
+│   └── Settings/              # 设置界面
+└── Services/                  # 服务层
+    ├── Core/                  # 核心服务（DIContainer、Logger 等）
+    ├── DataSources-From/      # 数据读取服务
+    │   ├── AppleBooks/
+    │   ├── GoodLinks/
+    │   ├── WeRead/
+    │   ├── Dedao/
+    │   ├── Chats/
+    │   └── OCR/
+    ├── DataSources-To/        # 数据写入服务
+    │   └── Notion/
+    └── SyncScheduling/        # 同步调度
+```
 
-## MVVM架构规范
+---
+
+## MVVM 架构规范
 
 ### 1. Models (数据模型)
 - 纯数据结构，不包含业务逻辑
 - 使用 `@Model` 宏用于 SwiftData
 - 只包含属性和简单的数据处理方法
 - 不直接引用 SwiftUI 或 Combine
-- 数据结构应该清晰、简洁
 
 ### 2. ViewModels (视图模型)
 - 处理业务逻辑，管理状态
 - 二选一：使用 `ObservableObject` + `@Published`，或使用 `@Observable`；不要混用
-- 使用 `ObservableObject` 时使用 `@Published`；使用 `@Observable` 时不要使用 `@Published`
-- 不直接引用 SwiftUI Views
 - **禁止使用单例模式** (`shared` 静态实例)
-- 使用 Combine 进行响应式数据流处理（需 `$property`/`assign(to:)` 时，选择 `ObservableObject` + `@Published`）
-- 状态管理与UI逻辑，处理用户交互
-- 数据绑定，向View提供格式化数据
-- 调用Service执行业务操作，订阅数据变化（Combine）
-- 错误与加载状态统一处理
-
-#### ViewModel响应式编程规范
-- 使用 `ObservableObject` 时：用 `@Published` 标记需要触发 UI 的属性
-- 使用 `@Observable` 时：不要使用 `@Published`，直接声明属性；双向绑定用 `@Bindable`
-- **计算属性响应式**: 计算属性应自动响应上游可观察属性变化
-- Combine 订阅（仅 `ObservableObject`）：使用 `$property.sink` 或 `assign(to:)` 等
-- **避免手动通知**: 不要手动调用`objectWillChange.send()`，依赖`@Published`自动机制
-- 使用 Combine 操作符 (map, filter, debounce, etc.) 处理复杂数据流
-- 使用 `Set<AnyCancellable>` 管理订阅生命周期
+- 使用 Combine 进行响应式数据流处理
+- 调用 Service 执行业务操作
 
 ### 3. Views (视图)
-- 纯UI展示，不包含业务逻辑
-- 绑定策略：`ObservableObject` 用 `@StateObject/@ObservedObject`；`@Observable` 用 `@State`/`@Environment` + `@Bindable`（不要混用）
+- 纯 UI 展示，不包含业务逻辑
+- 绑定策略：`ObservableObject` 用 `@StateObject/@ObservedObject`
 - 组件化、可复用、条件渲染（加载/错误/空数据）
-- iOS设备适配（iPhone/iPad）、暗黑模式、主题切换
-- 响应式布局，支持不同屏幕尺寸
 
-## 代码组织与职责分离
+### 4. Services (服务层)
+- 网络请求、数据存储等基础设施逻辑
+- 通过 `DIContainer.shared` 访问
+- 所有服务实现协议以支持测试
 
-### 文件结构
+---
+
+## 依赖注入
+
+服务通过 `DIContainer.shared` 管理：
+
+```swift
+// 核心服务
+DIContainer.shared.notionService
+DIContainer.shared.notionSyncEngine      // 统一同步引擎
+DIContainer.shared.databaseService
+DIContainer.shared.autoSyncService
+DIContainer.shared.syncTimestampStore
+
+// WeRead 服务
+DIContainer.shared.weReadAuthService
+DIContainer.shared.weReadAPIService
+DIContainer.shared.weReadCacheService
+
+// Dedao 服务
+DIContainer.shared.dedaoAuthService
+DIContainer.shared.dedaoAPIService
+DIContainer.shared.dedaoCacheService
+
+// Chats 服务
+DIContainer.shared.chatsCacheService
+DIContainer.shared.chatOCRParser
+
+// OCR 服务
+DIContainer.shared.ocrAPIService        // Apple Vision OCR（原生，离线）
+DIContainer.shared.ocrConfigStore       // 配置存储
 ```
-Feature/
-├── Views/
-│   ├── FeatureView.swift
-│   └── Components/
-├── ViewModels/
-│   └── FeatureViewModel.swift
-├── Models/
-│   └── FeatureModel.swift
-└── Services/
-    └── FeatureService.swift
+
+---
+
+## 同步架构
+
+### 核心设计模式：SyncEngine + Adapter
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ViewModel                                 │
+│  (AppleBooksViewModel / GoodLinksViewModel / WeReadViewModel)   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    NotionSyncEngine                              │
+│  - sync(source: NotionSyncSourceProtocol)                       │
+│  - 统一处理：确保数据库、确保页面、增量/全量同步、更新时间戳       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              NotionSyncSourceProtocol (Adapter)                  │
+│  - AppleBooksNotionAdapter                                       │
+│  - GoodLinksNotionAdapter                                        │
+│  - WeReadNotionAdapter                                           │
+│  - DedaoNotionAdapter                                            │
+│  - 职责：将数据源转换为 UnifiedHighlight                          │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 职责分离原则
-- **Views**: 只负责UI展示和用户交互响应
-- **ViewModels**: 处理业务逻辑、数据转换、状态管理
-- **Models**: 数据结构定义和简单数据处理
-- **Services**: 网络请求、数据存储等基础设施逻辑
-- **Protocols**: 定义接口契约，实现依赖反转
+### 添加新数据源
+
+只需要：
+1. 在 `DataSources-From/` 创建数据读取服务
+2. 在 `SyncEngine/Adapters/` 创建适配器，实现 `NotionSyncSourceProtocol`
+3. 在 ViewModel 中使用 `syncEngine.sync(source: adapter, ...)`
+
+**不需要**修改 `NotionSyncEngine` 或 `NotionService`。
+
+---
 
 ## 协议驱动开发 (Protocol-Oriented Programming)
 
@@ -83,7 +168,7 @@ Feature/
 2. **消除 switch 语句**: 当需要根据类型执行不同逻辑时，使用协议代替 switch
 3. **可扩展性**: 添加新类型只需实现协议，不需要修改现有代码
 
-### 协议设计规范
+### 示例
 
 ```swift
 // ✅ 正确：使用协议定义统一接口
@@ -103,50 +188,55 @@ struct AppleBooksUIProvider: DataSourceUIProvider {
 }
 ```
 
-### 避免的模式
-
 ```swift
 // ❌ 错误：在多处使用 switch 根据类型执行不同逻辑
 switch source {
 case .appleBooks: // 处理 AppleBooks
 case .goodLinks: // 处理 GoodLinks
-case .weRead: // 处理 WeRead
 // 每添加新类型都需要修改所有 switch
 }
 
 // ✅ 正确：通过协议统一处理
 func process(_ provider: DataSourceUIProvider) {
-    // 使用协议属性，无需 switch
     let name = provider.displayName
     NotificationCenter.default.post(name: provider.filterChangedNotification, object: nil)
 }
 ```
 
-### 适用场景
+---
 
-- **数据源配置**: 每个数据源的 UI 配置（通知、菜单、排序选项）
-- **同步引擎**: `NotionSyncSourceProtocol` 适配器模式
-- **服务协议**: `DatabaseServiceProtocol`、`NotionServiceProtocol`
-- **可测试性**: 使用协议便于 Mock 和单元测试
+## 通知与事件管理
+
+### 统一通知名称定义
+
+所有通知名称必须在 `Models/Core/NotificationNames.swift` 中统一定义：
+
+```swift
+// ✅ 正确：在 NotificationNames.swift 中统一定义
+extension Notification.Name {
+    static let refreshBooksRequested = Notification.Name("RefreshBooksRequested")
+    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
+}
+
+// ❌ 错误：在各处硬编码通知名称
+NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
+```
+
+### 唯一入口原则
+
+当多个操作触发相同的副作用时，应该**统一到一个入口点**，而不是在每个触发点分别处理。
+
+---
 
 ## ViewModel 实例化策略
 
 ### 推荐方式
-1. **按需创建**：每个视图创建独立的ViewModel实例
-2. **依赖注入**：通过 `.environmentObject()`（ObservableObject）或 `.environment(...)`（@Observable）传递 ViewModel
-3. **生命周期管理**：
-   - 短期：使用 `@State` 管理
-   - 长期：使用 `@Environment` 或 `@StateObject`
+1. **按需创建**：每个视图创建独立的 ViewModel 实例
+2. **依赖注入**：通过 `.environmentObject()` 传递 ViewModel
 
 ### 禁止方式
 - ❌ 使用 `static let shared` 单例模式创建 ViewModel
 - ❌ 在 ViewModel 中创建全局状态
-- ❌ 无关联的视图通过单例或全局变量共享 ViewModel
-
-### 允许的共享方式
-- ✅ 父视图创建 ViewModel，通过 `@ObservedObject` 传递给子视图
-- ✅ 通过 `.environmentObject()` 在视图层级中共享
-- ✅ List 和 Detail 视图共享同一个 ViewModel（父视图统一管理）
 
 ### 正确示例
 ```swift
@@ -156,201 +246,33 @@ func process(_ provider: DataSourceUIProvider) {
 // ✅ 正确：依赖注入（ObservableObject）
 .environmentObject(viewModel)
 
-// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
+// ✅ 正确：响应式 ViewModel（ObservableObject + Combine）
 class ItemViewModel: ObservableObject {
     @Published var items: [Item] = []
-    @Published var filteredItems: [DisplayItem] = []
-    @Published var isLoading = false
-
     private var cancellables = Set<AnyCancellable>()
 
     init() {
         $items
-            .map { items in
-                items.map { DisplayItem(from: $0) }
-            }
+            .map { items in items.map { DisplayItem(from: $0) } }
             .assign(to: &$filteredItems)
     }
 }
 ```
 
-## SwiftUI最佳实践
+---
 
-### 响应式布局
-- 优先使用 SwiftUI 内置的响应式布局系统
-- 合理使用 Size Classes 进行设备适配
-- 避免过度使用 GeometryReader
-- 使用 ScrollView 优化长内容展示
+## DetailView 内存释放与生命周期规范
 
-### 状态管理
-```swift
-// ✅ 正确：按需创建ViewModel（ObservableObject）
-struct FeatureView: View {
-    @StateObject private var viewModel = FeatureViewModel()
+> 背景：Detail（右侧详情）往往持有最大的数据，容易因为"非生命周期绑定的异步任务"导致对象无法及时释放。
 
-    var body: some View {
-        ContentView()
-            .environmentObject(viewModel)
-    }
-}
+- **生命周期绑定加载**：优先使用 `.task(id: selectionId)`
+- **切换/退出时强制释放**：
+  - 取消任务（或让结果可被丢弃）
+  - 关闭数据会话（例如 SQLite read-only session）
+  - 大数组使用 `removeAll(keepingCapacity: false)`
+- **防串台**：对分页/长任务使用 token 或 id 校验
 
-// ✅ 正确：响应式ViewModel（ObservableObject + Combine）
-class FeatureViewModel: ObservableObject {
-    @Published var items: [Item] = []
-    @Published var isLoading = false
-
-    private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        $items
-            .map { items in
-                items.map { transformItem($0) }
-            }
-            .sink { [weak self] transformedItems in
-                // 处理转换后的数据
-            }
-            .store(in: &cancellables)
-    }
-}
-```
-
-### 组件化开发
-- 每个组件职责单一
-- 组件可复用、可测试
-- 合理使用 ViewModifier 和 ViewBuilder
-- 避免过深层次的视图嵌套
-
-## Combine响应式编程
-
-### 数据流处理
-```swift
-// ViewModel中的响应式数据处理
-class MyViewModel: ObservableObject {
-    @Published var sourceData: [DataModel] = []
-    @Published var processedData: [DisplayModel] = []
-    @Published var searchText = ""
-    @Published var searchResults: [Item] = []
-    
-    private var cancellables = Set<AnyCancellable>()
-    
-    init() {
-        // 响应式数据转换
-        $sourceData
-            .map { data in
-                // 业务逻辑处理
-                return data.map { DisplayModel(from: $0) }
-            }
-            .assign(to: &$processedData)
-            
-        // 搜索功能
-        $searchText
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .flatMap { text in
-                text.isEmpty ? Just([]).eraseToAnyPublisher() : 
-                self.searchService.search(text).catch { _ in Just([]) }.eraseToAnyPublisher()
-            }
-            .assign(to: &$searchResults)
-    }
-}
-```
-
-### 响应式编程最佳实践
-1. **数据源响应**: 使用`@Published`属性作为数据源
-2. **自动转换**: 通过`.map`、`.filter`等操作符处理数据
-3. **链式操作**: 使用`.assign(to:)`或`.sink`订阅结果
-4. **内存管理**: 使用`Set<AnyCancellable>`管理订阅生命周期
-5. **错误处理**: 使用`.catch`、`.replaceError`处理错误情况
-
-### 错误处理
-- 使用 `catch` 操作符处理错误
-- 统一错误处理机制
-- 避免在 View 层处理复杂错误逻辑
-
-## 通知与事件管理
-
-### 统一通知名称定义
-
-所有通知名称必须在 `Models/**/NotificationNames.swift` 中统一定义：
-
-```swift
-// ✅ 正确：在 NotificationNames.swift 中统一定义
-extension Notification.Name {
-    static let refreshBooksRequested = Notification.Name("RefreshBooksRequested")
-    static let syncBookStatusChanged = Notification.Name("SyncBookStatusChanged")
-}
-
-// ✅ 正确：使用统一定义的通知名称
-NotificationCenter.default.post(name: .refreshBooksRequested, object: nil)
-NotificationCenter.default.publisher(for: .syncBookStatusChanged)
-```
-
-```swift
-// ❌ 错误：在各处硬编码通知名称
-NotificationCenter.default.post(name: Notification.Name("RefreshBooksRequested"), object: nil)
-```
-
-### 唯一入口原则
-
-当多个操作触发相同的副作用（如发送通知、更新状态）时，应该**统一到一个入口点**，而不是在每个触发点分别处理。
-
-#### 正确示例
-```swift
-// ✅ 正确：所有切换操作最终都通过 ViewModel 的统一方法
-class DataSourceSwitchViewModel: ObservableObject {
-    func switchTo(index: Int) {
-        activeIndex = index
-        triggerHapticFeedback()
-        notifyDataSourceSwitch(to: source)  // 唯一发送通知的地方
-    }
-    
-    private func notifyDataSourceSwitch(to source: ContentSource) {
-        NotificationCenter.default.post(name: notificationName, object: nil)
-    }
-}
-
-// 触控板滑动 → switchTo(index:)
-// 键盘快捷键 → contentSourceRawValue → MainListView.onChange → switchTo(source:)
-// 点击指示器 → switchTo(index:)
-```
-
-#### 错误示例
-```swift
-// ❌ 错误：在多个地方分别发送通知
-class SwipeContainer {
-    func handleSwipe() {
-        activeIndex += 1
-        NotificationCenter.default.post(...)  // 重复的通知发送
-    }
-}
-
-struct ViewCommands {
-    func switchDataSource() {
-        contentSourceRawValue = source.rawValue
-        NotificationCenter.default.post(...)  // 重复的通知发送
-    }
-}
-```
-
-### 通知使用规范
-- **发送点唯一**: 同一类型的通知只在一个地方发送
-- **接收点明确**: 只有需要响应的组件监听通知
-- **避免通知链**: 不要让通知触发另一个通知
-
-### 通知 vs 绑定的选择
-
-#### 使用 @Published/@Binding 的场景
-- 父子视图之间的数据传递
-- 有直接引用关系的组件之间
-- 同一个 ViewModel 内的状态变化
-- 需要双向绑定的场景
-
-#### 使用 NotificationCenter 的场景
-- 跨模块通信（如 Commands → Views）
-- 无直接引用关系的组件之间
-- 全局事件广播（如 "RefreshBooksRequested"、"DataSourceSwitched"）
-- 需要解耦的场景（发送方不需要知道接收方）
-- 一对多的通知场景
+---
 
 ## 禁止事项
 
@@ -358,16 +280,17 @@ struct ViewCommands {
 - ❌ 在 View 中直接处理业务逻辑
 - ❌ 在 Model 中包含业务逻辑
 - ❌ 使用 `static let shared` 单例模式创建 ViewModel
-- ❌ 无关联的视图通过单例或全局变量共享 ViewModel
 - ❌ 在 ViewModel 中直接操作 UI
 - ❌ 在 View 中直接访问数据库
-- ❌ 在多个地方发送相同类型的通知（应统一到一个入口）
+- ❌ 在多个地方发送相同类型的通知
 
 ### 代码实现
 - ❌ 手动计算屏幕尺寸和比例
 - ❌ 使用固定像素值布局
 - ❌ 复杂的 GeometryReader 嵌套
 - ❌ 忽略内存管理 (忘记调用 store(in:))
+
+---
 
 ## 性能优化
 
@@ -376,7 +299,34 @@ struct ViewCommands {
 - 使用 `removeDuplicates()` 减少重复计算
 - 使用 `debounce()` 优化用户输入响应
 
-### 视图渲染
-- 避免在 `body` 中进行复杂计算
-- 使用 `@State` 和 `@Binding` 优化状态传递
-- 合理使用 `@ViewBuilder` 优化视图构建
+### 速率限制与并发控制
+- **Notion API**: 读取 8 RPS，写入 3 RPS（在 `NotionSyncConfig` 中可配置）
+- **全局并发控制**: `ConcurrencyLimiter` 控制全局操作并发数
+- **重试逻辑**: 自动指数退避（429 和 409 错误）
+
+---
+
+## 常用开发命令
+
+```bash
+# 使用 Xcode 打开项目
+open SyncNos.xcodeproj
+
+# 使用命令行构建（Debug）
+xcodebuild -scheme SyncNos -configuration Debug build
+
+# 清理构建目录
+xcodebuild -scheme SyncNos clean
+```
+
+---
+
+## 相关文档
+
+- **添加新数据源**: `.codex/docs/添加新数据源完整指南.md`
+- **添加新同步目标**: `.codex/docs/添加新同步目标完整指南.md`
+- **国际化翻译**: `.codex/docs/国际化翻译流程指南.md`
+- **键盘导航**: `Views/Components/Main/AGENTS.md`
+- **OCR 技术**: `Services/DataSources-From/OCR/AGENTS.md`
+- **SwiftData 规范**: `Services/AGENTS.md`
+- **动态字体**: `Services/Core/AGENTS.md`
