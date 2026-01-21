@@ -11,6 +11,10 @@ actor ConcurrencyLimiter {
     }
     
     private var waitQueue: [Waiter] = []
+    private var cancelledWaiterIds: Set<UUID> = []
+    private var recentlyResumedWaiterIds: [UUID] = []
+    private var recentlyResumedWaiterIdSet: Set<UUID> = []
+    private let recentlyResumedLimit: Int = 64
 
     init(limit: Int) {
         precondition(limit > 0, "Concurrency limit must be greater than zero")
@@ -28,24 +32,47 @@ actor ConcurrencyLimiter {
         let waiterId = UUID()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                if cancelledWaiterIds.remove(waiterId) != nil {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                
                 waitQueue.append(Waiter(id: waiterId, continuation: continuation))
             }
         } onCancel: {
             Task { await self.cancelWaiter(id: waiterId) }
         }
-        
-        try Task.checkCancellation()
     }
     
     private func cancelWaiter(id: UUID) {
-        guard let index = waitQueue.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = waitQueue.firstIndex(where: { $0.id == id }) else {
+            if recentlyResumedWaiterIdSet.contains(id) {
+                return
+            }
+            cancelledWaiterIds.insert(id)
+            return
+        }
         let waiter = waitQueue.remove(at: index)
         waiter.continuation.resume(throwing: CancellationError())
+    }
+    
+    private func markResumed(id: UUID) {
+        recentlyResumedWaiterIds.append(id)
+        recentlyResumedWaiterIdSet.insert(id)
+        
+        if recentlyResumedWaiterIds.count > recentlyResumedLimit {
+            let overflow = recentlyResumedWaiterIds.count - recentlyResumedLimit
+            for _ in 0..<overflow {
+                let old = recentlyResumedWaiterIds.removeFirst()
+                recentlyResumedWaiterIdSet.remove(old)
+            }
+        }
     }
 
     private func release() {
         if !waitQueue.isEmpty {
             let next = waitQueue.removeFirst()
+            markResumed(id: next.id)
             next.continuation.resume(returning: ())
         } else {
             permitsAvailable += 1
@@ -57,6 +84,7 @@ actor ConcurrencyLimiter {
     func withPermit<T>(_ operation: () async throws -> T) async throws -> T {
         try await acquire()
         defer { release() }
+        try Task.checkCancellation()
         return try await operation()
     }
 }

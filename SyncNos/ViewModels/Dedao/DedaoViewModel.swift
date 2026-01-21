@@ -379,6 +379,8 @@ final class DedaoViewModel: ObservableObject {
                         let taskId = "\(ContentSource.dedao.rawValue):\(id)"
                         let task = Task { [weak self] in
                             guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .dedao, rawId: id) else { return }
                             
                             do {
                                 try await limiter.withPermit {
