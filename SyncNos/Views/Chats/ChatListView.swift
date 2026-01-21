@@ -8,7 +8,6 @@ import UniformTypeIdentifiers
 struct ChatListView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Binding var selectionIds: Set<String>
-    let isActive: Bool
     
     /// 用于接收焦点的 FocusState
     @FocusState private var isListFocused: Bool
@@ -34,11 +33,8 @@ struct ChatListView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
-        .task(id: isActive) {
-            // 仅在 Chats 真的成为当前激活数据源时才读取缓存。
-            // 背景原因：SwipeableDataSourceContainer 会同时构建所有启用的数据源视图，
-            // 如果在这里无条件读取，会在应用启动时触发 Keychain（加密密钥）访问弹窗。
-            guard isActive else { return }
+        .task {
+            // 视图首次出现时从缓存加载
             if viewModel.contacts.isEmpty {
                 await viewModel.loadFromCache()
             }
@@ -189,8 +185,7 @@ private struct ContactRow: View {
 #Preview {
     ChatListView(
         viewModel: ChatViewModel(),
-        selectionIds: .constant([]),
-        isActive: true
+        selectionIds: .constant([])
     )
     .applyFontScale()
     .frame(width: 300, height: 500)
