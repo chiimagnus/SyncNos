@@ -45,7 +45,10 @@ final class DataSourceRegistry {
     
     /// 获取所有已注册的数据源
     var allSources: [ContentSource] {
-        Array(providers.keys).sorted { $0.rawValue < $1.rawValue }
+        // 优先使用默认顺序，避免按 rawValue 排序导致的“字母顺序”展示
+        let ordered = ContentSource.defaultOrder.filter { providers[$0] != nil }
+        let missing = providers.keys.filter { !ordered.contains($0) }.sorted { $0.rawValue < $1.rawValue }
+        return ordered + missing
     }
     
     /// 获取所有 UIProvider
@@ -87,4 +90,3 @@ extension ContentSource {
         uiProvider?.enabledStorageKey ?? "datasource.\(rawValue).enabled"
     }
 }
-

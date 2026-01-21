@@ -28,9 +28,9 @@ struct DedaoUIProvider: DataSourceUIProvider {
     // MARK: - 存储配置
     
     let enabledStorageKey = "datasource.dedao.enabled"
+    let defaultEnabled = false
     
     // MARK: - 高亮颜色
     
     let highlightColorTheme: HighlightColorTheme? = .dedao
 }
-
