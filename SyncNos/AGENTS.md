@@ -325,7 +325,7 @@ xcodebuild -scheme SyncNos clean
 
 - **添加新数据源**: `.codex/docs/添加新数据源完整指南.md`
 - **添加新同步目标**: `.codex/docs/添加新同步目标完整指南.md`
-- **国际化翻译**: `.codex/docs/国际化翻译流程指南.md`
+- **国际化翻译**: `.codex/skills/syncnos-i18n/SKILL.md`
 - **键盘导航**: `Views/Components/Main/AGENTS.md`
 - **OCR 技术**: `Services/DataSources-From/OCR/AGENTS.md`
 - **SwiftData 规范**: `Services/AGENTS.md`
