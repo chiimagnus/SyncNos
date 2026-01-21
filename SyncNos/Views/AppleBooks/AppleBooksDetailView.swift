@@ -230,6 +230,7 @@ struct AppleBooksDetailView: View {
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
         .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
+            if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.appleBooks.rawValue { return }
             if bookId == (selectedBookId ?? "") {
                 externalIsSyncing = true
                 externalSyncProgress = info["progress"] as? String
@@ -237,6 +238,7 @@ struct AppleBooksDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
+            if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.appleBooks.rawValue { return }
             if bookId == (selectedBookId ?? "") {
                 switch status {
                 case "started":

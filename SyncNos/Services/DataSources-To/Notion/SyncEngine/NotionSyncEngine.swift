@@ -12,6 +12,67 @@ final class NotionSyncEngine {
     private let timestampStore: SyncTimestampStoreProtocol
     private let syncedHighlightStore: SyncedHighlightStoreProtocol
     private let helperMethods: NotionHelperMethods
+    private let ensureCache = EnsureCache()
+    
+    // MARK: - Ensure Cache
+    
+    /// 避免在高并发批量同步时对同一数据库重复 ensure（造成 409/429 与长时间无进度）。
+    private actor EnsureCache {
+        private var databaseIdsByKey: [String: String] = [:]
+        private var inFlightDatabaseEnsures: [String: Task<String, Error>] = [:]
+        private var ensuredPropertyDatabaseIds: Set<String> = []
+        private var inFlightPropertyEnsures: [String: Task<Void, Error>] = [:]
+        
+        func ensureDatabaseId(
+            cacheKey: String,
+            create: @Sendable @escaping () async throws -> String
+        ) async throws -> String {
+            if let cached = databaseIdsByKey[cacheKey] {
+                return cached
+            }
+            if let task = inFlightDatabaseEnsures[cacheKey] {
+                return try await task.value
+            }
+            
+            let task = Task<String, Error> { try await create() }
+            inFlightDatabaseEnsures[cacheKey] = task
+            
+            do {
+                let id = try await task.value
+                databaseIdsByKey[cacheKey] = id
+                inFlightDatabaseEnsures[cacheKey] = nil
+                return id
+            } catch {
+                inFlightDatabaseEnsures[cacheKey] = nil
+                throw error
+            }
+        }
+        
+        func ensureDatabaseProperties(
+            databaseId: String,
+            ensure: @Sendable @escaping () async throws -> Void
+        ) async throws {
+            if ensuredPropertyDatabaseIds.contains(databaseId) {
+                return
+            }
+            if let task = inFlightPropertyEnsures[databaseId] {
+                try await task.value
+                return
+            }
+            
+            let task = Task<Void, Error> { try await ensure() }
+            inFlightPropertyEnsures[databaseId] = task
+            
+            do {
+                try await task.value
+                ensuredPropertyDatabaseIds.insert(databaseId)
+                inFlightPropertyEnsures[databaseId] = nil
+            } catch {
+                inFlightPropertyEnsures[databaseId] = nil
+                throw error
+            }
+        }
+    }
     
     // MARK: - Initialization
     
@@ -37,9 +98,13 @@ final class NotionSyncEngine {
         source: NotionSyncSourceProtocol,
         progress: @escaping (String) -> Void
     ) async throws {
+        try Task.checkCancellation()
         let item = source.syncItem
         let itemLabel = formatItemLabel(item)
         logger.info("[SmartSync] Starting sync for \(source.sourceKey): \(itemLabel)")
+        
+        // 尽早发出进度，避免长时间“无提示”（例如：ensure database / retry backoff / rate limit）
+        progress(NSLocalizedString("Preparing...", comment: ""))
 
         let lastSync = timestampStore.getLastSyncTime(for: item.itemId)
         let incremental = lastSync != nil
@@ -96,6 +161,7 @@ final class NotionSyncEngine {
         incremental: Bool,
         progress: @escaping (String) -> Void
     ) async throws {
+        try Task.checkCancellation()
         let item = source.syncItem
         let itemLabel = formatItemLabel(item)
 
@@ -116,35 +182,38 @@ final class NotionSyncEngine {
         }
 
         // 2. 确保数据库存在
+        let cacheKey = "\(source.sourceKey):\(parentPageId)"
+        let databaseId: String
         do {
-            let databaseId = try await ensureDatabaseExists(
-                title: source.databaseTitle,
-                parentPageId: parentPageId,
-                sourceKey: source.sourceKey
-            )
+            databaseId = try await ensureCache.ensureDatabaseId(cacheKey: cacheKey) { [weak self] in
+                guard let self else { throw CancellationError() }
+                return try await self.ensureDatabaseExists(
+                    title: source.databaseTitle,
+                    parentPageId: parentPageId,
+                    sourceKey: source.sourceKey
+                )
+            }
             logger.debug("[SmartSync] Using database \(databaseId) for \(source.sourceKey)")
         } catch {
             logger.error("[SmartSync] Failed to ensure database exists for \(source.sourceKey): \(error.localizedDescription)")
             throw error
         }
 
-        let databaseId = try await ensureDatabaseExists(
-            title: source.databaseTitle,
-            parentPageId: parentPageId,
-            sourceKey: source.sourceKey
-        )
-
         // 3. 确保数据库属性
         do {
-            var propertyDefinitions = basePropertyDefinitions
-            propertyDefinitions.merge(source.additionalPropertyDefinitions) { _, new in new }
-            try await notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: propertyDefinitions)
+            try await ensureCache.ensureDatabaseProperties(databaseId: databaseId) { [weak self] in
+                guard let self else { throw CancellationError() }
+                var propertyDefinitions = self.basePropertyDefinitions
+                propertyDefinitions.merge(source.additionalPropertyDefinitions) { _, new in new }
+                try await self.notionService.ensureDatabaseProperties(databaseId: databaseId, definitions: propertyDefinitions)
+            }
         } catch {
             logger.error("[SmartSync] Failed to ensure database properties for \(source.sourceKey): \(error.localizedDescription)")
             throw error
         }
 
         // 4. 确保页面存在
+        try Task.checkCancellation()
         let ensured: (id: String, created: Bool)
         do {
             ensured = try await notionService.ensureBookPageInDatabase(
@@ -166,6 +235,7 @@ final class NotionSyncEngine {
         // 5. 更新额外页面属性
         let additionalProps = source.additionalPageProperties()
         if !additionalProps.isEmpty {
+            try Task.checkCancellation()
             do {
                 try await notionService.updatePageProperties(pageId: pageId, properties: additionalProps)
             } catch {
@@ -176,6 +246,7 @@ final class NotionSyncEngine {
 
         // 6. 获取高亮数据
         progress(NSLocalizedString("Preparing...", comment: ""))
+        try Task.checkCancellation()
         let highlights: [UnifiedHighlight]
         do {
             highlights = try await source.fetchHighlights()
@@ -194,6 +265,7 @@ final class NotionSyncEngine {
                     let headerContent = source.headerContentForNewPage()
                     if !headerContent.isEmpty {
                         progress(NSLocalizedString("Adding article content...", comment: ""))
+                        try Task.checkCancellation()
                         try await notionService.appendChildren(
                             pageId: pageId,
                             children: headerContent,
@@ -203,6 +275,7 @@ final class NotionSyncEngine {
                     }
                     
                     // 追加高亮
+                    try Task.checkCancellation()
                     try await appendAllHighlights(
                         pageId: pageId,
                         highlights: highlights,
@@ -218,6 +291,7 @@ final class NotionSyncEngine {
             } else {
                 // 已存在的页面：增量更新
                 do {
+                    try Task.checkCancellation()
                     try await syncExistingPage(
                         pageId: pageId,
                         highlights: highlights,
@@ -239,6 +313,7 @@ final class NotionSyncEngine {
 
         // 8. 更新计数和时间戳（无论是否有高亮都要更新）
         do {
+            try Task.checkCancellation()
             try await updateCountAndTimestamp(pageId: pageId, count: highlights.count, itemId: item.itemId)
             logger.debug("[SmartSync] Updated count and timestamp for \(source.sourceKey): \(itemLabel)")
         } catch {
@@ -720,4 +795,3 @@ final class NotionSyncEngine {
         timestampStore.setLastSyncTime(for: itemId, to: Date())
     }
 }
-

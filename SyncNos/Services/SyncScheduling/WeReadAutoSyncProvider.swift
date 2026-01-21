@@ -116,7 +116,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
             NotificationCenter.default.post(
                 name: .syncBookStatusChanged,
                 object: nil,
-                userInfo: ["bookId": book.bookId, "status": "skipped"]
+                userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "skipped"]
             )
         }
 
@@ -157,32 +157,68 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
 
                 group.addTask {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
-                    await limiter.withPermit {
-                        NotificationCenter.default.post(
-                            name: .syncBookStarted,
-                            object: book.bookId
-                        )
-                        NotificationCenter.default.post(
-                            name: .syncBookStatusChanged,
-                            object: nil,
-                            userInfo: ["bookId": book.bookId, "status": "started"]
-                        )
+                    let runningTaskStore = DIContainer.shared.syncRunningTaskStore
+                    let taskId = "\(ContentSource.weRead.rawValue):\(book.bookId)"
+                    
+                    let task = Task { [logger] in
                         do {
-                            let adapter = WeReadNotionAdapter(
-                                book: book,
-                                apiService: apiService
-                            )
-                            try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                            try await limiter.withPermit {
                                 NotificationCenter.default.post(
-                                    name: .syncProgressUpdated,
+                                    name: .syncBookStarted,
+                                    object: book.bookId
+                                )
+                                NotificationCenter.default.post(
+                                    name: .syncBookStatusChanged,
                                     object: nil,
-                                    userInfo: ["bookId": book.bookId, "progress": progressMessage]
+                                    userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "started"]
+                                )
+                                do {
+                                    let adapter = WeReadNotionAdapter(
+                                        book: book,
+                                        apiService: apiService
+                                    )
+                                    try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                                        NotificationCenter.default.post(
+                                            name: .syncProgressUpdated,
+                                            object: nil,
+                                            userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "progress": progressMessage]
+                                        )
+                                    }
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "succeeded"]
+                                    )
+                                } catch is CancellationError {
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "cancelled"]
+                                    )
+                                } catch {
+                                    let bookLabel = self.formatBookLabel(title: book.title, author: book.author)
+                                    logger.error("[SmartSync] WeRead: \(bookLabel) - failed: \(error.localizedDescription)")
+                                    let errorInfo = SyncErrorInfo.from(error)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                    )
+                                }
+                                NotificationCenter.default.post(
+                                    name: .syncBookFinished,
+                                    object: book.bookId
                                 )
                             }
+                        } catch is CancellationError {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": book.bookId, "status": "succeeded"]
+                                userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "cancelled"]
+                            )
+                            NotificationCenter.default.post(
+                                name: .syncBookFinished,
+                                object: book.bookId
                             )
                         } catch {
                             let bookLabel = self.formatBookLabel(title: book.title, author: book.author)
@@ -191,14 +227,18 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": book.bookId, "status": "failed", "errorInfo": errorInfo]
+                                userInfo: ["bookId": book.bookId, "source": ContentSource.weRead.rawValue, "status": "failed", "errorInfo": errorInfo]
+                            )
+                            NotificationCenter.default.post(
+                                name: .syncBookFinished,
+                                object: book.bookId
                             )
                         }
-                        NotificationCenter.default.post(
-                            name: .syncBookFinished,
-                            object: book.bookId
-                        )
                     }
+                    
+                    await runningTaskStore.register(taskId: taskId, task: task)
+                    await task.value
+                    await runningTaskStore.unregister(taskId: taskId)
                 }
             }
 
