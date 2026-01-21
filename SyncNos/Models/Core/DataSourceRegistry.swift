@@ -11,7 +11,7 @@ import SwiftUI
 /// let provider = DataSourceRegistry.shared.provider(for: .appleBooks)
 ///
 /// // 或通过 ContentSource 扩展
-/// let notification = ContentSource.appleBooks.uiProvider?.filterChangedNotification
+/// let notification = ContentSource.appleBooks.uiProvider.filterChangedNotification
 /// ```
 @MainActor
 final class DataSourceRegistry {
@@ -39,21 +39,21 @@ final class DataSourceRegistry {
     }
     
     /// 获取数据源配置
-    func provider(for source: ContentSource) -> (any DataSourceUIProvider)? {
-        providers[source]
+    func provider(for source: ContentSource) -> any DataSourceUIProvider {
+        guard let provider = providers[source] else {
+            fatalError("DataSourceUIProvider not registered for source: \(source.rawValue)")
+        }
+        return provider
     }
     
     /// 获取所有已注册的数据源
     var allSources: [ContentSource] {
-        // 优先使用默认顺序，避免按 rawValue 排序导致的“字母顺序”展示
-        let ordered = ContentSource.defaultOrder.filter { providers[$0] != nil }
-        let missing = providers.keys.filter { !ordered.contains($0) }.sorted { $0.rawValue < $1.rawValue }
-        return ordered + missing
+        ContentSource.defaultOrder
     }
     
     /// 获取所有 UIProvider
     var allProviders: [any DataSourceUIProvider] {
-        allSources.compactMap { providers[$0] }
+        allSources.map { provider(for: $0) }
     }
 }
 
@@ -62,31 +62,31 @@ final class DataSourceRegistry {
 extension ContentSource {
     /// 获取该数据源的 UI 配置
     @MainActor
-    var uiProvider: (any DataSourceUIProvider)? {
+    var uiProvider: any DataSourceUIProvider {
         DataSourceRegistry.shared.provider(for: self)
     }
     
     /// 筛选变更通知名称
     @MainActor
     var filterChangedNotification: Notification.Name {
-        uiProvider?.filterChangedNotification ?? Notification.Name("UnknownFilterChanged")
+        uiProvider.filterChangedNotification
     }
     
     /// 高亮颜色主题（可选，Chats 等不支持的返回 nil）
     @MainActor
     var highlightColorTheme: HighlightColorTheme? {
-        uiProvider?.highlightColorTheme
+        uiProvider.highlightColorTheme
     }
     
     /// 高亮颜色来源
     @MainActor
     var highlightSource: HighlightSource {
-        uiProvider?.highlightSource ?? .appleBooks
+        uiProvider.highlightSource
     }
     
     /// UserDefaults 启用状态存储键
     @MainActor
     var enabledStorageKey: String {
-        uiProvider?.enabledStorageKey ?? "datasource.\(rawValue).enabled"
+        uiProvider.enabledStorageKey
     }
 }
