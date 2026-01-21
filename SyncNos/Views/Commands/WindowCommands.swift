@@ -10,19 +10,19 @@ struct WindowCommands: Commands {
 
         // MARK: - Text Size Commands
         CommandGroup(replacing: .singleWindowList) {
-            Button("Increase Text Size") {
+            Button(String(localized: "Increase Text Size", table: "Common")) {
                 fontScaleManager.increaseSize()
             }
             .keyboardShortcut("+", modifiers: .command)
             .disabled(!fontScaleManager.canIncreaseSize)
 
-            Button("Decrease Text Size") {
+            Button(String(localized: "Decrease Text Size", table: "Common")) {
                 fontScaleManager.decreaseSize()
             }
             .keyboardShortcut("-", modifiers: .command)
             .disabled(!fontScaleManager.canDecreaseSize)
 
-            Button("Reset Text Size") {
+            Button(String(localized: "Reset Text Size", table: "Common")) {
                 fontScaleManager.reset()
             }
             .keyboardShortcut("0", modifiers: .command)

@@ -99,19 +99,19 @@ struct ViewCommands: Commands {
     var body: some Commands {
         // View 菜单 - 视图相关
         CommandGroup(after: .toolbar) {
-            Button("Toggle Sidebar", systemImage: "sidebar.left") {
+            Button(String(localized: "Toggle Sidebar", table: "Common"), systemImage: "sidebar.left") {
                 NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
             }
             .keyboardShortcut("\\", modifiers: .command)
 
             // 数据源切换：上一个/下一个（⌥⌘← / ⌥⌘→）- 循环切换
-            Button("Previous Data Source") {
+            Button(String(localized: "Previous Data Source", table: "Common")) {
                 switchToPreviousDataSource()
             }
             .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
             .disabled(!canSwitchDataSource)
 
-            Button("Next Data Source") {
+            Button(String(localized: "Next Data Source", table: "Common")) {
                 switchToNextDataSource()
             }
             .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
@@ -159,9 +159,9 @@ struct ViewCommands: Commands {
                         NotificationCenter.default.post(name: .highlightSortChanged, object: nil, userInfo: ["sortAscending": highlightSortAscending])
                     } label: {
                         if highlightSortAscending {
-                            Label("Ascending", systemImage: "checkmark")
+                            Label(String(localized: "Ascending", table: "Common"), systemImage: "checkmark")
                         } else {
-                            Label("Ascending", systemImage: "xmark")
+                            Label(String(localized: "Ascending", table: "Common"), systemImage: "xmark")
                         }
                     }
                 }
@@ -172,9 +172,9 @@ struct ViewCommands: Commands {
                         NotificationCenter.default.post(name: .highlightFilterChanged, object: nil, userInfo: ["hasNotes": highlightHasNotes])
                     } label: {
                         if highlightHasNotes {
-                            Label("Has Notes", systemImage: "checkmark")
+                            Label(String(localized: "Has Notes", table: "Common"), systemImage: "checkmark")
                         } else {
-                            Text("Has Notes")
+                            Text(String(localized: "Has Notes", table: "Common"))
                         }
                     }
 

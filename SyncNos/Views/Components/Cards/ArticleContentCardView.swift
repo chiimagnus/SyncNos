@@ -100,7 +100,7 @@ struct ArticleContentCardView: View {
                 .scaledFont(.headline)
                 .foregroundColor(.secondary)
             
-            Text("Article")
+            Text(String(localized: "Article", table: "Common"))
                 .scaledFont(.headline)
                 .foregroundColor(.primary)
             
@@ -158,7 +158,7 @@ struct ArticleContentCardView: View {
         HStack(spacing: 8) {
             ProgressView()
                 .scaleEffect(0.8)
-            Text("Loading...")
+            Text(String(localized: "Loading...", table: "Common"))
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
         }
@@ -180,7 +180,7 @@ struct ArticleContentCardView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .scaleEffect(0.8)
-                Text("Loading full content...")
+                Text(String(localized: "Loading full content...", table: "Common"))
                     .scaledFont(.body)
                     .foregroundColor(.secondary)
             }
@@ -199,7 +199,7 @@ struct ArticleContentCardView: View {
     
     private func emptyContent(openURL: URL?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text("No article content detected. Please")
+            Text(String(localized: "No article content detected. Please", table: "Common"))
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
             if let url = openURL {
@@ -207,7 +207,7 @@ struct ArticleContentCardView: View {
                     .scaledFont(.body)
                     .foregroundColor(.blue)
             }
-            Text("and re-download this article.")
+            Text(String(localized: "and re-download this article.", table: "Common"))
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
         }
@@ -219,7 +219,7 @@ struct ArticleContentCardView: View {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
-                Text("Failed to load article content")
+                Text(String(localized: "Failed to load article content", table: "Common"))
                     .scaledFont(.body)
                     .foregroundColor(.primary)
             }
@@ -234,7 +234,7 @@ struct ArticleContentCardView: View {
                         await onRetry?()
                     }
                 } label: {
-                    Label("Retry", systemImage: "arrow.clockwise")
+                    Label(String(localized: "Retry", table: "Common"), systemImage: "arrow.clockwise")
                         .scaledFont(.caption)
                 }
                 .buttonStyle(.bordered)

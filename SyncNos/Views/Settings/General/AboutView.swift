@@ -25,7 +25,7 @@ struct AboutView: View {
             }
         }
         .frame(minWidth: 450, minHeight: 320)
-        .navigationTitle("About")
+        .navigationTitle(String(localized: "About", table: "Settings"))
     }
     
     @ViewBuilder
@@ -63,7 +63,7 @@ struct AboutView: View {
             Spacer()
             
             // 底部信息
-            Text("Made with SwiftUI • macOS 14+")
+            Text(String(localized: "Made with SwiftUI • macOS 14+", table: "Settings"))
                 .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
         }

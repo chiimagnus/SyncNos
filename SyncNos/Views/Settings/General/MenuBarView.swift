@@ -6,7 +6,7 @@ struct MenuBarView: View {
     
     var body: some View {
         // MARK: - Window Management
-        Button("Open SyncNos") {
+        Button(String(localized: "Open SyncNos", table: "Settings")) {
             NSApp.activate(ignoringOtherApps: true) // 强制将应用带到前台
             openWindow(id: "main") // 打开或聚焦主窗口
         }
@@ -39,7 +39,7 @@ struct MenuBarView: View {
         Button {
             quitApplication()
         } label: {
-            Label("Quit SyncNos", systemImage: "power")
+            Label(String(localized: "Quit SyncNos", table: "Settings"), systemImage: "power")
         }
     }
     

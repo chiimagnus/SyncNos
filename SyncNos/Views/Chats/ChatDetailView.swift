@@ -117,7 +117,7 @@ struct ChatDetailView: View {
                                 ProgressView()
                                     .scaleEffect(0.7)
                             } else {
-                                Label("Sync to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                Label(String(localized: "Sync to Notion", table: "Chats"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
                         }
                         .disabled(listViewModel.syncingContactIds.contains(contact.id) || contact.messageCount == 0)
@@ -138,7 +138,7 @@ struct ChatDetailView: View {
                                 importerAllowsMultipleSelection = true
                                 showImporter = true
                             } label: {
-                                Label("Import Screenshot (OCR)", systemImage: "photo.badge.plus")
+                                Label(String(localized: "Import Screenshot (OCR)", table: "Chats"), systemImage: "photo.badge.plus")
                             }
                             
                             Button {
@@ -149,7 +149,7 @@ struct ChatDetailView: View {
                                 importerAllowsMultipleSelection = false
                                 showImporter = true
                             } label: {
-                                Label("Import from JSON/Markdown", systemImage: "square.and.arrow.down")
+                                Label(String(localized: "Import from JSON/Markdown", table: "Chats"), systemImage: "square.and.arrow.down")
                             }
                             
                             Divider()
@@ -160,7 +160,7 @@ struct ChatDetailView: View {
                                     prepareExport(for: contact, format: .json)
                                 }
                             } label: {
-                                Label("Export as JSON", systemImage: "doc.text")
+                                Label(String(localized: "Export as JSON", table: "Chats"), systemImage: "doc.text")
                             }
                             
                             Button {
@@ -168,12 +168,12 @@ struct ChatDetailView: View {
                                     prepareExport(for: contact, format: .markdown)
                                 }
                             } label: {
-                                Label("Export as Markdown", systemImage: "doc.richtext")
+                                Label(String(localized: "Export as Markdown", table: "Chats"), systemImage: "doc.richtext")
                             }
                         } label: {
-                            Label("Import/Export", systemImage: "arrow.up.arrow.down.circle")
+                            Label(String(localized: "Import/Export", table: "Chats"), systemImage: "arrow.up.arrow.down.circle")
                         }
-                        .help("Import or export chat records")
+                        .help(String(localized: "Import or export chat records", table: "Chats"))
                     }
                 }
             // 导出文件保存器
@@ -296,7 +296,7 @@ struct ChatDetailView: View {
                 
                 VStack {
                     ProgressView()
-                    Text("Loading...")
+                    Text(String(localized: "Loading...", table: "Common"))
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -345,14 +345,14 @@ struct ChatDetailView: View {
                                 if isLoadingMore {
                                     ProgressView()
                                         .scaleEffect(0.7)
-                                    Text("Loading more...")
+                                    Text(String(localized: "Loading more...", table: "Chats"))
                                         .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
                                     Button {
                                         loadMoreAndPreservePosition(for: contact, proxy: proxy)
                                     } label: {
-                                        Text("Load earlier messages")
+                                        Text(String(localized: "Load earlier messages", table: "Chats"))
                                             .scaledFont(.caption)
                                             .foregroundColor(.accentColor)
                                     }
@@ -629,11 +629,11 @@ struct ChatDetailView: View {
                     .font(.system(size: 48 * fontScale))
                     .foregroundColor(.white)
                 
-                Text("Drop files here")
+                Text(String(localized: "Drop files here", table: "Chats"))
                     .scaledFont(.headline)
                     .foregroundColor(.white)
                 
-                Text("Supported: Images (OCR), JSON, Markdown")
+                Text(String(localized: "Supported: Images (OCR), JSON, Markdown", table: "Chats"))
                     .scaledFont(.caption)
                     .foregroundColor(.white.opacity(0.8))
             }
@@ -729,7 +729,7 @@ struct ChatDetailView: View {
                 .font(.system(size: 40 * fontScale))
                 .foregroundColor(.secondary)
 
-            Text("No Messages")
+            Text(String(localized: "No Messages", table: "Chats"))
                 .scaledFont(.headline)
                 .foregroundColor(.secondary)
 
@@ -740,7 +740,7 @@ struct ChatDetailView: View {
                 importerAllowsMultipleSelection = true
                 showImporter = true
             } label: {
-                Label("Import Screenshot", systemImage: "photo.badge.plus")
+                Label(String(localized: "Import Screenshot", table: "Chats"), systemImage: "photo.badge.plus")
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)

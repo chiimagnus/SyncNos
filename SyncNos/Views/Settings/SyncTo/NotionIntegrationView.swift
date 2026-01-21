@@ -12,13 +12,13 @@ struct NotionIntegrationView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Authorization").scaledFont(.headline)) {
+            Section(header: Text(String(localized: "Authorization", table: "Settings")).scaledFont(.headline)) {
                 if viewModel.isOAuthAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("OAuth Authorized")
+                            Text(String(localized: "OAuth Authorized", table: "Settings"))
                                 .scaledFont(.headline)
                         }
                         
@@ -55,11 +55,11 @@ struct NotionIntegrationView: View {
                                     }
                                 )) {
                                     if viewModel.isBusy {
-                                        Text("Loading...")
+                                        Text(String(localized: "Loading...", table: "Common"))
                                             .scaledFont(.body)
                                             .tag("")
                                     } else if viewModel.availablePages.isEmpty {
-                                        Text("(No pages available)")
+                                        Text(String(localized: "(No pages available)", table: "Settings"))
                                             .scaledFont(.body)
                                             .tag("")
                                     } else {
@@ -89,11 +89,11 @@ struct NotionIntegrationView: View {
                                 .disabled(viewModel.isBusy)
                             }
                         } label: {
-                            Text("Parent Page")
+                            Text(String(localized: "Parent Page", table: "Settings"))
                                 .scaledFont(.body)
                         }
                         
-                        Button("Revoke Authorization") {
+                        Button(String(localized: "Revoke Authorization", table: "Settings")) {
                             viewModel.revokeOAuth()
                         }
                         .scaledFont(.body)
@@ -103,7 +103,7 @@ struct NotionIntegrationView: View {
                     .padding(.vertical, 4)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Use OAuth to authorize SyncNos to access your Notion workspace. This is the recommended method.")
+                        Text(String(localized: "Use OAuth to authorize SyncNos to access your Notion workspace. This is the recommended method.", table: "Settings"))
                             .scaledFont(.subheadline)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
@@ -130,7 +130,7 @@ struct NotionIntegrationView: View {
 
                     Divider()
 
-                    Text("If you have any problems with OAuth, you can manually enter credentials:")
+                    Text(String(localized: "If you have any problems with OAuth, you can manually enter credentials:", table: "Settings"))
                         .scaledFont(.subheadline)
                         .foregroundColor(.secondary)
 
@@ -139,7 +139,7 @@ struct NotionIntegrationView: View {
                             .textFieldStyle(.roundedBorder)
                             .disabled(viewModel.isOAuthAuthorized)
                     } label: {
-                        Text("NOTION_KEY")
+                        Text(String(localized: "NOTION_KEY", table: "Settings"))
                             .scaledFont(.body)
                     }
 
@@ -147,11 +147,11 @@ struct NotionIntegrationView: View {
                         TextField("NOTION_PAGE_ID", text: $viewModel.notionPageIdInput)
                             .textFieldStyle(.roundedBorder)
                     } label: {
-                        Text("NOTION_PAGE_ID")
+                        Text(String(localized: "NOTION_PAGE_ID", table: "Settings"))
                             .scaledFont(.body)
                     }
 
-                    Button("Save") {
+                    Button(String(localized: "Save", table: "Settings")) {
                         viewModel.saveCredentials()
                     }
                     .scaledFont(.body)
@@ -181,7 +181,7 @@ struct NotionIntegrationView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Notion API")
+        .navigationTitle(String(localized: "Notion API", table: "Settings"))
         .onAppear {
             if viewModel.isOAuthAuthorized {
                 viewModel.loadAccessiblePagesIfNeeded()

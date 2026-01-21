@@ -14,14 +14,14 @@ struct OCRSettingsView: View {
             // MARK: - 数据源开关
             Section {
                 Toggle(isOn: $chatsSourceEnabled) {
-                    Text("Enable Chats source")
+                    Text(String(localized: "Enable Chats source", table: "Settings"))
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Show Chats in the main list")
+                .help(String(localized: "Show Chats in the main list", table: "Settings"))
             } header: {
-                Text("Data Source")
+                Text(String(localized: "Data Source", table: "Settings"))
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -29,14 +29,14 @@ struct OCRSettingsView: View {
             // MARK: - Sync Settings
             Section {
                 Toggle(isOn: $autoSyncEnabled) {
-                    Text("Smart Auto Sync")
+                    Text(String(localized: "Smart Auto Sync", table: "Settings"))
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Sync every 5 minutes")
+                .help(String(localized: "Sync every 5 minutes", table: "Settings"))
             } header: {
-                Text("Sync Settings")
+                Text(String(localized: "Sync Settings", table: "Settings"))
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -48,13 +48,13 @@ struct OCRSettingsView: View {
                     showingLanguageSheet = true
                 } label: {
                     HStack {
-                        Text("OCR Languages")
+                        Text(String(localized: "OCR Languages", table: "Settings"))
                             .scaledFont(.body)
                         
                         Spacer()
                         
                         if configStore.selectedLanguages.isEmpty {
-                            Text("Auto")
+                            Text(String(localized: "Auto", table: "Settings"))
                                 .foregroundStyle(.secondary)
                         } else {
                             Text(configStore.selectedLanguages.prefix(3).map(\.code).joined(separator: ", "))
@@ -79,14 +79,14 @@ struct OCRSettingsView: View {
                     HStack {
                         Image(systemName: "ladybug")
                             .foregroundStyle(.orange)
-                        Text("Test OCR Recognition")
+                        Text(String(localized: "Test OCR Recognition", table: "Settings"))
                             .scaledFont(.body)
                         Spacer()
                     }
                 }
                 .buttonStyle(.plain)
             } header: {
-                Text("Apple OCR")
+                Text(String(localized: "Apple OCR", table: "Settings"))
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -94,7 +94,7 @@ struct OCRSettingsView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Chats")
+        .navigationTitle(String(localized: "Chats", table: "Settings"))
         .sheet(isPresented: $showingLanguageSheet) {
             LanguageSelectionSheet(configStore: configStore)
         }
@@ -143,7 +143,7 @@ private struct LanguageSelectionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if !configStore.selectedLanguageCodes.isEmpty {
-                        Button("Clear All") {
+                        Button(String(localized: "Clear All", table: "Settings")) {
                             configStore.selectedLanguageCodes = []
                         }
                         .foregroundStyle(.secondary)
@@ -151,7 +151,7 @@ private struct LanguageSelectionSheet: View {
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(String(localized: "Done", table: "Settings")) {
                         dismiss()
                     }
                 }
@@ -213,7 +213,7 @@ private struct OCRDebugSheet: View {
                 HSplitView {
                     // 左侧：图片预览
                     VStack {
-                        Text("Input Image")
+                        Text(String(localized: "Input Image", table: "Settings"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
@@ -235,7 +235,7 @@ private struct OCRDebugSheet: View {
                     
                     // 右侧：识别结果
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Recognition Results")
+                        Text(String(localized: "Recognition Results", table: "Settings"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
@@ -243,7 +243,7 @@ private struct OCRDebugSheet: View {
                             VStack(spacing: 12) {
                                 ProgressView()
                                     .progressViewStyle(.circular)
-                                Text("Processing...")
+                                Text(String(localized: "Processing...", table: "Settings"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -282,7 +282,7 @@ private struct OCRDebugSheet: View {
                                             
                                             // 解析统计（消息分类）
                                             HStack(spacing: 16) {
-                                                Text("Parsed:")
+                                                Text(String(localized: "Parsed:", table: "Settings"))
                                                     .foregroundStyle(.secondary)
                                                 messageStatBadge(
                                                     icon: "arrow.right.circle.fill",
@@ -320,7 +320,7 @@ private struct OCRDebugSheet: View {
                                 Image(systemName: "doc.text.magnifyingglass")
                                     .font(.largeTitle)
                                     .foregroundStyle(.secondary)
-                                Text("Import an image to see OCR results")
+                                Text(String(localized: "Import an image to see OCR results", table: "Settings"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -340,7 +340,7 @@ private struct OCRDebugSheet: View {
                     Button {
                         selectImage()
                     } label: {
-                        Label("Select Image", systemImage: "photo.badge.plus")
+                        Label(String(localized: "Select Image", table: "Settings"), systemImage: "photo.badge.plus")
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 8)
@@ -363,7 +363,7 @@ private struct OCRDebugSheet: View {
     private func combinedResultsView(result: OCRResult) -> some View {
         GroupBox("Recognition Details") {
             if result.blocks.isEmpty && parsedMessages.isEmpty {
-                Text("No content recognized")
+                Text(String(localized: "No content recognized", table: "Settings"))
                     .foregroundStyle(.secondary)
                     .italic()
                     .padding(.vertical, 4)
@@ -372,7 +372,7 @@ private struct OCRDebugSheet: View {
                     // 解析后的消息（主要展示）
                     if !parsedMessages.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Parsed Messages")
+                            Text(String(localized: "Parsed Messages", table: "Settings"))
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)

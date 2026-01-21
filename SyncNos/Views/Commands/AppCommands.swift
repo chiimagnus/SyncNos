@@ -35,7 +35,7 @@ struct AppCommands: Commands {
 
         // SyncNos 应用菜单 - 应用设置相关
         CommandGroup(replacing: .appSettings) {
-            Button("Settings", systemImage: "gear") {
+            Button(String(localized: "Settings", table: "Settings"), systemImage: "gear") {
                 openWindow(id: "setting")
             }
             .keyboardShortcut(",", modifiers: .command)

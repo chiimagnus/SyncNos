@@ -15,21 +15,21 @@ enum WeReadAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            return NSLocalizedString("Not Logged In", comment: "")
+            return NSLocalizedString("Not Logged In", tableName: "Common", bundle: .main, value: "", comment: "")
         case .unauthorized:
-            return NSLocalizedString("WeRead cookie expired or invalid. Please login again.", comment: "")
+            return NSLocalizedString("WeRead cookie expired or invalid. Please login again.", tableName: "WeRead", bundle: .main, value: "", comment: "")
         case .sessionExpired:
-            return NSLocalizedString("Session expired. Please log in again.", comment: "")
+            return NSLocalizedString("Session expired. Please log in again.", tableName: "Common", bundle: .main, value: "", comment: "")
         case .sessionExpiredWithRefreshFailure(let reason):
-            return String(format: NSLocalizedString("WeRead session expired and auto-refresh failed: %@. Please login manually.", comment: ""), reason)
+            return String(format: NSLocalizedString("WeRead session expired and auto-refresh failed: %@. Please login manually.", tableName: "WeRead", bundle: .main, value: "", comment: ""), reason)
         case .invalidResponse:
-            return NSLocalizedString("Invalid HTTP response from WeRead.", comment: "")
+            return NSLocalizedString("Invalid HTTP response from WeRead.", tableName: "WeRead", bundle: .main, value: "", comment: "")
         case .httpError(let statusCode, _):
             return NSLocalizedString("WeRead HTTP error \(statusCode)", comment: "")
         case .apiError(let code, let message):
             return "WeRead API error \(code): \(message)"
         case .rateLimited:
-            return NSLocalizedString("WeRead rate limited. Please try again later.", comment: "")
+            return NSLocalizedString("WeRead rate limited. Please try again later.", tableName: "WeRead", bundle: .main, value: "", comment: "")
         }
     }
     

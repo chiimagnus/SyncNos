@@ -20,9 +20,9 @@ enum ChatExportFormat: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .json:
-            return String(localized: "JSON Format", comment: "Export format: JSON")
+            return String(localized: "JSON Format", table: "Chats", comment: "Export format: JSON")
         case .markdown:
-            return String(localized: "Markdown Format", comment: "Export format: Markdown")
+            return String(localized: "Markdown Format", table: "Chats", comment: "Export format: Markdown")
         }
     }
     

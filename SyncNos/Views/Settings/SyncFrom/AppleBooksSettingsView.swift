@@ -9,17 +9,17 @@ struct AppleBooksSettingsView: View {
             // MARK: - Data Source
             Section {
                 Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable Apple Books source")
+                    Text(String(localized: "Enable Apple Books source", table: "Settings"))
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Show Apple Books in the main list and commands")
+                .help(String(localized: "Show Apple Books in the main list and commands", table: "Settings"))
                 .onChange(of: viewModel.isSourceEnabled) { _, _ in
                     viewModel.save()
                 }
             } header: {
-                Text("Data Source")
+                Text(String(localized: "Data Source", table: "Settings"))
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -27,14 +27,14 @@ struct AppleBooksSettingsView: View {
             // MARK: - Sync Settings
             Section {
                 Picker(selection: $viewModel.syncMode) {
-                    Text("One page per book")
+                    Text(String(localized: "One page per book", table: "Settings"))
                         .scaledFont(.body)
                         .tag("single")
-                    Text("One database per book")
+                    Text(String(localized: "One database per book", table: "Settings"))
                         .scaledFont(.body)
                         .tag("perBook")
                 } label: {
-                    Text("Sync Mode")
+                    Text(String(localized: "Sync Mode", table: "Settings"))
                         .scaledFont(.body)
                 }
                 .onChange(of: viewModel.syncMode) { _, _ in
@@ -48,17 +48,17 @@ struct AppleBooksSettingsView: View {
                             viewModel.save()
                         }
                 } label: {
-                    Text("Database ID (optional)")
+                    Text(String(localized: "Database ID (optional)", table: "Settings"))
                         .scaledFont(.body)
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
-                    Text("Smart Auto Sync")
+                    Text(String(localized: "Smart Auto Sync", table: "Settings"))
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help("Sync every 5 minutes, only changed content")
+                .help(String(localized: "Sync every 5 minutes, only changed content", table: "Settings"))
                 .onChange(of: viewModel.autoSync) { _, _ in
                     viewModel.save()
                 }
@@ -74,7 +74,7 @@ struct AppleBooksSettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label("Select Folder", systemImage: "folder")
+                        Label(String(localized: "Select Folder", table: "Common"), systemImage: "folder")
                             .scaledFont(.body)
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
@@ -83,9 +83,9 @@ struct AppleBooksSettingsView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("Choose data folder and load notes")
+                .help(String(localized: "Choose data folder and load notes", table: "Settings"))
             } header: {
-                Text("Sync Settings")
+                Text(String(localized: "Sync Settings", table: "Settings"))
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -94,7 +94,7 @@ struct AppleBooksSettingsView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Apple Books")
+        .navigationTitle(String(localized: "Apple Books", table: "Common"))
     }
 }
 

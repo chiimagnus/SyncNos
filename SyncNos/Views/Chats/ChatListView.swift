@@ -26,8 +26,8 @@ struct ChatListView: View {
                 contactList
             }
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
+        .alert(String(localized: "Error", table: "Chats"), isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button(String(localized: "OK", table: "Common")) {
                 viewModel.errorMessage = nil
             }
         } message: {
@@ -48,9 +48,9 @@ struct ChatListView: View {
             Image(systemName: "message.badge.filled.fill")
                 .font(.system(size: 40 * fontScale))
                 .foregroundColor(.secondary)
-            Text("No Chats")
+            Text(String(localized: "No Chats", table: "Chats"))
                 .scaledFont(.headline)
-            Text("Click \"+\" at the bottom right to create a new chat")
+            Text(String(localized: "Click \"+\" at the bottom right to create a new chat", table: "Chats"))
                 .scaledFont(.caption)
                 .foregroundColor(.secondary)
             
@@ -58,7 +58,7 @@ struct ChatListView: View {
             HStack(spacing: 6) {
                 Image(systemName: "lightbulb.fill")
                     .foregroundColor(.yellow)
-                Text("Tip: For best OCR results, expand the chat area to fill your screen before taking a screenshot.")
+                Text(String(localized: "Tip: For best OCR results, expand the chat area to fill your screen before taking a screenshot.", table: "Chats"))
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -83,7 +83,7 @@ struct ChatListView: View {
                         Button {
                             viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                         } label: {
-                            Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                            Label(String(localized: "Sync Selected to Notion", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
                         .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
                         
@@ -94,7 +94,7 @@ struct ChatListView: View {
                             selectionIds.remove(contact.id)
                             viewModel.deleteContact(contact)
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Label(String(localized: "Delete", table: "Chats"), systemImage: "trash")
                         }
                     }
             }
@@ -137,7 +137,7 @@ private struct ContactRow: View {
                 if isSyncing {
                     Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                         .foregroundColor(.yellow)
-                        .help("Syncing...")
+                        .help(String(localized: "Syncing...", table: "Common"))
                 }
                 
                 // Time
@@ -156,7 +156,7 @@ private struct ContactRow: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 } else if contact.messageCount == 0 {
-                    Text("No messages")
+                    Text(String(localized: "No messages", table: "Chats"))
                         .scaledFont(.caption)
                         .foregroundColor(.secondary.opacity(0.6))
                         .italic()

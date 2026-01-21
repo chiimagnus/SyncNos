@@ -90,7 +90,7 @@ struct WeReadDetailView: View {
                                 .scaledFont(.body)
                                 .padding(.top)
                         } else if detailViewModel.visibleHighlights.isEmpty {
-                            Text("No highlights found")
+                            Text(String(localized: "No highlights found", table: "Common"))
                                 .scaledFont(.body)
                                 .foregroundColor(.secondary)
                                 .padding(.top)
@@ -141,7 +141,7 @@ struct WeReadDetailView: View {
                                     Spacer()
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("Loading...")
+                                    Text(String(localized: "Loading...", table: "Common"))
                                         .scaledFont(.caption)
                                         .foregroundColor(.secondary)
                                     Spacer()
@@ -171,7 +171,7 @@ struct WeReadDetailView: View {
                                 Spacer()
                                 ProgressView()
                                     .scaleEffect(0.6)
-                                Text("Syncing in background...")
+                                Text(String(localized: "Syncing in background...", table: "Common"))
                                     .scaledFont(.caption2)
                                     .foregroundColor(.secondary)
                                 Spacer()
@@ -183,7 +183,7 @@ struct WeReadDetailView: View {
                 }
             }
         }
-        .navigationTitle("WeRead")
+        .navigationTitle(String(localized: "WeRead", table: "Common"))
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
@@ -216,18 +216,18 @@ struct WeReadDetailView: View {
                         if let progress = externalSyncProgress {
                             Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").scaledFont(.caption)
+                            Text(String(localized: "Syncing...", table: "Common")).scaledFont(.caption)
                         }
                     }
-                    .help("Sync in progress")
+                    .help(String(localized: "Sync in progress", table: "Common"))
                 } else if let book = selectedBook {
                     Button {
                         // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
                         listViewModel.batchSync(bookIds: Set([book.bookId]))
                     } label: {
-                        Label("Sync", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                        Label(String(localized: "Sync", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                     }
-                    .help("Sync highlights to Notion")
+                    .help(String(localized: "Sync highlights to Notion", table: "Common"))
                 }
             }
         }
@@ -275,8 +275,8 @@ struct WeReadDetailView: View {
             }
         }
         // 同步错误弹窗
-        .alert("Sync Error", isPresented: $showingSyncError) {
-            Button("OK", role: .cancel) { }
+        .alert(String(localized: "Sync Error", table: "Common"), isPresented: $showingSyncError) {
+            Button(String(localized: "OK", table: "Common"), role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
         }

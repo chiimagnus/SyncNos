@@ -131,9 +131,9 @@ final class PayWallViewModel: ObservableObject {
             do {
                 let success = try await iapService.purchase(product: product)
                 if success {
-                    message = NSLocalizedString("Purchase successful.", comment: "")
+                    message = NSLocalizedString("Purchase successful.", tableName: "Account", bundle: .main, value: "", comment: "")
                 } else {
-                    message = NSLocalizedString("Purchase cancelled or pending.", comment: "")
+                    message = NSLocalizedString("Purchase cancelled or pending.", tableName: "Account", bundle: .main, value: "", comment: "")
                 }
             } catch {
                 message = error.localizedDescription
@@ -149,8 +149,8 @@ final class PayWallViewModel: ObservableObject {
         Task {
             let success = await iapService.restorePurchases()
             message = success
-                ? NSLocalizedString("Restored successfully.", comment: "")
-                : NSLocalizedString("Restore failed.", comment: "")
+                ? NSLocalizedString("Restored successfully.", tableName: "Account", bundle: .main, value: "", comment: "")
+                : NSLocalizedString("Restore failed.", tableName: "Account", bundle: .main, value: "", comment: "")
         }
     }
     

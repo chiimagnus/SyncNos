@@ -18,16 +18,16 @@ struct AppleBooksListView: View {
                         .foregroundColor(.orange)
                         .scaledFont(.largeTitle)
                     
-                    Text("Access Denied")
+                    Text(String(localized: "Access Denied", table: "AppleBooks"))
                         .scaledFont(.headline)
                     
-                    Text("SyncNos needs permission to access Apple Books notes. If you previously selected \"Don't Allow\", please restart the app and select \"Allow\" when prompted.")
+                    Text(String(localized: "SyncNos needs permission to access Apple Books notes. If you previously selected \"Don't Allow\", please restart the app and select \"Allow\" when prompted.", table: "AppleBooks"))
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                     
                     VStack(spacing: 12) {
-                        Button("Restart", systemImage: "arrow.clockwise") {
+                        Button(String(localized: "Restart", table: "Common"), systemImage: "arrow.clockwise") {
                             // 重启应用
                             let task = Process()
                             task.launchPath = "/usr/bin/open"
@@ -40,7 +40,7 @@ struct AppleBooksListView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         
-                        Button("Select Folder", systemImage: "folder") {
+                        Button(String(localized: "Select Folder", table: "Common"), systemImage: "folder") {
                             AppleBooksPicker.pickAppleBooksContainer()
                         }
                     }
@@ -50,10 +50,10 @@ struct AppleBooksListView: View {
                     Image(systemName: "books.vertical")
                         .foregroundColor(.secondary)
                         .scaledFont(.largeTitle)
-                    Text("No books found")
+                    Text(String(localized: "No books found", table: "Common"))
                         .scaledFont(.body)
                         .padding()
-                    Button("Open Apple Books notes", systemImage: "folder") {
+                    Button(String(localized: "Open Apple Books notes", table: "AppleBooks"), systemImage: "folder") {
                         AppleBooksPicker.pickAppleBooksContainer()
                     }
                 }
@@ -66,7 +66,7 @@ struct AppleBooksListView: View {
                                     Text(book.bookTitle)
                                         .scaledFont(.headline, weight: .semibold)
                                 } else {
-                                    Text("No Title")
+                                    Text(String(localized: "No Title", table: "AppleBooks"))
                                         .scaledFont(.headline, weight: .semibold)
                                         .foregroundColor(.orange)
                                 }
@@ -81,11 +81,11 @@ struct AppleBooksListView: View {
                             if viewModel.syncingBookIds.contains(book.bookId) {
                                 Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                                     .foregroundColor(.yellow)
-                                    .help("Syncing...")
+                                    .help(String(localized: "Syncing...", table: "Common"))
                             } else if viewModel.syncedBookIds.contains(book.bookId) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
-                                    .help("Synced")
+                                    .help(String(localized: "Synced", table: "Common"))
                             }
                         }
                         .padding(.vertical, 4)
@@ -99,23 +99,23 @@ struct AppleBooksListView: View {
                                 Button {
                                     NSWorkspace.shared.open(ibooksURL)
                                 } label: {
-                                    Label("Open in Apple Books", systemImage: "book")
+                                    Label(String(localized: "Open in Apple Books", table: "AppleBooks"), systemImage: "book")
                                 }
                             }
 
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                Label(String(localized: "Sync Selected to Notion", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
                             let last = viewModel.lastSync(for: book.bookId)
                             if let lastDate = last {
-                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
+                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
                             } else {
-                                Text("Last Sync Time") + Text(": ") + Text("-")
+                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(String(localized: "-", table: "Common"))
                             }
                         }
                     }

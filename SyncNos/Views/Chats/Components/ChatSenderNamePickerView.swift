@@ -16,7 +16,7 @@ struct ChatSenderNamePickerView: View {
         VStack(alignment: .leading, spacing: 12) {
             // 本对话已使用的昵称标签区
             if !usedNames.isEmpty {
-                Text("Used in this chat:")
+                Text(String(localized: "Used in this chat:", table: "Chats"))
                     .scaledFont(.subheadline)
                     .foregroundColor(.secondary)
 
@@ -54,12 +54,12 @@ struct ChatSenderNamePickerView: View {
             HStack {
                 Spacer()
 
-                Button("Cancel") {
+                Button(String(localized: "Cancel", table: "Chats")) {
                     onDismiss()
                 }
                 .keyboardShortcut(.escape)
 
-                Button("OK") {
+                Button(String(localized: "OK", table: "Common")) {
                     if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         selectName(inputText)
                     } else {

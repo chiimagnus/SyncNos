@@ -38,19 +38,19 @@ struct AppleAccountView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "info.circle")
                                     .foregroundColor(.secondary)
-                                Text("Click the button above to start authorization")
+                                Text(String(localized: "Click the button above to start authorization", table: "Settings"))
                                     .foregroundColor(.secondary)
                                     .scaledFont(.subheadline)
                             }
                         case .processing:
                             HStack(spacing: 8) {
                                 ProgressView()
-                                Text("Requesting authorization...")
+                                Text(String(localized: "Requesting authorization...", table: "Settings"))
                                     .scaledFont(.subheadline)
                             }
                         case .succeeded(let user):
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Authorization successful")
+                                Text(String(localized: "Authorization successful", table: "Settings"))
                                     .scaledFont(.headline)
                                 if let name = user.fullName, !name.isEmpty { Text("Name: \(name)").scaledFont(.body) }
                                 if let mail = user.email, !mail.isEmpty { Text("Email: \(mail)").scaledFont(.body) }
@@ -71,14 +71,14 @@ struct AppleAccountView: View {
                                         .textSelection(.enabled)
                                 }
 #endif
-                                Button("Reset status") { appleViewModel.reset() }
+                                Button(String(localized: "Reset status", table: "Settings")) { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
                         case .failed(let message):
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Authorization failed").scaledFont(.headline)
+                                Text(String(localized: "Authorization failed", table: "Settings")).scaledFont(.headline)
                                 Text(message).foregroundColor(.red).scaledFont(.subheadline)
-                                Button("Retry") { appleViewModel.reset() }
+                                Button(String(localized: "Retry", table: "Common")) { appleViewModel.reset() }
                                     .buttonStyle(.bordered)
                             }
                         }
@@ -90,7 +90,7 @@ struct AppleAccountView: View {
                 // Account information
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text("Account information").scaledFont(.title3, weight: .bold)
+                        Text(String(localized: "Account information", table: "Settings")).scaledFont(.title3, weight: .bold)
                         Spacer()
                         if accountViewModel.isLoading { ProgressView() }
                     }
@@ -100,7 +100,7 @@ struct AppleAccountView: View {
                     }
 
                     if let p = accountViewModel.profile {
-                        GroupBox(label: Text("Basic information")) {
+                        GroupBox(label: Text(String(localized: "Basic information", table: "Settings"))) {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("User ID: \(p.userId)").scaledFont(.body)
                                 if let name = p.displayName, !name.isEmpty { Text("Display name: \(name)").scaledFont(.body) }
@@ -110,12 +110,12 @@ struct AppleAccountView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
-                        Text("User information not loaded").foregroundColor(.secondary).scaledFont(.body)
+                        Text(String(localized: "User information not loaded", table: "Settings")).foregroundColor(.secondary).scaledFont(.body)
                     }
 
-                    GroupBox(label: Text("Login methods")) {
+                    GroupBox(label: Text(String(localized: "Login methods", table: "Settings"))) {
                         if accountViewModel.loginMethods.isEmpty {
-                            Text("None").foregroundColor(.secondary).scaledFont(.body)
+                            Text(String(localized: "None", table: "Settings")).foregroundColor(.secondary).scaledFont(.body)
                         } else {
                             ForEach(Array(accountViewModel.loginMethods.enumerated()), id: \.0) { _, m in
                                 VStack(alignment: .leading, spacing: 4) {
@@ -129,11 +129,11 @@ struct AppleAccountView: View {
                     }
 
                     HStack(spacing: 12) {
-                        Button("Refresh information") { accountViewModel.load() }
+                        Button(String(localized: "Refresh information", table: "Settings")) { accountViewModel.load() }
                             .buttonStyle(.bordered)
-                        Button("Sign out") { accountViewModel.logout() }
+                        Button(String(localized: "Sign out", table: "Settings")) { accountViewModel.logout() }
                             .buttonStyle(.bordered)
-                        Button("Delete account") { accountViewModel.deleteAccount() }
+                        Button(String(localized: "Delete account", table: "Settings")) { accountViewModel.deleteAccount() }
                             .buttonStyle(.borderedProminent)
                             .tint(.red)
                     }
@@ -141,7 +141,7 @@ struct AppleAccountView: View {
             }
             .padding()
         }
-        .navigationTitle("Apple Account & Sign In")
+        .navigationTitle(String(localized: "Apple Account & Sign In", table: "Settings"))
         .onAppear { accountViewModel.load() }
     }
 }

@@ -132,7 +132,7 @@ struct SyncErrorInfo: Sendable {
         if nsError.domain == NSURLErrorDomain {
             return SyncErrorInfo(
                 type: .network,
-                message: NSLocalizedString("Network connection failed", comment: ""),
+                message: NSLocalizedString("Network connection failed", tableName: "Common", bundle: .main, value: "", comment: ""),
                 details: error.localizedDescription
             )
         }
@@ -141,7 +141,7 @@ struct SyncErrorInfo: Sendable {
         if nsError.domain == "NotionAPI" && nsError.code == 429 {
             return SyncErrorInfo(
                 type: .rateLimited,
-                message: NSLocalizedString("Notion API rate limited", comment: ""),
+                message: NSLocalizedString("Notion API rate limited", tableName: "Common", bundle: .main, value: "", comment: ""),
                 details: error.localizedDescription
             )
         }
@@ -151,7 +151,7 @@ struct SyncErrorInfo: Sendable {
         if desc.contains("notion") && (desc.contains("config") || desc.contains("token") || desc.contains("page_id")) {
             return SyncErrorInfo(
                 type: .notionConfigMissing,
-                message: NSLocalizedString("Notion not configured", comment: ""),
+                message: NSLocalizedString("Notion not configured", tableName: "Common", bundle: .main, value: "", comment: ""),
                 details: error.localizedDescription
             )
         }
@@ -160,7 +160,7 @@ struct SyncErrorInfo: Sendable {
         if desc.contains("unauthorized") || desc.contains("authentication") || desc.contains("401") {
             return SyncErrorInfo(
                 type: .authenticationFailed,
-                message: NSLocalizedString("Authentication failed", comment: ""),
+                message: NSLocalizedString("Authentication failed", tableName: "Common", bundle: .main, value: "", comment: ""),
                 details: error.localizedDescription
             )
         }

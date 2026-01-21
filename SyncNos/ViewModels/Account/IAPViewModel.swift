@@ -84,9 +84,9 @@ final class IAPViewModel: ObservableObject {
             do {
                 let ok = try await self.iap.purchase(product: product)
                 if ok {
-                    self.message = NSLocalizedString("Purchase successful.", comment: "")
+                    self.message = NSLocalizedString("Purchase successful.", tableName: "Account", bundle: .main, value: "", comment: "")
                 } else {
-                    self.message = NSLocalizedString("Purchase cancelled or pending.", comment: "")
+                    self.message = NSLocalizedString("Purchase cancelled or pending.", tableName: "Account", bundle: .main, value: "", comment: "")
                 }
             } catch {
                 self.message = error.localizedDescription
@@ -98,7 +98,7 @@ final class IAPViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             let ok = await self.iap.restorePurchases()
-            self.message = ok ? NSLocalizedString("Restored successfully.", comment: "") : NSLocalizedString("Restore failed.", comment: "")
+            self.message = ok ? NSLocalizedString("Restored successfully.", tableName: "Account", bundle: .main, value: "", comment: "") : NSLocalizedString("Restore failed.", tableName: "Account", bundle: .main, value: "", comment: "")
         }
     }
 

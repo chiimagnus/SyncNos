@@ -24,7 +24,7 @@ struct GoodLinksListView: View {
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
-                        Label("Select Folder", systemImage: "folder")
+                        Label(String(localized: "Select Folder", table: "Common"), systemImage: "folder")
                     }
                 }
             } else if viewModel.links.isEmpty {
@@ -32,13 +32,13 @@ struct GoodLinksListView: View {
                     Image(systemName: "link")
                         .foregroundColor(.secondary)
                         .scaledFont(.title)
-                    Text("No links found")
+                    Text(String(localized: "No links found", table: "GoodLinks"))
                         .scaledFont(.body)
                         .foregroundColor(.secondary)
                     Button {
                         GoodLinksPicker.pickGoodLinksFolder()
                     } label: {
-                        Label("Select Folder", systemImage: "folder")
+                        Label(String(localized: "Select Folder", table: "Common"), systemImage: "folder")
                     }
                 }
             } else {
@@ -82,11 +82,11 @@ struct GoodLinksListView: View {
                             if viewModel.syncingLinkIds.contains(link.id) {
                                 Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                                     .foregroundColor(.yellow)
-                                    .help("Syncing...")
+                                    .help(String(localized: "Syncing...", table: "Common"))
                             } else if viewModel.syncedLinkIds.contains(link.id) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
-                                    .help("Synced")
+                                    .help(String(localized: "Synced", table: "Common"))
                             }
                         }
                         .padding(.vertical, 4)
@@ -101,23 +101,23 @@ struct GoodLinksListView: View {
                                 Button {
                                     NSWorkspace.shared.open(openURL)
                                 } label: {
-                                    Label("Open in GoodLinks", systemImage: "link")
+                                    Label(String(localized: "Open in GoodLinks", table: "GoodLinks"), systemImage: "link")
                                 }
                             }
 
                             Button {
                                 viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                Label(String(localized: "Sync Selected to Notion", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
                             let last = viewModel.lastSync(for: link.id)
                             if let lastDate = last {
-                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
+                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
                             } else {
-                                Text("Last Sync Time") + Text(": ") + Text("-")
+                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(String(localized: "-", table: "Common"))
                             }
                         }
                     }

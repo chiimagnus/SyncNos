@@ -161,7 +161,7 @@ struct SyncTaskRowView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "Cancel this task"))
+                .help(String(localized: "Cancel this task", table: "Common"))
             }
         }
     }
@@ -206,7 +206,7 @@ struct SyncTaskRowView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "Show error details"))
+                    .help(String(localized: "Show error details", table: "Common"))
                 }
             }
             
@@ -337,7 +337,7 @@ struct SyncQueueView: View {
             )
             
             if viewModel.runningTasks.isEmpty {
-                emptyStateText("No active sync tasks")
+                emptyStateText(String(localized: "No active sync tasks", table: "Common"))
             } else {
                 taskList(viewModel.runningTasks, variant: .running)
             }
@@ -358,7 +358,7 @@ struct SyncQueueView: View {
             )
             
             if viewModel.queuedTasks.isEmpty {
-                emptyStateText("No queued tasks")
+                emptyStateText(String(localized: "No queued tasks", table: "Common"))
             } else {
                 taskList(viewModel.queuedTasks, variant: .queued)
             }
@@ -382,7 +382,7 @@ struct SyncQueueView: View {
 
             if isFailedExpanded {
                 if viewModel.failedTasks.isEmpty {
-                    emptyStateText("No failed tasks")
+                    emptyStateText(String(localized: "No failed tasks", table: "Common"))
                 } else {
                     taskList(viewModel.failedTasks, variant: .failed)
                 }
@@ -392,7 +392,7 @@ struct SyncQueueView: View {
     
     // MARK: - Helpers
     
-    private func emptyStateText(_ text: LocalizedStringKey) -> some View {
+    private func emptyStateText(_ text: String) -> some View {
         Text(text)
             .scaledFont(.body)
             .foregroundStyle(.secondary)

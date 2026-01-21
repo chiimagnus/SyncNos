@@ -138,14 +138,14 @@ final class WeReadIncrementalSyncService {
     @MainActor
     func fullSync(progress: ((String) -> Void)? = nil) async throws {
         logger.info("[WeReadSync] Starting full sync...")
-        progress?(NSLocalizedString("Fetching...", comment: ""))
+        progress?(NSLocalizedString("Fetching...", tableName: "WeRead", bundle: .main, value: "", comment: ""))
         
         // 1. 获取所有书籍
         let notebooks = try await apiService.fetchNotebooks()
         try await cacheService.saveBooks(notebooks)
         
         logger.info("[WeReadSync] Saved \(notebooks.count) books")
-        progress?(String(format: NSLocalizedString("Found %d books, fetching highlights...", comment: ""), notebooks.count))
+        progress?(String(format: NSLocalizedString("Found %d books, fetching highlights...", tableName: "WeRead", bundle: .main, value: "", comment: ""), notebooks.count))
         
         // 2. 并发获取每本书的高亮
         let total = notebooks.count
@@ -166,7 +166,7 @@ final class WeReadIncrementalSyncService {
                         // 更新进度
                         await MainActor.run {
                             completed += 1
-                            progress?(String(format: NSLocalizedString("Syncing highlights: %d/%d", comment: ""), completed, total))
+                            progress?(String(format: NSLocalizedString("Syncing highlights: %d/%d", tableName: "WeRead", bundle: .main, value: "", comment: ""), completed, total))
                         }
                     } catch {
                         self.logger.warning("[WeReadSync] Failed to sync highlights for bookId=\(notebook.bookId): \(error.localizedDescription)")
@@ -179,7 +179,7 @@ final class WeReadIncrementalSyncService {
         try await cacheService.updateSyncState(notebookSyncKey: nil, lastSyncAt: Date())
         
         logger.info("[WeReadSync] Full sync completed")
-        progress?(NSLocalizedString("Sync completed", comment: ""))
+        progress?(NSLocalizedString("Sync completed", tableName: "WeRead", bundle: .main, value: "", comment: ""))
     }
     
     // MARK: - Private Helpers

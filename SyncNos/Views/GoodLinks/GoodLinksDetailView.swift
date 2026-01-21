@@ -66,7 +66,7 @@ struct GoodLinksDetailView: View {
                                     // 收藏与标签
                                     HStack(spacing: 8) {
                                         if link.starred {
-                                            Label("Favorited", systemImage: "star.fill")
+                                            Label(String(localized: "Favorited", table: "GoodLinks"), systemImage: "star.fill")
                                                 .scaledFont(.caption)
                                                 .foregroundColor(.yellow)
                                         }
@@ -83,7 +83,7 @@ struct GoodLinksDetailView: View {
                                         Image(systemName: "link")
                                             .scaledFont(.caption)
                                             .foregroundColor(.secondary)
-                                        Text("URL")
+                                        Text(String(localized: "URL", table: "GoodLinks"))
                                             .scaledFont(.caption, weight: .medium)
                                             .foregroundColor(.secondary)
                                         Text(link.url)
@@ -98,7 +98,7 @@ struct GoodLinksDetailView: View {
                                             Image(systemName: "arrow.turn.up.left")
                                                 .scaledFont(.caption)
                                                 .foregroundColor(.secondary)
-                                            Text("Original URL")
+                                            Text(String(localized: "Original URL", table: "GoodLinks"))
                                                 .scaledFont(.caption, weight: .medium)
                                                 .foregroundColor(.secondary)
                                             Text(originalURL)
@@ -116,7 +116,7 @@ struct GoodLinksDetailView: View {
                                                 Image(systemName: "doc.text")
                                                     .scaledFont(.caption)
                                                     .foregroundColor(.secondary)
-                                                Text("Summary")
+                                                Text(String(localized: "Summary", table: "GoodLinks"))
                                                     .scaledFont(.caption, weight: .medium)
                                                     .foregroundColor(.secondary)
                                             }
@@ -143,7 +143,7 @@ struct GoodLinksDetailView: View {
                                     .scaledFont(.headline)
                                     .foregroundColor(.secondary)
 
-                                Text("Highlights")
+                                Text(String(localized: "Highlights", table: "GoodLinks"))
                                     .scaledFont(.headline)
                                     .foregroundColor(.primary)
 
@@ -187,8 +187,8 @@ struct GoodLinksDetailView: View {
                                                     .foregroundColor(.primary)
                                             }
                                             .buttonStyle(.plain)
-                                            .help("Open in GoodLinks")
-                                            .accessibilityLabel("Open in GoodLinks")
+                                            .help(String(localized: "Open in GoodLinks", table: "GoodLinks"))
+                                            .accessibilityLabel(String(localized: "Open in GoodLinks", table: "GoodLinks"))
                                         }
                                         .onAppear {
                                             // 滚动加载更多
@@ -225,7 +225,7 @@ struct GoodLinksDetailView: View {
                                         Spacer()
                                         ProgressView()
                                             .scaleEffect(0.8)
-                                        Text("Loading...")
+                                        Text(String(localized: "Loading...", table: "Common"))
                                             .scaledFont(.caption)
                                             .foregroundColor(.secondary)
                                         Spacer()
@@ -248,7 +248,7 @@ struct GoodLinksDetailView: View {
                                 }
                             } else {
                                 // 空状态提示
-                                Text("No highlights found")
+                                Text(String(localized: "No highlights found", table: "Common"))
                                     .scaledFont(.body)
                                     .foregroundColor(.secondary)
                                     .padding()
@@ -288,7 +288,7 @@ struct GoodLinksDetailView: View {
                     externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
-                .navigationTitle("GoodLinks")
+                .navigationTitle(String(localized: "GoodLinks", table: "Common"))
                 .toolbar {
                     // Filter 控件
                     ToolbarItem(placement: .automatic) {
@@ -321,19 +321,19 @@ struct GoodLinksDetailView: View {
                                 if let progress = externalSyncProgress {
                                     Text(progress).scaledFont(.caption)
                                 } else {
-                                    Text("Syncing...").scaledFont(.caption)
+                                    Text(String(localized: "Syncing...", table: "Common")).scaledFont(.caption)
                                 }
                             }
-                            .help("Sync in progress")
+                            .help(String(localized: "Sync in progress", table: "Common"))
                         } else {
                             if let link = viewModel.links.first(where: { $0.id == linkId }) {
                                 Button {
                                     // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
                                     viewModel.batchSync(linkIds: Set([link.id]))
                                 } label: {
-                                    Label("Sync", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                    Label(String(localized: "Sync", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                                 }
-                                .help("Sync highlights to Notion")
+                                .help(String(localized: "Sync highlights to Notion", table: "Common"))
                             }
                         }
                     }
@@ -360,8 +360,8 @@ struct GoodLinksDetailView: View {
                 }
             }
         }
-        .alert("Sync Error", isPresented: $showingSyncError) {
-            Button("OK", role: .cancel) { }
+        .alert(String(localized: "Sync Error", table: "Common"), isPresented: $showingSyncError) {
+            Button(String(localized: "OK", table: "Common"), role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
         }

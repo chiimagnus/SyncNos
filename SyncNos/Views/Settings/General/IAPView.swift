@@ -7,7 +7,7 @@ struct IAPView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Status")) {
+            Section(header: Text(String(localized: "Status", table: "Account"))) {
                 if viewModel.hasPurchased {
                     // 当前有有效购买
                     purchasedStatusView
@@ -20,11 +20,11 @@ struct IAPView: View {
                 }
             }
 
-            Section(header: Text("Subscription Plans")) {
+            Section(header: Text(String(localized: "Subscription Plans", table: "Account"))) {
                 if viewModel.isLoading {
                     ProgressView()
                 } else if viewModel.products.isEmpty {
-                    Text("No products available.")
+                    Text(String(localized: "No products available.", table: "Account"))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(viewModel.products, id: \.id) { product in
@@ -34,20 +34,20 @@ struct IAPView: View {
             }
 
             HStack {
-                Button("Restore Purchases") {
+                Button(String(localized: "Restore Purchases", table: "Common")) {
                     viewModel.restore()
                 }
                 .buttonStyle(.link)
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
 
-                Text("•")
+                Text(String(localized: "•", table: "Common"))
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
 
                 Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
                 
                 if let msg = viewModel.message, !msg.isEmpty {
-                    Text("•")
+                    Text(String(localized: "•", table: "Common"))
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
 
                     Text(msg)
@@ -57,31 +57,31 @@ struct IAPView: View {
             .scaledFont(.caption)
 
 #if DEBUG
-            Section(header: Text("Debug Actions")) {
-                Button("Reset All IAP Data", action: {
+            Section(header: Text(String(localized: "Debug Actions", table: "Account"))) {
+                Button(String(localized: "Reset All IAP Data", table: "Account"), action: {
                     viewModel.requestReset()
                 })
                 .buttonStyle(.bordered)
 
                 Menu("Simulate State") {
-                    Button("Purchased Annual") {
+                    Button(String(localized: "Purchased Annual", table: "Account")) {
                         viewModel.simulateState(.purchasedAnnual)
                     }
-                    Button("Purchased Lifetime") {
+                    Button(String(localized: "Purchased Lifetime", table: "Account")) {
                         viewModel.simulateState(.purchasedLifetime)
                     }
                     Divider()
-                    Button("Trial Day 23 (7 days left)") {
+                    Button(String(localized: "Trial Day 23 (7 days left)", table: "Account")) {
                         viewModel.simulateState(.trialDay(23))
                     }
-                    Button("Trial Day 27 (3 days left)") {
+                    Button(String(localized: "Trial Day 27 (3 days left)", table: "Account")) {
                         viewModel.simulateState(.trialDay(27))
                     }
-                    Button("Trial Day 29 (1 day left)") {
+                    Button(String(localized: "Trial Day 29 (1 day left)", table: "Account")) {
                         viewModel.simulateState(.trialDay(29))
                     }
                     Divider()
-                    Button("Trial Expired") {
+                    Button(String(localized: "Trial Expired", table: "Account")) {
                         viewModel.simulateState(.trialExpired)
                     }
                 }
@@ -92,7 +92,7 @@ struct IAPView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle("Support")
+        .navigationTitle(String(localized: "Support", table: "Common"))
         .onAppear {
             viewModel.onAppear()
         }
@@ -108,7 +108,7 @@ struct IAPView: View {
                 Text(viewModel.purchaseType.displayName)
                     .scaledFont(.headline)
                 Spacer()
-                Text("Active")
+                Text(String(localized: "Active", table: "Account"))
                     .scaledFont(.caption)
                     .foregroundStyle(.green)
             }
@@ -116,7 +116,7 @@ struct IAPView: View {
             // 显示购买日期
             if let purchaseDate = viewModel.purchaseDate {
                 HStack {
-                    Text("Purchased:")
+                    Text(String(localized: "Purchased:", table: "Account"))
                         .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
@@ -128,7 +128,7 @@ struct IAPView: View {
             // 如果是年度订阅，显示到期时间
             if viewModel.purchaseType == .annual, let expirationDate = viewModel.expirationDate {
                 HStack {
-                    Text("Expires:")
+                    Text(String(localized: "Expires:", table: "Account"))
                         .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(expirationDate.formatted(date: .abbreviated, time: .standard))
@@ -144,7 +144,7 @@ struct IAPView: View {
             HStack {
                 Image(systemName: viewModel.isInTrialPeriod ? "clock.fill" : "exclamationmark.triangle.fill")
                     .foregroundColor(viewModel.isInTrialPeriod ? .blue : .red)
-                Text("Trial Period")
+                Text(String(localized: "Trial Period", table: "Account"))
                     .scaledFont(.body)
                 Spacer()
                 if viewModel.isInTrialPeriod {
@@ -152,18 +152,18 @@ struct IAPView: View {
                         .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Expired")
+                    Text(String(localized: "Expired", table: "Account"))
                         .scaledFont(.caption)
                         .foregroundStyle(.red)
                 }
             }
             
             if viewModel.isInTrialPeriod {
-                Text("Enjoy full access during your trial period.")
+                Text(String(localized: "Enjoy full access during your trial period.", table: "Account"))
                     .scaledFont(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Purchase to continue using SyncNos.")
+                Text(String(localized: "Purchase to continue using SyncNos.", table: "Account"))
                     .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
@@ -175,10 +175,10 @@ struct IAPView: View {
             HStack {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundColor(.red)
-                Text("Annual Subscription")
+                Text(String(localized: "Annual Subscription", table: "Account"))
                     .scaledFont(.headline)
                 Spacer()
-                Text("Expired")
+                Text(String(localized: "Expired", table: "Account"))
                     .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
@@ -186,7 +186,7 @@ struct IAPView: View {
             // 显示购买日期
             if let purchaseDate = viewModel.purchaseDate {
                 HStack {
-                    Text("Purchased:")
+                    Text(String(localized: "Purchased:", table: "Account"))
                         .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(purchaseDate.formatted(date: .abbreviated, time: .standard))
@@ -198,7 +198,7 @@ struct IAPView: View {
             // 显示到期时间
             if let expirationDate = viewModel.expirationDate {
                 HStack {
-                    Text("Expired:")
+                    Text(String(localized: "Expired:", table: "Account"))
                         .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(expirationDate.formatted(date: .abbreviated, time: .standard))
@@ -207,7 +207,7 @@ struct IAPView: View {
                 }
             }
             
-            Text("Your subscription has expired. Renew to continue using SyncNos.")
+            Text(String(localized: "Your subscription has expired. Renew to continue using SyncNos.", table: "Account"))
                 .scaledFont(.caption)
                 .foregroundStyle(.red)
         }
@@ -242,7 +242,7 @@ struct IAPView: View {
                         ProgressView()
                             .scaleEffect(0.8, anchor: .center)
                     } else {
-                        Text("Purchase")
+                        Text(String(localized: "Purchase", table: "Account"))
                             .scaledFont(.caption)
                     }
                 }

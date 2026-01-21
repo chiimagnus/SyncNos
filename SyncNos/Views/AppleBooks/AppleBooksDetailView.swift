@@ -51,7 +51,7 @@ struct AppleBooksDetailView: View {
                             // Book header using unified card
                             InfoHeaderCardView(
                                 title: book.hasTitle ? book.bookTitle : "No Title",
-                                subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud"))",
+                                subtitle: book.hasTitle ? book.authorName : "\(book.authorName) • \(String(localized: "Book file not found on device or iCloud", table: "AppleBooks"))",
                                 overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
                                 timestamps: TimestampInfo(
                                     addedAt: book.createdAt,
@@ -97,8 +97,8 @@ struct AppleBooksDetailView: View {
                                                 .foregroundColor(.primary)
                                         }
                                         .buttonStyle(.plain)
-                                        .help("Open in Apple Books")
-                                        .accessibilityLabel("Open in Apple Books")
+                                        .help(String(localized: "Open in Apple Books", table: "AppleBooks"))
+                                        .accessibilityLabel(String(localized: "Open in Apple Books", table: "AppleBooks"))
                                     }
                                 }
                             }
@@ -137,7 +137,7 @@ struct AppleBooksDetailView: View {
                                         if viewModel.isLoadingPage {
                                             ProgressView()
                                         } else {
-                                            Text("Load More")
+                                            Text(String(localized: "Load More", table: "AppleBooks"))
                                         }
                                     }
                                     // .buttonStyle(.borderedProminent)
@@ -177,7 +177,7 @@ struct AppleBooksDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
-        .navigationTitle("Apple Books")
+        .navigationTitle(String(localized: "Apple Books", table: "Common"))
         .toolbar {
             // Filter 控件
             ToolbarItem(placement: .automatic) {
@@ -204,25 +204,25 @@ struct AppleBooksDetailView: View {
                         if let progress = externalSyncProgress {
                             Text(progress).scaledFont(.caption)
                         } else {
-                            Text("Syncing...").scaledFont(.caption)
+                            Text(String(localized: "Syncing...", table: "Common")).scaledFont(.caption)
                         }
                     }
-                    .help("Sync in progress")
+                    .help(String(localized: "Sync in progress", table: "Common"))
                 } else {
                     if let book = selectedBook {
                         Button {
                             // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
                             viewModelList.batchSync(bookIds: Set([book.bookId]))
                         } label: {
-                            Label("Sync", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                            Label(String(localized: "Sync", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
-                        .help("Sync highlights to Notion")
+                        .help(String(localized: "Sync highlights to Notion", table: "Common"))
                     }
                 }
             }
         }
-        .alert("Sync Error", isPresented: $showingSyncError) {
-            Button("OK", role: .cancel) { }
+        .alert(String(localized: "Sync Error", table: "Common"), isPresented: $showingSyncError) {
+            Button(String(localized: "OK", table: "Common"), role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
         }

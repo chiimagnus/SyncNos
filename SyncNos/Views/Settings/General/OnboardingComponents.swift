@@ -73,7 +73,7 @@ struct OnboardingWelcomeView: View {
                 HStack(alignment: .center, spacing: 20) {
                     // 文字部分
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("All your highlights, unified.")
+                        Text(String(localized: "All your highlights, unified.", table: "Settings"))
                             .scaledFont(.title2, weight: .bold)
                             .foregroundStyle(Color("OnboardingTextColor"))
 
@@ -128,7 +128,7 @@ struct OnboardingNotionView: View {
                     .font(.system(size: notionIconSize))
                     .foregroundStyle(Color("OnboardingTextColor"))
 
-                Text("Notion OAuth")
+                Text(String(localized: "Notion OAuth", table: "Settings"))
                     .scaledFont(.largeTitle, weight: .bold)
                     .foregroundStyle(Color("OnboardingTextColor"))
                     .multilineTextAlignment(.leading)
@@ -155,7 +155,7 @@ struct OnboardingNotionView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color("OnboardingButtonColor"))
-                    Text("Connected")
+                    Text(String(localized: "Connected", table: "Settings"))
                         .font(.system(size: subtitleFontSize, weight: .bold))
                         .foregroundStyle(Color("OnboardingTextColor"))
                 }
@@ -180,11 +180,11 @@ struct OnboardingNotionView: View {
     private var disconnectedStateView: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Connect Your Notion")
+                Text(String(localized: "Connect Your Notion", table: "Settings"))
                     .font(.system(size: subtitleFontSize, weight: .bold))
                     .foregroundStyle(Color("OnboardingTextColor"))
 
-                Text("We'll create secure databases in your Notion workspace.")
+                Text(String(localized: "We'll create secure databases in your Notion workspace.", table: "Settings"))
                     .scaledFont(.subheadline)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .lineLimit(2)
@@ -199,7 +199,7 @@ struct OnboardingNotionView: View {
             Spacer()
 
             // Skip 按钮
-            Button("Skip") {
+            Button(String(localized: "Skip", table: "Settings")) {
                 viewModel.nextStep()
             }
             .buttonStyle(.link)
@@ -212,7 +212,7 @@ struct OnboardingNotionView: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text("Connect")
+                        Text(String(localized: "Connect", table: "Settings"))
                             .scaledFont(.headline)
                     }
                 }
@@ -264,7 +264,7 @@ struct OnboardingSourcesView: View {
 
             HStack(alignment: .center, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Enable your datasources")
+                    Text(String(localized: "Enable your datasources", table: "Settings"))
                         .scaledFont(.title2, weight: .bold)
                         .foregroundStyle(Color("OnboardingTextColor"))
 
@@ -358,10 +358,10 @@ struct OnboardingNextButton: View {
                 .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Next")
+        .accessibilityLabel(String(localized: "Next", table: "Settings"))
         // 添加 Large Content Viewer 支持
         .accessibilityShowsLargeContentViewer {
-            Label("Next", systemImage: "arrow.right")
+            Label(String(localized: "Next", table: "Settings"), systemImage: "arrow.right")
         }
     }
 }

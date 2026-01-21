@@ -93,7 +93,7 @@ extension MainListView {
         Button {
             showNewConversationAlert = true
         } label: {
-            Label("New Chat", systemImage: "plus.message")
+            Label(String(localized: "New Chat", table: "Common"), systemImage: "plus.message")
         }
     }
 }

@@ -44,7 +44,7 @@ struct DedaoLoginView: View {
                         captureCookiesFromWebView()
                         dismiss()
                     } label: {
-                        Label("Save Cookies from WebView", systemImage: "checkmark.circle")
+                        Label(String(localized: "Save Cookies from WebView", table: "Settings"), systemImage: "checkmark.circle")
                     }
                 }
             }
@@ -58,7 +58,7 @@ struct DedaoLoginView: View {
             }
             guard !relevant.isEmpty else {
                 Task { @MainActor in
-                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.")
+                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.", table: "Settings")
                 }
                 return
             }

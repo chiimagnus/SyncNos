@@ -15,7 +15,7 @@ struct SettingsView: View {
                     // 字体大小设置
                     NavigationLink(destination: TextSizeSettingsView()) {
                         HStack {
-                            Label("Text Size", systemImage: "textformat.size")
+                            Label(String(localized: "Text Size", table: "Settings"), systemImage: "textformat.size")
                                 .scaledFont(.body)
                             Spacer()
                             Text(FontScaleManager.shared.scaleLevel.shortName)
@@ -26,7 +26,7 @@ struct SettingsView: View {
                                 .scaledFont(.body)
                         }
                     }
-                    .help("Adjust text size throughout the app")
+                    .help(String(localized: "Adjust text size throughout the app", table: "Settings"))
 
                     Toggle(isOn: Binding(
                         get: { loginItemVM.isEnabled },
@@ -35,7 +35,7 @@ struct SettingsView: View {
                             loginItemVM.setEnabled(newValue)
                         }
                     )) {
-                        Label("Launch at Login", systemImage: "arrow.up.right.square")
+                        Label(String(localized: "Launch at Login", table: "Settings"), systemImage: "arrow.up.right.square")
                             .scaledFont(.body)
                     }
                     .toggleStyle(SwitchToggleStyle())
@@ -47,7 +47,7 @@ struct SettingsView: View {
                                 .tag(mode)
                         }
                     } label: {
-                        Label("Display SyncNos icon", systemImage: "square.grid.2x2")
+                        Label(String(localized: "Display SyncNos icon", table: "Settings"), systemImage: "square.grid.2x2")
                             .scaledFont(.body)
                     }
                     .pickerStyle(.menu)
@@ -55,7 +55,7 @@ struct SettingsView: View {
                     // 添加 AboutView 的 NavigationLink
                     NavigationLink(destination: AboutView()) {
                         HStack {
-                            Label("About", systemImage: "info.circle")
+                            Label(String(localized: "About", table: "Settings"), systemImage: "info.circle")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -63,12 +63,12 @@ struct SettingsView: View {
                                 .scaledFont(.body)
                         }
                     }
-                    .help("Show application about information")
+                    .help(String(localized: "Show application about information", table: "Settings"))
 #if DEBUG
                     // 添加 Apple 账号与登录 的 NavigationLink
                     NavigationLink(destination: AppleAccountView()) {
                         HStack {
-                            Label("Apple Account", systemImage: "apple.logo")
+                            Label(String(localized: "Apple Account", table: "Settings"), systemImage: "apple.logo")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -76,12 +76,12 @@ struct SettingsView: View {
                                 .scaledFont(.body)
                         }
                     }
-                    .help("Manage Apple sign-in and account info")
+                    .help(String(localized: "Manage Apple sign-in and account info", table: "Settings"))
 #endif
 
                     NavigationLink(destination: IAPView()) {
                         HStack {
-                            Label("Support", systemImage: "star")
+                            Label(String(localized: "Support", table: "Common"), systemImage: "star")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -89,9 +89,9 @@ struct SettingsView: View {
                                 .scaledFont(.body)
                         }
                     }
-                    .help("Support development and unlock Pro features")
+                    .help(String(localized: "Support development and unlock Pro features", table: "Settings"))
                 } header: {
-                    Text("General")
+                    Text(String(localized: "General", table: "Settings"))
                         .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
@@ -100,7 +100,7 @@ struct SettingsView: View {
                 Section {
                     NavigationLink(value: "notion") {
                         HStack {
-                            Label("Notion", systemImage: "n.square")
+                            Label(String(localized: "Notion", table: "Settings"), systemImage: "n.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -108,9 +108,9 @@ struct SettingsView: View {
                                 .scaledFont(.body)
                         }
                     }
-                    .help("Configure Notion and run example API calls")
+                    .help(String(localized: "Configure Notion and run example API calls", table: "Settings"))
                 } header: {
-                    Text("Sync Data To")
+                    Text(String(localized: "Sync Data To", table: "Settings"))
                         .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
@@ -120,7 +120,7 @@ struct SettingsView: View {
                     // Per-source auto sync toggles and navigation
                     NavigationLink(destination: AppleBooksSettingsView()) {
                         HStack {
-                            Label("Apple Books", systemImage: "book")
+                            Label(String(localized: "Apple Books", table: "Common"), systemImage: "book")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -131,7 +131,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: GoodLinksSettingsView()) {
                         HStack {
-                            Label("GoodLinks", systemImage: "bookmark")
+                            Label(String(localized: "GoodLinks", table: "Common"), systemImage: "bookmark")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -142,7 +142,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: WeReadSettingsView()) {
                         HStack {
-                            Label("WeRead", systemImage: "w.square")
+                            Label(String(localized: "WeRead", table: "Common"), systemImage: "w.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -153,7 +153,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: DedaoSettingsView()) {
                         HStack {
-                            Label("Dedao", systemImage: "d.square")
+                            Label(String(localized: "Dedao", table: "Common"), systemImage: "d.square")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -164,7 +164,7 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: OCRSettingsView()) {
                         HStack {
-                            Label("Chats", systemImage: "message")
+                            Label(String(localized: "Chats", table: "Settings"), systemImage: "message")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -177,7 +177,7 @@ struct SettingsView: View {
 #if DEBUG
                     NavigationLink(destination: EmptyView()) {
                         HStack {
-                            Label("Get", systemImage: "")
+                            Label(String(localized: "Get", table: "Settings"), systemImage: "")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -188,7 +188,7 @@ struct SettingsView: View {
 
                     NavigationLink(destination: EmptyView()) {
                         HStack {
-                            Label("Logseq", systemImage: "")
+                            Label(String(localized: "Logseq", table: "Settings"), systemImage: "")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -199,7 +199,7 @@ struct SettingsView: View {
                     
                     NavigationLink(destination: EmptyView()) {
                         HStack {
-                            Label("Obsidian", systemImage: "")
+                            Label(String(localized: "Obsidian", table: "Settings"), systemImage: "")
                                 .scaledFont(.body)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -209,7 +209,7 @@ struct SettingsView: View {
                     }
 #endif
                 } header: {
-                    Text("Get Data From")
+                    Text(String(localized: "Get Data From", table: "Settings"))
                         .scaledFont(.headline)
                         .foregroundStyle(.primary)
                 }
@@ -231,10 +231,10 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle(String(localized: "Settings", table: "Settings"))
         .toolbar {
             ToolbarItem {
-                Text("")
+                Text(String(localized: "", table: "Settings"))
             }
         }
         .frame(width: 425)

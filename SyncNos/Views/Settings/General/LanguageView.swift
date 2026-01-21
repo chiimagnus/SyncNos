@@ -65,9 +65,9 @@ struct LanguageView: View {
         if DIContainer.shared.syncActivityMonitor.isSyncing {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = NSLocalizedString("Sync to Notion is in progress. Quit anyway?", comment: "")
-            alert.addButton(withTitle: NSLocalizedString("Don't Quit", comment: "")) // 默认：不退出
-            alert.addButton(withTitle: NSLocalizedString("Quit", comment: ""))
+            alert.messageText = NSLocalizedString("Sync to Notion is in progress. Quit anyway?", tableName: "Settings", bundle: .main, value: "", comment: "")
+            alert.addButton(withTitle: NSLocalizedString("Don't Quit", tableName: "Settings", bundle: .main, value: "", comment: "")) // 默认：不退出
+            alert.addButton(withTitle: NSLocalizedString("Quit", tableName: "Settings", bundle: .main, value: "", comment: ""))
             let response = alert.runModal()
             guard response == .alertSecondButtonReturn else { return }
             // 避免接下来 NSApp.terminate(nil) 再次弹窗
@@ -94,22 +94,22 @@ struct LanguageView: View {
                     .tag(language.0)
             }
         } label: {
-            Label("Language", systemImage: "globe")
+            Label(String(localized: "Language", table: "Settings"), systemImage: "globe")
                 .scaledFont(.body)
         }
         .onChange(of: selectedLanguage) { _, newLanguage in
             changeAppLanguage(to: newLanguage)
         }
-        .help("Change application language")
-        .alert("Language Changed", isPresented: $showRestartAlert) {
-            Button("OK") {
+        .help(String(localized: "Change application language", table: "Settings"))
+        .alert(String(localized: "Language Changed", table: "Settings"), isPresented: $showRestartAlert) {
+            Button(String(localized: "OK", table: "Common")) {
                 // 仅关闭提示
             }
-            Button("Restart") {
+            Button(String(localized: "Restart", table: "Common")) {
                 restartApplication()
             }
         } message: {
-            Text("Please restart the application for the language change to take effect.")
+            Text(String(localized: "Please restart the application for the language change to take effect.", table: "Settings"))
                 .scaledFont(.body)
         }
     }

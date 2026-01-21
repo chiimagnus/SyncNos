@@ -52,7 +52,7 @@ struct ChatMessageContextMenu: View {
                 if let name = senderName, !name.isEmpty {
                     Label("Change Sender Name (\(name))...", systemImage: "person.text.rectangle")
                 } else {
-                    Label("Set Sender Name", systemImage: "person.text.rectangle")
+                    Label(String(localized: "Set Sender Name", table: "Chats"), systemImage: "person.text.rectangle")
                 }
             }
 
@@ -61,7 +61,7 @@ struct ChatMessageContextMenu: View {
                     onSelect()
                     onClearSenderName()
                 } label: {
-                    Label("Clear Sender Name", systemImage: "person.badge.minus")
+                    Label(String(localized: "Clear Sender Name", table: "Chats"), systemImage: "person.badge.minus")
                 }
             }
 
@@ -72,11 +72,11 @@ struct ChatMessageContextMenu: View {
             onSelect()
             copyToPasteboard(text)
         } label: {
-            Label("Copy", systemImage: "doc.on.doc")
+            Label(String(localized: "Copy", table: "Chats"), systemImage: "doc.on.doc")
         }
 
         ShareLink(item: text) {
-            Label("Share…", systemImage: "square.and.arrow.up")
+            Label(String(localized: "Share…", table: "Chats"), systemImage: "square.and.arrow.up")
         }
         
         Divider()
@@ -85,7 +85,7 @@ struct ChatMessageContextMenu: View {
             onSelect()
             onDelete()
         } label: {
-            Label("Delete Message", systemImage: "trash")
+            Label(String(localized: "Delete Message", table: "Chats"), systemImage: "trash")
         }
     }
 

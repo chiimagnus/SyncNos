@@ -23,7 +23,7 @@ enum ChatImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidFormat:
-            return String(localized: "Unsupported file format", comment: "Import error")
+            return String(localized: "Unsupported file format", table: "Chats", comment: "Import error")
         case .jsonParseError(let detail):
             return String(localized: "JSON parse error: \(detail)", comment: "Import error")
         case .markdownParseError(let detail):
@@ -33,7 +33,7 @@ enum ChatImportError: LocalizedError {
         case .fileReadError(let detail):
             return String(localized: "File read error: \(detail)", comment: "Import error")
         case .emptyContent:
-            return String(localized: "No messages found in the file", comment: "Import error")
+            return String(localized: "No messages found in the file", table: "Chats", comment: "Import error")
         }
     }
 }

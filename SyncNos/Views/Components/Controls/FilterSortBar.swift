@@ -65,7 +65,7 @@ struct FilterSortBar: View {
                     Button {
                         onAscendingChanged?(!isAscending)
                     } label: {
-                        Label("Ascending", systemImage: isAscending ? "checkmark" : "xmark")
+                        Label(String(localized: "Ascending", table: "Common"), systemImage: isAscending ? "checkmark" : "xmark")
                     }
                 }
 
@@ -77,9 +77,9 @@ struct FilterSortBar: View {
                         noteFilter.toggle()
                     } label: {
                         if noteFilter {
-                            Label("Has Notes", systemImage: "checkmark")
+                            Label(String(localized: "Has Notes", table: "Common"), systemImage: "checkmark")
                         } else {
-                            Text("Has Notes")
+                            Text(String(localized: "Has Notes", table: "Common"))
                         }
                     }
                 }
@@ -87,7 +87,7 @@ struct FilterSortBar: View {
                 Image(systemName: "line.3.horizontal.decrease")
             }
             .menuIndicator(.hidden)
-            .help("Filters")
+            .help(String(localized: "Filters", table: "Common"))
 
             // 颜色筛选按钮组
             HStack {
