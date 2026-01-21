@@ -96,16 +96,43 @@ final class SyncQueueViewModel: ObservableObject {
     /// 取消单个等待中的任务
     func cancelTask(_ task: SyncQueueTask) {
         store.cancelTask(source: task.source, rawId: task.rawId)
+        Task {
+            _ = await DIContainer.shared.syncRunningTaskStore.cancel(taskId: task.id)
+        }
     }
     
     /// 取消所有等待中的任务
     func cancelAllQueued() {
+        let queuedTaskIds = store.snapshot
+            .filter { $0.state == .queued }
+            .map(\.id)
         store.cancelAllQueued(source: nil)
+        Task {
+            _ = await DIContainer.shared.syncRunningTaskStore.cancelAll(taskIds: queuedTaskIds)
+        }
     }
     
     /// 取消指定来源的所有等待任务
     func cancelAllQueued(source: ContentSource) {
+        let queuedTaskIds = store.snapshot
+            .filter { $0.state == .queued && $0.source == source }
+            .map(\.id)
         store.cancelAllQueued(source: source)
+        Task {
+            _ = await DIContainer.shared.syncRunningTaskStore.cancelAll(taskIds: queuedTaskIds)
+        }
+    }
+    
+    /// 取消正在运行的任务（best-effort，依赖 Task cancellation）
+    func cancelRunningTask(_ task: SyncQueueTask) {
+        NotificationCenter.default.post(
+            name: .syncProgressUpdated,
+            object: nil,
+            userInfo: ["bookId": task.rawId, "source": task.source.rawValue, "progress": NSLocalizedString("Cancelling...", comment: "")]
+        )
+        Task {
+            _ = await DIContainer.shared.syncRunningTaskStore.cancel(taskId: task.id)
+        }
     }
     
     /// 清除所有已完成的任务（succeeded/failed/cancelled）

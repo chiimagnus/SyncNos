@@ -378,6 +378,7 @@ final class WeReadViewModel: ObservableObject {
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
         let apiService = self.apiService
+        let runningTaskStore = DIContainer.shared.syncRunningTaskStore
 
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -385,48 +386,89 @@ final class WeReadViewModel: ObservableObject {
                     guard let book = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
-                        await limiter.withPermit {
-                            // 发送开始通知（syncingBookIds 已在外部同步设置）
-                            await MainActor.run {
-                                NotificationCenter.default.post(
-                                    name: .syncBookStatusChanged,
-                                    object: self,
-                                    userInfo: ["bookId": id, "status": "started"]
-                                )
-                            }
+                        
+                        let taskId = "\(ContentSource.weRead.rawValue):\(id)"
+                        let task = Task { [weak self] in
+                            guard let self else { return }
+                            
                             do {
-                                let adapter = WeReadNotionAdapter.create(book: book, apiService: apiService)
-                                try await syncEngine.syncSmart(source: adapter) { progressText in
-                                    Task { @MainActor in
+                                try await limiter.withPermit {
+                                    // 发送开始通知（syncingBookIds 已在外部同步设置）
+                                    await MainActor.run {
                                         NotificationCenter.default.post(
-                                            name: .syncProgressUpdated,
+                                            name: .syncBookStatusChanged,
                                             object: self,
-                                            userInfo: ["bookId": id, "progress": progressText]
+                                            userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "started"]
                                         )
                                     }
+                                    do {
+                                        let adapter = WeReadNotionAdapter.create(book: book, apiService: apiService)
+                                        try await syncEngine.syncSmart(source: adapter) { progressText in
+                                            Task { @MainActor in
+                                                NotificationCenter.default.post(
+                                                    name: .syncProgressUpdated,
+                                                    object: self,
+                                                    userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "progress": progressText]
+                                                )
+                                            }
+                                        }
+                                        await MainActor.run {
+                                            _ = self.syncingBookIds.remove(id)
+                                            _ = self.syncedBookIds.insert(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "succeeded"]
+                                            )
+                                        }
+                                    } catch is CancellationError {
+                                        await MainActor.run {
+                                            _ = self.syncingBookIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "cancelled"]
+                                            )
+                                        }
+                                    } catch {
+                                        let errorInfo = SyncErrorInfo.from(error)
+                                        await MainActor.run {
+                                            self.logger.error("[WeRead] batchSync error for id=\(id): \(error.localizedDescription)")
+                                            _ = self.syncingBookIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                            )
+                                        }
+                                    }
                                 }
+                            } catch is CancellationError {
                                 await MainActor.run {
                                     _ = self.syncingBookIds.remove(id)
-                                    _ = self.syncedBookIds.insert(id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "succeeded"]
+                                        userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "cancelled"]
                                     )
                                 }
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[WeRead] batchSync error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[WeRead] batchSync limiter error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                        userInfo: ["bookId": id, "source": ContentSource.weRead.rawValue, "status": "failed", "errorInfo": errorInfo]
                                     )
                                 }
                             }
                         }
+                        
+                        await runningTaskStore.register(taskId: taskId, task: task)
+                        await task.value
+                        await runningTaskStore.unregister(taskId: taskId)
                     }
                 }
                 await group.waitForAll()
@@ -450,6 +492,7 @@ final class WeReadViewModel: ObservableObject {
                 guard let info = notification.userInfo as? [String: Any],
                       let bookId = info["bookId"] as? String,
                       let status = info["status"] as? String else { return }
+                if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.weRead.rawValue { return }
                 switch status {
                 case "started":
                     self.syncingBookIds.insert(bookId)
@@ -457,6 +500,8 @@ final class WeReadViewModel: ObservableObject {
                     self.syncingBookIds.remove(bookId)
                     self.syncedBookIds.insert(bookId)
                 case "failed":
+                    self.syncingBookIds.remove(bookId)
+                case "cancelled":
                     self.syncingBookIds.remove(bookId)
                 case "skipped":
                     break

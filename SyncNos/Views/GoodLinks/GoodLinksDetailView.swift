@@ -383,6 +383,7 @@ struct GoodLinksDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
+            if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.goodLinks.rawValue { return }
             if bookId == (selectedLinkId ?? "") {
                 externalIsSyncing = true
                 externalSyncProgress = info["progress"] as? String
@@ -390,6 +391,7 @@ struct GoodLinksDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String, let status = info["status"] as? String else { return }
+            if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.goodLinks.rawValue { return }
             if bookId == (selectedLinkId ?? "") {
                 switch status {
                 case "started":
