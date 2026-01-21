@@ -173,6 +173,8 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                     
                     let task = Task { [weak self] in
                         guard let self else { return }
+                        let syncQueueStore = DIContainer.shared.syncQueueStore
+                        guard syncQueueStore.isTaskActive(source: .goodLinks, rawId: id) else { return }
                         do {
                             try await limiter.withPermit {
                                 NotificationCenter.default.post(

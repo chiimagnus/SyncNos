@@ -288,7 +288,8 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         
         // 调试日志：如果没有匹配到任何任务，记录警告
         if matchedCount == 0 {
-            print("[SyncQueueStore] WARNING: No task matched for rawId=\(rawId), status=\(status)")
+            let sourceRaw = info["source"] as? String ?? "unknown"
+            print("[SyncQueueStore] WARNING: No task matched for source=\(sourceRaw), rawId=\(rawId), status=\(status)")
         }
         
         if changed { publish() }

@@ -161,6 +161,8 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                     let taskId = "\(ContentSource.weRead.rawValue):\(book.bookId)"
                     
                     let task = Task { [logger] in
+                        let syncQueueStore = DIContainer.shared.syncQueueStore
+                        guard syncQueueStore.isTaskActive(source: .weRead, rawId: book.bookId) else { return }
                         do {
                             try await limiter.withPermit {
                                 NotificationCenter.default.post(

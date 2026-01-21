@@ -211,6 +211,8 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                     let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
                     
                     let task = Task { [logger] in
+                        let syncQueueStore = DIContainer.shared.syncQueueStore
+                        guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
                         do {
                             try await limiter.withPermit {
                                 NotificationCenter.default.post(

@@ -159,6 +159,8 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                     let taskId = "\(ContentSource.dedao.rawValue):\(book.bookId)"
                     
                     let task = Task { [logger] in
+                        let syncQueueStore = DIContainer.shared.syncQueueStore
+                        guard syncQueueStore.isTaskActive(source: .dedao, rawId: book.bookId) else { return }
                         do {
                             try await limiter.withPermit {
                                 NotificationCenter.default.post(

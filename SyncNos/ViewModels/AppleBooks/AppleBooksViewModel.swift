@@ -463,6 +463,8 @@ extension AppleBooksViewModel {
                         let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
                         let task = Task { [weak self] in
                             guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
                             
                             do {
                                 try await limiter.withPermit {

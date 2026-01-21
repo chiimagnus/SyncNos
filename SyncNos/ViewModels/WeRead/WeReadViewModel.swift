@@ -390,6 +390,8 @@ final class WeReadViewModel: ObservableObject {
                         let taskId = "\(ContentSource.weRead.rawValue):\(id)"
                         let task = Task { [weak self] in
                             guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .weRead, rawId: id) else { return }
                             
                             do {
                                 try await limiter.withPermit {
