@@ -14,7 +14,7 @@ SyncNos/
 │       ├── Core/                # 核心服务（DI、日志、加密）
 │       ├── DataSources-From/    # 数据源适配器
 │       └── DataSources-To/      # 同步目标适配器
-├── .codex/docs/                 # 开发指南文档
+├── .github/docs/                 # 开发指南文档
 └── Resource/                    # 资源文件
 ```
 
@@ -49,8 +49,8 @@ xcodebuild -scheme SyncNos build # 构建
 
 | 指南 | 路径 |
 |------|------|
-| 添加新数据源 | `.codex/docs/添加新数据源完整指南.md` |
-| 添加新同步目标 | `.codex/docs/添加新同步目标完整指南.md` |
+| 添加新数据源 | `.github/docs/添加新数据源完整指南.md` |
+| 添加新同步目标 | `.github/docs/添加新同步目标完整指南.md` |
 
 ## 提交规范
 
