@@ -246,8 +246,8 @@ struct OnboardingSourcesView: View {
                 alignment: .center,
                 spacing: fontScaleManager.isAccessibilitySize ? 16 : 20
             ) {
-                ForEach(ContentSource.allCases, id: \.self) { source in
-                    sourceCardView(for: source)
+                ForEach(viewModel.onboardingProviders, id: \.source) { provider in
+                    sourceCardView(for: provider)
                 }
             }
             .padding(.horizontal, 40)
@@ -294,47 +294,13 @@ struct OnboardingSourcesView: View {
         return [GridItem(.adaptive(minimum: 140 * fontScaleManager.scaleFactor), spacing: 24)]
     }
 
-    @ViewBuilder
-    private func sourceCardView(for source: ContentSource) -> some View {
-        if source == .weRead {
-            SourceCard(
-                icon: onboardingIconName(for: source),
-                color: source.accentColor,
-                title: source.title,
-                isOn: binding(for: source)
-            )
-            .onChange(of: viewModel.weReadEnabled) { _, newValue in
-                if newValue && !viewModel.isWeReadLoggedIn {
-                    // We could show a tip here
-                }
-            }
-        } else {
-            SourceCard(
-                icon: onboardingIconName(for: source),
-                color: source.accentColor,
-                title: source.title,
-                isOn: binding(for: source)
-            )
-        }
-    }
-
-    private func binding(for source: ContentSource) -> Binding<Bool> {
-        switch source {
-        case .appleBooks:
-            return $viewModel.appleBooksEnabled
-        case .goodLinks:
-            return $viewModel.goodLinksEnabled
-        case .weRead:
-            return $viewModel.weReadEnabled
-        case .dedao:
-            return $viewModel.dedaoEnabled
-        case .chats:
-            return $viewModel.chatsEnabled
-        }
-    }
-
-    private func onboardingIconName(for source: ContentSource) -> String {
-        source.icon
+    private func sourceCardView(for provider: any DataSourceUIProvider) -> some View {
+        SourceCard(
+            icon: provider.iconName,
+            color: provider.accentColor,
+            title: provider.displayName,
+            isOn: viewModel.enabledBinding(for: provider)
+        )
     }
 }
 
