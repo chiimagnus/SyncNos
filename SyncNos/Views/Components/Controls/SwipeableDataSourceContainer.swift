@@ -185,7 +185,11 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         case .dedao:
             DedaoListView(viewModel: dedaoVM, selectionIds: selectionState.selectionBinding(for: .dedao))
         case .chats:
-            ChatListView(viewModel: chatsVM, selectionIds: selectionState.selectionBinding(for: .chats))
+            ChatListView(
+                viewModel: chatsVM,
+                selectionIds: selectionState.selectionBinding(for: .chats),
+                isActive: viewModel.currentDataSource == .chats
+            )
         }
     }
     
