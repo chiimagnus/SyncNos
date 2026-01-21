@@ -113,7 +113,7 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             NotificationCenter.default.post(
                 name: .syncBookStatusChanged,
                 object: nil,
-                userInfo: ["bookId": id, "status": "skipped"]
+                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "skipped"]
             )
         }
         if eligibleIds.isEmpty {
@@ -168,30 +168,59 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
 
                 group.addTask {
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
-                    await limiter.withPermit {
-                        NotificationCenter.default.post(
-                            name: .syncBookStatusChanged,
-                            object: nil,
-                            userInfo: ["bookId": id, "status": "started"]
-                        )
+                    let runningTaskStore = DIContainer.shared.syncRunningTaskStore
+                    let taskId = "\(ContentSource.goodLinks.rawValue):\(id)"
+                    
+                    let task = Task { [weak self] in
+                        guard let self else { return }
                         do {
-                            // 创建适配器并使用统一同步引擎
-                            let adapter = try GoodLinksNotionAdapter.create(
-                                link: row,
-                                dbPath: dbPath,
-                                databaseService: self.goodLinksDatabaseService
-                            )
-                            try await self.syncEngine.syncSmart(source: adapter) { progress in
+                            try await limiter.withPermit {
                                 NotificationCenter.default.post(
-                                    name: .syncProgressUpdated,
+                                    name: .syncBookStatusChanged,
                                     object: nil,
-                                    userInfo: ["bookId": id, "progress": progress]
+                                    userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "started"]
                                 )
+                                do {
+                                    // 创建适配器并使用统一同步引擎
+                                    let adapter = try GoodLinksNotionAdapter.create(
+                                        link: row,
+                                        dbPath: dbPath,
+                                        databaseService: self.goodLinksDatabaseService
+                                    )
+                                    try await self.syncEngine.syncSmart(source: adapter) { progress in
+                                        NotificationCenter.default.post(
+                                            name: .syncProgressUpdated,
+                                            object: nil,
+                                            userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "progress": progress]
+                                        )
+                                    }
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "succeeded"]
+                                    )
+                                } catch is CancellationError {
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
+                                    )
+                                } catch {
+                                    let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
+                                    self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
+                                    let errorInfo = SyncErrorInfo.from(error)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                    )
+                                }
                             }
+                        } catch is CancellationError {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "succeeded"]
+                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
                             )
                         } catch {
                             let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
@@ -200,10 +229,14 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
                             )
                         }
                     }
+                    
+                    await runningTaskStore.register(taskId: taskId, task: task)
+                    await task.value
+                    await runningTaskStore.unregister(taskId: taskId)
                 }
             }
 
