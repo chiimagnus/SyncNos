@@ -1,0 +1,465 @@
+# 国际化翻译流程指南 (i18n Translation Guide)
+
+分类: 流程指南
+简介: i18n 国际化翻译工作流
+
+# 国际化翻译流程指南 (i18n Translation Guide)
+
+本文档详细说明如何为 SyncNos 项目的 `Localizable.xcstrings` 文件添加多语言翻译。
+
+## 支持的语言 (16种)
+
+| 语言代码 | 语言名称 |
+| --- | --- |
+| `en` | English |
+| `zh-Hans` | Chinese, Simplified (简体中文) |
+| `da` | Danish (丹麦语) |
+| `nl` | Dutch (荷兰语) |
+| `fi` | Finnish (芬兰语) |
+| `fr` | French (法语) |
+| `de` | German (德语) |
+| `id` | Indonesian (印尼语) |
+| `ja` | Japanese (日语) |
+| `ko` | Korean (韩语) |
+| `pt-BR` | Portuguese, Brazil (巴西葡萄牙语) |
+| `ru` | Russian (俄语) |
+| `es` | Spanish, Spain (西班牙语) |
+| `sv` | Swedish (瑞典语) |
+| `th` | Thai (泰语) |
+| `vi` | Vietnamese (越南语) |
+
+## 快速开始
+
+### 推荐方式：Python 脚本 + sed
+
+对于批量翻译，推荐使用以下工作流：
+
+1. **使用 sed 添加翻译**（紧凑格式）
+2. **运行压缩脚本** 统一格式
+3. **验证并构建**
+
+```bash
+# 步骤 1: 添加翻译
+cd /Users/chii_magnus/Github_OpenSource/SyncNos
+sed -i '' 's/"目标字符串" : {/"目标字符串" : {\\
+      "localizations" : {\\
+        "da": { "stringUnit" : { "state" : "translated", "value" : "丹麦语" } },\\
+        ... 其他语言 ...\\
+      },/' Resource/Localizable.xcstrings
+
+# 步骤 2: 压缩格式（可选，统一风格）
+python3 .cursor/rules/compact_xcstrings.py
+
+# 步骤 3: 验证
+python3 -m json.tool Resource/Localizable.xcstrings > /dev/null && echo "✅ JSON valid"
+
+```
+
+---
+
+## 详细流程
+
+### 步骤 1：搜索字符串位置
+
+```bash
+grep -n '"目标字符串"' Resource/Localizable.xcstrings
+
+```
+
+**示例：**
+
+```bash
+grep -n '"Connect Your Notion"' Resource/Localizable.xcstrings
+# 输出: 4572:    "Connect Your Notion" : {
+
+```
+
+### 步骤 2：查看上下文和 comment
+
+```bash
+sed -n '行号,行号+20p' Resource/Localizable.xcstrings
+
+```
+
+**重要：** `comment` 字段提供翻译上下文，确保翻译准确性。
+
+### 步骤 3：添加翻译
+
+### 紧凑格式（推荐）
+
+```bash
+sed -i '' 's/"Active" : {/"Active" : {\\
+      "localizations" : {\\
+        "da": { "stringUnit" : { "state" : "translated", "value" : "Aktiv" } },\\
+        "de": { "stringUnit" : { "state" : "translated", "value" : "Aktiv" } },\\
+        "es": { "stringUnit" : { "state" : "translated", "value" : "Activo" } },\\
+        "fi": { "stringUnit" : { "state" : "translated", "value" : "Aktiivinen" } },\\
+        "fr": { "stringUnit" : { "state" : "translated", "value" : "Actif" } },\\
+        "id": { "stringUnit" : { "state" : "translated", "value" : "Aktif" } },\\
+        "ja": { "stringUnit" : { "state" : "translated", "value" : "アクティブ" } },\\
+        "ko": { "stringUnit" : { "state" : "translated", "value" : "활성" } },\\
+        "nl": { "stringUnit" : { "state" : "translated", "value" : "Actief" } },\\
+        "pt-BR": { "stringUnit" : { "state" : "translated", "value" : "Ativo" } },\\
+        "ru": { "stringUnit" : { "state" : "translated", "value" : "Активно" } },\\
+        "sv": { "stringUnit" : { "state" : "translated", "value" : "Aktiv" } },\\
+        "th": { "stringUnit" : { "state" : "translated", "value" : "ใช้งานอยู่" } },\\
+        "vi": { "stringUnit" : { "state" : "translated", "value" : "Đang hoạt động" } },\\
+        "zh-Hans": { "stringUnit" : { "state" : "translated", "value" : "活跃" } }\\
+      },/' Resource/Localizable.xcstrings
+
+```
+
+### 步骤 4：运行格式压缩脚本
+
+```bash
+python3 .cursor/rules/compact_xcstrings.py
+
+```
+
+**功能：**
+
+- 将 `stringUnit` 块压缩为单行
+- 将语言条目压缩为单行
+- 自动验证 JSON 格式
+
+### 步骤 5：验证并构建
+
+```bash
+# JSON 验证
+python3 -m json.tool Resource/Localizable.xcstrings > /dev/null && echo "✅ JSON valid"
+
+# 项目构建
+xcodebuild -scheme SyncNos -configuration Debug build -quiet
+
+```
+
+---
+
+## 格式压缩脚本
+
+位置：`.cursor/rules/compact_xcstrings.py`
+
+### 使用方法
+
+```bash
+# 方式 1：默认处理 Resource/Localizable.xcstrings
+python3 .cursor/rules/compact_xcstrings.py
+
+# 方式 2：指定自定义路径
+python3 .cursor/rules/compact_xcstrings.py path/to/file.xcstrings
+
+# 方式 3：直接执行
+./.cursor/rules/compact_xcstrings.py
+
+```
+
+### 压缩效果
+
+**压缩前：**
+
+```json
+"nl": {
+  "stringUnit": {
+    "state": "translated",
+    "value": "Waarde"
+  }
+}
+
+```
+
+**压缩后：**
+
+```json
+"nl": { "stringUnit" : { "state" : "translated", "value" : "Waarde" } }
+
+```
+
+---
+
+## 特殊字符转义规则
+
+在 `sed` 命令中，某些字符需要转义：
+
+| 原字符 | 转义后 | 说明 |
+| --- | --- | --- |
+| `'` | `'\\''` | 单引号 |
+| `.` | `\\.` | 句点（正则表达式中） |
+| `/` | `\\/` | 斜杠 |
+| `&` | `\\&` | 与号 |
+| `[` | `\\[` | 方括号 |
+| `]` | `\\]` | 方括号 |
+| `*` | `\\*` | 星号 |
+| `$` | `\\$` | 美元符号 |
+| `\\` | `\\\\` | 反斜杠 |
+
+**示例：**
+
+```bash
+# 原字符串: "We'll create secure databases."
+# 转义后:
+sed -i '' 's/"We'\\''ll create secure databases\\." : {/.../'
+
+```
+
+---
+
+## 格式化参数处理
+
+### 单参数字符串
+
+原字符串：`"Found %d books"`
+
+```
+中文: "找到 %d 本书"
+日语: "%d冊の本が見つかりました"
+
+```
+
+### 多参数字符串
+
+原字符串：`"Syncing highlights: %d/%d"`
+
+**必须使用位置参数** `%1$d`, `%2$d`：
+
+```
+中文: "正在同步高亮: %1$d/%2$d"
+日语: "ハイライトを同期中: %1$d/%2$d"
+
+```
+
+---
+
+## 完整示例模板
+
+### 15 语言翻译模板
+
+```bash
+sed -i '' 's/"YOUR_STRING" : {/"YOUR_STRING" : {\\
+      "localizations" : {\\
+        "da": { "stringUnit" : { "state" : "translated", "value" : "DANISH" } },\\
+        "de": { "stringUnit" : { "state" : "translated", "value" : "GERMAN" } },\\
+        "es": { "stringUnit" : { "state" : "translated", "value" : "SPANISH" } },\\
+        "fi": { "stringUnit" : { "state" : "translated", "value" : "FINNISH" } },\\
+        "fr": { "stringUnit" : { "state" : "translated", "value" : "FRENCH" } },\\
+        "id": { "stringUnit" : { "state" : "translated", "value" : "INDONESIAN" } },\\
+        "ja": { "stringUnit" : { "state" : "translated", "value" : "JAPANESE" } },\\
+        "ko": { "stringUnit" : { "state" : "translated", "value" : "KOREAN" } },\\
+        "nl": { "stringUnit" : { "state" : "translated", "value" : "DUTCH" } },\\
+        "pt-BR": { "stringUnit" : { "state" : "translated", "value" : "PORTUGUESE_BR" } },\\
+        "ru": { "stringUnit" : { "state" : "translated", "value" : "RUSSIAN" } },\\
+        "sv": { "stringUnit" : { "state" : "translated", "value" : "SWEDISH" } },\\
+        "th": { "stringUnit" : { "state" : "translated", "value" : "THAI" } },\\
+        "vi": { "stringUnit" : { "state" : "translated", "value" : "VIETNAMESE" } },\\
+        "zh-Hans": { "stringUnit" : { "state" : "translated", "value" : "简体中文" } }\\
+      },/' Resource/Localizable.xcstrings
+
+```
+
+### 批量处理多个字符串
+
+```bash
+cd /Users/chii_magnus/Github_OpenSource/SyncNos && \\
+sed -i '' 's/"String1" : {/.../' Resource/Localizable.xcstrings && \\
+sed -i '' 's/"String2" : {/.../' Resource/Localizable.xcstrings && \\
+python3 .cursor/rules/compact_xcstrings.py
+
+```
+
+---
+
+## 常见问题
+
+### Q1: 如何处理已有部分翻译的字符串？
+
+使用范围替换：
+
+```bash
+sed -i '' '/"字符串" : {/,/^    },$/c\\
+    "字符串" : {\\
+      "localizations" : {\\
+        ... 完整的翻译块 ...
+      }\\
+    },' Resource/Localizable.xcstrings
+
+```
+
+### Q2: JSON 验证失败怎么办？
+
+1. 检查逗号是否正确（最后一个语言块后不需要逗号）
+2. 检查引号是否配对
+3. 检查特殊字符是否正确转义
+4. 查看详细错误：
+    
+    ```bash
+    python3 -m json.tool Resource/Localizable.xcstrings
+    
+    ```
+    
+
+### Q3: 空条目插入翻译后出现多余逗号？
+
+对于空条目 `"SomeString" : { },`，插入后结尾应使用 `}\\` 而不是 `},\\`：
+
+```bash
+# ❌ 错误：会产生多余逗号
+'s/"SomeString" : {/"SomeString" : {\\
+      "localizations" : { ... },\\
+/'
+
+# ✅ 正确：无逗号
+'s/"SomeString" : {/"SomeString" : {\\
+      "localizations" : { ... }\\
+/'
+
+```
+
+### Q4: 如何回滚错误的修改？
+
+```bash
+git checkout -- Resource/Localizable.xcstrings
+
+```
+
+---
+
+## 翻译质量建议
+
+1. **参考 comment 字段**：确保理解字符串的使用场景
+2. **保持一致性**：同一术语在不同地方使用相同的翻译
+3. **考虑长度**：某些语言翻译后可能更长，注意 UI 适配
+4. **测试验证**：构建并运行应用，检查翻译效果
+
+---
+
+## 文件路径
+
+| 文件 | 路径 |
+| --- | --- |
+| **Localizable.xcstrings** | `Resource/Localizable.xcstrings` |
+| **格式压缩脚本** | `.cursor/rules/compact_xcstrings.py` |
+| **本指南** | `.cursor/rules/国际化翻译流程指南.mdc` |
+
+---
+
+*最后更新: 2025年12月28日*
+
+```python
+#!/usr/bin/env python3
+"""
+Localizable.xcstrings 格式压缩脚本
+
+将 xcstrings 文件中的语言条目从多行格式压缩为更紧凑的单行格式，
+提高可读性并减小文件体积。
+
+使用方法:
+    python3 .cursor/rules/compact_xcstrings.py
+    # 或
+    ./.cursor/rules/compact_xcstrings.py
+
+压缩前:
+    "nl": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "..."
+      }
+    }
+
+压缩后:
+    "nl": { "stringUnit" : { "state" : "translated", "value" : "..." } }
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+def compact_xcstrings(file_path: str) -> bool:
+    """
+    压缩 xcstrings 文件，将 stringUnit 条目压缩为单行。
+    
+    参数:
+        file_path: xcstrings 文件路径
+        
+    返回:
+        成功返回 True，失败返回 False
+    """
+    try:
+        # 读取并解析 JSON
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 处理前验证 JSON 格式
+        data = json.loads(content)
+        
+        # 第一步：使用标准 2 空格缩进导出
+        output = json.dumps(data, ensure_ascii=False, indent=2)
+        
+        # 第二步：将 stringUnit 块压缩为单行
+        # 匹配模式: "stringUnit" : {\n..."state" : "...",\n..."value" : "..."\n...}
+        string_unit_pattern = r'"stringUnit"\s*:\s*\{\s*\n\s*"state"\s*:\s*"([^"]+)",\s*\n\s*"value"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*\n\s*\}'
+        
+        def string_unit_replacer(match):
+            state = match.group(1)
+            value = match.group(2)
+            return f'"stringUnit" : {{ "state" : "{state}", "value" : "{value}" }}'
+        
+        output = re.sub(string_unit_pattern, string_unit_replacer, output)
+        
+        # 第三步：将语言条目压缩为单行
+        # 匹配模式: "langCode": {\n..."stringUnit" : { ... }\n...}
+        lang_pattern = r'"([a-z]{2}(?:-[A-Za-z]+)?)": \{\s*\n\s*("stringUnit" : \{ "state" : "[^"]+", "value" : "[^"\\]*(?:\\.[^"\\]*)*" \})\s*\n\s*\}'
+        
+        def lang_replacer(match):
+            lang = match.group(1)
+            string_unit = match.group(2)
+            return f'"{lang}": {{ {string_unit} }}'
+        
+        output = re.sub(lang_pattern, lang_replacer, output)
+        
+        # 写回文件
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(output)
+        
+        # 处理后验证 JSON 格式
+        with open(file_path, 'r', encoding='utf-8') as f:
+            json.load(f)
+        
+        return True
+        
+    except json.JSONDecodeError as e:
+        print(f"错误: JSON 格式无效 - {e}", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"错误: {e}", file=sys.stderr)
+        return False
+
+def main():
+    # 脚本位置的相对路径（.cursor/rules -> 项目根目录）
+    script_dir = Path(__file__).parent.parent.parent
+    default_path = script_dir / "Resource" / "Localizable.xcstrings"
+    
+    # 支持命令行参数指定自定义路径
+    if len(sys.argv) > 1:
+        file_path = sys.argv[1]
+    else:
+        file_path = str(default_path)
+    
+    if not Path(file_path).exists():
+        print(f"错误: 文件不存在: {file_path}", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"正在压缩: {file_path}")
+    
+    if compact_xcstrings(file_path):
+        print("✅ 完成 - xcstrings 文件压缩成功")
+        print("   - stringUnit 块已压缩为单行")
+        print("   - 语言条目已压缩为单行")
+        print("   - JSON 格式验证通过")
+    else:
+        print("❌ xcstrings 文件压缩失败", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+```
