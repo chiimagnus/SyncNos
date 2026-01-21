@@ -20,14 +20,6 @@ final class OnboardingViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentStep: OnboardingStep = .welcome
     
-    // Source Toggles (datasource visibility, independent from Auto Sync)
-    // 默认：仅启用 Apple Books，其余数据源关闭
-    @AppStorage("datasource.appleBooks.enabled") var appleBooksEnabled: Bool = true
-    @AppStorage("datasource.goodLinks.enabled") var goodLinksEnabled: Bool = false
-    @AppStorage("datasource.weRead.enabled") var weReadEnabled: Bool = false
-    @AppStorage("datasource.dedao.enabled") var dedaoEnabled: Bool = false
-    @AppStorage("datasource.chats.enabled") var chatsEnabled: Bool = false
-    
     // Notion State
     @Published var isNotionConnected: Bool = false
     @Published var workspaceName: String?
@@ -70,7 +62,7 @@ final class OnboardingViewModel: ObservableObject {
     
     func nextStep() {
         if currentStep == .enableSources {
-            guard appleBooksEnabled || goodLinksEnabled || weReadEnabled || dedaoEnabled || chatsEnabled else {
+            guard hasAtLeastOneEnabledSource else {
                 sourceSelectionError = "Please open at least one synchronization source"
                 return
             }
@@ -135,5 +127,35 @@ final class OnboardingViewModel: ObservableObject {
     
     func skipTrial() {
         completeOnboarding()
+    }
+
+    // MARK: - Data Sources (Onboarding)
+
+    var onboardingProviders: [any DataSourceUIProvider] {
+        DataSourceRegistry.shared.allProviders
+    }
+
+    func isSourceEnabled(_ provider: any DataSourceUIProvider) -> Bool {
+        (UserDefaults.standard.object(forKey: provider.enabledStorageKey) as? Bool) ?? provider.defaultEnabled
+    }
+
+    func setSourceEnabled(_ provider: any DataSourceUIProvider, _ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: provider.enabledStorageKey)
+    }
+
+    func enabledBinding(for provider: any DataSourceUIProvider) -> Binding<Bool> {
+        Binding(
+            get: { [weak self] in
+                guard let self else { return provider.defaultEnabled }
+                return self.isSourceEnabled(provider)
+            },
+            set: { [weak self] newValue in
+                self?.setSourceEnabled(provider, newValue)
+            }
+        )
+    }
+
+    private var hasAtLeastOneEnabledSource: Bool {
+        onboardingProviders.contains { isSourceEnabled($0) }
     }
 }
