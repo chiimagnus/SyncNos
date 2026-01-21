@@ -272,7 +272,7 @@ struct MainListView: View {
             }
             // 统一的会话过期弹窗（WeRead/Dedao）
             .alert(
-                "\(sessionExpiredSource.uiProvider?.displayName ?? "Unknown") Session Expired",
+                "\(sessionExpiredSource.uiProvider.displayName) Session Expired",
                 isPresented: $showSessionExpiredAlert
             ) {
                 Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }
