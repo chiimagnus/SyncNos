@@ -28,9 +28,9 @@ struct AppleBooksUIProvider: DataSourceUIProvider {
     // MARK: - 存储配置
     
     let enabledStorageKey = "datasource.appleBooks.enabled"
+    let defaultEnabled = true
     
     // MARK: - 高亮颜色
     
     let highlightColorTheme: HighlightColorTheme? = .appleBooks
 }
-
