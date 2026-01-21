@@ -809,6 +809,8 @@ final class ChatViewModel: ObservableObject {
                         let taskId = "\(ContentSource.chats.rawValue):\(id)"
                         let task = Task { [weak self] in
                             guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .chats, rawId: id) else { return }
                             
                             do {
                                 try await limiter.withPermit {
