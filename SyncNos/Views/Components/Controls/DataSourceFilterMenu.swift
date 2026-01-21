@@ -165,9 +165,9 @@ struct DataSourceFilterSections<SortKey: SortKeyType>: View {
                 )
             } label: {
                 if sortAscending {
-                    Label(String(localized: "Ascending", table: "Common"), systemImage: "checkmark")
+                    Label("Ascending", systemImage: "checkmark")
                 } else {
-                    Label(String(localized: "Ascending", table: "Common"), systemImage: "xmark")
+                    Label("Ascending", systemImage: "xmark")
                 }
             }
         }

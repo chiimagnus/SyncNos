@@ -9,17 +9,17 @@ struct GoodLinksSettingsView: View {
             // MARK: - Data Source
             Section {
                 Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text(String(localized: "Enable GoodLinks source", table: "Settings"))
+                    Text("Enable GoodLinks source")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help(String(localized: "Show GoodLinks in the main list and commands", table: "Settings"))
+                .help("Show GoodLinks in the main list and commands")
                 .onChange(of: viewModel.isSourceEnabled) { _, _ in
                     viewModel.save()
                 }
             } header: {
-                Text(String(localized: "Data Source", table: "Settings"))
+                Text("Data Source")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -33,17 +33,17 @@ struct GoodLinksSettingsView: View {
                             viewModel.save()
                         }
                 } label: {
-                    Text(String(localized: "Database ID (optional)", table: "Settings"))
+                    Text("Database ID (optional)")
                         .scaledFont(.body)
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
-                    Text(String(localized: "Smart Auto Sync", table: "Settings"))
+                    Text("Smart Auto Sync")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help(String(localized: "Sync every 5 minutes, only changed content", table: "Settings"))
+                .help("Sync every 5 minutes, only changed content")
                 .onChange(of: viewModel.autoSync) { _, _ in
                     viewModel.save()
                 }
@@ -58,7 +58,7 @@ struct GoodLinksSettingsView: View {
                     }
                 }) {
                     HStack {
-                        Label(String(localized: "Select Folder", table: "Common"), systemImage: "folder")
+                        Label("Select Folder", systemImage: "folder")
                             .scaledFont(.body)
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
@@ -67,9 +67,9 @@ struct GoodLinksSettingsView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(String(localized: "Choose data folder and load notes", table: "Settings"))
+                .help("Choose data folder and load notes")
             } header: {
-                Text(String(localized: "Sync Settings", table: "Settings"))
+                Text("Sync Settings")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -78,7 +78,7 @@ struct GoodLinksSettingsView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle(String(localized: "GoodLinks", table: "Common"))
+        .navigationTitle("GoodLinks")
     }
 }
 

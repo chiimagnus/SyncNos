@@ -79,13 +79,13 @@ final class WeReadSettingsViewModel: ObservableObject {
             await authService.clearCookies()
             await MainActor.run {
                 refreshLoginStatus()
-                message = String(localized: "Logged Out", table: "Common")
+                message = String(localized: "Logged Out")
                 // 发送登录状态变化通知，让 WeReadListView/WeReadViewModel 更新 UI
                 NotificationCenter.default.post(name: .weReadLoginStatusChanged, object: nil)
             }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
-                if self.message == String(localized: "Logged Out", table: "Common") {
+                if self.message == String(localized: "Logged Out") {
                     self.message = nil
                 }
             }

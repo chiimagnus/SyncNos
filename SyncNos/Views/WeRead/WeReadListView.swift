@@ -16,13 +16,13 @@ struct WeReadListView: View {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .scaledFont(.largeTitle)
                         .foregroundColor(.secondary)
-                    Text(String(localized: "Not Logged In", table: "Common"))
+                    Text("Not Logged In")
                         .scaledFont(.headline, weight: .semibold)
                         .foregroundColor(.secondary)
                     Button {
                         viewModel.navigateToWeReadLogin()
                     } label: {
-                        Label(String(localized: "Log In", table: "Common"), systemImage: "qrcode")
+                        Label("Log In", systemImage: "qrcode")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -43,7 +43,7 @@ struct WeReadListView: View {
                     Image(systemName: "w.square")
                         .foregroundColor(.secondary)
                         .scaledFont(.title)
-                    Text(String(localized: "No books found", table: "Common"))
+                    Text("No books found")
                         .scaledFont(.body)
                         .foregroundColor(.secondary)
                 }
@@ -68,11 +68,11 @@ struct WeReadListView: View {
                             if viewModel.syncingBookIds.contains(book.bookId) {
                                 Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                                     .foregroundColor(.yellow)
-                                    .help(String(localized: "Syncing...", table: "Common"))
+                                    .help("Syncing...")
                             } else if viewModel.syncedBookIds.contains(book.bookId) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
-                                    .help(String(localized: "Synced", table: "Common"))
+                                    .help("Synced")
                             }
                         }
                         .padding(.vertical, 4)
@@ -84,15 +84,15 @@ struct WeReadListView: View {
                             Button {
                                 viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
-                                Label(String(localized: "Sync Selected to Notion", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
                             Divider()
                             let last = viewModel.lastSync(for: book.bookId)
                             if let lastDate = last {
-                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
+                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
                             } else {
-                                Text(String(localized: "Last Sync Time", table: "Common")) + Text(String(localized: ": ", table: "Common")) + Text(String(localized: "-", table: "Common"))
+                                Text("Last Sync Time") + Text(": ") + Text("-")
                             }
                         }
                     }

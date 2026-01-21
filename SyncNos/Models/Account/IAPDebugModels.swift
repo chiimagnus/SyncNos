@@ -41,9 +41,9 @@ enum IAPError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .resetFailed(let reason):
-            return String(format: NSLocalizedString("Reset failed: %@", tableName: "Account", bundle: .main, value: "", comment: ""), reason)
+            return String(format: NSLocalizedString("Reset failed: %@", comment: ""), reason)
         case .simulationFailed(let reason):
-            return String(format: NSLocalizedString("Simulation failed: %@", tableName: "Account", bundle: .main, value: "", comment: ""), reason)
+            return String(format: NSLocalizedString("Simulation failed: %@", comment: ""), reason)
         }
     }
 }

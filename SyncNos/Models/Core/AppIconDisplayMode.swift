@@ -16,11 +16,11 @@ enum AppIconDisplayMode: Int, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .both:
-            return String(localized: "In the Menu Bar and Dock", table: "Common", comment: "App icon display mode: both menu bar and dock")
+            return String(localized: "In the Menu Bar and Dock", comment: "App icon display mode: both menu bar and dock")
         case .menuBarOnly:
-            return String(localized: "In the Menu Bar", table: "Common", comment: "App icon display mode: menu bar only")
+            return String(localized: "In the Menu Bar", comment: "App icon display mode: menu bar only")
         case .dockOnly:
-            return String(localized: "In the Dock", table: "Common", comment: "App icon display mode: dock only")
+            return String(localized: "In the Dock", comment: "App icon display mode: dock only")
         }
     }
     

@@ -126,7 +126,7 @@ struct SelectionPlaceholderView: View {
                         .padding(.bottom, 16)
                     } else {
                         HStack(spacing: 12) {
-                            Text(String(localized: "Please select an item", table: "Common"))
+                            Text("Please select an item")
                                 .scaledFont(.title3)
                                 .foregroundColor(.secondary)
                             
@@ -150,7 +150,7 @@ struct SelectionPlaceholderView: View {
                             HStack {
                                 Image(systemName: syncQueueCollapseStore.isCollapsed ? "chevron.right" : "chevron.down")
                                     .foregroundStyle(.secondary)
-                                Text(String(localized: "Sync Queue", table: "Common"))
+                                Text("Sync Queue")
                                     .scaledFont(.title2, weight: .semibold)
                                     .foregroundStyle(.primary)
                                 Spacer()

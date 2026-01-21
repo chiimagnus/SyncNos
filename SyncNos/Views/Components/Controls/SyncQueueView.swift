@@ -161,7 +161,7 @@ struct SyncTaskRowView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "Cancel this task", table: "Common"))
+                .help(String(localized: "Cancel this task"))
             }
         }
     }
@@ -206,7 +206,7 @@ struct SyncTaskRowView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "Show error details", table: "Common"))
+                    .help(String(localized: "Show error details"))
                 }
             }
             
@@ -337,7 +337,7 @@ struct SyncQueueView: View {
             )
             
             if viewModel.runningTasks.isEmpty {
-                emptyStateText(String(localized: "No active sync tasks", table: "Common"))
+                emptyStateText("No active sync tasks")
             } else {
                 taskList(viewModel.runningTasks, variant: .running)
             }
@@ -358,7 +358,7 @@ struct SyncQueueView: View {
             )
             
             if viewModel.queuedTasks.isEmpty {
-                emptyStateText(String(localized: "No queued tasks", table: "Common"))
+                emptyStateText("No queued tasks")
             } else {
                 taskList(viewModel.queuedTasks, variant: .queued)
             }
@@ -382,7 +382,7 @@ struct SyncQueueView: View {
 
             if isFailedExpanded {
                 if viewModel.failedTasks.isEmpty {
-                    emptyStateText(String(localized: "No failed tasks", table: "Common"))
+                    emptyStateText("No failed tasks")
                 } else {
                     taskList(viewModel.failedTasks, variant: .failed)
                 }
@@ -392,7 +392,7 @@ struct SyncQueueView: View {
     
     // MARK: - Helpers
     
-    private func emptyStateText(_ text: String) -> some View {
+    private func emptyStateText(_ text: LocalizedStringKey) -> some View {
         Text(text)
             .scaledFont(.body)
             .foregroundStyle(.secondary)

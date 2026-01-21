@@ -14,17 +14,17 @@ struct DedaoSettingsView: View {
             // MARK: - Data Source
             Section {
                 Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text(String(localized: "Enable Dedao source", table: "Settings"))
+                    Text("Enable Dedao source")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help(String(localized: "Show Dedao in the main list and commands", table: "Settings"))
+                .help("Show Dedao in the main list and commands")
                 .onChange(of: viewModel.isSourceEnabled) { _, _ in
                     viewModel.save()
                 }
             } header: {
-                Text(String(localized: "Data Source", table: "Settings"))
+                Text("Data Source")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -36,7 +36,7 @@ struct DedaoSettingsView: View {
                         .scaledFont(.body)
                         .foregroundColor(viewModel.isLoggedIn ? .green : .secondary)
                 } label: {
-                    Label(String(localized: "Login Status", table: "Settings"), systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
+                    Label("Login Status", systemImage: viewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
                         .scaledFont(.body)
                 }
 
@@ -44,7 +44,7 @@ struct DedaoSettingsView: View {
                     Button(role: .destructive) {
                         viewModel.clearLogin()
                     } label: {
-                        Text(String(localized: "Log Out", table: "Settings"))
+                        Text("Log Out")
                             .scaledFont(.body)
                     }
                     .disabled(!viewModel.isLoggedIn)
@@ -52,12 +52,12 @@ struct DedaoSettingsView: View {
                     Button {
                         viewModel.showLoginSheet = true
                     } label: {
-                        Label(String(localized: "Open Login", table: "Settings"), systemImage: "safari")
+                        Label("Open Login", systemImage: "safari")
                             .scaledFont(.body)
                     }
                 }
             } header: {
-                Text(String(localized: "Account", table: "Settings"))
+                Text("Account")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -71,22 +71,22 @@ struct DedaoSettingsView: View {
                             viewModel.save()
                         }
                 } label: {
-                    Text(String(localized: "Database ID (optional)", table: "Settings"))
+                    Text("Database ID (optional)")
                         .scaledFont(.body)
                 }
 
                 Toggle(isOn: $viewModel.autoSync) {
-                    Text(String(localized: "Smart Auto Sync", table: "Settings"))
+                    Text("Smart Auto Sync")
                         .scaledFont(.body)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .help(String(localized: "Sync every 5 minutes, only changed content", table: "Settings"))
+                .help("Sync every 5 minutes, only changed content")
                 .onChange(of: viewModel.autoSync) { _, _ in
                     viewModel.save()
                 }
             } header: {
-                Text(String(localized: "Sync Settings", table: "Settings"))
+                Text("Sync Settings")
                     .scaledFont(.headline)
                     .foregroundStyle(.primary)
             }
@@ -95,7 +95,7 @@ struct DedaoSettingsView: View {
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
-        .navigationTitle(String(localized: "Dedao", table: "Common"))
+        .navigationTitle("Dedao")
         .sheet(isPresented: $viewModel.showLoginSheet) {
             DedaoLoginView(viewModel: DedaoLoginViewModel(
                 authService: DIContainer.shared.dedaoAuthService,

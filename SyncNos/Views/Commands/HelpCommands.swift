@@ -7,21 +7,21 @@ struct HelpCommands: Commands {
     var body: some Commands {
         // Help 菜单 - 帮助相关
         CommandGroup(replacing: .help) {
-            Button(String(localized: "Please give five stars", table: "Common"), systemImage: "heart") {
+            Button("Please give five stars", systemImage: "heart") {
                 openAppStoreReview()
             }
 
-            Button(String(localized: "Report Issues & Suggestions", table: "Common"), systemImage: "ladybug") {
+            Button("Report Issues & Suggestions", systemImage: "ladybug") {
                 openGitHubRepo()
             }
 
-            Button(String(localized: "View Source Code", table: "Common"), systemImage: "link") {
+            Button("View Source Code", systemImage: "link") {
                 openGitHubSource()
             }
 
             Divider()
 
-            Button(String(localized: "Show Logs", table: "Common"), systemImage: "doc.text.magnifyingglass") {
+            Button("Show Logs", systemImage: "doc.text.magnifyingglass") {
                 openWindow(id: "log")
             }
             .keyboardShortcut("l", modifiers: [.command, .shift])

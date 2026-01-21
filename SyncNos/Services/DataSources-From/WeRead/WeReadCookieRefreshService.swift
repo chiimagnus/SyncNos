@@ -141,13 +141,13 @@ enum WeReadCookieRefreshError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .timeout:
-            return NSLocalizedString("Cookie refresh timeout. Please login manually.", tableName: "WeRead", bundle: .main, value: "", comment: "")
+            return NSLocalizedString("Cookie refresh timeout. Please login manually.", comment: "")
         case .noCookiesFound:
-            return NSLocalizedString("No WeRead cookies found. Please login manually.", tableName: "WeRead", bundle: .main, value: "", comment: "")
+            return NSLocalizedString("No WeRead cookies found. Please login manually.", comment: "")
         case .invalidCookies:
-            return NSLocalizedString("Invalid WeRead cookies. Please login manually.", tableName: "WeRead", bundle: .main, value: "", comment: "")
+            return NSLocalizedString("Invalid WeRead cookies. Please login manually.", comment: "")
         case .invalidURL:
-            return NSLocalizedString("Invalid WeRead URL.", tableName: "WeRead", bundle: .main, value: "", comment: "")
+            return NSLocalizedString("Invalid WeRead URL.", comment: "")
         }
     }
 }

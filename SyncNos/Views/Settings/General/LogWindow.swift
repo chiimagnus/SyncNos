@@ -28,7 +28,7 @@ struct LogWindow: View {
             }
         }
         .frame(minWidth: 600, minHeight: 300)
-        .navigationTitle(String(localized: "Logs", table: "Settings"))
+        .navigationTitle("Logs")
         .searchable(text: $viewModel.searchText, prompt: "Search logs...")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -42,12 +42,12 @@ struct LogWindow: View {
                 Button(action: { viewModel.clear() }) {
                     Image(systemName: "trash")
                 }
-                .help(String(localized: "Clear logs", table: "Settings"))
+                .help("Clear logs")
 
                 Button(action: { shareLogs() }) {
                     Image(systemName: "square.and.arrow.up.on.square")
                 }
-                .help(String(localized: "Share logs", table: "Settings"))
+                .help("Share logs")
             }
         }
     }

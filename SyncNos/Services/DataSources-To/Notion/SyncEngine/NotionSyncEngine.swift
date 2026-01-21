@@ -104,14 +104,14 @@ final class NotionSyncEngine {
             throw NSError(
                 domain: "NotionSync",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", tableName: "Notion", bundle: .main, value: "", comment: "")]
+                userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please set NOTION_PAGE_ID in Notion Integration view first.", comment: "")]
             )
         }
         guard let token = notionConfig.effectiveToken, !token.isEmpty else {
             throw NSError(
                 domain: "NotionSync",
                 code: 2,
-                userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please authorize Notion first.", tableName: "Notion", bundle: .main, value: "", comment: "")]
+                userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("Please authorize Notion first.", comment: "")]
             )
         }
 
@@ -175,7 +175,7 @@ final class NotionSyncEngine {
         }
 
         // 6. 获取高亮数据
-        progress(NSLocalizedString("Preparing...", tableName: "Notion", bundle: .main, value: "", comment: ""))
+        progress(NSLocalizedString("Preparing...", comment: ""))
         let highlights: [UnifiedHighlight]
         do {
             highlights = try await source.fetchHighlights()
@@ -193,7 +193,7 @@ final class NotionSyncEngine {
                     // 追加头部内容（如果有）
                     let headerContent = source.headerContentForNewPage()
                     if !headerContent.isEmpty {
-                        progress(NSLocalizedString("Adding article content...", tableName: "Notion", bundle: .main, value: "", comment: ""))
+                        progress(NSLocalizedString("Adding article content...", comment: ""))
                         try await notionService.appendChildren(
                             pageId: pageId,
                             children: headerContent,
@@ -233,7 +233,7 @@ final class NotionSyncEngine {
                 }
             }
         } else {
-            progress(NSLocalizedString("No highlights to sync.", tableName: "Notion", bundle: .main, value: "", comment: ""))
+            progress(NSLocalizedString("No highlights to sync.", comment: ""))
             logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey): \(itemLabel)")
         }
 
@@ -267,19 +267,19 @@ final class NotionSyncEngine {
         let recreated = ensured.recreated
         
         // 2. 获取高亮数据
-        progress(NSLocalizedString("Fetching highlights...", tableName: "Notion", bundle: .main, value: "", comment: ""))
+        progress(NSLocalizedString("Fetching highlights...", comment: ""))
         let highlights = try await source.fetchHighlights()
         
         // 3. 如果没有高亮，只更新时间戳
         guard !highlights.isEmpty else {
-            progress(NSLocalizedString("No highlights to sync.", tableName: "Notion", bundle: .main, value: "", comment: ""))
+            progress(NSLocalizedString("No highlights to sync.", comment: ""))
             timestampStore.setLastSyncTime(for: item.itemId, to: Date())
             return
         }
         
         // 4. 如果数据库是新创建的，执行全量同步
         if recreated {
-            progress(NSLocalizedString("Detected database recreation, performing full sync...", tableName: "Notion", bundle: .main, value: "", comment: ""))
+            progress(NSLocalizedString("Detected database recreation, performing full sync...", comment: ""))
             try await fullSyncPerBook(
                 databaseId: databaseId,
                 highlights: highlights,
@@ -300,7 +300,7 @@ final class NotionSyncEngine {
             let endIndex = min(startIndex + pageSize, highlights.count)
             let slice = Array(highlights[startIndex..<endIndex])
             
-            progress(String(format: NSLocalizedString("Plan 2: Processing batch %d...", tableName: "Notion", bundle: .main, value: "", comment: ""), batch + 1))
+            progress(String(format: NSLocalizedString("Plan 2: Processing batch %d...", comment: ""), batch + 1))
             
             for h in slice {
                 let highlightRow = h.toHighlightRow(assetId: item.itemId)
@@ -488,7 +488,7 @@ final class NotionSyncEngine {
             
             appended += slice.count
             let percent = Int(Double(appended) / Double(total) * 100)
-            progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", tableName: "Notion", bundle: .main, value: "", comment: ""), appended, total, percent))
+            progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), appended, total, percent))
             
             index = end
         }
@@ -531,10 +531,10 @@ final class NotionSyncEngine {
             logger.info("[SyncEngine] Using local records: \(localRecords.count) for \"\(item.title)\"")
         } else {
             // 回退到 Notion 查询（首次同步或本地记录为空）
-            progress(NSLocalizedString("Fetching from Notion...", tableName: "Notion", bundle: .main, value: "", comment: ""))
+            progress(NSLocalizedString("Fetching from Notion...", comment: ""))
             logger.info("[SyncEngine] No local records, fetching from Notion for \"\(item.title)\"...")
             let existingMapWithToken = try await notionService.collectExistingUUIDMapWithToken(fromPageId: pageId) { fetchedCount in
-                progress(String(format: NSLocalizedString("Fetching... %lld found", tableName: "Notion", bundle: .main, value: "", comment: ""), fetchedCount))
+                progress(String(format: NSLocalizedString("Fetching... %lld found", comment: ""), fetchedCount))
             }
             for (uuid, value) in existingMapWithToken {
                 existingMap[uuid] = (blockId: value.blockId, contentHash: value.token)
@@ -574,7 +574,7 @@ final class NotionSyncEngine {
         
         // 如果没有任何操作，显示无变更
         if totalOperations == 0 {
-            progress(NSLocalizedString("No changes", tableName: "Notion", bundle: .main, value: "", comment: ""))
+            progress(NSLocalizedString("No changes", comment: ""))
             logger.info("[SyncEngine] No changes for \"\(item.title)\"")
         }
         
@@ -604,7 +604,7 @@ final class NotionSyncEngine {
                 
                 completed += 1
                 let percent = Int(Double(completed) / Double(totalOperations) * 100)
-                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", tableName: "Notion", bundle: .main, value: "", comment: ""), completed, totalOperations, percent))
+                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
             }
         }
         
@@ -641,7 +641,7 @@ final class NotionSyncEngine {
                 
                 completed += slice.count
                 let percent = Int(Double(completed) / Double(totalOperations) * 100)
-                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", tableName: "Notion", bundle: .main, value: "", comment: ""), completed, totalOperations, percent))
+                progress(String(format: NSLocalizedString("Syncing... %d/%d (%d%%)", comment: ""), completed, totalOperations, percent))
                 
                 index = end
             }
@@ -688,7 +688,7 @@ final class NotionSyncEngine {
             let endIndex = min(startIndex + pageSize, highlights.count)
             let slice = Array(highlights[startIndex..<endIndex])
             
-            progress(String(format: NSLocalizedString("Plan 2: Full batch %d, count: %lld", tableName: "Notion", bundle: .main, value: "", comment: ""), batch + 1, slice.count))
+            progress(String(format: NSLocalizedString("Plan 2: Full batch %d, count: %lld", comment: ""), batch + 1, slice.count))
             
             for h in slice {
                 let highlightRow = h.toHighlightRow(assetId: item.itemId)

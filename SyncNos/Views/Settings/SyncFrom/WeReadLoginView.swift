@@ -41,7 +41,7 @@ struct WeReadLoginView: View {
                     captureCookiesFromWebView()
                     dismiss()
                 } label: {
-                    Label(String(localized: "Save Cookies from WebView", table: "Settings"), systemImage: "checkmark.circle")
+                    Label("Save Cookies from WebView", systemImage: "checkmark.circle")
                 }
             }
         }
@@ -55,7 +55,7 @@ struct WeReadLoginView: View {
             }
             guard !relevant.isEmpty else {
                 Task { @MainActor in
-                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.", table: "Settings")
+                    viewModel.statusMessage = String(localized: "No cookies found. Please log in via the web view first.")
                 }
                 return
             }

@@ -243,9 +243,9 @@ struct MainListView: View {
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
             // MARK: - Chats New Chat Alert
-            .alert(String(localized: "New Chat", table: "Common"), isPresented: $showNewConversationAlert) {
+            .alert("New Chat", isPresented: $showNewConversationAlert) {
                 TextField("Chat Name", text: $newConversationName)
-                Button(String(localized: "Create", table: "Common")) {
+                Button("Create") {
                     guard !newConversationName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                     let contactId = chatsVM.createConversation(
                         name: newConversationName.trimmingCharacters(in: .whitespaces)
@@ -253,30 +253,30 @@ struct MainListView: View {
                     selectionState.setSelection(for: .chats, ids: [contactId.uuidString])
                     newConversationName = ""
                 }
-                Button(String(localized: "Cancel", table: "Chats"), role: .cancel) {
+                Button("Cancel", role: .cancel) {
                     newConversationName = ""
                 }
             }
             // MARK: - Centralized Alerts
             // 统一的 Notion 配置弹窗
-            .alert(String(localized: "Notion Configuration Required", table: "Common"), isPresented: $showNotionConfigAlert) {
-                Button(String(localized: "Go to Settings", table: "Common")) {
+            .alert("Notion Configuration Required", isPresented: $showNotionConfigAlert) {
+                Button("Go to Settings") {
                     openWindow(id: "setting")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         NotificationCenter.default.post(name: .navigateToNotionSettings, object: nil)
                     }
                 }
-                Button(String(localized: "Cancel", table: "Chats"), role: .cancel) { }
+                Button("Cancel", role: .cancel) { }
             } message: {
-                Text(String(localized: "Please configure Notion API Key and Page ID before syncing.", table: "Common"))
+                Text("Please configure Notion API Key and Page ID before syncing.")
             }
             // 统一的会话过期弹窗（WeRead/Dedao）
             .alert(
                 "\(sessionExpiredSource.uiProvider?.displayName ?? "Unknown") Session Expired",
                 isPresented: $showSessionExpiredAlert
             ) {
-                Button(NSLocalizedString("Remind Me Later", tableName: "Common", bundle: .main, value: "", comment: ""), role: .cancel) { }
-                Button(NSLocalizedString("Go to Login", tableName: "Common", bundle: .main, value: "", comment: "")) {
+                Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }
+                Button(NSLocalizedString("Go to Login", comment: "")) {
                     navigateToLogin(for: sessionExpiredSource)
                 }
             } message: {
@@ -318,9 +318,9 @@ struct MainListView: View {
             Image(systemName: "books.vertical")
                 .font(.system(size: 40 * fontScaleManager.scaleFactor))
                 .foregroundStyle(.secondary)
-            Text(String(localized: "No data sources enabled", table: "Common"))
+            Text("No data sources enabled")
                 .scaledFont(.title3)
-            Text(String(localized: "Please enable at least one source in Settings.", table: "Common"))
+            Text("Please enable at least one source in Settings.")
                 .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -328,7 +328,7 @@ struct MainListView: View {
             Button {
                 openWindow(id: "setting")
             } label: {
-                Label(String(localized: "Open Settings", table: "Common"), systemImage: "gearshape")
+                Label("Open Settings", systemImage: "gearshape")
             }
             .scaledFont(.body)
         }

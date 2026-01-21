@@ -9,19 +9,19 @@ struct EditCommands: Commands {
         // 替换剪贴板命令组，但显式添加 Copy/Cut/Paste 以保留文本字段的快捷键功能
         CommandGroup(replacing: .pasteboard) {
             // 保留系统默认的 Copy 命令（用于文本字段）
-            Button(String(localized: "Copy", table: "Chats"), systemImage: "doc.on.doc") {
+            Button("Copy", systemImage: "doc.on.doc") {
                 NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("c", modifiers: .command)
 
             // 保留系统默认的 Cut 命令（用于文本字段）
-            Button(String(localized: "Cut", table: "Common"), systemImage: "scissors") {
+            Button("Cut", systemImage: "scissors") {
                 NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("x", modifiers: .command)
 
             // 保留系统默认的 Paste 命令（用于文本字段）
-            Button(String(localized: "Paste", table: "Common"), systemImage: "doc.on.clipboard") {
+            Button("Paste", systemImage: "doc.on.clipboard") {
                 NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("v", modifiers: .command)
@@ -29,7 +29,7 @@ struct EditCommands: Commands {
             Divider()
 
             // 自定义的 Select All（优先尝试系统文本全选，失败时回退到列表选择）
-            Button(String(localized: "Select All", table: "Common"), systemImage: "character.textbox") {
+            Button("Select All", systemImage: "character.textbox") {
                 // 先尝试系统的文本全选（针对 TextField、TextEditor 等）
                 let handled = NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
                 
@@ -41,7 +41,7 @@ struct EditCommands: Commands {
             .keyboardShortcut("a", modifiers: [.command])
 
             // 自定义的 Deselect（用于列表视图）
-            Button(String(localized: "Deselect", table: "Common"), systemImage: "character.textbox.badge.sparkles") {
+            Button("Deselect", systemImage: "character.textbox.badge.sparkles") {
                 selectionCommands?.deselectAll()
             }
             .keyboardShortcut(.escape)

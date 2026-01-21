@@ -44,7 +44,7 @@ struct DedaoDetailView: View {
             if let book = selectedBook {
                 bookDetailView(book: book)
             } else {
-                Text(String(localized: "Select a book", table: "Dedao"))
+                Text("Select a book")
                     .scaledFont(.body)
                     .foregroundColor(.secondary)
             }
@@ -72,7 +72,7 @@ struct DedaoDetailView: View {
                 }
                 .padding()
             }
-            .navigationTitle(String(localized: "Dedao", table: "Common"))
+            .navigationTitle("Dedao")
             .toolbar { toolbarContent(book: book) }
             // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
             .onAppear {
@@ -100,8 +100,8 @@ struct DedaoDetailView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { handleSyncProgressUpdate($0) }
             .onReceive(NotificationCenter.default.publisher(for: .syncBookStatusChanged).receive(on: DispatchQueue.main)) { handleSyncStatusChange($0) }
-            .alert(String(localized: "Sync Error", table: "Common"), isPresented: $showingSyncError) {
-                Button(String(localized: "OK", table: "Common"), role: .cancel) { }
+            .alert("Sync Error", isPresented: $showingSyncError) {
+                Button("OK", role: .cancel) { }
             } message: {
                 Text(syncErrorMessage)
             }
@@ -158,7 +158,7 @@ struct DedaoDetailView: View {
                 .scaledFont(.body)
                 .padding(.top)
         } else if detailViewModel.visibleHighlights.isEmpty {
-            Text(String(localized: "No highlights found", table: "Common"))
+            Text("No highlights found")
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
                 .padding(.top)
@@ -204,7 +204,7 @@ struct DedaoDetailView: View {
         if detailViewModel.isBackgroundSyncing {
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.6)
-                Text(String(localized: "Syncing in background...", table: "Common"))
+                Text("Syncing in background...")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
             }
@@ -218,7 +218,7 @@ struct DedaoDetailView: View {
             HStack {
                 Spacer()
                 ProgressView().scaleEffect(0.8)
-                Text(String(localized: "Loading...", table: "Common"))
+                Text("Loading...")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
@@ -281,15 +281,15 @@ struct DedaoDetailView: View {
                 Text(externalSyncProgress ?? "Syncing...")
                     .scaledFont(.caption)
             }
-            .help(String(localized: "Sync in progress", table: "Common"))
+            .help("Sync in progress")
         } else {
             Button {
                 // 同步入口统一放在 ListVM，避免 DetailVM 被同步任务强持有导致内存无法释放
                 listViewModel.batchSync(bookIds: Set([book.bookId]))
             } label: {
-                Label(String(localized: "Sync", table: "Common"), systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                Label("Sync", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
             }
-            .help(String(localized: "Sync highlights to Notion", table: "Common"))
+            .help("Sync highlights to Notion")
         }
     }
     

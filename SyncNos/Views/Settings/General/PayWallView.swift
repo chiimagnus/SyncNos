@@ -64,7 +64,7 @@ struct PayWallView: View {
                     .onAppear {
                         startWiggleAnimation()
                     }
-                Text(String(localized: "30-day free trial included", table: "Settings"))
+                Text("30-day free trial included")
                     .scaledFont(.headline)
                     .foregroundStyle(Color("OnboardingTextColor"))
             }
@@ -164,7 +164,7 @@ struct PayWallView: View {
             ProgressView()
                 .padding()
         } else if viewModel.products.isEmpty {
-            Text(String(localized: "Loading...", table: "Common"))
+            Text("Loading...")
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
         } else {
             VStack(spacing: 12) {
@@ -177,20 +177,20 @@ struct PayWallView: View {
         
         // 链接和消息行
         HStack(spacing: 16) {
-            Button(String(localized: "Restore Purchases", table: "Common")) {
+            Button("Restore Purchases") {
                 viewModel.restore()
             }
             .buttonStyle(.link)
             .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
             
-            Text(String(localized: "•", table: "Common"))
+            Text("•")
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
             
             Link("Privacy Policy & Terms of Use", destination: URL(string: "https://chiimagnus.notion.site/privacypolicyandtermsofuse")!)
                 .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
             
             if !viewModel.hasPurchased, let msg = viewModel.message, !msg.isEmpty {
-                Text(String(localized: "•", table: "Common"))
+                Text("•")
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.3))
                 Text(msg)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
@@ -307,7 +307,7 @@ struct PayWallView: View {
                         dismiss()
                     }
                 }) {
-                    Text(String(localized: "Later", table: "Settings"))
+                    Text("Later")
                         .scaledFont(.headline)
                         .foregroundColor(.white)
                         .frame(width: 80, height: 44)

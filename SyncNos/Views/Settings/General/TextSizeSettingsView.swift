@@ -30,7 +30,7 @@ struct TextSizeSettingsView: View {
         }
         .padding()
         .frame(minWidth: 400, maxWidth: 500)
-        .navigationTitle(String(localized: "Text Size", table: "Settings"))
+        .navigationTitle("Text Size")
         // 同步外部变化（如通过快捷键修改）
         .onChange(of: fontScaleManager.scaleLevel) { _, newLevel in
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -43,7 +43,7 @@ struct TextSizeSettingsView: View {
     
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Adjust the text size for the app. This setting affects all text throughout the application.", table: "Settings"))
+            Text("Adjust the text size for the app. This setting affects all text throughout the application.")
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
         }
@@ -123,7 +123,7 @@ struct TextSizeSettingsView: View {
     private var resetButton: some View {
         HStack {
             Spacer()
-            Button(String(localized: "Reset", table: "Settings")) {
+            Button("Reset") {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     fontScaleManager.reset()
                     selectedIndex = Double(fontScaleManager.scaleLevel.index)
