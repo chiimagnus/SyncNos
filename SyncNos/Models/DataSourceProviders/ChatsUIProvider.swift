@@ -28,10 +28,10 @@ struct ChatsUIProvider: DataSourceUIProvider {
     // MARK: - 存储配置
     
     let enabledStorageKey = "datasource.chats.enabled"
+    let defaultEnabled = false
     
     // MARK: - 高亮颜色
     
     /// Chats 不支持高亮颜色筛选
     let highlightColorTheme: HighlightColorTheme? = nil
 }
-

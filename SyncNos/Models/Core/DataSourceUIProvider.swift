@@ -53,6 +53,10 @@ protocol DataSourceUIProvider {
     
     /// UserDefaults 启用状态键（如 "datasource.appleBooks.enabled"）
     var enabledStorageKey: String { get }
+
+    /// 默认启用状态（当 UserDefaults 尚未写入该 key 时使用）
+    /// - 目的：让 onboarding/设置页不再为每个数据源手写默认值
+    var defaultEnabled: Bool { get }
     
     // MARK: - 高亮颜色
     
@@ -81,4 +85,3 @@ enum NoSortKey: String, SortKeyType, CaseIterable {
     
     var displayName: LocalizedStringResource { "Default" }
 }
-
