@@ -8,11 +8,11 @@ Localizable.xcstrings 格式压缩脚本
 - 写回后进行 JSON 校验，避免格式化过程中破坏文件
 
 用法：
-    # 默认：自动定位仓库根目录下的 Resource/Localizable.xcstrings
+    # 默认：压缩 Resource/ 目录下所有 *.xcstrings
     python3 .codex/skills/syncnos-i18n/scripts/compact_xcstrings.py
 
-    # 或者指定文件路径
-    python3 .codex/skills/syncnos-i18n/scripts/compact_xcstrings.py path/to/file.xcstrings
+    # 指定一个或多个文件路径
+    python3 .codex/skills/syncnos-i18n/scripts/compact_xcstrings.py path/to/A.xcstrings path/to/B.xcstrings
 """
 
 from __future__ import annotations
@@ -79,24 +79,32 @@ def compact_xcstrings(file_path: Path) -> None:
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root = _find_repo_root(script_dir) or Path.cwd()
-    default_path = repo_root / "Resource" / "Localizable.xcstrings"
+    resource_dir = repo_root / "Resource"
 
-    file_path = Path(sys.argv[1]).expanduser().resolve() if len(sys.argv) > 1 else default_path
+    if len(sys.argv) > 1:
+        file_paths = [Path(arg).expanduser().resolve() for arg in sys.argv[1:]]
+    else:
+        file_paths = sorted(resource_dir.glob("*.xcstrings"))
 
-    if not file_path.exists():
-        print(f"错误: 文件不存在: {file_path}", file=sys.stderr)
+    if not file_paths:
+        print(f"错误: 未找到任何 .xcstrings 文件（{resource_dir}）", file=sys.stderr)
         return 1
 
-    print(f"正在压缩: {file_path}")
+    for file_path in file_paths:
+        if not file_path.exists():
+            print(f"错误: 文件不存在: {file_path}", file=sys.stderr)
+            return 1
 
-    try:
-        compact_xcstrings(file_path)
-    except json.JSONDecodeError as exc:
-        print(f"错误: JSON 格式无效 - {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:
-        print(f"错误: {exc}", file=sys.stderr)
-        return 1
+        print(f"正在压缩: {file_path}")
+
+        try:
+            compact_xcstrings(file_path)
+        except json.JSONDecodeError as exc:
+            print(f"错误: JSON 格式无效 - {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"错误: {exc}", file=sys.stderr)
+            return 1
 
     print("✅ 完成 - xcstrings 文件压缩成功")
     return 0
@@ -104,4 +112,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

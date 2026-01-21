@@ -42,6 +42,32 @@ python3 -m json.tool Resource/Localizable.xcstrings > /dev/null && echo "✅ JSO
 python3 .codex/skills/syncnos-i18n/scripts/compact_xcstrings.py
 ```
 
+## 多个 `.xcstrings`（table / tableName）
+
+可以把不同模块的文案拆成多个 `.xcstrings` 文件；每个文件就是一个 **table**：
+
+- table 名称 = 文件名去掉扩展名（例如 `Notion.xcstrings` 对应 table `"Notion"`）
+- 不指定 table 的 API 会走默认 table（通常是 `Localizable`）
+
+常用写法：
+
+```swift
+// Swift（推荐）
+let text = String(localized: "settings.saved", table: "Settings", comment: "Toast")
+
+// Foundation
+let text = NSLocalizedString("settings.saved", tableName: "Settings", bundle: .main, value: "", comment: "Toast")
+
+// SwiftUI
+Text("settings.saved", tableName: "Settings", bundle: .main, comment: "Toast")
+```
+
+快速查看当前项目有哪些 `.xcstrings`：
+
+```bash
+ls -1 Resource/*.xcstrings
+```
+
 ## 支持语言（16 种）
 
 | code | language |
@@ -75,4 +101,3 @@ python3 .codex/skills/syncnos-i18n/scripts/compact_xcstrings.py
 ```bash
 git restore -- Resource/Localizable.xcstrings
 ```
-
