@@ -14,7 +14,9 @@ final class UserDefaultsObserver: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.changeCounter &+= 1
+            Task { @MainActor in
+                self?.changeCounter &+= 1
+            }
         }
     }
 
@@ -28,4 +30,3 @@ final class UserDefaultsObserver: ObservableObject {
         changeCounter &+= 1
     }
 }
-
