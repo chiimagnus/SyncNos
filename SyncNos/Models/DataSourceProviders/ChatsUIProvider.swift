@@ -34,4 +34,11 @@ struct ChatsUIProvider: DataSourceUIProvider {
     
     /// Chats 不支持高亮颜色筛选
     let highlightColorTheme: HighlightColorTheme? = nil
+
+    // MARK: - Settings
+
+    @MainActor
+    func makeSettingsView() -> AnyView {
+        AnyView(OCRSettingsView())
+    }
 }

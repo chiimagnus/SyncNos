@@ -62,6 +62,13 @@ protocol DataSourceUIProvider {
     
     /// 高亮颜色主题（用于 ViewCommands 颜色筛选，不支持高亮颜色的数据源返回 nil）
     var highlightColorTheme: HighlightColorTheme? { get }
+
+    // MARK: - Settings
+
+    /// 设置页视图工厂
+    /// - 目的：让 Settings 的侧边栏与详情页也遵循协议驱动，不再写死每个数据源的 UI。
+    @MainActor
+    func makeSettingsView() -> AnyView
 }
 
 // MARK: - SortKeyType 协议
