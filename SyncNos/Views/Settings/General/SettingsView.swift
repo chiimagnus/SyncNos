@@ -19,14 +19,11 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                // MARK: - General
                 Section {
+                    // MARK: - General
                     sidebarRow(title: "General", systemImage: "gear", tag: .general)
-                }
-                .collapsible(false)
 
-                // MARK: - Data Sources
-                Section {
+                    // MARK: - Data Sources
                     sidebarRow(title: "Data Sources", systemImage: "square.stack.3d.up", tag: .dataSources)
                 }
                 .collapsible(false)
@@ -41,10 +38,6 @@ struct SettingsView: View {
                                 tag: .dataSource(provider.source)
                             )
                         }
-                    } header: {
-                        Text("Data Source Settings")
-                            .scaledFont(.headline)
-                            .foregroundStyle(.primary)
                     }
                     .collapsible(false)
                 }
@@ -52,10 +45,6 @@ struct SettingsView: View {
                 // MARK: - Sync Data To
                 Section {
                     sidebarRow(title: "Notion", systemImage: "n.square", tag: .notion)
-                } header: {
-                    Text("Sync Data To")
-                        .scaledFont(.headline)
-                        .foregroundStyle(.primary)
                 }
                 .collapsible(false)
             }
