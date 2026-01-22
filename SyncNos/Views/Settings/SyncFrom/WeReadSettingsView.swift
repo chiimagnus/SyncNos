@@ -1,7 +1,16 @@
 import SwiftUI
 
 struct WeReadSettingsView: View {
-    @StateObject private var viewModel = WeReadSettingsViewModel()
+    @StateObject private var viewModel: WeReadSettingsViewModel
+
+    @MainActor
+    init(viewModel: WeReadSettingsViewModel? = nil) {
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: WeReadSettingsViewModel())
+        }
+    }
 
     var body: some View {
         List {
