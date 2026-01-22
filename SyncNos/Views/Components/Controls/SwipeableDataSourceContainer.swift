@@ -155,18 +155,17 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
         
         return SelectionCommands(
             selectAll: { [selectionState] in
-                if !allIds.isEmpty {
-                    selectionState.setSelection(for: currentSource, ids: allIds)
-                }
+                guard !allIds.isEmpty else { return }
+                selectionState.setAllSelected(for: currentSource)
             },
             deselectAll: { [selectionState] in
                 selectionState.clear(for: currentSource)
             },
             canSelectAll: { [selectionState] in
-                totalCount > 0 && selectionState.selectionCount(for: currentSource) < totalCount
+                selectionState.logicalSelectedCount(for: currentSource, totalCount: totalCount) < totalCount
             },
             canDeselect: { [selectionState] in
-                selectionState.hasSelection(for: currentSource)
+                selectionState.logicalSelectedCount(for: currentSource, totalCount: totalCount) > 0
             }
         )
     }
@@ -177,15 +176,45 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     private func dataSourceView(for source: ContentSource) -> some View {
         switch source {
         case .appleBooks:
-            AppleBooksListView(viewModel: appleBooksVM, selectionIds: selectionState.selectionBinding(for: .appleBooks))
+            AppleBooksListView(
+                viewModel: appleBooksVM,
+                selectionIds: selectionState.selectionBinding(
+                    for: .appleBooks,
+                    scopeIds: { appleBooksVM.visibleBooks.map { $0.bookId } }
+                )
+            )
         case .goodLinks:
-            GoodLinksListView(viewModel: goodLinksVM, selectionIds: selectionState.selectionBinding(for: .goodLinks))
+            GoodLinksListView(
+                viewModel: goodLinksVM,
+                selectionIds: selectionState.selectionBinding(
+                    for: .goodLinks,
+                    scopeIds: { goodLinksVM.visibleLinks.map { $0.id } }
+                )
+            )
         case .weRead:
-            WeReadListView(viewModel: weReadVM, selectionIds: selectionState.selectionBinding(for: .weRead))
+            WeReadListView(
+                viewModel: weReadVM,
+                selectionIds: selectionState.selectionBinding(
+                    for: .weRead,
+                    scopeIds: { weReadVM.visibleBooks.map { $0.bookId } }
+                )
+            )
         case .dedao:
-            DedaoListView(viewModel: dedaoVM, selectionIds: selectionState.selectionBinding(for: .dedao))
+            DedaoListView(
+                viewModel: dedaoVM,
+                selectionIds: selectionState.selectionBinding(
+                    for: .dedao,
+                    scopeIds: { dedaoVM.visibleBooks.map { $0.bookId } }
+                )
+            )
         case .chats:
-            ChatListView(viewModel: chatsVM, selectionIds: selectionState.selectionBinding(for: .chats))
+            ChatListView(
+                viewModel: chatsVM,
+                selectionIds: selectionState.selectionBinding(
+                    for: .chats,
+                    scopeIds: { chatsVM.contacts.map { $0.id } }
+                )
+            )
         }
     }
     
