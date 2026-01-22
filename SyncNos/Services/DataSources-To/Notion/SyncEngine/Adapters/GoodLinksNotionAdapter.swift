@@ -11,19 +11,19 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     
     private let link: GoodLinksLinkRow
     private let dbPath: String
-    private let contentRow: GoodLinksContentRow?
+    private let articleText: String?
     
     // MARK: - Initialization
     
     init(
         link: GoodLinksLinkRow,
         dbPath: String,
-        contentRow: GoodLinksContentRow? = nil,
+        articleText: String? = nil,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService
     ) {
         self.link = link
         self.dbPath = dbPath
-        self.contentRow = contentRow
+        self.articleText = articleText
         self.databaseService = databaseService
     }
     
@@ -129,7 +129,7 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         ])
         
         // 添加文章内容（如果有）
-        if let contentText = contentRow?.content,
+        if let contentText = articleText,
            !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let paragraphs = helperMethods.buildParagraphBlocks(from: contentText)
             children.append(contentsOf: paragraphs)
@@ -147,17 +147,21 @@ extension GoodLinksNotionAdapter {
     static func create(
         link: GoodLinksLinkRow,
         dbPath: String,
-        databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService
-    ) throws -> GoodLinksNotionAdapter {
-        // 预加载内容
-        let contentRow = try databaseService.fetchContent(dbPath: dbPath, linkId: link.id)
+        databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher
+    ) async throws -> GoodLinksNotionAdapter {
+        let result: ArticleFetchResult?
+        do {
+            result = try await urlFetcher.fetchArticle(url: link.url)
+        } catch URLFetchError.contentNotFound {
+            result = nil
+        }
         
         return GoodLinksNotionAdapter(
             link: link,
             dbPath: dbPath,
-            contentRow: contentRow,
+            articleText: result?.textContent,
             databaseService: databaseService
         )
     }
 }
-
