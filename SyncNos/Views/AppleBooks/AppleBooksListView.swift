@@ -104,7 +104,7 @@ struct AppleBooksListView: View {
                             }
 
                             Button {
-                                NotificationCenter.default.post(name: .syncSelectedToNotionRequested, object: nil)
+                                viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
                             } label: {
                                 Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }

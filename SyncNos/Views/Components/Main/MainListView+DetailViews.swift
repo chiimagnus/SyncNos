@@ -24,10 +24,8 @@ extension MainListView {
     
     @ViewBuilder
     var appleBooksDetailView: some View {
-        let filteredCount = appleBooksVM.displayBooks.count
-        let logicalCount = selectionState.logicalSelectedCount(for: .appleBooks, totalCount: filteredCount)
         let selectedIds = selectionState.selection(for: .appleBooks)
-        if selectedIds.count == 1 && !selectionState.isAllSelected(for: .appleBooks) {
+        if selectedIds.count == 1 {
             let singleBookBinding = Binding<String?>(
                 get: { [selectionState] in selectionState.singleSelectedId(for: .appleBooks) },
                 set: { [selectionState] new in
@@ -44,20 +42,18 @@ extension MainListView {
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
-                count: logicalCount == 0 ? nil : logicalCount,
-                filteredCount: filteredCount,
+                count: selectedIds.isEmpty ? nil : selectedIds.count,
+                filteredCount: appleBooksVM.displayBooks.count,
                 totalCount: appleBooksVM.books.count,
-                onSyncSelected: logicalCount == 0 ? nil : { syncSelectedAppleBooks() }
+                onSyncSelected: selectedIds.isEmpty ? nil : { syncSelectedAppleBooks() }
             )
         }
     }
     
     @ViewBuilder
     var goodLinksDetailView: some View {
-        let filteredCount = goodLinksVM.displayLinks.count
-        let logicalCount = selectionState.logicalSelectedCount(for: .goodLinks, totalCount: filteredCount)
         let selectedIds = selectionState.selection(for: .goodLinks)
-        if selectedIds.count == 1 && !selectionState.isAllSelected(for: .goodLinks) {
+        if selectedIds.count == 1 {
             let singleLinkBinding = Binding<String?>(
                 get: { [selectionState] in selectionState.singleSelectedId(for: .goodLinks) },
                 set: { [selectionState] new in
@@ -74,20 +70,18 @@ extension MainListView {
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
-                count: logicalCount == 0 ? nil : logicalCount,
-                filteredCount: filteredCount,
+                count: selectedIds.isEmpty ? nil : selectedIds.count,
+                filteredCount: goodLinksVM.displayLinks.count,
                 totalCount: goodLinksVM.links.count,
-                onSyncSelected: logicalCount == 0 ? nil : { syncSelectedGoodLinks() }
+                onSyncSelected: selectedIds.isEmpty ? nil : { syncSelectedGoodLinks() }
             )
         }
     }
     
     @ViewBuilder
     var weReadDetailView: some View {
-        let filteredCount = weReadVM.displayBooks.count
-        let logicalCount = selectionState.logicalSelectedCount(for: .weRead, totalCount: filteredCount)
         let selectedIds = selectionState.selection(for: .weRead)
-        if selectedIds.count == 1 && !selectionState.isAllSelected(for: .weRead) {
+        if selectedIds.count == 1 {
             let singleWeReadBinding = Binding<String?>(
                 get: { [selectionState] in selectionState.singleSelectedId(for: .weRead) },
                 set: { [selectionState] new in
@@ -104,20 +98,18 @@ extension MainListView {
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
-                count: logicalCount == 0 ? nil : logicalCount,
-                filteredCount: filteredCount,
+                count: selectedIds.isEmpty ? nil : selectedIds.count,
+                filteredCount: weReadVM.displayBooks.count,
                 totalCount: weReadVM.books.count,
-                onSyncSelected: logicalCount == 0 ? nil : { syncSelectedWeRead() }
+                onSyncSelected: selectedIds.isEmpty ? nil : { syncSelectedWeRead() }
             )
         }
     }
     
     @ViewBuilder
     var dedaoDetailView: some View {
-        let filteredCount = dedaoVM.displayBooks.count
-        let logicalCount = selectionState.logicalSelectedCount(for: .dedao, totalCount: filteredCount)
         let selectedIds = selectionState.selection(for: .dedao)
-        if selectedIds.count == 1 && !selectionState.isAllSelected(for: .dedao) {
+        if selectedIds.count == 1 {
             let singleDedaoBookBinding = Binding<String?>(
                 get: { [selectionState] in selectionState.singleSelectedId(for: .dedao) },
                 set: { [selectionState] new in
@@ -134,20 +126,18 @@ extension MainListView {
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
-                count: logicalCount == 0 ? nil : logicalCount,
-                filteredCount: filteredCount,
+                count: selectedIds.isEmpty ? nil : selectedIds.count,
+                filteredCount: dedaoVM.displayBooks.count,
                 totalCount: dedaoVM.books.count,
-                onSyncSelected: logicalCount == 0 ? nil : { syncSelectedDedao() }
+                onSyncSelected: selectedIds.isEmpty ? nil : { syncSelectedDedao() }
             )
         }
     }
     
     @ViewBuilder
     var chatsDetailView: some View {
-        let filteredCount = chatsVM.contacts.count
-        let logicalCount = selectionState.logicalSelectedCount(for: .chats, totalCount: filteredCount)
         let selectedIds = selectionState.selection(for: .chats)
-        if selectedIds.count == 1 && !selectionState.isAllSelected(for: .chats) {
+        if selectedIds.count == 1 {
             let singleContactBinding = Binding<String?>(
                 get: { [selectionState] in selectionState.singleSelectedId(for: .chats) },
                 set: { [selectionState] new in
@@ -164,10 +154,10 @@ extension MainListView {
         } else {
             SelectionPlaceholderView(
                 source: contentSource,
-                count: logicalCount == 0 ? nil : logicalCount,
-                filteredCount: filteredCount,
-                totalCount: filteredCount,
-                onSyncSelected: logicalCount == 0 ? nil : { syncSelectedChats() }
+                count: selectedIds.isEmpty ? nil : selectedIds.count,
+                filteredCount: chatsVM.contacts.count,
+                totalCount: chatsVM.contacts.count,
+                onSyncSelected: selectedIds.isEmpty ? nil : { syncSelectedChats() }
             )
         }
     }
@@ -176,36 +166,27 @@ extension MainListView {
     
     /// 同步选中的 Apple Books
     func syncSelectedAppleBooks() {
-        let allIds = Set(appleBooksVM.displayBooks.map { $0.bookId })
-        let selectedIds = selectionState.logicalSelectedIds(for: .appleBooks, allIds: allIds)
-        appleBooksVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
+        appleBooksVM.batchSync(bookIds: selectionState.selection(for: .appleBooks), concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     /// 同步选中的 GoodLinks
     func syncSelectedGoodLinks() {
-        let allIds = Set(goodLinksVM.displayLinks.map { $0.id })
-        let selectedIds = selectionState.logicalSelectedIds(for: .goodLinks, allIds: allIds)
-        goodLinksVM.batchSync(linkIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
+        goodLinksVM.batchSync(linkIds: selectionState.selection(for: .goodLinks), concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     /// 同步选中的 WeRead
     func syncSelectedWeRead() {
-        let allIds = Set(weReadVM.displayBooks.map { $0.bookId })
-        let selectedIds = selectionState.logicalSelectedIds(for: .weRead, allIds: allIds)
-        weReadVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
+        weReadVM.batchSync(bookIds: selectionState.selection(for: .weRead), concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     /// 同步选中的 Dedao
     func syncSelectedDedao() {
-        let allIds = Set(dedaoVM.displayBooks.map { $0.bookId })
-        let selectedIds = selectionState.logicalSelectedIds(for: .dedao, allIds: allIds)
-        dedaoVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
+        dedaoVM.batchSync(bookIds: selectionState.selection(for: .dedao), concurrency: NotionSyncConfig.batchConcurrency)
     }
     
     /// 同步选中的 Chats
     func syncSelectedChats() {
-        let allIds = Set(chatsVM.contacts.map { $0.id })
-        let selectedIds = selectionState.logicalSelectedIds(for: .chats, allIds: allIds)
-        chatsVM.batchSync(contactIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
+        chatsVM.batchSync(contactIds: selectionState.selection(for: .chats), concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
+
