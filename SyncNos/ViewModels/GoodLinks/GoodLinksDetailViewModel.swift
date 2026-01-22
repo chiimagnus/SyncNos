@@ -50,7 +50,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     @Published var highlights: [GoodLinksHighlightRow] = []
     
     /// 当前 link 的全文内容
-    @Published var content: GoodLinksContentRow?
+    @Published var article: ArticleFetchResult?
     
     /// 全文内容加载状态（用于按需加载/卸载）
     @Published var contentLoadState: ContentLoadState = .notLoaded
@@ -93,6 +93,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
+    private let urlFetcher: GoodLinksURLFetcherProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     
@@ -102,16 +103,18 @@ final class GoodLinksDetailViewModel: ObservableObject {
     /// 当前高亮加载任务（用于切换 link / Detail 退场时取消）
     private var highlightsFetchTask: Task<[GoodLinksHighlightRow], Error>?
     /// 当前全文加载任务（用于切换 link / Detail 退场时取消）
-    private var contentFetchTask: Task<GoodLinksContentRow?, Error>?
+    private var contentFetchTask: Task<ArticleFetchResult?, Error>?
     
     // MARK: - Initialization
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.service = service
+        self.urlFetcher = urlFetcher
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         
@@ -294,50 +297,63 @@ final class GoodLinksDetailViewModel: ObservableObject {
     private var cachedPreview: (content: String, wordCount: Int)?
     
     /// 加载预览内容（在 Detail 打开时调用）
-    func loadContentPreview(for linkId: String) async {
-        let serviceForTask = service
-        let loggerForTask = logger
+    func loadContentPreview(for link: GoodLinksLinkRow) async {
+        let linkId = link.id
+        
+        // 取消上一次全文加载（预览加载也复用同一个 task，便于统一取消）
+        contentFetchTask?.cancel()
+        contentFetchTask = nil
+        
+        // 初始状态：显示 loading（与 ArticleContentCardView notLoaded 一致）
+        if contentLoadState == .notLoaded {
+            contentLoadState = .notLoaded
+        }
         
         do {
-            let task = Task.detached(priority: .userInitiated) { [previewLength] () throws -> GoodLinksContentRow? in
-                guard !Task.isCancelled else { return nil }
-                loggerForTask.debug("[GoodLinksDetail] 开始加载预览内容，linkId=\(linkId)")
-                let dbPath = serviceForTask.resolveDatabasePath()
-                let row = try serviceForTask.fetchContentPreview(dbPath: dbPath, linkId: linkId, previewLength: previewLength)
-                guard !Task.isCancelled else { return nil }
-                return row
+            let task = Task { [urlFetcher, logger] () async throws -> ArticleFetchResult? in
+                logger.debug("[GoodLinksDetail] 开始从 URL 加载预览内容，linkId=\(linkId), url=\(link.url)")
+                do {
+                    return try await urlFetcher.fetchArticle(url: link.url)
+                } catch URLFetchError.contentNotFound {
+                    return nil
+                }
             }
+            contentFetchTask = task
             
-            let previewRow = try await withTaskCancellationHandler {
+            let result = try await withTaskCancellationHandler {
                 try await task.value
             } onCancel: {
                 task.cancel()
             }
             
-            // 任务取消或 link 已切换：丢弃结果
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             
-            if let row = previewRow, let previewText = row.content, !previewText.isEmpty {
-                cachedPreview = (previewText, row.wordCount)
-                contentLoadState = .preview(previewText, row.wordCount)
-                loggerForTask.debug("[GoodLinksDetail] 加载到预览内容，linkId=\(linkId), wordCount=\(row.wordCount)")
+            if let result, !result.textContent.isEmpty {
+                article = result
+                let text = result.textContent
+                let previewText = text.count > previewLength ? String(text.prefix(previewLength)) + "..." : text
+                cachedPreview = (previewText, result.wordCount)
+                contentLoadState = .preview(previewText, result.wordCount)
+                logger.debug("[GoodLinksDetail] 加载到预览内容，linkId=\(linkId), wordCount=\(result.wordCount)")
             } else {
-                // 无内容
-                contentLoadState = .loaded  // 标记为已加载但无内容
-                loggerForTask.debug("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
+                contentLoadState = .loaded
+                logger.debug("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
+            
+            contentFetchTask = nil
         } catch {
             let desc = error.localizedDescription
-            loggerForTask.error("[GoodLinksDetail] loadContentPreview error: \(desc)")
+            logger.error("[GoodLinksDetail] loadContentPreview error: \(desc)")
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             contentLoadState = .error(desc)
+            contentFetchTask = nil
         }
     }
     
     /// 加载完整全文内容（展开时调用）
-    private func loadFullContent(for linkId: String) async {
-        let serviceForTask = service
-        let loggerForTask = logger
+    private func loadFullContent(for link: GoodLinksLinkRow) async {
+        let linkId = link.id
+        let cachedArticle = article
         
         // 取消上一次全文加载
         contentFetchTask?.cancel()
@@ -347,17 +363,23 @@ final class GoodLinksDetailViewModel: ObservableObject {
         contentLoadState = .loadingFull
         
         do {
-            let task = Task.detached(priority: .userInitiated) { () throws -> GoodLinksContentRow? in
-                guard !Task.isCancelled else { return nil }
-                loggerForTask.info("[GoodLinksDetail] 开始加载完整全文内容，linkId=\(linkId)")
-                let dbPath = serviceForTask.resolveDatabasePath()
-                let row = try serviceForTask.fetchContent(dbPath: dbPath, linkId: linkId)
-                guard !Task.isCancelled else { return nil }
-                return row
+            let task = Task { [cachedArticle, urlFetcher, logger] () async throws -> ArticleFetchResult? in
+                logger.info("[GoodLinksDetail] 开始从 URL 加载完整全文内容，linkId=\(linkId), url=\(link.url)")
+                
+                // 若预览阶段已抓取过 result，优先复用，避免重复请求
+                if let existing = cachedArticle, !existing.textContent.isEmpty {
+                    return existing
+                }
+                
+                do {
+                    return try await urlFetcher.fetchArticle(url: link.url)
+                } catch URLFetchError.contentNotFound {
+                    return nil
+                }
             }
             contentFetchTask = task
             
-            let contentRow = try await withTaskCancellationHandler {
+            let result = try await withTaskCancellationHandler {
                 try await task.value
             } onCancel: {
                 task.cancel()
@@ -366,18 +388,18 @@ final class GoodLinksDetailViewModel: ObservableObject {
             // 任务取消或 link 已切换：丢弃结果
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             
-            content = contentRow
+            article = result
             contentLoadState = .loaded
             
-            if let c = contentRow {
-                loggerForTask.info("[GoodLinksDetail] 加载到完整全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
+            if let c = result {
+                logger.info("[GoodLinksDetail] 加载到完整全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
             } else {
-                loggerForTask.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
+                logger.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
             contentFetchTask = nil
         } catch {
             let desc = error.localizedDescription
-            loggerForTask.error("[GoodLinksDetail] loadFullContent error: \(desc)")
+            logger.error("[GoodLinksDetail] loadFullContent error: \(desc)")
             // 如果已经切换 link 或任务被取消，不提示错误
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             contentLoadState = .error(desc)
@@ -388,16 +410,15 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - 按需加载/卸载全文
     
     /// 按需加载完整全文（仅在展开时调用）
-    func loadContentOnDemand() async {
-        guard let linkId = currentLinkId else { return }
+    func loadContentOnDemand(for link: GoodLinksLinkRow) async {
         // 只有在预览状态或错误状态时才加载完整内容
         switch contentLoadState {
         case .preview, .error:
-            await loadFullContent(for: linkId)
+            await loadFullContent(for: link)
         case .notLoaded:
             // 如果没有预览，先加载预览再加载完整内容
-            await loadContentPreview(for: linkId)
-            await loadFullContent(for: linkId)
+            await loadContentPreview(for: link)
+            await loadFullContent(for: link)
         case .loadingFull, .loaded:
             // 已经在加载或已加载，不重复操作
             break
@@ -408,7 +429,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     func unloadContent() {
         contentFetchTask?.cancel()
         contentFetchTask = nil
-        content = nil  // 释放完整内容的大字符串
+        article = nil  // 释放完整内容的大字符串
         
         // 恢复到预览状态（保留预览内容，不需要重新加载）
         if let cached = cachedPreview {
@@ -428,7 +449,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
         contentFetchTask = nil
         currentLinkId = nil
         highlights.removeAll(keepingCapacity: false)
-        content = nil
+        article = nil
         cachedPreview = nil  // 清除预览缓存
         contentLoadState = .notLoaded
         visibleHighlights.removeAll(keepingCapacity: false)
@@ -533,4 +554,3 @@ final class GoodLinksDetailViewModel: ObservableObject {
         syncTimestampStore.getLastSyncTime(for: linkId)
     }
 }
-
