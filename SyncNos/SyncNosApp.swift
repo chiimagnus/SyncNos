@@ -96,7 +96,8 @@ struct SyncNosApp: App {
         Window("Settings", id: "setting") {
             SettingsView()
         }
-        .windowResizability(.contentSize)
+        .defaultSize(width: 960, height: 640)
+        .windowResizability(.contentMinSize)
         
         // 日志窗口（单实例）
         Window("Logs", id: "log") {
