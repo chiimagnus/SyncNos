@@ -33,4 +33,11 @@ struct DedaoUIProvider: DataSourceUIProvider {
     // MARK: - 高亮颜色
     
     let highlightColorTheme: HighlightColorTheme? = .dedao
+
+    // MARK: - Settings
+
+    @MainActor
+    func makeSettingsView() -> AnyView {
+        AnyView(DedaoSettingsView())
+    }
 }

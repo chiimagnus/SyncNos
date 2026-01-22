@@ -1,268 +1,138 @@
 import SwiftUI
 
 struct SettingsView: View {
+    // MARK: - Navigation
+
+    private enum Pane: Hashable {
+        case general
+        case dataSources
+        case notion
+        case dataSource(ContentSource)
+    }
+
     @StateObject private var loginItemVM = LoginItemViewModel()
     @StateObject private var appIconDisplayVM = AppIconDisplayViewModel()
-    @ObservedObject private var fontScaleManager = FontScaleManager.shared
-    @State private var navigationPath = NavigationPath()
-    
+    @StateObject private var defaultsObserver = UserDefaultsObserver()
+
+    @State private var selection: Pane? = .general
+
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            List {
+        NavigationSplitView {
+            List(selection: $selection) {
                 Section {
-                    LanguageView()
-                    
-                    // 字体大小设置
-                    NavigationLink(destination: TextSizeSettingsView()) {
-                        HStack {
-                            Label("Text Size", systemImage: "textformat.size")
-                                .scaledFont(.body)
-                            Spacer()
-                            Text(FontScaleManager.shared.scaleLevel.shortName)
-                                .scaledFont(.subheadline)
-                                .foregroundColor(.secondary)
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
-                        }
-                    }
-                    .help("Adjust text size throughout the app")
+                    // MARK: - General
+                    sidebarRow(title: "General", systemImage: "gear", tag: .general)
 
-                    Toggle(isOn: Binding(
-                        get: { loginItemVM.isEnabled },
-                        set: { newValue in
-                            // 只在用户手动操作toggle时才调用setEnabled
-                            loginItemVM.setEnabled(newValue)
-                        }
-                    )) {
-                        Label("Launch at Login", systemImage: "arrow.up.right.square")
-                            .scaledFont(.body)
-                    }
-                    .toggleStyle(SwitchToggleStyle())
-                    
-                    // 图标显示模式选择
-                    Picker(selection: $appIconDisplayVM.selectedMode) {
-                        ForEach(AppIconDisplayMode.allCases) { mode in
-                            Text(mode.displayName)
-                                .tag(mode)
-                        }
-                    } label: {
-                        Label("Display SyncNos icon", systemImage: "square.grid.2x2")
-                            .scaledFont(.body)
-                    }
-                    .pickerStyle(.menu)
-
-                    // 添加 AboutView 的 NavigationLink
-                    NavigationLink(destination: AboutView()) {
-                        HStack {
-                            Label("About", systemImage: "info.circle")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
-                        }
-                    }
-                    .help("Show application about information")
-#if DEBUG
-                    // 添加 Apple 账号与登录 的 NavigationLink
-                    NavigationLink(destination: AppleAccountView()) {
-                        HStack {
-                            Label("Apple Account", systemImage: "apple.logo")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
-                        }
-                    }
-                    .help("Manage Apple sign-in and account info")
-#endif
-
-                    NavigationLink(destination: IAPView()) {
-                        HStack {
-                            Label("Support", systemImage: "star")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
-                        }
-                    }
-                    .help("Support development and unlock Pro features")
-                } header: {
-                    Text("General")
-                        .scaledFont(.headline)
-                        .foregroundStyle(.primary)
+                    // MARK: - Data Sources
+                    sidebarRow(title: "Data Sources", systemImage: "square.stack.3d.up", tag: .dataSources)
                 }
                 .collapsible(false)
 
-                Section {
-                    NavigationLink(value: "notion") {
-                        HStack {
-                            Label("Notion", systemImage: "n.square")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.body)
+                // MARK: - Data Source Settings
+                if hasAnyEnabledDataSource {
+                    Section {
+                        ForEach(enabledProviders, id: \.source) { provider in
+                            sidebarRow(
+                                title: provider.displayName,
+                                systemImage: provider.iconName,
+                                tag: .dataSource(provider.source)
+                            )
                         }
                     }
-                    .help("Configure Notion and run example API calls")
-                } header: {
-                    Text("Sync Data To")
-                        .scaledFont(.headline)
-                        .foregroundStyle(.primary)
+                    .collapsible(false)
                 }
-                .collapsible(false)
 
+                // MARK: - Sync Data To
                 Section {
-                    // Per-source auto sync toggles and navigation
-                    NavigationLink(destination: AppleBooksSettingsView()) {
-                        HStack {
-                            Label("Apple Books", systemImage: "book")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-
-                    NavigationLink(destination: GoodLinksSettingsView()) {
-                        HStack {
-                            Label("GoodLinks", systemImage: "bookmark")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-
-                    NavigationLink(destination: WeReadSettingsView()) {
-                        HStack {
-                            Label("WeRead", systemImage: "w.square")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-
-                    NavigationLink(destination: DedaoSettingsView()) {
-                        HStack {
-                            Label("Dedao", systemImage: "d.square")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-                    
-                    NavigationLink(destination: OCRSettingsView()) {
-                        HStack {
-                            Label("Chats", systemImage: "message")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-                    
-
-#if DEBUG
-                    NavigationLink(destination: EmptyView()) {
-                        HStack {
-                            Label("Get", systemImage: "")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-
-                    NavigationLink(destination: EmptyView()) {
-                        HStack {
-                            Label("Logseq", systemImage: "")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-                    
-                    NavigationLink(destination: EmptyView()) {
-                        HStack {
-                            Label("Obsidian", systemImage: "")
-                                .scaledFont(.body)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .scaledFont(.caption)
-                        }
-                    }
-#endif
-                } header: {
-                    Text("Get Data From")
-                        .scaledFont(.headline)
-                        .foregroundStyle(.primary)
+                    sidebarRow(title: "Notion", systemImage: "n.square", tag: .notion)
                 }
                 .collapsible(false)
             }
-            .listStyle(SidebarListStyle())
+            .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .background(VisualEffectBackground(material: .windowBackground))
-            .navigationDestination(for: String.self) { destination in
-                switch destination {
-                case "notion":
-                    NotionIntegrationView()
-                case "weread":
-                    WeReadSettingsView()
-                case "dedao":
-                    DedaoSettingsView()
-                default:
-                    EmptyView()
-                }
+        }
+        detail: {
+            NavigationStack {
+                detailView(for: selection ?? .general)
             }
         }
-        .navigationTitle("Settings")
-        .toolbar {
-            ToolbarItem {
-                Text("")
-            }
-        }
-        .frame(width: 425)
+        .frame(minWidth: 600, minHeight: 560)
         .onAppear {
             // 视图出现时刷新状态，监听系统设置中的变化
             loginItemVM.refreshStatus()
+            normalizeSelectionIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToNotionSettings)) { _ in
-            navigationPath.append("notion")
+        .onChange(of: defaultsObserver.changeCounter) { _, _ in
+            normalizeSelectionIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadLogin)) { _ in
-            // 先导航到 WeReadSettingsView，然后它会自动打开登录 Sheet
-            navigationPath.append("weread")
-            // 延迟发送通知，等待 WeReadSettingsView 加载完成
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToNotionSettings).receive(on: DispatchQueue.main)) { _ in
+            selection = .notion
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadLogin).receive(on: DispatchQueue.main)) { _ in
+            selection = .dataSource(.weRead)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NotificationCenter.default.post(name: .weReadSettingsShowLoginSheet, object: nil)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin)) { _ in
-            // 先导航到 DedaoSettingsView，然后它会自动打开登录 Sheet
-            navigationPath.append("dedao")
-            // 延迟发送通知，等待 DedaoSettingsView 加载完成
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin).receive(on: DispatchQueue.main)) { _ in
+            selection = .dataSource(.dedao)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NotificationCenter.default.post(name: .dedaoSettingsShowLoginSheet, object: nil)
             }
         }
         // 应用字体缩放到整个视图层级
         .applyFontScale()
+    }
+
+    // MARK: - Sidebar
+
+    private var hasAnyEnabledDataSource: Bool {
+        !enabledProviders.isEmpty
+    }
+
+    private var enabledProviders: [any DataSourceUIProvider] {
+        DataSourceRegistry.shared.allProviders.filter { isSourceEnabled($0) }
+    }
+
+    @ViewBuilder
+    private func sidebarRow(title: String, systemImage: String, tag: Pane) -> some View {
+        Label(title, systemImage: systemImage)
+            .scaledFont(.body)
+            .tag(tag)
+    }
+
+    // MARK: - Detail
+
+    @ViewBuilder
+    private func detailView(for pane: Pane) -> some View {
+        switch pane {
+        case .general:
+            GeneralSettingsPane(loginItemVM: loginItemVM, appIconDisplayVM: appIconDisplayVM)
+        case .dataSources:
+            DataSourcesOverviewView(defaultsObserver: defaultsObserver)
+        case .notion:
+            NotionIntegrationView()
+        case .dataSource(let source):
+            DataSourceRegistry.shared.provider(for: source).makeSettingsView()
+        }
+    }
+
+    // MARK: - Selection Normalization
+
+    private func normalizeSelectionIfNeeded() {
+        guard let selection else { return }
+        switch selection {
+        case .dataSource(let source) where !isSourceEnabled(DataSourceRegistry.shared.provider(for: source)):
+            self.selection = .dataSources
+        default:
+            break
+        }
+    }
+
+    // MARK: - Enabled State
+
+    private func isSourceEnabled(_ provider: any DataSourceUIProvider) -> Bool {
+        (UserDefaults.standard.object(forKey: provider.enabledStorageKey) as? Bool) ?? provider.defaultEnabled
     }
 }
 
