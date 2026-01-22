@@ -104,6 +104,7 @@ final class GoodLinksViewModel: ObservableObject {
                 guard let info = notification.userInfo as? [String: Any],
                       let bookId = info["bookId"] as? String,
                       let status = info["status"] as? String else { return }
+                if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.goodLinks.rawValue { return }
                 switch status {
                 case "started":
                     self.syncingLinkIds.insert(bookId)
@@ -111,6 +112,8 @@ final class GoodLinksViewModel: ObservableObject {
                     self.syncingLinkIds.remove(bookId)
                     self.syncedLinkIds.insert(bookId)
                 case "failed":
+                    self.syncingLinkIds.remove(bookId)
+                case "cancelled":
                     self.syncingLinkIds.remove(bookId)
                 default:
                     break
@@ -368,6 +371,7 @@ extension GoodLinksViewModel {
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
         let goodLinksService = self.service
+        let runningTaskStore = DIContainer.shared.syncRunningTaskStore
         
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -375,37 +379,96 @@ extension GoodLinksViewModel {
                     guard let link = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
-                        await limiter.withPermit {
-                            // 发送开始通知
-                            await MainActor.run {
-                                NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
-                            }
+                        
+                        let taskId = "\(ContentSource.goodLinks.rawValue):\(id)"
+                        let task = Task { [weak self] in
+                            guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .goodLinks, rawId: id) else { return }
+                            
                             do {
-                                // 创建适配器并使用统一同步引擎
-                                let adapter = try GoodLinksNotionAdapter.create(
-                                    link: link,
-                                    dbPath: dbPath,
-                                    databaseService: goodLinksService
-                                )
-                                try await syncEngine.syncSmart(source: adapter) { progress in
-                                    Task { @MainActor in
-                                        NotificationCenter.default.post(name: .syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                try await limiter.withPermit {
+                                    await MainActor.run {
+                                        NotificationCenter.default.post(
+                                            name: .syncBookStatusChanged,
+                                            object: self,
+                                            userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "started"]
+                                        )
+                                    }
+                                    
+                                    do {
+                                        // 创建适配器并使用统一同步引擎
+                                        let adapter = try GoodLinksNotionAdapter.create(
+                                            link: link,
+                                            dbPath: dbPath,
+                                            databaseService: goodLinksService
+                                        )
+                                        try await syncEngine.syncSmart(source: adapter) { progress in
+                                            Task { @MainActor in
+                                                NotificationCenter.default.post(
+                                                    name: .syncProgressUpdated,
+                                                    object: self,
+                                                    userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "progress": progress]
+                                                )
+                                            }
+                                        }
+                                        await MainActor.run {
+                                            _ = self.syncingLinkIds.remove(id)
+                                            _ = self.syncedLinkIds.insert(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "succeeded"]
+                                            )
+                                        }
+                                    } catch is CancellationError {
+                                        await MainActor.run {
+                                            _ = self.syncingLinkIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
+                                            )
+                                        }
+                                    } catch {
+                                        let errorInfo = SyncErrorInfo.from(error)
+                                        await MainActor.run {
+                                            self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                            _ = self.syncingLinkIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                            )
+                                        }
                                     }
                                 }
+                            } catch is CancellationError {
                                 await MainActor.run {
                                     _ = self.syncingLinkIds.remove(id)
-                                    _ = self.syncedLinkIds.insert(id)
-                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
+                                    )
                                 }
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[GoodLinks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[GoodLinks] batchSync limiter error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingLinkIds.remove(id)
-                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo])
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                    )
                                 }
                             }
                         }
+                        
+                        await runningTaskStore.register(taskId: taskId, task: task)
+                        await task.value
+                        await runningTaskStore.unregister(taskId: taskId)
                     }
                 }
                 await group.waitForAll()

@@ -797,6 +797,7 @@ final class ChatViewModel: ObservableObject {
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
         let cacheService = self.cacheService
+        let runningTaskStore = DIContainer.shared.syncRunningTaskStore
         
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -804,50 +805,96 @@ final class ChatViewModel: ObservableObject {
                     guard let contact = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
-                        await limiter.withPermit {
-                            // 发送开始通知
-                            await MainActor.run {
-                                NotificationCenter.default.post(
-                                    name: .syncBookStatusChanged,
-                                    object: self,
-                                    userInfo: ["bookId": id, "status": "started"]
-                                )
-                            }
+                        
+                        let taskId = "\(ContentSource.chats.rawValue):\(id)"
+                        let task = Task { [weak self] in
+                            guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .chats, rawId: id) else { return }
+                            
                             do {
-                                let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
-                                try await syncEngine.syncSmart(source: adapter) { progressText in
-                                    Task { @MainActor in
-                                        self.syncProgress[id] = progressText
+                                try await limiter.withPermit {
+                                    // 发送开始通知
+                                    await MainActor.run {
                                         NotificationCenter.default.post(
-                                            name: .syncProgressUpdated,
+                                            name: .syncBookStatusChanged,
                                             object: self,
-                                            userInfo: ["bookId": id, "progress": progressText]
+                                            userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "started"]
                                         )
                                     }
+                                    do {
+                                        let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
+                                        try await syncEngine.syncSmart(source: adapter) { progressText in
+                                            Task { @MainActor in
+                                                self.syncProgress[id] = progressText
+                                                NotificationCenter.default.post(
+                                                    name: .syncProgressUpdated,
+                                                    object: self,
+                                                    userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "progress": progressText]
+                                                )
+                                            }
+                                        }
+                                        await MainActor.run {
+                                            _ = self.syncingContactIds.remove(id)
+                                            self.syncProgress.removeValue(forKey: id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "succeeded"]
+                                            )
+                                        }
+                                    } catch is CancellationError {
+                                        await MainActor.run {
+                                            _ = self.syncingContactIds.remove(id)
+                                            self.syncProgress.removeValue(forKey: id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "cancelled"]
+                                            )
+                                        }
+                                    } catch {
+                                        let errorInfo = SyncErrorInfo.from(error)
+                                        await MainActor.run {
+                                            self.logger.error("[ChatsSync] batchSync error for id=\(id): \(error.localizedDescription)")
+                                            _ = self.syncingContactIds.remove(id)
+                                            self.syncProgress.removeValue(forKey: id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                            )
+                                        }
+                                    }
                                 }
+                            } catch is CancellationError {
                                 await MainActor.run {
                                     _ = self.syncingContactIds.remove(id)
                                     self.syncProgress.removeValue(forKey: id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "succeeded"]
+                                        userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "cancelled"]
                                     )
                                 }
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[ChatsSync] batchSync error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[ChatsSync] batchSync limiter error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingContactIds.remove(id)
                                     self.syncProgress.removeValue(forKey: id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                        userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "failed", "errorInfo": errorInfo]
                                     )
                                 }
                             }
                         }
+                        
+                        await runningTaskStore.register(taskId: taskId, task: task)
+                        await task.value
+                        await runningTaskStore.unregister(taskId: taskId)
                     }
                 }
                 await group.waitForAll()

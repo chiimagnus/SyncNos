@@ -19,6 +19,7 @@ class DIContainer {
     private var _authService: AuthServiceProtocol?
     private var _syncActivityMonitor: SyncActivityMonitorProtocol?
     private var _syncQueueStore: SyncQueueStoreProtocol?
+    private var _syncRunningTaskStore: SyncRunningTaskStore?
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
@@ -125,6 +126,13 @@ class DIContainer {
             _syncQueueStore = SyncQueueStore()
         }
         return _syncQueueStore!
+    }
+
+    var syncRunningTaskStore: SyncRunningTaskStore {
+        if _syncRunningTaskStore == nil {
+            _syncRunningTaskStore = SyncRunningTaskStore()
+        }
+        return _syncRunningTaskStore!
     }
 
     // 全局并发限制器：统一限制所有 Notion 同步的并发度（AppleBooks/GoodLinks/AutoSync 合计）
@@ -336,6 +344,10 @@ class DIContainer {
 
     func register(syncQueueStore: SyncQueueStoreProtocol) {
         self._syncQueueStore = syncQueueStore
+    }
+
+    func register(syncRunningTaskStore: SyncRunningTaskStore) {
+        self._syncRunningTaskStore = syncRunningTaskStore
     }
 
     func register(syncConcurrencyLimiter: ConcurrencyLimiter) {
