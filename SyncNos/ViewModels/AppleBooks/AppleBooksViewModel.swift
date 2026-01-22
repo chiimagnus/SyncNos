@@ -239,6 +239,7 @@ final class AppleBooksViewModel: ObservableObject {
                 guard let info = notification.userInfo as? [String: Any],
                       let bookId = info["bookId"] as? String,
                       let status = info["status"] as? String else { return }
+                if let sourceRaw = info["source"] as? String, sourceRaw != ContentSource.appleBooks.rawValue { return }
                 switch status {
                 case "started":
                     self.syncingBookIds.insert(bookId)
@@ -246,6 +247,8 @@ final class AppleBooksViewModel: ObservableObject {
                     self.syncingBookIds.remove(bookId)
                     self.syncedBookIds.insert(bookId)
                 case "failed":
+                    self.syncingBookIds.remove(bookId)
+                case "cancelled":
                     self.syncingBookIds.remove(bookId)
                 default:
                     break
@@ -448,6 +451,7 @@ extension AppleBooksViewModel {
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
         let notionConfig = self.notionConfig
+        let runningTaskStore = DIContainer.shared.syncRunningTaskStore
 
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -455,37 +459,92 @@ extension AppleBooksViewModel {
                     guard let book = itemsById[id] else { continue }
                     group.addTask { [weak self] in
                         guard let self else { return }
-                        await limiter.withPermit {
-                            // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
-                            await MainActor.run {
-                                NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "started"])
-                            }
+                        
+                        let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
+                        let task = Task { [weak self] in
+                            guard let self else { return }
+                            let syncQueueStore = DIContainer.shared.syncQueueStore
+                            guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
+                            
                             do {
-                                let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
-                                try await syncEngine.syncSmart(source: adapter) { progress in
-                                    // 广播该书的同步进度，供详情页监听并显示
-                                    Task { @MainActor in
-                                        NotificationCenter.default.post(name: .syncProgressUpdated, object: self, userInfo: ["bookId": id, "progress": progress])
+                                try await limiter.withPermit {
+                                    // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
+                                    await MainActor.run {
+                                        NotificationCenter.default.post(
+                                            name: .syncBookStatusChanged,
+                                            object: self,
+                                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
+                                        )
+                                    }
+                                    do {
+                                        let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
+                                        try await syncEngine.syncSmart(source: adapter) { progress in
+                                            // 广播该书的同步进度，供详情页监听并显示
+                                            Task { @MainActor in
+                                                NotificationCenter.default.post(
+                                                    name: .syncProgressUpdated,
+                                                    object: self,
+                                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progress]
+                                                )
+                                            }
+                                        }
+                                        await MainActor.run {
+                                            self.syncingBookIds.remove(id)
+                                            self.syncedBookIds.insert(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
+                                            )
+                                        }
+                                    } catch is CancellationError {
+                                        await MainActor.run {
+                                            self.syncingBookIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                                            )
+                                        }
+                                    } catch {
+                                        let errorInfo = SyncErrorInfo.from(error)
+                                        await MainActor.run {
+                                            self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
+                                            self.syncingBookIds.remove(id)
+                                            NotificationCenter.default.post(
+                                                name: .syncBookStatusChanged,
+                                                object: self,
+                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                            )
+                                        }
                                     }
                                 }
+                            } catch is CancellationError {
                                 await MainActor.run {
-                                    self.syncingBookIds.remove(id)
-                                    self.syncedBookIds.insert(id)
-                                    NotificationCenter.default.post(name: .syncBookStatusChanged, object: self, userInfo: ["bookId": id, "status": "succeeded"])
-                                }
-                            } catch {
-                                let errorInfo = SyncErrorInfo.from(error)
-                                await MainActor.run {
-                                    self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
                                         object: self,
-                                        userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                                    )
+                                }
+                            } catch {
+                                let errorInfo = SyncErrorInfo.from(error)
+                                await MainActor.run {
+                                    self.logger.error("[AppleBooks] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                                    self.syncingBookIds.remove(id)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
                                     )
                                 }
                             }
                         }
+                        
+                        await runningTaskStore.register(taskId: taskId, task: task)
+                        await task.value
+                        await runningTaskStore.unregister(taskId: taskId)
                     }
                 }
                 await group.waitForAll()

@@ -130,16 +130,28 @@ struct SyncTaskRowView: View {
     // MARK: - Running Row
     
     private var runningRow: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                statusIndicator
+        HStack(spacing: 12) {
+            statusIndicator
+            
+            Button(action: onSelect) {
                 taskInfo(showProgress: true)
-                Spacer()
-                ProgressView()
-                    .controlSize(.small)
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            ProgressView()
+                .controlSize(.small)
+            
+            if let onCancel {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Cancel this task"))
             }
         }
-        .buttonStyle(.plain)
     }
     
     // MARK: - Queued Row
@@ -408,7 +420,16 @@ struct SyncQueueView: View {
                     variant: variant,
                     expandedErrorTaskId: $expandedErrorTaskId,
                     onSelect: { selectTask(task) },
-                    onCancel: variant == .queued ? { viewModel.cancelTask(task) } : nil
+                    onCancel: {
+                        switch variant {
+                        case .running:
+                            viewModel.cancelRunningTask(task)
+                        case .queued:
+                            viewModel.cancelTask(task)
+                        case .failed:
+                            break
+                        }
+                    }
                 )
                 .padding(.horizontal, 12)
             }

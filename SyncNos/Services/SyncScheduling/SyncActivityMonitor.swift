@@ -19,7 +19,7 @@ final class SyncActivityMonitor: SyncActivityMonitorProtocol {
                 switch status {
                 case "started":
                     self.addActive(id: bookId)
-                case "succeeded", "failed":
+                case "succeeded", "failed", "cancelled", "skipped":
                     self.removeActive(id: bookId)
                 default:
                     break
