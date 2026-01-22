@@ -10,22 +10,7 @@ struct OCRSettingsView: View {
     @State private var showingDebugSheet = false
     
     var body: some View {
-        List {
-            // MARK: - 数据源开关
-            Section {
-                Toggle(isOn: $chatsSourceEnabled) {
-                    Text("Enable Chats source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show Chats in the main list")
-            } header: {
-                Text("Data Source")
-                    .scaledFont(.headline)
-                    .foregroundStyle(.primary)
-            }
-            
+        List {            
             // MARK: - Sync Settings
             Section {
                 Toggle(isOn: $autoSyncEnabled) {
@@ -38,7 +23,6 @@ struct OCRSettingsView: View {
             } header: {
                 Text("Sync Settings")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
             
             // MARK: - OCR 设置
@@ -88,7 +72,6 @@ struct OCRSettingsView: View {
             } header: {
                 Text("Apple OCR")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
         }
         .listStyle(.sidebar)
