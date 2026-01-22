@@ -299,6 +299,7 @@ struct DedaoDetailView: View {
         guard let userInfo = notification.userInfo as? [String: Any],
               let bookId = userInfo["bookId"] as? String,
               bookId == (selectedBookId ?? "") else { return }
+        if let sourceRaw = userInfo["source"] as? String, sourceRaw != ContentSource.dedao.rawValue { return }
         externalIsSyncing = true
         externalSyncProgress = userInfo["progress"] as? String
     }
@@ -308,6 +309,7 @@ struct DedaoDetailView: View {
               let bookId = userInfo["bookId"] as? String,
               let status = userInfo["status"] as? String,
               bookId == (selectedBookId ?? "") else { return }
+        if let sourceRaw = userInfo["source"] as? String, sourceRaw != ContentSource.dedao.rawValue { return }
         switch status {
         case "started":
             externalIsSyncing = true

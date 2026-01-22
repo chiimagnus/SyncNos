@@ -153,7 +153,7 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             NotificationCenter.default.post(
                 name: .syncBookStatusChanged,
                 object: nil,
-                userInfo: ["bookId": id, "status": "skipped"]
+                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "skipped"]
             )
         }
         if eligibleIds.isEmpty {
@@ -207,29 +207,67 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                 group.addTask {
                     // 与手动批量共享全局并发限制器，确保全局并发不超过 NotionSyncConfig.batchConcurrency
                     let limiter = DIContainer.shared.syncConcurrencyLimiter
-                    await limiter.withPermit {
-                        NotificationCenter.default.post(
-                            name: .syncBookStarted,
-                            object: id
-                        )
-                        NotificationCenter.default.post(
-                            name: .syncBookStatusChanged,
-                            object: nil,
-                            userInfo: ["bookId": id, "status": "started"]
-                        )
+                    let runningTaskStore = DIContainer.shared.syncRunningTaskStore
+                    let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
+                    
+                    let task = Task { [logger] in
+                        let syncQueueStore = DIContainer.shared.syncQueueStore
+                        guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
                         do {
-                            let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
-                            try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                            try await limiter.withPermit {
                                 NotificationCenter.default.post(
-                                    name: .syncProgressUpdated,
+                                    name: .syncBookStarted,
+                                    object: id
+                                )
+                                NotificationCenter.default.post(
+                                    name: .syncBookStatusChanged,
                                     object: nil,
-                                    userInfo: ["bookId": id, "progress": progressMessage]
+                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
+                                )
+                                do {
+                                    let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
+                                    try await syncEngine.syncSmart(source: adapter) { progressMessage in
+                                        NotificationCenter.default.post(
+                                            name: .syncProgressUpdated,
+                                            object: nil,
+                                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progressMessage]
+                                        )
+                                    }
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
+                                    )
+                                } catch is CancellationError {
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                                    )
+                                } catch {
+                                    let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
+                                    logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
+                                    let errorInfo = SyncErrorInfo.from(error)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: nil,
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                                    )
+                                }
+                                NotificationCenter.default.post(
+                                    name: .syncBookFinished,
+                                    object: id
                                 )
                             }
+                        } catch is CancellationError {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "succeeded"]
+                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                            )
+                            NotificationCenter.default.post(
+                                name: .syncBookFinished,
+                                object: id
                             )
                         } catch {
                             let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
@@ -238,14 +276,18 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
-                                userInfo: ["bookId": id, "status": "failed", "errorInfo": errorInfo]
+                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                            )
+                            NotificationCenter.default.post(
+                                name: .syncBookFinished,
+                                object: id
                             )
                         }
-                        NotificationCenter.default.post(
-                            name: .syncBookFinished,
-                            object: id
-                        )
                     }
+                    
+                    await runningTaskStore.register(taskId: taskId, task: task)
+                    await task.value
+                    await runningTaskStore.unregister(taskId: taskId)
                 }
             }
 

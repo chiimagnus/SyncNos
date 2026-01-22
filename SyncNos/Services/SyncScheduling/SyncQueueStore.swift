@@ -153,8 +153,8 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             // 发送取消通知，以便 SyncActivityMonitor 等组件感知
             notificationCenter.post(
                 name: .syncBookStatusChanged,
-                object: nil,
-                userInfo: ["bookId": rawId, "status": "cancelled"]
+                object: self,
+                userInfo: ["bookId": rawId, "source": source.rawValue, "status": "cancelled"]
             )
         }
         
@@ -167,7 +167,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     @discardableResult
     func cancelAllQueued(source: ContentSource? = nil) -> Int {
         var cancelledCount = 0
-        var cancelledRawIds: [String] = []
+        var cancelledItems: [(rawId: String, source: ContentSource)] = []
         
         stateQueue.sync {
             for key in enqueuedOrder {
@@ -181,7 +181,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                     task.state = .cancelled
                     tasksById[key] = task
                     cancelledCount += 1
-                    cancelledRawIds.append(task.rawId)
+                    cancelledItems.append((rawId: task.rawId, source: task.source))
                 }
             }
         }
@@ -189,11 +189,11 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         if cancelledCount > 0 {
             publish()
             // 批量发送取消通知
-            for rawId in cancelledRawIds {
+            for item in cancelledItems {
                 notificationCenter.post(
                     name: .syncBookStatusChanged,
-                    object: nil,
-                    userInfo: ["bookId": rawId, "status": "cancelled"]
+                    object: self,
+                    userInfo: ["bookId": item.rawId, "source": item.source.rawValue, "status": "cancelled"]
                 )
             }
         }
@@ -223,6 +223,8 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         guard let rawId = info["bookId"] as? String,
               let status = info["status"] as? String else { return }
         
+        let sourceRaw = info["source"] as? String
+        
         // 提取错误信息（如果有）
         let errorInfo = info["errorInfo"] as? SyncErrorInfo
 
@@ -233,16 +235,21 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
             
             for key in enqueuedOrder {
                 guard var t = tasksById[key], t.rawId == rawId else { continue }
+                if let sourceRaw, t.source.rawValue != sourceRaw { continue }
                 matchedCount += 1
                 switch status {
                 case "started":
                     t.state = .running
+                    if t.progressText == nil || t.progressText?.isEmpty == true {
+                        t.progressText = NSLocalizedString("Preparing...", comment: "")
+                    }
                     // 清除之前可能残留的错误信息
                     t.errorType = nil
                     t.errorMessage = nil
                     t.errorDetails = nil
                 case "succeeded":
                     t.state = .succeeded
+                    t.progressText = nil
                     // 成功时清除冷却记录（如果有）
                     failedTaskTimestamps.removeValue(forKey: key)
                     // 清除错误信息
@@ -251,6 +258,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                     t.errorDetails = nil
                 case "failed":
                     t.state = .failed
+                    t.progressText = nil
                     // 记录失败时间，启动冷却机制
                     failedTaskTimestamps[key] = now
                     // 记录错误信息
@@ -261,6 +269,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                     }
                 case "cancelled":
                     t.state = .cancelled
+                    t.progressText = nil
                 default: break
                 }
                 tasksById[key] = t
@@ -279,7 +288,8 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
         
         // 调试日志：如果没有匹配到任何任务，记录警告
         if matchedCount == 0 {
-            print("[SyncQueueStore] WARNING: No task matched for rawId=\(rawId), status=\(status)")
+            let sourceRaw = info["source"] as? String ?? "unknown"
+            print("[SyncQueueStore] WARNING: No task matched for source=\(sourceRaw), rawId=\(rawId), status=\(status)")
         }
         
         if changed { publish() }
@@ -288,11 +298,14 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     private func handleProgress(info: [String: Any]) {
         guard let rawId = info["bookId"] as? String,
               let progress = info["progress"] as? String else { return }
+        
+        let sourceRaw = info["source"] as? String
 
         var changed = false
         stateQueue.sync {
             for key in enqueuedOrder {
                 guard var t = tasksById[key], t.rawId == rawId else { continue }
+                if let sourceRaw, t.source.rawValue != sourceRaw { continue }
                 t.progressText = progress
                 tasksById[key] = t
                 changed = true
