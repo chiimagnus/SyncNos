@@ -1,8 +1,17 @@
 import SwiftUI
 
 struct GoodLinksSettingsView: View {
-    @StateObject private var viewModel = GoodLinksSettingsViewModel()
+    @StateObject private var viewModel: GoodLinksSettingsViewModel
     @State private var isPickingGoodLinks: Bool = false
+
+    @MainActor
+    init(viewModel: GoodLinksSettingsViewModel? = nil) {
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: GoodLinksSettingsViewModel())
+        }
+    }
 
     var body: some View {
         List {

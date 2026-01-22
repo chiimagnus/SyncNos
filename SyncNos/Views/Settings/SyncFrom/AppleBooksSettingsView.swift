@@ -1,8 +1,17 @@
 import SwiftUI
 
 struct AppleBooksSettingsView: View {
-    @StateObject private var viewModel = AppleBooksSettingsViewModel()
+    @StateObject private var viewModel: AppleBooksSettingsViewModel
     @State private var isPickingBooks: Bool = false
+
+    @MainActor
+    init(viewModel: AppleBooksSettingsViewModel? = nil) {
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: AppleBooksSettingsViewModel())
+        }
+    }
 
     var body: some View {
         List {

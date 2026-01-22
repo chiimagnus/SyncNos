@@ -3,10 +3,13 @@ import SwiftUI
 struct DedaoSettingsView: View {
     @StateObject private var viewModel: DedaoSettingsViewModel
     
-    init() {
-        _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(
-            authService: DIContainer.shared.dedaoAuthService
-        ))
+    @MainActor
+    init(viewModel: DedaoSettingsViewModel? = nil) {
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(authService: DIContainer.shared.dedaoAuthService))
+        }
     }
 
     var body: some View {
@@ -124,4 +127,3 @@ struct DedaoSettingsView_Previews: PreviewProvider {
         DedaoSettingsView()
     }
 }
-
