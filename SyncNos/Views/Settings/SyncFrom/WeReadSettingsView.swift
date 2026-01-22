@@ -14,24 +14,6 @@ struct WeReadSettingsView: View {
 
     var body: some View {
         List {
-            // MARK: - Data Source
-            Section {
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable WeRead source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show WeRead in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
-                }
-            } header: {
-                Text("Data Source")
-                    .scaledFont(.headline)
-                    .foregroundStyle(.primary)
-            }
-            
             // MARK: - Account
             Section {
                 LabeledContent {
@@ -62,7 +44,6 @@ struct WeReadSettingsView: View {
             } header: {
                 Text("Account")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
             
             // MARK: - Sync Settings
@@ -91,7 +72,6 @@ struct WeReadSettingsView: View {
             } header: {
                 Text("Sync Settings")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
 
         }
