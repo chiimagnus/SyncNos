@@ -33,4 +33,11 @@ struct GoodLinksUIProvider: DataSourceUIProvider {
     // MARK: - 高亮颜色
     
     let highlightColorTheme: HighlightColorTheme? = .goodLinks
+
+    // MARK: - Settings
+
+    @MainActor
+    func makeSettingsView() -> AnyView {
+        AnyView(GoodLinksSettingsView())
+    }
 }

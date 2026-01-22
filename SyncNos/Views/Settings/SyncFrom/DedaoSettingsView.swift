@@ -3,32 +3,17 @@ import SwiftUI
 struct DedaoSettingsView: View {
     @StateObject private var viewModel: DedaoSettingsViewModel
     
-    init() {
-        _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(
-            authService: DIContainer.shared.dedaoAuthService
-        ))
+    @MainActor
+    init(viewModel: DedaoSettingsViewModel? = nil) {
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(authService: DIContainer.shared.dedaoAuthService))
+        }
     }
 
     var body: some View {
         List {
-            // MARK: - Data Source
-            Section {
-                Toggle(isOn: $viewModel.isSourceEnabled) {
-                    Text("Enable Dedao source")
-                        .scaledFont(.body)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .help("Show Dedao in the main list and commands")
-                .onChange(of: viewModel.isSourceEnabled) { _, _ in
-                    viewModel.save()
-                }
-            } header: {
-                Text("Data Source")
-                    .scaledFont(.headline)
-                    .foregroundStyle(.primary)
-            }
-            
             // MARK: - Account
             Section {
                 LabeledContent {
@@ -59,7 +44,6 @@ struct DedaoSettingsView: View {
             } header: {
                 Text("Account")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
             
             // MARK: - Sync Settings
@@ -88,7 +72,6 @@ struct DedaoSettingsView: View {
             } header: {
                 Text("Sync Settings")
                     .scaledFont(.headline)
-                    .foregroundStyle(.primary)
             }
 
         }
@@ -124,4 +107,3 @@ struct DedaoSettingsView_Previews: PreviewProvider {
         DedaoSettingsView()
     }
 }
-

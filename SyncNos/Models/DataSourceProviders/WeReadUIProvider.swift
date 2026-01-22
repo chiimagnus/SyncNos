@@ -33,4 +33,11 @@ struct WeReadUIProvider: DataSourceUIProvider {
     // MARK: - 高亮颜色
     
     let highlightColorTheme: HighlightColorTheme? = .weRead
+
+    // MARK: - Settings
+
+    @MainActor
+    func makeSettingsView() -> AnyView {
+        AnyView(WeReadSettingsView())
+    }
 }
