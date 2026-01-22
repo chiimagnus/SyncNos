@@ -8,24 +8,14 @@ struct DataSourcesOverviewView: View {
     var body: some View {
         List {
             // MARK: - Data Sources
-            Section {
-                ForEach(DataSourceRegistry.shared.allProviders, id: \.source) { provider in
-                    Toggle(isOn: enabledBinding(for: provider)) {
-                        Label(provider.displayName, systemImage: provider.iconName)
-                            .scaledFont(.body)
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .help("Show \(provider.displayName) in the main list and Settings sidebar")
+            ForEach(DataSourceRegistry.shared.allProviders, id: \.source) { provider in
+                Toggle(isOn: enabledBinding(for: provider)) {
+                    Label(provider.displayName, systemImage: provider.iconName)
+                        .scaledFont(.body)
                 }
-            } header: {
-                Text("Data Sources")
-                    .scaledFont(.headline)
-                    .foregroundStyle(.primary)
-            } footer: {
-                Text("Enabled data sources will appear in the Settings sidebar.")
-                    .scaledFont(.footnote)
-                    .foregroundStyle(.secondary)
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show \(provider.displayName) in the main list and Settings sidebar")
             }
         }
         .listStyle(SidebarListStyle())
