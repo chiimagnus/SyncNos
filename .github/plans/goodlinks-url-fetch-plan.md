@@ -7,10 +7,10 @@
 2. 数据库中存储的内容可能是经过处理的（HTML、Markdown 等）
 3. 无法获取最新的文章内容（需要 GoodLinks app 先抓取）
 
-**解决方案**：实现 URL 文章直接抓取功能，类似于 WeRead/Dedao 的登录机制，支持：
+**解决方案**：完全放弃数据库内容读取，改为 URL 文章直接抓取，类似于 WeRead/Dedao 的登录机制，支持：
 - 直接从 URL 获取文章内容（主流模式：Reader Mode 提取正文）
 - 支持需要登录的网站（WebKit 登录，类似 WeRead/Dedao）
-- 智能回退：优先使用数据库内容，失败时尝试 URL 抓取
+- 统一 URL 抓取入口（不再使用数据库内容）
 
 ---
 
@@ -18,7 +18,7 @@
 
 ### P0: 架构设计与基础模型（准备阶段）
 
-**目标**: 定义清晰的架构和数据模型，为后续实现打下基础
+**目标**: 定义清晰的架构和数据模型，为后续 URL 抓取主路径打下基础
 
 #### P0.1: 定义服务协议和数据模型
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`（新建）
@@ -39,11 +39,10 @@
        let publishedDate: Date?
        let wordCount: Int
        let fetchedAt: Date
-       let source: FetchSource  // .database, .url, .urlWithAuth
+       let source: FetchSource  // .url, .urlWithAuth
    }
    
    enum FetchSource: String, Codable {
-       case database      // 从 GoodLinks 数据库获取
        case url           // 从 URL 直接获取（无需登录）
        case urlWithAuth   // 从 URL 获取（需要登录）
    }
@@ -159,7 +158,7 @@
 - 确保能正确提取标题、作者和正文
 - 错误处理正确（网络错误、解析失败等）
 
-#### P1.2: 集成到 GoodLinks 服务
+#### P1.2: 集成到 GoodLinks 服务（URL Only）
 **文件**: 
 - `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksService.swift`
 - `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksProtocols.swift`
@@ -170,40 +169,22 @@
    protocol GoodLinksDatabaseServiceProtocol {
        // 现有方法...
        
-       /// 获取文章内容（智能回退：数据库 -> URL）
-       func fetchArticleContent(linkId: String, url: String) async throws -> ArticleFetchResult
+       /// 获取文章内容（统一 URL 抓取）
+       func fetchArticleContent(url: String) async throws -> ArticleFetchResult
    }
    ```
 
 2. 在 `GoodLinksDatabaseService` 中实现:
    ```swift
-   func fetchArticleContent(linkId: String, url: String) async throws -> ArticleFetchResult {
-       // 1. 首先尝试从数据库获取
-       if let dbContent = try? fetchContent(dbPath: resolveDatabasePath(), linkId: linkId),
-          let content = dbContent.content, !content.isEmpty {
-           logger.info("[GoodLinks] 使用数据库内容，linkId=\(linkId)")
-           return ArticleFetchResult(
-               title: nil,
-               content: content,
-               textContent: content,
-               author: nil,
-               publishedDate: nil,
-               wordCount: dbContent.wordCount,
-               fetchedAt: Date(),
-               source: .database
-           )
-       }
-       
-       // 2. 数据库内容为空或失败，尝试 URL 抓取
-       logger.info("[GoodLinks] 数据库无内容，尝试 URL 抓取，url=\(url)")
+   func fetchArticleContent(url: String) async throws -> ArticleFetchResult {
+       logger.info("[GoodLinks] 使用 URL 抓取内容，url=\(url)")
        let urlFetcher = GoodLinksURLFetcher()
        return try await urlFetcher.fetchArticle(url: url)
    }
    ```
 
 **验证**:
-- 测试回退逻辑：数据库有内容时优先使用
-- 测试 URL 抓取：数据库无内容时自动抓取
+- 测试 URL 抓取：不同网站均可获取内容
 - Build 成功
 
 #### P1.3: 更新 ViewModel 和 UI
@@ -234,7 +215,6 @@
        
        do {
            let result = try await serviceForTask.fetchArticleContent(
-               linkId: linkId, 
                url: link.url
            )
            
@@ -247,9 +227,7 @@
            fetchSource = result.source
            contentLoadState = .loaded
            
-           if result.source == .url {
-               loggerForTask.info("[GoodLinksDetail] 从 URL 获取到内容，url=\(link.url)")
-           }
+           loggerForTask.info("[GoodLinksDetail] 从 URL 获取到内容，url=\(link.url)")
        } catch {
            contentLoadState = .error(error.localizedDescription)
        }
@@ -739,15 +717,11 @@
    ```swift
    Section("Content Fetching") {
        Toggle("Enable URL Fetching", isOn: $viewModel.urlFetchingEnabled)
-           .help("Fetch article content from URL when database content is unavailable")
-       
-       Toggle("Prefer Database Content", isOn: $viewModel.preferDatabaseContent)
-           .help("Always try to use database content first, even if URL fetching is available")
+           .help("Fetch article content directly from the URL")
        
        Picker("Fetch Strategy", selection: $viewModel.fetchStrategy) {
-           Text("Database Only").tag(FetchStrategy.databaseOnly)
            Text("URL Only").tag(FetchStrategy.urlOnly)
-           Text("Database → URL (Fallback)").tag(FetchStrategy.fallback)
+           Text("URL (Use Login if Available)").tag(FetchStrategy.urlWithAuthFirst)
        }
    }
    ```
@@ -774,7 +748,7 @@
    ```
 
 2. 完善日志记录:
-   - 记录每次抓取的来源（数据库 vs URL）
+   - 记录每次抓取的来源（URL vs URL-Auth）
    - 记录失败原因和重试次数
    - 记录缓存命中率
 
@@ -829,8 +803,7 @@
                .font(.headline)
            
            Text("""
-           When GoodLinks database doesn't contain article content, \
-           SyncNos can fetch it directly from the URL. \
+           SyncNos fetches article content directly from the URL. \
            For protected content, you need to log in first.
            """)
            .font(.caption)
@@ -855,7 +828,6 @@
 
 ### P1 验证
 - [ ] 可以从 URL 抓取文章内容（测试 3-5 个不同网站）
-- [ ] 回退逻辑正常（数据库 → URL）
 - [ ] UI 正确显示内容来源
 - [ ] Build 成功，无运行时错误
 - [ ] 日志完整
