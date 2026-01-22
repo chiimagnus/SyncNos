@@ -56,7 +56,7 @@ struct SettingsView: View {
                 detailView(for: selection ?? .general)
             }
         }
-        .frame(minWidth: 900, minHeight: 560)
+        .frame(minWidth: 600, minHeight: 560)
         .onAppear {
             // 视图出现时刷新状态，监听系统设置中的变化
             loginItemVM.refreshStatus()
