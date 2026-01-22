@@ -81,11 +81,10 @@ struct ChatListView: View {
                     .tag(contact.id)
                     .contextMenu {
                         Button {
-                            viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
+                            NotificationCenter.default.post(name: .syncSelectedToNotionRequested, object: nil)
                         } label: {
                             Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
-                        .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
                         
                         Divider()
                         

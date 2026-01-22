@@ -4,6 +4,27 @@ import SwiftUI
 
 extension MainListView {
     
+    // MARK: - Logical Selection Helpers
+    
+    private func allIds(for source: ContentSource) -> Set<String> {
+        switch source {
+        case .appleBooks:
+            return Set(appleBooksVM.displayBooks.map { $0.bookId })
+        case .goodLinks:
+            return Set(goodLinksVM.displayLinks.map { $0.id })
+        case .weRead:
+            return Set(weReadVM.displayBooks.map { $0.bookId })
+        case .dedao:
+            return Set(dedaoVM.displayBooks.map { $0.bookId })
+        case .chats:
+            return Set(chatsVM.contacts.map { $0.id })
+        }
+    }
+    
+    private func logicalSelectedIds(for source: ContentSource) -> Set<String> {
+        selectionState.logicalSelectedIds(for: source, allIds: allIds(for: source))
+    }
+    
     // MARK: - Navigation
     
     func navigateToLogin(for source: ContentSource) {
@@ -32,7 +53,7 @@ extension MainListView {
     // MARK: - Sync Selected
     
     func syncSelectedForCurrentSource() {
-        let selectedIds = selectionState.selection(for: contentSource)
+        let selectedIds = logicalSelectedIds(for: contentSource)
         switch contentSource {
         case .appleBooks:
             appleBooksVM.batchSync(bookIds: selectedIds, concurrency: NotionSyncConfig.batchConcurrency)
@@ -51,7 +72,7 @@ extension MainListView {
     func fullResyncSelectedForCurrentSource() {
         let syncedHighlightStore = DIContainer.shared.syncedHighlightStore
         let logger = DIContainer.shared.loggerService
-        let selectedIds = selectionState.selection(for: contentSource)
+        let selectedIds = logicalSelectedIds(for: contentSource)
         
         Task {
             // 使用协议驱动获取 sourceKey，消除部分 switch 语句
@@ -64,28 +85,28 @@ extension MainListView {
             switch contentSource {
             case .appleBooks:
                 selectedItems = selectedIds.compactMap { id in
-                    if let book = appleBooksVM.books.first(where: { $0.bookId == id }) {
+                    if let book = appleBooksVM.displayBooks.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.bookTitle)
                     }
                     return nil
                 }
             case .goodLinks:
                 selectedItems = selectedIds.compactMap { id in
-                    if let link = goodLinksVM.links.first(where: { $0.id == id }) {
+                    if let link = goodLinksVM.displayLinks.first(where: { $0.id == id }) {
                         return (id: id, title: link.title ?? "Unknown")
                     }
                     return nil
                 }
             case .weRead:
                 selectedItems = selectedIds.compactMap { id in
-                    if let book = weReadVM.books.first(where: { $0.bookId == id }) {
+                    if let book = weReadVM.displayBooks.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
                     }
                     return nil
                 }
             case .dedao:
                 selectedItems = selectedIds.compactMap { id in
-                    if let book = dedaoVM.books.first(where: { $0.bookId == id }) {
+                    if let book = dedaoVM.displayBooks.first(where: { $0.bookId == id }) {
                         return (id: id, title: book.title)
                     }
                     return nil
@@ -135,4 +156,3 @@ extension MainListView {
         }
     }
 }
-
