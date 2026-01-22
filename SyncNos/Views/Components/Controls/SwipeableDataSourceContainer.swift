@@ -21,6 +21,10 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     
     // 触控板滑动监听器
     @StateObject private var swipeHandler = TrackpadSwipeHandler()
+
+    // MARK: - Settings Menu State
+
+    @State private var isSettingsMenuVisible: Bool = false
     
     /// 底部栏的高度（用于内容区域的底部空间）
     private let bottomBarHeight: CGFloat = 20
@@ -51,8 +55,9 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             }
             
             // 悬浮底部栏：指示器 + Filter 按钮
-            if viewModel.hasEnabledSources {
+            if viewModel.hasEnabledSources && !isSettingsMenuVisible {
                 HStack(spacing: 8) {
+                    settingsMenuButton
                     // 左侧：数据源指示器（只在多数据源时显示）
                     if viewModel.enabledDataSources.count > 1 {
                         DataSourceIndicatorBar(viewModel: viewModel)
@@ -68,6 +73,12 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+            }
+            
+            if isSettingsMenuVisible {
+                SidebarSettingsView(isPresented: $isSettingsMenuVisible)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .zIndex(1)
             }
         }
         // 根据当前活动的 DataSource 设置 SelectionCommands
@@ -210,6 +221,37 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
     /// 清空所有数据源的选择
     private func clearAllSelections() {
         selectionState.clearAll()
+    }
+
+    // MARK: - Settings Menu
+
+    private var settingsMenuButton: some View {
+        Button {
+            toggleSettingsMenu()
+        } label: {
+            let minSize = 20 * fontScaleManager.scaleFactor
+            Image(systemName: "gearshape")
+                .scaledFont(.body, weight: .semibold)
+                .foregroundStyle(.primary)
+                .frame(minWidth: minSize, minHeight: minSize)
+        }
+        .buttonStyle(.plain)
+        .padding(8)
+        .glassCapsuleBackground()
+        .overlay {
+            if isSettingsMenuVisible {
+                Capsule()
+                    .stroke(Color.primary.opacity(0.2), lineWidth: 1)
+            }
+        }
+        .help(String(localized: "Sidebar Settings"))
+        .accessibilityLabel(String(localized: "Sidebar Settings"))
+    }
+
+    private func toggleSettingsMenu() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isSettingsMenuVisible.toggle()
+        }
     }
 }
 
