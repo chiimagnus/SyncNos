@@ -30,11 +30,12 @@ struct EditCommands: Commands {
 
             // 自定义的 Select All（优先尝试系统文本全选，失败时回退到列表选择）
             Button("Select All", systemImage: "character.textbox") {
-                // 先尝试系统的文本全选（针对 TextField、TextEditor 等）
-                let handled = NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
-                
-                // 如果系统没有处理（没有活跃的文本字段），则执行列表全选
-                if !handled {
+                // 只在用户正在输入文本时才走系统文本全选。
+                // 注意：如果先无差别调用 sendAction(selectAll:)，List 的底层 NSOutlineView/NSTableView 可能会拦截并“只全选已渲染的 80 条”（分页子集），
+                // 从而导致我们的逻辑全选（display* 全量 - 排除）根本不会执行。
+                if let window = NSApp.keyWindow, window.firstResponder is NSTextView {
+                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                } else {
                     selectionCommands?.selectAll()
                 }
             }
