@@ -14,6 +14,7 @@ class DIContainer {
     private var _loggerService: LoggerServiceProtocol?
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
+    private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
@@ -91,6 +92,13 @@ class DIContainer {
             _goodLinksService = GoodLinksDatabaseService()
         }
         return _goodLinksService!
+    }
+    
+    var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
+        if _goodLinksURLFetcher == nil {
+            _goodLinksURLFetcher = GoodLinksURLFetcher()
+        }
+        return _goodLinksURLFetcher!
     }
 
     var autoSyncService: AutoSyncServiceProtocol {
