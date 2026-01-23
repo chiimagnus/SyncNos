@@ -17,7 +17,7 @@
 
 **Acceptance（验收）**
 - Notion：同步 3 篇包含多张图片的文章，Notion 页面中图片作为 `image` block 出现，顺序与原文一致（图片不集中堆在顶部/底部）。
-- App：GoodLinks 详情页展开文章后能看到图片；段落/标题/列表/引用可读；链接可点击（或至少可复制）。
+- App：GoodLinks 详情页展开文章后能看到图片；先保证“能显示图片 + 可读”，再逐步增强样式。
 - 兼容：抓取不到正文时仍按当前逻辑显示 empty/error，不影响高亮同步。
 
 ---
@@ -65,7 +65,9 @@
   - `ol_li` → `numbered_list_item`
   - `hr` → `divider`
   - `img` → `image.external`
-- 先不做 inline 样式（bold/italic/code/link）也可以验收“图片 + 顺序 + 基本结构”；后续再增强。
+- 说明：Notion 的“文字”不是一个 HTML 字符串，而是 `rich_text` 数组。最简版本我们可以先用单段纯文本：
+  - `rich_text: [["text": ["content": "一段文字"]]]`
+- 本阶段先不做 inline 标注（bold/italic/link/code）也可以验收“图片 + 顺序 + 基本结构”；后续再增强（见 P2.5）。
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build`
@@ -126,9 +128,44 @@
 
 ---
 
+### P2.5（可选增强）：Notion rich_text 的 inline 标注（bold/italic/link/code）
+
+> 用于让 Notion 页面的文字更接近原网页，但不是“图片可见”的前置条件，可在 P1/P2 跑通后再做。
+
+#### Task 5: JS 输出从 “text” 升级为 “segments”
+
+**Files**
+- Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
+
+**Step 1: 定义 segments 数据结构（概念）**
+- 让 JS 输出每个文本块的富文本片段数组（示例）：
+  ```json
+  [
+    { "text": "Hello ", "marks": {} },
+    { "text": "world", "marks": { "bold": true } },
+    { "text": " link", "marks": { "href": "https://example.com" } }
+  ]
+  ```
+- Swift 侧把它映射为 Notion `rich_text`：
+  - `marks.bold` → `annotations.bold = true`
+  - `marks.italic` → `annotations.italic = true`
+  - `marks.code` → `annotations.code = true`
+  - `marks.href` → `text.link = ["url": "..."]`
+
+**Step 2: 逐类支持（小步）**
+- 先支持：`<a>`、`<strong>/<b>`、`<em>/<i>`、`<code>`。
+- 不建议一开始就做复杂嵌套（例如 `<a><strong>...</strong></a>`），先用“就近标注”策略保证稳定。
+
+**Verify**
+- Build: `xcodebuild -scheme SyncNos build`
+
+---
+
 ### P3：App 内文章展示从纯文本升级为 HTML 渲染（含图片与样式）
 
-#### Task 5: 新增通用 HTML WebView 组件（SwiftUI）
+#### P3.1（先做）：图片渲染（HTML WebView 基础能力）
+
+#### Task 6: 新增通用 HTML WebView 组件（SwiftUI）
 
 **Files**
 - Create: `SyncNos/Views/Components/Web/HTMLWebView.swift`
@@ -137,21 +174,42 @@
 **Step 1: HTMLWebView**
 - `NSViewRepresentable` 包装 `WKWebView`，支持：
   - `loadHTMLString(styledHTML, baseURL:)`
-  - 禁用不必要能力（如需要：`WKPreferences` / 导航策略）
-- 注入统一 CSS（示例方向）：
-  - `body { font: -apple-system-body; line-height: 1.6; }`
+  - 可选：导航策略（点击链接时用外部浏览器打开）
+- 先注入“最小 CSS”（只为图片与基础排版兜底）：
   - `img { max-width: 100%; height: auto; }`
-  - `pre, code { font-family: ui-monospace; }`
+  - `body { margin: 0; padding: 0; }`
 
 **Step 2: ArticleContentCardView 改为渲染 HTML**
 - 当前 `.loaded/.preview` 都是 `Text(content)`（纯文本），改为：
   - 展开后：显示 `HTMLWebView(html: ..., baseURL: ...)`
-  - 折叠预览：仍可用纯文本（更轻），或也用 HTML（视觉更一致，性能略差）
+  - 折叠预览：先保持纯文本（性能更稳，避免 WebView 频繁创建/销毁）
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build`
 - Manual:
   - 打开任意含图片的 GoodLinks 链接详情页 → 展开 Article → 可看到图片
+
+---
+
+#### P3.2（再做）：文本样式美化（统一 CSS）
+
+#### Task 7: 增强 CSS 与可读性（不改内容结构）
+
+**Files**
+- Modify: `SyncNos/Views/Components/Web/HTMLWebView.swift`
+
+**Step**
+- 在不影响图片显示的前提下，逐步增强排版（示例方向）：
+  - `body { font: -apple-system-body; line-height: 1.6; color: ... }`
+  - `h1,h2,h3 { ... }`
+  - `p, li { ... }`
+  - `blockquote { ... }`
+  - `a { ... }`
+  - `pre, code { font-family: ui-monospace; }`
+
+**Verify**
+- Build: `xcodebuild -scheme SyncNos build`
+- Manual: 同一篇文章前后对比，正文更易读、层级更清晰
 
 ---
 
@@ -178,6 +236,5 @@
 ---
 
 ## 不确定项（实现前需确认）
-- Notion blocks 的“富文本 inline 标注”（bold/italic/link/code）是否也要在 P1/P2 一起做？（若要，JS 输出需变为 segments：`[{text:"", marks:{...}}]`）
+- Notion blocks 的“富文本 inline 标注”（bold/italic/link/code）是否要做为 P2.5（建议：先不做，等图片与顺序稳定后再做）？
 - App 侧文章区域的交互：是否需要支持“复制保留格式/右键复制图片/打开原图”？（影响 WKWebView 配置与菜单策略）
-
