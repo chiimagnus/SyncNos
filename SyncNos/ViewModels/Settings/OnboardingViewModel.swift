@@ -37,18 +37,18 @@ final class OnboardingViewModel: ObservableObject {
     private let notionConfig: NotionConfigStoreProtocol
     private let notionOAuthService: NotionOAuthService
     private let iapService: IAPServiceProtocol
-    private let weReadAuthService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     
     init(
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         notionOAuthService: NotionOAuthService = DIContainer.shared.notionOAuthService,
         iapService: IAPServiceProtocol = DIContainer.shared.iapService,
-        weReadAuthService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore
     ) {
         self.notionConfig = notionConfig
         self.notionOAuthService = notionOAuthService
         self.iapService = iapService
-        self.weReadAuthService = weReadAuthService
+        self.siteLoginsStore = siteLoginsStore
         
         // Initialize states
         self.checkNotionStatus()
@@ -117,7 +117,12 @@ final class OnboardingViewModel: ObservableObject {
     }
     
     func checkWeReadStatus() {
-        isWeReadLoggedIn = weReadAuthService.isLoggedIn
+        Task {
+            let cookie = await siteLoginsStore.getCookieHeader(for: "https://weread.qq.com/")
+            await MainActor.run {
+                self.isWeReadLoggedIn = (cookie?.isEmpty == false)
+            }
+        }
     }
     
     func completeOnboarding() {

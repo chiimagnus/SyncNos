@@ -72,16 +72,13 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToNotionSettings).receive(on: DispatchQueue.main)) { _ in
             selection = .notion
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadLogin).receive(on: DispatchQueue.main)) { _ in
-            selection = .dataSource(.weRead)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NotificationCenter.default.post(name: .weReadSettingsShowLoginSheet, object: nil)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin).receive(on: DispatchQueue.main)) { _ in
-            selection = .dataSource(.dedao)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NotificationCenter.default.post(name: .dedaoSettingsShowLoginSheet, object: nil)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSiteLogins).receive(on: DispatchQueue.main)) { notification in
+            selection = .siteLogins
+            if let sourceRaw = notification.userInfo?["source"] as? String,
+               let _ = ContentSource(rawValue: sourceRaw) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    NotificationCenter.default.post(name: .siteLoginsShowLoginSheet, object: nil, userInfo: ["source": sourceRaw])
+                }
             }
         }
         // 应用字体缩放到整个视图层级

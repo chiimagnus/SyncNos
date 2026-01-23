@@ -46,7 +46,7 @@ enum WeReadAPIError: LocalizedError {
 /// WeRead API 客户端实现
 /// 集成令牌桶限流器 + 重试机制，有效防止触发反爬
 final class WeReadAPIService: WeReadAPIServiceProtocol {
-    private let authService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let logger: LoggerServiceProtocol
     private let refreshCoordinator = CookieRefreshCoordinator()
     private let limiter: WeReadRequestLimiter
@@ -55,10 +55,10 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     private let baseURL = URL(string: "https://weread.qq.com")!
 
     init(
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.logger = logger
         self.limiter = WeReadRequestLimiter(logger: logger)
     }
@@ -140,7 +140,6 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             // 在 MainActor 上创建 WeReadCookieRefreshService
             let refreshService = await MainActor.run {
                 WeReadCookieRefreshService(
-                    authService: authService,
                     logger: logger
                 )
             }
@@ -148,7 +147,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             // 通过 actor 协调刷新
             _ = try await refreshCoordinator.attemptRefresh(
                 refreshService: refreshService,
-                authService: authService
+                siteLoginsStore: siteLoginsStore
             )
             
             logger.info("[WeReadAPI] Cookie refreshed successfully, retrying request")
@@ -159,7 +158,10 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
             logger.error("[WeReadAPI] Cookie refresh failed: \(error.localizedDescription)")
             
             // 清除过期的 Cookie
-            await authService.clearCookies()
+            await siteLoginsStore.clear(domains: [
+                "weread.qq.com",
+                "i.weread.qq.com"
+            ])
             
             // 抛出包含刷新失败信息的错误
             throw WeReadAPIError.sessionExpiredWithRefreshFailure(
@@ -170,7 +172,7 @@ final class WeReadAPIService: WeReadAPIServiceProtocol {
     
     /// 实际执行 HTTP 请求
     private func executeRequest(url: URL) async throws -> Data {
-        guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
+        guard let cookie = await siteLoginsStore.getCookieHeader(for: url.absoluteString), !cookie.isEmpty else {
             throw WeReadAPIError.notLoggedIn
         }
 

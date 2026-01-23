@@ -8,7 +8,7 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
 
     private let logger: LoggerServiceProtocol
     private let apiService: WeReadAPIServiceProtocol
-    private let authService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let syncEngine: NotionSyncEngine
     private let notionConfig: NotionConfigStoreProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
@@ -18,14 +18,14 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.logger = logger
         self.apiService = apiService
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.syncEngine = syncEngine
         self.notionConfig = notionConfig
         self.syncTimestampStore = syncTimestampStore
@@ -49,12 +49,6 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
         let enabled = UserDefaults.standard.bool(forKey: autoSyncUserDefaultsKey)
         guard enabled else { return }
 
-        // 检查 WeRead 是否已登录
-        guard authService.isLoggedIn else {
-            logger.warning("[SmartSync] WeRead skipped: not logged in")
-            return
-        }
-
         isSyncing = true
         logger.info("[SmartSync] WeRead: starting check for all books")
 
@@ -65,6 +59,13 @@ final class WeReadAutoSyncProvider: AutoSyncSourceProvider {
                 self.logger.info("[SmartSync] WeRead: finished")
             }
             do {
+                // 检查 WeRead 是否已登录
+                let cookie = await self.siteLoginsStore.getCookieHeader(for: "https://weread.qq.com/")
+                guard let cookie, !cookie.isEmpty else {
+                    self.logger.warning("[SmartSync] WeRead skipped: not logged in")
+                    return
+                }
+
                 try await self.syncAllBooksSmart()
             } catch {
                 self.logger.error("[SmartSync] WeRead error: \(error.localizedDescription)")
