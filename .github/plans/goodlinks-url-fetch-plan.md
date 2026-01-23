@@ -35,7 +35,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **目标**: 定义清晰的架构和数据模型，为后续 URL 抓取主路径打下基础
 
-#### P0.1: 定义服务协议和数据模型
+#### P0.1: 定义服务协议和数据模型✅
 **文件**:
 - `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 - `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksModels.swift`
@@ -60,7 +60,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **目标**: 实现基础的 URL 文章抓取，支持公开访问的网站
 
-#### P1.1: 实现基础 URL 抓取服务
+#### P1.1: 实现基础 URL 抓取服务✅
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
 **状态**: ✅ 已完成（当前实现为“轻量正文提取”，非 Reader Mode）
@@ -82,14 +82,14 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 - ✅ 编译通过
 - ⏳（建议）运行时抽样验证：Medium/个人博客/少数派/公众号外链等
 
-#### P1.2: 集成策略（当前实现）
+#### P1.2: 集成策略（当前实现）✅
 **状态**: ✅ 已改为直接注入 URLFetcher（不扩展数据库服务协议）
 
 **说明**:
 - 目前 “正文抓取” 不属于 SQLite service 责任范围，直接通过 `DIContainer.shared.goodLinksURLFetcher` 使用
 - SQLite 仅保留 links/highlights 的读取能力（正文完全不再走 DB）
 
-#### P1.3: 更新 ViewModel 和 UI
+#### P1.3: 更新 ViewModel 和 UI✅
 **文件**:
 - `SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`
 - `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`
@@ -105,7 +105,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 - ✅ Build 成功
 - ⏳（建议）手动验证：展开/折叠/切换 link/刷新时正文状态不串台
 
-#### P1.4: 添加到 DIContainer
+#### P1.4: 添加到 DIContainer✅
 **文件**: `SyncNos/Services/Core/DIContainer.swift`
 
 **状态**: ✅ 已完成
@@ -121,7 +121,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **状态**: ✅ 已完成（已支持多站点登录：WebView 获取 cookies → Keychain 持久化 → 请求自动带 Cookie）
 
-#### P2.1: 创建统一 Site Logins 存储（domain → cookieHeader）
+#### P2.1: 创建统一 Site Logins 存储（domain → cookieHeader）✅
 **文件**: `SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
 
 **状态**: ✅ 已完成（多站点：按域名持久化 `cookieHeader`，按 URL 自动匹配最合适 domain）
@@ -133,7 +133,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 - 支持清理指定域名/全部（含 WebKit cookies 清理）
 - 允许破坏性修改：首次读取时 best-effort 迁移旧 Keychain（如存在）并清理旧条目
 
-#### P2.2: 创建 WebKit 登录视图
+#### P2.2: 创建 WebKit 登录视图✅
 **文件**: 
 - `SyncNos/Views/Settings/SyncFrom/Shared/CookieWebLoginSheet.swift`
 - `SyncNos/Views/Settings/SyncFrom/GoodLinksLoginView.swift`
