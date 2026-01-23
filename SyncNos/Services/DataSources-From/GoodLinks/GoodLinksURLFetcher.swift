@@ -19,15 +19,18 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
     private let logger: LoggerServiceProtocol
     private let session: URLSession
     private let cacheService: GoodLinksURLCacheServiceProtocol?
+    private let authService: GoodLinksAuthServiceProtocol?
     
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         session: URLSession = .shared,
-        cacheService: GoodLinksURLCacheServiceProtocol? = nil
+        cacheService: GoodLinksURLCacheServiceProtocol? = nil,
+        authService: GoodLinksAuthServiceProtocol? = nil
     ) {
         self.logger = logger
         self.session = session
         self.cacheService = cacheService
+        self.authService = authService
     }
     
     func fetchArticle(url: String) async throws -> ArticleFetchResult {
@@ -39,6 +42,13 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 }
             } catch {
                 logger.warning("[GoodLinksURLFetcher] 读取缓存失败 url=\(url) error=\(error.localizedDescription)")
+            }
+        }
+        
+        if let authService {
+            let cookieHeader = await authService.getCookieHeader(for: url)
+            if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return try await fetchArticleInternal(url: url, cookieHeader: cookieHeader, source: .urlWithAuth)
             }
         }
         
