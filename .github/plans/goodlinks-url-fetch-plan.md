@@ -126,69 +126,12 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **状态**: ✅ 已完成（多站点：按域名持久化 `cookieHeader`，按 URL 自动匹配最合适 domain）
 
-> 备注：旧的 `WeReadAuthService` / `DedaoAuthService` / `GoodLinksAuthService` 已删除；下面的示例代码仅作为历史记录，不再适用。
-
-**任务**:
-1. 参考 `WeReadAuthService.swift` 和 `DedaoAuthService.swift` 实现:
-   ```swift
-   protocol GoodLinksAuthServiceProtocol: Sendable {
-       var isLoggedIn: Bool { get }
-       func updateCookies(_ cookies: [HTTPCookie])
-       func getCookieHeader(for url: String) -> String?
-       func clearCookies()
-   }
-   
-   final class GoodLinksAuthService: GoodLinksAuthServiceProtocol {
-       private let logger: LoggerServiceProtocol
-       private let keychainKey = "goodlinks_auth_cookies"
-       
-       // 使用 Keychain 存储 cookies（安全）
-       var isLoggedIn: Bool {
-           return getCookies().count > 0
-       }
-       
-       func updateCookies(_ cookies: [HTTPCookie]) {
-           // 序列化并保存到 Keychain
-           let data = try? NSKeyedArchiver.archivedData(
-               withRootObject: cookies, 
-               requiringSecureCoding: false
-           )
-           KeychainHelper.save(data: data, forKey: keychainKey)
-       }
-       
-       func getCookieHeader(for url: String) -> String? {
-           let cookies = getCookies()
-           guard let url = URL(string: url) else { return nil }
-           
-           // 筛选适用于该 URL 的 cookies
-           let applicableCookies = cookies.filter { cookie in
-               // 检查 domain 是否匹配
-               if let domain = cookie.domain {
-                   return url.host?.contains(domain) ?? false
-               }
-               return false
-           }
-           
-           return applicableCookies.map { "\($0.name)=\($0.value)" }
-               .joined(separator: "; ")
-       }
-       
-       private func getCookies() -> [HTTPCookie] {
-           guard let data = KeychainHelper.load(forKey: keychainKey),
-                 let cookies = try? NSKeyedUnarchiver.unarchivedObject(
-                     ofClasses: [NSArray.self, HTTPCookie.self],
-                     from: data
-                 ) as? [HTTPCookie] else {
-               return []
-           }
-           return cookies
-       }
-   }
-   ```
-
-**验证**:
-- 编译通过
-- Keychain 存储/读取正常
+**实现要点（现状）**:
+- Keychain 持久化：`domain → cookieHeader (+updatedAt)`
+- 按 URL 自动匹配最合适 domain（host 精确/子域匹配，优先更长的 domain）
+- 支持批量写入（WeRead/Dedao 便捷入口一次写多个 domain）
+- 支持清理指定域名/全部（含 WebKit cookies 清理）
+- 允许破坏性修改：首次读取时 best-effort 迁移旧 Keychain（如存在）并清理旧条目
 
 #### P2.2: 创建 WebKit 登录视图
 **文件**: 
@@ -197,237 +140,27 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **状态**: ✅ 已完成（已与 WeRead/Dedao 统一到同一个 Web 登录 Sheet：带 URL 输入栏）
 
-**任务**:
-1. 参考 `WeReadLoginView.swift` 实现 `GoodLinksLoginView`:
-   ```swift
-   private struct GoodLinksWebView: NSViewRepresentable {
-       let webView: WKWebView
-       
-       func makeNSView(context: Context) -> WKWebView {
-           webView
-       }
-       
-       func updateNSView(_ nsView: WKWebView, context: Context) {}
-   }
-   
-   struct GoodLinksLoginView: View {
-       @Environment(\.dismiss) private var dismiss
-       @StateObject private var viewModel: GoodLinksLoginViewModel
-       @State private var webView = WKWebView()
-       @State private var currentURL: String = ""
-       
-       let onLoginChanged: (() -> Void)?
-       
-       var body: some View {
-           VStack {
-               // URL 输入框（用户可以输入需要登录的网站）
-               HStack {
-                   TextField("Enter URL", text: $currentURL)
-                       .textFieldStyle(.roundedBorder)
-                   Button("Go") {
-                       if let url = URL(string: currentURL) {
-                           webView.load(URLRequest(url: url))
-                       }
-                   }
-               }
-               .padding()
-               
-               GoodLinksWebView(webView: webView)
-           }
-           .frame(minWidth: 640, minHeight: 600)
-           .toolbar {
-               ToolbarItem(placement: .confirmationAction) {
-                   Button {
-                       captureCookiesFromWebView()
-                       dismiss()
-                   } label: {
-                       Label("Save Cookies", systemImage: "checkmark.circle")
-                   }
-               }
-           }
-       }
-       
-       private func captureCookiesFromWebView() {
-           let store = webView.configuration.websiteDataStore.httpCookieStore
-           store.getAllCookies { cookies in
-               guard !cookies.isEmpty else {
-                   Task { @MainActor in
-                       viewModel.statusMessage = "No cookies found"
-                   }
-                   return
-               }
-               Task { @MainActor in
-                   viewModel.saveCookies(cookies)
-                   onLoginChanged?()
-               }
-           }
-       }
-   }
-   ```
+**实现要点（现状）**:
+- 统一组件：`CookieWebLoginSheet` 始终带 URL 输入栏 + WebView
+- 保存：从 WebView 抓 cookies → 组装 `cookieHeader` → 写入 `SiteLoginsStore`
+- GoodLinks：基于当前页面 host/父域计算存储 domain（用于“任意站点登录”）
 
-2. 实现 `GoodLinksLoginViewModel`:
-   ```swift
-   @MainActor
-   final class GoodLinksLoginViewModel: ObservableObject {
-       @Published var isLoggedIn: Bool = false
-       @Published var statusMessage: String?
-       
-       private let authService: GoodLinksAuthServiceProtocol
-       
-       init(authService: GoodLinksAuthServiceProtocol = DIContainer.shared.goodLinksAuthService) {
-           self.authService = authService
-           refreshState()
-       }
-       
-       func refreshState() {
-           isLoggedIn = authService.isLoggedIn
-           statusMessage = isLoggedIn ? "Logged in" : "Not logged in"
-       }
-       
-       func saveCookies(_ cookies: [HTTPCookie]) {
-           authService.updateCookies(cookies)
-           refreshState()
-       }
-   }
-   ```
-
-**验证**:
-- WebView 可以正常加载网页
-- 登录后可以捕获 cookies
-- Cookies 保存到 Keychain
-
-#### P2.3: 集成认证到 URL Fetcher
+#### P2.3: 集成认证到 URL Fetcher ✅
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
-**状态**: ✅ 已完成（`fetchArticle(url:)` 自动使用 `SiteLoginsService.cookieHeader(for:)`）
+**状态**: ✅ 已完成（请求前调用 `SiteLoginsStore.getCookieHeader(for:)`，命中则设置 `Cookie` header）
 
-**任务**:
-1. 添加带认证的抓取方法:
-   ```swift
-   final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
-       private let authService: GoodLinksAuthServiceProtocol
-       
-       init(logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-            authService: GoodLinksAuthServiceProtocol = DIContainer.shared.goodLinksAuthService,
-            session: URLSession = .shared) {
-           self.logger = logger
-           self.authService = authService
-           self.session = session
-       }
-       
-       func fetchArticle(url: String) async throws -> ArticleFetchResult {
-           // 如果有登录，自动使用认证
-           if authService.isLoggedIn, 
-              let cookieHeader = authService.getCookieHeader(for: url) {
-               return try await fetchArticleWithAuth(url: url, cookieHeader: cookieHeader)
-           }
-           
-           // 否则使用无认证模式（现有逻辑）
-           return try await fetchArticleWithoutAuth(url: url)
-       }
-       
-       private func fetchArticleWithAuth(url: String, cookieHeader: String) async throws -> ArticleFetchResult {
-           guard let url = URL(string: url) else {
-               throw URLFetchError.invalidURL
-           }
-           
-           var request = URLRequest(url: url)
-           request.setValue("Mozilla/5.0 ...", forHTTPHeaderField: "User-Agent")
-           request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
-           
-           let (data, response) = try await session.data(for: request)
-           
-           // ... 其余逻辑与 fetchArticleWithoutAuth 相同
-           
-           return ArticleFetchResult(
-               // ...
-               source: .urlWithAuth
-           )
-       }
-   }
-   ```
-
-**验证**:
-- 带 Cookie 的请求能成功获取需要登录的内容
-- 无登录时自动降级为普通模式
-
-#### P2.4: 添加登录入口到设置界面
+#### P2.4: 添加登录入口到设置界面 ✅
 **文件**:
 - `SyncNos/Views/Settings/General/SettingsView.swift`
 - `SyncNos/Views/Settings/General/SiteLoginsView.swift`
 
-**状态**: ✅ 已完成（登录管理拆分到 Settings 侧边栏的 `Site Logins`）
+**状态**: ✅ 已完成（登录管理拆分到 Settings 侧边栏的 `Site Logins`，并在该页面提供 WeRead/Dedao/Custom URL 登录入口）
 
-**任务**:
-1. 添加 "Login for Protected Content" 按钮:
-   ```swift
-   struct GoodLinksSettingsView: View {
-       @StateObject private var loginViewModel = GoodLinksLoginViewModel()
-       @State private var showingLoginSheet = false
-       
-       var body: some View {
-           Form {
-               // 现有设置...
-               
-               Section("Authentication") {
-                   HStack {
-                       if loginViewModel.isLoggedIn {
-                           Label("Logged in", systemImage: "checkmark.circle.fill")
-                               .foregroundColor(.green)
-                           
-                           Button("Clear Cookies") {
-                               DIContainer.shared.goodLinksAuthService.clearCookies()
-                               loginViewModel.refreshState()
-                           }
-                       } else {
-                           Label("Not logged in", systemImage: "xmark.circle")
-                               .foregroundColor(.secondary)
-                           
-                           Button("Login for Protected Content") {
-                               showingLoginSheet = true
-                           }
-                       }
-                   }
-               }
-           }
-           .sheet(isPresented: $showingLoginSheet) {
-               GoodLinksLoginView(
-                   viewModel: loginViewModel,
-                   onLoginChanged: {
-                       loginViewModel.refreshState()
-                   }
-               )
-           }
-       }
-   }
-   ```
-
-**验证**:
-- 设置界面显示正常
-- 点击登录按钮弹出 WebView
-- 登录后状态更新
-
-#### P2.5: 更新 DIContainer
+#### P2.5: 更新 DIContainer ✅
 **文件**: `SyncNos/Services/Core/DIContainer.swift`
 
-**状态**: ✅ 已完成（`siteLoginsService` 已注入到 `goodLinksURLFetcher`）
-
-**任务**:
-1. 添加认证服务:
-   ```swift
-   private var _goodLinksAuthService: GoodLinksAuthServiceProtocol?
-   
-   var goodLinksAuthService: GoodLinksAuthServiceProtocol {
-       if _goodLinksAuthService == nil {
-           _goodLinksAuthService = GoodLinksAuthService()
-       }
-       return _goodLinksAuthService!
-   }
-   ```
-
-**验证**:
-- DIContainer 编译通过
-- 依赖注入正常工作
+**状态**: ✅ 已完成（统一注入 `siteLoginsStore`；已移除旧的按数据源 AuthService + providers/service 聚合层）
 
 ---
 
