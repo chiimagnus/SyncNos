@@ -12,8 +12,8 @@ enum ArticleLoadState: Equatable {
     case loadingFull
     /// 已加载完整内容
     case loaded(content: String, wordCount: Int)
-    /// 已加载但无内容（需要用户在 GoodLinks 中重新下载）
-    case empty(openURL: URL?)
+    /// 已加载但无内容
+    case empty
     /// 加载失败
     case error(message: String)
     
@@ -37,7 +37,7 @@ enum ArticleLoadState: Equatable {
 /// - `preview`: 预览状态，显示前 N 个字符 + Expand 按钮
 /// - `loadingFull`: 加载完整内容中
 /// - `loaded`: 已加载完整内容 + Collapse 按钮
-/// - `empty`: 无内容，提示用户在 GoodLinks 中重新下载
+/// - `empty`: 无内容
 /// - `error`: 加载失败，显示错误信息和重试按钮
 struct ArticleContentCardView: View {
     // MARK: - Properties
@@ -136,8 +136,8 @@ struct ArticleContentCardView: View {
             case .loaded(let content, _):
                 loadedContent(content)
                 
-            case .empty(let openURL):
-                emptyContent(openURL: openURL)
+            case .empty:
+                emptyContent
                 
             case .error(let message):
                 errorContent(message: message)
@@ -197,21 +197,11 @@ struct ArticleContentCardView: View {
             .fixedSize(horizontal: false, vertical: isExpanded)
     }
     
-    private func emptyContent(openURL: URL?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text("No article content detected. Please")
-                .scaledFont(.body)
-                .foregroundColor(.secondary)
-            if let url = openURL {
-                Link("Open in GoodLinks", destination: url)
-                    .scaledFont(.body)
-                    .foregroundColor(.blue)
-            }
-            Text("and re-download this article.")
-                .scaledFont(.body)
-                .foregroundColor(.secondary)
-        }
-        .fixedSize(horizontal: false, vertical: true)
+    private var emptyContent: some View {
+        Text("No article content detected.")
+            .scaledFont(.body)
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
     
     private func errorContent(message: String) -> some View {

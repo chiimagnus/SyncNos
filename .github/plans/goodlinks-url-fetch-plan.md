@@ -14,25 +14,6 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ---
 
-## 当前实现状态（已完成）
-
-> 代码已落地且通过编译：`xcodebuild -scheme SyncNos build -quiet`
-
-- ✅ 已新增 `GoodLinksURLFetcher` 与协议：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
-- ✅ 已新增 URL 抓取模型与错误类型：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksModels.swift`
-  - `ArticleFetchResult` / `FetchSource` / `URLFetchError`
-- ✅ 已在 DIContainer 注册：`SyncNos/Services/Core/DIContainer.swift`（`goodLinksURLFetcher`）
-- ✅ 已将 GoodLinks 详情页正文加载改为 URL Only：
-  - `SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`（`article: ArticleFetchResult?`）
-  - `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`（向 VM 传入 `GoodLinksLinkRow`）
-- ✅ 已将 Notion 同步的 “Article” 正文改为 URL Only：
-  - `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
-  - `GoodLinksNotionAdapter.create(...)` 已改为 `async`
-- ✅ 已彻底删除 SQLite `content` 表相关代码（协议/查询/模型/调用链）
-  - 不再存在 `GoodLinksContentRow`、`fetchContent`、`fetchContentPreview`、SQL `FROM content`
-
----
-
 ## 优先级分级与后续计划（从当前实现继续）
 
 ### P0: 架构设计与基础模型（准备阶段）✅
@@ -120,14 +101,16 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ---
 
-### P2: WebKit 登录支持（需要登录的网站）
+### P2: WebKit 登录支持（需要登录的网站）✅
 
 **目标**: 实现 WebKit 登录功能，支持需要登录的网站（如 Medium 会员内容、付费博客等）
 
-**状态**: ⏳ 未开始（目前仅提供 `fetchArticleWithAuth(url:cookies:)` 接口，尚无登录 UI 与 cookie 管理）
+**状态**: ✅ 已完成（已支持多站点登录：WebView 获取 cookies → Keychain 持久化 → 请求自动带 Cookie）
 
 #### P2.1: 创建 GoodLinks 认证服务
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksAuthService.swift`（新建）
+
+**状态**: ✅ 已完成（多站点 cookies 合并存储，按 URL 生成 Cookie Header）
 
 **任务**:
 1. 参考 `WeReadAuthService.swift` 和 `DedaoAuthService.swift` 实现:
@@ -195,6 +178,8 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 **文件**: 
 - `SyncNos/Views/Settings/SyncFrom/GoodLinksLoginView.swift`（新建）
 - `SyncNos/ViewModels/GoodLinks/GoodLinksLoginViewModel.swift`（新建）
+
+**状态**: ✅ 已完成
 
 **任务**:
 1. 参考 `WeReadLoginView.swift` 实现 `GoodLinksLoginView`:
@@ -298,6 +283,8 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 #### P2.3: 集成认证到 URL Fetcher
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
+**状态**: ✅ 已完成（`fetchArticle(url:)` 自动使用已保存 cookies）
+
 **任务**:
 1. 添加带认证的抓取方法:
    ```swift
@@ -349,7 +336,11 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 - 无登录时自动降级为普通模式
 
 #### P2.4: 添加登录入口到设置界面
-**文件**: `SyncNos/Views/Settings/SyncFrom/GoodLinksSettingsView.swift`
+**文件**:
+- `SyncNos/Views/Settings/General/SettingsView.swift`
+- `SyncNos/Views/Settings/General/SiteLoginsView.swift`
+
+**状态**: ✅ 已完成（登录管理已拆分到 Settings 侧边栏的 `Site Logins`，不再放在 GoodLinks 设置页）
 
 **任务**:
 1. 添加 "Login for Protected Content" 按钮:
@@ -403,6 +394,8 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 #### P2.5: 更新 DIContainer
 **文件**: `SyncNos/Services/Core/DIContainer.swift`
 
+**状态**: ✅ 已完成（`goodLinksAuthService` 已注入到 `goodLinksURLFetcher`）
+
 **任务**:
 1. 添加认证服务:
    ```swift
@@ -426,8 +419,14 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **目标**: 提升用户体验，添加缓存、错误处理、UI 优化等
 
-#### P3.1: 添加 URL 抓取缓存
-**文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLCache.swift`（新建）
+#### P3.1: 添加 URL 抓取缓存✅
+**文件**:
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLCacheModels.swift`（新建）
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLCacheService.swift`（新建）
+- `SyncNos/Services/Core/DIContainer.swift`（注入）
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`（读写缓存）
+
+**状态**: ✅ 已完成（SwiftData 持久化缓存，TTL=7 天）
 
 **任务**:
 1. 实现本地缓存机制（使用 UserDefaults 或 SwiftData）:
@@ -501,6 +500,10 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 #### P3.2: 添加重试机制和错误提示
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
+**状态**: ⏳ 部分完成
+- ✅ UI 侧已有错误提示与 Retry 按钮（`ArticleContentCardView`）
+- ⏳ Fetcher 的指数退避重试逻辑尚未实现
+
 **任务**:
 1. 添加重试逻辑（参考 `WeReadRequestLimiter.swift`）:
    ```swift
@@ -563,6 +566,8 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 #### P3.3: 添加 URL 抓取配置选项
 **文件**: `SyncNos/Views/Settings/SyncFrom/GoodLinksSettingsView.swift`
 
+**状态**: ⏳ 未开始（目前为 URL Only 固定策略）
+
 **任务**:
 1. 添加配置选项:
    ```swift
@@ -603,104 +608,11 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
    - 记录失败原因和重试次数
    - 记录缓存命中率
 
-**验证**:
-- 日志输出完整且清晰
-- 性能指标准确
-
----
-
-### P4: 国际化与文档
-
-**目标**: 添加多语言支持和完善文档
-
-#### P4.1: 添加本地化字符串
-**文件**: `Resource/Localizable.xcstrings`
-
-**任务**:
-1. 添加新的本地化字符串:
-   - "Fetched from URL"
-   - "Enable URL Fetching"
-   - "Login for Protected Content"
-   - "Failed to load article content"
-   - "URL fetching is disabled"
-   - 等等...
-
-2. 至少提供英文和中文翻译
+**状态**: ⏳ 部分完成（Fetcher 已记录单次请求耗时；缓存命中率/重试次数统计尚未补齐）
 
 **验证**:
-- 切换语言后 UI 文本正确显示
-
-#### P4.2: 更新 CLAUDE.md 文档
-**文件**: `CLAUDE.md`
-
-**任务**:
-1. 更新架构说明，添加 GoodLinks URL 抓取服务
-2. 更新核心功能列表
-3. 添加 URL 抓取服务说明
-4. 更新依赖注入部分
-
-**验证**:
-- 文档清晰且准确
-
-#### P4.3: 添加用户使用说明
-**文件**: 在 `GoodLinksSettingsView` 中添加帮助文本
-
-**任务**:
-1. 添加使用说明:
-   ```swift
-   Section {
-       VStack(alignment: .leading, spacing: 8) {
-           Text("URL Fetching")
-               .font(.headline)
-           
-           Text("""
-           SyncNos fetches article content directly from the URL. \
-           For protected content, you need to log in first.
-           """)
-           .font(.caption)
-           .foregroundColor(.secondary)
-       }
-   } header: {
-       Text("About URL Fetching")
-   }
-   ```
-
-**验证**:
-- 帮助文本清晰易懂
-
----
-
-## 验证清单（每个优先级完成后）
-
-### P0 验证
-- [ ] 协议和模型定义完整
-- [ ] 编译通过
-- [ ] 架构清晰，符合 MVVM
-
-### P1 验证
-- [ ] 可以从 URL 抓取文章内容（测试 3-5 个不同网站）
-- [ ] UI 正确显示内容来源
-- [ ] Build 成功，无运行时错误
-- [ ] 日志完整
-
-### P2 验证
-- [ ] WebView 登录功能正常
-- [ ] Cookies 正确保存和加载
-- [ ] 带认证的请求能获取受保护内容
-- [ ] 设置界面显示登录状态
-- [ ] Build 成功
-
-### P3 验证
-- [ ] 缓存机制工作正常
-- [ ] 重试逻辑正确
-- [ ] 错误提示友好
-- [ ] 配置选项生效
-- [ ] 性能指标准确
-
-### P4 验证
-- [ ] 本地化字符串完整
-- [ ] 文档更新准确
-- [ ] 用户帮助清晰
+- ✅ Build 通过
+- ⏳（建议）补齐：缓存命中率/重试次数/失败原因聚合日志
 
 ---
 
@@ -717,9 +629,6 @@ P2 (WebKit 登录)
   ↓
 P3 (优化)
   ├─ P3.1, P3.2, P3.3, P3.4 (可并行)
-  ↓
-P4 (国际化与文档)
-  ├─ P4.1, P4.2, P4.3 (可并行)
 ```
 
 ---
@@ -776,18 +685,5 @@ P4 (国际化与文档)
 3. **离线阅读**: 下载文章内容到本地，支持离线查看
 4. **自定义提取规则**: 允许用户为特定网站配置 CSS Selector
 5. **RSS 支持**: 对于有 RSS 的网站，优先使用 RSS 提取内容
-
----
-
-## 总结
-
-本方案分为 4 个主要优先级（P0-P4），每个优先级包含多个子任务。实现顺序为：
-1. **P0**: 架构设计（1-2 小时）
-2. **P1**: 基础 URL 抓取（4-6 小时）
-3. **P2**: WebKit 登录（3-4 小时）
-4. **P3**: 优化（2-3 小时）
-5. **P4**: 国际化与文档（1-2 小时）
-
-**总预计时间**: 11-17 小时
 
 每完成一个优先级，都需要验证代码无问题并能成功 build，确保项目始终处于可运行状态。
