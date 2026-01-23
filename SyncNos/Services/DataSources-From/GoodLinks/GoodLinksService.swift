@@ -30,14 +30,6 @@ final class GoodLinksReadOnlySession: GoodLinksReadOnlySessionProtocol {
     func fetchHighlightCountsByLink() throws -> [GoodLinksLinkHighlightCount] {
         try query.fetchHighlightCountsByLink(db: db)
     }
-    
-    func fetchContent(linkId: String) throws -> GoodLinksContentRow? {
-        try query.fetchContent(db: db, linkId: linkId)
-    }
-    
-    func fetchContentPreview(linkId: String, previewLength: Int) throws -> GoodLinksContentRow? {
-        try query.fetchContentPreview(db: db, linkId: linkId, previewLength: previewLength)
-    }
 
     func close() {
         connection.close(db)
@@ -99,18 +91,6 @@ final class GoodLinksDatabaseService: GoodLinksDatabaseServiceProtocol, GoodLink
         let session = try makeReadOnlySession(dbPath: dbPath)
         defer { session.close() }
         return try session.fetchHighlightsForLink(linkId: linkId, limit: limit, offset: offset)
-    }
-
-    func fetchContent(dbPath: String, linkId: String) throws -> GoodLinksContentRow? {
-        let session = try makeReadOnlySession(dbPath: dbPath)
-        defer { session.close() }
-        return try session.fetchContent(linkId: linkId)
-    }
-    
-    func fetchContentPreview(dbPath: String, linkId: String, previewLength: Int) throws -> GoodLinksContentRow? {
-        let session = try makeReadOnlySession(dbPath: dbPath)
-        defer { session.close() }
-        return try session.fetchContentPreview(linkId: linkId, previewLength: previewLength)
     }
 }
 
