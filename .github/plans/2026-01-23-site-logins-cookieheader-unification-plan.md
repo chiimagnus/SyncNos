@@ -2,6 +2,28 @@
 
 > 执行方式：建议使用 `executing-plans` 按批次实现与验收（此计划不改动国际化资源文件，除非另行明确要求）。
 
+## 当前进度（更新于 2026-01-23）
+
+- ✅ P1（统一模型 + Provider/Service 协议）：已完成
+- ✅ P2.1（WeRead Provider）：已完成
+- ✅ P2.2（Dedao Provider）：已完成
+- ✅ P2.3（GoodLinks：domain → cookieHeader 存储 + Provider）：已完成（破坏性变更，需重新登录一次）
+- ✅ P3.1（Site Logins 总览页）：已完成（已展示 `cookieHeader` 单行文本，便于复制排查）
+- ⏳ P3.2（Settings 页逻辑委托到 Provider/Service + 删除旧通知兼容链路）：未做（当前仍保留原有 Settings 登录 UI 与通知跳转链路）
+- ⏳ P4（会话过期统一入口，推荐但可选）：未做（当前仍走 `.navigateToWeReadLogin/.navigateToDedaoLogin`）
+
+**本次落地的主要文件**
+- `SyncNos/Models/SiteLogins/SiteLoginModels.swift`
+- `SyncNos/Services/SiteLogins/SiteLoginsService.swift`
+- `SyncNos/Services/SiteLogins/Providers/WeReadSiteLoginProvider.swift`
+- `SyncNos/Services/SiteLogins/Providers/DedaoSiteLoginProvider.swift`
+- `SyncNos/Services/SiteLogins/Providers/GoodLinksSiteLoginProvider.swift`
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksAuthService.swift`
+- `SyncNos/Views/Settings/General/SiteLoginsView.swift`
+- `SyncNos/ViewModels/SiteLogins/SiteLoginsViewModel.swift`
+- `SyncNos/Services/Core/DIContainer.swift`
+- `SyncNos/Services/Core/Protocols.swift`
+
 **Breaking changes（破坏性修改）**
 - ✅ 接受破坏性修改：**不需要**向后兼容旧的存储格式/旧的通知链路/旧的设置页结构。
 - 影响：升级后用户可能需要重新登录（Keychain 旧数据可直接废弃或清理）。
@@ -22,7 +44,8 @@
   - 读/写 `cookieHeader`（WeRead/Dedao：单项；GoodLinks：按站点域名分组多项）
   - `checkSession()`（WeRead：调用最轻 API；Dedao：调用 `fetchUserInfo()`；GoodLinks：先返回 `.unknown`，由抓取器的 401/403 决策为主）
   - `clear()` / `clearAll()`
-- `SiteLoginsView` 只依赖 providers 列表渲染，避免逻辑散落到多个 ViewModel。
+- `SiteLoginProviderProtocol` 采用 `Actor`，避免 Swift 6 下的 Sendable 警告；聚合层 `SiteLoginsService` 也是 `actor`。
+- `SiteLoginsView` 依赖 `SiteLoginsService` + 简单 ViewModel 来渲染与触发操作，避免逻辑散落到多个地方。
 
 **Acceptance（验收）**
 - `Site Logins` 页面能同时看到：WeRead、Dedao（各 1 项）与 GoodLinks（按站点域名多项）的登录状态与操作按钮（Open Login / Check / Log Out 或 Clear）。
@@ -94,15 +117,17 @@
 - Create: `SyncNos/Services/SiteLogins/SiteLoginsService.swift`
 
 **内容建议**
-- `protocol SiteLoginProviderProtocol: Sendable`（或 `Actor`，按实现需要选择）：
-  - `var source: ContentSource { get }`
+- `protocol SiteLoginProviderProtocol: Actor`：
+  - `nonisolated var source: ContentSource { get }`
   - `func listEntries() async -> [SiteLoginEntry]`
-  - `func openLogin(for entryId: String)`（通过 Notification / 直接回调打开对应登录 UI）
-  - `func checkSession(for entryId: String) async -> SiteLoginStatus`
-  - `func clear(for entryId: String) async`
+  - `func checkSession(entryId: String) async -> SiteLoginStatus`
+  - `func clear(entryId: String) async`
   - `func clearAll() async`
-- `protocol SiteLoginsServiceProtocol: Sendable`：
+- `protocol SiteLoginsServiceProtocol: Actor`：
   - `func listAllEntries() async -> [SiteLoginEntry]`
+  - `func checkSession(entryId: String) async -> SiteLoginStatus`
+  - `func clear(entryId: String) async`
+  - `func clearAll() async`
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build -quiet`
@@ -120,7 +145,7 @@
 - `listEntries()`：返回单条 entry（`domain=nil`），`isLoggedIn` 使用 `weReadAuthService.isLoggedIn`。
 - `checkSession()`：调用 `weReadAPIService.fetchNotebooks()`；成功 → `.valid`；捕获 `WeReadAPIError.sessionExpired*` → `.expired(reason)`；未登录 → `.needLogin(reason)`。
 - `clearAll()`：`await weReadAuthService.clearCookies()`。
-- `openLogin()`：以“新的统一入口”为准（例如 `.navigateToSiteLogins` + `.siteLoginsShowWeReadLoginSheet`），不保留旧通知链路的兼容分支。
+- 登录 UI：在 `SiteLoginsView` 直接弹出 `WeReadLoginView`；WeRead 设置页仍保留原有登录 Sheet（当前仍存在旧通知跳转链路）。
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build -quiet`
@@ -192,10 +217,8 @@
 **实现要点**
 - Settings 页的 Account 区继续显示：
   - Login Status / Open Login / Log Out
-- 但底层操作全部委托到对应 Provider/Service（减少重复逻辑）：
-  - `clearLogin()` → provider.clearAll()
-  - `refreshLoginStatus()` → provider.listEntries() 的结果
-- 破坏性变更：删除/移除旧的“从 SettingsView 导航到各自 dataSource pane 并自动弹 sheet”的兼容逻辑（如有），统一以当前方案为准。
+- （可选优化）底层操作委托到 Provider/Service（减少重复逻辑）：当前未做，仍使用原有 SettingsViewModel 的实现。
+- （可选清理）删除/移除旧的“从 SettingsView 导航到各自 dataSource pane 并自动弹 sheet”的兼容逻辑：当前未做，仍保留。
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build -quiet`
