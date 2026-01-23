@@ -459,9 +459,7 @@ struct GoodLinksDetailView: View {
                 return .loaded(content: result.textContent, wordCount: result.wordCount)
             } else {
                 // 已加载但无内容
-                let link = viewModel.links.first(where: { $0.id == linkId })
-                let openURL = link.flatMap { URL(string: $0.openInGoodLinksURLString) }
-                return .empty(openURL: openURL)
+                return .empty
             }
             
         case .error(let message):
