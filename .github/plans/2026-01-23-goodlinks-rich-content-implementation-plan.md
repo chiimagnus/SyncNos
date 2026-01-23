@@ -30,7 +30,7 @@
 
 > 这是 Notion 与 App 展示的共同前置：如果没有缓存，用户会感知到“每次都重新抓网页”。
 
-#### Task 0.1: 新增 SwiftData 缓存模型与服务（GoodLinksURLCacheService）
+#### Task 0.1: 新增 SwiftData 缓存模型与服务（GoodLinksURLCacheService）✅
 
 **Files**
 - Create: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLCacheModels.swift`
@@ -52,7 +52,7 @@
 
 ---
 
-#### Task 0.2: 在 DIContainer 注册缓存服务
+#### Task 0.2: 在 DIContainer 注册缓存服务✅
 
 **Files**
 - Modify: `SyncNos/Services/Core/DIContainer.swift`
@@ -65,7 +65,7 @@
 
 ---
 
-#### Task 0.3: URLFetcher 集成缓存（读写 + 日志）
+#### Task 0.3: URLFetcher 集成缓存（读写 + 日志）✅
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
