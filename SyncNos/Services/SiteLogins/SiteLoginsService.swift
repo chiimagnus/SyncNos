@@ -31,6 +31,16 @@ actor SiteLoginsService: SiteLoginsServiceProtocol {
         guard let provider = provider(for: entryId) else { return .unknown }
         return await provider.checkSession(entryId: entryId)
     }
+
+    func cookieHeader(for url: String) async -> String? {
+        for provider in providersByPriority {
+            if let header = await provider.cookieHeader(for: url),
+               !header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return header
+            }
+        }
+        return nil
+    }
     
     func clear(entryId: String) async {
         guard let provider = provider(for: entryId) else { return }
@@ -51,5 +61,27 @@ actor SiteLoginsService: SiteLoginsServiceProtocol {
         guard let source = ContentSource(rawValue: String(first)) else { return nil }
         return providers.first { $0.source == source }
     }
-}
 
+    private var providersByPriority: [any SiteLoginProviderProtocol] {
+        // 用于 URL 抓取的 cookieHeader 优先级：
+        // 1) GoodLinks（任意站点 cookieHeader 存储）
+        // 2) Dedao / WeRead（各自站点固定 cookieHeader）
+        // 3) 其他（未来扩展）
+        providers.sorted { lhs, rhs in
+            priority(of: lhs.source) < priority(of: rhs.source)
+        }
+    }
+
+    private func priority(of source: ContentSource) -> Int {
+        switch source {
+        case .goodLinks:
+            return 0
+        case .dedao:
+            return 1
+        case .weRead:
+            return 2
+        default:
+            return 9
+        }
+    }
+}

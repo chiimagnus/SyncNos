@@ -45,6 +45,10 @@ actor GoodLinksSiteLoginProvider: SiteLoginProviderProtocol {
         }
         return .needLogin(reason: "No cookieHeader")
     }
+
+    func cookieHeader(for url: String) async -> String? {
+        await authService.getCookieHeader(for: url)
+    }
     
     func clear(entryId: String) async {
         guard let domain = parseDomain(from: entryId) else { return }
@@ -67,4 +71,3 @@ actor GoodLinksSiteLoginProvider: SiteLoginProviderProtocol {
         return domain.isEmpty ? nil : domain
     }
 }
-

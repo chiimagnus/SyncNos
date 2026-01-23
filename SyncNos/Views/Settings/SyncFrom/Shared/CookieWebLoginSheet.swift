@@ -17,15 +17,27 @@ private struct CookieWebView: NSViewRepresentable {
 struct CookieWebLoginSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let initialURL: URL
-    let cookieFilter: (HTTPCookie) -> Bool
-    let onSaveCookieHeader: @MainActor (String) -> Void
+    let defaultURLString: String
+    let cookieFilter: (_ currentHost: String, _ cookie: HTTPCookie) -> Bool
+    let onSave: @MainActor (_ cookies: [HTTPCookie], _ host: String, _ cookieHeader: String) -> Void
 
     @State private var webView = WKWebView()
     @State private var statusMessage: String?
+    @State private var currentURL: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                TextField("Enter URL", text: $currentURL)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Go") {
+                    loadCurrentURL()
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding()
+
             if let statusMessage, !statusMessage.isEmpty {
                 HStack {
                     Text(statusMessage)
@@ -40,10 +52,13 @@ struct CookieWebLoginSheet: View {
 
             CookieWebView(webView: webView)
         }
-        .frame(minWidth: 640, minHeight: 600)
+        .frame(minWidth: 720, minHeight: 640)
         .onAppear {
+            if currentURL.isEmpty {
+                currentURL = webView.url?.absoluteString ?? defaultURLString
+            }
             if webView.url == nil {
-                webView.load(URLRequest(url: initialURL))
+                loadCurrentURL()
             }
         }
         .toolbar {
@@ -57,10 +72,27 @@ struct CookieWebLoginSheet: View {
         }
     }
 
+    private func loadCurrentURL() {
+        let trimmed = currentURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.scheme != nil else {
+            statusMessage = String(localized: "Invalid URL.")
+            return
+        }
+        webView.load(URLRequest(url: url))
+    }
+
     private func captureCookiesFromWebView() {
         let store = webView.configuration.websiteDataStore.httpCookieStore
         store.getAllCookies { cookies in
-            let relevant = cookies.filter(cookieFilter)
+            let host = webView.url?.host ?? URL(string: currentURL)?.host
+            guard let host, !host.isEmpty else {
+                Task { @MainActor in
+                    statusMessage = String(localized: "Invalid URL.")
+                }
+                return
+            }
+
+            let relevant = cookies.filter { cookieFilter(host, $0) }
             guard !relevant.isEmpty else {
                 Task { @MainActor in
                     statusMessage = String(localized: "No cookies found. Please log in via the web view first.")
@@ -72,10 +104,9 @@ struct CookieWebLoginSheet: View {
             let header = headerFields["Cookie"] ?? relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
 
             Task { @MainActor in
-                onSaveCookieHeader(header)
+                onSave(relevant, host, header)
                 dismiss()
             }
         }
     }
 }
-

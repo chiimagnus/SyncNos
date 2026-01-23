@@ -61,6 +61,17 @@ actor DedaoSiteLoginProvider: SiteLoginProviderProtocol {
             return .unknown
         }
     }
+
+    func cookieHeader(for url: String) async -> String? {
+        guard let host = URL(string: url)?.host?.lowercased() else { return nil }
+        if host == "www.dedao.cn" || host.hasSuffix(".dedao.cn") || host == "dedao.cn" {
+            return authService.cookieHeader
+        }
+        if host == "igetget.com" || host.hasSuffix(".igetget.com") {
+            return authService.cookieHeader
+        }
+        return nil
+    }
     
     func clear(entryId: String) async {
         guard entryId == source.rawValue else { return }

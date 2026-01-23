@@ -63,6 +63,17 @@ actor WeReadSiteLoginProvider: SiteLoginProviderProtocol {
             return .unknown
         }
     }
+
+    func cookieHeader(for url: String) async -> String? {
+        guard let host = URL(string: url)?.host?.lowercased() else { return nil }
+        if host == "weread.qq.com" || host.hasSuffix(".weread.qq.com") {
+            return authService.cookieHeader
+        }
+        if host == "i.weread.qq.com" || host.hasSuffix(".i.weread.qq.com") {
+            return authService.cookieHeader
+        }
+        return nil
+    }
     
     func clear(entryId: String) async {
         guard entryId == source.rawValue else { return }
