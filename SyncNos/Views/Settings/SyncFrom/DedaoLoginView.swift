@@ -13,12 +13,12 @@ struct DedaoLoginView: View {
 
     var body: some View {
         CookieWebLoginSheet(
-            initialURL: URL(string: "https://www.dedao.cn/")!,
-            cookieFilter: { cookie in
+            defaultURLString: "https://www.dedao.cn/",
+            cookieFilter: { _, cookie in
                 cookie.domain.contains("dedao.cn") || cookie.domain.contains("igetget.com")
             },
-            onSaveCookieHeader: { header in
-                viewModel.saveCookieHeader(header)
+            onSave: { _, _, cookieHeader in
+                viewModel.saveCookieHeader(cookieHeader)
                 onLoginChanged?()
             }
         )

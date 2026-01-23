@@ -104,7 +104,7 @@ class DIContainer {
         if _goodLinksURLFetcher == nil {
             _goodLinksURLFetcher = GoodLinksURLFetcher(
                 cacheService: goodLinksURLCacheService,
-                authService: goodLinksAuthService
+                siteLoginsService: siteLoginsService
             )
         }
         return _goodLinksURLFetcher!
