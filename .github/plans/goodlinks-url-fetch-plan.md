@@ -20,16 +20,16 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 - ✅ P0（架构设计与基础模型）：已完成（协议/模型已落地）
 - ✅ P1（基础 URL 抓取）：已完成（正文提取 + 错误映射 + UI 接入）
-- ✅ P2（登录支持）：已完成（通过 `Site Logins` 统一管理 cookieHeader；抓取时自动带 Cookie）
+- ✅ P2（登录支持）：已完成（通过 `SiteLoginsStore` 统一管理 `domain → cookieHeader`；抓取时自动带 Cookie）
 - ✅ P3.1（抓取结果持久化缓存）：已完成（SwiftData，TTL=7 天）
 - ⏳ P3.2（Fetcher 内部重试/退避）：未完成（当前仅 UI 侧提供 Retry；Fetcher 未实现指数退避）
 - ⏳ P3.3（抓取策略配置开关）：未开始
 - ⏳ P3.4（缓存命中率/重试次数等聚合日志）：部分完成（已有单次耗时与缓存命中日志；统计未补齐）
 
 **与原计划的差异（已按破坏性修改落地）**
-- `GoodLinksURLFetcherProtocol.fetchArticleWithAuth(url:cookies:)` 已移除：统一走 `SiteLoginsService.cookieHeader(for:)`（更符合“多数据源登录共享”的目标）。
+- `GoodLinksURLFetcherProtocol.fetchArticleWithAuth(url:cookies:)` 已移除：统一走 `SiteLoginsStore.getCookieHeader(for:)`（更符合“多数据源登录共享”的目标）。
 - Web 登录 UI 统一：WeRead/Dedao/GoodLinks 都使用同一个带 URL 输入栏的 `CookieWebLoginSheet`。
-- GoodLinks 登录存储升级：从“逐 cookie 存储”切换为 “domain → cookieHeader（+updatedAt）”，旧 Keychain 条目直接废弃（需重新登录一次）。
+- 登录存储升级：从“分散在各数据源 AuthService”切换为统一的 “domain → cookieHeader（+updatedAt）”，旧 Keychain 条目（如存在）会在首次读取时 best-effort 迁移并清理。
 
 ### P0: 架构设计与基础模型（准备阶段）✅
 
@@ -121,10 +121,12 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **状态**: ✅ 已完成（已支持多站点登录：WebView 获取 cookies → Keychain 持久化 → 请求自动带 Cookie）
 
-#### P2.1: 创建 GoodLinks 认证服务
-**文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksAuthService.swift`（新建）
+#### P2.1: 创建统一 Site Logins 存储（domain → cookieHeader）
+**文件**: `SyncNos/Services/SiteLogins/SiteLoginsStore.swift`
 
-**状态**: ✅ 已完成（多站点：按域名持久化 `cookieHeader`，按 URL 生成 Cookie Header）
+**状态**: ✅ 已完成（多站点：按域名持久化 `cookieHeader`，按 URL 自动匹配最合适 domain）
+
+> 备注：旧的 `WeReadAuthService` / `DedaoAuthService` / `GoodLinksAuthService` 已删除；下面的示例代码仅作为历史记录，不再适用。
 
 **任务**:
 1. 参考 `WeReadAuthService.swift` 和 `DedaoAuthService.swift` 实现:
@@ -190,8 +192,8 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 #### P2.2: 创建 WebKit 登录视图
 **文件**: 
-- `SyncNos/Views/Settings/SyncFrom/GoodLinksLoginView.swift`（新建）
-- `SyncNos/ViewModels/GoodLinks/GoodLinksLoginViewModel.swift`（新建）
+- `SyncNos/Views/Settings/SyncFrom/Shared/CookieWebLoginSheet.swift`
+- `SyncNos/Views/Settings/SyncFrom/GoodLinksLoginView.swift`
 
 **状态**: ✅ 已完成（已与 WeRead/Dedao 统一到同一个 Web 登录 Sheet：带 URL 输入栏）
 
