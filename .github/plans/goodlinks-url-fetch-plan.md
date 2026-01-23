@@ -35,7 +35,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ## 优先级分级与后续计划（从当前实现继续）
 
-### P0: 架构设计与基础模型（准备阶段）
+### P0: 架构设计与基础模型（准备阶段）✅
 
 **目标**: 定义清晰的架构和数据模型，为后续 URL 抓取主路径打下基础
 
@@ -61,7 +61,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ---
 
-### P1: 基础 URL 抓取（不需要登录的网站）
+### P1: 基础 URL 抓取（不需要登录的网站）✅
 
 **目标**: 实现基础的 URL 文章抓取，支持公开访问的网站
 
