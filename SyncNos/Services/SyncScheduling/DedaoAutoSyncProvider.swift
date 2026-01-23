@@ -8,7 +8,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     
     private let logger: LoggerServiceProtocol
     private let apiService: DedaoAPIServiceProtocol
-    private let authService: DedaoAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let cacheService: DedaoCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
     private let notionConfig: NotionConfigStoreProtocol
@@ -19,7 +19,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
-        authService: DedaoAuthServiceProtocol = DIContainer.shared.dedaoAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         cacheService: DedaoCacheServiceProtocol = DIContainer.shared.dedaoCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
@@ -27,7 +27,7 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
     ) {
         self.logger = logger
         self.apiService = apiService
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.cacheService = cacheService
         self.syncEngine = syncEngine
         self.notionConfig = notionConfig
@@ -52,12 +52,6 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
         let enabled = UserDefaults.standard.bool(forKey: autoSyncUserDefaultsKey)
         guard enabled else { return }
         
-        // 检查 Dedao 是否已登录
-        guard authService.isLoggedIn else {
-            logger.warning("[SmartSync] Dedao skipped: not logged in")
-            return
-        }
-        
         isSyncing = true
         logger.info("[SmartSync] Dedao: starting check for all books")
         
@@ -68,6 +62,13 @@ final class DedaoAutoSyncProvider: AutoSyncSourceProvider {
                 self.logger.info("[SmartSync] Dedao: finished")
             }
             do {
+                // 检查 Dedao 是否已登录
+                let cookie = await self.siteLoginsStore.getCookieHeader(for: "https://www.dedao.cn/")
+                guard let cookie, !cookie.isEmpty else {
+                    self.logger.warning("[SmartSync] Dedao skipped: not logged in")
+                    return
+                }
+
                 try await self.syncAllBooksSmart()
             } catch {
                 self.logger.error("[SmartSync] Dedao error: \(error.localizedDescription)")

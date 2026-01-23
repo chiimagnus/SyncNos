@@ -65,11 +65,7 @@ struct MainListView: View {
     // MARK: - Initialization
     
     init() {
-        _dedaoVM = StateObject(wrappedValue: DedaoViewModel(
-            authService: DIContainer.shared.dedaoAuthService,
-            apiService: DIContainer.shared.dedaoAPIService,
-            cacheService: DIContainer.shared.dedaoCacheService
-        ))
+        _dedaoVM = StateObject(wrappedValue: DedaoViewModel())
     }
     
     // MARK: - Environment
@@ -277,7 +273,14 @@ struct MainListView: View {
             ) {
                 Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }
                 Button(NSLocalizedString("Go to Login", comment: "")) {
-                    navigateToLogin(for: sessionExpiredSource)
+                    openWindow(id: "setting")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NotificationCenter.default.post(
+                            name: .navigateToSiteLogins,
+                            object: nil,
+                            userInfo: ["source": sessionExpiredSource.rawValue]
+                        )
+                    }
                 }
             } message: {
                 Text(sessionExpiredReason)

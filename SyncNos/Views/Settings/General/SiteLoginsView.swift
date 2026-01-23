@@ -2,99 +2,156 @@ import SwiftUI
 
 /// 站点登录管理（用于需要 Cookie 才能抓取的网页）
 ///
-/// 当前用途：
-/// - GoodLinks URL 抓取：当站点需要登录时，通过这里保存 cookies 以便后续请求携带 Cookie Header。
 struct SiteLoginsView: View {
-    @StateObject private var goodLinksLoginViewModel = GoodLinksLoginViewModel()
+    @StateObject private var viewModel = SiteLoginsViewModel()
+    
+    @State private var showingWeReadLoginSheet: Bool = false
+    @State private var showingDedaoLoginSheet: Bool = false
     @State private var showingGoodLinksLoginSheet: Bool = false
     
     var body: some View {
         List {
             Section {
                 LabeledContent {
-                    Text(goodLinksLoginViewModel.domainSummaries.isEmpty ? "Not Logged In" : "\(goodLinksLoginViewModel.domainSummaries.count) sites")
+                    Text(viewModel.domains.isEmpty ? "0" : "\(viewModel.domains.count)")
                         .scaledFont(.body)
-                        .foregroundColor(goodLinksLoginViewModel.domainSummaries.isEmpty ? .secondary : .green)
+                        .foregroundColor(viewModel.domains.isEmpty ? .secondary : .green)
                 } label: {
-                    Label("Login Status", systemImage: goodLinksLoginViewModel.domainSummaries.isEmpty ? "xmark.seal" : "checkmark.seal.fill")
+                    Label("Saved Logins", systemImage: viewModel.domains.isEmpty ? "xmark.seal" : "checkmark.seal.fill")
                         .scaledFont(.body)
-                }
-                
-                LabeledContent {
-                    Button(role: .destructive) {
-                        Task {
-                            await goodLinksLoginViewModel.logout()
-                        }
-                    } label: {
-                        Text("Clear All")
-                            .scaledFont(.body)
-                    }
-                    .disabled(goodLinksLoginViewModel.domainSummaries.isEmpty)
-                } label: {
-                    Button {
-                        showingGoodLinksLoginSheet = true
-                    } label: {
-                        Label("Open Login", systemImage: "safari")
-                            .scaledFont(.body)
-                    }
-                }
-                
-                if !goodLinksLoginViewModel.domainSummaries.isEmpty {
-                    ForEach(goodLinksLoginViewModel.domainSummaries) { item in
-                        LabeledContent {
-                            HStack(spacing: 10) {
-                                Text("\(item.cookieCount) cookies")
-                                    .scaledFont(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                if item.hasSessionCookies {
-                                    Text("Session")
-                                        .scaledFont(.caption)
-                                        .foregroundColor(.secondary)
-                                } else if let exp = item.earliestExpiry {
-                                    Text("Expires \(format(exp))")
-                                        .scaledFont(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                Button(role: .destructive) {
-                                    goodLinksLoginViewModel.clearDomain(item.domain)
-                                } label: {
-                                    Text("Clear")
-                                        .scaledFont(.caption)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        } label: {
-                            Text(item.domain)
-                                .scaledFont(.body)
-                        }
-                    }
                 }
             } footer: {
-                Text("These cookies are used to fetch articles from websites that require login.")
+                Text("These cookies are used to fetch content from websites that require login.")
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
+            }
+            
+            Section {
+                if viewModel.domains.isEmpty {
+                    Text("No sites")
+                        .scaledFont(.body)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(viewModel.domains) { entry in
+                        domainRow(entry)
+                    }
+                }
+            } header: {
+                Text("Domains")
+                    .scaledFont(.headline)
             }
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("Site Logins")
-        .onAppear {
-            goodLinksLoginViewModel.refreshState()
+        .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    viewModel.refresh()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                
+                Menu {
+                    Button {
+                        showingWeReadLoginSheet = true
+                    } label: {
+                        Text("WeRead")
+                    }
+                    
+                    Button {
+                        showingDedaoLoginSheet = true
+                    } label: {
+                        Text("Dedao")
+                    }
+                    
+                    Button {
+                        showingGoodLinksLoginSheet = true
+                    } label: {
+                        Text("Custom URL")
+                    }
+                } label: {
+                    Label("Open Login", systemImage: "safari")
+                }
+                
+                Button(role: .destructive) {
+                    viewModel.clearAll()
+                } label: {
+                    Text("Clear All")
+                }
+                .disabled(viewModel.domains.isEmpty)
+            }
+        }
+        .onAppear { viewModel.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .siteLoginsShowLoginSheet).receive(on: DispatchQueue.main)) { notification in
+            guard let sourceRaw = notification.userInfo?["source"] as? String,
+                  let source = ContentSource(rawValue: sourceRaw) else { return }
+            openLogin(for: source)
+        }
+        .sheet(isPresented: $showingWeReadLoginSheet) {
+            WeReadLoginView {
+                viewModel.refresh()
+            }
+        }
+        .sheet(isPresented: $showingDedaoLoginSheet) {
+            DedaoLoginView(onLoginChanged: {
+                viewModel.refresh()
+            })
         }
         .sheet(isPresented: $showingGoodLinksLoginSheet) {
-            GoodLinksLoginView(viewModel: goodLinksLoginViewModel) {
-                goodLinksLoginViewModel.refreshState()
+            GoodLinksLoginView {
+                viewModel.refresh()
             }
         }
     }
     
     // MARK: - Helpers
+    
+    private func domainRow(_ entry: SiteLoginsDomainEntry) -> some View {
+        LabeledContent {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text("Updated \(format(entry.updatedAt))")
+                        .scaledFont(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Button(role: .destructive) {
+                        viewModel.clear(domain: entry.domain)
+                    } label: {
+                        Text("Clear")
+                            .scaledFont(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                
+                Text(entry.cookieHeader)
+                    .scaledFont(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .textSelection(.enabled)
+            }
+        } label: {
+            Text(entry.domain)
+                .scaledFont(.body)
+        }
+    }
+    
+    private func openLogin(for source: ContentSource) {
+        switch source {
+        case .weRead:
+            showingWeReadLoginSheet = true
+        case .dedao:
+            showingDedaoLoginSheet = true
+        case .goodLinks:
+            showingGoodLinksLoginSheet = true
+        default:
+            break
+        }
+    }
     
     private func format(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -110,4 +167,3 @@ struct SiteLoginsView_Previews: PreviewProvider {
         SiteLoginsView()
     }
 }
-

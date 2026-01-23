@@ -101,14 +101,15 @@ DIContainer.shared.autoSyncService
 DIContainer.shared.syncTimestampStore
 
 // WeRead 服务
-DIContainer.shared.weReadAuthService
 DIContainer.shared.weReadAPIService
 DIContainer.shared.weReadCacheService
 
 // Dedao 服务
-DIContainer.shared.dedaoAuthService
 DIContainer.shared.dedaoAPIService
 DIContainer.shared.dedaoCacheService
+
+// Site Logins（Cookie 登录统一存储：domain → cookieHeader）
+DIContainer.shared.siteLoginsStore
 
 // Chats 服务
 DIContainer.shared.chatsCacheService

@@ -26,6 +26,7 @@ final class WeReadViewModel: ObservableObject {
     
     // 登录状态相关
     @Published var showLoginSheet: Bool = false
+    @Published var isLoggedIn: Bool = false
 
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -36,7 +37,7 @@ final class WeReadViewModel: ObservableObject {
     private var currentPageSize: Int = 0
 
     // 依赖
-    private let authService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let apiService: WeReadAPIServiceProtocol
     private let cacheService: WeReadCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
@@ -52,7 +53,7 @@ final class WeReadViewModel: ObservableObject {
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
 
     init(
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         apiService: WeReadAPIServiceProtocol = DIContainer.shared.weReadAPIService,
         cacheService: WeReadCacheServiceProtocol = DIContainer.shared.weReadCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
@@ -60,7 +61,7 @@ final class WeReadViewModel: ObservableObject {
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.apiService = apiService
         self.cacheService = cacheService
         self.syncEngine = syncEngine
@@ -77,6 +78,7 @@ final class WeReadViewModel: ObservableObject {
 
         setupPipelines()
         subscribeSyncStatusNotifications()
+        refreshLoginStatus()
     }
 
     // MARK: - Pipelines
@@ -142,6 +144,7 @@ final class WeReadViewModel: ObservableObject {
                 self.books = []
                 self.displayBooks = []
                 self.visibleBooks = []
+                self.isLoggedIn = false
                 self.objectWillChange.send()
             }
             .store(in: &cancellables)
@@ -153,9 +156,21 @@ final class WeReadViewModel: ObservableObject {
         recomputeTrigger.send(())
     }
 
+    func refreshLoginStatus() {
+        Task {
+            let cookie = await siteLoginsStore.getCookieHeader(for: "https://weread.qq.com/")
+            await MainActor.run {
+                self.isLoggedIn = (cookie?.isEmpty == false)
+            }
+        }
+    }
+
     /// 加载书籍（优先从缓存，后台增量同步）
     func loadBooks() async {
-        guard authService.isLoggedIn else {
+        let cookie = await siteLoginsStore.getCookieHeader(for: "https://weread.qq.com/")
+        let loggedIn = (cookie?.isEmpty == false)
+        isLoggedIn = loggedIn
+        guard loggedIn else {
             logger.info("[WeRead] Not logged in, skip loading books")
             return
         }
@@ -315,10 +330,6 @@ final class WeReadViewModel: ObservableObject {
     
     // MARK: - Login Status
     
-    var isLoggedIn: Bool {
-        authService.isLoggedIn
-    }
-    
     /// 导航到 WeRead 登录页面（直接在 ListView 中打开登录 Sheet）
     func navigateToWeReadLogin() {
         showLoginSheet = true
@@ -326,9 +337,8 @@ final class WeReadViewModel: ObservableObject {
     
     /// 登录成功后调用，触发 UI 更新并加载书籍
     func onLoginSuccess() {
-        // 触发 SwiftUI 重新检查 isLoggedIn
-        objectWillChange.send()
         Task {
+            refreshLoginStatus()
             await loadBooks()
         }
     }

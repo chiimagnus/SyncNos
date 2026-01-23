@@ -16,7 +16,7 @@ class DIContainer {
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
     private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
-    private var _goodLinksAuthService: GoodLinksAuthServiceProtocol?
+    private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
@@ -27,11 +27,9 @@ class DIContainer {
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
     // WeRead
-    private var _weReadAuthService: WeReadAuthServiceProtocol?
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadCacheService: WeReadCacheServiceProtocol?
     // Dedao
-    private var _dedaoAuthService: DedaoAuthServiceProtocol?
     private var _dedaoAPIService: DedaoAPIServiceProtocol?
     private var _dedaoCacheService: DedaoCacheServiceProtocol?
     // Sync Engine
@@ -100,7 +98,7 @@ class DIContainer {
         if _goodLinksURLFetcher == nil {
             _goodLinksURLFetcher = GoodLinksURLFetcher(
                 cacheService: goodLinksURLCacheService,
-                authService: goodLinksAuthService
+                siteLoginsStore: siteLoginsStore
             )
         }
         return _goodLinksURLFetcher!
@@ -119,12 +117,13 @@ class DIContainer {
         }
         return _goodLinksURLCacheService!
     }
-    
-    var goodLinksAuthService: GoodLinksAuthServiceProtocol {
-        if _goodLinksAuthService == nil {
-            _goodLinksAuthService = GoodLinksAuthService()
+
+    // MARK: - Site Logins Services
+    var siteLoginsStore: SiteLoginsStoreProtocol {
+        if _siteLoginsStore == nil {
+            _siteLoginsStore = SiteLoginsStore()
         }
-        return _goodLinksAuthService!
+        return _siteLoginsStore!
     }
 
     var autoSyncService: AutoSyncServiceProtocol {
@@ -193,16 +192,12 @@ class DIContainer {
 
     // MARK: - WeRead Services
 
-    var weReadAuthService: WeReadAuthServiceProtocol {
-        if _weReadAuthService == nil {
-            _weReadAuthService = WeReadAuthService()
-        }
-        return _weReadAuthService!
-    }
-
     var weReadAPIService: WeReadAPIServiceProtocol {
         if _weReadAPIService == nil {
-            _weReadAPIService = WeReadAPIService(authService: weReadAuthService)
+            _weReadAPIService = WeReadAPIService(
+                siteLoginsStore: siteLoginsStore,
+                logger: loggerService
+            )
         }
         return _weReadAPIService!
     }
@@ -226,17 +221,10 @@ class DIContainer {
     
     // MARK: - Dedao Services
     
-    var dedaoAuthService: DedaoAuthServiceProtocol {
-        if _dedaoAuthService == nil {
-            _dedaoAuthService = DedaoAuthService()
-        }
-        return _dedaoAuthService!
-    }
-    
     var dedaoAPIService: DedaoAPIServiceProtocol {
         if _dedaoAPIService == nil {
             _dedaoAPIService = DedaoAPIService(
-                authService: dedaoAuthService,
+                siteLoginsStore: siteLoginsStore,
                 logger: loggerService
             )
         }
@@ -396,10 +384,6 @@ class DIContainer {
         self._notionOAuthService = notionOAuthService
     }
 
-    func register(weReadAuthService: WeReadAuthServiceProtocol) {
-        self._weReadAuthService = weReadAuthService
-    }
-
     func register(weReadAPIService: WeReadAPIServiceProtocol) {
         self._weReadAPIService = weReadAPIService
     }
@@ -421,10 +405,6 @@ class DIContainer {
         self._environmentDetector = environmentDetector
     }
     
-    func register(dedaoAuthService: DedaoAuthServiceProtocol) {
-        self._dedaoAuthService = dedaoAuthService
-    }
-    
     func register(dedaoAPIService: DedaoAPIServiceProtocol) {
         self._dedaoAPIService = dedaoAPIService
     }
@@ -443,5 +423,9 @@ class DIContainer {
     
     func register(chatsCacheService: ChatCacheServiceProtocol) {
         self._chatsCacheService = chatsCacheService
+    }
+
+    func register(siteLoginsStore: SiteLoginsStoreProtocol) {
+        self._siteLoginsStore = siteLoginsStore
     }
 }

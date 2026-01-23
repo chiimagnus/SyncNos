@@ -257,6 +257,19 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
 }
 
+// MARK: - Site Logins Protocols
+
+/// 统一站点登录存储：以 domain 为 key 存储 cookieHeader
+protocol SiteLoginsStoreProtocol: Actor {
+    func upsertCookieHeader(_ cookieHeader: String, forDomain domain: String) async
+    func upsertCookieHeader(_ cookieHeader: String, forDomains domains: [String]) async
+    func getCookieHeader(for url: String) async -> String?
+    func listDomains() async -> [SiteLoginsDomainEntry]
+    func clear(domain: String) async
+    func clear(domains: [String]) async
+    func clearAll() async
+}
+
 /// GoodLinks URL 抓取结果缓存服务协议（SwiftData）
 /// 调用方需要使用 await 调用这些方法（actor 隔离）
 protocol GoodLinksURLCacheServiceProtocol: Actor {
@@ -271,28 +284,6 @@ protocol GoodLinksURLCacheServiceProtocol: Actor {
     
     /// 清空全部缓存
     func removeAll() throws
-}
-
-/// GoodLinks 网页登录 Cookie 管理服务协议
-/// 用于访问需要登录的网站（按 URL 计算适用 Cookie Header）
-protocol GoodLinksAuthServiceProtocol: Actor {
-    /// 当前是否已登录（依据是否存在可用 Cookie）
-    var isLoggedIn: Bool { get }
-    
-    /// 更新并持久化 WebKit cookies
-    func updateCookies(_ cookies: [HTTPCookie])
-    
-    /// 获取指定 URL 的 Cookie Header（`Cookie: ...` 的值部分）
-    func getCookieHeader(for url: String) -> String?
-    
-    /// 获取已保存的站点列表（用于设置页展示）
-    func getDomainSummaries() -> [GoodLinksAuthDomainSummary]
-    
-    /// 清除指定站点的 cookies
-    func clearCookies(forDomain domain: String) async
-    
-    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
-    func clearCookies() async
 }
 
 // MARK: - Auto Sync Service Protocol
@@ -321,19 +312,6 @@ protocol SyncTimestampStoreProtocol: AnyObject {
 }
 
 // MARK: - WeRead Auth & Data Protocols
-
-/// 管理 WeRead 认证 Cookie 的服务协议
-protocol WeReadAuthServiceProtocol: AnyObject {
-    /// 当前是否已登录（依据是否存在可用 Cookie）
-    var isLoggedIn: Bool { get }
-    /// 已持久化的 Cookie Header（`Cookie: ...` 的值部分）
-    var cookieHeader: String? { get }
-
-    /// 更新并持久化新的 Cookie Header
-    func updateCookieHeader(_ header: String)
-    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
-    func clearCookies() async
-}
 
 /// WeRead API 服务协议
 protocol WeReadAPIServiceProtocol: AnyObject {
@@ -480,19 +458,6 @@ protocol SyncQueueStoreProtocol: AnyObject {
 }
 
 // MARK: - Dedao Auth & Data Protocols
-
-/// 管理 Dedao 认证 Cookie 的服务协议
-protocol DedaoAuthServiceProtocol: AnyObject {
-    /// 当前是否已登录（依据是否存在可用 Cookie）
-    var isLoggedIn: Bool { get }
-    /// 已持久化的 Cookie Header（`Cookie: ...` 的值部分）
-    var cookieHeader: String? { get }
-    
-    /// 更新并持久化新的 Cookie Header
-    func updateCookieHeader(_ header: String)
-    /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
-    func clearCookies() async
-}
 
 /// Dedao API 服务协议
 protocol DedaoAPIServiceProtocol: AnyObject {
