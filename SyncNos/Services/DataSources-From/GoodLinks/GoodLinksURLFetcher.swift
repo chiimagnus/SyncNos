@@ -18,20 +18,45 @@ protocol GoodLinksURLFetcherProtocol: AnyObject, Sendable {
 final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
     private let logger: LoggerServiceProtocol
     private let session: URLSession
+    private let cacheService: GoodLinksURLCacheServiceProtocol?
     
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        cacheService: GoodLinksURLCacheServiceProtocol? = nil
     ) {
         self.logger = logger
         self.session = session
+        self.cacheService = cacheService
     }
     
     func fetchArticle(url: String) async throws -> ArticleFetchResult {
-        try await fetchArticleInternal(url: url, cookieHeader: nil, source: .url)
+        if let cacheService {
+            do {
+                if let cached = try await cacheService.getArticle(url: url) {
+                    logger.info("[GoodLinksURLFetcher] 命中缓存 url=\(url)")
+                    return cached
+                }
+            } catch {
+                logger.warning("[GoodLinksURLFetcher] 读取缓存失败 url=\(url) error=\(error.localizedDescription)")
+            }
+        }
+        
+        return try await fetchArticleInternal(url: url, cookieHeader: nil, source: .url)
     }
     
     func fetchArticleWithAuth(url: String, cookies: [HTTPCookie]) async throws -> ArticleFetchResult {
+        if let cacheService {
+            do {
+                if let cached = try await cacheService.getArticle(url: url) {
+                    logger.info("[GoodLinksURLFetcher] 命中缓存（含认证调用）url=\(url)")
+                    return cached
+                }
+            } catch {
+                logger.warning("[GoodLinksURLFetcher] 读取缓存失败（含认证调用）url=\(url) error=\(error.localizedDescription)")
+            }
+        }
+        
         let headerFields = HTTPCookie.requestHeaderFields(with: cookies)
         let cookieHeader = headerFields["Cookie"]
         return try await fetchArticleInternal(url: url, cookieHeader: cookieHeader, source: .urlWithAuth)
@@ -90,7 +115,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             let text = htmlToPlainText(mainHTML).trimmingCharacters(in: .whitespacesAndNewlines)
             let wordCount = countWords(in: text)
             
-            return ArticleFetchResult(
+            let result = ArticleFetchResult(
                 title: title,
                 content: mainHTML,
                 textContent: text,
@@ -100,6 +125,16 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 fetchedAt: Date(),
                 source: source
             )
+            
+            if let cacheService {
+                do {
+                    try await cacheService.upsertArticle(url: raw, result: result)
+                } catch {
+                    logger.warning("[GoodLinksURLFetcher] 写入缓存失败 url=\(raw) error=\(error.localizedDescription)")
+                }
+            }
+            
+            return result
         } catch let error as URLFetchError {
             throw error
         } catch {
@@ -214,4 +249,3 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
     
     private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)"
 }
-
