@@ -14,25 +14,6 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ---
 
-## 当前实现状态（已完成）
-
-> 代码已落地且通过编译：`xcodebuild -scheme SyncNos build -quiet`
-
-- ✅ 已新增 `GoodLinksURLFetcher` 与协议：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
-- ✅ 已新增 URL 抓取模型与错误类型：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksModels.swift`
-  - `ArticleFetchResult` / `FetchSource` / `URLFetchError`
-- ✅ 已在 DIContainer 注册：`SyncNos/Services/Core/DIContainer.swift`（`goodLinksURLFetcher`）
-- ✅ 已将 GoodLinks 详情页正文加载改为 URL Only：
-  - `SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`（`article: ArticleFetchResult?`）
-  - `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`（向 VM 传入 `GoodLinksLinkRow`）
-- ✅ 已将 Notion 同步的 “Article” 正文改为 URL Only：
-  - `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
-  - `GoodLinksNotionAdapter.create(...)` 已改为 `async`
-- ✅ 已彻底删除 SQLite `content` 表相关代码（协议/查询/模型/调用链）
-  - 不再存在 `GoodLinksContentRow`、`fetchContent`、`fetchContentPreview`、SQL `FROM content`
-
----
-
 ## 优先级分级与后续计划（从当前实现继续）
 
 ### P0: 架构设计与基础模型（准备阶段）✅
