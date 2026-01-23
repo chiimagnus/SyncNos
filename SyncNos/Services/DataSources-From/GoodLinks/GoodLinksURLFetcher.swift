@@ -5,7 +5,6 @@ import AppKit
 
 protocol GoodLinksURLFetcherProtocol: AnyObject, Sendable {
     func fetchArticle(url: String) async throws -> ArticleFetchResult
-    func fetchArticleWithAuth(url: String, cookies: [HTTPCookie]) async throws -> ArticleFetchResult
 }
 
 // MARK: - GoodLinks URL Fetcher
@@ -53,23 +52,6 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         }
         
         return try await fetchArticleInternal(url: url, cookieHeader: nil, source: .url)
-    }
-    
-    func fetchArticleWithAuth(url: String, cookies: [HTTPCookie]) async throws -> ArticleFetchResult {
-        if let cacheService {
-            do {
-                if let cached = try await cacheService.getArticle(url: url) {
-                    logger.info("[GoodLinksURLFetcher] 命中缓存（含认证调用）url=\(url)")
-                    return cached
-                }
-            } catch {
-                logger.warning("[GoodLinksURLFetcher] 读取缓存失败（含认证调用）url=\(url) error=\(error.localizedDescription)")
-            }
-        }
-        
-        let headerFields = HTTPCookie.requestHeaderFields(with: cookies)
-        let cookieHeader = headerFields["Cookie"]
-        return try await fetchArticleInternal(url: url, cookieHeader: cookieHeader, source: .urlWithAuth)
     }
     
     // MARK: - Internal

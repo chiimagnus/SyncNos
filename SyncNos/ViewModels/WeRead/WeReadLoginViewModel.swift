@@ -4,7 +4,6 @@ import Foundation
 final class WeReadLoginViewModel: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var statusMessage: String?
-    @Published var manualCookie: String = ""
 
     private let authService: WeReadAuthServiceProtocol
 
@@ -30,10 +29,5 @@ final class WeReadLoginViewModel: ObservableObject {
         } else {
             statusMessage = String(localized: "Cookie is empty or invalid. Please log in first.")
         }
-    }
-
-    func applyManualCookie() {
-        let trimmed = manualCookie.trimmingCharacters(in: .whitespacesAndNewlines)
-        saveCookieHeader(trimmed)
     }
 }
