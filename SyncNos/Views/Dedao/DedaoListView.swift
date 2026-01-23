@@ -135,13 +135,10 @@ struct DedaoListView: View {
             }
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {
-            DedaoLoginView(viewModel: DedaoLoginViewModel(
-                authService: DIContainer.shared.dedaoAuthService,
-                apiService: DIContainer.shared.dedaoAPIService
-            )) {
+            DedaoLoginView(onLoginChanged: {
                 // 登录成功后触发 UI 更新并刷新书籍列表
                 viewModel.onLoginSuccess()
-            }
+            })
         }
     }
 }
