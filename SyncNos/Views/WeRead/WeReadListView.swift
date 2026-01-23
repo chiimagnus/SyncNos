@@ -121,10 +121,10 @@ struct WeReadListView: View {
         }
         // SyncSelectedToNotionRequested、RefreshBooksRequested、Notion 配置弹窗、会话过期弹窗已移至 MainListView 统一处理
         .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadSettings).receive(on: DispatchQueue.main)) { _ in
-            // 打开设置窗口，SettingsView 会监听 NavigateToWeReadLogin 通知并导航到 WeReadSettingsView
+            // 打开设置窗口并跳转到 Site Logins
             openWindow(id: "setting")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NotificationCenter.default.post(name: .navigateToWeReadLogin, object: nil)
+                NotificationCenter.default.post(name: .navigateToSiteLogins, object: nil, userInfo: ["source": ContentSource.weRead.rawValue])
             }
         }
         .sheet(isPresented: $viewModel.showLoginSheet) {

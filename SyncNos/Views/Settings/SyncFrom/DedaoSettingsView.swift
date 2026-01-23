@@ -91,14 +91,6 @@ struct DedaoSettingsView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin).receive(on: DispatchQueue.main)) { _ in
-            // 自动打开登录页面（当会话过期时）
-            viewModel.showLoginSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .dedaoSettingsShowLoginSheet).receive(on: DispatchQueue.main)) { _ in
-            // 从 SettingsView 导航过来后，打开登录 Sheet
-            viewModel.showLoginSheet = true
-        }
     }
 }
 

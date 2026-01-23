@@ -52,6 +52,11 @@ struct SiteLoginsView: View {
             }
         }
         .onAppear { viewModel.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .siteLoginsShowLoginSheet).receive(on: DispatchQueue.main)) { notification in
+            guard let sourceRaw = notification.userInfo?["source"] as? String,
+                  let source = ContentSource(rawValue: sourceRaw) else { return }
+            openLogin(for: source)
+        }
         .sheet(isPresented: $showingWeReadLoginSheet) {
             WeReadLoginView {
                 viewModel.refresh()
