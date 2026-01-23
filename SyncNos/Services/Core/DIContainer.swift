@@ -15,6 +15,7 @@ class DIContainer {
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
+    private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
@@ -96,9 +97,23 @@ class DIContainer {
     
     var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         if _goodLinksURLFetcher == nil {
-            _goodLinksURLFetcher = GoodLinksURLFetcher()
+            _goodLinksURLFetcher = GoodLinksURLFetcher(cacheService: goodLinksURLCacheService)
         }
         return _goodLinksURLFetcher!
+    }
+    
+    var goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
+        if _goodLinksURLCacheService == nil {
+            do {
+                let container = try GoodLinksURLCacheModelContainerFactory.createContainer()
+                _goodLinksURLCacheService = GoodLinksURLCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] GoodLinksURLCache ModelContainer created successfully")
+            } catch {
+                loggerService.error("[DIContainer] Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
+            }
+        }
+        return _goodLinksURLCacheService!
     }
 
     var autoSyncService: AutoSyncServiceProtocol {
