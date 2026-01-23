@@ -80,16 +80,13 @@ struct DedaoSettingsView: View {
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("Dedao")
         .sheet(isPresented: $viewModel.showLoginSheet) {
-            DedaoLoginView(viewModel: DedaoLoginViewModel(
-                authService: DIContainer.shared.dedaoAuthService,
-                apiService: DIContainer.shared.dedaoAPIService
-            )) {
+            DedaoLoginView(onLoginChanged: {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
                 if viewModel.isLoggedIn {
                     NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
                 }
-            }
+            })
         }
     }
 }
