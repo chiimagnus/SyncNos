@@ -4,7 +4,6 @@ import SwiftUI
 ///
 struct SiteLoginsView: View {
     @StateObject private var viewModel = SiteLoginsViewModel()
-    @StateObject private var goodLinksLoginViewModel = GoodLinksLoginViewModel()
     
     @State private var showingWeReadLoginSheet: Bool = false
     @State private var showingDedaoLoginSheet: Bool = false
@@ -63,16 +62,12 @@ struct SiteLoginsView: View {
             }
         }
         .sheet(isPresented: $showingDedaoLoginSheet) {
-            DedaoLoginView(viewModel: DedaoLoginViewModel(
-                authService: DIContainer.shared.dedaoAuthService,
-                apiService: DIContainer.shared.dedaoAPIService
-            )) {
+            DedaoLoginView(onLoginChanged: {
                 viewModel.refresh()
-            }
+            })
         }
         .sheet(isPresented: $showingGoodLinksLoginSheet) {
-            GoodLinksLoginView(viewModel: goodLinksLoginViewModel) {
-                goodLinksLoginViewModel.refreshState()
+            GoodLinksLoginView {
                 viewModel.refresh()
             }
         }
