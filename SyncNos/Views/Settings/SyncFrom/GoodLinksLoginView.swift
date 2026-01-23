@@ -6,16 +6,16 @@ import SwiftUI
 /// - GoodLinks 可能用于“任意网站”的登录，因此提供 URL 输入框，用户可自行输入需要登录的网站地址。
 /// - 保存时仅提取当前页面 Host 及其父域的 cookies，避免误存无关 cookies。
 struct GoodLinksLoginView: View {
-    private let authService: GoodLinksAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     
     let onLoginChanged: (() -> Void)?
     
     @MainActor
     init(
-        authService: GoodLinksAuthServiceProtocol = DIContainer.shared.goodLinksAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         onLoginChanged: (() -> Void)? = nil
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.onLoginChanged = onLoginChanged
     }
     
@@ -28,7 +28,7 @@ struct GoodLinksLoginView: View {
             onSave: { cookies, host, cookieHeader in
                 let storageDomain = computeStorageDomain(host: host, cookies: cookies)
                 Task {
-                    await authService.upsertCookieHeader(cookieHeader, forDomain: storageDomain)
+                    await siteLoginsStore.upsertCookieHeader(cookieHeader, forDomain: storageDomain)
                     await MainActor.run {
                         onLoginChanged?()
                     }

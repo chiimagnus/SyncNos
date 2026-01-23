@@ -5,7 +5,6 @@ import WebKit
 /// 在检测到会话过期时，尝试静默刷新 Cookie
 @MainActor
 final class WeReadCookieRefreshService: NSObject {
-    private let authService: WeReadAuthServiceProtocol
     private let logger: LoggerServiceProtocol
     
     private var webView: WKWebView?
@@ -13,10 +12,8 @@ final class WeReadCookieRefreshService: NSObject {
     private var timeoutTask: Task<Void, Never>?
     
     init(
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
-        self.authService = authService
         self.logger = logger
         super.init()
     }

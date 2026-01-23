@@ -11,16 +11,16 @@ final class DedaoSettingsViewModel: ObservableObject {
     @Published var showLoginSheet: Bool = false
     
     private let notionConfig: NotionConfigStoreProtocol
-    private let authService: DedaoAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let autoSyncService: AutoSyncServiceProtocol
     
     init(
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        authService: DedaoAuthServiceProtocol,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         autoSyncService: AutoSyncServiceProtocol = DIContainer.shared.autoSyncService
     ) {
         self.notionConfig = notionConfig
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.autoSyncService = autoSyncService
         
         if let id = notionConfig.databaseIdForSource("dedao") {
@@ -33,7 +33,12 @@ final class DedaoSettingsViewModel: ObservableObject {
     }
     
     func refreshLoginStatus() {
-        isLoggedIn = authService.isLoggedIn
+        Task {
+            let cookie = await siteLoginsStore.getCookieHeader(for: "https://www.dedao.cn/")
+            await MainActor.run {
+                self.isLoggedIn = (cookie?.isEmpty == false)
+            }
+        }
     }
     
     func save() {
@@ -77,7 +82,10 @@ final class DedaoSettingsViewModel: ObservableObject {
     
     func clearLogin() {
         Task {
-            await authService.clearCookies()
+            await siteLoginsStore.clear(domains: [
+                "dedao.cn",
+                "igetget.com"
+            ])
             await MainActor.run {
                 refreshLoginStatus()
                 message = String(localized: "Logged Out")
@@ -93,4 +101,3 @@ final class DedaoSettingsViewModel: ObservableObject {
         }
     }
 }
-

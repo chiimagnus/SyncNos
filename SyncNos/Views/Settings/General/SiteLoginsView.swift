@@ -13,11 +13,11 @@ struct SiteLoginsView: View {
         List {
             Section {
                 LabeledContent {
-                    Text(viewModel.entries.isEmpty ? "0" : "\(viewModel.entries.count)")
+                    Text(viewModel.domains.isEmpty ? "0" : "\(viewModel.domains.count)")
                         .scaledFont(.body)
-                        .foregroundColor(viewModel.entries.isEmpty ? .secondary : .green)
+                        .foregroundColor(viewModel.domains.isEmpty ? .secondary : .green)
                 } label: {
-                    Label("Saved Logins", systemImage: viewModel.entries.isEmpty ? "xmark.seal" : "checkmark.seal.fill")
+                    Label("Saved Logins", systemImage: viewModel.domains.isEmpty ? "xmark.seal" : "checkmark.seal.fill")
                         .scaledFont(.body)
                 }
             } footer: {
@@ -26,9 +26,20 @@ struct SiteLoginsView: View {
                     .foregroundColor(.secondary)
             }
             
-            siteSection(source: .weRead)
-            siteSection(source: .dedao)
-            goodLinksSection()
+            Section {
+                if viewModel.domains.isEmpty {
+                    Text("No sites")
+                        .scaledFont(.body)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(viewModel.domains) { entry in
+                        domainRow(entry)
+                    }
+                }
+            } header: {
+                Text("Domains")
+                    .scaledFont(.headline)
+            }
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
@@ -42,12 +53,34 @@ struct SiteLoginsView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 
+                Menu {
+                    Button {
+                        showingWeReadLoginSheet = true
+                    } label: {
+                        Text("WeRead")
+                    }
+                    
+                    Button {
+                        showingDedaoLoginSheet = true
+                    } label: {
+                        Text("Dedao")
+                    }
+                    
+                    Button {
+                        showingGoodLinksLoginSheet = true
+                    } label: {
+                        Text("Custom URL")
+                    }
+                } label: {
+                    Label("Open Login", systemImage: "safari")
+                }
+                
                 Button(role: .destructive) {
                     viewModel.clearAll()
                 } label: {
                     Text("Clear All")
                 }
-                .disabled(viewModel.entries.isEmpty)
+                .disabled(viewModel.domains.isEmpty)
             }
         }
         .onAppear { viewModel.refresh() }
@@ -75,129 +108,18 @@ struct SiteLoginsView: View {
     
     // MARK: - Helpers
     
-    @ViewBuilder
-    private func siteSection(source: ContentSource) -> some View {
-        let entries = viewModel.entries.filter { $0.source == source }
-        let entry = entries.first
-        
-        Section {
-            if let entry {
-                siteRow(entry)
-            } else {
-                Text("Not Configured")
-                    .scaledFont(.body)
-                    .foregroundColor(.secondary)
-            }
-        } header: {
-            Text(source.displayName)
-                .scaledFont(.headline)
-        }
-    }
-    
-    @ViewBuilder
-    private func goodLinksSection() -> some View {
-        let entries = viewModel.entries
-            .filter { $0.source == .goodLinks }
-            .sorted { ($0.domain ?? "") < ($1.domain ?? "") }
-        
-        Section {
-            LabeledContent {
-                Button {
-                    showingGoodLinksLoginSheet = true
-                } label: {
-                    Label("Open Login", systemImage: "safari")
-                        .scaledFont(.body)
-                }
-            } label: {
-                Text("GoodLinks Web Login")
-                    .scaledFont(.body)
-            }
-            
-            if entries.isEmpty {
-                Text("No sites")
-                    .scaledFont(.body)
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(entries) { entry in
-                    goodLinksRow(entry)
-                }
-            }
-        } header: {
-            Text("GoodLinks")
-                .scaledFont(.headline)
-        }
-    }
-    
-    private func siteRow(_ entry: SiteLoginEntry) -> some View {
-        let status = viewModel.status(for: entry)
-        return LabeledContent {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(statusText(status: status, fallbackIsLoggedIn: entry.isLoggedIn))
-                        .scaledFont(.caption)
-                        .foregroundColor(statusColor(status: status, fallbackIsLoggedIn: entry.isLoggedIn))
-                    
-                    Spacer()
-                    
-                    Button {
-                        openLogin(for: entry.source)
-                    } label: {
-                        Text("Open Login")
-                            .scaledFont(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    
-                    Button {
-                        viewModel.checkSession(for: entry)
-                    } label: {
-                        Text("Check")
-                            .scaledFont(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    
-                    Button(role: .destructive) {
-                        viewModel.clear(entry)
-                    } label: {
-                        Text("Log Out")
-                            .scaledFont(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                
-                Text(entry.cookieHeader ?? "—")
-                    .scaledFont(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
-            }
-        } label: {
-            Label("Login Status", systemImage: entry.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
-                .scaledFont(.body)
-        }
-    }
-    
-    private func goodLinksRow(_ entry: SiteLoginEntry) -> some View {
-        let status = viewModel.status(for: entry)
-        return LabeledContent {
+    private func domainRow(_ entry: SiteLoginsDomainEntry) -> some View {
+        LabeledContent {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    Text(statusText(status: status, fallbackIsLoggedIn: entry.isLoggedIn))
+                    Text("Updated \(format(entry.updatedAt))")
                         .scaledFont(.caption)
-                        .foregroundColor(statusColor(status: status, fallbackIsLoggedIn: entry.isLoggedIn))
-                    
-                    if let updatedAt = entry.updatedAt {
-                        Text("Updated \(format(updatedAt))")
-                            .scaledFont(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                        .foregroundColor(.secondary)
                     
                     Spacer()
                     
                     Button(role: .destructive) {
-                        viewModel.clear(entry)
+                        viewModel.clear(domain: entry.domain)
                     } label: {
                         Text("Clear")
                             .scaledFont(.caption)
@@ -206,14 +128,14 @@ struct SiteLoginsView: View {
                     .controlSize(.small)
                 }
                 
-                Text(entry.cookieHeader ?? "—")
+                Text(entry.cookieHeader)
                     .scaledFont(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .textSelection(.enabled)
             }
         } label: {
-            Text(entry.domain ?? "Unknown Domain")
+            Text(entry.domain)
                 .scaledFont(.body)
         }
     }
@@ -228,32 +150,6 @@ struct SiteLoginsView: View {
             showingGoodLinksLoginSheet = true
         default:
             break
-        }
-    }
-    
-    private func statusText(status: SiteLoginStatus, fallbackIsLoggedIn: Bool) -> String {
-        switch status {
-        case .valid:
-            return "Valid"
-        case .unknown:
-            return fallbackIsLoggedIn ? "Logged In (unchecked)" : "Not Logged In"
-        case .expired:
-            return "Expired"
-        case .needLogin:
-            return "Need Login"
-        case .needVerification:
-            return "Need Verification"
-        }
-    }
-    
-    private func statusColor(status: SiteLoginStatus, fallbackIsLoggedIn: Bool) -> Color {
-        switch status {
-        case .valid:
-            return .green
-        case .unknown:
-            return fallbackIsLoggedIn ? .green : .secondary
-        case .expired, .needLogin, .needVerification:
-            return .secondary
         }
     }
     
