@@ -277,7 +277,14 @@ struct MainListView: View {
             ) {
                 Button(NSLocalizedString("Remind Me Later", comment: ""), role: .cancel) { }
                 Button(NSLocalizedString("Go to Login", comment: "")) {
-                    navigateToLogin(for: sessionExpiredSource)
+                    openWindow(id: "setting")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NotificationCenter.default.post(
+                            name: .navigateToSiteLogins,
+                            object: nil,
+                            userInfo: ["source": sessionExpiredSource.rawValue]
+                        )
+                    }
                 }
             } message: {
                 Text(sessionExpiredReason)
