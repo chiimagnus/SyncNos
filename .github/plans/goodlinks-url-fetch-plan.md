@@ -22,9 +22,9 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 - ✅ P1（基础 URL 抓取）：已完成（正文提取 + 错误映射 + UI 接入）
 - ✅ P2（登录支持）：已完成（通过 `SiteLoginsStore` 统一管理 `domain → cookieHeader`；抓取时自动带 Cookie）
 - ✅ P3.1（抓取结果持久化缓存）：已完成（SwiftData，TTL=7 天）
-- ⏳ P3.2（Fetcher 内部重试/退避）：未完成（当前仅 UI 侧提供 Retry；Fetcher 未实现指数退避）
-- ⏳ P3.3（抓取策略配置开关）：未开始
-- ⏳ P3.4（缓存命中率/重试次数等聚合日志）：部分完成（已有单次耗时与缓存命中日志；统计未补齐）
+- ✅ P3.2（Fetcher 内部重试/退避）：已完成（Fetcher 内部实现指数退避重试；UI Retry 仅作为手动触发）
+- ✅ P3.3（抓取策略配置开关）：已完成（设置页可配置 Cache/Cookie/Retry/Backoff）
+- ✅ P3.4（缓存命中率/重试次数等聚合日志）：已完成（聚合统计：cache hit/miss、attempts、retries、失败原因等）
 
 **与原计划的差异（已按破坏性修改落地）**
 - `GoodLinksURLFetcherProtocol.fetchArticleWithAuth(url:cookies:)` 已移除：统一走 `SiteLoginsStore.getCookieHeader(for:)`（更符合“多数据源登录共享”的目标）。
@@ -164,7 +164,7 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 ---
 
-### P3: 高级功能与优化
+### P3: 高级功能与优化✅
 
 **目标**: 提升用户体验，添加缓存、错误处理、UI 优化等
 
@@ -177,122 +177,53 @@ SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/hi
 
 **状态**: ✅ 已完成（SwiftData 持久化缓存，TTL=7 天）
 
-#### P3.2: 添加重试机制和错误提示
+#### P3.2: 添加重试机制和错误提示✅
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
-**状态**: ⏳ 部分完成
+**状态**: ✅ 已完成
 - ✅ UI 侧已有错误提示与 Retry 按钮（`ArticleContentCardView`）
-- ⏳ Fetcher 的指数退避重试逻辑尚未实现
+- ✅ Fetcher 内部实现指数退避重试（对短暂性错误自动重试）
 
-**任务**:
-1. 添加重试逻辑（参考 `WeReadRequestLimiter.swift`）:
-   ```swift
-   private func fetchWithRetry(url: String, maxRetries: Int = 3) async throws -> ArticleFetchResult {
-       var lastError: Error?
-       
-       for attempt in 1...maxRetries {
-           do {
-               return try await fetchArticle(url: url)
-           } catch {
-               lastError = error
-               logger.warning("[URLFetcher] 抓取失败，重试 \(attempt)/\(maxRetries)，error=\(error)")
-               
-               // 等待后重试（指数退避）
-               try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
-           }
-       }
-       
-       throw lastError ?? URLFetchError.networkError(...)
-   }
-   ```
-
-2. 在 UI 中显示友好的错误提示:
-   ```swift
-   // 在 GoodLinksDetailView.swift 中
-   if case .error(let message) = detailViewModel.contentLoadState {
-       VStack(spacing: 12) {
-           Image(systemName: "exclamationmark.triangle")
-               .font(.largeTitle)
-               .foregroundColor(.orange)
-           
-           Text("Failed to load article content")
-               .font(.headline)
-           
-           Text(message)
-               .font(.caption)
-               .foregroundColor(.secondary)
-           
-           HStack {
-               Button("Retry") {
-                   Task {
-                       await detailViewModel.loadContentOnDemand()
-                   }
-               }
-               
-               Button("Copy URL") {
-                   NSPasteboard.general.clearContents()
-                   NSPasteboard.general.setString(link.url, forType: .string)
-               }
-           }
-       }
-       .padding()
-   }
-   ```
+**实现要点（现状）**:
+- Retry 逻辑在 Fetcher 内部完成：对 `.rateLimited`、`.httpStatus(408/5xx)`、`.invalidResponse`、部分 `URLError` 自动重试
+- 不重试：`.authenticationRequired`、`.invalidURL`、`.decodingFailed`、`.contentNotFound` 等确定性错误
+- 指数退避 + 抖动（jitter），避免固定周期重试造成反爬风险
+- 可通过设置页开关控制是否启用重试与最大重试次数
 
 **验证**:
 - 重试机制工作正常
 - 错误提示友好且可操作
 
-#### P3.3: 添加 URL 抓取配置选项
+#### P3.3: 添加 URL 抓取配置选项✅
 **文件**: `SyncNos/Views/Settings/SyncFrom/GoodLinksSettingsView.swift`
 
-**状态**: ⏳ 未开始（目前为 URL Only 固定策略）
+**状态**: ✅ 已完成
 
-**任务**:
-1. 添加配置选项:
-   ```swift
-   Section("Content Fetching") {
-       Toggle("Enable URL Fetching", isOn: $viewModel.urlFetchingEnabled)
-           .help("Fetch article content directly from the URL")
-       
-       Picker("Fetch Strategy", selection: $viewModel.fetchStrategy) {
-           Text("URL Only").tag(FetchStrategy.urlOnly)
-           Text("URL (Use Login if Available)").tag(FetchStrategy.urlWithAuthFirst)
-       }
-   }
-   ```
-
-2. 保存配置到 UserDefaults
+**实现要点（现状）**:
+- 设置页新增 `Content Fetching` 区块，支持配置：
+  - 是否启用 URL Fetch Cache
+  - 是否使用 `Site Logins` 的 CookieHeader
+  - 是否启用 Retry（指数退避）与最大重试次数
+  -（可选）退避参数（Initial/Max）
+- 配置持久化：UserDefaults
+  - `goodlinks.urlFetcher.enableCache`
+  - `goodlinks.urlFetcher.enableCookieAuth`
+  - `goodlinks.urlFetcher.enableRetry`
+  - `goodlinks.urlFetcher.maxRetries`
+  - `goodlinks.urlFetcher.initialBackoffSeconds`
+  - `goodlinks.urlFetcher.maxBackoffSeconds`
+  - `goodlinks.urlFetcher.aggregateLogEvery`
 
 **验证**:
 - 配置选项正常保存和加载
 - 不同策略正确执行
 
-#### P3.4: 性能优化与日志
-**任务**:
-1. 添加性能监控:
-   ```swift
-   func fetchArticle(url: String) async throws -> ArticleFetchResult {
-       let startTime = Date()
-       defer {
-           let duration = Date().timeIntervalSince(startTime)
-           logger.info("[URLFetcher] 抓取耗时 \(duration)s，url=\(url)")
-       }
-       
-       // 抓取逻辑...
-   }
-   ```
-
-2. 完善日志记录:
-   - 记录每次抓取的来源（URL vs URL-Auth）
-   - 记录失败原因和重试次数
-   - 记录缓存命中率
-
-**状态**: ⏳ 部分完成（Fetcher 已记录单次请求耗时；缓存命中率/重试次数统计尚未补齐）
+#### P3.4: 性能优化与日志✅
+**状态**: ✅ 已完成
 
 **验证**:
 - ✅ Build 通过
-- ⏳（建议）补齐：缓存命中率/重试次数/失败原因聚合日志
+- ✅ 聚合日志可在 Console 看到：cache 命中率、attempts、retries、success/failure breakdown 等
 
 ---
 
