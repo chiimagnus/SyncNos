@@ -2,6 +2,8 @@
 
 SyncNos 是一款 macOS 应用，将 Apple Books、GoodLinks、微信读书、得到和微信聊天 OCR 中的高亮笔记同步到 Notion。
 
+需要注意，当我没有明确说明的情况下，不要查看不要编辑国际化字段
+
 ## 项目结构
 
 ```
