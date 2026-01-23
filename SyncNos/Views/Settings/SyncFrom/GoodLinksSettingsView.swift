@@ -14,50 +14,55 @@ struct GoodLinksSettingsView: View {
     }
 
     var body: some View {
-        List {          
+        List {
             // MARK: - Sync Settings
-            LabeledContent {
-                TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: viewModel.goodLinksDbId) { _, _ in
-                        viewModel.save()
+            Section {
+                LabeledContent {
+                    TextField("Notion Database ID for GoodLinks", text: $viewModel.goodLinksDbId)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: viewModel.goodLinksDbId) { _, _ in
+                            viewModel.save()
+                        }
+                } label: {
+                    Text("Database ID (optional)")
+                        .scaledFont(.body)
+                }
+
+                Toggle(isOn: $viewModel.autoSync) {
+                    Text("Smart Auto Sync")
+                        .scaledFont(.body)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Sync every 5 minutes, only changed content")
+                .onChange(of: viewModel.autoSync) { _, _ in
+                    viewModel.save()
+                }
+
+                // GoodLinks 数据目录授权按钮
+                Button(action: {
+                    guard !isPickingGoodLinks else { return }
+                    isPickingGoodLinks = true
+                    GoodLinksPicker.pickGoodLinksFolder()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isPickingGoodLinks = false
                     }
-            } label: {
-                Text("Database ID (optional)")
-                    .scaledFont(.body)
-            }
-
-            Toggle(isOn: $viewModel.autoSync) {
-                Text("Smart Auto Sync")
-                    .scaledFont(.body)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .help("Sync every 5 minutes, only changed content")
-            .onChange(of: viewModel.autoSync) { _, _ in
-                viewModel.save()
-            }
-
-            // GoodLinks 数据目录授权按钮
-            Button(action: {
-                guard !isPickingGoodLinks else { return }
-                isPickingGoodLinks = true
-                GoodLinksPicker.pickGoodLinksFolder()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isPickingGoodLinks = false
+                }) {
+                    HStack {
+                        Label("Select Folder", systemImage: "folder")
+                            .scaledFont(.body)
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                            .foregroundColor(.secondary)
+                            .scaledFont(.body)
+                    }
                 }
-            }) {
-                HStack {
-                    Label("Select Folder", systemImage: "folder")
-                        .scaledFont(.body)
-                    Spacer()
-                    Image(systemName: "arrow.up.right.square")
-                        .foregroundColor(.secondary)
-                        .scaledFont(.body)
-                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Choose data folder and load notes")
+            } header: {
+                Text("Sync Settings")
+                    .scaledFont(.headline)
             }
-            .buttonStyle(PlainButtonStyle())
-            .help("Choose data folder and load notes")
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
