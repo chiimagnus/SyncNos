@@ -9,8 +9,8 @@
 - ✅ P2.2（Dedao Provider）：已完成
 - ✅ P2.3（GoodLinks：domain → cookieHeader 存储 + Provider）：已完成（破坏性变更，需重新登录一次）
 - ✅ P3.1（Site Logins 总览页）：已完成（已展示 `cookieHeader` 单行文本，便于复制排查）
-- ⏳ P3.2（Settings 页逻辑委托到 Provider/Service + 删除旧通知兼容链路）：未做（当前仍保留原有 Settings 登录 UI 与通知跳转链路）
-- ⏳ P4（会话过期统一入口，推荐但可选）：未做（当前仍走 `.navigateToWeReadLogin/.navigateToDedaoLogin`）
+- ✅ P3.2（清理旧通知跳转链路）：已完成（保留 WeRead/Dedao Settings 页内的登录 UI，但移除“通知跳转到各自 Settings 并自动弹登录 sheet”的旧链路）
+- ✅ P4（会话过期统一入口，推荐但可选）：已完成（`.showSessionExpiredAlert` 的 “Go to Login” 统一打开 Settings → `Site Logins` 并弹出对应登录 sheet）
 
 **本次落地的主要文件**
 - `SyncNos/Models/SiteLogins/SiteLoginModels.swift`
@@ -23,6 +23,9 @@
 - `SyncNos/ViewModels/SiteLogins/SiteLoginsViewModel.swift`
 - `SyncNos/Services/Core/DIContainer.swift`
 - `SyncNos/Services/Core/Protocols.swift`
+- `SyncNos/Views/Settings/General/SettingsView.swift`
+- `SyncNos/Views/Components/Main/MainListView.swift`
+- `SyncNos/Models/Core/NotificationNames.swift`
 
 **Breaking changes（破坏性修改）**
 - ✅ 接受破坏性修改：**不需要**向后兼容旧的存储格式/旧的通知链路/旧的设置页结构。
