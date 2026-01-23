@@ -3,20 +3,6 @@ import SwiftUI
 // MARK: - MainListView Sync & Refresh Extension
 
 extension MainListView {
-    
-    // MARK: - Navigation
-    
-    func navigateToLogin(for source: ContentSource) {
-        switch source {
-        case .weRead:
-            weReadVM.navigateToWeReadLogin()
-        case .dedao:
-            dedaoVM.navigateToDedaoLogin()
-        default:
-            break
-        }
-    }
-    
     // MARK: - Sync Queue Task Selection
     
     /// 处理同步队列任务选择
@@ -135,4 +121,3 @@ extension MainListView {
         }
     }
 }
-

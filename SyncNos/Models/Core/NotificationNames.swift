@@ -68,18 +68,15 @@ extension Notification.Name {
     
     /// 导航到 Notion 设置
     static let navigateToNotionSettings = Notification.Name("NavigateToNotionSettings")
+
+    /// 导航到 Site Logins（可选携带 source，用于自动弹出对应登录 sheet）
+    static let navigateToSiteLogins = Notification.Name("NavigateToSiteLogins")
     
     /// 导航到 WeRead 设置
     static let navigateToWeReadSettings = Notification.Name("NavigateToWeReadSettings")
     
-    /// 导航到 WeRead 登录
-    static let navigateToWeReadLogin = Notification.Name("NavigateToWeReadLogin")
-    
     /// 导航到 Dedao 设置
     static let navigateToDedaoSettings = Notification.Name("NavigateToDedaoSettings")
-    
-    /// 导航到 Dedao 登录
-    static let navigateToDedaoLogin = Notification.Name("NavigateToDedaoLogin")
     
     // MARK: - 自动同步通知
     
@@ -119,13 +116,10 @@ extension Notification.Name {
     /// GoodLinks 文件夹被选中
     static let goodLinksFolderSelected = Notification.Name("GoodLinksFolderSelected")
     
-    // MARK: - 设置视图通知
+    // MARK: - Site Logins 通知
     
-    /// WeRead 设置显示登录弹窗
-    static let weReadSettingsShowLoginSheet = Notification.Name("WeReadSettingsShowLoginSheet")
-    
-    /// Dedao 设置显示登录弹窗
-    static let dedaoSettingsShowLoginSheet = Notification.Name("DedaoSettingsShowLoginSheet")
+    /// Site Logins：打开指定数据源的登录 Sheet（userInfo: ["source": ContentSource.rawValue]）
+    static let siteLoginsShowLoginSheet = Notification.Name("SiteLoginsShowLoginSheet")
     
     // MARK: - 应用退出通知
     
