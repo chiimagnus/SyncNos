@@ -8,12 +8,12 @@ actor CookieRefreshCoordinator {
     /// 尝试刷新 Cookie，如果已有刷新在进行中则等待
     /// - Parameters:
     ///   - refreshService: Cookie 刷新服务
-    ///   - authService: 认证服务，用于更新 Cookie
+    ///   - siteLoginsStore: 统一站点登录存储，用于更新 Cookie
     /// - Returns: 新的 Cookie header
     /// - Throws: 刷新失败时抛出错误
     func attemptRefresh(
         refreshService: WeReadCookieRefreshService,
-        authService: WeReadAuthServiceProtocol
+        siteLoginsStore: SiteLoginsStoreProtocol
     ) async throws -> String {
         // 如果已有刷新任务在进行中，等待其完成
         if let existingTask = refreshInProgress {
@@ -26,10 +26,11 @@ actor CookieRefreshCoordinator {
                 // 执行静默刷新
                 let newCookie = try await refreshService.attemptSilentRefresh()
                 
-                // 更新认证服务中的 Cookie
-                await MainActor.run {
-                    authService.updateCookieHeader(newCookie)
-                }
+                // 更新统一站点登录存储中的 Cookie
+                await siteLoginsStore.upsertCookieHeader(newCookie, forDomains: [
+                    "weread.qq.com",
+                    "i.weread.qq.com"
+                ])
                 
                 return newCookie
             } catch {

@@ -8,7 +8,7 @@ struct DedaoSettingsView: View {
         if let viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
-            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(authService: DIContainer.shared.dedaoAuthService))
+            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel())
         }
     }
 
@@ -80,24 +80,11 @@ struct DedaoSettingsView: View {
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("Dedao")
         .sheet(isPresented: $viewModel.showLoginSheet) {
-            DedaoLoginView(viewModel: DedaoLoginViewModel(
-                authService: DIContainer.shared.dedaoAuthService,
-                apiService: DIContainer.shared.dedaoAPIService
-            )) {
+            DedaoLoginView(onLoginChanged: {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
-                if viewModel.isLoggedIn {
-                    NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToDedaoLogin).receive(on: DispatchQueue.main)) { _ in
-            // 自动打开登录页面（当会话过期时）
-            viewModel.showLoginSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .dedaoSettingsShowLoginSheet).receive(on: DispatchQueue.main)) { _ in
-            // 从 SettingsView 导航过来后，打开登录 Sheet
-            viewModel.showLoginSheet = true
+                NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
+            })
         }
     }
 }

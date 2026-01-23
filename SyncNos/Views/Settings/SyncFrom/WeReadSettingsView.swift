@@ -83,18 +83,8 @@ struct WeReadSettingsView: View {
             WeReadLoginView {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
-                if viewModel.isLoggedIn {
-                    NotificationCenter.default.post(name: .weReadLoginSucceeded, object: nil)
-                }
+                NotificationCenter.default.post(name: .weReadLoginSucceeded, object: nil)
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToWeReadLogin).receive(on: DispatchQueue.main)) { _ in
-            // 自动打开登录页面（当会话过期时）- 旧通知，保持兼容
-            viewModel.showLoginSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .weReadSettingsShowLoginSheet).receive(on: DispatchQueue.main)) { _ in
-            // 从 SettingsView 导航过来后，打开登录 Sheet
-            viewModel.showLoginSheet = true
         }
     }
 }

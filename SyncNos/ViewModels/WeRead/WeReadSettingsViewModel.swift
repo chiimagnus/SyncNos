@@ -11,16 +11,16 @@ final class WeReadSettingsViewModel: ObservableObject {
     @Published var showLoginSheet: Bool = false
 
     private let notionConfig: NotionConfigStoreProtocol
-    private let authService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let autoSyncService: AutoSyncServiceProtocol
 
     init(
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         autoSyncService: AutoSyncServiceProtocol = DIContainer.shared.autoSyncService
     ) {
         self.notionConfig = notionConfig
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.autoSyncService = autoSyncService
 
         if let id = notionConfig.databaseIdForSource("weRead") {
@@ -33,7 +33,12 @@ final class WeReadSettingsViewModel: ObservableObject {
     }
 
     func refreshLoginStatus() {
-        isLoggedIn = authService.isLoggedIn
+        Task {
+            let cookie = await siteLoginsStore.getCookieHeader(for: "https://weread.qq.com/")
+            await MainActor.run {
+                self.isLoggedIn = (cookie?.isEmpty == false)
+            }
+        }
     }
 
     func save() {
@@ -76,7 +81,10 @@ final class WeReadSettingsViewModel: ObservableObject {
 
     func clearLogin() {
         Task {
-            await authService.clearCookies()
+            await siteLoginsStore.clear(domains: [
+                "weread.qq.com",
+                "i.weread.qq.com"
+            ])
             await MainActor.run {
                 refreshLoginStatus()
                 message = String(localized: "Logged Out")
