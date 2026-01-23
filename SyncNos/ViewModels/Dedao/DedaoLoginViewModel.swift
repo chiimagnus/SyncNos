@@ -4,7 +4,6 @@ import Foundation
 final class DedaoLoginViewModel: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var statusMessage: String?
-    @Published var manualCookie: String = ""
 
     private let authService: DedaoAuthServiceProtocol
     private let apiService: DedaoAPIServiceProtocol
@@ -35,11 +34,6 @@ final class DedaoLoginViewModel: ObservableObject {
         } else {
             statusMessage = String(localized: "Cookie is empty or invalid. Please log in first.")
         }
-    }
-
-    func applyManualCookie() {
-        let trimmed = manualCookie.trimmingCharacters(in: .whitespacesAndNewlines)
-        saveCookieHeader(trimmed)
     }
 
     func logout() async {
