@@ -4,18 +4,17 @@ import Foundation
 
 @MainActor
 final class SiteLoginsViewModel: ObservableObject {
-    @Published var entries: [SiteLoginEntry] = []
-    @Published var statusOverrides: [String: SiteLoginStatus] = [:]
+    @Published var domains: [SiteLoginsDomainEntry] = []
     @Published var isLoading: Bool = false
     
-    private let service: SiteLoginsServiceProtocol
+    private let store: SiteLoginsStoreProtocol
     private let logger: LoggerServiceProtocol
     
     init(
-        service: SiteLoginsServiceProtocol = DIContainer.shared.siteLoginsService,
+        store: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService
     ) {
-        self.service = service
+        self.store = store
         self.logger = logger
     }
     
@@ -25,29 +24,16 @@ final class SiteLoginsViewModel: ObservableObject {
         }
     }
     
-    func status(for entry: SiteLoginEntry) -> SiteLoginStatus {
-        statusOverrides[entry.id] ?? entry.status
-    }
-    
-    func checkSession(for entry: SiteLoginEntry) {
+    func clear(domain: String) {
         Task {
-            let status = await service.checkSession(entryId: entry.id)
-            statusOverrides[entry.id] = status
-        }
-    }
-    
-    func clear(_ entry: SiteLoginEntry) {
-        Task {
-            await service.clear(entryId: entry.id)
-            statusOverrides.removeValue(forKey: entry.id)
+            await store.clear(domain: domain)
             await refreshInternal()
         }
     }
     
     func clearAll() {
         Task {
-            await service.clearAll()
-            statusOverrides.removeAll()
+            await store.clearAll()
             await refreshInternal()
         }
     }
@@ -57,6 +43,7 @@ final class SiteLoginsViewModel: ObservableObject {
     private func refreshInternal() async {
         isLoading = true
         defer { isLoading = false }
-        entries = await service.listAllEntries()
+        domains = await store.listDomains()
+        logger.debug("[SiteLoginsViewModel] Loaded domains=\(domains.count)")
     }
 }

@@ -18,18 +18,18 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
     private let logger: LoggerServiceProtocol
     private let session: URLSession
     private let cacheService: GoodLinksURLCacheServiceProtocol?
-    private let siteLoginsService: SiteLoginsServiceProtocol?
+    private let siteLoginsStore: SiteLoginsStoreProtocol?
     
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         session: URLSession = .shared,
         cacheService: GoodLinksURLCacheServiceProtocol? = nil,
-        siteLoginsService: SiteLoginsServiceProtocol? = nil
+        siteLoginsStore: SiteLoginsStoreProtocol? = nil
     ) {
         self.logger = logger
         self.session = session
         self.cacheService = cacheService
-        self.siteLoginsService = siteLoginsService
+        self.siteLoginsStore = siteLoginsStore
     }
     
     func fetchArticle(url: String) async throws -> ArticleFetchResult {
@@ -44,8 +44,8 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             }
         }
         
-        if let siteLoginsService {
-            let cookieHeader = await siteLoginsService.cookieHeader(for: url)
+        if let siteLoginsStore {
+            let cookieHeader = await siteLoginsStore.getCookieHeader(for: url)
             if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return try await fetchArticleInternal(url: url, cookieHeader: cookieHeader, source: .urlWithAuth)
             }

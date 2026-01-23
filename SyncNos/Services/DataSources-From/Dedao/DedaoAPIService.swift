@@ -3,7 +3,7 @@ import Foundation
 /// Dedao API 客户端实现
 /// 集成令牌桶限流器 + 重试机制，有效防止触发反爬
 final class DedaoAPIService: DedaoAPIServiceProtocol {
-    private let authService: DedaoAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let logger: LoggerServiceProtocol
     private let limiter: DedaoRequestLimiter
     
@@ -14,10 +14,10 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     private let pageSize = 18
     
     init(
-        authService: DedaoAuthServiceProtocol,
+        siteLoginsStore: SiteLoginsStoreProtocol,
         logger: LoggerServiceProtocol
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.logger = logger
         self.limiter = DedaoRequestLimiter(logger: logger)
     }
@@ -241,7 +241,7 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     
     /// 执行 GET 请求（走限流器）
     private func performGetRequest(url: URL) async throws -> Data {
-        guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
+        guard let cookie = await siteLoginsStore.getCookieHeader(for: url.absoluteString), !cookie.isEmpty else {
             throw DedaoAPIError.notLoggedIn
         }
         
@@ -258,10 +258,14 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     
     /// 执行 POST 请求（走限流器）
     private func performPostRequest(url: URL, body: [String: Any], requiresAuth: Bool = true) async throws -> Data {
+        let cookieHeader: String?
         if requiresAuth {
-            guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
+            cookieHeader = await siteLoginsStore.getCookieHeader(for: url.absoluteString)
+            guard let cookieHeader, !cookieHeader.isEmpty else {
                 throw DedaoAPIError.notLoggedIn
             }
+        } else {
+            cookieHeader = nil
         }
         
         var request = URLRequest(url: url)
@@ -271,11 +275,11 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         
-        if requiresAuth, let cookie = authService.cookieHeader {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        if let cookieHeader {
+            request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             
             // 提取 CSRF Token（如果存在）
-            if let csrfToken = extractCSRFToken(from: cookie) {
+            if let csrfToken = extractCSRFToken(from: cookieHeader) {
                 request.setValue(csrfToken, forHTTPHeaderField: "Xi-Csrf-Token")
                 request.setValue("web", forHTTPHeaderField: "Xi-DT")
             }
@@ -289,10 +293,14 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
     
     /// 直接执行 POST 请求（不走限流器，用于登录相关 API）
     private func performPostRequestDirect(url: URL, body: [String: Any], requiresAuth: Bool = true) async throws -> Data {
+        let cookieHeader: String?
         if requiresAuth {
-            guard let cookie = authService.cookieHeader, !cookie.isEmpty else {
+            cookieHeader = await siteLoginsStore.getCookieHeader(for: url.absoluteString)
+            guard let cookieHeader, !cookieHeader.isEmpty else {
                 throw DedaoAPIError.notLoggedIn
             }
+        } else {
+            cookieHeader = nil
         }
         
         var request = URLRequest(url: url)
@@ -302,10 +310,10 @@ final class DedaoAPIService: DedaoAPIServiceProtocol {
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         
-        if requiresAuth, let cookie = authService.cookieHeader {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        if let cookieHeader {
+            request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             
-            if let csrfToken = extractCSRFToken(from: cookie) {
+            if let csrfToken = extractCSRFToken(from: cookieHeader) {
                 request.setValue(csrfToken, forHTTPHeaderField: "Xi-Csrf-Token")
                 request.setValue("web", forHTTPHeaderField: "Xi-DT")
             }

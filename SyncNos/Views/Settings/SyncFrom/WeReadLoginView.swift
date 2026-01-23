@@ -1,15 +1,15 @@
 import SwiftUI
 
 struct WeReadLoginView: View {
-    private let authService: WeReadAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
 
     let onLoginChanged: () -> Void
 
     init(
-        authService: WeReadAuthServiceProtocol = DIContainer.shared.weReadAuthService,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
         onLoginChanged: @escaping () -> Void
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.onLoginChanged = onLoginChanged
     }
 
@@ -20,8 +20,15 @@ struct WeReadLoginView: View {
                 cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
             },
             onSave: { _, _, cookieHeader in
-                authService.updateCookieHeader(cookieHeader)
-                onLoginChanged()
+                Task {
+                    await siteLoginsStore.upsertCookieHeader(cookieHeader, forDomains: [
+                        "weread.qq.com",
+                        "i.weread.qq.com"
+                    ])
+                    await MainActor.run {
+                        onLoginChanged()
+                    }
+                }
             }
         )
     }

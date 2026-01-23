@@ -26,6 +26,7 @@ final class DedaoViewModel: ObservableObject {
     
     // 登录状态相关
     @Published var showLoginSheet: Bool = false
+    @Published var isLoggedIn: Bool = false
     
     // 排序
     @Published var sortKey: BookListSortKey = .title
@@ -36,7 +37,7 @@ final class DedaoViewModel: ObservableObject {
     private var currentPageSize: Int = 0
     
     // 依赖
-    private let authService: DedaoAuthServiceProtocol
+    private let siteLoginsStore: SiteLoginsStoreProtocol
     private let apiService: DedaoAPIServiceProtocol
     private let cacheService: DedaoCacheServiceProtocol
     private let syncEngine: NotionSyncEngine
@@ -49,15 +50,15 @@ final class DedaoViewModel: ObservableObject {
     private let recomputeTrigger = PassthroughSubject<Void, Never>()
     
     init(
-        authService: DedaoAuthServiceProtocol,
-        apiService: DedaoAPIServiceProtocol,
-        cacheService: DedaoCacheServiceProtocol,
+        siteLoginsStore: SiteLoginsStoreProtocol = DIContainer.shared.siteLoginsStore,
+        apiService: DedaoAPIServiceProtocol = DIContainer.shared.dedaoAPIService,
+        cacheService: DedaoCacheServiceProtocol = DIContainer.shared.dedaoCacheService,
         syncEngine: NotionSyncEngine = DIContainer.shared.notionSyncEngine,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore
     ) {
-        self.authService = authService
+        self.siteLoginsStore = siteLoginsStore
         self.apiService = apiService
         self.cacheService = cacheService
         self.syncEngine = syncEngine
@@ -67,6 +68,7 @@ final class DedaoViewModel: ObservableObject {
         
         setupPipelines()
         subscribeSyncStatusNotifications()
+        refreshLoginStatus()
     }
     
     // MARK: - Pipelines
@@ -132,6 +134,7 @@ final class DedaoViewModel: ObservableObject {
                 self.books = []
                 self.displayBooks = []
                 self.visibleBooks = []
+                self.isLoggedIn = false
                 self.objectWillChange.send()
             }
             .store(in: &cancellables)
@@ -139,17 +142,25 @@ final class DedaoViewModel: ObservableObject {
     
     // MARK: - Public API
     
-    var isLoggedIn: Bool {
-        authService.isLoggedIn
-    }
-    
     func triggerRecompute() {
         recomputeTrigger.send(())
+    }
+
+    func refreshLoginStatus() {
+        Task {
+            let cookie = await siteLoginsStore.getCookieHeader(for: "https://www.dedao.cn/")
+            await MainActor.run {
+                self.isLoggedIn = (cookie?.isEmpty == false)
+            }
+        }
     }
     
     /// 加载书籍（优先从本地存储，后台同步）
     func loadBooks() async {
-        guard authService.isLoggedIn else {
+        let cookie = await siteLoginsStore.getCookieHeader(for: "https://www.dedao.cn/")
+        let loggedIn = (cookie?.isEmpty == false)
+        isLoggedIn = loggedIn
+        guard loggedIn else {
             logger.info("[Dedao] Not logged in, skip loading books")
             return
         }
@@ -312,9 +323,8 @@ final class DedaoViewModel: ObservableObject {
     
     /// 登录成功后调用，触发 UI 更新并加载书籍
     func onLoginSuccess() {
-        // 触发 SwiftUI 重新检查 isLoggedIn
-        objectWillChange.send()
         Task {
+            refreshLoginStatus()
             await loadBooks()
         }
     }

@@ -83,9 +83,7 @@ struct WeReadSettingsView: View {
             WeReadLoginView {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
-                if viewModel.isLoggedIn {
-                    NotificationCenter.default.post(name: .weReadLoginSucceeded, object: nil)
-                }
+                NotificationCenter.default.post(name: .weReadLoginSucceeded, object: nil)
             }
         }
     }
