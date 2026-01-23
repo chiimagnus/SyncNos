@@ -16,6 +16,7 @@ class DIContainer {
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
     private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
+    private var _goodLinksAuthService: GoodLinksAuthServiceProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
@@ -97,7 +98,10 @@ class DIContainer {
     
     var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         if _goodLinksURLFetcher == nil {
-            _goodLinksURLFetcher = GoodLinksURLFetcher(cacheService: goodLinksURLCacheService)
+            _goodLinksURLFetcher = GoodLinksURLFetcher(
+                cacheService: goodLinksURLCacheService,
+                authService: goodLinksAuthService
+            )
         }
         return _goodLinksURLFetcher!
     }
@@ -114,6 +118,13 @@ class DIContainer {
             }
         }
         return _goodLinksURLCacheService!
+    }
+    
+    var goodLinksAuthService: GoodLinksAuthServiceProtocol {
+        if _goodLinksAuthService == nil {
+            _goodLinksAuthService = GoodLinksAuthService()
+        }
+        return _goodLinksAuthService!
     }
 
     var autoSyncService: AutoSyncServiceProtocol {
