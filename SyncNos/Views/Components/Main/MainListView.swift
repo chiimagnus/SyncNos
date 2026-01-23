@@ -65,11 +65,7 @@ struct MainListView: View {
     // MARK: - Initialization
     
     init() {
-        _dedaoVM = StateObject(wrappedValue: DedaoViewModel(
-            authService: DIContainer.shared.dedaoAuthService,
-            apiService: DIContainer.shared.dedaoAPIService,
-            cacheService: DIContainer.shared.dedaoCacheService
-        ))
+        _dedaoVM = StateObject(wrappedValue: DedaoViewModel())
     }
     
     // MARK: - Environment

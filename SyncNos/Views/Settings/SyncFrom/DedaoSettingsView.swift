@@ -8,7 +8,7 @@ struct DedaoSettingsView: View {
         if let viewModel {
             _viewModel = StateObject(wrappedValue: viewModel)
         } else {
-            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel(authService: DIContainer.shared.dedaoAuthService))
+            _viewModel = StateObject(wrappedValue: DedaoSettingsViewModel())
         }
     }
 
@@ -83,9 +83,7 @@ struct DedaoSettingsView: View {
             DedaoLoginView(onLoginChanged: {
                 viewModel.refreshLoginStatus()
                 // 登录成功后发送通知，触发自动同步
-                if viewModel.isLoggedIn {
-                    NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
-                }
+                NotificationCenter.default.post(name: .dedaoLoginSucceeded, object: nil)
             })
         }
     }
