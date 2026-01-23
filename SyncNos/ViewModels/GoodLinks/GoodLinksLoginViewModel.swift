@@ -4,7 +4,7 @@ import Foundation
 final class GoodLinksLoginViewModel: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var statusMessage: String?
-    @Published var domainSummaries: [GoodLinksAuthDomainSummary] = []
+    @Published var domainEntries: [GoodLinksAuthDomainEntry] = []
     
     private let authService: GoodLinksAuthServiceProtocol
     
@@ -17,17 +17,20 @@ final class GoodLinksLoginViewModel: ObservableObject {
         Task {
             let loggedIn = await authService.isLoggedIn
             isLoggedIn = loggedIn
-            domainSummaries = await authService.getDomainSummaries()
+            domainEntries = await authService.listDomains()
             statusMessage = loggedIn ? String(localized: "Login detected.") : String(localized: "Please log in via the web view.")
         }
     }
     
-    func saveCookies(_ cookies: [HTTPCookie]) {
+    func saveCookies(_ cookies: [HTTPCookie], host: String) {
         Task {
-            await authService.updateCookies(cookies)
+            let headerFields = HTTPCookie.requestHeaderFields(with: cookies)
+            let cookieHeader = headerFields["Cookie"] ?? ""
+            let storageDomain = computeStorageDomain(host: host, cookies: cookies)
+            await authService.upsertCookieHeader(cookieHeader, forDomain: storageDomain)
             let loggedIn = await authService.isLoggedIn
             isLoggedIn = loggedIn
-            domainSummaries = await authService.getDomainSummaries()
+            domainEntries = await authService.listDomains()
             statusMessage = loggedIn ? String(localized: "Cookie saved successfully.") : String(localized: "Cookie is empty or invalid. Please log in first.")
         }
     }
@@ -36,7 +39,7 @@ final class GoodLinksLoginViewModel: ObservableObject {
         await authService.clearCookies()
         let loggedIn = await authService.isLoggedIn
         isLoggedIn = loggedIn
-        domainSummaries = await authService.getDomainSummaries()
+        domainEntries = await authService.listDomains()
         statusMessage = String(localized: "Logged Out")
     }
     
@@ -44,7 +47,35 @@ final class GoodLinksLoginViewModel: ObservableObject {
         Task {
             await authService.clearCookies(forDomain: domain)
             isLoggedIn = await authService.isLoggedIn
-            domainSummaries = await authService.getDomainSummaries()
+            domainEntries = await authService.listDomains()
         }
+    }
+    
+    // MARK: - Helpers
+    
+    private func computeStorageDomain(host: String, cookies: [HTTPCookie]) -> String {
+        let h = normalizeDomain(host)
+        guard !h.isEmpty else { return host }
+        
+        let candidates = Set(cookies.map { normalizeDomain($0.domain) })
+            .filter { !$0.isEmpty && domainMatches(host: h, domain: $0) }
+            .sorted { $0.count < $1.count }
+        
+        return candidates.first ?? h
+    }
+    
+    private func domainMatches(host: String, domain: String) -> Bool {
+        let h = normalizeDomain(host)
+        let d = normalizeDomain(domain)
+        guard !h.isEmpty, !d.isEmpty else { return false }
+        if h == d { return true }
+        return h.hasSuffix("." + d)
+    }
+    
+    private func normalizeDomain(_ domain: String) -> String {
+        domain
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 }

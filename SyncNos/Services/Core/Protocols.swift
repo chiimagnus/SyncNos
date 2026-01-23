@@ -257,6 +257,25 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
 }
 
+// MARK: - Site Logins Protocols
+
+/// Site Login Provider：统一 cookieHeader 抽象（WeRead/Dedao 单项，GoodLinks 按域名多项）
+protocol SiteLoginProviderProtocol: Actor {
+    nonisolated var source: ContentSource { get }
+    func listEntries() async -> [SiteLoginEntry]
+    func checkSession(entryId: String) async -> SiteLoginStatus
+    func clear(entryId: String) async
+    func clearAll() async
+}
+
+/// Site Logins 聚合服务：汇总所有 Provider 的登录项
+protocol SiteLoginsServiceProtocol: Actor {
+    func listAllEntries() async -> [SiteLoginEntry]
+    func checkSession(entryId: String) async -> SiteLoginStatus
+    func clear(entryId: String) async
+    func clearAll() async
+}
+
 /// GoodLinks URL 抓取结果缓存服务协议（SwiftData）
 /// 调用方需要使用 await 调用这些方法（actor 隔离）
 protocol GoodLinksURLCacheServiceProtocol: Actor {
@@ -279,14 +298,14 @@ protocol GoodLinksAuthServiceProtocol: Actor {
     /// 当前是否已登录（依据是否存在可用 Cookie）
     var isLoggedIn: Bool { get }
     
-    /// 更新并持久化 WebKit cookies
-    func updateCookies(_ cookies: [HTTPCookie])
+    /// 写入/更新某站点的 Cookie Header（`Cookie: ...` 的值部分）
+    func upsertCookieHeader(_ cookieHeader: String, forDomain domain: String)
     
     /// 获取指定 URL 的 Cookie Header（`Cookie: ...` 的值部分）
     func getCookieHeader(for url: String) -> String?
     
-    /// 获取已保存的站点列表（用于设置页展示）
-    func getDomainSummaries() -> [GoodLinksAuthDomainSummary]
+    /// 获取已保存的站点列表（用于设置页/总览展示）
+    func listDomains() -> [GoodLinksAuthDomainEntry]
     
     /// 清除指定站点的 cookies
     func clearCookies(forDomain domain: String) async

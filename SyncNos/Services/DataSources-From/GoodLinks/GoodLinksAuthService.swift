@@ -1,14 +1,12 @@
 import Foundation
 import WebKit
 
-// MARK: - Domain Summary
+// MARK: - Domain Entry
 
-struct GoodLinksAuthDomainSummary: Identifiable, Sendable, Equatable {
+struct GoodLinksAuthDomainEntry: Identifiable, Sendable, Equatable {
     var id: String { domain }
     let domain: String
-    let cookieCount: Int
-    let earliestExpiry: Date?
-    let hasSessionCookies: Bool
+    let updatedAt: Date
 }
 
 /// GoodLinks 认证服务：管理 WebKit cookies 的安全存储与读取（用于需要登录的网站）
@@ -16,13 +14,14 @@ struct GoodLinksAuthDomainSummary: Identifiable, Sendable, Equatable {
 /// 注意：
 /// - 采用延迟加载策略，只有在真正访问 `isLoggedIn` / `getCookieHeader(for:)` 时才会读取 Keychain，
 ///   避免在应用启动时触发 Keychain 权限弹窗。
-/// - 由于 GoodLinks 可能用于任意网站，清理 WebKit cookies 时只删除“本服务已保存的 cookie 域名”对应的 cookies，
+/// - 由于 GoodLinks 可能用于任意网站，清理 WebKit cookies 时只删除“本服务已保存的 domain”对应的 cookies，
 ///   避免误删其他数据源的登录状态。
 actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
-    private let keychainKey = "GoodLinksStoredCookiesV1"
+    private let keychainKeyV2 = "GoodLinksCookieHeaderByDomainV2"
+    private let legacyKeychainKeyV1 = "GoodLinksStoredCookiesV1"
     private let logger = DIContainer.shared.loggerService
     
-    private var cachedCookies: [StoredCookie] = []
+    private var cachedDomainCookies: [StoredDomainCookie] = []
     private var hasLoadedFromKeychain = false
     
     init() {
@@ -31,58 +30,54 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
     
     var isLoggedIn: Bool {
         ensureLoadedFromKeychain()
-        return !validCookies(forHost: nil).isEmpty
+        return cachedDomainCookies.contains { !$0.cookieHeader.isEmpty }
     }
     
-    func updateCookies(_ cookies: [HTTPCookie]) {
+    func upsertCookieHeader(_ cookieHeader: String, forDomain domain: String) {
         ensureLoadedFromKeychain()
-        let stored = cookies.compactMap(StoredCookie.init(cookie:))
-        cachedCookies = mergeCookies(existing: cachedCookies, incoming: stored)
+        
+        let d = Self.normalizeDomain(domain)
+        guard !d.isEmpty else { return }
+        
+        let header = cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines)
+        if header.isEmpty {
+            cachedDomainCookies.removeAll { $0.domain == d }
+            hasLoadedFromKeychain = true
+            saveDomainCookiesToKeychain(cachedDomainCookies)
+            logger.info("[GoodLinksAuth] Removed cookieHeader for domain=\(d)")
+            return
+        }
+        
+        if let index = cachedDomainCookies.firstIndex(where: { $0.domain == d }) {
+            cachedDomainCookies[index] = StoredDomainCookie(domain: d, cookieHeader: header, updatedAt: Date())
+        } else {
+            cachedDomainCookies.append(StoredDomainCookie(domain: d, cookieHeader: header, updatedAt: Date()))
+        }
+        
         hasLoadedFromKeychain = true
-        saveCookiesToKeychain(cachedCookies)
-        logger.info("[GoodLinksAuth] Saved cookies count=\(cachedCookies.count)")
+        saveDomainCookiesToKeychain(cachedDomainCookies)
+        logger.info("[GoodLinksAuth] Saved cookieHeader domain=\(d)")
     }
     
     func getCookieHeader(for url: String) -> String? {
         ensureLoadedFromKeychain()
         guard let u = URL(string: url), let host = u.host, !host.isEmpty else { return nil }
-        let applicable = validCookies(forHost: host)
-        guard !applicable.isEmpty else { return nil }
-        return applicable
-            .map { "\($0.name)=\($0.value)" }
-            .joined(separator: "; ")
+        
+        let h = host.lowercased()
+        let candidates = cachedDomainCookies
+            .filter { Self.domainMatches(host: h, domain: $0.domain) && !$0.cookieHeader.isEmpty }
+            .sorted { $0.domain.count > $1.domain.count }
+        
+        return candidates.first?.cookieHeader
     }
     
-    func getDomainSummaries() -> [GoodLinksAuthDomainSummary] {
+    func listDomains() -> [GoodLinksAuthDomainEntry] {
         ensureLoadedFromKeychain()
         
-        let now = Date()
-        let valid = cachedCookies.filter { cookie in
-            if let exp = cookie.expiresAt, exp <= now { return false }
-            return true
-        }
-        
-        let grouped = Dictionary(grouping: valid) { cookie in
-            Self.normalizeDomain(cookie.domain)
-        }
-        
-        let summaries: [GoodLinksAuthDomainSummary] = grouped.compactMap { (domain, items) in
-            let d = domain.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !d.isEmpty else { return nil }
-            
-            let expiries = items.compactMap { $0.expiresAt }
-            let earliestExpiry = expiries.min()
-            let hasSessionCookies = items.contains { $0.expiresAt == nil }
-            
-            return GoodLinksAuthDomainSummary(
-                domain: d,
-                cookieCount: items.count,
-                earliestExpiry: earliestExpiry,
-                hasSessionCookies: hasSessionCookies
-            )
-        }
-        
-        return summaries.sorted { $0.domain < $1.domain }
+        return cachedDomainCookies
+            .filter { !$0.domain.isEmpty }
+            .sorted { $0.domain < $1.domain }
+            .map { GoodLinksAuthDomainEntry(domain: $0.domain, updatedAt: $0.updatedAt) }
     }
     
     func clearCookies(forDomain domain: String) async {
@@ -90,9 +85,9 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
         let d = Self.normalizeDomain(domain)
         guard !d.isEmpty else { return }
         
-        cachedCookies.removeAll { Self.normalizeDomain($0.domain) == d || Self.normalizeDomain($0.domain).hasSuffix("." + d) }
+        cachedDomainCookies.removeAll { $0.domain == d }
         hasLoadedFromKeychain = true
-        saveCookiesToKeychain(cachedCookies)
+        saveDomainCookiesToKeychain(cachedDomainCookies)
         
         await clearWebKitCookies(domains: [d])
         logger.info("[GoodLinksAuth] Cleared cookies for domain=\(d)")
@@ -100,64 +95,41 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
     
     func clearCookies() async {
         ensureLoadedFromKeychain()
-        let domainsToClear = Set(cachedCookies.map { Self.normalizeDomain($0.domain) }.filter { !$0.isEmpty })
-        cachedCookies = []
+        let domainsToClear = Set(cachedDomainCookies.map { $0.domain }.filter { !$0.isEmpty })
+        cachedDomainCookies = []
         hasLoadedFromKeychain = true
         removeCookiesFromKeychain()
         await clearWebKitCookies(domains: domainsToClear)
         logger.info("[GoodLinksAuth] Cookies cleared from Keychain and WebKit.")
     }
     
-    // MARK: - Stored Cookie
+    // MARK: - Stored Domain Cookie
     
-    private struct StoredCookie: Codable {
-        let name: String
-        let value: String
+    private struct StoredDomainCookie: Codable {
         let domain: String
-        let path: String
-        let expiresAt: Date?
-        let isSecure: Bool
-        let isHTTPOnly: Bool
-        
-        init?(cookie: HTTPCookie) {
-            guard !cookie.name.isEmpty else { return nil }
-            guard !cookie.value.isEmpty else { return nil }
-            guard !cookie.domain.isEmpty else { return nil }
-            
-            self.name = cookie.name
-            self.value = cookie.value
-            self.domain = cookie.domain
-            self.path = cookie.path
-            self.expiresAt = cookie.expiresDate
-            self.isSecure = cookie.isSecure
-            self.isHTTPOnly = cookie.isHTTPOnly
-        }
+        let cookieHeader: String
+        let updatedAt: Date
     }
     
     // MARK: - Lazy Load
     
     private func ensureLoadedFromKeychain() {
         guard !hasLoadedFromKeychain else { return }
-        cachedCookies = loadCookiesFromKeychain() ?? []
+        cachedDomainCookies = loadDomainCookiesFromKeychain() ?? []
+        
+        // 破坏性：不迁移旧格式，直接废弃旧 Keychain entry（避免后续困惑）
+        if KeychainHelper.shared.read(service: "SyncNos.GoodLinks", account: legacyKeychainKeyV1) != nil {
+            _ = KeychainHelper.shared.delete(service: "SyncNos.GoodLinks", account: legacyKeychainKeyV1)
+        }
+        
         hasLoadedFromKeychain = true
     }
     
-    // MARK: - Cookie Selection
+    // MARK: - Domain Matching
     
-    private func validCookies(forHost host: String?) -> [StoredCookie] {
-        let now = Date()
-        return cachedCookies.filter { cookie in
-            if let exp = cookie.expiresAt, exp <= now { return false }
-            if let host {
-                return Self.domainMatches(host: host, cookieDomain: cookie.domain)
-            }
-            return true
-        }
-    }
-    
-    private static func domainMatches(host: String, cookieDomain: String) -> Bool {
+    private static func domainMatches(host: String, domain: String) -> Bool {
         let h = host.lowercased()
-        let d = normalizeDomain(cookieDomain)
+        let d = normalizeDomain(domain)
         guard !h.isEmpty, !d.isEmpty else { return false }
         if h == d { return true }
         return h.hasSuffix("." + d)
@@ -170,57 +142,23 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
     
-    private func mergeCookies(existing: [StoredCookie], incoming: [StoredCookie]) -> [StoredCookie] {
-        var dict: [String: StoredCookie] = [:]
-        for c in existing {
-            dict[cookieKey(c)] = c
-        }
-        for c in incoming {
-            dict[cookieKey(c)] = c
-        }
-        
-        let merged = Array(dict.values)
-        // 清理已过期的 cookies，避免越积越多
-        let now = Date()
-        return merged.filter { cookie in
-            if let exp = cookie.expiresAt, exp <= now { return false }
-            return true
-        }
-    }
-    
-    private func cookieKey(_ cookie: StoredCookie) -> String {
-        "\(cookie.name)|\(Self.normalizeDomain(cookie.domain))|\(cookie.path)"
-    }
-    
-    private func deduplicate(_ cookies: [StoredCookie]) -> [StoredCookie] {
-        var seen = Set<String>()
-        var result: [StoredCookie] = []
-        for c in cookies {
-            let key = "\(c.name)|\(Self.normalizeDomain(c.domain))|\(c.path)"
-            if seen.contains(key) { continue }
-            seen.insert(key)
-            result.append(c)
-        }
-        return result
-    }
-    
     // MARK: - Keychain helpers
     
-    private func saveCookiesToKeychain(_ cookies: [StoredCookie]) {
+    private func saveDomainCookiesToKeychain(_ cookies: [StoredDomainCookie]) {
         guard let data = try? JSONEncoder().encode(cookies) else { return }
-        let ok = KeychainHelper.shared.save(service: "SyncNos.GoodLinks", account: keychainKey, data: data)
+        let ok = KeychainHelper.shared.save(service: "SyncNos.GoodLinks", account: keychainKeyV2, data: data)
         if !ok {
             logger.warning("[GoodLinksAuth] Failed to store cookies in Keychain.")
         }
     }
     
-    private func loadCookiesFromKeychain() -> [StoredCookie]? {
-        guard let data = KeychainHelper.shared.read(service: "SyncNos.GoodLinks", account: keychainKey) else { return nil }
-        return try? JSONDecoder().decode([StoredCookie].self, from: data)
+    private func loadDomainCookiesFromKeychain() -> [StoredDomainCookie]? {
+        guard let data = KeychainHelper.shared.read(service: "SyncNos.GoodLinks", account: keychainKeyV2) else { return nil }
+        return try? JSONDecoder().decode([StoredDomainCookie].self, from: data)
     }
     
     private func removeCookiesFromKeychain() {
-        _ = KeychainHelper.shared.delete(service: "SyncNos.GoodLinks", account: keychainKey)
+        _ = KeychainHelper.shared.delete(service: "SyncNos.GoodLinks", account: keychainKeyV2)
     }
     
     // MARK: - WebKit Cookie helpers
