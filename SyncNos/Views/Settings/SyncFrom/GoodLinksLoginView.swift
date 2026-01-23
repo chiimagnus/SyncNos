@@ -90,11 +90,14 @@ struct GoodLinksLoginView: View {
         store.getAllCookies { cookies in
             let host = webView.url?.host ?? URL(string: currentURL)?.host
             let relevant: [HTTPCookie]
-            if let host, !host.isEmpty {
-                relevant = cookies.filter { domainMatches(host: host, cookieDomain: $0.domain) }
-            } else {
-                relevant = []
+            guard let host, !host.isEmpty else {
+                Task { @MainActor in
+                    viewModel.statusMessage = String(localized: "Invalid URL.")
+                }
+                return
             }
+            
+            relevant = cookies.filter { domainMatches(host: host, cookieDomain: $0.domain) }
             
             guard !relevant.isEmpty else {
                 Task { @MainActor in
@@ -104,7 +107,7 @@ struct GoodLinksLoginView: View {
             }
             
             Task { @MainActor in
-                viewModel.saveCookies(relevant)
+                viewModel.saveCookies(relevant, host: host)
                 onLoginChanged?()
             }
         }
@@ -127,4 +130,3 @@ struct GoodLinksLoginView_Previews: PreviewProvider {
         GoodLinksLoginView(viewModel: GoodLinksLoginViewModel())
     }
 }
-

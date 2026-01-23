@@ -17,6 +17,10 @@ class DIContainer {
     private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
     private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
     private var _goodLinksAuthService: GoodLinksAuthServiceProtocol?
+    private var _siteLoginsService: SiteLoginsServiceProtocol?
+    private var _weReadSiteLoginProvider: SiteLoginProviderProtocol?
+    private var _dedaoSiteLoginProvider: SiteLoginProviderProtocol?
+    private var _goodLinksSiteLoginProvider: SiteLoginProviderProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _authService: AuthServiceProtocol?
@@ -125,6 +129,51 @@ class DIContainer {
             _goodLinksAuthService = GoodLinksAuthService()
         }
         return _goodLinksAuthService!
+    }
+    
+    // MARK: - Site Logins Services
+    
+    var weReadSiteLoginProvider: SiteLoginProviderProtocol {
+        if _weReadSiteLoginProvider == nil {
+            _weReadSiteLoginProvider = WeReadSiteLoginProvider(
+                authService: weReadAuthService,
+                apiService: weReadAPIService,
+                logger: loggerService
+            )
+        }
+        return _weReadSiteLoginProvider!
+    }
+    
+    var dedaoSiteLoginProvider: SiteLoginProviderProtocol {
+        if _dedaoSiteLoginProvider == nil {
+            _dedaoSiteLoginProvider = DedaoSiteLoginProvider(
+                authService: dedaoAuthService,
+                apiService: dedaoAPIService,
+                logger: loggerService
+            )
+        }
+        return _dedaoSiteLoginProvider!
+    }
+    
+    var goodLinksSiteLoginProvider: SiteLoginProviderProtocol {
+        if _goodLinksSiteLoginProvider == nil {
+            _goodLinksSiteLoginProvider = GoodLinksSiteLoginProvider(
+                authService: goodLinksAuthService,
+                logger: loggerService
+            )
+        }
+        return _goodLinksSiteLoginProvider!
+    }
+    
+    var siteLoginsService: SiteLoginsServiceProtocol {
+        if _siteLoginsService == nil {
+            _siteLoginsService = SiteLoginsService(providers: [
+                weReadSiteLoginProvider,
+                dedaoSiteLoginProvider,
+                goodLinksSiteLoginProvider
+            ])
+        }
+        return _siteLoginsService!
     }
 
     var autoSyncService: AutoSyncServiceProtocol {
