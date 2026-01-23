@@ -5,6 +5,7 @@ struct SettingsView: View {
 
     private enum Pane: Hashable {
         case general
+        case siteLogins
         case dataSources
         case notion
         case dataSource(ContentSource)
@@ -22,6 +23,9 @@ struct SettingsView: View {
                 Section {
                     // MARK: - General
                     sidebarRow(title: "General", systemImage: "gear", tag: .general)
+
+                    // MARK: - Site Logins
+                    sidebarRow(title: "Site Logins", systemImage: "key", tag: .siteLogins)
 
                     // MARK: - Data Sources
                     sidebarRow(title: "Data Sources", systemImage: "square.stack.3d.up", tag: .dataSources)
@@ -108,6 +112,8 @@ struct SettingsView: View {
         switch pane {
         case .general:
             GeneralSettingsPane(loginItemVM: loginItemVM, appIconDisplayVM: appIconDisplayVM)
+        case .siteLogins:
+            SiteLoginsView()
         case .dataSources:
             DataSourcesOverviewView(defaultsObserver: defaultsObserver)
         case .notion:

@@ -1,6 +1,16 @@
 import Foundation
 import WebKit
 
+// MARK: - Domain Summary
+
+struct GoodLinksAuthDomainSummary: Identifiable, Sendable, Equatable {
+    var id: String { domain }
+    let domain: String
+    let cookieCount: Int
+    let earliestExpiry: Date?
+    let hasSessionCookies: Bool
+}
+
 /// GoodLinks 认证服务：管理 WebKit cookies 的安全存储与读取（用于需要登录的网站）
 ///
 /// 注意：
@@ -25,8 +35,9 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
     }
     
     func updateCookies(_ cookies: [HTTPCookie]) {
+        ensureLoadedFromKeychain()
         let stored = cookies.compactMap(StoredCookie.init(cookie:))
-        cachedCookies = deduplicate(stored)
+        cachedCookies = mergeCookies(existing: cachedCookies, incoming: stored)
         hasLoadedFromKeychain = true
         saveCookiesToKeychain(cachedCookies)
         logger.info("[GoodLinksAuth] Saved cookies count=\(cachedCookies.count)")
@@ -40,6 +51,51 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
         return applicable
             .map { "\($0.name)=\($0.value)" }
             .joined(separator: "; ")
+    }
+    
+    func getDomainSummaries() -> [GoodLinksAuthDomainSummary] {
+        ensureLoadedFromKeychain()
+        
+        let now = Date()
+        let valid = cachedCookies.filter { cookie in
+            if let exp = cookie.expiresAt, exp <= now { return false }
+            return true
+        }
+        
+        let grouped = Dictionary(grouping: valid) { cookie in
+            Self.normalizeDomain(cookie.domain)
+        }
+        
+        let summaries: [GoodLinksAuthDomainSummary] = grouped.compactMap { (domain, items) in
+            let d = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !d.isEmpty else { return nil }
+            
+            let expiries = items.compactMap { $0.expiresAt }
+            let earliestExpiry = expiries.min()
+            let hasSessionCookies = items.contains { $0.expiresAt == nil }
+            
+            return GoodLinksAuthDomainSummary(
+                domain: d,
+                cookieCount: items.count,
+                earliestExpiry: earliestExpiry,
+                hasSessionCookies: hasSessionCookies
+            )
+        }
+        
+        return summaries.sorted { $0.domain < $1.domain }
+    }
+    
+    func clearCookies(forDomain domain: String) async {
+        ensureLoadedFromKeychain()
+        let d = Self.normalizeDomain(domain)
+        guard !d.isEmpty else { return }
+        
+        cachedCookies.removeAll { Self.normalizeDomain($0.domain) == d || Self.normalizeDomain($0.domain).hasSuffix("." + d) }
+        hasLoadedFromKeychain = true
+        saveCookiesToKeychain(cachedCookies)
+        
+        await clearWebKitCookies(domains: [d])
+        logger.info("[GoodLinksAuth] Cleared cookies for domain=\(d)")
     }
     
     func clearCookies() async {
@@ -114,6 +170,28 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
     
+    private func mergeCookies(existing: [StoredCookie], incoming: [StoredCookie]) -> [StoredCookie] {
+        var dict: [String: StoredCookie] = [:]
+        for c in existing {
+            dict[cookieKey(c)] = c
+        }
+        for c in incoming {
+            dict[cookieKey(c)] = c
+        }
+        
+        let merged = Array(dict.values)
+        // 清理已过期的 cookies，避免越积越多
+        let now = Date()
+        return merged.filter { cookie in
+            if let exp = cookie.expiresAt, exp <= now { return false }
+            return true
+        }
+    }
+    
+    private func cookieKey(_ cookie: StoredCookie) -> String {
+        "\(cookie.name)|\(Self.normalizeDomain(cookie.domain))|\(cookie.path)"
+    }
+    
     private func deduplicate(_ cookies: [StoredCookie]) -> [StoredCookie] {
         var seen = Set<String>()
         var result: [StoredCookie] = []
@@ -156,7 +234,10 @@ actor GoodLinksAuthService: GoodLinksAuthServiceProtocol {
             store.httpCookieStore.getAllCookies { cookies in
                 let targets = cookies.filter { cookie in
                     let d = Self.normalizeDomain(cookie.domain)
-                    return domains.contains(d)
+                    for target in domains {
+                        if d == target || d.hasSuffix("." + target) { return true }
+                    }
+                    return false
                 }
                 
                 let group = DispatchGroup()

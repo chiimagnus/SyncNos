@@ -2,9 +2,7 @@ import SwiftUI
 
 struct GoodLinksSettingsView: View {
     @StateObject private var viewModel: GoodLinksSettingsViewModel
-    @StateObject private var loginViewModel = GoodLinksLoginViewModel()
     @State private var isPickingGoodLinks: Bool = false
-    @State private var showingLoginSheet: Bool = false
 
     @MainActor
     init(viewModel: GoodLinksSettingsViewModel? = nil) {
@@ -17,40 +15,6 @@ struct GoodLinksSettingsView: View {
 
     var body: some View {
         List {
-            // MARK: - Account
-            Section {
-                LabeledContent {
-                    Text(loginViewModel.isLoggedIn ? "Logged In" : "Not Logged In")
-                        .scaledFont(.body)
-                        .foregroundColor(loginViewModel.isLoggedIn ? .green : .secondary)
-                } label: {
-                    Label("Login Status", systemImage: loginViewModel.isLoggedIn ? "checkmark.seal.fill" : "xmark.seal")
-                        .scaledFont(.body)
-                }
-                
-                LabeledContent {
-                    Button(role: .destructive) {
-                        Task {
-                            await loginViewModel.logout()
-                        }
-                    } label: {
-                        Text("Log Out")
-                            .scaledFont(.body)
-                    }
-                    .disabled(!loginViewModel.isLoggedIn)
-                } label: {
-                    Button {
-                        showingLoginSheet = true
-                    } label: {
-                        Label("Open Login", systemImage: "safari")
-                            .scaledFont(.body)
-                    }
-                }
-            } header: {
-                Text("Account")
-                    .scaledFont(.headline)
-            }
-            
             // MARK: - Sync Settings
             Section {
                 LabeledContent {
@@ -104,11 +68,6 @@ struct GoodLinksSettingsView: View {
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("GoodLinks")
-        .sheet(isPresented: $showingLoginSheet) {
-            GoodLinksLoginView(viewModel: loginViewModel) {
-                loginViewModel.refreshState()
-            }
-        }
     }
 }
 
