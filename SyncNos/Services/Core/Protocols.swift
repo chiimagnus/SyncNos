@@ -285,6 +285,12 @@ protocol GoodLinksAuthServiceProtocol: Actor {
     /// 获取指定 URL 的 Cookie Header（`Cookie: ...` 的值部分）
     func getCookieHeader(for url: String) -> String?
     
+    /// 获取已保存的站点列表（用于设置页展示）
+    func getDomainSummaries() -> [GoodLinksAuthDomainSummary]
+    
+    /// 清除指定站点的 cookies
+    func clearCookies(forDomain domain: String) async
+    
     /// 清除本地存储的 Cookie 与登录状态（包括 WebKit cookies）
     func clearCookies() async
 }
