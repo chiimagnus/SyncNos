@@ -398,7 +398,7 @@ extension GoodLinksViewModel {
                                     
                                     do {
                                         // 创建适配器并使用统一同步引擎
-                                        let adapter = try GoodLinksNotionAdapter.create(
+                                        let adapter = try await GoodLinksNotionAdapter.create(
                                             link: link,
                                             dbPath: dbPath,
                                             databaseService: goodLinksService

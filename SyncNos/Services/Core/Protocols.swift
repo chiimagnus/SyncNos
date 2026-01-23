@@ -255,9 +255,22 @@ protocol GoodLinksDatabaseServiceExposed: AnyObject, Sendable {
     func resolveDatabasePath() -> String
     func fetchRecentLinks(dbPath: String, limit: Int) throws -> [GoodLinksLinkRow]
     func fetchHighlightsForLink(dbPath: String, linkId: String, limit: Int, offset: Int) throws -> [GoodLinksHighlightRow]
-    func fetchContent(dbPath: String, linkId: String) throws -> GoodLinksContentRow?
-    /// 获取内容预览（只取前 N 个字符，避免加载完整大字符串）
-    func fetchContentPreview(dbPath: String, linkId: String, previewLength: Int) throws -> GoodLinksContentRow?
+}
+
+/// GoodLinks URL 抓取结果缓存服务协议（SwiftData）
+/// 调用方需要使用 await 调用这些方法（actor 隔离）
+protocol GoodLinksURLCacheServiceProtocol: Actor {
+    /// 读取缓存（命中且未过期才返回）
+    func getArticle(url: String) throws -> ArticleFetchResult?
+    
+    /// 写入/更新缓存
+    func upsertArticle(url: String, result: ArticleFetchResult) throws
+    
+    /// 清理过期缓存
+    func removeExpiredArticles() throws
+    
+    /// 清空全部缓存
+    func removeAll() throws
 }
 
 // MARK: - Auto Sync Service Protocol

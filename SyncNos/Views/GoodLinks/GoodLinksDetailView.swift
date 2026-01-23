@@ -261,8 +261,10 @@ struct GoodLinksDetailView: View {
                     .onChange(of: articleIsExpanded) { _, expanded in
                         if expanded {
                             // 展开时按需加载全文
-                            Task {
-                                await detailViewModel.loadContentOnDemand()
+                            if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                                Task {
+                                    await detailViewModel.loadContentOnDemand(for: link)
+                                }
                             }
                         } else {
                             // 折叠时卸载全文，释放内存
@@ -284,7 +286,9 @@ struct GoodLinksDetailView: View {
                 .task(id: linkId) {
                     detailViewModel.clear()
                     await detailViewModel.loadHighlights(for: linkId)
-                    await detailViewModel.loadContentPreview(for: linkId)
+                    if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                        await detailViewModel.loadContentPreview(for: link)
+                    }
                     externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
@@ -352,10 +356,14 @@ struct GoodLinksDetailView: View {
                 detailViewModel.clear()
                 Task {
                     await detailViewModel.loadHighlights(for: linkId)
-                    await detailViewModel.loadContentPreview(for: linkId)
+                    if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                        await detailViewModel.loadContentPreview(for: link)
+                    }
                     // 如果刷新前是展开状态，重新加载完整内容
                     if wasExpanded {
-                        await detailViewModel.loadContentOnDemand()
+                        if let link = viewModel.links.first(where: { $0.id == linkId }) {
+                            await detailViewModel.loadContentOnDemand(for: link)
+                        }
                     }
                 }
             }
@@ -446,10 +454,9 @@ struct GoodLinksDetailView: View {
             return .loadingFull
             
         case .loaded:
-            if let contentRow = detailViewModel.content,
-               let fullText = contentRow.content,
-               !fullText.isEmpty {
-                return .loaded(content: fullText, wordCount: contentRow.wordCount)
+            if let result = detailViewModel.article,
+               !result.textContent.isEmpty {
+                return .loaded(content: result.textContent, wordCount: result.wordCount)
             } else {
                 // 已加载但无内容
                 let link = viewModel.links.first(where: { $0.id == linkId })
@@ -465,13 +472,15 @@ struct GoodLinksDetailView: View {
     /// 渲染全文内容卡片
     @ViewBuilder
     private func articleContentSection(linkId: String) -> some View {
+        let link = viewModel.links.first(where: { $0.id == linkId })
         ArticleContentCardView(
             loadState: mapToArticleLoadState(linkId: linkId),
             isExpanded: $articleIsExpanded,
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in
-                await detailViewModel?.loadContentOnDemand()
+                guard let link else { return }
+                await detailViewModel?.loadContentOnDemand(for: link)
             }
         )
     }

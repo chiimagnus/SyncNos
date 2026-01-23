@@ -1,301 +1,130 @@
-# GoodLinks URL 文章获取功能实现方案（Plan A）
+# GoodLinks URL 文章获取功能实现方案（Plan A / URL Only）
 
 ## 背景
 
-目前 SyncNos 从 GoodLinks app 的 SQLite 数据库中读取文章内容（`content` 表），但存在以下问题：
-1. GoodLinks 数据库中的 `content` 字段可能为空或不完整
-2. 数据库中存储的内容可能是经过处理的（HTML、Markdown 等）
-3. 无法获取最新的文章内容（需要 GoodLinks app 先抓取）
+SyncNos 的 GoodLinks 数据来自 GoodLinks app 的 SQLite 数据库（links/highlights 等结构化信息），但**文章正文**不稳定（历史上来自 `content` 表），存在：
+1. `content` 可能为空或不完整
+2. 内容格式不一致（HTML/Markdown/处理过的文本）
+3. 依赖 GoodLinks 先抓取并写入本地内容，导致正文滞后或缺失
 
-**解决方案**：实现 URL 文章直接抓取功能，类似于 WeRead/Dedao 的登录机制，支持：
-- 直接从 URL 获取文章内容（主流模式：Reader Mode 提取正文）
-- 支持需要登录的网站（WebKit 登录，类似 WeRead/Dedao）
-- 智能回退：优先使用数据库内容，失败时尝试 URL 抓取
+**解决方案（URL Only）**：完全放弃数据库正文读取，改为**直接从 URL 抓取文章内容**：
+- 公开网页：直接 HTTP GET + 轻量正文提取（优先 `<article>` / `<main>`）
+- 受保护网页：后续扩展 WebKit 登录拿 Cookie，再带 Cookie 抓取
+- 全项目统一通过 `GoodLinksURLFetcher` 获取正文（不再存在数据库正文 fallback）
 
 ---
 
-## 优先级分级与详细实现计划
+## 当前实现状态（已完成）
 
-### P0: 架构设计与基础模型（准备阶段）
+> 代码已落地且通过编译：`xcodebuild -scheme SyncNos build -quiet`
 
-**目标**: 定义清晰的架构和数据模型，为后续实现打下基础
+- ✅ 已新增 `GoodLinksURLFetcher` 与协议：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
+- ✅ 已新增 URL 抓取模型与错误类型：`SyncNos/Services/DataSources-From/GoodLinks/GoodLinksModels.swift`
+  - `ArticleFetchResult` / `FetchSource` / `URLFetchError`
+- ✅ 已在 DIContainer 注册：`SyncNos/Services/Core/DIContainer.swift`（`goodLinksURLFetcher`）
+- ✅ 已将 GoodLinks 详情页正文加载改为 URL Only：
+  - `SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`（`article: ArticleFetchResult?`）
+  - `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`（向 VM 传入 `GoodLinksLinkRow`）
+- ✅ 已将 Notion 同步的 “Article” 正文改为 URL Only：
+  - `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
+  - `GoodLinksNotionAdapter.create(...)` 已改为 `async`
+- ✅ 已彻底删除 SQLite `content` 表相关代码（协议/查询/模型/调用链）
+  - 不再存在 `GoodLinksContentRow`、`fetchContent`、`fetchContentPreview`、SQL `FROM content`
+
+---
+
+## 优先级分级与后续计划（从当前实现继续）
+
+### P0: 架构设计与基础模型（准备阶段）✅
+
+**目标**: 定义清晰的架构和数据模型，为后续 URL 抓取主路径打下基础
 
 #### P0.1: 定义服务协议和数据模型
-**文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`（新建）
+**文件**:
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
+- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksModels.swift`
 
-**任务**:
-1. 创建 `GoodLinksURLFetcherProtocol` 协议
-   - `fetchArticle(url: String) async throws -> ArticleFetchResult`
-   - `fetchArticleWithAuth(url: String, cookies: [HTTPCookie]) async throws -> ArticleFetchResult`
+**状态**: ✅ 已完成
 
-2. 定义数据模型（在 `GoodLinksModels.swift` 中扩展）:
-   ```swift
-   /// 文章抓取结果
-   struct ArticleFetchResult: Equatable {
-       let title: String?
-       let content: String      // HTML or Markdown
-       let textContent: String  // 纯文本（用于搜索和同步）
-       let author: String?
-       let publishedDate: Date?
-       let wordCount: Int
-       let fetchedAt: Date
-       let source: FetchSource  // .database, .url, .urlWithAuth
-   }
-   
-   enum FetchSource: String, Codable {
-       case database      // 从 GoodLinks 数据库获取
-       case url           // 从 URL 直接获取（无需登录）
-       case urlWithAuth   // 从 URL 获取（需要登录）
-   }
-   
-   /// URL 抓取错误
-   enum URLFetchError: LocalizedError {
-       case invalidURL
-       case networkError(Error)
-       case authenticationRequired
-       case parsingFailed
-       case contentNotFound
-       case rateLimited
-   }
-   ```
+**实现要点（现状）**:
+- `GoodLinksURLFetcherProtocol`
+  - `fetchArticle(url: String) async throws -> ArticleFetchResult`
+  - `fetchArticleWithAuth(url: String, cookies: [HTTPCookie]) async throws -> ArticleFetchResult`
+- `ArticleFetchResult`
+  - `content` 当前为 HTML 片段（抓取后提取 `<article>` / `<main>` / `<body>` 的片段包装）
+  - `textContent` 为纯文本（用于搜索/Notion 同步）
+- `URLFetchError` 已覆盖：URL 校验、HTTP 状态、认证需求、限流、解析/内容缺失等
 
 **验证**: 
-- 编译通过，没有语法错误
-- 协议和模型定义清晰，符合项目 MVVM 架构
+- ✅ 编译通过
+- ✅ 类型均为 `Sendable`（便于 async 任务传递）
 
 ---
 
-### P1: 基础 URL 抓取（不需要登录的网站）
+### P1: 基础 URL 抓取（不需要登录的网站）✅
 
 **目标**: 实现基础的 URL 文章抓取，支持公开访问的网站
 
 #### P1.1: 实现基础 URL 抓取服务
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksURLFetcher.swift`
 
-**任务**:
-1. 实现 `GoodLinksURLFetcher` 类
-   ```swift
-   final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
-       private let logger: LoggerServiceProtocol
-       private let session: URLSession
-       
-       init(logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
-            session: URLSession = .shared) {
-           self.logger = logger
-           self.session = session
-       }
-       
-       func fetchArticle(url: String) async throws -> ArticleFetchResult {
-           // 1. 验证 URL
-           guard let url = URL(string: url) else {
-               throw URLFetchError.invalidURL
-           }
-           
-           // 2. 发起 HTTP 请求
-           var request = URLRequest(url: url)
-           request.setValue("Mozilla/5.0 ...", forHTTPHeaderField: "User-Agent")
-           
-           let (data, response) = try await session.data(for: request)
-           
-           // 3. 检查响应状态
-           guard let httpResponse = response as? HTTPURLResponse else {
-               throw URLFetchError.networkError(...)
-           }
-           
-           guard httpResponse.statusCode == 200 else {
-               if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                   throw URLFetchError.authenticationRequired
-               }
-               throw URLFetchError.networkError(...)
-           }
-           
-           // 4. 解析 HTML（使用简单的正则或字符串处理）
-           guard let html = String(data: data, encoding: .utf8) else {
-               throw URLFetchError.parsingFailed
-           }
-           
-           // 5. 提取元数据和内容（简单版本）
-           let (title, author, content) = extractArticleContent(from: html)
-           
-           return ArticleFetchResult(
-               title: title,
-               content: content,
-               textContent: stripHTML(content),
-               author: author,
-               publishedDate: nil,
-               wordCount: countWords(stripHTML(content)),
-               fetchedAt: Date(),
-               source: .url
-           )
-       }
-       
-       // 简单的 HTML 内容提取（基于常见标签）
-       private func extractArticleContent(from html: String) -> (String?, String?, String) {
-           // 1. 提取 title
-           let title = extractTag(html, tagName: "title")
-               ?? extractMetaContent(html, property: "og:title")
-           
-           // 2. 提取 author
-           let author = extractMetaContent(html, name: "author")
-               ?? extractMetaContent(html, property: "article:author")
-           
-           // 3. 提取正文（尝试常见容器）
-           let content = extractMainContent(html)
-           
-           return (title, author, content)
-       }
-   }
-   ```
+**状态**: ✅ 已完成（当前实现为“轻量正文提取”，非 Reader Mode）
 
-2. 添加辅助方法:
-   - `extractTag(_:tagName:)`: 提取 HTML 标签内容
-   - `extractMetaContent(_:name:)`: 提取 meta 标签内容
-   - `extractMainContent(_:)`: 提取正文（查找 `<article>`, `<main>`, `.post-content` 等）
-   - `stripHTML(_:)`: 去除 HTML 标签
-   - `countWords(_:)`: 统计字数
+**实现要点（现状）**:
+- URL 校验：仅允许 `http/https`
+- HTTP：自定义 `User-Agent` + `Accept`
+- 状态码：
+  - `401/403` → `.authenticationRequired`
+  - `429` → `.rateLimited`
+  - 其它非 200 → `.httpStatus(code)`
+- HTML 提取策略：
+  - 移除 `<script>`/`<style>` 降噪
+  - 优先取 `<article>`，其次 `<main>`，再退到 `<body>`
+- 纯文本提取：`NSAttributedString` HTML 转换（失败则 fallback 正则去标签）
+- 统计字数：按 `byWords` 枚举
 
 **验证**:
-- 测试常见网站（如 Medium、个人博客）
-- 确保能正确提取标题、作者和正文
-- 错误处理正确（网络错误、解析失败等）
+- ✅ 编译通过
+- ⏳（建议）运行时抽样验证：Medium/个人博客/少数派/公众号外链等
 
-#### P1.2: 集成到 GoodLinks 服务
-**文件**: 
-- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksService.swift`
-- `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksProtocols.swift`
+#### P1.2: 集成策略（当前实现）
+**状态**: ✅ 已改为直接注入 URLFetcher（不扩展数据库服务协议）
 
-**任务**:
-1. 扩展 `GoodLinksDatabaseServiceProtocol`:
-   ```swift
-   protocol GoodLinksDatabaseServiceProtocol {
-       // 现有方法...
-       
-       /// 获取文章内容（智能回退：数据库 -> URL）
-       func fetchArticleContent(linkId: String, url: String) async throws -> ArticleFetchResult
-   }
-   ```
-
-2. 在 `GoodLinksDatabaseService` 中实现:
-   ```swift
-   func fetchArticleContent(linkId: String, url: String) async throws -> ArticleFetchResult {
-       // 1. 首先尝试从数据库获取
-       if let dbContent = try? fetchContent(dbPath: resolveDatabasePath(), linkId: linkId),
-          let content = dbContent.content, !content.isEmpty {
-           logger.info("[GoodLinks] 使用数据库内容，linkId=\(linkId)")
-           return ArticleFetchResult(
-               title: nil,
-               content: content,
-               textContent: content,
-               author: nil,
-               publishedDate: nil,
-               wordCount: dbContent.wordCount,
-               fetchedAt: Date(),
-               source: .database
-           )
-       }
-       
-       // 2. 数据库内容为空或失败，尝试 URL 抓取
-       logger.info("[GoodLinks] 数据库无内容，尝试 URL 抓取，url=\(url)")
-       let urlFetcher = GoodLinksURLFetcher()
-       return try await urlFetcher.fetchArticle(url: url)
-   }
-   ```
-
-**验证**:
-- 测试回退逻辑：数据库有内容时优先使用
-- 测试 URL 抓取：数据库无内容时自动抓取
-- Build 成功
+**说明**:
+- 目前 “正文抓取” 不属于 SQLite service 责任范围，直接通过 `DIContainer.shared.goodLinksURLFetcher` 使用
+- SQLite 仅保留 links/highlights 的读取能力（正文完全不再走 DB）
 
 #### P1.3: 更新 ViewModel 和 UI
 **文件**:
 - `SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift`
+- `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`
 
-**任务**:
-1. 在 `GoodLinksDetailViewModel` 中添加新状态:
-   ```swift
-   enum ContentLoadState: Equatable {
-       case notLoaded
-       case preview(String, Int)
-       case loadingFull
-       case loaded
-       case loadingFromURL         // 新增：正在从 URL 获取
-       case error(String)
-   }
-   
-   @Published var fetchSource: FetchSource? = nil  // 显示内容来源
-   ```
+**状态**: ✅ 已完成（并保持原有“按需加载/卸载全文”交互）
 
-2. 修改 `loadFullContent(for:)` 方法，支持 URL 抓取:
-   ```swift
-   private func loadFullContent(for linkId: String) async {
-       contentLoadState = .loadingFull
-       
-       guard let link = /* 获取 link 信息 */ else { return }
-       
-       do {
-           let result = try await serviceForTask.fetchArticleContent(
-               linkId: linkId, 
-               url: link.url
-           )
-           
-           content = GoodLinksContentRow(
-               id: linkId,
-               content: result.textContent,
-               wordCount: result.wordCount,
-               videoDuration: nil
-           )
-           fetchSource = result.source
-           contentLoadState = .loaded
-           
-           if result.source == .url {
-               loggerForTask.info("[GoodLinksDetail] 从 URL 获取到内容，url=\(link.url)")
-           }
-       } catch {
-           contentLoadState = .error(error.localizedDescription)
-       }
-   }
-   ```
-
-3. 在 UI 中显示内容来源标识（可选）:
-   ```swift
-   // 在 GoodLinksDetailView.swift 中添加来源徽章
-   if let source = detailViewModel.fetchSource, source == .url {
-       Label("Fetched from URL", systemImage: "globe")
-           .font(.caption)
-           .foregroundColor(.blue)
-   }
-   ```
+**实现要点（现状）**:
+- VM 不再持有 `GoodLinksContentRow`，改为 `article: ArticleFetchResult?`
+- 预览与全文均通过 URLFetcher 获取；折叠时卸载以释放内存
+- `GoodLinksDetailView` 在 `.task(id: linkId)` 与展开/重试时传入 `GoodLinksLinkRow`（避免 VM 自己反查 link 列表）
 
 **验证**:
-- UI 正确显示内容来源
-- 从 URL 抓取的内容正常展示
-- Build 成功，UI 无报错
+- ✅ Build 成功
+- ⏳（建议）手动验证：展开/折叠/切换 link/刷新时正文状态不串台
 
 #### P1.4: 添加到 DIContainer
 **文件**: `SyncNos/Services/Core/DIContainer.swift`
 
-**任务**:
-1. 添加 URL Fetcher 服务:
-   ```swift
-   private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
-   
-   var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
-       if _goodLinksURLFetcher == nil {
-           _goodLinksURLFetcher = GoodLinksURLFetcher()
-       }
-       return _goodLinksURLFetcher!
-   }
-   ```
+**状态**: ✅ 已完成
 
 **验证**:
-- DIContainer 编译通过
-- 服务可以正确注入
+- ✅ DIContainer 编译通过
 
 ---
 
 ### P2: WebKit 登录支持（需要登录的网站）
 
 **目标**: 实现 WebKit 登录功能，支持需要登录的网站（如 Medium 会员内容、付费博客等）
+
+**状态**: ⏳ 未开始（目前仅提供 `fetchArticleWithAuth(url:cookies:)` 接口，尚无登录 UI 与 cookie 管理）
 
 #### P2.1: 创建 GoodLinks 认证服务
 **文件**: `SyncNos/Services/DataSources-From/GoodLinks/GoodLinksAuthService.swift`（新建）
@@ -739,15 +568,11 @@
    ```swift
    Section("Content Fetching") {
        Toggle("Enable URL Fetching", isOn: $viewModel.urlFetchingEnabled)
-           .help("Fetch article content from URL when database content is unavailable")
-       
-       Toggle("Prefer Database Content", isOn: $viewModel.preferDatabaseContent)
-           .help("Always try to use database content first, even if URL fetching is available")
+           .help("Fetch article content directly from the URL")
        
        Picker("Fetch Strategy", selection: $viewModel.fetchStrategy) {
-           Text("Database Only").tag(FetchStrategy.databaseOnly)
            Text("URL Only").tag(FetchStrategy.urlOnly)
-           Text("Database → URL (Fallback)").tag(FetchStrategy.fallback)
+           Text("URL (Use Login if Available)").tag(FetchStrategy.urlWithAuthFirst)
        }
    }
    ```
@@ -774,7 +599,7 @@
    ```
 
 2. 完善日志记录:
-   - 记录每次抓取的来源（数据库 vs URL）
+   - 记录每次抓取的来源（URL vs URL-Auth）
    - 记录失败原因和重试次数
    - 记录缓存命中率
 
@@ -829,8 +654,7 @@
                .font(.headline)
            
            Text("""
-           When GoodLinks database doesn't contain article content, \
-           SyncNos can fetch it directly from the URL. \
+           SyncNos fetches article content directly from the URL. \
            For protected content, you need to log in first.
            """)
            .font(.caption)
@@ -855,7 +679,6 @@
 
 ### P1 验证
 - [ ] 可以从 URL 抓取文章内容（测试 3-5 个不同网站）
-- [ ] 回退逻辑正常（数据库 → URL）
 - [ ] UI 正确显示内容来源
 - [ ] Build 成功，无运行时错误
 - [ ] 日志完整
