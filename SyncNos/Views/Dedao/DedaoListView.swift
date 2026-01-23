@@ -110,7 +110,8 @@ struct DedaoListView: View {
         }
         .onAppear {
             viewModel.triggerRecompute()
-            if viewModel.books.isEmpty && viewModel.isLoggedIn {
+            // 不依赖 isLoggedIn（Keychain / cookieHeader 读取可能晚于 onAppear），由 VM 内部自行判断并更新登录态
+            if viewModel.books.isEmpty {
                 Task {
                     await viewModel.loadBooks()
                 }
