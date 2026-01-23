@@ -264,14 +264,20 @@ protocol SiteLoginProviderProtocol: Actor {
     nonisolated var source: ContentSource { get }
     func listEntries() async -> [SiteLoginEntry]
     func checkSession(entryId: String) async -> SiteLoginStatus
+    func cookieHeader(for url: String) async -> String?
     func clear(entryId: String) async
     func clearAll() async
+}
+
+extension SiteLoginProviderProtocol {
+    func cookieHeader(for url: String) async -> String? { nil }
 }
 
 /// Site Logins 聚合服务：汇总所有 Provider 的登录项
 protocol SiteLoginsServiceProtocol: Actor {
     func listAllEntries() async -> [SiteLoginEntry]
     func checkSession(entryId: String) async -> SiteLoginStatus
+    func cookieHeader(for url: String) async -> String?
     func clear(entryId: String) async
     func clearAll() async
 }

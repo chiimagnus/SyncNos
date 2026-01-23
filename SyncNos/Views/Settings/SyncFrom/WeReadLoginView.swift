@@ -11,12 +11,12 @@ struct WeReadLoginView: View {
 
     var body: some View {
         CookieWebLoginSheet(
-            initialURL: URL(string: "https://weread.qq.com/")!,
-            cookieFilter: { cookie in
+            defaultURLString: "https://weread.qq.com/",
+            cookieFilter: { _, cookie in
                 cookie.domain.contains("weread.qq.com") || cookie.domain.contains("i.weread.qq.com")
             },
-            onSaveCookieHeader: { header in
-                viewModel.saveCookieHeader(header)
+            onSave: { _, _, cookieHeader in
+                viewModel.saveCookieHeader(cookieHeader)
                 onLoginChanged()
             }
         )
