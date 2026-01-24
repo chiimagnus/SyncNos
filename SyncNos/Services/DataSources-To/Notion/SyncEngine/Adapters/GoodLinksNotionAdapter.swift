@@ -12,6 +12,7 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     private let link: GoodLinksLinkRow
     private let dbPath: String
     private let articleText: String?
+    private let articleBlocks: [[String: Any]]?
     
     // MARK: - Initialization
     
@@ -19,11 +20,13 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         link: GoodLinksLinkRow,
         dbPath: String,
         articleText: String? = nil,
+        articleBlocks: [[String: Any]]? = nil,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService
     ) {
         self.link = link
         self.dbPath = dbPath
         self.articleText = articleText
+        self.articleBlocks = articleBlocks
         self.databaseService = databaseService
     }
     
@@ -117,7 +120,6 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     /// 首次创建页面时的头部内容
     /// GoodLinks 需要在高亮之前添加 "Article" 标题和文章内容
     func headerContentForNewPage() -> [[String: Any]] {
-        let helperMethods = NotionHelperMethods()
         var children: [[String: Any]] = []
         
         // 添加 "Article" 标题
@@ -128,9 +130,14 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
             ]
         ])
         
-        // 添加文章内容（如果有）
-        if let contentText = articleText,
-           !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        // 优先使用 articleBlocks（富内容），否则回退到 articleText（纯文本）
+        if let blocks = articleBlocks, !blocks.isEmpty {
+            // 使用富内容 blocks（包含图片和样式）
+            children.append(contentsOf: blocks)
+        } else if let contentText = articleText,
+                  !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // 回退到纯文本段落
+            let helperMethods = NotionHelperMethods()
             let paragraphs = helperMethods.buildParagraphBlocks(from: contentText)
             children.append(contentsOf: paragraphs)
         }
@@ -148,7 +155,8 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher
+        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
+        htmlConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
         let result: ArticleFetchResult?
         do {
@@ -157,10 +165,29 @@ extension GoodLinksNotionAdapter {
             result = nil
         }
         
+        // 尝试转换 HTML 为 Notion blocks
+        var articleBlocks: [[String: Any]]? = nil
+        if let fetchResult = result,
+           !fetchResult.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let baseURL = URL(string: link.url) {
+            do {
+                articleBlocks = try await htmlConverter.convertArticleHTMLToBlocks(
+                    html: fetchResult.content,
+                    baseURL: baseURL
+                )
+            } catch {
+                // 转换失败时记录日志，但不影响同步（降级为纯文本）
+                DIContainer.shared.loggerService.warning(
+                    "[GoodLinksNotionAdapter] HTML to blocks conversion failed for url=\(link.url): \(error.localizedDescription)"
+                )
+            }
+        }
+        
         return GoodLinksNotionAdapter(
             link: link,
             dbPath: dbPath,
             articleText: result?.textContent,
+            articleBlocks: articleBlocks,
             databaseService: databaseService
         )
     }
