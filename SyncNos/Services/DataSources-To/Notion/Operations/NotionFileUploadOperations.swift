@@ -3,13 +3,42 @@ import Foundation
 // MARK: - Notion File Upload Operations
 
 final class NotionFileUploadOperations {
+    fileprivate enum JSONValue: Decodable {
+        case string(String)
+        case number(Double)
+        case object([String: JSONValue])
+        case array([JSONValue])
+        case bool(Bool)
+        case null
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if container.decodeNil() {
+                self = .null
+            } else if let value = try? container.decode(String.self) {
+                self = .string(value)
+            } else if let value = try? container.decode(Double.self) {
+                self = .number(value)
+            } else if let value = try? container.decode(Bool.self) {
+                self = .bool(value)
+            } else if let value = try? container.decode([String: JSONValue].self) {
+                self = .object(value)
+            } else if let value = try? container.decode([JSONValue].self) {
+                self = .array(value)
+            } else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")
+            }
+        }
+    }
+
     struct FileUpload: Decodable {
+
         let object: String
         let id: String
         let status: String
         let upload_url: String?
         let complete_url: String?
-        let file_import_result: String?
+        fileprivate let file_import_result: JSONValue?
         let filename: String?
         let content_type: String?
         let content_length: Int?
@@ -192,6 +221,25 @@ final class NotionFileUploadOperations {
         }
     }
 
+
+    private func describeFileImportResult(_ value: JSONValue?) -> String {
+        guard let value else { return "unknown" }
+        switch value {
+        case .string(let str):
+            return str
+        case .number(let num):
+            return String(num)
+        case .bool(let flag):
+            return String(flag)
+        case .null:
+            return "null"
+        case .array(let items):
+            return "[\(items.count) items]"
+        case .object(let dict):
+            return "{\(dict.keys.joined(separator: ","))}"
+        }
+    }
+
     func waitUntilUploaded(id: String) async throws -> FileUpload {
         let maxAttempts = max(1, NotionSyncConfig.fileUploadMaxAttempts)
         for attempt in 1...maxAttempts {
@@ -200,7 +248,7 @@ final class NotionFileUploadOperations {
             case "uploaded":
                 return upload
             case "failed":
-                throw FileUploadError.failed(upload.file_import_result ?? "unknown")
+                throw FileUploadError.failed(describeFileImportResult(upload.file_import_result))
             case "expired":
                 throw FileUploadError.expired
             case "pending":
