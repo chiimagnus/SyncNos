@@ -12,6 +12,7 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     private let link: GoodLinksLinkRow
     private let dbPath: String
     private let articleText: String?
+    private let articleBlocks: [[String: Any]]?
     
     // MARK: - Initialization
     
@@ -19,11 +20,13 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         link: GoodLinksLinkRow,
         dbPath: String,
         articleText: String? = nil,
+        articleBlocks: [[String: Any]]? = nil,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService
     ) {
         self.link = link
         self.dbPath = dbPath
         self.articleText = articleText
+        self.articleBlocks = articleBlocks
         self.databaseService = databaseService
     }
     
@@ -129,10 +132,12 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         ])
         
         // 添加文章内容（如果有）
-        if let contentText = articleText,
-           !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let paragraphs = helperMethods.buildParagraphBlocks(from: contentText)
-            children.append(contentsOf: paragraphs)
+        if let blocks = articleBlocks, !blocks.isEmpty {
+            children.append(contentsOf: blocks)
+        } else if let contentText = articleText,
+                  !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // 兼容降级：转换失败时仍回退到纯文本段落
+            children.append(contentsOf: helperMethods.buildParagraphBlocks(from: contentText))
         }
         
         return children
@@ -148,19 +153,37 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher
+        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
+        htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
+        let logger = DIContainer.shared.loggerService
+
         let result: ArticleFetchResult?
         do {
             result = try await urlFetcher.fetchArticle(url: link.url)
         } catch URLFetchError.contentNotFound {
             result = nil
         }
+
+        var blocks: [[String: Any]]?
+        if let result, let baseURL = URL(string: link.url) {
+            do {
+                let converted = try await htmlToBlocksConverter.convertArticleHTMLToBlocks(
+                    html: result.content,
+                    baseURL: baseURL
+                )
+                blocks = converted.isEmpty ? nil : converted
+            } catch {
+                logger.warning("[GoodLinks] Failed to convert HTML to Notion blocks for \(link.url): \(error.localizedDescription)")
+                blocks = nil
+            }
+        }
         
         return GoodLinksNotionAdapter(
             link: link,
             dbPath: dbPath,
             articleText: result?.textContent,
+            articleBlocks: blocks,
             databaseService: databaseService
         )
     }
