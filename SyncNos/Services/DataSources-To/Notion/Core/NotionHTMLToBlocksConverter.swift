@@ -310,6 +310,13 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @u
         return raw
     }
 
+    private func upgradedToHTTPS(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http" else { return url }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url ?? url
+    }
+
     private func makeImageBlock(urlString: String) async -> [String: Any] {
         guard let url = URL(string: urlString),
               let scheme = url.scheme?.lowercased(),
@@ -318,13 +325,14 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @u
         }
 
         let cacheKey = url.absoluteString
+        let uploadURL = upgradedToHTTPS(url)
         if let cachedId = await imageUploadCache.get(cacheKey) {
             return makeFileUploadImageBlock(id: cachedId)
         }
 
         do {
             let fileUploadId = try await notionService.importImageFromExternalURL(
-                url: url,
+                url: uploadURL,
                 filename: nil,
                 contentType: nil
             )
