@@ -33,6 +33,9 @@
 **Files**
 - Create: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
 
+**Status**
+- ✅ 已完成（2026-01-24）：已落地 MVP（保序 + 基础结构 + 图片 `image.external`），并通过 `xcodebuild -scheme SyncNos build`。
+
 **Step 1: 定义协议与输出约束**
 - 定义协议（示例）：
   ```swift
@@ -87,6 +90,9 @@
 **Files**
 - Modify: `SyncNos/Services/Core/DIContainer.swift`
 
+**Status**
+- ✅ 已完成（2026-01-24）：新增 `notionHTMLToBlocksConverter` 注入点与 `register(...)`。
+
 **Step**
 - 添加 `notionHTMLToBlocksConverter` 的实例化与注入点（遵循现有 DI 风格）。
 
@@ -101,6 +107,9 @@
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
+
+**Status**
+- ✅ 已完成（2026-01-24）：adapter 预加载 HTML blocks，并在转换失败时回退为纯文本段落，保证高亮同步不受影响。
 
 **Step 1: 调整状态字段**
 - 将 `articleText: String?` 替换为 `articleBlocks: [[String: Any]]?`（或两者并存，先平滑迁移）。
@@ -127,6 +136,9 @@
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHelperMethods.swift`
 - Or Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
+
+**Status**
+- ✅ 已完成（2026-01-24）：converter 内部对文本类 blocks 使用 `NotionHelperMethods.chunkText` 按 `NotionSyncConfig.maxTextLengthPrimary` 分块。
 
 **Step**
 - 复用已有 `buildParagraphBlocks(from:chunkSize:)` 的 chunk 思路：
@@ -179,6 +191,10 @@
 **Files**
 - Create: `SyncNos/Views/Components/Web/HTMLWebView.swift`
 - Modify: `SyncNos/Views/Components/Cards/ArticleContentCardView.swift`
+- Modify: `SyncNos/Views/GoodLinks/GoodLinksDetailView.swift`（向卡片透传 `ArticleFetchResult.content` 与 `baseURL`）
+
+**Status**
+- ✅ 已完成（2026-01-24）：展开后使用 WebKit 渲染 HTML（含图片），链接点击外部打开；并通过 `xcodebuild -scheme SyncNos build`。
 
 **Step 1: HTMLWebView**
 - `NSViewRepresentable` 包装 `WKWebView`，支持：
@@ -187,6 +203,7 @@
 - 先注入“最小 CSS”（只为图片与基础排版兜底）：
   - `img { max-width: 100%; height: auto; }`
   - `body { margin: 0; padding: 0; }`
+- 高度策略（建议）：用 JS 读取 `document.body.scrollHeight` 动态回传高度，避免 WebView 内部滚动与外层 ScrollView 冲突。
 
 **Step 2: ArticleContentCardView 改为渲染 HTML**
 - 当前 `.loaded/.preview` 都是 `Text(content)`（纯文本），改为：
