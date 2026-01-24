@@ -52,6 +52,14 @@ enum NotionSyncConfig {
     /// 409 退避抖动（毫秒）
     static let retryConflictJitterMs: UInt64 = 200
     
+    // MARK: - File upload (Notion-hosted)
+    /// Notion File Upload API 版本（与现有 Notion API 版本不同）
+    static let notionFileUploadVersion: String = "2025-09-03"
+    /// File upload 轮询间隔（毫秒）
+    static let fileUploadPollIntervalMs: UInt64 = 800
+    /// File upload 最大轮询次数
+    static let fileUploadMaxAttempts: Int = 20
+
     // MARK: - Timeout
     /// Notion API 请求超时时间（秒）
     /// 对于大量数据的同步（如 6000 条笔记），需要更长的超时时间
