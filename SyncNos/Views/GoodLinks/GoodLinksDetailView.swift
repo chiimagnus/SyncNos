@@ -473,6 +473,8 @@ struct GoodLinksDetailView: View {
         let link = viewModel.links.first(where: { $0.id == linkId })
         ArticleContentCardView(
             loadState: mapToArticleLoadState(linkId: linkId),
+            htmlContent: detailViewModel.article?.content,
+            htmlBaseURL: URL(string: link?.url ?? ""),
             isExpanded: $articleIsExpanded,
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
