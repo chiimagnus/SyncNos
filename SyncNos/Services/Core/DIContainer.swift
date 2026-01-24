@@ -196,7 +196,10 @@ class DIContainer {
 
     var notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         if _notionHTMLToBlocksConverter == nil {
-            _notionHTMLToBlocksConverter = NotionHTMLToBlocksConverter()
+            _notionHTMLToBlocksConverter = NotionHTMLToBlocksConverter(
+                notionService: notionService,
+                logger: loggerService
+            )
         }
         return _notionHTMLToBlocksConverter!
     }
