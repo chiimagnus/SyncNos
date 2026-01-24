@@ -256,25 +256,31 @@ final class NotionSyncEngine {
             throw error
         }
 
-        // 7. 执行同步（如果有高亮）
+        // 7. 执行同步（允许无高亮也追加正文）
+        if created {
+            // 新创建的页面：先追加头部内容（如 GoodLinks 的 Article）
+            do {
+                let headerContent = source.headerContentForNewPage()
+                if !headerContent.isEmpty {
+                    progress(NSLocalizedString("Adding article content...", comment: ""))
+                    try Task.checkCancellation()
+                    try await notionService.appendChildren(
+                        pageId: pageId,
+                        children: headerContent,
+                        batchSize: NotionSyncConfig.defaultAppendBatchSize
+                    )
+                    logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
+                }
+            } catch {
+                logger.error("[SmartSync] Failed to append header content for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
+                throw error
+            }
+        }
+
         if !highlights.isEmpty {
             if created {
-                // 新创建的页面：首先追加头部内容（如 GoodLinks 的 Article），然后追加高亮
+                // 新创建的页面：追加高亮
                 do {
-                    // 追加头部内容（如果有）
-                    let headerContent = source.headerContentForNewPage()
-                    if !headerContent.isEmpty {
-                        progress(NSLocalizedString("Adding article content...", comment: ""))
-                        try Task.checkCancellation()
-                        try await notionService.appendChildren(
-                            pageId: pageId,
-                            children: headerContent,
-                            batchSize: NotionSyncConfig.defaultAppendBatchSize
-                        )
-                        logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
-                    }
-                    
-                    // 追加高亮
                     try Task.checkCancellation()
                     try await appendAllHighlights(
                         pageId: pageId,
