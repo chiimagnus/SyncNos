@@ -18,6 +18,18 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
     // MARK: - Types
 
     fileprivate struct DOMItem: Decodable, Sendable {
+        struct Segment: Decodable, Sendable {
+            struct Marks: Decodable, Sendable {
+                let bold: Bool?
+                let italic: Bool?
+                let code: Bool?
+                let href: String?
+            }
+
+            let text: String
+            let marks: Marks?
+        }
+
         enum ItemType: String, Decodable, Sendable {
             case h1
             case h2
@@ -32,6 +44,7 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
 
         let type: ItemType
         let text: String?
+        let segments: [Segment]?
         let src: String?
     }
 
@@ -91,34 +104,43 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
                 ])
 
             case .h1:
-                blocks.append(contentsOf: makeTextBlocks(type: "heading_1", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "heading_1", item: item))
             case .h2:
-                blocks.append(contentsOf: makeTextBlocks(type: "heading_2", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "heading_2", item: item))
             case .h3:
-                blocks.append(contentsOf: makeTextBlocks(type: "heading_3", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "heading_3", item: item))
             case .p:
-                blocks.append(contentsOf: makeTextBlocks(type: "paragraph", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "paragraph", item: item))
             case .blockquote:
-                blocks.append(contentsOf: makeTextBlocks(type: "quote", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "quote", item: item))
             case .ul_li:
-                blocks.append(contentsOf: makeTextBlocks(type: "bulleted_list_item", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "bulleted_list_item", item: item))
             case .ol_li:
-                blocks.append(contentsOf: makeTextBlocks(type: "numbered_list_item", text: item.text))
+                blocks.append(contentsOf: makeTextBlocks(type: "numbered_list_item", item: item))
             }
         }
 
         return blocks
     }
 
-    private func makeTextBlocks(type: String, text: String?) -> [[String: Any]] {
-        let normalized = (text ?? "")
+    private func makeTextBlocks(type: String, item: DOMItem) -> [[String: Any]] {
+        if let segments = item.segments, !segments.isEmpty {
+            return makeTextBlocksFromSegments(type: type, segments: segments)
+        }
+
+        let normalized = (item.text ?? "")
             .replacingOccurrences(of: "\r\n", with: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !normalized.isEmpty else { return [] }
 
+        // 回退：纯文本
+        return makeTextBlocksFromPlainText(type: type, text: normalized)
+    }
+
+    private func makeTextBlocksFromPlainText(type: String, text: String) -> [[String: Any]] {
         let helperMethods = NotionHelperMethods()
-        let chunks = helperMethods.chunkText(normalized, chunkSize: NotionSyncConfig.maxTextLengthPrimary)
+        let chunks = helperMethods.chunkText(text, chunkSize: NotionSyncConfig.maxTextLengthPrimary)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
@@ -132,6 +154,110 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
                 ]
             ]
         }
+    }
+
+    private func makeTextBlocksFromSegments(type: String, segments: [DOMItem.Segment]) -> [[String: Any]] {
+        let normalizedSegments = normalizeSegments(segments)
+        guard !normalizedSegments.isEmpty else { return [] }
+
+        let chunked = chunkSegments(normalizedSegments, chunkSize: NotionSyncConfig.maxTextLengthPrimary)
+        return chunked.map { segmentChunk in
+            [
+                "object": "block",
+                type: [
+                    "rich_text": segmentChunk.map { makeRichText(from: $0) }
+                ]
+            ]
+        }
+    }
+
+    private func normalizeSegments(_ segments: [DOMItem.Segment]) -> [DOMItem.Segment] {
+        // 去掉空文本，并合并相邻 marks 相同的片段（降低 rich_text 数量）
+        var result: [DOMItem.Segment] = []
+        for segment in segments {
+            let trimmed = segment.text.replacingOccurrences(of: "\r\n", with: "\n")
+            guard !trimmed.isEmpty else { continue }
+
+            if let last = result.last, marksEqual(last.marks, segment.marks) {
+                result[result.count - 1] = DOMItem.Segment(
+                    text: last.text + trimmed,
+                    marks: last.marks
+                )
+            } else {
+                result.append(DOMItem.Segment(text: trimmed, marks: segment.marks))
+            }
+        }
+
+        // 如果整体只有空白（trim 后为空），直接返回空
+        let allText = result.map(\.text).joined()
+        if allText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return []
+        }
+        return result
+    }
+
+    private func marksEqual(_ a: DOMItem.Segment.Marks?, _ b: DOMItem.Segment.Marks?) -> Bool {
+        (a?.bold ?? false) == (b?.bold ?? false)
+            && (a?.italic ?? false) == (b?.italic ?? false)
+            && (a?.code ?? false) == (b?.code ?? false)
+            && (a?.href ?? "") == (b?.href ?? "")
+    }
+
+    private func chunkSegments(_ segments: [DOMItem.Segment], chunkSize: Int) -> [[DOMItem.Segment]] {
+        var chunks: [[DOMItem.Segment]] = []
+        var current: [DOMItem.Segment] = []
+        var currentCount = 0
+
+        func flushIfNeeded(force: Bool = false) {
+            if force || (currentCount >= chunkSize && !current.isEmpty) {
+                chunks.append(current)
+                current = []
+                currentCount = 0
+            }
+        }
+
+        for segment in segments {
+            var remainingText = segment.text
+            while !remainingText.isEmpty {
+                let spaceLeft = max(1, chunkSize - currentCount)
+                if remainingText.count <= spaceLeft {
+                    current.append(DOMItem.Segment(text: remainingText, marks: segment.marks))
+                    currentCount += remainingText.count
+                    remainingText = ""
+                    if currentCount >= chunkSize {
+                        flushIfNeeded(force: true)
+                    }
+                } else {
+                    let splitIndex = remainingText.index(remainingText.startIndex, offsetBy: spaceLeft)
+                    let head = String(remainingText[..<splitIndex])
+                    let tail = String(remainingText[splitIndex...])
+                    current.append(DOMItem.Segment(text: head, marks: segment.marks))
+                    currentCount += head.count
+                    flushIfNeeded(force: true)
+                    remainingText = tail
+                }
+            }
+        }
+
+        flushIfNeeded(force: !current.isEmpty)
+        return chunks
+    }
+
+    private func makeRichText(from segment: DOMItem.Segment) -> [String: Any] {
+        var textPayload: [String: Any] = ["content": segment.text]
+        if let href = segment.marks?.href, !href.isEmpty {
+            textPayload["link"] = ["url": href]
+        }
+
+        var richText: [String: Any] = ["text": textPayload]
+        var annotations: [String: Any] = [:]
+        if segment.marks?.bold == true { annotations["bold"] = true }
+        if segment.marks?.italic == true { annotations["italic"] = true }
+        if segment.marks?.code == true { annotations["code"] = true }
+        if !annotations.isEmpty {
+            richText["annotations"] = annotations
+        }
+        return richText
     }
 
     private func makeExternalImageBlock(urlString: String) -> [String: Any] {
@@ -290,6 +416,90 @@ private enum WebKitDOMExtractor {
             return (el.textContent || '').trim();
           }
 
+          function isWhitespaceText(text) {
+            return !text || !String(text).replace(/\s+/g, '').length;
+          }
+
+          function mergeSegments(segments) {
+            const merged = [];
+            for (const seg of segments) {
+              if (!seg || isWhitespaceText(seg.text)) continue;
+              const last = merged.length ? merged[merged.length - 1] : null;
+              const a = last ? (last.marks || {}) : {};
+              const b = seg.marks || {};
+              const same =
+                (a.bold ? true : false) === (b.bold ? true : false) &&
+                (a.italic ? true : false) === (b.italic ? true : false) &&
+                (a.code ? true : false) === (b.code ? true : false) &&
+                String(a.href || '') === String(b.href || '');
+              if (last && same) {
+                last.text += seg.text;
+              } else {
+                merged.push({
+                  text: seg.text,
+                  marks: Object.keys(b).length ? b : undefined
+                });
+              }
+            }
+            return merged;
+          }
+
+          function segmentsFromNode(node, marks) {
+            const out = [];
+            if (!node) return out;
+
+            const m = marks || {};
+            const nodeType = node.nodeType;
+
+            // Text node
+            if (nodeType === 3) {
+              const txt = node.nodeValue || '';
+              if (!isWhitespaceText(txt)) {
+                out.push({ text: txt, marks: Object.keys(m).length ? m : undefined });
+              }
+              return out;
+            }
+
+            // Element node
+            if (nodeType !== 1) return out;
+
+            const tag = (node.tagName || '').toLowerCase();
+            if (tag === 'br') {
+              out.push({ text: '\n', marks: Object.keys(m).length ? m : undefined });
+              return out;
+            }
+
+            // 标注：a/b/strong/em/i/code
+            let nextMarks = m;
+            if (tag === 'a') {
+              const href = node.getAttribute('href');
+              if (href) {
+                try {
+                  const abs = new URL(href, document.baseURI).href;
+                  nextMarks = Object.assign({}, nextMarks, { href: abs });
+                } catch (e) {}
+              }
+            } else if (tag === 'strong' || tag === 'b') {
+              nextMarks = Object.assign({}, nextMarks, { bold: true });
+            } else if (tag === 'em' || tag === 'i') {
+              nextMarks = Object.assign({}, nextMarks, { italic: true });
+            } else if (tag === 'code') {
+              nextMarks = Object.assign({}, nextMarks, { code: true });
+            }
+
+            for (const child of Array.from(node.childNodes || [])) {
+              out.push(...segmentsFromNode(child, nextMarks));
+            }
+            return out;
+          }
+
+          function segmentsOf(el) {
+            if (!el) return [];
+            // 对 block 元素，直接从子节点生成 segments，避免 innerText 丢失 inline 标注
+            const segs = segmentsFromNode(el, {});
+            return mergeSegments(segs);
+          }
+
           function pickImageURL(img) {
             if (!img) return null;
             const candidates = [
@@ -343,26 +553,33 @@ private enum WebKitDOMExtractor {
             if (tag === 'p' && (isInside(el, 'blockquote') || isInside(el, 'li'))) continue;
 
             if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (t) results.push({ type: tag, text: t });
+              if (segs.length) results.push({ type: tag, segments: segs, text: t });
+              else if (t) results.push({ type: tag, text: t });
               continue;
             }
             if (tag === 'p') {
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (t) results.push({ type: 'p', text: t });
+              if (segs.length) results.push({ type: 'p', segments: segs, text: t });
+              else if (t) results.push({ type: 'p', text: t });
               continue;
             }
             if (tag === 'blockquote') {
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (t) results.push({ type: 'blockquote', text: t });
+              if (segs.length) results.push({ type: 'blockquote', segments: segs, text: t });
+              else if (t) results.push({ type: 'blockquote', text: t });
               continue;
             }
             if (tag === 'li') {
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (!t) continue;
+              if (!t && !segs.length) continue;
               const parent = el.parentElement ? (el.parentElement.tagName || '').toLowerCase() : '';
-              if (parent === 'ol') results.push({ type: 'ol_li', text: t });
-              else results.push({ type: 'ul_li', text: t });
+              if (parent === 'ol') results.push({ type: 'ol_li', segments: segs.length ? segs : undefined, text: t });
+              else results.push({ type: 'ul_li', segments: segs.length ? segs : undefined, text: t });
               continue;
             }
             if (tag === 'hr') {
@@ -375,8 +592,10 @@ private enum WebKitDOMExtractor {
               continue;
             }
             if (tag === 'pre' || tag === 'figcaption') {
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (t) results.push({ type: 'p', text: t });
+              if (segs.length) results.push({ type: 'p', segments: segs, text: t });
+              else if (t) results.push({ type: 'p', text: t });
               continue;
             }
             if (tag === 'div' || tag === 'section') {
@@ -385,8 +604,10 @@ private enum WebKitDOMExtractor {
               if (el.getAttribute('aria-hidden') === 'true') continue;
               if (isInside(el, 'p') || isInside(el, 'blockquote') || isInside(el, 'li')) continue;
               if (el.querySelector('div,section,h1,h2,h3,p,blockquote,li,hr,img,pre,figcaption')) continue;
+              const segs = segmentsOf(el);
               const t = textOf(el);
-              if (t) results.push({ type: 'p', text: t });
+              if (segs.length) results.push({ type: 'p', segments: segs, text: t });
+              else if (t) results.push({ type: 'p', text: t });
               continue;
             }
           }

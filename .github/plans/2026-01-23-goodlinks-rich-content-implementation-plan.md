@@ -159,6 +159,9 @@
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
 
+**Status**
+- ✅ 已完成（2026-01-24）：JS 侧输出 `segments`（支持 `<a>`/`<strong>/<b>`/`<em>/<i>`/`<code>`），Swift 侧映射为 Notion `rich_text`，并保留分块策略。
+
 **Step 1: 定义 segments 数据结构（概念）**
 - 让 JS 输出每个文本块的富文本片段数组（示例）：
   ```json
