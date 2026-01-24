@@ -124,6 +124,11 @@ struct HTMLWebView: NSViewRepresentable {
     // MARK: - Styling
 
     private static func wrapWithStyle(html: String) -> String {
+        let normalizedBodyHTML = extractBodyInnerHTML(from: html)
+            .map(stripNoscriptWrappersPreservingContent)
+            ?? stripNoscriptWrappersPreservingContent(html)
+        let displayReadyHTML = sanitizeHiddenInlineStyles(normalizedBodyHTML)
+
         let css = """
         :root {
           color-scheme: light dark;
@@ -255,8 +260,77 @@ struct HTMLWebView: NSViewRepresentable {
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <style>\(css)</style>
           </head>
-          <body>\(html)</body>
+          <body>\(displayReadyHTML)</body>
         </html>
         """
+    }
+
+    private static func extractBodyInnerHTML(from html: String) -> String? {
+        guard let regex = try? NSRegularExpression(
+            pattern: "<body\\b[^>]*>([\\s\\S]*?)<\\/body>",
+            options: [.caseInsensitive]
+        ) else {
+            return nil
+        }
+
+        let range = NSRange(html.startIndex..<html.endIndex, in: html)
+        guard let match = regex.firstMatch(in: html, options: [], range: range),
+              match.numberOfRanges >= 2,
+              let bodyRange = Range(match.range(at: 1), in: html) else {
+            return nil
+        }
+
+        let inner = String(html[bodyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return inner.isEmpty ? nil : inner
+    }
+
+    private static func stripNoscriptWrappersPreservingContent(_ html: String) -> String {
+        html
+            .replacingOccurrences(
+                of: "<noscript\\b[^>]*>",
+                with: "",
+                options: [.regularExpression, .caseInsensitive]
+            )
+            .replacingOccurrences(
+                of: "<\\/noscript>",
+                with: "",
+                options: [.regularExpression, .caseInsensitive]
+            )
+    }
+
+    /// 一些站点会把正文节点默认隐藏（依赖外部 CSS/JS 再显示），导致 WebView 渲染“几乎没文字”。
+    /// 这里仅移除会导致不可见的内联样式片段，保留其他 style。
+    private static func sanitizeHiddenInlineStyles(_ html: String) -> String {
+        var result = html
+        // display: none
+        result = result.replacingOccurrences(
+            of: "(?i)display\\s*:\\s*none\\s*;?",
+            with: "",
+            options: [.regularExpression]
+        )
+        // visibility: hidden
+        result = result.replacingOccurrences(
+            of: "(?i)visibility\\s*:\\s*hidden\\s*;?",
+            with: "",
+            options: [.regularExpression]
+        )
+        // opacity: 0
+        result = result.replacingOccurrences(
+            of: "(?i)opacity\\s*:\\s*0(\\.0+)?\\s*;?",
+            with: "",
+            options: [.regularExpression]
+        )
+        // -webkit-text-fill-color: transparent / color: transparent
+        result = result.replacingOccurrences(
+            of: "(?i)-webkit-text-fill-color\\s*:\\s*transparent\\s*;?",
+            with: "",
+            options: [.regularExpression]
+        )
+        result = result.replacingOccurrences(
+            of: "(?i)color\\s*:\\s*transparent\\s*;?",
+            with: "",
+            options: [.regularExpression]
+        )
+        return result
     }
 }
