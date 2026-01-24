@@ -175,6 +175,7 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 - **API 路径**：已确认使用 `POST /v1/file_uploads` 与 `GET /v1/file_uploads/{id}`。
 - **轮询上限**：当前为 `fileUploadMaxAttempts = 20`、`fileUploadPollIntervalMs = 800`，可按需要调整。
  - **图片类型**：external_url 会补齐 filename（URL path / query / content_type 推断），必要时推断 content_type；默认 image.jpg。
+- **URL 方案**：HTTP 图片在上传时自动升级为 HTTPS（Notion 仅接受 HTTPS）。
 ---
 
 ## Bugfix（同步无高亮正文）
