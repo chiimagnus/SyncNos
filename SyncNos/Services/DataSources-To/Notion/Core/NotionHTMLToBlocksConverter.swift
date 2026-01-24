@@ -324,8 +324,8 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @u
             return makeExternalImageBlock(urlString: urlString)
         }
 
-        let cacheKey = url.absoluteString
         let uploadURL = upgradedToHTTPS(url)
+        let cacheKey = uploadURL.absoluteString
         if let cachedId = await imageUploadCache.get(cacheKey) {
             return makeFileUploadImageBlock(id: cachedId)
         }
