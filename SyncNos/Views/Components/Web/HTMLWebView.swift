@@ -125,8 +125,126 @@ struct HTMLWebView: NSViewRepresentable {
 
     private static func wrapWithStyle(html: String) -> String {
         let css = """
-        img { max-width: 100%; height: auto; }
-        body { margin: 0; padding: 0; }
+        :root {
+          color-scheme: light dark;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: -apple-system, system-ui, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+          font-size: 15px;
+          line-height: 1.65;
+          -webkit-text-size-adjust: 100%;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+          color: rgba(0, 0, 0, 0.88);
+          background: transparent;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          body {
+            color: rgba(255, 255, 255, 0.88);
+          }
+        }
+
+        h1, h2, h3 {
+          margin: 0 0 0.6em 0;
+          line-height: 1.25;
+        }
+
+        p {
+          margin: 0 0 0.9em 0;
+        }
+
+        ul, ol {
+          margin: 0 0 0.9em 1.2em;
+          padding: 0;
+        }
+
+        li {
+          margin: 0.25em 0;
+        }
+
+        blockquote {
+          margin: 0 0 0.9em 0;
+          padding: 0.6em 0.9em;
+          border-left: 3px solid rgba(0, 0, 0, 0.18);
+          background: rgba(0, 0, 0, 0.04);
+        }
+
+        @media (prefers-color-scheme: dark) {
+          blockquote {
+            border-left-color: rgba(255, 255, 255, 0.22);
+            background: rgba(255, 255, 255, 0.06);
+          }
+        }
+
+        a {
+          color: #0A84FF;
+          text-decoration: none;
+        }
+
+        a:hover {
+          text-decoration: underline;
+        }
+
+        hr {
+          border: none;
+          height: 1px;
+          background: rgba(0, 0, 0, 0.12);
+          margin: 1.0em 0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          hr {
+            background: rgba(255, 255, 255, 0.18);
+          }
+        }
+
+        img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 0.6em 0;
+        }
+
+        figure {
+          margin: 0 0 0.9em 0;
+        }
+
+        figcaption {
+          margin-top: 0.4em;
+          font-size: 12px;
+          opacity: 0.72;
+        }
+
+        pre {
+          margin: 0 0 0.9em 0;
+          padding: 0.75em 0.9em;
+          overflow-x: auto;
+          border-radius: 8px;
+          background: rgba(0, 0, 0, 0.06);
+        }
+
+        @media (prefers-color-scheme: dark) {
+          pre {
+            background: rgba(255, 255, 255, 0.08);
+          }
+        }
+
+        code {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 0.92em;
+        }
+
+        pre code {
+          font-size: 0.9em;
+        }
         """
 
         return """
