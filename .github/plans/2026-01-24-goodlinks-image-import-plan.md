@@ -174,3 +174,22 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 - **API 路径**：已确认使用 `POST /v1/file_uploads` 与 `GET /v1/file_uploads/{id}`。
 - **轮询上限**：当前为 `fileUploadMaxAttempts = 20`、`fileUploadPollIntervalMs = 800`，可按需要调整。
 - **图片类型**：当前不推断 `content_type/filename`，由 Notion external_url 自动处理。
+---
+
+## Bugfix（同步无高亮正文）
+
+**Issue**
+- ✅ 已修复（2026-01-24）：无高亮的 GoodLinks 文章不会追加正文。
+
+**Fix**
+- 新增 NotionService `pageHasHeading`，无高亮且页面已存在时补齐 Article 头部块。
+- 新页面仍保持先追加 Article，再追加高亮。
+
+**Files**
+- Modify: `SyncNos/Services/Core/Protocols.swift`
+- Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionService.swift`
+- Modify: `SyncNos/Services/DataSources-To/Notion/SyncEngine/NotionSyncEngine.swift`
+
+**Verify**
+- Build: `xcodebuild -scheme SyncNos build`
+
