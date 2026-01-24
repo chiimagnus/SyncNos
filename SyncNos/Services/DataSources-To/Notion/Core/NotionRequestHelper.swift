@@ -30,15 +30,20 @@ class NotionRequestHelper {
         }
         return false
     }
-    private func addCommonHeaders(to request: inout URLRequest, key: String) {
+    private func addCommonHeaders(to request: inout URLRequest, key: String, versionOverride: String? = nil) {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+        request.setValue(versionOverride ?? notionVersion, forHTTPHeaderField: "Notion-Version")
     }
 
     // Centralized request sender to remove duplicated URLSession/request boilerplate
-    func performRequest(path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
+    func performRequest(
+        path: String,
+        method: String = "GET",
+        body: [String: Any]? = nil,
+        versionOverride: String? = nil
+    ) async throws -> Data {
         guard let key = configStore.effectiveToken else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
@@ -46,7 +51,7 @@ class NotionRequestHelper {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = NotionSyncConfig.requestTimeoutSeconds
-        addCommonHeaders(to: &request, key: key)
+        addCommonHeaders(to: &request, key: key, versionOverride: versionOverride)
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }
@@ -148,14 +153,19 @@ class NotionRequestHelper {
     }
 
     // Overload that accepts a full URL (used for URLComponents-built URLs)
-    func performRequest(url: URL, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
+    func performRequest(
+        url: URL,
+        method: String = "GET",
+        body: [String: Any]? = nil,
+        versionOverride: String? = nil
+    ) async throws -> Data {
         guard let key = configStore.effectiveToken else {
             throw NSError(domain: "NotionService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Notion not configured"])
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = NotionSyncConfig.requestTimeoutSeconds
-        addCommonHeaders(to: &request, key: key)
+        addCommonHeaders(to: &request, key: key, versionOverride: versionOverride)
         if let b = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: b, options: [])
         }

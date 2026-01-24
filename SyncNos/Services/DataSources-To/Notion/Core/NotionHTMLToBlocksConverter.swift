@@ -12,8 +12,8 @@ protocol NotionHTMLToBlocksConverterProtocol: Sendable {
 
 // MARK: - Converter
 
-/// 将文章 HTML 转为 Notion blocks（MVP：保序 + 基础结构 + 图片 external）
-final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
+/// 将文章 HTML 转为 Notion blocks（保序 + 基础结构 + 图片 file_upload）
+final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @unchecked Sendable {
 
     // MARK: - Types
 
@@ -65,14 +65,38 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         }
     }
 
+
+    private actor ImageUploadCache {
+        private var cache: [String: String] = [:]
+
+        func get(_ url: String) -> String? {
+            cache[url]
+        }
+
+        func set(_ url: String, id: String) {
+            cache[url] = id
+        }
+    }
+
     // MARK: - Dependencies
-    init() {}
+    private let notionService: NotionServiceProtocol
+    private let logger: LoggerServiceProtocol
+    private let imageUploadCache = ImageUploadCache()
+
+    init(
+        notionService: NotionServiceProtocol,
+        logger: LoggerServiceProtocol
+    ) {
+        self.notionService = notionService
+        self.logger = logger
+    }
 
     // MARK: - Limits
 
     /// Notion 单个 block 的 rich_text 数量存在上限；这里留足安全余量，避免触发 API 校验失败。
     private static let maxRichTextItemsPerBlock: Int = 80
     private static let maxLinkURLLength: Int = 2000
+    private static let allowedImageSchemes: Set<String> = ["http", "https"]
 
     // MARK: - NotionHTMLToBlocksConverterProtocol
 
@@ -87,12 +111,12 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
 
         let domItems = try await WebKitDOMExtractor.extractDOMItems(fromHTML: trimmed, baseURL: baseURL)
 
-        return buildBlocks(from: domItems)
+        return await buildBlocks(from: domItems)
     }
 
     // MARK: - Build blocks
 
-    private func buildBlocks(from items: [DOMItem]) -> [[String: Any]] {
+    private func buildBlocks(from items: [DOMItem]) async -> [[String: Any]] {
         var blocks: [[String: Any]] = []
         blocks.reserveCapacity(items.count)
 
@@ -100,7 +124,7 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
             switch item.type {
             case .img:
                 if let src = item.src?.trimmingCharacters(in: .whitespacesAndNewlines), !src.isEmpty {
-                    blocks.append(makeExternalImageBlock(urlString: src))
+                    blocks.append(await makeImageBlock(urlString: src))
                 }
 
             case .hr:
@@ -286,6 +310,40 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         return raw
     }
 
+    private func upgradedToHTTPS(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http" else { return url }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url ?? url
+    }
+
+    private func makeImageBlock(urlString: String) async -> [String: Any] {
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              Self.allowedImageSchemes.contains(scheme) else {
+            return makeExternalImageBlock(urlString: urlString)
+        }
+
+        let uploadURL = upgradedToHTTPS(url)
+        let cacheKey = uploadURL.absoluteString
+        if let cachedId = await imageUploadCache.get(cacheKey) {
+            return makeFileUploadImageBlock(id: cachedId)
+        }
+
+        do {
+            let fileUploadId = try await notionService.importImageFromExternalURL(
+                url: uploadURL,
+                filename: nil,
+                contentType: nil
+            )
+            await imageUploadCache.set(cacheKey, id: fileUploadId)
+            return makeFileUploadImageBlock(id: fileUploadId)
+        } catch {
+            logger.warning("[NotionHTMLToBlocks] Image import failed for \(urlString): \(error.localizedDescription)")
+            return makeExternalImageBlock(urlString: urlString)
+        }
+    }
+
     private func makeExternalImageBlock(urlString: String) -> [String: Any] {
         [
             "object": "block",
@@ -293,6 +351,18 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
                 "type": "external",
                 "external": [
                     "url": urlString
+                ]
+            ]
+        ]
+    }
+
+    private func makeFileUploadImageBlock(id: String) -> [String: Any] {
+        [
+            "object": "block",
+            "image": [
+                "type": "file_upload",
+                "file_upload": [
+                    "id": id
                 ]
             ]
         ]

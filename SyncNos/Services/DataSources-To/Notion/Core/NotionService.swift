@@ -86,6 +86,7 @@ final class NotionService: NotionServiceProtocol {
     private let pageOps: NotionPageOperations
     private let highlightOps: NotionHighlightOperations
     private let queryOps: NotionQueryOperations
+    private let fileUploadOps: NotionFileUploadOperations
     
     // MARK: - Concurrency Control
     
@@ -113,6 +114,10 @@ final class NotionService: NotionServiceProtocol {
             requestHelper: requestHelper,
             helperMethods: helperMethods,
             pageOperations: pageOps,
+            logger: logger
+        )
+        self.fileUploadOps = NotionFileUploadOperations(
+            requestHelper: requestHelper,
             logger: logger
         )
     }
@@ -225,6 +230,47 @@ final class NotionService: NotionServiceProtocol {
     // Expose append so callers using the protocol can delegate to page operations
     func appendChildren(pageId: String, children: [[String: Any]], batchSize: Int) async throws {
         try await pageOps.appendChildren(pageId: pageId, children: children, batchSize: batchSize)
+    }
+
+    // MARK: - File upload helpers
+    func importImageFromExternalURL(url: URL, filename: String?, contentType: String?) async throws -> String {
+        let upload = try await fileUploadOps.createExternalURLUpload(
+            url: url,
+            filename: filename,
+            contentType: contentType
+        )
+        let ready = try await fileUploadOps.waitUntilUploaded(id: upload.id)
+        return ready.id
+    }
+
+    // MARK: - Page inspection
+    func pageHasHeading(pageId: String, title: String) async throws -> Bool {
+        let target = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !target.isEmpty else { return false }
+        var cursor: String? = nil
+        repeat {
+            let (results, nextCursor) = try await requestHelper.listPageChildren(
+                pageId: pageId,
+                startCursor: cursor,
+                pageSize: 100
+            )
+            for block in results {
+                guard let type = block["type"] as? String else { continue }
+                guard type.hasPrefix("heading_") else { continue }
+                guard let heading = block[type] as? [String: Any] else { continue }
+                let richText = heading["rich_text"] as? [[String: Any]] ?? []
+                let text = richText.compactMap { item -> String? in
+                    if let plain = item["plain_text"] as? String { return plain }
+                    if let textObj = item["text"] as? [String: Any], let content = textObj["content"] as? String { return content }
+                    return nil
+                }.joined()
+                if text.trimmingCharacters(in: .whitespacesAndNewlines) == target {
+                    return true
+                }
+            }
+            cursor = nextCursor
+        } while cursor != nil
+        return false
     }
 
     // MARK: - Ensure / find-or-create helpers (consolidated)
