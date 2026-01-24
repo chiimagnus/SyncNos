@@ -26,9 +26,9 @@
 
 ## Plan A（主方案）：WebKit DOM → Notion blocks + WebKit 渲染
 
-### P1：为 Notion 新增“HTML → blocks（含图片）”转换器
+### ✅P1：为 Notion 新增“HTML → blocks（含图片）”转换器
 
-#### Task 1: 新建转换器协议与实现（WebKit DOM 提取）
+#### ✅Task 1: 新建转换器协议与实现（WebKit DOM 提取）
 
 **Files**
 - Create: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
@@ -85,7 +85,7 @@
 
 ---
 
-#### Task 2: 在 DIContainer 注册转换器（可注入、可替换）
+#### ✅Task 2: 在 DIContainer 注册转换器（可注入、可替换）
 
 **Files**
 - Modify: `SyncNos/Services/Core/DIContainer.swift`
@@ -101,9 +101,9 @@
 
 ---
 
-### P2：GoodLinks Notion 同步改为 blocks（含图片）而不是纯文本 paragraph
+### ✅P2：GoodLinks Notion 同步改为 blocks（含图片）而不是纯文本 paragraph
 
-#### Task 3: 扩展 GoodLinksNotionAdapter 预加载 HTML blocks
+#### ✅Task 3: 扩展 GoodLinksNotionAdapter 预加载 HTML blocks
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
@@ -131,7 +131,7 @@
 
 ---
 
-#### Task 4: Notion blocks 的长度与分块策略（避免 Notion API 限制）
+#### ✅Task 4: Notion blocks 的长度与分块策略（避免 Notion API 限制）
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHelperMethods.swift`
@@ -184,9 +184,9 @@
 
 ### P3：App 内文章展示从纯文本升级为 HTML 渲染（含图片与样式）
 
-#### P3.1（先做）：图片渲染（HTML WebView 基础能力）
+#### ✅P3.1（先做）：图片渲染（HTML WebView 基础能力）
 
-#### Task 6: 新增通用 HTML WebView 组件（SwiftUI）
+#### ✅Task 6: 新增通用 HTML WebView 组件（SwiftUI）
 
 **Files**
 - Create: `SyncNos/Views/Components/Web/HTMLWebView.swift`
