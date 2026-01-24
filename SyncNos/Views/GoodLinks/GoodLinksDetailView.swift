@@ -456,7 +456,15 @@ struct GoodLinksDetailView: View {
         case .loaded:
             if let result = detailViewModel.article,
                !result.textContent.isEmpty {
-                return .loaded(content: result.textContent, wordCount: result.wordCount)
+                // 优先使用 HTML 内容（如果可用）
+                if !result.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let link = viewModel.links.first(where: { $0.id == linkId }),
+                   let baseURL = URL(string: link.url) {
+                    return .loadedHTML(html: result.content, baseURL: baseURL, wordCount: result.wordCount)
+                } else {
+                    // 降级为纯文本
+                    return .loaded(content: result.textContent, wordCount: result.wordCount)
+                }
             } else {
                 // 已加载但无内容
                 return .empty

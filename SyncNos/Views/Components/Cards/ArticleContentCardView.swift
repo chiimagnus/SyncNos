@@ -10,8 +10,10 @@ enum ArticleLoadState: Equatable {
     case preview(content: String, wordCount: Int)
     /// 正在加载完整内容
     case loadingFull
-    /// 已加载完整内容
+    /// 已加载完整内容（纯文本）
     case loaded(content: String, wordCount: Int)
+    /// 已加载完整内容（HTML）
+    case loadedHTML(html: String, baseURL: URL?, wordCount: Int)
     /// 已加载但无内容
     case empty
     /// 加载失败
@@ -19,12 +21,35 @@ enum ArticleLoadState: Equatable {
     
     var isLoaded: Bool {
         if case .loaded = self { return true }
+        if case .loadedHTML = self { return true }
         return false
     }
     
     var isPreview: Bool {
         if case .preview = self { return true }
         return false
+    }
+    
+    // 实现 Equatable（手动）
+    static func == (lhs: ArticleLoadState, rhs: ArticleLoadState) -> Bool {
+        switch (lhs, rhs) {
+        case (.notLoaded, .notLoaded):
+            return true
+        case (.preview(let c1, let w1), .preview(let c2, let w2)):
+            return c1 == c2 && w1 == w2
+        case (.loadingFull, .loadingFull):
+            return true
+        case (.loaded(let c1, let w1), .loaded(let c2, let w2)):
+            return c1 == c2 && w1 == w2
+        case (.loadedHTML(let h1, let u1, let w1), .loadedHTML(let h2, let u2, let w2)):
+            return h1 == h2 && u1 == u2 && w1 == w2
+        case (.empty, .empty):
+            return true
+        case (.error(let m1), .error(let m2)):
+            return m1 == m2
+        default:
+            return false
+        }
     }
 }
 
@@ -136,6 +161,9 @@ struct ArticleContentCardView: View {
             case .loaded(let content, _):
                 loadedContent(content)
                 
+            case .loadedHTML(let html, let baseURL, _):
+                loadedHTMLContent(html: html, baseURL: baseURL)
+                
             case .empty:
                 emptyContent
                 
@@ -195,6 +223,47 @@ struct ArticleContentCardView: View {
             .textSelection(.enabled)
             .lineLimit(isExpanded ? nil : collapsedLineLimit)
             .fixedSize(horizontal: false, vertical: isExpanded)
+    }
+    
+    /// 加载 HTML 内容（使用 WebView 渲染）
+    private func loadedHTMLContent(html: String, baseURL: URL?) -> some View {
+        Group {
+            if isExpanded {
+                // 展开时显示完整的 HTML 内容
+                HTMLWebView(html: html, baseURL: baseURL)
+                    .frame(minHeight: 400)
+            } else {
+                // 折叠时显示纯文本预览（提取前 N 个字符）
+                Text(extractPlainText(from: html))
+                    .scaledFont(.body)
+                    .foregroundColor(.primary)
+                    .textSelection(.enabled)
+                    .lineLimit(collapsedLineLimit)
+                    .fixedSize(horizontal: false, vertical: false)
+            }
+        }
+    }
+    
+    /// 从 HTML 中提取纯文本（用于折叠预览）
+    private func extractPlainText(from html: String) -> String {
+        // 简单的纯文本提取：移除所有 HTML 标签
+        let pattern = "<[^>]+>"
+        let plainText = html.replacingOccurrences(
+            of: pattern,
+            with: " ",
+            options: .regularExpression
+        )
+        
+        // 清理多余空白
+        let cleaned = plainText
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 截取前 500 字符作为预览
+        if cleaned.count > 500 {
+            return String(cleaned.prefix(500)) + "..."
+        }
+        return cleaned
     }
     
     private var emptyContent: some View {
@@ -264,7 +333,7 @@ struct ArticleContentCardView: View {
     
     private var wordCount: Int {
         switch loadState {
-        case .preview(_, let count), .loaded(_, let count):
+        case .preview(_, let count), .loaded(_, let count), .loadedHTML(_, _, let count):
             return count
         default:
             return 0
@@ -285,6 +354,9 @@ struct ArticleContentCardView: View {
         case .loaded(let content, _):
             // 已加载完整内容时显示 Collapse 按钮（内容足够长时）
             return content.count > 200
+        case .loadedHTML:
+            // HTML 内容始终显示展开/折叠按钮
+            return true
         case .empty:
             // 空内容时不显示按钮（没有内容可以展开/折叠）
             return false
