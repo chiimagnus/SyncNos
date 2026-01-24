@@ -78,6 +78,7 @@ let upload = try await fileUploadOps.createExternalURLUpload(
 )
 let ready = try await fileUploadOps.waitUntilUploaded(id: upload.id)
 ```
+> external_url 需要 filename：缺省时从 URL path 或 content_type 推断并补齐。
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build`
@@ -173,7 +174,7 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 
 - **API 路径**：已确认使用 `POST /v1/file_uploads` 与 `GET /v1/file_uploads/{id}`。
 - **轮询上限**：当前为 `fileUploadMaxAttempts = 20`、`fileUploadPollIntervalMs = 800`，可按需要调整。
-- **图片类型**：当前不推断 `content_type/filename`，由 Notion external_url 自动处理。
+ - **图片类型**：已为 external_url 补齐 filename（URL path / content_type 推断）；content_type 仍交由 Notion 处理。
 ---
 
 ## Bugfix（同步无高亮正文）
@@ -192,4 +193,3 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build`
-
