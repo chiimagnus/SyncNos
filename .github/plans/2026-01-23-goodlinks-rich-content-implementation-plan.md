@@ -17,8 +17,10 @@
 
 **Acceptance（验收）**
 - Notion：同步 3 篇包含多张图片的文章，Notion 页面中图片作为 `image` block 出现，顺序与原文一致（图片不集中堆在顶部/底部）。
+- Notion（压力用例）：同步 1 篇长文（预期会产生 150+ blocks），页面能完整落库（按 API 上限分批追加 children），顺序不乱、不丢块。
 - App：GoodLinks 详情页展开文章后能看到图片；先保证“能显示图片 + 可读”，再逐步增强样式。
 - 兼容：抓取不到正文时仍按当前逻辑显示 empty/error，不影响高亮同步。
+- 交互：App 侧文章内链接点击时使用外部浏览器打开（行为一致、无死链/卡住）。
 
 ---
 
@@ -51,10 +53,16 @@
   - `SyncNos/Views/Settings/SyncFrom/WeReadLoginView.swift`
   - `SyncNos/Views/Settings/SyncFrom/DedaoLoginView.swift`
   - `SyncNos/Services/DataSources-From/WeRead/WeReadCookieRefreshService.swift`
-- `WKWebView` 使用 `loadHTMLString(html, baseURL: baseURL)`（不需要真的下载图片，只要拿到 `<img src>` 顺序即可）。
+- `WKWebView` 使用 `loadHTMLString(html, baseURL: baseURL)`。
+- 并发约束：`WKWebView` 的创建/加载/执行 JS 建议统一在主线程（`@MainActor`）完成；converter 对外仍提供 `async` 接口，但内部需要 `MainActor.run` 协调线程。
+- 解析专用 WebView 建议：
+  - 使用 `WKWebsiteDataStore.nonPersistent()`（避免写入/污染 cookie、缓存与本地存储）。
+  - 尽量阻断外部子资源加载（图片/CSS/JS/字体等）以提升性能并减少隐私/追踪面（优先用 `WKContentRuleList`；极端站点如依赖脚本生成正文再单独开例外）。
 - JavaScript 输出建议为数组：
   - `[{type:"h2", text:"..."}, {type:"p", text:"..."}, {type:"img", src:"https://..."}, {type:"ul_li", text:"..."}, ...]`
-  - 图片 URL 用 `new URL(img.getAttribute("src"), document.baseURI).href` 归一为绝对 URL。
+  - 图片 URL 归一化为绝对 URL：
+    - 优先读取 `data-src`/`data-original`/`data-lazy-src` 等懒加载字段，其次 `src`，必要时再回退 `srcset` 的首个候选。
+    - 使用 `new URL(raw, document.baseURI).href` 归一化；过滤空值与 `data:` URL（占位图）。
 
 **Step 3: 映射到 Notion blocks**
 - 先做 block 级别结构（MVP）：
@@ -107,6 +115,7 @@
   - 用 converter 将 `result.content`（HTML）+ `baseURL: URL(string: link.url)!` 转为 blocks
   - 将 blocks 注入 adapter
 - 对 `contentNotFound` 等错误：降级为无正文（保持可同步高亮）。
+- 如果 `children` 超过 Notion API 的单次上限（以官方文档为准；常见为 100）：创建页面时仅带第一批 children，剩余 blocks 用 “append block children” 分批追加，并对 429 做退避重试。
 
 **Verify**
 - Build: `xcodebuild -scheme SyncNos build`
@@ -217,7 +226,7 @@
 
 > 先完成 Plan A 的“原图 URL（image.external）”版本；此阶段再做稳定性增强。
 
-### Task 6: 图片导入/转存开关（分域名/失败重试）
+### Task 8: 图片导入/转存开关（分域名/失败重试）
 
 **Files（预期）**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionService.swift`
