@@ -29,7 +29,7 @@ struct HTMLWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = false
@@ -127,7 +127,8 @@ struct HTMLWebView: NSViewRepresentable {
         let normalizedBodyHTML = extractBodyInnerHTML(from: html)
             .map(stripNoscriptWrappersPreservingContent)
             ?? stripNoscriptWrappersPreservingContent(html)
-        let displayReadyHTML = sanitizeHiddenInlineStyles(normalizedBodyHTML)
+        var displayReadyHTML = sanitizeHiddenInlineStyles(normalizedBodyHTML)
+        displayReadyHTML = normalizeImages(displayReadyHTML)
 
         let css = """
         :root {
@@ -332,5 +333,130 @@ struct HTMLWebView: NSViewRepresentable {
             options: [.regularExpression]
         )
         return result
+    }
+
+    /// 将常见懒加载图片属性提升为 `src`，避免正文图片不显示。
+    private static func normalizeImages(_ html: String) -> String {
+        guard let imgRegex = try? NSRegularExpression(pattern: "<img\\b[^>]*>", options: [.caseInsensitive]) else {
+            return html
+        }
+
+        let ns = html as NSString
+        let matches = imgRegex.matches(in: html, options: [], range: NSRange(location: 0, length: ns.length))
+        if matches.isEmpty { return html }
+
+        var result = html
+        // 从后往前替换，避免 range 位移
+        for match in matches.reversed() {
+            let tag = (result as NSString).substring(with: match.range)
+            let normalizedTag = normalizeImgTag(tag)
+            result = (result as NSString).replacingCharacters(in: match.range, with: normalizedTag)
+        }
+        return result
+    }
+
+    private static func normalizeImgTag(_ tag: String) -> String {
+        let src = firstAttributeValue(in: tag, name: "src")
+        let dataSrc = firstAttributeValue(in: tag, name: "data-src")
+            ?? firstAttributeValue(in: tag, name: "data-original")
+            ?? firstAttributeValue(in: tag, name: "data-lazy-src")
+            ?? firstAttributeValue(in: tag, name: "data-url")
+        let srcset = firstAttributeValue(in: tag, name: "srcset")
+
+        let normalizedSrc: String? = {
+            if let src, isLikelyValidImageSrc(src) {
+                return src
+            }
+            if let dataSrc, isLikelyValidImageSrc(dataSrc) {
+                return dataSrc
+            }
+            if let srcset, let candidate = firstSrcsetCandidate(srcset), isLikelyValidImageSrc(candidate) {
+                return candidate
+            }
+            return nil
+        }()
+
+        guard let normalizedSrc else { return tag }
+
+        if src != nil {
+            return replaceAttributeValue(in: tag, name: "src", newValue: normalizedSrc)
+        }
+
+        // 没有 src：在 <img 后插入
+        if let insertRange = tag.range(of: "<img", options: [.caseInsensitive]) {
+            let end = tag.index(insertRange.lowerBound, offsetBy: 3)
+            return tag[..<end] + " src=\"\(escapeHTMLAttribute(normalizedSrc))\"" + tag[end...]
+        }
+        return tag
+    }
+
+    private static func firstAttributeValue(in tag: String, name: String) -> String? {
+        guard let regex = try? NSRegularExpression(
+            pattern: "(?i)\\b\(NSRegularExpression.escapedPattern(for: name))\\s*=\\s*([\"'])(.*?)\\1",
+            options: []
+        ) else {
+            return nil
+        }
+        let range = NSRange(tag.startIndex..<tag.endIndex, in: tag)
+        guard let match = regex.firstMatch(in: tag, options: [], range: range),
+              match.numberOfRanges >= 3,
+              let valueRange = Range(match.range(at: 2), in: tag) else {
+            return nil
+        }
+        let value = String(tag[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private static func replaceAttributeValue(in tag: String, name: String, newValue: String) -> String {
+        guard let regex = try? NSRegularExpression(
+            pattern: "(?i)(\\b\(NSRegularExpression.escapedPattern(for: name))\\s*=\\s*)([\"'])(.*?)(\\2)",
+            options: []
+        ) else {
+            return tag
+        }
+        let range = NSRange(tag.startIndex..<tag.endIndex, in: tag)
+        let escaped = escapeHTMLAttribute(newValue)
+        return regex.stringByReplacingMatches(
+            in: tag,
+            options: [],
+            range: range,
+            withTemplate: "$1$2\(escaped)$4"
+        )
+    }
+
+    private static func firstSrcsetCandidate(_ srcset: String) -> String? {
+        // 取第一个候选（浏览器仍会基于 DPR/宽度做选择，这里只是保证 src 不为空）
+        let parts = srcset.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let first = parts.first, !first.isEmpty else { return nil }
+        let segs = first.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        return segs.first?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isLikelyValidImageSrc(_ src: String) -> Bool {
+        let trimmed = src.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // 常见 1x1 占位图
+        if trimmed.hasPrefix("data:image/gif") || trimmed.hasPrefix("data:image/png") {
+            return false
+        }
+        return true
+    }
+
+    private static func escapeHTMLAttribute(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+}
+
+// MARK: - Passthrough Scroll
+
+/// 让滚轮事件向上传递，避免鼠标悬停在 WebView 上时父级 ScrollView 无法滚动。
+private final class PassthroughScrollWKWebView: WKWebView {
+    override func scrollWheel(with event: NSEvent) {
+        // 由于我们把 WebView 高度撑到内容高度，内部滚动应尽量禁用，让外层统一滚动。
+        nextResponder?.scrollWheel(with: event)
     }
 }
