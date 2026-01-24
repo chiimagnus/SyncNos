@@ -44,6 +44,12 @@ struct ArticleContentCardView: View {
     
     /// 加载状态
     let loadState: ArticleLoadState
+
+    /// 可选：用于富文本渲染的 HTML（展开时优先使用）
+    let htmlContent: String?
+
+    /// HTML baseURL（用于相对链接/图片）
+    let htmlBaseURL: URL?
     
     /// 父组件控制的展开状态（双向绑定）
     @Binding var isExpanded: Bool
@@ -59,11 +65,15 @@ struct ArticleContentCardView: View {
     
     /// 重试回调（仅 error 状态使用）
     let onRetry: (() async -> Void)?
+
+    @State private var htmlContentHeight: CGFloat = 320
     
     // MARK: - Initialization
     
     init(
         loadState: ArticleLoadState,
+        htmlContent: String? = nil,
+        htmlBaseURL: URL? = nil,
         isExpanded: Binding<Bool>,
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
@@ -71,6 +81,8 @@ struct ArticleContentCardView: View {
         onRetry: (() async -> Void)? = nil
     ) {
         self.loadState = loadState
+        self.htmlContent = htmlContent
+        self.htmlBaseURL = htmlBaseURL
         self._isExpanded = isExpanded
         self.overrideWidth = overrideWidth
         self._measuredWidth = measuredWidth
@@ -189,12 +201,26 @@ struct ArticleContentCardView: View {
     }
     
     private func loadedContent(_ content: String) -> some View {
-        Text(content)
-            .scaledFont(.body)
-            .foregroundColor(.primary)
-            .textSelection(.enabled)
-            .lineLimit(isExpanded ? nil : collapsedLineLimit)
-            .fixedSize(horizontal: false, vertical: isExpanded)
+        Group {
+            if isExpanded,
+               let htmlContent,
+               !htmlContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                HTMLWebView(
+                    html: htmlContent,
+                    baseURL: htmlBaseURL,
+                    openLinksInExternalBrowser: true,
+                    contentHeight: $htmlContentHeight
+                )
+                .frame(height: max(320, htmlContentHeight))
+            } else {
+                Text(content)
+                    .scaledFont(.body)
+                    .foregroundColor(.primary)
+                    .textSelection(.enabled)
+                    .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                    .fixedSize(horizontal: false, vertical: isExpanded)
+            }
+        }
     }
     
     private var emptyContent: some View {
