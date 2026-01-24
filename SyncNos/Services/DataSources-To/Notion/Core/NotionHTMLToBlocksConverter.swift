@@ -270,8 +270,9 @@ private enum WebKitDOMExtractor {
         #"""
         (() => {
           const results = [];
-          const selector = 'h1,h2,h3,p,blockquote,li,hr,img';
-          const nodes = Array.from(document.body.querySelectorAll(selector));
+          const root = document.querySelector('article') || document.querySelector('main') || document.body;
+          const selector = 'h1,h2,h3,p,blockquote,li,hr,img,pre,figcaption,section,div';
+          const nodes = Array.from(root.querySelectorAll(selector));
 
           function isInside(el, tagName) {
             let p = el.parentElement;
@@ -284,7 +285,9 @@ private enum WebKitDOMExtractor {
 
           function textOf(el) {
             if (!el) return '';
-            return (el.innerText || el.textContent || '').trim();
+            const inner = (el.innerText || '').trim();
+            if (inner) return inner;
+            return (el.textContent || '').trim();
           }
 
           function pickImageURL(img) {
@@ -293,6 +296,7 @@ private enum WebKitDOMExtractor {
               img.getAttribute('data-src'),
               img.getAttribute('data-original'),
               img.getAttribute('data-lazy-src'),
+              img.getAttribute('data-url'),
               img.getAttribute('src')
             ].filter(Boolean);
 
@@ -368,6 +372,21 @@ private enum WebKitDOMExtractor {
             if (tag === 'img') {
               const url = pickImageURL(el);
               if (url) results.push({ type: 'img', src: url });
+              continue;
+            }
+            if (tag === 'pre' || tag === 'figcaption') {
+              const t = textOf(el);
+              if (t) results.push({ type: 'p', text: t });
+              continue;
+            }
+            if (tag === 'div' || tag === 'section') {
+              // 兜底：部分站点正文不使用 <p>，而是 div/section + inline 文本
+              // 只处理“叶子容器”，避免把整块内容重复输出
+              if (el.getAttribute('aria-hidden') === 'true') continue;
+              if (isInside(el, 'p') || isInside(el, 'blockquote') || isInside(el, 'li')) continue;
+              if (el.querySelector('div,section,h1,h2,h3,p,blockquote,li,hr,img,pre,figcaption')) continue;
+              const t = textOf(el);
+              if (t) results.push({ type: 'p', text: t });
               continue;
             }
           }
