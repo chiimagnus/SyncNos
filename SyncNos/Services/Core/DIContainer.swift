@@ -26,6 +26,8 @@ class DIContainer {
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
+    // Notion - HTML → Blocks
+    private var _notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol?
     // WeRead
     private var _weReadAPIService: WeReadAPIServiceProtocol?
     private var _weReadCacheService: WeReadCacheServiceProtocol?
@@ -188,6 +190,15 @@ class DIContainer {
             _notionOAuthService = NotionOAuthService()
         }
         return _notionOAuthService!
+    }
+
+    // MARK: - Notion HTML → Blocks
+
+    var notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
+        if _notionHTMLToBlocksConverter == nil {
+            _notionHTMLToBlocksConverter = NotionHTMLToBlocksConverter()
+        }
+        return _notionHTMLToBlocksConverter!
     }
 
     // MARK: - WeRead Services
@@ -382,6 +393,10 @@ class DIContainer {
 
     func register(notionOAuthService: NotionOAuthService) {
         self._notionOAuthService = notionOAuthService
+    }
+
+    func register(notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol) {
+        self._notionHTMLToBlocksConverter = notionHTMLToBlocksConverter
     }
 
     func register(weReadAPIService: WeReadAPIServiceProtocol) {
