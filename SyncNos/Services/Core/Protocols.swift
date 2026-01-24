@@ -178,6 +178,8 @@ protocol NotionServiceProtocol: AnyObject {
     // Helpers added for consolidated DB management
     func ensureDatabaseIdForSource(title: String, parentPageId: String, sourceKey: String) async throws -> String
     func ensurePerBookDatabase(bookTitle: String, author: String, assetId: String) async throws -> (id: String, recreated: Bool)
+    // File upload
+    func importImageFromExternalURL(url: URL, filename: String?, contentType: String?) async throws -> String
     // Discovery helpers
     /// 列出当前 token 可访问、且可作为数据库父级的 Notion 页面（过滤掉 database item）
     func listAccessibleParentPages(searchQuery: String?) async throws -> [NotionPageSummary]

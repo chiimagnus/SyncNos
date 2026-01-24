@@ -86,6 +86,7 @@ final class NotionService: NotionServiceProtocol {
     private let pageOps: NotionPageOperations
     private let highlightOps: NotionHighlightOperations
     private let queryOps: NotionQueryOperations
+    private let fileUploadOps: NotionFileUploadOperations
     
     // MARK: - Concurrency Control
     
@@ -113,6 +114,10 @@ final class NotionService: NotionServiceProtocol {
             requestHelper: requestHelper,
             helperMethods: helperMethods,
             pageOperations: pageOps,
+            logger: logger
+        )
+        self.fileUploadOps = NotionFileUploadOperations(
+            requestHelper: requestHelper,
             logger: logger
         )
     }
@@ -225,6 +230,17 @@ final class NotionService: NotionServiceProtocol {
     // Expose append so callers using the protocol can delegate to page operations
     func appendChildren(pageId: String, children: [[String: Any]], batchSize: Int) async throws {
         try await pageOps.appendChildren(pageId: pageId, children: children, batchSize: batchSize)
+    }
+
+    // MARK: - File upload helpers
+    func importImageFromExternalURL(url: URL, filename: String?, contentType: String?) async throws -> String {
+        let upload = try await fileUploadOps.createExternalURLUpload(
+            url: url,
+            filename: filename,
+            contentType: contentType
+        )
+        let ready = try await fileUploadOps.waitUntilUploaded(id: upload.id)
+        return ready.id
     }
 
     // MARK: - Ensure / find-or-create helpers (consolidated)
