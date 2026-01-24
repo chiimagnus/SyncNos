@@ -35,6 +35,7 @@
 
 **Status**
 - ✅ 已完成（2026-01-24）：已落地 MVP（保序 + 基础结构 + 图片 `image.external`），并通过 `xcodebuild -scheme SyncNos build`。
+- ✅ 已增强（2026-01-24）：补充 `div/section` 叶子节点文本兜底、`pre/figcaption` 文本兜底，并修正 `innerText` 为空白时回退到 `textContent`，减少“Notion 少字”。
 
 **Step 1: 定义协议与输出约束**
 - 定义协议（示例）：
