@@ -12,8 +12,8 @@ protocol NotionHTMLToBlocksConverterProtocol: Sendable {
 
 // MARK: - Converter
 
-/// 将文章 HTML 转为 Notion blocks（MVP：保序 + 基础结构 + 图片 external）
-final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
+/// 将文章 HTML 转为 Notion blocks（保序 + 基础结构 + 图片 file_upload）
+final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @unchecked Sendable {
 
     // MARK: - Types
 
@@ -65,8 +65,31 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         }
     }
 
+
+    private actor ImageUploadCache {
+        private var cache: [String: String] = [:]
+
+        func get(_ url: String) -> String? {
+            cache[url]
+        }
+
+        func set(_ url: String, id: String) {
+            cache[url] = id
+        }
+    }
+
     // MARK: - Dependencies
-    init() {}
+    private let notionService: NotionServiceProtocol
+    private let logger: LoggerServiceProtocol
+    private let imageUploadCache = ImageUploadCache()
+
+    init(
+        notionService: NotionServiceProtocol,
+        logger: LoggerServiceProtocol
+    ) {
+        self.notionService = notionService
+        self.logger = logger
+    }
 
     // MARK: - Limits
 
@@ -294,14 +317,18 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
             return makeExternalImageBlock(urlString: urlString)
         }
 
-        let notionService = DIContainer.shared.notionService
-        let logger = DIContainer.shared.loggerService
+        let cacheKey = url.absoluteString
+        if let cachedId = await imageUploadCache.get(cacheKey) {
+            return makeFileUploadImageBlock(id: cachedId)
+        }
+
         do {
             let fileUploadId = try await notionService.importImageFromExternalURL(
                 url: url,
                 filename: nil,
                 contentType: nil
             )
+            await imageUploadCache.set(cacheKey, id: fileUploadId)
             return makeFileUploadImageBlock(id: fileUploadId)
         } catch {
             logger.warning("[NotionHTMLToBlocks] Image import failed for \(urlString): \(error.localizedDescription)")
