@@ -55,14 +55,13 @@ final class NotionFileUploadOperations {
         filename: String?,
         contentType: String?
     ) async throws -> FileUpload {
-        let resolvedFilename = (filename ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalFilename = resolvedFilename.isEmpty ? defaultFilename(for: url, contentType: contentType) : resolvedFilename
+        let resolved = resolveUploadInfo(url: url, filename: filename, contentType: contentType)
         var body: [String: Any] = [
             "mode": "external_url",
             "external_url": url.absoluteString,
-            "filename": finalFilename
+            "filename": resolved.filename
         ]
-        if let contentType, !contentType.isEmpty {
+        if let contentType = resolved.contentType, !contentType.isEmpty {
             body["content_type"] = contentType
         }
         let data = try await requestHelper.performRequest(
@@ -85,15 +84,66 @@ final class NotionFileUploadOperations {
     }
 
 
-    private func defaultFilename(for url: URL, contentType: String?) -> String {
-        let last = url.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !last.isEmpty, last.contains(".") {
-            return sanitizeFilename(last)
+    private func resolveUploadInfo(
+        url: URL,
+        filename: String?,
+        contentType: String?
+    ) -> (filename: String, contentType: String?) {
+        let cleanedFilename = sanitizeFilename((filename ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+        var resolvedContentType = contentType?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var baseName = "image"
+        var ext: String?
+
+        if !cleanedFilename.isEmpty {
+            let components = filenameComponents(from: cleanedFilename)
+            if !components.base.isEmpty { baseName = components.base }
+            ext = components.ext
+        } else {
+            let last = url.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !last.isEmpty {
+                let components = filenameComponents(from: last)
+                if !components.base.isEmpty { baseName = components.base }
+                ext = components.ext
+            }
         }
-        if let contentType, let ext = fileExtension(for: contentType) {
-            return "image.\(ext)"
+
+        if ext == nil {
+            ext = extensionFromQuery(url)
         }
-        return "image"
+        if ext == nil, let resolvedContentType, let extFromContentType = fileExtension(for: resolvedContentType) {
+            ext = extFromContentType
+        }
+        if ext == nil {
+            ext = "jpg"
+        }
+        if resolvedContentType == nil, let ext, let inferredType = self.contentType(forExtension: ext) {
+            resolvedContentType = inferredType
+        }
+
+        let finalFilename = ext.map { "\(baseName).\($0)" } ?? baseName
+        return (finalFilename, resolvedContentType)
+    }
+
+    private func filenameComponents(from name: String) -> (base: String, ext: String?) {
+        let nsName = name as NSString
+        let base = nsName.deletingPathExtension
+        let ext = normalizedExtension(nsName.pathExtension)
+        return (base, ext)
+    }
+
+    private func extensionFromQuery(_ url: URL) -> String? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let items = components.queryItems, !items.isEmpty else {
+            return nil
+        }
+        let keys = ["wx_fmt", "format", "fm", "ext", "type"]
+        for key in keys {
+            if let value = items.first(where: { $0.name.lowercased() == key })?.value,
+               let normalized = normalizedExtension(value) {
+                return normalized
+            }
+        }
+        return nil
     }
 
     private func sanitizeFilename(_ name: String) -> String {
@@ -101,6 +151,33 @@ final class NotionFileUploadOperations {
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\r", with: "")
         return cleaned.isEmpty ? "image" : cleaned
+    }
+
+    private func normalizedExtension(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+        let cleaned = trimmed.hasPrefix(".") ? String(trimmed.dropFirst()) : trimmed
+        switch cleaned {
+        case "jpg", "jpeg": return "jpg"
+        case "png": return "png"
+        case "gif": return "gif"
+        case "webp": return "webp"
+        case "heic": return "heic"
+        case "heif": return "heif"
+        default: return nil
+        }
+    }
+
+    private func contentType(forExtension ext: String) -> String? {
+        switch ext.lowercased() {
+        case "jpg": return "image/jpeg"
+        case "png": return "image/png"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        case "heic": return "image/heic"
+        case "heif": return "image/heif"
+        default: return nil
+        }
     }
 
     private func fileExtension(for contentType: String) -> String? {
