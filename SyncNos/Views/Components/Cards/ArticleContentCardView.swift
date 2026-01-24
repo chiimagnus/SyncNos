@@ -65,6 +65,13 @@ enum ArticleLoadState: Equatable {
 /// - `empty`: 无内容
 /// - `error`: 加载失败，显示错误信息和重试按钮
 struct ArticleContentCardView: View {
+    // MARK: - Constants
+    
+    /// HTML 预览时提取的最大字符数
+    private static let htmlPreviewMaxLength: Int = 500
+    /// HTML 展开时的最小高度
+    private static let htmlExpandedMinHeight: CGFloat = 400
+    
     // MARK: - Properties
     
     /// 加载状态
@@ -231,7 +238,7 @@ struct ArticleContentCardView: View {
             if isExpanded {
                 // 展开时显示完整的 HTML 内容
                 HTMLWebView(html: html, baseURL: baseURL)
-                    .frame(minHeight: 400)
+                    .frame(minHeight: Self.htmlExpandedMinHeight)
             } else {
                 // 折叠时显示纯文本预览（提取前 N 个字符）
                 Text(extractPlainText(from: html))
@@ -259,9 +266,9 @@ struct ArticleContentCardView: View {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 截取前 500 字符作为预览
-        if cleaned.count > 500 {
-            return String(cleaned.prefix(500)) + "..."
+        // 截取前 N 字符作为预览
+        if cleaned.count > Self.htmlPreviewMaxLength {
+            return String(cleaned.prefix(Self.htmlPreviewMaxLength)) + "..."
         }
         return cleaned
     }

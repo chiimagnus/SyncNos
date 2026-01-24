@@ -4,12 +4,13 @@ import WebKit
 // MARK: - Protocol
 
 /// HTML 转 Notion blocks 转换器协议
-protocol NotionHTMLToBlocksConverterProtocol: Sendable {
+protocol NotionHTMLToBlocksConverterProtocol {
     /// 将 HTML 文章内容转换为 Notion blocks 数组
     /// - Parameters:
     ///   - html: HTML 字符串（文章内容）
     ///   - baseURL: 基准 URL（用于解析相对链接和图片）
     /// - Returns: Notion blocks 数组，每个 block 是一个字典
+    @MainActor
     func convertArticleHTMLToBlocks(
         html: String,
         baseURL: URL
@@ -23,6 +24,7 @@ struct DOMNode: Codable {
     let type: String  // "h1", "h2", "h3", "p", "img", "ul_li", "ol_li", "blockquote", "hr"
     let text: String? // 文本内容（对于文本节点）
     let src: String?  // 图片 URL（对于 img 节点）
+    let alt: String?  // 图片 alt 文本（对于 img 节点）
 }
 
 // MARK: - Implementation
@@ -30,6 +32,11 @@ struct DOMNode: Codable {
 /// WebKit 基础的 HTML 转 Notion blocks 转换器
 @MainActor
 final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterProtocol {
+    
+    // MARK: - Constants
+    
+    /// 默认超时时间（秒）
+    private static let defaultTimeoutSeconds: TimeInterval = 30
     
     // MARK: - Dependencies
     
@@ -86,9 +93,9 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             
-            // 设置超时（30 秒）
+            // 设置超时
             timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                try? await Task.sleep(nanoseconds: UInt64(Self.defaultTimeoutSeconds * 1_000_000_000))
                 if !Task.isCancelled {
                     self.handleExtractionFailure(error: ConversionError.timeout)
                 }
@@ -117,6 +124,34 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
             const body = document.body;
             if (!body) return JSON.stringify(result);
             
+            // 提取节点的纯文本内容（不递归子元素）
+            function getDirectText(node) {
+                let text = '';
+                for (let child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        text += child.textContent || '';
+                    }
+                }
+                return text.trim();
+            }
+            
+            // 提取节点的完整文本内容（包括子元素，但跳过图片等）
+            function getFullText(node) {
+                let text = '';
+                for (let child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        text += child.textContent || '';
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const childTag = child.tagName?.toLowerCase();
+                        // 跳过图片和其他非文本元素
+                        if (!['img', 'video', 'audio', 'iframe'].includes(childTag)) {
+                            text += getFullText(child);
+                        }
+                    }
+                }
+                return text;
+            }
+            
             function processNode(node) {
                 const tag = node.tagName?.toLowerCase();
                 
@@ -134,11 +169,18 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
                         result.push({ type: 'p', text: text });
                     }
                 }
-                // 引用
+                // 引用 - 递归处理内部元素
                 else if (tag === 'blockquote') {
-                    const text = node.textContent?.trim() || '';
-                    if (text) {
-                        result.push({ type: 'blockquote', text: text });
+                    // 先处理引用内的子元素（可能包含段落、图片等）
+                    for (let child of node.children) {
+                        processNode(child);
+                    }
+                    // 如果没有子元素，提取文本
+                    if (node.children.length === 0) {
+                        const text = node.textContent?.trim() || '';
+                        if (text) {
+                            result.push({ type: 'blockquote', text: text });
+                        }
                     }
                 }
                 // 分隔线
@@ -152,28 +194,47 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
                         // 将相对 URL 转换为绝对 URL
                         try {
                             const absoluteURL = new URL(src, document.baseURI).href;
-                            result.push({ type: 'img', src: absoluteURL });
+                            const alt = node.getAttribute('alt') || '';
+                            result.push({ type: 'img', src: absoluteURL, alt: alt });
                         } catch (e) {
                             // 无效 URL，跳过
                         }
                     }
                 }
-                // 无序列表项
-                else if (tag === 'li' && node.parentElement?.tagName?.toLowerCase() === 'ul') {
-                    const text = node.textContent?.trim() || '';
-                    if (text) {
-                        result.push({ type: 'ul_li', text: text });
+                // 列表项 - 递归处理内部元素
+                else if (tag === 'li') {
+                    const parentTag = node.parentElement?.tagName?.toLowerCase();
+                    if (parentTag === 'ul' || parentTag === 'ol') {
+                        // 提取列表项的文本（不包括嵌套列表）
+                        const text = getFullText(node).trim();
+                        if (text) {
+                            const type = parentTag === 'ul' ? 'ul_li' : 'ol_li';
+                            result.push({ type: type, text: text });
+                        }
+                        // 处理列表项内的图片
+                        for (let child of node.children) {
+                            if (child.tagName?.toLowerCase() === 'img') {
+                                processNode(child);
+                            }
+                        }
                     }
                 }
-                // 有序列表项
-                else if (tag === 'li' && node.parentElement?.tagName?.toLowerCase() === 'ol') {
-                    const text = node.textContent?.trim() || '';
-                    if (text) {
-                        result.push({ type: 'ol_li', text: text });
+                // 列表容器 - 递归处理列表项
+                else if (tag === 'ul' || tag === 'ol') {
+                    for (let child of node.children) {
+                        if (child.tagName?.toLowerCase() === 'li') {
+                            processNode(child);
+                        }
                     }
                 }
-                // 递归处理子节点（对于容器元素）
-                else if (['div', 'article', 'section', 'main', 'ul', 'ol'].includes(tag)) {
+                // 递归处理子节点（对于其他容器元素）
+                else if (['div', 'article', 'section', 'main', 'header', 'footer', 'aside', 'nav'].includes(tag)) {
+                    for (let child of node.children) {
+                        processNode(child);
+                    }
+                }
+                // 默认情况：对于未知元素，尝试递归处理
+                else if (node.children && node.children.length > 0) {
                     for (let child of node.children) {
                         processNode(child);
                     }
@@ -272,8 +333,8 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
             case "hr":
                 blocks.append(buildDividerBlock())
             case "img":
-                if let src = node.src, !src.isEmpty {
-                    blocks.append(buildImageBlock(url: src))
+                if let src = node.src, !src.isEmpty, isValidImageURL(src) {
+                    blocks.append(buildImageBlock(url: src, alt: node.alt))
                 }
             default:
                 // 未知类型，跳过
@@ -366,16 +427,36 @@ final class NotionHTMLToBlocksConverter: NSObject, NotionHTMLToBlocksConverterPr
     }
     
     /// 构建图片 block（使用 external URL）
-    private func buildImageBlock(url: String) -> [String: Any] {
-        [
-            "object": "block",
-            "image": [
-                "type": "external",
-                "external": [
-                    "url": url
-                ]
+    private func buildImageBlock(url: String, alt: String?) -> [String: Any] {
+        var imageDict: [String: Any] = [
+            "type": "external",
+            "external": [
+                "url": url
             ]
         ]
+        
+        // Notion API 不直接支持 alt 文本在 image block 中
+        // 可以考虑在后续添加 caption 支持
+        
+        return [
+            "object": "block",
+            "image": imageDict
+        ]
+    }
+    
+    /// 验证图片 URL 是否有效
+    private func isValidImageURL(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString) else {
+            return false
+        }
+        
+        // 检查是否有有效的 scheme
+        guard let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        
+        // 只接受 http 和 https
+        return scheme == "http" || scheme == "https"
     }
     
     // MARK: - Text Chunking

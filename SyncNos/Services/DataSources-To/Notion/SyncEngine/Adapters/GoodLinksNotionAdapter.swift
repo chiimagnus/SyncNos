@@ -151,6 +151,7 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
 extension GoodLinksNotionAdapter {
     
     /// 创建适配器并预加载内容
+    @MainActor
     static func create(
         link: GoodLinksLinkRow,
         dbPath: String,
