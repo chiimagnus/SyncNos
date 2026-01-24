@@ -150,7 +150,7 @@
 
 ---
 
-### P2.5（可选增强）：Notion rich_text 的 inline 标注（bold/italic/link/code）
+### ✅P2.5（可选增强）：Notion rich_text 的 inline 标注（bold/italic/link/code）
 
 > 用于让 Notion 页面的文字更接近原网页，但不是“图片可见”的前置条件，可在 P1/P2 跑通后再做。
 
