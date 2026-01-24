@@ -255,6 +255,7 @@ final class NotionFileUploadOperations {
                 break
             default:
                 logger.warning("[NotionFileUpload] Unknown status=\(upload.status) for id=\(id)")
+                throw FileUploadError.failed("unknown status: \(upload.status)")
             }
             if attempt < maxAttempts {
                 let delayMs = NotionSyncConfig.fileUploadPollIntervalMs
