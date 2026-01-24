@@ -18,3 +18,12 @@ protocol GoodLinksReadOnlySessionProtocol: AnyObject {
     func fetchHighlightCountsByLink() throws -> [GoodLinksLinkHighlightCount]
     func close()
 }
+
+// MARK: - URL Cache Protocol
+
+protocol GoodLinksURLCacheServiceProtocol: Sendable {
+    func getArticle(url: String) async throws -> ArticleFetchResult?
+    func upsertArticle(url: String, result: ArticleFetchResult) async throws
+    func removeExpiredArticles() async throws
+    func removeAll() async throws
+}

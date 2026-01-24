@@ -43,6 +43,8 @@ class DIContainer {
     private var _ocrAPIService: OCRAPIServiceProtocol?
     // Chats
     private var _chatsCacheService: ChatCacheServiceProtocol?
+    // Notion HTML Converter
+    private var _notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -427,5 +429,16 @@ class DIContainer {
 
     func register(siteLoginsStore: SiteLoginsStoreProtocol) {
         self._siteLoginsStore = siteLoginsStore
+    }
+    
+    var notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
+        if _notionHTMLToBlocksConverter == nil {
+            _notionHTMLToBlocksConverter = NotionHTMLToBlocksConverter()
+        }
+        return _notionHTMLToBlocksConverter!
+    }
+    
+    func register(notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol) {
+        self._notionHTMLToBlocksConverter = notionHTMLToBlocksConverter
     }
 }
