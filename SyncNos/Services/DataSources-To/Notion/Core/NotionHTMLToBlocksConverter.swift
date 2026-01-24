@@ -68,6 +68,12 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
     // MARK: - Dependencies
     init() {}
 
+    // MARK: - Limits
+
+    /// Notion 单个 block 的 rich_text 数量存在上限；这里留足安全余量，避免触发 API 校验失败。
+    private static let maxRichTextItemsPerBlock: Int = 80
+    private static let maxLinkURLLength: Int = 2000
+
     // MARK: - NotionHTMLToBlocksConverterProtocol
 
     func convertArticleHTMLToBlocks(
@@ -160,7 +166,11 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         let normalizedSegments = normalizeSegments(segments)
         guard !normalizedSegments.isEmpty else { return [] }
 
-        let chunked = chunkSegments(normalizedSegments, chunkSize: NotionSyncConfig.maxTextLengthPrimary)
+        let chunked = chunkSegments(
+            normalizedSegments,
+            chunkSize: NotionSyncConfig.maxTextLengthPrimary,
+            maxItems: Self.maxRichTextItemsPerBlock
+        )
         return chunked.map { segmentChunk in
             [
                 "object": "block",
@@ -175,16 +185,20 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         // 去掉空文本，并合并相邻 marks 相同的片段（降低 rich_text 数量）
         var result: [DOMItem.Segment] = []
         for segment in segments {
-            let trimmed = segment.text.replacingOccurrences(of: "\r\n", with: "\n")
-            guard !trimmed.isEmpty else { continue }
+            var text = segment.text.replacingOccurrences(of: "\r\n", with: "\n")
+            // 兜底：删除非法的空字符，避免 Notion API 校验失败
+            text = text.replacingOccurrences(of: "\u{0000}", with: "")
+            // 折叠多余空白，保留必要的分隔（避免 words 粘连）
+            text = text.replacingOccurrences(of: "\\s+", with: " ", options: [.regularExpression])
+            guard !text.isEmpty else { continue }
 
             if let last = result.last, marksEqual(last.marks, segment.marks) {
                 result[result.count - 1] = DOMItem.Segment(
-                    text: last.text + trimmed,
+                    text: last.text + text,
                     marks: last.marks
                 )
             } else {
-                result.append(DOMItem.Segment(text: trimmed, marks: segment.marks))
+                result.append(DOMItem.Segment(text: text, marks: segment.marks))
             }
         }
 
@@ -203,13 +217,13 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
             && (a?.href ?? "") == (b?.href ?? "")
     }
 
-    private func chunkSegments(_ segments: [DOMItem.Segment], chunkSize: Int) -> [[DOMItem.Segment]] {
+    private func chunkSegments(_ segments: [DOMItem.Segment], chunkSize: Int, maxItems: Int) -> [[DOMItem.Segment]] {
         var chunks: [[DOMItem.Segment]] = []
         var current: [DOMItem.Segment] = []
         var currentCount = 0
 
         func flushIfNeeded(force: Bool = false) {
-            if force || (currentCount >= chunkSize && !current.isEmpty) {
+            if force || ((currentCount >= chunkSize || current.count >= maxItems) && !current.isEmpty) {
                 chunks.append(current)
                 current = []
                 currentCount = 0
@@ -219,12 +233,15 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         for segment in segments {
             var remainingText = segment.text
             while !remainingText.isEmpty {
+                if current.count >= maxItems {
+                    flushIfNeeded(force: true)
+                }
                 let spaceLeft = max(1, chunkSize - currentCount)
                 if remainingText.count <= spaceLeft {
                     current.append(DOMItem.Segment(text: remainingText, marks: segment.marks))
                     currentCount += remainingText.count
                     remainingText = ""
-                    if currentCount >= chunkSize {
+                    if currentCount >= chunkSize || current.count >= maxItems {
                         flushIfNeeded(force: true)
                     }
                 } else {
@@ -245,7 +262,7 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
 
     private func makeRichText(from segment: DOMItem.Segment) -> [String: Any] {
         var textPayload: [String: Any] = ["content": segment.text]
-        if let href = segment.marks?.href, !href.isEmpty {
+        if let href = sanitizedLinkURL(segment.marks?.href) {
             textPayload["link"] = ["url": href]
         }
 
@@ -258,6 +275,15 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
             richText["annotations"] = annotations
         }
         return richText
+    }
+
+    private func sanitizedLinkURL(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        // Notion 对 URL 校验较严格：这里仅保留 http/https，避免 javascript/mailto 等导致整页同步失败
+        guard raw.count <= Self.maxLinkURLLength else { return nil }
+        guard let url = URL(string: raw), let scheme = url.scheme?.lowercased() else { return nil }
+        guard scheme == "http" || scheme == "https" else { return nil }
+        return raw
     }
 
     private func makeExternalImageBlock(urlString: String) -> [String: Any] {
