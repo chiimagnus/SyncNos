@@ -182,7 +182,7 @@
 
 ---
 
-### P3：App 内文章展示从纯文本升级为 HTML 渲染（含图片与样式）
+### ✅P3：App 内文章展示从纯文本升级为 HTML 渲染（含图片与样式）
 
 #### ✅P3.1（先做）：图片渲染（HTML WebView 基础能力）
 
@@ -217,12 +217,15 @@
 
 ---
 
-#### P3.2（再做）：文本样式美化（统一 CSS）
+#### ✅P3.2（再做）：文本样式美化（统一 CSS）
 
-#### Task 7: 增强 CSS 与可读性（不改内容结构）
+#### ✅Task 7: 增强 CSS 与可读性（不改内容结构）
 
 **Files**
 - Modify: `SyncNos/Views/Components/Web/HTMLWebView.swift`
+
+**Status**
+- ✅ 已完成（2026-01-24）：补全标题/段落/列表/引用/代码块/分隔线/链接等基础样式，并适配 Dark Mode（`prefers-color-scheme`）。
 
 **Step**
 - 在不影响图片显示的前提下，逐步增强排版（示例方向）：
