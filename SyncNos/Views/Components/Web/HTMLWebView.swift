@@ -29,6 +29,28 @@ struct HTMLWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        let userContentController = WKUserContentController()
+        configuration.userContentController = userContentController
+
+        // 修复常见懒加载图片（data-src/srcset），以及部分站点设置的 referrerpolicy 导致图片加载失败
+        userContentController.addUserScript(
+            WKUserScript(
+                source: Coordinator.imageNormalizationScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
+        // 通过 JS ResizeObserver 持续上报内容高度，避免图片/字体加载后高度变化导致内容被截断
+        userContentController.add(context.coordinator, name: Coordinator.heightMessageHandlerName)
+        userContentController.addUserScript(
+            WKUserScript(
+                source: Coordinator.heightObserverScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
         let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
@@ -62,7 +84,100 @@ struct HTMLWebView: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        static let heightMessageHandlerName = "syncnosHeight"
+        static let imageNormalizationScript = #"""
+        (() => {
+          function isPlaceholder(src) {
+            if (!src) return true;
+            const s = String(src).trim();
+            if (!s) return true;
+            if (s.startsWith('data:image/')) return true;
+            return false;
+          }
+
+          function pickBestFromSrcset(srcset) {
+            if (!srcset) return null;
+            const parts = String(srcset).split(',').map(p => p.trim()).filter(Boolean);
+            if (!parts.length) return null;
+            // 取第一个候选即可（浏览器会自行选择合适资源），这里主要保证 src 不为空
+            const first = parts[0];
+            const segs = first.split(/\s+/).filter(Boolean);
+            return segs.length ? segs[0] : null;
+          }
+
+          function normalizeOne(img) {
+            if (!img) return;
+            const src = img.getAttribute('src');
+            const dataSrc =
+              img.getAttribute('data-src') ||
+              img.getAttribute('data-original') ||
+              img.getAttribute('data-lazy-src') ||
+              img.getAttribute('data-url');
+            const srcset = img.getAttribute('srcset');
+            const srcsetCandidate = pickBestFromSrcset(srcset);
+
+            const replacement = dataSrc || srcsetCandidate;
+            if (isPlaceholder(src) && replacement) {
+              img.setAttribute('src', replacement);
+            }
+
+            // 部分站点使用 referrerpolicy=no-referrer，会导致 CDN 按防盗链策略拒绝图片
+            img.removeAttribute('referrerpolicy');
+          }
+
+          const imgs = Array.from(document.images || []);
+          imgs.forEach(normalizeOne);
+
+          // MutationObserver：处理后续动态插入的图片节点
+          const mo = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              for (const node of m.addedNodes || []) {
+                if (!node) continue;
+                if (node.tagName && node.tagName.toLowerCase() === 'img') {
+                  normalizeOne(node);
+                } else if (node.querySelectorAll) {
+                  node.querySelectorAll('img').forEach(normalizeOne);
+                }
+              }
+            }
+          });
+          mo.observe(document.documentElement, { childList: true, subtree: true });
+        })();
+        """#
+
+        static let heightObserverScript = #"""
+        (() => {
+          function reportHeight() {
+            const h = Math.max(
+              document.body ? document.body.scrollHeight : 0,
+              document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+            try {
+              window.webkit.messageHandlers.syncnosHeight.postMessage(h);
+            } catch (e) {}
+          }
+
+          // 初次上报 + 兜底轮询（图片异步加载、字体加载）
+          reportHeight();
+          let ticks = 0;
+          const timer = setInterval(() => {
+            ticks += 1;
+            reportHeight();
+            if (ticks >= 15) clearInterval(timer);
+          }, 250);
+
+          // 观察布局变化（比 didFinish + 1s 更稳）
+          if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => reportHeight());
+            if (document.body) ro.observe(document.body);
+          }
+
+          // 图片加载后高度可能变化
+          window.addEventListener('load', () => reportHeight(), { once: true });
+        })();
+        """#
+
         var lastLoadedHTML: String?
         var lastLoadedBaseURL: URL?
         var openLinksInExternalBrowser: Bool
@@ -117,6 +232,15 @@ struct HTMLWebView: NSViewRepresentable {
                 if let value = result as? Double, value > 0 {
                     self.onContentHeightChange?(CGFloat(value))
                 }
+            }
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == Self.heightMessageHandlerName else { return }
+            if let value = message.body as? Double, value > 0 {
+                onContentHeightChange?(CGFloat(value))
+            } else if let value = message.body as? Int, value > 0 {
+                onContentHeightChange?(CGFloat(value))
             }
         }
     }
