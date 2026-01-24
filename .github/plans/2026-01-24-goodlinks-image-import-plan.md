@@ -15,6 +15,10 @@
 - NotionHTMLToBlocksConverter 在处理图片时调用上传服务，成功使用 `file_upload` 类型的 image block，失败回退到 `external`。
 
 **Acceptance（验收）:**
+**Status**
+- ✅ Build: `xcodebuild -scheme SyncNos build`
+- ⏳ Manual: Notion 端图片显示验收待执行
+
 - 同步包含多张图片的 GoodLinks 文章，Notion 页内图片为 Notion-hosted（`file_upload`）。
 - 任一图片导入失败时仍可同步整篇文章，失败图片回退为 external image。
 - `xcodebuild -scheme SyncNos build` 成功。
@@ -26,6 +30,9 @@
 ### P1：新增 Notion File Upload 基础能力
 
 #### Task 1: 为 NotionRequestHelper 增加版本覆盖与配置常量
+
+**Status**
+- ✅ 已完成（2026-01-24）：新增 file upload 版本/轮询常量并支持 versionOverride。
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionRequestHelper.swift`
@@ -51,6 +58,9 @@ let data = try await requestHelper.performRequest(
 ---
 
 #### Task 2: 新建 NotionFileUploadOperations（external_url + 轮询）
+
+**Status**
+- ✅ 已完成（2026-01-24）：支持 external_url 创建与轮询上传状态。
 
 **Files**
 - Create: `SyncNos/Services/DataSources-To/Notion/Operations/NotionFileUploadOperations.swift`
@@ -78,6 +88,9 @@ let ready = try await fileUploadOps.waitUntilUploaded(id: upload.id)
 
 #### Task 3: 扩展 NotionServiceProtocol / NotionService
 
+**Status**
+- ✅ 已完成（2026-01-24）：新增 importImageFromExternalURL 接口并接入 NotionFileUploadOperations。
+
 **Files**
 - Modify: `SyncNos/Services/Core/Protocols.swift`
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionService.swift`
@@ -102,6 +115,9 @@ let fileUploadId = try await notionService.importImageFromExternalURL(
 ### P3：NotionHTMLToBlocksConverter 将图片转为 file_upload
 
 #### Task 4: 转换器集成上传 + 失败回退
+
+**Status**
+- ✅ 已完成（2026-01-24）：图片转为 file_upload，失败回退 external；已加入 URL 级缓存与依赖注入。
 
 **Files**
 - Modify: `SyncNos/Services/DataSources-To/Notion/Core/NotionHTMLToBlocksConverter.swift`
@@ -131,6 +147,9 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 
 #### Task 5: 同步管线确认（如签名变更）
 
+**Status**
+- ✅ 已确认（2026-01-24）：同步管线无需额外修改。
+
 **Files**
 - Modify (if needed): `SyncNos/Services/DataSources-To/Notion/SyncEngine/Adapters/GoodLinksNotionAdapter.swift`
 
@@ -141,14 +160,17 @@ return makeExternalImageBlock(urlString: imageURL.absoluteString)
 
 ## Manual Verification（手动验收）
 
+**Status**: ⏳ 待人工执行
+
+
 1. 同步含多图的 GoodLinks 文章 → Notion 页面图片显示为 Notion-hosted（非 external）。
 2. 用无效图片 URL（或屏蔽网络）同步 → 该图片回退 external，不影响其他内容。
 3. Build: `xcodebuild -scheme SyncNos build`
 
 ---
 
-## 不确定项（实现前确认）
+## 不确定项（已确认）
 
-- **API 路径**：确认 file upload endpoint 为 `POST /v1/file_uploads`、`GET /v1/file_uploads/{id}`（来自 Notion 文档）。
-- **轮询上限**：`fileUploadMaxAttempts` 与间隔是否足够（避免过慢或超时）。
-- **图片类型**：是否需要根据 URL 后缀推断 `content_type` 与 `filename`。
+- **API 路径**：已确认使用 `POST /v1/file_uploads` 与 `GET /v1/file_uploads/{id}`。
+- **轮询上限**：当前为 `fileUploadMaxAttempts = 20`、`fileUploadPollIntervalMs = 800`，可按需要调整。
+- **图片类型**：当前不推断 `content_type/filename`，由 Notion external_url 自动处理。
