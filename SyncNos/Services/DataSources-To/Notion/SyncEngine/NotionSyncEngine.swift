@@ -313,6 +313,28 @@ final class NotionSyncEngine {
                 }
             }
         } else {
+            // 无高亮：已存在页面需确保正文补齐（GoodLinks）
+            if !created {
+                let headerContent = source.headerContentForNewPage()
+                if !headerContent.isEmpty {
+                    do {
+                        let hasArticleHeading = try await notionService.pageHasHeading(pageId: pageId, title: "Article")
+                        if !hasArticleHeading {
+                            progress(NSLocalizedString("Adding article content...", comment: ""))
+                            try Task.checkCancellation()
+                            try await notionService.appendChildren(
+                                pageId: pageId,
+                                children: headerContent,
+                                batchSize: NotionSyncConfig.defaultAppendBatchSize
+                            )
+                            logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
+                        }
+                    } catch {
+                        logger.error("[SmartSync] Failed to append header content for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
+                        throw error
+                    }
+                }
+            }
             progress(NSLocalizedString("No highlights to sync.", comment: ""))
             logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey): \(itemLabel)")
         }
