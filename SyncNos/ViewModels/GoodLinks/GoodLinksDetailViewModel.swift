@@ -318,7 +318,9 @@ final class GoodLinksDetailViewModel: ObservableObject {
             article = result
             contentLoadState = .loaded
             
-            if let c = result, !c.textContent.isEmpty {
+            if let c = result,
+               !c.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !c.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 logger.info("[GoodLinksDetail] 加载到全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
             } else {
                 logger.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
