@@ -6,7 +6,7 @@ final class NotionSyncEngine {
     
     // MARK: - Dependencies
     
-    private let notionService: NotionServiceProtocol
+    private let notionService: NotionClientProtocol
     private let notionConfig: NotionConfigStoreProtocol
     private let logger: LoggerServiceProtocol
     private let timestampStore: SyncTimestampStoreProtocol
@@ -77,7 +77,7 @@ final class NotionSyncEngine {
     // MARK: - Initialization
     
     init(
-        notionService: NotionServiceProtocol = DIContainer.shared.notionService,
+        notionService: NotionClientProtocol = DIContainer.shared.notionClient,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
@@ -423,7 +423,7 @@ final class NotionSyncEngine {
                                 highlight: highlightRow
                             )
                         } catch {
-                            if NotionRequestHelper.isDatabaseMissingError(error) {
+                            if NotionAPIClient.isDatabaseMissingError(error) {
                                 let newEnsured = try await notionService.ensurePerBookDatabase(
                                     bookTitle: item.title,
                                     author: item.author,
@@ -452,7 +452,7 @@ final class NotionSyncEngine {
                                 highlight: highlightRow
                             )
                         } catch {
-                            if NotionRequestHelper.isDatabaseMissingError(error) {
+                            if NotionAPIClient.isDatabaseMissingError(error) {
                                 let newEnsured = try await notionService.ensurePerBookDatabase(
                                     bookTitle: item.title,
                                     author: item.author,
@@ -472,7 +472,7 @@ final class NotionSyncEngine {
                         }
                     }
                 } catch {
-                    if NotionRequestHelper.isDatabaseMissingError(error) {
+                    if NotionAPIClient.isDatabaseMissingError(error) {
                         let newEnsured = try await notionService.ensurePerBookDatabase(
                             bookTitle: item.title,
                             author: item.author,

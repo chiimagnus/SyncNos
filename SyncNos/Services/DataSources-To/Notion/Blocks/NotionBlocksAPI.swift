@@ -1,11 +1,11 @@
 import Foundation
 
 /// Notion 查询操作类
-class NotionQueryOperations {
-    private let requestHelper: NotionRequestHelper
+class NotionBlocksAPI {
+    private let requestHelper: NotionAPIClient
     private let logger: LoggerServiceProtocol
 
-    init(requestHelper: NotionRequestHelper, logger: LoggerServiceProtocol) {
+    init(requestHelper: NotionAPIClient, logger: LoggerServiceProtocol) {
         self.requestHelper = requestHelper
         self.logger = logger
     }

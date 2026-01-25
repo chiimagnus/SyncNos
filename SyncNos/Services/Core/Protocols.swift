@@ -145,8 +145,8 @@ protocol NotionConfigStoreProtocol: AnyObject {
     func setDatabaseId(_ id: String?, forBook assetId: String)
 }
 
-// MARK: - Notion Service Protocol
-protocol NotionServiceProtocol: AnyObject {
+// MARK: - Notion Client Protocol
+protocol NotionClientProtocol: AnyObject {
     func createDatabase(title: String) async throws -> NotionDatabase
     // Extended sync helpers
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?
