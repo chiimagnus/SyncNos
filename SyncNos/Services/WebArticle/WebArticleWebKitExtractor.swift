@@ -50,7 +50,14 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
         try await limiter.withPermit {
             try Task.checkCancellation()
             let startedAt = Date()
-            let extracted = try await extractOnMainActor(url: url, cookieHeader: cookieHeader)
+            let readabilityScript: String
+            do {
+                readabilityScript = try ReadabilityScriptProvider.loadScript()
+            } catch {
+                logger.error("[WebArticleWebKit] Failed to load Readability.js: \(error.localizedDescription)")
+                throw URLFetchError.parsingFailed
+            }
+            let extracted = try await extractOnMainActor(url: url, cookieHeader: cookieHeader, readabilityScript: readabilityScript)
             let duration = Date().timeIntervalSince(startedAt)
             logger.info("[WebArticleWebKit] Extracted in \(String(format: "%.2f", duration))s url=\(url.absoluteString)")
             return extracted
@@ -62,21 +69,32 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
     @MainActor
     private func extractOnMainActor(
         url: URL,
-        cookieHeader: String?
+        cookieHeader: String?,
+        readabilityScript: String
     ) async throws -> (title: String?, author: String?, contentHTML: String, textContent: String) {
-        let webView = acquireWebView()
+        let webView = acquireWebView(readabilityScript: readabilityScript)
         defer { releaseWebView(webView) }
 
         try await loadURL(in: webView, url: url, cookieHeader: cookieHeader)
         try await waitForDOMStabilized(in: webView, timeoutSeconds: stabilizationTimeoutSeconds)
-        return try await extractFromDOM(in: webView)
+        return try await extractFromDOM(in: webView, readabilityScript: readabilityScript)
     }
 
     @MainActor
-    private func makeWebView() -> WKWebView {
+    private func makeWebView(readabilityScript: String) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+
+        let trimmed = readabilityScript.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            let userScript = WKUserScript(
+                source: trimmed,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+            configuration.userContentController.addUserScript(userScript)
+        }
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.isHidden = true
@@ -85,11 +103,11 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
     }
     
     @MainActor
-    private func acquireWebView() -> WKWebView {
+    private func acquireWebView(readabilityScript: String) -> WKWebView {
         if let existing = webViewPool.popLast() {
             return existing
         }
-        return makeWebView()
+        return makeWebView(readabilityScript: readabilityScript)
     }
     
     @MainActor
@@ -207,141 +225,49 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
     // MARK: - Extract
 
     @MainActor
-    private func extractFromDOM(in webView: WKWebView) async throws -> (title: String?, author: String?, contentHTML: String, textContent: String) {
+    private func extractFromDOM(
+        in webView: WKWebView,
+        readabilityScript: String
+    ) async throws -> (title: String?, author: String?, contentHTML: String, textContent: String) {
+        try await ensureReadabilityLoaded(in: webView, readabilityScript: readabilityScript)
+
         let script = #"""
         (() => {
-          function firstMeta(name, attr = 'name') {
-            const el = document.querySelector(`meta[${attr}="${name}"]`);
-            return el ? (el.getAttribute('content') || '') : '';
-          }
-
-          const title = (firstMeta('og:title', 'property') || firstMeta('twitter:title', 'name') || document.title || '').trim();
-          const author = (firstMeta('author', 'name') || firstMeta('article:author', 'property') || '').trim();
-
-          let root =
-            document.querySelector('#js_content') ||
-            document.querySelector('article') ||
-            document.querySelector('main') ||
-            document.body;
-
-          if (!root) {
-            return JSON.stringify({ title, author, html: '', text: '' });
-          }
-
-          // WeChat: js_content 默认隐藏，正文已在 HTML 中，直接解除隐藏。
-          if (root.id === 'js_content') {
-            root.style.visibility = 'visible';
-            root.style.opacity = '1';
-          }
-
-          // 移除明显无关/误导的 a11y 提示节点（避免“只剩一行字”的假象）
-          const a11y = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
-          a11y.forEach(n => n && n.remove());
-
-          const clone = root.cloneNode(true);
-          clone.querySelectorAll('script,style').forEach(n => n.remove());
-          
-          // 尽量保留 noscript 内的真实内容（公众号视频等经常在 noscript 里塞 iframe）
-          clone.querySelectorAll('noscript').forEach(n => {
-            const raw = (n.textContent || '').trim();
-            if (!raw) { n.remove(); return; }
-            const tmp = document.createElement('div');
-            tmp.innerHTML = raw;
-            const frag = document.createDocumentFragment();
-            while (tmp.firstChild) frag.appendChild(tmp.firstChild);
-            n.replaceWith(frag);
-          });
-          
-          function toAbs(u) {
-            try { return new URL(String(u), document.baseURI).toString(); } catch (e) { return String(u); }
-          }
-          
-          // 兜底：把 iframe 的 data-src 提升为 src（公众号视频/音乐等常见）
-          clone.querySelectorAll('iframe').forEach(el => {
-            const src = el.getAttribute('src') || '';
-            const dataSrc = el.getAttribute('data-src') || el.getAttribute('data-original-src') || '';
-            const normalizedSrc = (src && String(src).trim()) ? toAbs(src) : (dataSrc ? toAbs(dataSrc) : '');
-            if (normalizedSrc) el.setAttribute('src', normalizedSrc);
-            
-            // video_iframe 常依赖外部 CSS/JS 设置尺寸，这里给一个可见的默认尺寸
-            if (el.classList && el.classList.contains('video_iframe')) {
-              const ratio = parseFloat(el.getAttribute('data-ratio') || '');
-              if (!el.getAttribute('width') && !el.style.width) {
-                el.style.width = '100%';
-              }
-              if (!el.style.aspectRatio) {
-                if (ratio && ratio > 0) {
-                  el.style.aspectRatio = ratio.toString() + ' / 1';
-                } else {
-                  el.style.aspectRatio = '16 / 9';
-                }
-              }
-              const heightAttr = el.getAttribute('height') || '';
-              if (!String(heightAttr).trim() && !el.style.minHeight) {
-                el.style.minHeight = '240px';
-              }
+          try {
+            // WeChat: js_content 默认隐藏，正文已在 HTML 中，直接解除隐藏，避免 Readability 误判“不可见”。
+            const wechat = document.querySelector('#js_content');
+            if (wechat) {
+              wechat.style.visibility = 'visible';
+              wechat.style.opacity = '1';
             }
-          });
-          
-          // 兜底：把 video/source 的 data-src 提升为 src（部分站点/公众号会懒加载）
-          clone.querySelectorAll('video').forEach(el => {
-            const src = el.getAttribute('src') || '';
-            const dataSrc = el.getAttribute('data-src') || el.getAttribute('data-url') || '';
-            const normalizedSrc = (src && String(src).trim()) ? toAbs(src) : (dataSrc ? toAbs(dataSrc) : '');
-            if (normalizedSrc) el.setAttribute('src', normalizedSrc);
 
-            el.querySelectorAll('source').forEach(s => {
-              const sSrc = s.getAttribute('src') || '';
-              const sData = s.getAttribute('data-src') || s.getAttribute('data-url') || '';
-              const sNormalized = (sSrc && String(sSrc).trim()) ? toAbs(sSrc) : (sData ? toAbs(sData) : '');
-              if (sNormalized) s.setAttribute('src', sNormalized);
-            });
-          });
-          
-          // 微信自定义标签：mp-video 通常需要 JS 才会渲染，尽量转换为 iframe（若有可用地址）
-          clone.querySelectorAll('mp-video').forEach(el => {
-            const src = el.getAttribute('src') || el.getAttribute('data-src') || el.getAttribute('data-origin-src');
-            if (!src) return;
-            const iframe = document.createElement('iframe');
-            iframe.setAttribute('src', toAbs(src));
-            iframe.setAttribute('frameborder', '0');
-            iframe.setAttribute('allowfullscreen', 'true');
-            
-            const rawCover = el.getAttribute('data-cover') || el.getAttribute('poster') || el.getAttribute('data-poster') || '';
-            if (rawCover && String(rawCover).trim()) {
-              iframe.setAttribute('data-cover', toAbs(rawCover));
+            // 移除明显无关/误导的 a11y 提示节点（避免“只剩一行字”的假象）
+            const a11y = document.querySelectorAll('.weui-a11y_ref, #js_a11y_like_btn_tips');
+            a11y.forEach(n => n && n.remove());
+
+            if (typeof Readability !== 'function') {
+              return JSON.stringify({ ok: false, error: 'ReadabilityNotLoaded' });
             }
-            
-            if (!iframe.style.width) iframe.style.width = '100%';
-            if (!iframe.style.aspectRatio) iframe.style.aspectRatio = '16 / 9';
-            if (!iframe.style.minHeight) iframe.style.minHeight = '240px';
-            el.replaceWith(iframe);
-          });
-          
-          // 微信常见视频卡片：mp-common-videosnap（通常给出可嵌入的播放 URL/cover）
-          clone.querySelectorAll('mp-common-videosnap').forEach(el => {
-            const rawUrl = el.getAttribute('data-url') || el.getAttribute('data-src') || '';
-            if (!rawUrl) return;
-            const url = toAbs(rawUrl);
-            const rawCover = el.getAttribute('data-cover') || el.getAttribute('data-poster') || '';
-            let cover = rawCover ? String(rawCover) : '';
-            try { if (cover.includes('%')) cover = decodeURIComponent(cover); } catch (e) {}
-            if (cover) cover = toAbs(cover);
-            
-            const iframe = document.createElement('iframe');
-            iframe.setAttribute('src', url);
-            iframe.setAttribute('frameborder', '0');
-            iframe.setAttribute('allowfullscreen', 'true');
-            if (cover) iframe.setAttribute('data-cover', cover);
-            if (!iframe.style.width) iframe.style.width = '100%';
-            if (!iframe.style.aspectRatio) iframe.style.aspectRatio = '16 / 9';
-            if (!iframe.style.minHeight) iframe.style.minHeight = '240px';
-            el.replaceWith(iframe);
-          });
 
-          const html = '<html><body>' + (clone.outerHTML || '') + '</body></html>';
-          const text = (clone.innerText || '').trim();
-          return JSON.stringify({ title, author, html, text });
+            // 保留常见视频 embed（Readability 默认只放行 YouTube/Vimeo）。
+            const allowedVideoRegex = /(youtube\\.com|youtu\\.be|vimeo\\.com|v\\.qq\\.com|youku\\.com|bilibili\\.com|music\\.163\\.com)/i;
+
+            const cloned = document.cloneNode(true);
+            const article = new Readability(cloned, { allowedVideoRegex }).parse();
+            if (!article) {
+              return JSON.stringify({ ok: false, error: 'ParseReturnedNull' });
+            }
+
+            const title = (article.title || '').trim();
+            const author = (article.byline || '').trim();
+            const content = (article.content || '').trim();
+            const text = (article.textContent || '').trim();
+
+            return JSON.stringify({ ok: true, title, author, content, text });
+          } catch (e) {
+            const message = (e && (e.message || e.toString())) ? (e.message || e.toString()) : 'UnknownError';
+            return JSON.stringify({ ok: false, error: message });
+          }
         })();
         """#
 
@@ -351,10 +277,12 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
         }
 
         struct Payload: Decodable {
-            let title: String
-            let author: String
-            let html: String
-            let text: String
+            let ok: Bool
+            let error: String?
+            let title: String?
+            let author: String?
+            let content: String?
+            let text: String?
         }
 
         guard let data = json.data(using: .utf8),
@@ -362,18 +290,57 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
             throw URLFetchError.parsingFailed
         }
 
-        let html = payload.html.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = payload.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !html.isEmpty || !text.isEmpty else {
+        guard payload.ok else {
+            throw URLFetchError.parsingFailed
+        }
+
+        let content = (payload.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = (payload.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty || !text.isEmpty else {
             throw URLFetchError.contentNotFound
         }
 
+        let html: String
+        if !content.isEmpty {
+            html = "<html><body>\(content)</body></html>"
+        } else {
+            html = "<html><body><p>\(escapeHTML(text))</p></body></html>"
+        }
+
+        let normalizedTitle = payload.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedAuthor = payload.author?.trimmingCharacters(in: .whitespacesAndNewlines)
+
         return (
-            title: payload.title.isEmpty ? nil : payload.title,
-            author: payload.author.isEmpty ? nil : payload.author,
+            title: (normalizedTitle?.isEmpty == true) ? nil : normalizedTitle,
+            author: (normalizedAuthor?.isEmpty == true) ? nil : normalizedAuthor,
             contentHTML: html.isEmpty ? "<html><body></body></html>" : html,
             textContent: text
         )
+    }
+
+    // MARK: - Readability
+
+    @MainActor
+    private func ensureReadabilityLoaded(in webView: WKWebView, readabilityScript: String) async throws {
+        let check = "typeof Readability === 'function'"
+        if let ok = try? await evaluateJavaScript(in: webView, script: check) as? Bool, ok == true {
+            return
+        }
+
+        let trimmed = readabilityScript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw URLFetchError.parsingFailed
+        }
+        _ = try await evaluateJavaScript(in: webView, script: trimmed)
+    }
+
+    private func escapeHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 
     @MainActor
