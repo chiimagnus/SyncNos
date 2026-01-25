@@ -115,17 +115,9 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     // MARK: - Header Content Hook
     
     /// 首次创建页面时的头部内容
-    /// GoodLinks 需要在高亮之前添加 "Article" 标题和文章内容
+    /// GoodLinks 需要在高亮之前添加文章内容
     func headerContentForNewPage() -> [[String: Any]] {
-        guard let blocks = articleBlocks, !blocks.isEmpty else { return [] }
-        return [
-            [
-                "object": "block",
-                "heading_2": [
-                    "rich_text": [["text": ["content": "Article"]]]
-                ]
-            ]
-        ] + blocks
+        articleBlocks ?? []
     }
 
     // MARK: - NotionSyncSourceProtocol Hooks
@@ -136,8 +128,7 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     }
 
     func headerContentPresenceHeadingTitle() -> String? {
-        // 用于“无高亮且页面已存在”的补齐判断
-        "Article"
+        nil
     }
 }
 
