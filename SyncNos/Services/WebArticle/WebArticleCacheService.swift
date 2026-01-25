@@ -39,10 +39,6 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
         DIContainer.shared.loggerService
     }
 
-    private var cacheExpiration: TimeInterval {
-        3600 * 24 * 7 // 7 天
-    }
-
     // MARK: - Read
 
     func getArticle(url: String) throws -> ArticleFetchResult? {
@@ -57,13 +53,6 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
         descriptor.fetchLimit = 1
 
         guard let cached = try modelContext.fetch(descriptor).first else {
-            return nil
-        }
-
-        if isExpired(cached.cachedAt) {
-            modelContext.delete(cached)
-            try modelContext.save()
-            logger.debug("[WebArticleCache] Cache expired, deleted url=\(targetURL)")
             return nil
         }
 
@@ -121,19 +110,8 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     // MARK: - Cleanup
 
     func removeExpiredArticles() throws {
-        let all = try modelContext.fetch(FetchDescriptor<CachedWebArticle>())
-        guard !all.isEmpty else { return }
-
-        var deleted = 0
-        for item in all where isExpired(item.cachedAt) {
-            modelContext.delete(item)
-            deleted += 1
-        }
-
-        if deleted > 0 {
-            try modelContext.save()
-            logger.info("[WebArticleCache] Removed expired articles: \(deleted)")
-        }
+        // 已取消过期机制：文章缓存为持久化存储，不再按时间自动淘汰
+        return
     }
 
     func removeAll() throws {
@@ -144,11 +122,4 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
         try modelContext.save()
         logger.info("[WebArticleCache] Removed all cached articles: \(all.count)")
     }
-
-    // MARK: - Helpers
-
-    private func isExpired(_ cachedAt: Date) -> Bool {
-        Date().timeIntervalSince(cachedAt) > cacheExpiration
-    }
 }
-
