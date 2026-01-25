@@ -97,7 +97,7 @@
 
 1. 优先读取本地持久化缓存：`WebArticleCacheService.getArticle(url:)`
 2. 缓存缺失时，调用 `WebArticleFetcher.fetchArticle(url:)` 抓取正文，并写回缓存
-3. 使用 `result.content` 进行 HTML → Notion Blocks 转换；转换失败则跳过 Article 正文写入（不再降级为纯文本段落）
+3. 使用 `result.content` 进行 HTML → Notion Blocks 转换；转换失败则跳过正文写入（不再降级为纯文本段落）
 
 相关文件：
 - SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift
@@ -114,8 +114,7 @@
 ### 5.4 同步引擎落库
 `NotionSyncEngine` 在创建新页面时：
 
-1. 先写入 **Article 标题**
-2. 再写入正文 blocks
+1. 先写入正文 blocks
 3. 随后追加高亮内容
 
 相关文件：
@@ -363,7 +362,7 @@ func convertArticleHTMLToBlocks(
 }
 ```
 
-### 9.7 Article 头部内容写入 Notion（Adapter + Engine）
+### 9.7 正文头部内容写入 Notion（Adapter + Engine）
 
 参考：
 - [SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift](../../SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift)
@@ -372,15 +371,7 @@ func convertArticleHTMLToBlocks(
 ```swift
 // GoodLinksNotionAdapter.headerContentForNewPage
 func headerContentForNewPage() -> [[String: Any]] {
-    guard let blocks = articleBlocks, !blocks.isEmpty else { return [] }
-    return [
-        [
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Article"]]]
-            ]
-        ]
-    ] + blocks
+    articleBlocks ?? []
 }
 
 // NotionSyncEngine.syncSingleDatabase
