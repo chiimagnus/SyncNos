@@ -5,9 +5,9 @@
 ## 1. 范围与结论摘要
 
 - **正文抓取与提取**统一由 `WebArticleFetcher.fetchArticle()` 完成。
-- **详情页展示**与**同步到 Notion**是**两次独立的抓取调用**，但**走同一套提取逻辑**。
+- **详情页展示**会触发抓取调用；**同步到 Notion**优先使用**本地持久化缓存（SwiftData）**，缓存缺失时才抓取并写回缓存。
 - `NotionHTMLToBlocksConverter` 使用的是**提取后的正文 HTML 片段**（`ArticleFetchResult.content`），**不是整页原始 HTML**。
-- 详情页显示的是**提取后的 HTML（优先）**，若无 HTML 则显示纯文本（`textContent`）。
+- 详情页仅展示**提取后的 HTML**；无 HTML 时显示空态/错误，不再降级为纯文本（`textContent`）。
 
 ## 2. 关键数据结构
 
@@ -15,7 +15,7 @@
 用于承载网页抓取和正文提取后的结果：
 
 - `content`: 提取后的正文 **HTML 片段**
-- `textContent`: HTML 转换后的纯文本（用于搜索/降级显示/Notion 降级写入）
+- `textContent`: HTML 转换后的纯文本（用于搜索/词数统计等内部用途）
 - `title` / `author` / `wordCount` / `fetchedAt` 等元信息
 
 来源：
@@ -39,7 +39,7 @@
 `ArticleContentCardView` 的渲染顺序为：
 
 1. 若 `article.content`（HTML）不为空 → 使用 `HTMLWebView` 渲染
-2. 否则显示 `article.textContent`（纯文本）
+2. 否则显示空态（无正文）
 
 `HTMLWebView` 仅用于展示 **提取后的 HTML 片段**，并做以下增强：
 - 统一 CSS 样式
@@ -56,12 +56,12 @@
 ### 4.1 抓取与缓存
 `WebArticleFetcher.fetchArticle(url:)` 的流程：
 
-1. **缓存命中**：若缓存存在且未过期，直接返回缓存结果
+1. **缓存命中**：若缓存存在，直接返回缓存结果
 2. **带 cookie 抓取**：若站点需要登录，尝试带 cookie 的请求
 3. **普通抓取**：否则使用普通 HTTP 请求
 
 缓存逻辑：
-- `WebArticleCacheService`（7 天有效期）
+- `WebArticleCacheService`（持久化存储，不做过期淘汰）
 
 相关文件：
 - SyncNos/Services/WebArticle/WebArticleFetcher.swift
@@ -95,9 +95,9 @@
 ### 5.2 适配器预加载正文
 `GoodLinksNotionAdapter.create()` 在创建适配器时：
 
-1. 再次调用 `WebArticleFetcher.fetchArticle(url:)`
-2. 使用 `result.content` 进行 HTML → Notion Blocks 转换
-3. 若转换失败或为空，则使用 `result.textContent` 降级为纯文本段落
+1. 优先读取本地持久化缓存：`WebArticleCacheService.getArticle(url:)`
+2. 缓存缺失时，调用 `WebArticleFetcher.fetchArticle(url:)` 抓取正文，并写回缓存
+3. 使用 `result.content` 进行 HTML → Notion Blocks 转换；转换失败则跳过 Article 正文写入（不再降级为纯文本段落）
 
 相关文件：
 - SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift
@@ -127,15 +127,14 @@
 |------|------------|---------------|------|
 | DetailView 正文展示 | `ArticleFetchResult.content` | 否 | 提取后的正文 HTML 片段 |
 | Notion 同步正文 | `ArticleFetchResult.content` | 否 | 提取后再转 Notion blocks |
-| 纯文本降级 | `ArticleFetchResult.textContent` | 否 | 由提取后的 HTML 转文本 |
 
 > 当前实现 **未保留整页原始 HTML**；仅保留提取后的正文 HTML 片段。
 
-## 7. 两次抓取的独立性说明
+## 7. 抓取调用与缓存策略
 
-- **DetailView 展示**与 **Notion 同步**调用是两次独立的 `fetchArticle()`。
-- 逻辑一致，但**结果可能因缓存/网络/登录态变化而略有差异**。
-- 若缓存命中，两次结果通常一致。
+- **DetailView 展示**：调用 `WebArticleFetcher.fetchArticle(url:)` 获取正文。
+- **Notion 同步**：优先读取 `WebArticleCacheService` 的持久化缓存；若缓存缺失/过期，则调用 `fetchArticle()` 抓取并写回缓存。
+- 因缓存过期/清空或未曾抓取过，Notion 同步在少数情况下仍可能触发一次抓取；但不再“必然二次抓取”。
 
 ## 8. 关键链路简图
 
@@ -145,7 +144,7 @@ flowchart TD
     B --> C[WebArticleFetcher.fetchArticle]
     C --> D[提取正文 HTML content + textContent]
     D --> E[ArticleContentCardView]
-    E --> F[HTMLWebView 渲染或纯文本展示]
+    E --> F[HTMLWebView 渲染或空态展示]
 
     G[GoodLinksViewModel.batchSync] --> H[GoodLinksNotionAdapter.create]
     H --> C
@@ -230,7 +229,7 @@ func loadContent(for link: GoodLinksLinkRow) async {
 - [SyncNos/Views/Components/Cards/ArticleContentCardView.swift](../../SyncNos/Views/Components/Cards/ArticleContentCardView.swift)
 
 ```swift
-private func loadedContent(_ content: String) -> some View {
+private func loadedContent() -> some View {
     Group {
         if let htmlContent,
            !htmlContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -242,11 +241,7 @@ private func loadedContent(_ content: String) -> some View {
             )
             .frame(height: max(320, htmlContentHeight))
         } else {
-            Text(content)
-                .scaledFont(.body)
-                .foregroundColor(.primary)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            emptyContent
         }
     }
 }
@@ -306,16 +301,22 @@ static func create(
     link: GoodLinksLinkRow,
     dbPath: String,
     databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+    cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
     urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
     htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
 ) async throws -> GoodLinksNotionAdapter {
     let logger = DIContainer.shared.loggerService
 
-    let result: ArticleFetchResult?
-    do {
-        result = try await urlFetcher.fetchArticle(url: link.url)
-    } catch URLFetchError.contentNotFound {
-        result = nil
+    let cached = try? await cacheService.getArticle(url: link.url)
+    var result = cached
+    if result == nil {
+        do {
+            let fetched = try await urlFetcher.fetchArticle(url: link.url)
+            result = fetched
+            try? await cacheService.upsertArticle(url: link.url, result: fetched)
+        } catch URLFetchError.contentNotFound {
+            result = nil
+        }
     }
 
     var blocks: [[String: Any]]?
@@ -335,7 +336,6 @@ static func create(
     return GoodLinksNotionAdapter(
         link: link,
         dbPath: dbPath,
-        articleText: result?.textContent,
         articleBlocks: blocks,
         databaseService: databaseService
     )
@@ -372,27 +372,15 @@ func convertArticleHTMLToBlocks(
 ```swift
 // GoodLinksNotionAdapter.headerContentForNewPage
 func headerContentForNewPage() -> [[String: Any]] {
-    let helperMethods = NotionHelperMethods()
-    var children: [[String: Any]] = []
-
-    // 添加 "Article" 标题
-    children.append([
-        "object": "block",
-        "heading_2": [
-            "rich_text": [["text": ["content": "Article"]]]
+    guard let blocks = articleBlocks, !blocks.isEmpty else { return [] }
+    return [
+        [
+            "object": "block",
+            "heading_2": [
+                "rich_text": [["text": ["content": "Article"]]]
+            ]
         ]
-    ])
-
-    // 添加文章内容（如果有）
-    if let blocks = articleBlocks, !blocks.isEmpty {
-        children.append(contentsOf: blocks)
-    } else if let contentText = articleText,
-              !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        // 兼容降级：转换失败时仍回退到纯文本段落
-        children.append(contentsOf: helperMethods.buildParagraphBlocks(from: contentText))
-    }
-
-    return children
+    ] + blocks
 }
 
 // NotionSyncEngine.syncSingleDatabase
