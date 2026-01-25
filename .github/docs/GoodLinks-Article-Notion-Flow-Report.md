@@ -154,6 +154,262 @@ flowchart TD
     J --> K[Notion 页面写入]
 ```
 
+## 9. 关键代码片段（节选）
+
+### 9.1 详情页触发加载（DetailView）
+
+参考：
+- [SyncNos/Views/GoodLinks/GoodLinksDetailView.swift](../../SyncNos/Views/GoodLinks/GoodLinksDetailView.swift)
+
+```swift
+// 全文内容卡片入口
+articleContentSection(linkId: linkId)
+
+// linkId 变化时加载高亮与全文
+.task(id: linkId) {
+    detailViewModel.clear()
+    await detailViewModel.loadHighlights(for: linkId)
+    if let link = viewModel.links.first(where: { $0.id == linkId }) {
+        await detailViewModel.loadContent(for: link)
+    }
+    externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
+    if !externalIsSyncing { externalSyncProgress = nil }
+}
+```
+
+### 9.2 详情页正文抓取（DetailViewModel）
+
+参考：
+- [SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift](../../SyncNos/ViewModels/GoodLinks/GoodLinksDetailViewModel.swift)
+
+```swift
+func loadContent(for link: GoodLinksLinkRow) async {
+    let linkId = link.id
+    currentLinkId = linkId
+
+    contentFetchTask?.cancel()
+    contentFetchTask = nil
+    article = nil
+    contentLoadState = .loadingFull
+
+    do {
+        let task = Task { [urlFetcher, logger] () async throws -> ArticleFetchResult? in
+            logger.info("[GoodLinksDetail] 开始从 URL 加载全文内容，linkId=\(linkId), url=\(link.url)")
+            do {
+                return try await urlFetcher.fetchArticle(url: link.url)
+            } catch URLFetchError.contentNotFound {
+                return nil
+            }
+        }
+        contentFetchTask = task
+
+        let result = try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+
+        guard !Task.isCancelled, currentLinkId == linkId else { return }
+
+        article = result
+        contentLoadState = .loaded
+        contentFetchTask = nil
+    } catch {
+        let desc = error.localizedDescription
+        logger.error("[GoodLinksDetail] loadContent error: \(desc)")
+        guard !Task.isCancelled, currentLinkId == linkId else { return }
+        contentLoadState = .error(desc)
+        contentFetchTask = nil
+    }
+}
+```
+
+### 9.3 HTML 优先渲染（ArticleContentCardView）
+
+参考：
+- [SyncNos/Views/Components/Cards/ArticleContentCardView.swift](../../SyncNos/Views/Components/Cards/ArticleContentCardView.swift)
+
+```swift
+private func loadedContent(_ content: String) -> some View {
+    Group {
+        if let htmlContent,
+           !htmlContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            HTMLWebView(
+                html: htmlContent,
+                baseURL: htmlBaseURL,
+                openLinksInExternalBrowser: true,
+                contentHeight: $htmlContentHeight
+            )
+            .frame(height: max(320, htmlContentHeight))
+        } else {
+            Text(content)
+                .scaledFont(.body)
+                .foregroundColor(.primary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+```
+
+### 9.4 正文提取策略（WebArticleFetcher）
+
+参考：
+- [SyncNos/Services/WebArticle/WebArticleFetcher.swift](../../SyncNos/Services/WebArticle/WebArticleFetcher.swift)
+
+```swift
+private func extractMainContent(from html: String) -> String {
+    // 优先使用语义容器，尽量不要返回整页
+    if let article = extractTagBlock(html, tagName: "article") { return article }
+    if let main = extractTagBlock(html, tagName: "main") { return main }
+    if let body = extractTagBlock(html, tagName: "body") { return body }
+    return html
+}
+
+private func parseArticleFromHTMLData(_ data: Data, source: FetchSource) throws -> ArticleFetchResult {
+    guard let html = decodeHTML(data) else {
+        throw URLFetchError.decodingFailed
+    }
+
+    let cleaned = sanitizeHTML(html)
+    let title = extractTitle(from: cleaned)
+    let author = extractAuthor(from: cleaned)
+    let mainHTML = extractMainContent(from: cleaned)
+
+    guard !mainHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw URLFetchError.contentNotFound
+    }
+
+    let text = htmlToPlainText(mainHTML).trimmingCharacters(in: .whitespacesAndNewlines)
+    let wordCount = countWords(in: text)
+
+    return ArticleFetchResult(
+        title: title,
+        content: mainHTML,
+        textContent: text,
+        author: author,
+        publishedDate: nil,
+        wordCount: wordCount,
+        fetchedAt: Date(),
+        source: source
+    )
+}
+```
+
+### 9.5 Notion 预加载与 HTML → Blocks（GoodLinksNotionAdapter）
+
+参考：
+- [SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift](../../SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift)
+
+```swift
+static func create(
+    link: GoodLinksLinkRow,
+    dbPath: String,
+    databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+    urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
+    htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
+) async throws -> GoodLinksNotionAdapter {
+    let logger = DIContainer.shared.loggerService
+
+    let result: ArticleFetchResult?
+    do {
+        result = try await urlFetcher.fetchArticle(url: link.url)
+    } catch URLFetchError.contentNotFound {
+        result = nil
+    }
+
+    var blocks: [[String: Any]]?
+    if let result, let baseURL = URL(string: link.url) {
+        do {
+            let converted = try await htmlToBlocksConverter.convertArticleHTMLToBlocks(
+                html: result.content,
+                baseURL: baseURL
+            )
+            blocks = converted.isEmpty ? nil : converted
+        } catch {
+            logger.warning("[GoodLinks] Failed to convert HTML to Notion blocks for \(link.url): \(error.localizedDescription)")
+            blocks = nil
+        }
+    }
+
+    return GoodLinksNotionAdapter(
+        link: link,
+        dbPath: dbPath,
+        articleText: result?.textContent,
+        articleBlocks: blocks,
+        databaseService: databaseService
+    )
+}
+```
+
+### 9.6 HTML → Notion Blocks（NotionHTMLToBlocksConverter）
+
+参考：
+- [SyncNos/Services/DataSources-To/Notion/Utils/NotionHTMLToBlocksConverter.swift](../../SyncNos/Services/DataSources-To/Notion/Utils/NotionHTMLToBlocksConverter.swift)
+
+```swift
+func convertArticleHTMLToBlocks(
+    html: String,
+    baseURL: URL
+) async throws -> [[String: Any]] {
+    let trimmed = html.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+        throw ConversionError.emptyHTML
+    }
+
+    let domItems = try await WebKitDOMExtractor.extractDOMItems(fromHTML: trimmed, baseURL: baseURL)
+
+    return await buildBlocks(from: domItems)
+}
+```
+
+### 9.7 Article 头部内容写入 Notion（Adapter + Engine）
+
+参考：
+- [SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift](../../SyncNos/Services/DataSources-To/Notion/Sync/Adapters/GoodLinksNotionAdapter.swift)
+- [SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift](../../SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift)
+
+```swift
+// GoodLinksNotionAdapter.headerContentForNewPage
+func headerContentForNewPage() -> [[String: Any]] {
+    let helperMethods = NotionHelperMethods()
+    var children: [[String: Any]] = []
+
+    // 添加 "Article" 标题
+    children.append([
+        "object": "block",
+        "heading_2": [
+            "rich_text": [["text": ["content": "Article"]]]
+        ]
+    ])
+
+    // 添加文章内容（如果有）
+    if let blocks = articleBlocks, !blocks.isEmpty {
+        children.append(contentsOf: blocks)
+    } else if let contentText = articleText,
+              !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        // 兼容降级：转换失败时仍回退到纯文本段落
+        children.append(contentsOf: helperMethods.buildParagraphBlocks(from: contentText))
+    }
+
+    return children
+}
+
+// NotionSyncEngine.syncSingleDatabase
+if created {
+    let headerContent = source.headerContentForNewPage()
+    if !headerContent.isEmpty {
+        progress(NSLocalizedString("Adding article content...", comment: ""))
+        try Task.checkCancellation()
+        try await notionService.appendChildren(
+            pageId: pageId,
+            children: headerContent,
+            batchSize: NotionSyncConfig.defaultAppendBatchSize
+        )
+    }
+}
+```
+
 ---
 
 如需新增“显示原始 HTML 模式”，需要在抓取阶段额外保留整页原始 HTML 并在 UI/同步链路中区分使用。
