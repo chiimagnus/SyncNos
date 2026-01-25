@@ -21,7 +21,6 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
         let readyState: String
         let textLen: Int
         let nodeCount: Int
-        let mediaCount: Int
     }
     
     @MainActor
@@ -182,7 +181,7 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
                 // readyState 完成且正文/媒体稳定即可开始抽取，避免等待过久。
                 if stableTicks >= 2,
                    sample.readyState.lowercased() == "complete",
-                   (sample.textLen >= stabilizationMinTextLength || sample.mediaCount > 0) {
+                   sample.textLen >= stabilizationMinTextLength {
                     return
                 }
             }
@@ -202,12 +201,10 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
             document.body;
           const text = root ? (root.innerText || '') : '';
           const nodeCount = root ? root.querySelectorAll('*').length : 0;
-          const mediaCount = root ? root.querySelectorAll('iframe,video,mp-common-videosnap,mp-video').length : 0;
           return {
             readyState: document.readyState || '',
             textLen: String(text).trim().length,
-            nodeCount: nodeCount,
-            mediaCount: mediaCount
+            nodeCount: nodeCount
           };
         })();
         """#
@@ -215,11 +212,10 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
         guard let dict = any as? [String: Any],
               let readyState = dict["readyState"] as? String,
               let textLen = dict["textLen"] as? Int,
-              let nodeCount = dict["nodeCount"] as? Int,
-              let mediaCount = dict["mediaCount"] as? Int else {
+              let nodeCount = dict["nodeCount"] as? Int else {
             throw URLFetchError.parsingFailed
         }
-        return Sample(readyState: readyState, textLen: textLen, nodeCount: nodeCount, mediaCount: mediaCount)
+        return Sample(readyState: readyState, textLen: textLen, nodeCount: nodeCount)
     }
 
     // MARK: - Extract
@@ -249,11 +245,8 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
               return JSON.stringify({ ok: false, error: 'ReadabilityNotLoaded' });
             }
 
-            // 保留常见视频 embed（Readability 默认只放行 YouTube/Vimeo）。
-            const allowedVideoRegex = /(youtube\\.com|youtu\\.be|vimeo\\.com|v\\.qq\\.com|youku\\.com|bilibili\\.com|music\\.163\\.com)/i;
-
             const cloned = document.cloneNode(true);
-            const article = new Readability(cloned, { allowedVideoRegex }).parse();
+            const article = new Readability(cloned).parse();
             if (!article) {
               return JSON.stringify({ ok: false, error: 'ParseReturnedNull' });
             }
