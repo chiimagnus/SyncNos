@@ -119,17 +119,6 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     func headerContentForNewPage() -> [[String: Any]] {
         articleBlocks ?? []
     }
-
-    // MARK: - NotionSyncSourceProtocol Hooks
-
-    func pageHeaderTitleForNewPage() -> String? {
-        // GoodLinks 页面需要先写入 Article 内容，再写入 Highlights 标题与高亮列表
-        nil
-    }
-
-    func headerContentPresenceHeadingTitle() -> String? {
-        nil
-    }
 }
 
 // MARK: - Factory
