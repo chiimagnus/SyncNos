@@ -153,7 +153,7 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
+        urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
         htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
         let logger = DIContainer.shared.loggerService
