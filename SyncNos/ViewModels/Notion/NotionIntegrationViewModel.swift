@@ -23,11 +23,11 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var availablePages: [NotionPageSummary] = []
     
     private let notionConfig: NotionConfigStoreProtocol
-    private let notionService: NotionServiceProtocol
+    private let notionService: NotionClientProtocol
     private let oauthService: NotionOAuthService
     
     init(notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
-         notionService: NotionServiceProtocol = DIContainer.shared.notionService,
+         notionService: NotionClientProtocol = DIContainer.shared.notionClient,
          oauthService: NotionOAuthService = DIContainer.shared.notionOAuthService) {
         self.notionConfig = notionConfig
         self.notionService = notionService

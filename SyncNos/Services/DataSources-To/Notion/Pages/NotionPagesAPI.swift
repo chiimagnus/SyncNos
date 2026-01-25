@@ -1,11 +1,11 @@
 import Foundation
 
 /// Notion 页面操作类
-class NotionPageOperations {
-    private let requestHelper: NotionRequestHelper
+class NotionPagesAPI {
+    private let requestHelper: NotionAPIClient
     private let helperMethods: NotionHelperMethods
 
-    init(requestHelper: NotionRequestHelper, helperMethods: NotionHelperMethods) {
+    init(requestHelper: NotionAPIClient, helperMethods: NotionHelperMethods) {
         self.requestHelper = requestHelper
         self.helperMethods = helperMethods
     }
@@ -100,14 +100,14 @@ class NotionPageOperations {
     func replacePageChildren(pageId: String, with children: [[String: Any]]) async throws {
         // 1) List existing children
         var startCursor: String? = nil
-        var existing: [NotionQueryOperations.BlockChildrenResponse.Block] = []
+        var existing: [NotionBlocksAPI.BlockChildrenResponse.Block] = []
         repeat {
             var components = requestHelper.makeURLComponents(path: "blocks/\(pageId)/children")
             if let cursor = startCursor {
                 components.queryItems = [URLQueryItem(name: "start_cursor", value: cursor)]
             }
             let data = try await requestHelper.performRequest(url: components.url!, method: "GET", body: nil)
-            let decoded = try JSONDecoder().decode(NotionQueryOperations.BlockChildrenResponse.self, from: data)
+            let decoded = try JSONDecoder().decode(NotionBlocksAPI.BlockChildrenResponse.self, from: data)
             existing.append(contentsOf: decoded.results)
             startCursor = decoded.has_more ? decoded.next_cursor : nil
         } while startCursor != nil

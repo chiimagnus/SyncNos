@@ -145,8 +145,8 @@ protocol NotionConfigStoreProtocol: AnyObject {
     func setDatabaseId(_ id: String?, forBook assetId: String)
 }
 
-// MARK: - Notion Service Protocol
-protocol NotionServiceProtocol: AnyObject {
+// MARK: - Notion Client Protocol
+protocol NotionClientProtocol: AnyObject {
     func createDatabase(title: String) async throws -> NotionDatabase
     // Extended sync helpers
     func findDatabaseId(title: String, parentPageId: String) async throws -> String?
@@ -273,9 +273,9 @@ protocol SiteLoginsStoreProtocol: Actor {
     func clearAll() async
 }
 
-/// GoodLinks URL 抓取结果缓存服务协议（SwiftData）
+/// URL 网页文章抓取结果缓存服务协议（SwiftData）
 /// 调用方需要使用 await 调用这些方法（actor 隔离）
-protocol GoodLinksURLCacheServiceProtocol: Actor {
+protocol WebArticleCacheServiceProtocol: Actor {
     /// 读取缓存（命中且未过期才返回）
     func getArticle(url: String) throws -> ArticleFetchResult?
     

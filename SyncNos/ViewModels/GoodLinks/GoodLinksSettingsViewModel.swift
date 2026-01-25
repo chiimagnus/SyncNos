@@ -33,13 +33,13 @@ final class GoodLinksSettingsViewModel: ObservableObject {
         
         // URL Fetcher settings（与 GoodLinksURLFetcher 默认值保持一致）
         let defaults = UserDefaults.standard
-        self.urlFetcherEnableCache = (defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.enableCache) as? Bool) ?? true
-        self.urlFetcherEnableCookieAuth = (defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.enableCookieAuth) as? Bool) ?? true
-        self.urlFetcherEnableRetry = (defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.enableRetry) as? Bool) ?? true
-        self.urlFetcherMaxRetries = clamp(defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.maxRetries) as? Int ?? 2, min: 0, max: 10)
-        self.urlFetcherInitialBackoffSeconds = max(0.1, defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.initialBackoffSeconds) as? Double ?? 1.0)
-        self.urlFetcherMaxBackoffSeconds = max(self.urlFetcherInitialBackoffSeconds, defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.maxBackoffSeconds) as? Double ?? 8.0)
-        self.urlFetcherAggregateLogEvery = max(1, defaults.object(forKey: GoodLinksURLFetcher.DefaultsKeys.aggregateLogEvery) as? Int ?? 20)
+        self.urlFetcherEnableCache = (defaults.object(forKey: WebArticleFetcher.DefaultsKeys.enableCache) as? Bool) ?? true
+        self.urlFetcherEnableCookieAuth = (defaults.object(forKey: WebArticleFetcher.DefaultsKeys.enableCookieAuth) as? Bool) ?? true
+        self.urlFetcherEnableRetry = (defaults.object(forKey: WebArticleFetcher.DefaultsKeys.enableRetry) as? Bool) ?? true
+        self.urlFetcherMaxRetries = clamp(defaults.object(forKey: WebArticleFetcher.DefaultsKeys.maxRetries) as? Int ?? 2, min: 0, max: 10)
+        self.urlFetcherInitialBackoffSeconds = max(0.1, defaults.object(forKey: WebArticleFetcher.DefaultsKeys.initialBackoffSeconds) as? Double ?? 1.0)
+        self.urlFetcherMaxBackoffSeconds = max(self.urlFetcherInitialBackoffSeconds, defaults.object(forKey: WebArticleFetcher.DefaultsKeys.maxBackoffSeconds) as? Double ?? 8.0)
+        self.urlFetcherAggregateLogEvery = max(1, defaults.object(forKey: WebArticleFetcher.DefaultsKeys.aggregateLogEvery) as? Int ?? 20)
     }
 
     func save() {
@@ -49,13 +49,13 @@ final class GoodLinksSettingsViewModel: ObservableObject {
         UserDefaults.standard.set(autoSync, forKey: "autoSync.goodLinks")
         
         // URL Fetcher settings
-        UserDefaults.standard.set(urlFetcherEnableCache, forKey: GoodLinksURLFetcher.DefaultsKeys.enableCache)
-        UserDefaults.standard.set(urlFetcherEnableCookieAuth, forKey: GoodLinksURLFetcher.DefaultsKeys.enableCookieAuth)
-        UserDefaults.standard.set(urlFetcherEnableRetry, forKey: GoodLinksURLFetcher.DefaultsKeys.enableRetry)
-        UserDefaults.standard.set(clamp(urlFetcherMaxRetries, min: 0, max: 10), forKey: GoodLinksURLFetcher.DefaultsKeys.maxRetries)
-        UserDefaults.standard.set(max(0.1, urlFetcherInitialBackoffSeconds), forKey: GoodLinksURLFetcher.DefaultsKeys.initialBackoffSeconds)
-        UserDefaults.standard.set(max(max(0.1, urlFetcherInitialBackoffSeconds), urlFetcherMaxBackoffSeconds), forKey: GoodLinksURLFetcher.DefaultsKeys.maxBackoffSeconds)
-        UserDefaults.standard.set(max(1, urlFetcherAggregateLogEvery), forKey: GoodLinksURLFetcher.DefaultsKeys.aggregateLogEvery)
+        UserDefaults.standard.set(urlFetcherEnableCache, forKey: WebArticleFetcher.DefaultsKeys.enableCache)
+        UserDefaults.standard.set(urlFetcherEnableCookieAuth, forKey: WebArticleFetcher.DefaultsKeys.enableCookieAuth)
+        UserDefaults.standard.set(urlFetcherEnableRetry, forKey: WebArticleFetcher.DefaultsKeys.enableRetry)
+        UserDefaults.standard.set(clamp(urlFetcherMaxRetries, min: 0, max: 10), forKey: WebArticleFetcher.DefaultsKeys.maxRetries)
+        UserDefaults.standard.set(max(0.1, urlFetcherInitialBackoffSeconds), forKey: WebArticleFetcher.DefaultsKeys.initialBackoffSeconds)
+        UserDefaults.standard.set(max(max(0.1, urlFetcherInitialBackoffSeconds), urlFetcherMaxBackoffSeconds), forKey: WebArticleFetcher.DefaultsKeys.maxBackoffSeconds)
+        UserDefaults.standard.set(max(1, urlFetcherAggregateLogEvery), forKey: WebArticleFetcher.DefaultsKeys.aggregateLogEvery)
         
         // 根据 per-source 开关控制 AutoSyncService 生命周期
         let anyEnabled = UserDefaults.standard.bool(forKey: "autoSync.appleBooks") || UserDefaults.standard.bool(forKey: "autoSync.goodLinks")

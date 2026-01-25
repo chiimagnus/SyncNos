@@ -10,12 +10,12 @@ class DIContainer {
     private var _databaseService: DatabaseServiceProtocol?
     private var _bookmarkStore: BookmarkStoreProtocol?
     private var _notionConfigStore: NotionConfigStoreProtocol?
-    private var _notionService: NotionServiceProtocol?
+    private var _notionClient: NotionClientProtocol?
     private var _loggerService: LoggerServiceProtocol?
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
-    private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
-    private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
+    private var _webArticleFetcher: WebArticleFetcherProtocol?
+    private var _webArticleCacheService: WebArticleCacheServiceProtocol?
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
@@ -68,11 +68,11 @@ class DIContainer {
         return _notionConfigStore!
     }
 
-    var notionService: NotionServiceProtocol {
-        if _notionService == nil {
-            _notionService = NotionService(configStore: notionConfigStore)
+    var notionClient: NotionClientProtocol {
+        if _notionClient == nil {
+            _notionClient = NotionClient(configStore: notionConfigStore)
         }
-        return _notionService!
+        return _notionClient!
     }
 
     var loggerService: LoggerServiceProtocol {
@@ -96,28 +96,30 @@ class DIContainer {
         return _goodLinksService!
     }
     
-    var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
-        if _goodLinksURLFetcher == nil {
-            _goodLinksURLFetcher = GoodLinksURLFetcher(
-                cacheService: goodLinksURLCacheService,
+    // MARK: - Web Article Fetching
+
+    var webArticleFetcher: WebArticleFetcherProtocol {
+        if _webArticleFetcher == nil {
+            _webArticleFetcher = WebArticleFetcher(
+                cacheService: webArticleCacheService,
                 siteLoginsStore: siteLoginsStore
             )
         }
-        return _goodLinksURLFetcher!
+        return _webArticleFetcher!
     }
-    
-    var goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
-        if _goodLinksURLCacheService == nil {
+
+    var webArticleCacheService: WebArticleCacheServiceProtocol {
+        if _webArticleCacheService == nil {
             do {
-                let container = try GoodLinksURLCacheModelContainerFactory.createContainer()
-                _goodLinksURLCacheService = GoodLinksURLCacheService(modelContainer: container)
-                loggerService.info("[DIContainer] GoodLinksURLCache ModelContainer created successfully")
+                let container = try WebArticleCacheModelContainerFactory.createContainer()
+                _webArticleCacheService = WebArticleCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] WebArticleCache ModelContainer created successfully")
             } catch {
-                loggerService.error("[DIContainer] Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
-                fatalError("Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
+                loggerService.error("[DIContainer] Failed to create WebArticleCache ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create WebArticleCache ModelContainer: \(error.localizedDescription)")
             }
         }
-        return _goodLinksURLCacheService!
+        return _webArticleCacheService!
     }
 
     // MARK: - Site Logins Services
@@ -197,7 +199,7 @@ class DIContainer {
     var notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol {
         if _notionHTMLToBlocksConverter == nil {
             _notionHTMLToBlocksConverter = NotionHTMLToBlocksConverter(
-                notionService: notionService,
+                notionService: notionClient,
                 logger: loggerService
             )
         }
@@ -283,7 +285,7 @@ class DIContainer {
     var notionSyncEngine: NotionSyncEngine {
         if _notionSyncEngine == nil {
             _notionSyncEngine = NotionSyncEngine(
-                notionService: notionService,
+                notionService: notionClient,
                 notionConfig: notionConfigStore,
                 logger: loggerService,
                 timestampStore: syncTimestampStore,
@@ -346,8 +348,8 @@ class DIContainer {
         self._notionConfigStore = notionConfigStore
     }
 
-    func register(notionService: NotionServiceProtocol) {
-        self._notionService = notionService
+    func register(notionClient: NotionClientProtocol) {
+        self._notionClient = notionClient
     }
 
     func register(loggerService: LoggerServiceProtocol) {
