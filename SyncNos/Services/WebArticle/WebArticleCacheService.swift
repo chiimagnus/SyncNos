@@ -1,28 +1,28 @@
 import Foundation
 import SwiftData
 
-// MARK: - GoodLinks URL Model Container Factory
+// MARK: - Web Article Cache Model Container Factory
 
-/// GoodLinks URL 缓存专用 ModelContainer 工厂
-enum GoodLinksURLCacheModelContainerFactory {
+/// URL 网页文章缓存专用 ModelContainer 工厂
+enum WebArticleCacheModelContainerFactory {
     static func createContainer() throws -> ModelContainer {
         let schema = Schema([
-            CachedGoodLinksArticle.self
+            CachedWebArticle.self
         ])
-        
+
         let storeURL = URL.applicationSupportDirectory
             .appendingPathComponent("SyncNos", isDirectory: true)
-            .appendingPathComponent("goodlinks_url_cache.store")
-        
+            .appendingPathComponent("web_article_cache.store")
+
         let directory = storeURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        
+
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             url: storeURL,
             allowsSave: true
         )
-        
+
         return try ModelContainer(
             for: schema,
             configurations: [modelConfiguration]
@@ -32,41 +32,41 @@ enum GoodLinksURLCacheModelContainerFactory {
 
 // MARK: - Cache Service
 
-/// GoodLinks URL 抓取缓存服务（SwiftData）
+/// URL 网页文章抓取缓存服务（SwiftData）
 @ModelActor
-actor GoodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
+actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     private var logger: LoggerServiceProtocol {
         DIContainer.shared.loggerService
     }
-    
+
     private var cacheExpiration: TimeInterval {
         3600 * 24 * 7 // 7 天
     }
-    
+
     // MARK: - Read
-    
+
     func getArticle(url: String) throws -> ArticleFetchResult? {
         let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        
+
         let targetURL = trimmed
-        let predicate = #Predicate<CachedGoodLinksArticle> { item in
+        let predicate = #Predicate<CachedWebArticle> { item in
             item.url == targetURL
         }
-        var descriptor = FetchDescriptor<CachedGoodLinksArticle>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedWebArticle>(predicate: predicate)
         descriptor.fetchLimit = 1
-        
+
         guard let cached = try modelContext.fetch(descriptor).first else {
             return nil
         }
-        
+
         if isExpired(cached.cachedAt) {
             modelContext.delete(cached)
             try modelContext.save()
-            logger.debug("[GoodLinksURLCache] Cache expired, deleted url=\(targetURL)")
+            logger.debug("[WebArticleCache] Cache expired, deleted url=\(targetURL)")
             return nil
         }
-        
+
         return ArticleFetchResult(
             title: cached.title,
             content: cached.contentHTML,
@@ -78,20 +78,20 @@ actor GoodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
             source: .url
         )
     }
-    
+
     // MARK: - Write
-    
+
     func upsertArticle(url: String, result: ArticleFetchResult) throws {
         let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
+
         let targetURL = trimmed
-        let predicate = #Predicate<CachedGoodLinksArticle> { item in
+        let predicate = #Predicate<CachedWebArticle> { item in
             item.url == targetURL
         }
-        var descriptor = FetchDescriptor<CachedGoodLinksArticle>(predicate: predicate)
+        var descriptor = FetchDescriptor<CachedWebArticle>(predicate: predicate)
         descriptor.fetchLimit = 1
-        
+
         if let existing = try modelContext.fetch(descriptor).first {
             existing.title = result.title
             existing.author = result.author
@@ -101,7 +101,7 @@ actor GoodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
             existing.fetchedAt = result.fetchedAt
             existing.cachedAt = Date()
         } else {
-            let newItem = CachedGoodLinksArticle(
+            let newItem = CachedWebArticle(
                 url: targetURL,
                 title: result.title,
                 author: result.author,
@@ -113,41 +113,42 @@ actor GoodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
             )
             modelContext.insert(newItem)
         }
-        
+
         try modelContext.save()
-        logger.debug("[GoodLinksURLCache] Upserted url=\(targetURL)")
+        logger.debug("[WebArticleCache] Upserted url=\(targetURL)")
     }
-    
+
     // MARK: - Cleanup
-    
+
     func removeExpiredArticles() throws {
-        let all = try modelContext.fetch(FetchDescriptor<CachedGoodLinksArticle>())
+        let all = try modelContext.fetch(FetchDescriptor<CachedWebArticle>())
         guard !all.isEmpty else { return }
-        
+
         var deleted = 0
         for item in all where isExpired(item.cachedAt) {
             modelContext.delete(item)
             deleted += 1
         }
-        
+
         if deleted > 0 {
             try modelContext.save()
-            logger.info("[GoodLinksURLCache] Removed expired articles: \(deleted)")
+            logger.info("[WebArticleCache] Removed expired articles: \(deleted)")
         }
     }
-    
+
     func removeAll() throws {
-        let all = try modelContext.fetch(FetchDescriptor<CachedGoodLinksArticle>())
+        let all = try modelContext.fetch(FetchDescriptor<CachedWebArticle>())
         for item in all {
             modelContext.delete(item)
         }
         try modelContext.save()
-        logger.info("[GoodLinksURLCache] Removed all cached articles: \(all.count)")
+        logger.info("[WebArticleCache] Removed all cached articles: \(all.count)")
     }
-    
+
     // MARK: - Helpers
-    
+
     private func isExpired(_ cachedAt: Date) -> Bool {
         Date().timeIntervalSince(cachedAt) > cacheExpiration
     }
 }
+

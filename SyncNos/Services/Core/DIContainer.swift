@@ -14,8 +14,8 @@ class DIContainer {
     private var _loggerService: LoggerServiceProtocol?
     private var _iapService: IAPServiceProtocol?
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
-    private var _goodLinksURLFetcher: GoodLinksURLFetcherProtocol?
-    private var _goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol?
+    private var _webArticleFetcher: WebArticleFetcherProtocol?
+    private var _webArticleCacheService: WebArticleCacheServiceProtocol?
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
@@ -96,28 +96,30 @@ class DIContainer {
         return _goodLinksService!
     }
     
-    var goodLinksURLFetcher: GoodLinksURLFetcherProtocol {
-        if _goodLinksURLFetcher == nil {
-            _goodLinksURLFetcher = GoodLinksURLFetcher(
-                cacheService: goodLinksURLCacheService,
+    // MARK: - Web Article Fetching
+
+    var webArticleFetcher: WebArticleFetcherProtocol {
+        if _webArticleFetcher == nil {
+            _webArticleFetcher = WebArticleFetcher(
+                cacheService: webArticleCacheService,
                 siteLoginsStore: siteLoginsStore
             )
         }
-        return _goodLinksURLFetcher!
+        return _webArticleFetcher!
     }
-    
-    var goodLinksURLCacheService: GoodLinksURLCacheServiceProtocol {
-        if _goodLinksURLCacheService == nil {
+
+    var webArticleCacheService: WebArticleCacheServiceProtocol {
+        if _webArticleCacheService == nil {
             do {
-                let container = try GoodLinksURLCacheModelContainerFactory.createContainer()
-                _goodLinksURLCacheService = GoodLinksURLCacheService(modelContainer: container)
-                loggerService.info("[DIContainer] GoodLinksURLCache ModelContainer created successfully")
+                let container = try WebArticleCacheModelContainerFactory.createContainer()
+                _webArticleCacheService = WebArticleCacheService(modelContainer: container)
+                loggerService.info("[DIContainer] WebArticleCache ModelContainer created successfully")
             } catch {
-                loggerService.error("[DIContainer] Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
-                fatalError("Failed to create GoodLinksURLCache ModelContainer: \(error.localizedDescription)")
+                loggerService.error("[DIContainer] Failed to create WebArticleCache ModelContainer: \(error.localizedDescription)")
+                fatalError("Failed to create WebArticleCache ModelContainer: \(error.localizedDescription)")
             }
         }
-        return _goodLinksURLCacheService!
+        return _webArticleCacheService!
     }
 
     // MARK: - Site Logins Services
