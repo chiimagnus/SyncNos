@@ -18,6 +18,8 @@ final class CachedWebArticle {
     var wordCount: Int
     var fetchedAt: Date
     var cachedAt: Date
+    /// 抓取/抽取算法版本（用于在实现升级时自动重算缓存）
+    var contentVersion: Int
 
     init(
         url: String,
@@ -27,7 +29,8 @@ final class CachedWebArticle {
         textContent: String,
         wordCount: Int,
         fetchedAt: Date,
-        cachedAt: Date
+        cachedAt: Date,
+        contentVersion: Int = 1
     ) {
         self.url = url
         self.title = title
@@ -37,6 +40,6 @@ final class CachedWebArticle {
         self.wordCount = wordCount
         self.fetchedAt = fetchedAt
         self.cachedAt = cachedAt
+        self.contentVersion = contentVersion
     }
 }
-
