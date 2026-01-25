@@ -445,6 +445,7 @@ struct GoodLinksDetailView: View {
             loadState: mapToArticleLoadState(linkId: linkId),
             htmlContent: detailViewModel.article?.content,
             htmlBaseURL: URL(string: link?.url ?? ""),
+            originalPageURL: URL(string: link?.originalURL ?? link?.url ?? ""),
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in
