@@ -215,7 +215,9 @@ descriptor.fetchLimit = 1  // 只需要一条记录
 |------|----------|
 | Dedao | `Services/DataSources-From/Dedao/DedaoCacheService.swift` |
 | WeRead | `Services/DataSources-From/WeRead/WeReadCacheService.swift` |
-| Chats | `Services/DataSources-From/Chats/ChatsCacheService.swift` |
+| Chats | `Services/DataSources-From/Chats/ChatCacheService.swift` |
+| WebArticle | `Services/WebArticle/WebArticleCacheService.swift` |
+| SyncedHighlight | `Services/SyncScheduling/SyncedHighlightStore.swift` |
 
 ---
 
