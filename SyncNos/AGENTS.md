@@ -94,7 +94,7 @@ SyncNos/
 
 ```swift
 // 核心服务
-DIContainer.shared.notionService
+DIContainer.shared.notionClient
 DIContainer.shared.notionSyncEngine      // 统一同步引擎
 DIContainer.shared.databaseService
 DIContainer.shared.autoSyncService
@@ -157,7 +157,7 @@ DIContainer.shared.ocrConfigStore       // 配置存储
 2. 在 `SyncEngine/Adapters/` 创建适配器，实现 `NotionSyncSourceProtocol`
 3. 在 ViewModel 中使用 `syncEngine.sync(source: adapter, ...)`
 
-**不需要**修改 `NotionSyncEngine` 或 `NotionService`。
+**不需要**修改 `NotionSyncEngine` 或 `NotionClient`。
 
 ---
 

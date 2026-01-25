@@ -1,30 +1,30 @@
 import Foundation
 import AppKit
 
-// MARK: - GoodLinks URL Fetcher Protocol
+// MARK: - Web Article Fetcher Protocol
 
-protocol GoodLinksURLFetcherProtocol: AnyObject, Sendable {
+protocol WebArticleFetcherProtocol: AnyObject, Sendable {
     func fetchArticle(url: String) async throws -> ArticleFetchResult
 }
 
-// MARK: - GoodLinks URL Fetcher
+// MARK: - Web Article Fetcher
 
-/// GoodLinks URL Only 文章抓取器
+/// URL Only 文章抓取器
 ///
 /// 说明：
 /// - 仅负责从 URL 获取网页并做“轻量”正文提取（优先 `<article>` / `<main>`）
 /// - 纯文本提取使用 `NSAttributedString` HTML 转换，便于 Notion 同步与搜索
-final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
+final class WebArticleFetcher: WebArticleFetcherProtocol {
     private let logger: LoggerServiceProtocol
     private let session: URLSession
-    private let cacheService: GoodLinksURLCacheServiceProtocol?
+    private let cacheService: WebArticleCacheServiceProtocol?
     private let siteLoginsStore: SiteLoginsStoreProtocol?
     private let telemetry = Telemetry()
-    
+
     init(
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         session: URLSession = .shared,
-        cacheService: GoodLinksURLCacheServiceProtocol? = nil,
+        cacheService: WebArticleCacheServiceProtocol? = nil,
         siteLoginsStore: SiteLoginsStoreProtocol? = nil
     ) {
         self.logger = logger
@@ -32,11 +32,11 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         self.cacheService = cacheService
         self.siteLoginsStore = siteLoginsStore
     }
-    
+
     func fetchArticle(url: String) async throws -> ArticleFetchResult {
         let config = Config.load(userDefaults: .standard)
         await telemetry.recordCall()
-        
+
         if config.enableCache, let cacheService {
             do {
                 if let cached = try await cacheService.getArticle(url: url) {
@@ -44,17 +44,17 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                     if let snapshot = await telemetry.snapshotIfNeeded(every: config.aggregateLogEvery) {
                         logTelemetrySnapshot(snapshot)
                     }
-                    logger.info("[GoodLinksURLFetcher] 命中缓存 url=\(url)")
+                    logger.info("[WebArticleFetcher] 命中缓存 url=\(url)")
                     return cached
                 } else {
                     await telemetry.recordCacheMiss()
                 }
             } catch {
                 await telemetry.recordCacheMiss()
-                logger.warning("[GoodLinksURLFetcher] 读取缓存失败 url=\(url) error=\(error.localizedDescription)")
+                logger.warning("[WebArticleFetcher] 读取缓存失败 url=\(url) error=\(error.localizedDescription)")
             }
         }
-        
+
         if config.enableCookieAuth, let siteLoginsStore {
             let cookieHeader = await siteLoginsStore.getCookieHeader(for: url)
             if let cookieHeader, !cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -79,7 +79,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 }
             }
         }
-        
+
         do {
             let result = try await fetchArticleInternal(url: url, cookieHeader: nil, source: .url, config: config)
             await telemetry.recordSuccess(source: .url)
@@ -95,9 +95,9 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             throw error
         }
     }
-    
+
     // MARK: - Internal
-    
+
     private func fetchArticleInternal(
         url raw: String,
         cookieHeader: String?,
@@ -109,36 +109,36 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
               scheme == "http" || scheme == "https" else {
             throw URLFetchError.invalidURL(raw)
         }
-        
+
         var request = URLRequest(url: url)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
         if let cookieHeader, !cookieHeader.isEmpty {
             request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
         }
-        
+
         let data = try await fetchDataWithRetry(request: request, rawURL: raw, config: config)
         let result = try parseArticleFromHTMLData(data, source: source)
-        
+
         if config.enableCache, let cacheService {
             do {
                 try await cacheService.upsertArticle(url: raw, result: result)
             } catch {
-                logger.warning("[GoodLinksURLFetcher] 写入缓存失败 url=\(raw) error=\(error.localizedDescription)")
+                logger.warning("[WebArticleFetcher] 写入缓存失败 url=\(raw) error=\(error.localizedDescription)")
             }
         }
-        
+
         return result
     }
-    
+
     // MARK: - Decode / Extract / Transform
-    
+
     private func decodeHTML(_ data: Data) -> String? {
         if let utf8 = String(data: data, encoding: .utf8) { return utf8 }
         if let latin1 = String(data: data, encoding: .isoLatin1) { return latin1 }
         return String(decoding: data, as: UTF8.self)
     }
-    
+
     private func sanitizeHTML(_ html: String) -> String {
         var result = html
         // 移除脚本与样式，降低噪声
@@ -154,18 +154,18 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         )
         return result
     }
-    
+
     private func extractTitle(from html: String) -> String? {
         extractTag(html, tagName: "title")
             ?? extractMetaContent(html, key: "property", value: "og:title")
             ?? extractMetaContent(html, key: "name", value: "twitter:title")
     }
-    
+
     private func extractAuthor(from html: String) -> String? {
         extractMetaContent(html, key: "name", value: "author")
             ?? extractMetaContent(html, key: "property", value: "article:author")
     }
-    
+
     private func extractMainContent(from html: String) -> String {
         // 优先使用语义容器，尽量不要返回整页
         if let article = extractTagBlock(html, tagName: "article") { return article }
@@ -173,14 +173,14 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         if let body = extractTagBlock(html, tagName: "body") { return body }
         return html
     }
-    
+
     private func extractTag(_ html: String, tagName: String) -> String? {
         let pattern = "<\(tagName)\\b[^>]*>([\\s\\S]*?)<\\/\(tagName)>"
         return firstCapture(html, pattern: pattern)?
             .replacingOccurrences(of: "\\s+", with: " ", options: [.regularExpression])
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
     private func extractTagBlock(_ html: String, tagName: String) -> String? {
         let pattern = "<\(tagName)\\b[^>]*>([\\s\\S]*?)<\\/\(tagName)>"
         guard let inner = firstCapture(html, pattern: pattern) else { return nil }
@@ -189,15 +189,15 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         // 包装成最小 HTML，便于后续 HTML -> 文本
         return "<html><body>\(trimmed)</body></html>"
     }
-    
+
     private func extractMetaContent(_ html: String, key: String, value: String) -> String? {
-        // 支持 <meta property="og:title" content="..."> / 单引号 / 属性顺序变化
+        // 支持 <meta property=\"og:title\" content=\"...\"> / 单引号 / 属性顺序变化
         let escapedValue = NSRegularExpression.escapedPattern(for: value)
         let pattern = "<meta\\b[^>]*\\b\(key)\\s*=\\s*['\\\"]\(escapedValue)['\\\"][^>]*\\bcontent\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"][^>]*>"
         return firstCapture(html, pattern: pattern)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
     private func firstCapture(_ text: String, pattern: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -206,7 +206,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
               let r = Range(match.range(at: 1), in: text) else { return nil }
         return String(text[r])
     }
-    
+
     private func htmlToPlainText(_ html: String) -> String {
         guard let data = html.data(using: .utf8) else { return "" }
         do {
@@ -225,7 +225,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 .replacingOccurrences(of: "<[^>]+>", with: " ", options: [.regularExpression])
         }
     }
-    
+
     private func countWords(in text: String) -> Int {
         var count = 0
         text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.byWords, .localized]) { _, _, _, _ in
@@ -233,26 +233,26 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         }
         return count
     }
-    
+
     // MARK: - Retry / Telemetry / Config
-    
+
     private func fetchDataWithRetry(request: URLRequest, rawURL: String, config: Config) async throws -> Data {
         let maxAttempts = config.enableRetry ? max(1, config.maxRetries + 1) : 1
         var lastError: Error?
-        
+
         for attemptIndex in 1...maxAttempts {
             await telemetry.recordAttempt()
             let startTime = Date()
-            
+
             do {
                 let (data, response) = try await session.data(for: request)
                 let duration = Date().timeIntervalSince(startTime)
-                logger.info("[GoodLinksURLFetcher] 请求完成 \(String(format: "%.2f", duration))s url=\(rawURL)")
-                
+                logger.info("[WebArticleFetcher] 请求完成 \(String(format: "%.2f", duration))s url=\(rawURL)")
+
                 guard let http = response as? HTTPURLResponse else {
                     throw URLFetchError.invalidResponse
                 }
-                
+
                 switch http.statusCode {
                 case 200:
                     return data
@@ -266,11 +266,11 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             } catch {
                 let normalized = normalizeError(error)
                 lastError = normalized
-                
+
                 let shouldRetry = config.enableRetry
                     && attemptIndex < maxAttempts
                     && shouldRetryError(normalized)
-                
+
                 if shouldRetry {
                     await telemetry.recordRetry()
                     let backoff = computeBackoffSeconds(
@@ -278,23 +278,23 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                         initialSeconds: config.initialBackoffSeconds,
                         maxSeconds: config.maxBackoffSeconds
                     )
-                    logger.warning("[GoodLinksURLFetcher] 抓取失败，重试 \(attemptIndex)/\(maxAttempts - 1) in \(String(format: "%.2f", backoff))s url=\(rawURL) error=\(String(describing: normalized))")
+                    logger.warning("[WebArticleFetcher] 抓取失败，重试 \(attemptIndex)/\(maxAttempts - 1) in \(String(format: "%.2f", backoff))s url=\(rawURL) error=\(String(describing: normalized))")
                     try? await Task.sleep(nanoseconds: UInt64(backoff * 1_000_000_000))
                     continue
                 }
-                
+
                 throw normalized
             }
         }
-        
+
         throw lastError ?? URLFetchError.invalidResponse
     }
-    
+
     private func normalizeError(_ error: Error) -> Error {
         if let fetchError = error as? URLFetchError { return fetchError }
         return URLFetchError.networkError(error)
     }
-    
+
     private func shouldRetryError(_ error: Error) -> Bool {
         guard let fetchError = error as? URLFetchError else { return false }
         switch fetchError {
@@ -311,7 +311,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             return false
         }
     }
-    
+
     private func isTransientNetworkError(_ underlying: Error) -> Bool {
         let urlError: URLError?
         if let e = underlying as? URLError {
@@ -321,7 +321,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         } else {
             urlError = nil
         }
-        
+
         guard let urlError else { return false }
         switch urlError.code {
         case .timedOut,
@@ -340,7 +340,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             return false
         }
     }
-    
+
     private func computeBackoffSeconds(attemptIndex: Int, initialSeconds: Double, maxSeconds: Double) -> Double {
         // attemptIndex 从 1 开始；第 1 次失败后的等待使用 initialSeconds
         let exponent = Double(max(0, attemptIndex - 1))
@@ -349,24 +349,24 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         let jitter = Double.random(in: 0...(capped * 0.25))
         return capped + jitter
     }
-    
+
     private func parseArticleFromHTMLData(_ data: Data, source: FetchSource) throws -> ArticleFetchResult {
         guard let html = decodeHTML(data) else {
             throw URLFetchError.decodingFailed
         }
-        
+
         let cleaned = sanitizeHTML(html)
         let title = extractTitle(from: cleaned)
         let author = extractAuthor(from: cleaned)
         let mainHTML = extractMainContent(from: cleaned)
-        
+
         guard !mainHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw URLFetchError.contentNotFound
         }
-        
+
         let text = htmlToPlainText(mainHTML).trimmingCharacters(in: .whitespacesAndNewlines)
         let wordCount = countWords(in: text)
-        
+
         return ArticleFetchResult(
             title: title,
             content: mainHTML,
@@ -378,13 +378,13 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             source: source
         )
     }
-    
+
     private func logTelemetrySnapshot(_ snapshot: Telemetry.Snapshot) {
         let cacheTotal = snapshot.cacheHits + snapshot.cacheMisses
         let cacheHitRate: Double = cacheTotal == 0 ? 0 : (Double(snapshot.cacheHits) / Double(cacheTotal))
-        
+
         logger.info(
-            "[GoodLinksURLFetcher] 统计 calls=\(snapshot.totalCalls) " +
+            "[WebArticleFetcher] 统计 calls=\(snapshot.totalCalls) " +
             "cacheHit=\(snapshot.cacheHits) cacheMiss=\(snapshot.cacheMisses) hitRate=\(String(format: "%.0f%%", cacheHitRate * 100)) " +
             "attempts=\(snapshot.attempts) retries=\(snapshot.retries) " +
             "success=\(snapshot.successes) fail=\(snapshot.failures) " +
@@ -392,7 +392,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             "failByKind=\(snapshot.failuresByKind)"
         )
     }
-    
+
     private struct Config: Sendable {
         let enableCache: Bool
         let enableCookieAuth: Bool
@@ -401,22 +401,22 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         let initialBackoffSeconds: Double
         let maxBackoffSeconds: Double
         let aggregateLogEvery: Int
-        
+
         static func load(userDefaults: UserDefaults) -> Config {
             let enableCache = (userDefaults.object(forKey: DefaultsKeys.enableCache) as? Bool) ?? true
             let enableCookieAuth = (userDefaults.object(forKey: DefaultsKeys.enableCookieAuth) as? Bool) ?? true
             let enableRetry = (userDefaults.object(forKey: DefaultsKeys.enableRetry) as? Bool) ?? true
-            
+
             let maxRetries = clamp(
                 Int(userDefaults.object(forKey: DefaultsKeys.maxRetries) as? Int ?? 2),
                 min: 0,
                 max: 10
             )
-            
+
             let initialBackoffSeconds = max(0.1, userDefaults.object(forKey: DefaultsKeys.initialBackoffSeconds) as? Double ?? 1.0)
             let maxBackoffSeconds = max(initialBackoffSeconds, userDefaults.object(forKey: DefaultsKeys.maxBackoffSeconds) as? Double ?? 8.0)
             let aggregateLogEvery = max(1, userDefaults.object(forKey: DefaultsKeys.aggregateLogEvery) as? Int ?? 20)
-            
+
             return Config(
                 enableCache: enableCache,
                 enableCookieAuth: enableCookieAuth,
@@ -427,13 +427,14 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 aggregateLogEvery: aggregateLogEvery
             )
         }
-        
+
         private static func clamp(_ value: Int, min: Int, max: Int) -> Int {
             Swift.max(min, Swift.min(max, value))
         }
     }
-    
+
     enum DefaultsKeys {
+        // 保留历史 key 字符串，避免用户设置丢失（之前由 GoodLinksURLFetcher 定义）
         static let enableCache = "goodlinks.urlFetcher.enableCache"
         static let enableCookieAuth = "goodlinks.urlFetcher.enableCookieAuth"
         static let enableRetry = "goodlinks.urlFetcher.enableRetry"
@@ -442,7 +443,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         static let maxBackoffSeconds = "goodlinks.urlFetcher.maxBackoffSeconds"
         static let aggregateLogEvery = "goodlinks.urlFetcher.aggregateLogEvery"
     }
-    
+
     private actor Telemetry {
         struct Snapshot: Sendable {
             let totalCalls: Int
@@ -455,7 +456,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             let successesBySource: [String: Int]
             let failuresByKind: [String: Int]
         }
-        
+
         private var totalCalls: Int = 0
         private var cacheHits: Int = 0
         private var cacheMisses: Int = 0
@@ -465,39 +466,39 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
         private var failures: Int = 0
         private var successesBySource: [String: Int] = [:]
         private var failuresByKind: [String: Int] = [:]
-        
+
         func recordCall() {
             totalCalls += 1
         }
-        
+
         func recordCacheHit() {
             cacheHits += 1
         }
-        
+
         func recordCacheMiss() {
             cacheMisses += 1
         }
-        
+
         func recordAttempt() {
             attempts += 1
         }
-        
+
         func recordRetry() {
             retries += 1
         }
-        
+
         func recordSuccess(source: FetchSource) {
             successes += 1
             let key = source.rawValue
             successesBySource[key, default: 0] += 1
         }
-        
+
         func recordFailure(error: Error) {
             failures += 1
             let key = failureKind(from: error)
             failuresByKind[key, default: 0] += 1
         }
-        
+
         func snapshotIfNeeded(every: Int) -> Snapshot? {
             guard every > 0 else { return nil }
             guard totalCalls > 0, totalCalls % every == 0 else { return nil }
@@ -513,7 +514,7 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
                 failuresByKind: failuresByKind
             )
         }
-        
+
         private func failureKind(from error: Error) -> String {
             if let e = error as? URLFetchError {
                 switch e {
@@ -543,8 +544,9 @@ final class GoodLinksURLFetcher: GoodLinksURLFetcherProtocol {
             return "unknown"
         }
     }
-    
+
     // MARK: - Constants
-    
+
     private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)"
 }
+

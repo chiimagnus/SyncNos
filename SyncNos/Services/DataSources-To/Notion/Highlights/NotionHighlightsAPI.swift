@@ -1,13 +1,13 @@
 import Foundation
 
 /// Notion 高亮操作类
-class NotionHighlightOperations {
-    private let requestHelper: NotionRequestHelper
+class NotionHighlightsAPI {
+    private let requestHelper: NotionAPIClient
     private let helperMethods: NotionHelperMethods
-    private let pageOperations: NotionPageOperations
+    private let pageOperations: NotionPagesAPI
     private let logger: LoggerServiceProtocol
 
-    init(requestHelper: NotionRequestHelper, helperMethods: NotionHelperMethods, pageOperations: NotionPageOperations, logger: LoggerServiceProtocol) {
+    init(requestHelper: NotionAPIClient, helperMethods: NotionHelperMethods, pageOperations: NotionPagesAPI, logger: LoggerServiceProtocol) {
         self.requestHelper = requestHelper
         self.helperMethods = helperMethods
         self.pageOperations = pageOperations
@@ -74,7 +74,7 @@ class NotionHighlightOperations {
             return try JSONDecoder().decode(NotionPage.self, from: data)
         } catch {
             // 兜底：若服务端校验仍认为内容过大，则降级为占位条目
-            if NotionRequestHelper.isContentTooLargeError(error) {
+            if NotionAPIClient.isContentTooLargeError(error) {
                 logger.warning("PerBook: content too large (HTTP), fallback to placeholder. uuid=\(highlight.uuid)")
                 return try await createPlaceholderItem(inDatabaseId: databaseId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
             }
@@ -97,7 +97,7 @@ class NotionHighlightOperations {
             let children = helperMethods.buildPerBookPageChildren(for: highlight, bookId: bookId, source: "appleBooks")
             try await pageOperations.replacePageChildren(pageId: pageId, with: children)
         } catch {
-            if NotionRequestHelper.isContentTooLargeError(error) {
+            if NotionAPIClient.isContentTooLargeError(error) {
                 logger.warning("PerBook: content too large (HTTP) on update, fallback to placeholder. uuid=\(highlight.uuid)")
                 try await updatePlaceholderItem(pageId: pageId, bookId: bookId, bookTitle: bookTitle, author: author, highlight: highlight)
                 return

@@ -93,7 +93,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
-    private let urlFetcher: GoodLinksURLFetcherProtocol
+    private let urlFetcher: WebArticleFetcherProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     
@@ -109,7 +109,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
+        urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {

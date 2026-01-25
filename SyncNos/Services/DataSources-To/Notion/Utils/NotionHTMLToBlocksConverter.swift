@@ -79,12 +79,12 @@ final class NotionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol, @u
     }
 
     // MARK: - Dependencies
-    private let notionService: NotionServiceProtocol
+    private let notionService: NotionClientProtocol
     private let logger: LoggerServiceProtocol
     private let imageUploadCache = ImageUploadCache()
 
     init(
-        notionService: NotionServiceProtocol,
+        notionService: NotionClientProtocol,
         logger: LoggerServiceProtocol
     ) {
         self.notionService = notionService
