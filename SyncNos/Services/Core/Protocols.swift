@@ -281,6 +281,9 @@ protocol WebArticleCacheServiceProtocol: Actor {
     
     /// 写入/更新缓存
     func upsertArticle(url: String, result: ArticleFetchResult) throws
+
+    /// 删除指定 URL 的缓存（用于强制重抓取）
+    func removeArticle(url: String) throws
     
     /// 清理过期缓存
     func removeExpiredArticles() throws

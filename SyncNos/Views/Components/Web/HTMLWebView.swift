@@ -10,18 +10,24 @@ struct HTMLWebView: NSViewRepresentable {
 
     let html: String
     let baseURL: URL?
+    let originalPageURL: URL?
     let openLinksInExternalBrowser: Bool
+    let onRefetchRequested: (() -> Void)?
     @Binding var contentHeight: CGFloat
 
     init(
         html: String,
         baseURL: URL? = nil,
+        originalPageURL: URL? = nil,
         openLinksInExternalBrowser: Bool = true,
+        onRefetchRequested: (() -> Void)? = nil,
         contentHeight: Binding<CGFloat>
     ) {
         self.html = html
         self.baseURL = baseURL
+        self.originalPageURL = originalPageURL
         self.openLinksInExternalBrowser = openLinksInExternalBrowser
+        self.onRefetchRequested = onRefetchRequested
         self._contentHeight = contentHeight
     }
 
@@ -54,6 +60,7 @@ struct HTMLWebView: NSViewRepresentable {
         let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = false
         if let scrollView = webView.enclosingScrollView {
             scrollView.drawsBackground = false
@@ -64,7 +71,7 @@ struct HTMLWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        let styledHTML = HTMLWebView.wrapWithStyle(html: html)
+        let styledHTML = HTMLWebView.wrapWithStyle(html: html, originalPageURL: originalPageURL)
         if context.coordinator.lastLoadedHTML != styledHTML || context.coordinator.lastLoadedBaseURL != baseURL {
             context.coordinator.lastLoadedHTML = styledHTML
             context.coordinator.lastLoadedBaseURL = baseURL
@@ -76,6 +83,12 @@ struct HTMLWebView: NSViewRepresentable {
             }
         }
         context.coordinator.openLinksInExternalBrowser = openLinksInExternalBrowser
+        if let menuWebView = webView as? PassthroughScrollWKWebView {
+            menuWebView.onRefetchRequested = onRefetchRequested
+            menuWebView.onRefreshRenderRequested = { [weak webView] in
+                webView?.reload()
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -84,7 +97,7 @@ struct HTMLWebView: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         static let heightMessageHandlerName = "syncnosHeight"
         static let imageNormalizationScript = #"""
         (() => {
@@ -247,12 +260,14 @@ struct HTMLWebView: NSViewRepresentable {
 
     // MARK: - Styling
 
-    private static func wrapWithStyle(html: String) -> String {
+    private static func wrapWithStyle(html: String, originalPageURL: URL?) -> String {
         let normalizedBodyHTML = extractBodyInnerHTML(from: html)
             .map(stripNoscriptWrappersPreservingContent)
             ?? stripNoscriptWrappersPreservingContent(html)
         var displayReadyHTML = sanitizeHiddenInlineStyles(normalizedBodyHTML)
         displayReadyHTML = normalizeImages(displayReadyHTML)
+
+        let originalURLAttribute = originalPageURL?.absoluteString ?? ""
 
         let css = """
         :root {
@@ -339,18 +354,71 @@ struct HTMLWebView: NSViewRepresentable {
         img {
           max-width: 100%;
           height: auto;
+        }
+
+        iframe, video {
+          max-width: 100%;
+        }
+
+        .sn-media-fallback {
+          margin: 0.8em 0;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid rgba(0, 0, 0, 0.12);
+          background: rgba(0, 0, 0, 0.03);
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .sn-media-fallback {
+            border-color: rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.06);
+          }
+        }
+
+        .sn-media-cover {
+          width: 100%;
+          height: auto;
           display: block;
-          margin: 0.6em 0;
+          margin: 0;
+          background: rgba(0, 0, 0, 0.08);
+          aspect-ratio: 16 / 9;
+          object-fit: cover;
         }
 
-        figure {
-          margin: 0 0 0.9em 0;
+        .sn-media-cover-placeholder {
+          width: 100%;
+          aspect-ratio: 16 / 9;
+          background: rgba(0, 0, 0, 0.10);
         }
 
-        figcaption {
-          margin-top: 0.4em;
-          font-size: 12px;
-          opacity: 0.72;
+        @media (prefers-color-scheme: dark) {
+          .sn-media-cover-placeholder {
+            background: rgba(255, 255, 255, 0.10);
+          }
+        }
+
+        .sn-media-actions {
+          display: flex;
+          justify-content: flex-end;
+          padding: 10px 12px;
+        }
+
+        .sn-open-original {
+          display: inline-block;
+          padding: 7px 10px;
+          border-radius: 10px;
+          border: 1px solid rgba(0, 0, 0, 0.16);
+          background: rgba(255, 255, 255, 0.65);
+          color: inherit;
+          text-decoration: none;
+          font-size: 13px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .sn-open-original {
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(0, 0, 0, 0.24);
+          }
         }
 
         pre {
@@ -377,6 +445,113 @@ struct HTMLWebView: NSViewRepresentable {
         }
         """
 
+        let mediaFallbackScript = """
+        (() => {
+          const originalUrl = document.body ? (document.body.getAttribute('data-syncnos-original-url') || '') : '';
+          if (!originalUrl) return;
+
+          function firstNonEmpty(values) {
+            for (const v of values) {
+              if (v == null) continue;
+              const s = String(v).trim();
+              if (s) return s;
+            }
+            return '';
+          }
+
+          function coverFor(el) {
+            if (!el) return '';
+
+            if (el.tagName && el.tagName.toLowerCase() === 'video') {
+              return firstNonEmpty([el.poster, el.getAttribute('poster'), el.getAttribute('data-cover'), el.getAttribute('data-poster')]);
+            }
+
+            const own = firstNonEmpty([
+              el.getAttribute('data-cover'),
+              el.getAttribute('data-cover-url'),
+              el.getAttribute('data-poster'),
+              el.getAttribute('poster'),
+              el.getAttribute('cover')
+            ]);
+            if (own) return own;
+
+            // 尝试在附近找一张图当封面
+            let p = el.parentElement;
+            for (let i = 0; i < 3 && p; i += 1) {
+              const img = p.querySelector && p.querySelector('img');
+              const src = img ? (img.getAttribute('src') || '') : '';
+              const trimmed = String(src).trim();
+              if (trimmed) return trimmed;
+              p = p.parentElement;
+            }
+            return '';
+          }
+
+          function buildFallbackHTML(cover) {
+            const safeCover = cover ? String(cover).replace(/\"/g, '&quot;') : '';
+            const coverHTML = safeCover
+              ? `<img class="sn-media-cover" src="${safeCover}" />`
+              : `<div class="sn-media-cover-placeholder"></div>`;
+            return `
+              <div class="sn-media-fallback">
+                ${coverHTML}
+                <div class="sn-media-actions">
+                  <a class="sn-open-original" href="${originalUrl}">打开原网页观看</a>
+                </div>
+              </div>
+            `;
+          }
+
+          function replaceWithFallback(el) {
+            if (!el || !el.parentNode) return;
+            const cover = coverFor(el);
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = buildFallbackHTML(cover);
+            const node = wrapper.firstElementChild;
+            if (!node) return;
+            el.parentNode.replaceChild(node, el);
+          }
+
+          function isLikelyVideoIframe(el) {
+            if (!el) return false;
+            const cls = firstNonEmpty([el.getAttribute('class'), el.getAttribute('data-type')]).toLowerCase();
+            if (cls.includes('video')) return true;
+            const src = firstNonEmpty([el.getAttribute('src'), el.getAttribute('data-src')]).toLowerCase();
+            if (!src) return false;
+            if (src.includes('videoplayer')) return true;
+            if (src.includes('/video')) return true;
+            return false;
+          }
+
+          // 1) video：如果加载/解码失败，替换为“封面 + 打开原网页”
+          document.querySelectorAll('video').forEach((v) => {
+            if (!v) return;
+            let replaced = false;
+            const fail = () => {
+              if (replaced) return;
+              replaced = true;
+              replaceWithFallback(v);
+            };
+            v.addEventListener('error', fail, { once: true });
+            // 没有任何可用源：直接降级
+            const hasSrc = !!(v.getAttribute('src') || (v.querySelector && v.querySelector('source')));
+            if (!hasSrc) {
+              fail();
+            }
+          });
+
+          // 2) iframe：视频类 iframe 如果在短时间内未完成加载，替换为“封面 + 打开原网页”
+          document.querySelectorAll('iframe').forEach((f) => {
+            if (!isLikelyVideoIframe(f)) return;
+            let loaded = false;
+            f.addEventListener('load', () => { loaded = true; }, { once: true });
+            setTimeout(() => {
+              if (!loaded) replaceWithFallback(f);
+            }, 4000);
+          });
+        })();
+        """
+
         return """
         <!doctype html>
         <html>
@@ -385,7 +560,10 @@ struct HTMLWebView: NSViewRepresentable {
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <style>\(css)</style>
           </head>
-          <body>\(displayReadyHTML)</body>
+          <body data-syncnos-original-url="\(escapeHTMLAttribute(originalURLAttribute))">
+            \(displayReadyHTML)
+            <script>\(mediaFallbackScript)</script>
+          </body>
         </html>
         """
     }
@@ -579,8 +757,90 @@ struct HTMLWebView: NSViewRepresentable {
 
 /// 让滚轮事件向上传递，避免鼠标悬停在 WebView 上时父级 ScrollView 无法滚动。
 private final class PassthroughScrollWKWebView: WKWebView {
+    // MARK: - Actions
+
+    /// 触发“重新抓取正文”（走 ViewModel 的完整抓取链路）
+    var onRefetchRequested: (() -> Void)?
+    /// 仅刷新当前渲染（不触发抓取/缓存写入）
+    var onRefreshRenderRequested: (() -> Void)?
+
     override func scrollWheel(with event: NSEvent) {
         // 由于我们把 WebView 高度撑到内容高度，内部滚动应尽量禁用，让外层统一滚动。
         nextResponder?.scrollWheel(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+
+        // 避免菜单复用时重复插入自定义项
+        if menu.items.contains(where: { $0.action == #selector(handleRefetchRequested) }) {
+            return menu
+        }
+
+        let refreshItem = findReloadMenuItem(in: menu)
+        if let refreshItem {
+            refreshItem.title = "仅刷新当前渲染"
+        }
+
+        let refetchItem = NSMenuItem(
+            title: "重新抓取正文",
+            action: #selector(handleRefetchRequested),
+            keyEquivalent: ""
+        )
+        refetchItem.target = self
+        refetchItem.isEnabled = onRefetchRequested != nil
+
+        if let refreshItem, let idx = menu.items.firstIndex(of: refreshItem) {
+            menu.insertItem(refetchItem, at: idx)
+            menu.insertItem(.separator(), at: idx + 1)
+        } else {
+            // 未能识别出“重新载入”项：提供一个明确的“仅刷新当前渲染”
+            let refreshOnly = NSMenuItem(
+                title: "仅刷新当前渲染",
+                action: #selector(handleRefreshRenderRequested),
+                keyEquivalent: ""
+            )
+            refreshOnly.target = self
+            refreshOnly.isEnabled = true
+
+            menu.insertItem(refetchItem, at: 0)
+            menu.insertItem(refreshOnly, at: 1)
+            menu.insertItem(.separator(), at: 2)
+        }
+
+        return menu
+    }
+
+    // MARK: - Menu Handlers
+
+    @objc private func handleRefetchRequested() {
+        onRefetchRequested?()
+    }
+
+    @objc private func handleRefreshRenderRequested() {
+        if let onRefreshRenderRequested {
+            onRefreshRenderRequested()
+        } else {
+            reload()
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func findReloadMenuItem(in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            if let submenu = item.submenu,
+               let found = findReloadMenuItem(in: submenu) {
+                return found
+            }
+
+            guard let action = item.action else { continue }
+            let name = NSStringFromSelector(action)
+            // WebKit 可能使用内部 selector；这里尽量稳妥地匹配 reload 语义
+            if name == "reload:" || name == "reload" || name.lowercased().contains("reload") {
+                return item
+            }
+        }
+        return nil
     }
 }
