@@ -11,7 +11,6 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     
     private let link: GoodLinksLinkRow
     private let dbPath: String
-    private let articleText: String?
     private let articleBlocks: [[String: Any]]?
     
     // MARK: - Initialization
@@ -19,13 +18,11 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     init(
         link: GoodLinksLinkRow,
         dbPath: String,
-        articleText: String? = nil,
         articleBlocks: [[String: Any]]? = nil,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService
     ) {
         self.link = link
         self.dbPath = dbPath
-        self.articleText = articleText
         self.articleBlocks = articleBlocks
         self.databaseService = databaseService
     }
@@ -118,41 +115,9 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
     // MARK: - Header Content Hook
     
     /// 首次创建页面时的头部内容
-    /// GoodLinks 需要在高亮之前添加 "Article" 标题和文章内容
+    /// GoodLinks 需要在高亮之前添加文章内容
     func headerContentForNewPage() -> [[String: Any]] {
-        let helperMethods = NotionHelperMethods()
-        var children: [[String: Any]] = []
-        
-        // 添加 "Article" 标题
-        children.append([
-            "object": "block",
-            "heading_2": [
-                "rich_text": [["text": ["content": "Article"]]]
-            ]
-        ])
-        
-        // 添加文章内容（如果有）
-        if let blocks = articleBlocks, !blocks.isEmpty {
-            children.append(contentsOf: blocks)
-        } else if let contentText = articleText,
-                  !contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // 兼容降级：转换失败时仍回退到纯文本段落
-            children.append(contentsOf: helperMethods.buildParagraphBlocks(from: contentText))
-        }
-        
-        return children
-    }
-
-    // MARK: - NotionSyncSourceProtocol Hooks
-
-    func pageHeaderTitleForNewPage() -> String? {
-        // GoodLinks 页面需要先写入 Article 内容，再写入 Highlights 标题与高亮列表
-        nil
-    }
-
-    func headerContentPresenceHeadingTitle() -> String? {
-        // 用于“无高亮且页面已存在”的补齐判断
-        "Article"
+        articleBlocks ?? []
     }
 }
 
@@ -165,6 +130,7 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
+        cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
         urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
         htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
@@ -172,16 +138,37 @@ extension GoodLinksNotionAdapter {
 
         let result: ArticleFetchResult?
         do {
-            result = try await urlFetcher.fetchArticle(url: link.url)
-        } catch URLFetchError.contentNotFound {
+            result = try await cacheService.getArticle(url: link.url)
+            if result != nil {
+                logger.debug("[GoodLinks] Use persisted article cache for \(link.url)")
+            }
+        } catch {
+            logger.warning("[GoodLinks] Failed to read persisted article cache for \(link.url): \(error.localizedDescription)")
             result = nil
         }
 
+        var fetched: ArticleFetchResult? = nil
+        if result == nil {
+            do {
+                let fetchedResult = try await urlFetcher.fetchArticle(url: link.url)
+                fetched = fetchedResult
+                do {
+                    try await cacheService.upsertArticle(url: link.url, result: fetchedResult)
+                } catch {
+                    logger.warning("[GoodLinks] Failed to persist fetched article for \(link.url): \(error.localizedDescription)")
+                }
+            } catch URLFetchError.contentNotFound {
+                fetched = nil
+            }
+        }
+        
+        let finalResult = result ?? fetched
+
         var blocks: [[String: Any]]?
-        if let result, let baseURL = URL(string: link.url) {
+        if let finalResult, let baseURL = URL(string: link.url) {
             do {
                 let converted = try await htmlToBlocksConverter.convertArticleHTMLToBlocks(
-                    html: result.content,
+                    html: finalResult.content,
                     baseURL: baseURL
                 )
                 blocks = converted.isEmpty ? nil : converted
@@ -194,7 +181,6 @@ extension GoodLinksNotionAdapter {
         return GoodLinksNotionAdapter(
             link: link,
             dbPath: dbPath,
-            articleText: result?.textContent,
             articleBlocks: blocks,
             databaseService: databaseService
         )
