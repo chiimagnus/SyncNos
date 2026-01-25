@@ -41,7 +41,7 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     
     /// 缓存内容版本：当抽取策略升级时，通过版本号触发自动重算（不依赖“过期时间”）。
     private var currentContentVersion: Int {
-        4
+        5
     }
 
     // MARK: - Read
