@@ -401,16 +401,6 @@ protocol WeReadCacheServiceProtocol: Actor {
     func getCacheStats() throws -> WeReadCacheStats
 }
 
-// MARK: - Auth Service Protocol
-protocol AuthServiceProtocol: AnyObject {
-    func loginWithApple(authorizationCode: String, nonce: String?) async throws -> AuthTokens
-    func refresh(refreshToken: String) async throws -> AuthTokens
-    func logout(refreshToken: String) async throws
-    func fetchProfile(accessToken: String) async throws -> AccountProfile
-    func fetchLoginMethods(accessToken: String) async throws -> [LoginMethod]
-    func deleteAccount(accessToken: String) async throws
-}
-
 // MARK: - Sync Activity Monitor Protocol
 /// 汇总应用范围内的同步活动，用于退出拦截提示等场景。
 protocol SyncActivityMonitorProtocol: AnyObject {
