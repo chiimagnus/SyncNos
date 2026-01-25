@@ -59,6 +59,24 @@ protocol NotionSyncSourceProtocol {
     /// 返回在 "Highlights" 标题之前追加的 Notion blocks
     /// 例如 GoodLinks 需要添加 "Article" 标题和文章内容
     func headerContentForNewPage() -> [[String: Any]]
+
+    /// 创建页面时是否在页面最开始写入一个标题（可选）
+    /// - 返回值会作为 `createBookPage(..., header:)` 传入 Notion API
+    /// - 默认行为：
+    ///   - 若 `headerContentForNewPage()` 为空：返回 "Highlights"（保持历史行为）
+    ///   - 若 `headerContentForNewPage()` 非空：返回 nil（确保头部内容在高亮标题之前）
+    func pageHeaderTitleForNewPage() -> String?
+
+    /// 新页面追加高亮前是否需要补一个 “Highlights” 标题（可选）
+    /// - 典型场景：`pageHeaderTitleForNewPage()` 为 nil（创建页时不写标题），但仍希望在高亮列表之前有标题分隔
+    /// - 默认行为：当且仅当 `pageHeaderTitleForNewPage()` 为 nil 时返回 "Highlights"
+    func highlightsHeadingTitleForNewPageAppend() -> String?
+
+    /// 判断“头部内容是否已存在”的标题（可选）
+    /// - 用于在“无高亮且页面已存在”的场景下，决定是否补齐 `headerContentForNewPage()`。
+    /// - 返回一个 heading 标题文本（例如 "Article"），引擎会调用 `pageHasHeading(pageId:title:)` 检测。
+    /// - 默认返回 nil（表示不需要做存在性检测/补齐）。
+    func headerContentPresenceHeadingTitle() -> String?
     
     // MARK: - Strategy Support (Optional)
     
@@ -97,6 +115,21 @@ extension NotionSyncSourceProtocol {
     func headerContentForNewPage() -> [[String: Any]] {
         []
     }
+
+    func pageHeaderTitleForNewPage() -> String? {
+        // 保持旧行为：大多数数据源在页面开头有 "Highlights"。
+        // 但当存在 headerContent（例如文章正文）时，为确保顺序正确，默认不在创建页时写入标题。
+        headerContentForNewPage().isEmpty ? "Highlights" : nil
+    }
+
+    func highlightsHeadingTitleForNewPageAppend() -> String? {
+        // 若创建页时没有写标题，则在追加高亮前补一个标题。
+        pageHeaderTitleForNewPage() == nil ? "Highlights" : nil
+    }
+
+    func headerContentPresenceHeadingTitle() -> String? {
+        nil
+    }
 }
 
 // MARK: - Per-Book Strategy Extension
@@ -122,7 +155,7 @@ struct NotionSyncContext {
     let notionConfig: NotionConfigStoreProtocol
     
     /// Notion 服务
-    let notionService: NotionServiceProtocol
+    let notionService: NotionClientProtocol
     
     /// 日志服务
     let logger: LoggerServiceProtocol

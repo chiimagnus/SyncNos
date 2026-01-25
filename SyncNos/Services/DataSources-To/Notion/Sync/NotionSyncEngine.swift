@@ -6,7 +6,7 @@ final class NotionSyncEngine {
     
     // MARK: - Dependencies
     
-    private let notionService: NotionServiceProtocol
+    private let notionService: NotionClientProtocol
     private let notionConfig: NotionConfigStoreProtocol
     private let logger: LoggerServiceProtocol
     private let timestampStore: SyncTimestampStoreProtocol
@@ -77,7 +77,7 @@ final class NotionSyncEngine {
     // MARK: - Initialization
     
     init(
-        notionService: NotionServiceProtocol = DIContainer.shared.notionService,
+        notionService: NotionClientProtocol = DIContainer.shared.notionClient,
         notionConfig: NotionConfigStoreProtocol = DIContainer.shared.notionConfigStore,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         timestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore,
@@ -222,7 +222,7 @@ final class NotionSyncEngine {
                 author: item.author,
                 assetId: item.itemId,
                 urlString: item.url,
-                header: item.source == .goodLinks ? nil : "Highlights"
+                header: source.pageHeaderTitleForNewPage()
             )
         } catch {
             logger.error("[SmartSync] Failed to ensure page for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
@@ -318,16 +318,19 @@ final class NotionSyncEngine {
                 let headerContent = source.headerContentForNewPage()
                 if !headerContent.isEmpty {
                     do {
-                        let hasArticleHeading = try await notionService.pageHasHeading(pageId: pageId, title: "Article")
-                        if !hasArticleHeading {
-                            progress(NSLocalizedString("Adding article content...", comment: ""))
-                            try Task.checkCancellation()
-                            try await notionService.appendChildren(
-                                pageId: pageId,
-                                children: headerContent,
-                                batchSize: NotionSyncConfig.defaultAppendBatchSize
-                            )
-                            logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
+                        if let marker = source.headerContentPresenceHeadingTitle(),
+                           !marker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            let hasMarkerHeading = try await notionService.pageHasHeading(pageId: pageId, title: marker)
+                            if !hasMarkerHeading {
+                                progress(NSLocalizedString("Adding article content...", comment: ""))
+                                try Task.checkCancellation()
+                                try await notionService.appendChildren(
+                                    pageId: pageId,
+                                    children: headerContent,
+                                    batchSize: NotionSyncConfig.defaultAppendBatchSize
+                                )
+                                logger.debug("[SmartSync] Appended \(headerContent.count) header blocks for \(source.sourceKey): \(itemLabel)")
+                            }
                         }
                     } catch {
                         logger.error("[SmartSync] Failed to append header content for \(source.sourceKey): \(itemLabel) - \(error.localizedDescription)")
@@ -420,7 +423,7 @@ final class NotionSyncEngine {
                                 highlight: highlightRow
                             )
                         } catch {
-                            if NotionRequestHelper.isDatabaseMissingError(error) {
+                            if NotionAPIClient.isDatabaseMissingError(error) {
                                 let newEnsured = try await notionService.ensurePerBookDatabase(
                                     bookTitle: item.title,
                                     author: item.author,
@@ -449,7 +452,7 @@ final class NotionSyncEngine {
                                 highlight: highlightRow
                             )
                         } catch {
-                            if NotionRequestHelper.isDatabaseMissingError(error) {
+                            if NotionAPIClient.isDatabaseMissingError(error) {
                                 let newEnsured = try await notionService.ensurePerBookDatabase(
                                     bookTitle: item.title,
                                     author: item.author,
@@ -469,7 +472,7 @@ final class NotionSyncEngine {
                         }
                     }
                 } catch {
-                    if NotionRequestHelper.isDatabaseMissingError(error) {
+                    if NotionAPIClient.isDatabaseMissingError(error) {
                         let newEnsured = try await notionService.ensurePerBookDatabase(
                             bookTitle: item.title,
                             author: item.author,
@@ -539,12 +542,13 @@ final class NotionSyncEngine {
         var highlightChildren: [[String: Any]] = []
         var highlightMeta: [(uuid: String, contentHash: String)] = []
         
-        // GoodLinks 特殊处理：添加 Highlights 标题
-        if item.source == .goodLinks {
+        // 若创建页时未写入标题，则在追加高亮前补一个标题（由 source 决定）
+        if let title = source.highlightsHeadingTitleForNewPageAppend(),
+           !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             headerChildren.append([
                 "object": "block",
                 "heading_2": [
-                    "rich_text": [["text": ["content": "Highlights"]]]
+                    "rich_text": [["text": ["content": title]]]
                 ]
             ])
         }

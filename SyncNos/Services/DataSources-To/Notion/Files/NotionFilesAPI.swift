@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Notion File Upload Operations
+// MARK: - Notion Files API
 
-final class NotionFileUploadOperations {
+final class NotionFilesAPI {
     fileprivate enum JSONValue: Decodable {
         case string(String)
         case number(Double)
@@ -71,10 +71,10 @@ final class NotionFileUploadOperations {
         }
     }
 
-    private let requestHelper: NotionRequestHelper
+    private let requestHelper: NotionAPIClient
     private let logger: LoggerServiceProtocol
 
-    init(requestHelper: NotionRequestHelper, logger: LoggerServiceProtocol) {
+    init(requestHelper: NotionAPIClient, logger: LoggerServiceProtocol) {
         self.requestHelper = requestHelper
         self.logger = logger
     }

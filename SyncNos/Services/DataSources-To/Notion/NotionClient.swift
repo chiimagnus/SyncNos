@@ -65,9 +65,9 @@ private actor NotionDBPropsEnsureLock {
     }
 }
 
-// MARK: - NotionService
+// MARK: - NotionClient
 
-final class NotionService: NotionServiceProtocol {
+final class NotionClient: NotionClientProtocol {
     // MARK: - Core Properties
     
     let configStore: NotionConfigStoreProtocol
@@ -77,16 +77,16 @@ final class NotionService: NotionServiceProtocol {
     
     // MARK: - Helper Components
     
-    private let requestHelper: NotionRequestHelper
+    private let requestHelper: NotionAPIClient
     private let helperMethods: NotionHelperMethods
 
     // MARK: - Operation Modules
     
-    private let databaseOps: NotionDatabaseOperations
-    private let pageOps: NotionPageOperations
-    private let highlightOps: NotionHighlightOperations
-    private let queryOps: NotionQueryOperations
-    private let fileUploadOps: NotionFileUploadOperations
+    private let databaseOps: NotionDatabasesAPI
+    private let pageOps: NotionPagesAPI
+    private let highlightOps: NotionHighlightsAPI
+    private let queryOps: NotionBlocksAPI
+    private let fileUploadOps: NotionFilesAPI
     
     // MARK: - Concurrency Control
     
@@ -98,7 +98,7 @@ final class NotionService: NotionServiceProtocol {
     init(configStore: NotionConfigStoreProtocol) {
         self.configStore = configStore
         self.logger = DIContainer.shared.loggerService
-        self.requestHelper = NotionRequestHelper(
+        self.requestHelper = NotionAPIClient(
             configStore: configStore,
             apiBase: apiBase,
             notionVersion: notionVersion,
@@ -107,16 +107,16 @@ final class NotionService: NotionServiceProtocol {
         self.helperMethods = NotionHelperMethods()
 
         // Initialize operation modules
-        self.databaseOps = NotionDatabaseOperations(requestHelper: requestHelper)
-        self.pageOps = NotionPageOperations(requestHelper: requestHelper, helperMethods: helperMethods)
-        self.queryOps = NotionQueryOperations(requestHelper: requestHelper, logger: logger)
-        self.highlightOps = NotionHighlightOperations(
+        self.databaseOps = NotionDatabasesAPI(requestHelper: requestHelper)
+        self.pageOps = NotionPagesAPI(requestHelper: requestHelper, helperMethods: helperMethods)
+        self.queryOps = NotionBlocksAPI(requestHelper: requestHelper, logger: logger)
+        self.highlightOps = NotionHighlightsAPI(
             requestHelper: requestHelper,
             helperMethods: helperMethods,
             pageOperations: pageOps,
             logger: logger
         )
-        self.fileUploadOps = NotionFileUploadOperations(
+        self.fileUploadOps = NotionFilesAPI(
             requestHelper: requestHelper,
             logger: logger
         )

@@ -142,6 +142,18 @@ final class GoodLinksNotionAdapter: NotionSyncSourceProtocol {
         
         return children
     }
+
+    // MARK: - NotionSyncSourceProtocol Hooks
+
+    func pageHeaderTitleForNewPage() -> String? {
+        // GoodLinks 页面需要先写入 Article 内容，再写入 Highlights 标题与高亮列表
+        nil
+    }
+
+    func headerContentPresenceHeadingTitle() -> String? {
+        // 用于“无高亮且页面已存在”的补齐判断
+        "Article"
+    }
 }
 
 // MARK: - Factory
@@ -153,7 +165,7 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: GoodLinksURLFetcherProtocol = DIContainer.shared.goodLinksURLFetcher,
+        urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
         htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
         let logger = DIContainer.shared.loggerService

@@ -1,10 +1,10 @@
 import Foundation
 
 /// Notion 数据库操作类
-class NotionDatabaseOperations {
-    private let requestHelper: NotionRequestHelper
+class NotionDatabasesAPI {
+    private let requestHelper: NotionAPIClient
 
-    init(requestHelper: NotionRequestHelper) {
+    init(requestHelper: NotionAPIClient) {
         self.requestHelper = requestHelper
     }
 
