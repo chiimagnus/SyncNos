@@ -30,37 +30,6 @@
 - **数据持久化**: SwiftData
 - **语言版本**: Swift 5.9+ / Swift 6.0+
 
-### 文件结构
-```
-SyncNos/
-├── Models/                    # 数据模型
-│   ├── Core/                  # 核心模型（ContentSource、UnifiedHighlight 等）
-│   ├── DataSourceProviders/   # 数据源 UI 配置协议实现
-│   ├── WeRead/                # WeRead 相关模型
-│   ├── Dedao/                 # Dedao 相关模型
-│   ├── Chats/                 # Chats 相关模型
-│   └── Sync/                  # 同步相关模型
-├── ViewModels/                # 视图模型
-├── Views/                     # 视图
-│   ├── Components/            # 通用组件
-│   ├── Commands/              # 菜单命令
-│   └── Settings/              # 设置界面
-└── Services/                  # 服务层
-    ├── Core/                  # 核心服务（DIContainer、Logger 等）
-    ├── DataSources-From/      # 数据读取服务
-    │   ├── AppleBooks/
-    │   ├── GoodLinks/
-    │   ├── WeRead/
-    │   ├── Dedao/
-    │   ├── Chats/
-    │   └── OCR/
-    ├── DataSources-To/        # 数据写入服务
-    │   └── Notion/
-    └── SyncScheduling/        # 同步调度
-```
-
----
-
 ## MVVM 架构规范
 
 ### 1. Models (数据模型)
