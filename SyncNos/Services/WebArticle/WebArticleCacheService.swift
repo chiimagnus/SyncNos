@@ -41,7 +41,7 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     
     /// 缓存内容版本：当抽取策略升级时，通过版本号触发自动重算（不依赖“过期时间”）。
     private var currentContentVersion: Int {
-        3
+        4
     }
 
     // MARK: - Read
@@ -121,6 +121,26 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     }
 
     // MARK: - Cleanup
+
+    func removeArticle(url: String) throws {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let targetURL = trimmed
+        let predicate = #Predicate<CachedWebArticle> { item in
+            item.url == targetURL
+        }
+        var descriptor = FetchDescriptor<CachedWebArticle>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let existing = try modelContext.fetch(descriptor).first else {
+            return
+        }
+
+        modelContext.delete(existing)
+        try modelContext.save()
+        logger.info("[WebArticleCache] Removed cached article url=\(targetURL)")
+    }
 
     func removeExpiredArticles() throws {
         // 已取消过期机制：文章缓存为持久化存储，不再按时间自动淘汰

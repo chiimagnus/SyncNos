@@ -88,6 +88,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     private let service: GoodLinksDatabaseServiceExposed
     private let urlFetcher: WebArticleFetcherProtocol
+    private let cacheService: WebArticleCacheServiceProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     
@@ -104,11 +105,13 @@ final class GoodLinksDetailViewModel: ObservableObject {
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
         urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
+        cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.service = service
         self.urlFetcher = urlFetcher
+        self.cacheService = cacheService
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         
@@ -334,6 +337,16 @@ final class GoodLinksDetailViewModel: ObservableObject {
             contentLoadState = .error(desc)
             contentFetchTask = nil
         }
+    }
+
+    /// 强制重新抓取全文（用于右键菜单“重新抓取正文”）
+    func refetchContent(for link: GoodLinksLinkRow) async {
+        do {
+            try await cacheService.removeArticle(url: link.url)
+        } catch {
+            logger.warning("[GoodLinksDetail] remove cached article failed url=\(link.url) error=\(error.localizedDescription)")
+        }
+        await loadContent(for: link)
     }
     
     /// 清空当前数据（切换 link 时调用）

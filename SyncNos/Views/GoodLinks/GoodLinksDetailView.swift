@@ -446,6 +446,12 @@ struct GoodLinksDetailView: View {
             htmlContent: detailViewModel.article?.content,
             htmlBaseURL: URL(string: link?.url ?? ""),
             originalPageURL: URL(string: link?.originalURL ?? link?.url ?? ""),
+            onRefetchRequested: { [weak detailViewModel] in
+                guard let link else { return }
+                Task {
+                    await detailViewModel?.refetchContent(for: link)
+                }
+            },
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in

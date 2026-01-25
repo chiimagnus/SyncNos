@@ -12,6 +12,7 @@ struct HTMLWebView: NSViewRepresentable {
     let baseURL: URL?
     let originalPageURL: URL?
     let openLinksInExternalBrowser: Bool
+    let onRefetchRequested: (() -> Void)?
     @Binding var contentHeight: CGFloat
 
     init(
@@ -19,12 +20,14 @@ struct HTMLWebView: NSViewRepresentable {
         baseURL: URL? = nil,
         originalPageURL: URL? = nil,
         openLinksInExternalBrowser: Bool = true,
+        onRefetchRequested: (() -> Void)? = nil,
         contentHeight: Binding<CGFloat>
     ) {
         self.html = html
         self.baseURL = baseURL
         self.originalPageURL = originalPageURL
         self.openLinksInExternalBrowser = openLinksInExternalBrowser
+        self.onRefetchRequested = onRefetchRequested
         self._contentHeight = contentHeight
     }
 
@@ -57,6 +60,7 @@ struct HTMLWebView: NSViewRepresentable {
         let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = false
         if let scrollView = webView.enclosingScrollView {
             scrollView.drawsBackground = false
@@ -79,6 +83,12 @@ struct HTMLWebView: NSViewRepresentable {
             }
         }
         context.coordinator.openLinksInExternalBrowser = openLinksInExternalBrowser
+        if let menuWebView = webView as? PassthroughScrollWKWebView {
+            menuWebView.onRefetchRequested = onRefetchRequested
+            menuWebView.onRefreshRenderRequested = { [weak webView] in
+                webView?.reload()
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -87,7 +97,7 @@ struct HTMLWebView: NSViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         static let heightMessageHandlerName = "syncnosHeight"
         static let imageNormalizationScript = #"""
         (() => {
@@ -344,8 +354,6 @@ struct HTMLWebView: NSViewRepresentable {
         img {
           max-width: 100%;
           height: auto;
-          display: block;
-          margin: 0.6em 0;
         }
 
         iframe, video {
@@ -411,16 +419,6 @@ struct HTMLWebView: NSViewRepresentable {
             border-color: rgba(255, 255, 255, 0.18);
             background: rgba(0, 0, 0, 0.24);
           }
-        }
-
-        figure {
-          margin: 0 0 0.9em 0;
-        }
-
-        figcaption {
-          margin-top: 0.4em;
-          font-size: 12px;
-          opacity: 0.72;
         }
 
         pre {
@@ -759,8 +757,90 @@ struct HTMLWebView: NSViewRepresentable {
 
 /// 让滚轮事件向上传递，避免鼠标悬停在 WebView 上时父级 ScrollView 无法滚动。
 private final class PassthroughScrollWKWebView: WKWebView {
+    // MARK: - Actions
+
+    /// 触发“重新抓取正文”（走 ViewModel 的完整抓取链路）
+    var onRefetchRequested: (() -> Void)?
+    /// 仅刷新当前渲染（不触发抓取/缓存写入）
+    var onRefreshRenderRequested: (() -> Void)?
+
     override func scrollWheel(with event: NSEvent) {
         // 由于我们把 WebView 高度撑到内容高度，内部滚动应尽量禁用，让外层统一滚动。
         nextResponder?.scrollWheel(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+
+        // 避免菜单复用时重复插入自定义项
+        if menu.items.contains(where: { $0.action == #selector(handleRefetchRequested) }) {
+            return menu
+        }
+
+        let refreshItem = findReloadMenuItem(in: menu)
+        if let refreshItem {
+            refreshItem.title = "仅刷新当前渲染"
+        }
+
+        let refetchItem = NSMenuItem(
+            title: "重新抓取正文",
+            action: #selector(handleRefetchRequested),
+            keyEquivalent: ""
+        )
+        refetchItem.target = self
+        refetchItem.isEnabled = onRefetchRequested != nil
+
+        if let refreshItem, let idx = menu.items.firstIndex(of: refreshItem) {
+            menu.insertItem(refetchItem, at: idx)
+            menu.insertItem(.separator(), at: idx + 1)
+        } else {
+            // 未能识别出“重新载入”项：提供一个明确的“仅刷新当前渲染”
+            let refreshOnly = NSMenuItem(
+                title: "仅刷新当前渲染",
+                action: #selector(handleRefreshRenderRequested),
+                keyEquivalent: ""
+            )
+            refreshOnly.target = self
+            refreshOnly.isEnabled = true
+
+            menu.insertItem(refetchItem, at: 0)
+            menu.insertItem(refreshOnly, at: 1)
+            menu.insertItem(.separator(), at: 2)
+        }
+
+        return menu
+    }
+
+    // MARK: - Menu Handlers
+
+    @objc private func handleRefetchRequested() {
+        onRefetchRequested?()
+    }
+
+    @objc private func handleRefreshRenderRequested() {
+        if let onRefreshRenderRequested {
+            onRefreshRenderRequested()
+        } else {
+            reload()
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func findReloadMenuItem(in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            if let submenu = item.submenu,
+               let found = findReloadMenuItem(in: submenu) {
+                return found
+            }
+
+            guard let action = item.action else { continue }
+            let name = NSStringFromSelector(action)
+            // WebKit 可能使用内部 selector；这里尽量稳妥地匹配 reload 语义
+            if name == "reload:" || name == "reload" || name.lowercased().contains("reload") {
+                return item
+            }
+        }
+        return nil
     }
 }

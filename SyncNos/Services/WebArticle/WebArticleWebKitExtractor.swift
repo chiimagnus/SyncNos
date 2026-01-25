@@ -266,14 +266,36 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
             // video_iframe 常依赖外部 CSS/JS 设置尺寸，这里给一个可见的默认尺寸
             if (el.classList && el.classList.contains('video_iframe')) {
               const ratio = parseFloat(el.getAttribute('data-ratio') || '');
-              el.style.width = '100%';
-              if (ratio && ratio > 0) {
-                el.style.aspectRatio = ratio.toString() + ' / 1';
-              } else {
-                el.style.aspectRatio = '16 / 9';
+              if (!el.getAttribute('width') && !el.style.width) {
+                el.style.width = '100%';
               }
-              if (!el.style.minHeight) el.style.minHeight = '240px';
+              if (!el.style.aspectRatio) {
+                if (ratio && ratio > 0) {
+                  el.style.aspectRatio = ratio.toString() + ' / 1';
+                } else {
+                  el.style.aspectRatio = '16 / 9';
+                }
+              }
+              const heightAttr = el.getAttribute('height') || '';
+              if (!String(heightAttr).trim() && !el.style.minHeight) {
+                el.style.minHeight = '240px';
+              }
             }
+          });
+          
+          // 兜底：把 video/source 的 data-src 提升为 src（部分站点/公众号会懒加载）
+          clone.querySelectorAll('video').forEach(el => {
+            const src = el.getAttribute('src') || '';
+            const dataSrc = el.getAttribute('data-src') || el.getAttribute('data-url') || '';
+            const normalizedSrc = (src && String(src).trim()) ? toAbs(src) : (dataSrc ? toAbs(dataSrc) : '');
+            if (normalizedSrc) el.setAttribute('src', normalizedSrc);
+
+            el.querySelectorAll('source').forEach(s => {
+              const sSrc = s.getAttribute('src') || '';
+              const sData = s.getAttribute('data-src') || s.getAttribute('data-url') || '';
+              const sNormalized = (sSrc && String(sSrc).trim()) ? toAbs(sSrc) : (sData ? toAbs(sData) : '');
+              if (sNormalized) s.setAttribute('src', sNormalized);
+            });
           });
           
           // 微信自定义标签：mp-video 通常需要 JS 才会渲染，尽量转换为 iframe（若有可用地址）
@@ -284,13 +306,19 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
             iframe.setAttribute('src', toAbs(src));
             iframe.setAttribute('frameborder', '0');
             iframe.setAttribute('allowfullscreen', 'true');
-            iframe.style.width = '100%';
-            iframe.style.aspectRatio = '16 / 9';
-            iframe.style.minHeight = '240px';
+            
+            const rawCover = el.getAttribute('data-cover') || el.getAttribute('poster') || el.getAttribute('data-poster') || '';
+            if (rawCover && String(rawCover).trim()) {
+              iframe.setAttribute('data-cover', toAbs(rawCover));
+            }
+            
+            if (!iframe.style.width) iframe.style.width = '100%';
+            if (!iframe.style.aspectRatio) iframe.style.aspectRatio = '16 / 9';
+            if (!iframe.style.minHeight) iframe.style.minHeight = '240px';
             el.replaceWith(iframe);
           });
           
-          // 微信常见视频卡片：mp-common-videosnap（提供可播放 URL/cover）
+          // 微信常见视频卡片：mp-common-videosnap（通常给出可嵌入的播放 URL/cover）
           clone.querySelectorAll('mp-common-videosnap').forEach(el => {
             const rawUrl = el.getAttribute('data-url') || el.getAttribute('data-src') || '';
             if (!rawUrl) return;
@@ -300,15 +328,15 @@ final class WebArticleWebKitExtractor: NSObject, WebArticleWebKitExtractorProtoc
             try { if (cover.includes('%')) cover = decodeURIComponent(cover); } catch (e) {}
             if (cover) cover = toAbs(cover);
             
-            const video = document.createElement('video');
-            video.setAttribute('controls', '');
-            video.setAttribute('preload', 'metadata');
-            video.style.width = '100%';
-            video.style.aspectRatio = '16 / 9';
-            video.style.minHeight = '240px';
-            if (cover) video.setAttribute('poster', cover);
-            video.setAttribute('src', url);
-            el.replaceWith(video);
+            const iframe = document.createElement('iframe');
+            iframe.setAttribute('src', url);
+            iframe.setAttribute('frameborder', '0');
+            iframe.setAttribute('allowfullscreen', 'true');
+            if (cover) iframe.setAttribute('data-cover', cover);
+            if (!iframe.style.width) iframe.style.width = '100%';
+            if (!iframe.style.aspectRatio) iframe.style.aspectRatio = '16 / 9';
+            if (!iframe.style.minHeight) iframe.style.minHeight = '240px';
+            el.replaceWith(iframe);
           });
 
           const html = '<html><body>' + (clone.outerHTML || '') + '</body></html>';
