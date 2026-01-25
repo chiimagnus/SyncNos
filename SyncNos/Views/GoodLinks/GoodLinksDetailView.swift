@@ -423,13 +423,15 @@ struct GoodLinksDetailView: View {
             return .loadingFull
             
         case .loaded:
-            if let result = detailViewModel.article,
-               !result.textContent.isEmpty {
-                return .loaded(content: result.textContent, wordCount: result.wordCount)
-            } else {
-                // 已加载但无内容
-                return .empty
+            if let result = detailViewModel.article {
+                let hasText = !result.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let hasHTML = !result.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if hasText || hasHTML {
+                    return .loaded(content: result.textContent, wordCount: result.wordCount)
+                }
             }
+            // 已加载但无内容
+            return .empty
             
         case .error(let message):
             return .error(message: message)
