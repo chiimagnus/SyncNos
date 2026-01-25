@@ -19,7 +19,9 @@
 				AGENTS.md,
 				Info.plist,
 				Services/AGENTS.md,
+				Services/Core/AGENTS.md,
 				"Services/DataSources-To/Notion/Config/NotionConfig.swift.example",
+				"Services/WebArticle/ThirdParty/Readability/UPSTREAM-README.md",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
