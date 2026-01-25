@@ -6,18 +6,12 @@ import Combine
 /// 全文内容加载状态
 enum ContentLoadState: Equatable {
     case notLoaded                      // 未加载（默认状态）
-    case preview(String, Int)           // 预览状态（预览内容, wordCount）
     case loadingFull                    // 正在加载完整内容
     case loaded                         // 已加载完整内容
     case error(String)                  // 加载失败
     
     var isError: Bool {
         if case .error = self { return true }
-        return false
-    }
-    
-    var isPreview: Bool {
-        if case .preview = self { return true }
         return false
     }
 }
@@ -52,7 +46,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
     /// 当前 link 的全文内容
     @Published var article: ArticleFetchResult?
     
-    /// 全文内容加载状态（用于按需加载/卸载）
+    /// 全文内容加载状态
     @Published var contentLoadState: ContentLoadState = .notLoaded
     
     /// 分页后的可见高亮
@@ -288,89 +282,22 @@ final class GoodLinksDetailViewModel: ObservableObject {
         }
     }
     
-    // MARK: - 预览与完整内容加载
+    // MARK: - 全文内容加载
     
-    /// 预览长度（字符数）
-    private let previewLength: Int = 300
-    
-    /// 缓存的预览内容（折叠时恢复使用）
-    private var cachedPreview: (content: String, wordCount: Int)?
-    
-    /// 加载预览内容（在 Detail 打开时调用）
-    func loadContentPreview(for link: GoodLinksLinkRow) async {
+    /// 加载完整全文内容（进入详情时调用）
+    func loadContent(for link: GoodLinksLinkRow) async {
         let linkId = link.id
-        
-        // 取消上一次全文加载（预览加载也复用同一个 task，便于统一取消）
-        contentFetchTask?.cancel()
-        contentFetchTask = nil
-        
-        // 初始状态：显示 loading（与 ArticleContentCardView notLoaded 一致）
-        if contentLoadState == .notLoaded {
-            contentLoadState = .notLoaded
-        }
-        
-        do {
-            let task = Task { [urlFetcher, logger] () async throws -> ArticleFetchResult? in
-                logger.debug("[GoodLinksDetail] 开始从 URL 加载预览内容，linkId=\(linkId), url=\(link.url)")
-                do {
-                    return try await urlFetcher.fetchArticle(url: link.url)
-                } catch URLFetchError.contentNotFound {
-                    return nil
-                }
-            }
-            contentFetchTask = task
-            
-            let result = try await withTaskCancellationHandler {
-                try await task.value
-            } onCancel: {
-                task.cancel()
-            }
-            
-            guard !Task.isCancelled, currentLinkId == linkId else { return }
-            
-            if let result, !result.textContent.isEmpty {
-                article = result
-                let text = result.textContent
-                let previewText = text.count > previewLength ? String(text.prefix(previewLength)) + "..." : text
-                cachedPreview = (previewText, result.wordCount)
-                contentLoadState = .preview(previewText, result.wordCount)
-                logger.debug("[GoodLinksDetail] 加载到预览内容，linkId=\(linkId), wordCount=\(result.wordCount)")
-            } else {
-                contentLoadState = .loaded
-                logger.debug("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
-            }
-            
-            contentFetchTask = nil
-        } catch {
-            let desc = error.localizedDescription
-            logger.error("[GoodLinksDetail] loadContentPreview error: \(desc)")
-            guard !Task.isCancelled, currentLinkId == linkId else { return }
-            contentLoadState = .error(desc)
-            contentFetchTask = nil
-        }
-    }
-    
-    /// 加载完整全文内容（展开时调用）
-    private func loadFullContent(for link: GoodLinksLinkRow) async {
-        let linkId = link.id
-        let cachedArticle = article
+        currentLinkId = linkId
         
         // 取消上一次全文加载
         contentFetchTask?.cancel()
         contentFetchTask = nil
-        
-        // 更新加载状态
+        article = nil
         contentLoadState = .loadingFull
         
         do {
-            let task = Task { [cachedArticle, urlFetcher, logger] () async throws -> ArticleFetchResult? in
-                logger.info("[GoodLinksDetail] 开始从 URL 加载完整全文内容，linkId=\(linkId), url=\(link.url)")
-                
-                // 若预览阶段已抓取过 result，优先复用，避免重复请求
-                if let existing = cachedArticle, !existing.textContent.isEmpty {
-                    return existing
-                }
-                
+            let task = Task { [urlFetcher, logger] () async throws -> ArticleFetchResult? in
+                logger.info("[GoodLinksDetail] 开始从 URL 加载全文内容，linkId=\(linkId), url=\(link.url)")
                 do {
                     return try await urlFetcher.fetchArticle(url: link.url)
                 } catch URLFetchError.contentNotFound {
@@ -391,53 +318,19 @@ final class GoodLinksDetailViewModel: ObservableObject {
             article = result
             contentLoadState = .loaded
             
-            if let c = result {
-                logger.info("[GoodLinksDetail] 加载到完整全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
+            if let c = result, !c.textContent.isEmpty {
+                logger.info("[GoodLinksDetail] 加载到全文内容，linkId=\(linkId), wordCount=\(c.wordCount)")
             } else {
                 logger.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
             contentFetchTask = nil
         } catch {
             let desc = error.localizedDescription
-            logger.error("[GoodLinksDetail] loadFullContent error: \(desc)")
+            logger.error("[GoodLinksDetail] loadContent error: \(desc)")
             // 如果已经切换 link 或任务被取消，不提示错误
             guard !Task.isCancelled, currentLinkId == linkId else { return }
             contentLoadState = .error(desc)
             contentFetchTask = nil
-        }
-    }
-    
-    // MARK: - 按需加载/卸载全文
-    
-    /// 按需加载完整全文（仅在展开时调用）
-    func loadContentOnDemand(for link: GoodLinksLinkRow) async {
-        // 只有在预览状态或错误状态时才加载完整内容
-        switch contentLoadState {
-        case .preview, .error:
-            await loadFullContent(for: link)
-        case .notLoaded:
-            // 如果没有预览，先加载预览再加载完整内容
-            await loadContentPreview(for: link)
-            await loadFullContent(for: link)
-        case .loadingFull, .loaded:
-            // 已经在加载或已加载，不重复操作
-            break
-        }
-    }
-    
-    /// 卸载完整全文内容，恢复预览状态以释放内存
-    func unloadContent() {
-        contentFetchTask?.cancel()
-        contentFetchTask = nil
-        article = nil  // 释放完整内容的大字符串
-        
-        // 恢复到预览状态（保留预览内容，不需要重新加载）
-        if let cached = cachedPreview {
-            contentLoadState = .preview(cached.content, cached.wordCount)
-            logger.debug("[GoodLinksDetail] 已卸载完整内容，恢复预览状态")
-        } else {
-            contentLoadState = .notLoaded
-            logger.debug("[GoodLinksDetail] 已卸载全文内容，无预览缓存")
         }
     }
     
@@ -450,7 +343,6 @@ final class GoodLinksDetailViewModel: ObservableObject {
         currentLinkId = nil
         highlights.removeAll(keepingCapacity: false)
         article = nil
-        cachedPreview = nil  // 清除预览缓存
         contentLoadState = .notLoaded
         visibleHighlights.removeAll(keepingCapacity: false)
         allFilteredHighlights.removeAll(keepingCapacity: false)

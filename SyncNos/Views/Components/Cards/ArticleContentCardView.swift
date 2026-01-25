@@ -4,10 +4,8 @@ import SwiftUI
 
 /// 文章内容加载状态（驱动 ArticleContentCardView 渲染）
 enum ArticleLoadState: Equatable {
-    /// 未加载（初始状态，预览自动加载中）
+    /// 未加载（初始状态）
     case notLoaded
-    /// 预览状态（显示前 N 个字符，等待用户展开加载完整内容）
-    case preview(content: String, wordCount: Int)
     /// 正在加载完整内容
     case loadingFull
     /// 已加载完整内容
@@ -22,10 +20,6 @@ enum ArticleLoadState: Equatable {
         return false
     }
     
-    var isPreview: Bool {
-        if case .preview = self { return true }
-        return false
-    }
 }
 
 // MARK: - Article Content Card View
@@ -33,10 +27,9 @@ enum ArticleLoadState: Equatable {
 /// 展示文章全文的内容卡片（状态驱动）。
 /// 
 /// 支持以下状态：
-/// - `notLoaded`: 初始状态，显示加载指示器（预览自动加载）
-/// - `preview`: 预览状态，显示前 N 个字符 + Expand 按钮
+/// - `notLoaded`: 初始状态，显示加载指示器
 /// - `loadingFull`: 加载完整内容中
-/// - `loaded`: 已加载完整内容 + Collapse 按钮
+/// - `loaded`: 已加载完整内容
 /// - `empty`: 无内容
 /// - `error`: 加载失败，显示错误信息和重试按钮
 struct ArticleContentCardView: View {
@@ -45,23 +38,17 @@ struct ArticleContentCardView: View {
     /// 加载状态
     let loadState: ArticleLoadState
 
-    /// 可选：用于富文本渲染的 HTML（展开时优先使用）
+    /// 可选：用于富文本渲染的 HTML（有内容时优先使用）
     let htmlContent: String?
 
     /// HTML baseURL（用于相对链接/图片）
     let htmlBaseURL: URL?
-    
-    /// 父组件控制的展开状态（双向绑定）
-    @Binding var isExpanded: Bool
     
     /// 可选：覆盖宽度（用于 live resize 冻结）
     let overrideWidth: CGFloat?
     
     /// 输出当前测量宽度
     @Binding var measuredWidth: CGFloat
-    
-    /// 折叠时显示的行数
-    let collapsedLineLimit: Int
     
     /// 重试回调（仅 error 状态使用）
     let onRetry: (() async -> Void)?
@@ -74,19 +61,15 @@ struct ArticleContentCardView: View {
         loadState: ArticleLoadState,
         htmlContent: String? = nil,
         htmlBaseURL: URL? = nil,
-        isExpanded: Binding<Bool>,
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
-        collapsedLineLimit: Int = 12,
         onRetry: (() async -> Void)? = nil
     ) {
         self.loadState = loadState
         self.htmlContent = htmlContent
         self.htmlBaseURL = htmlBaseURL
-        self._isExpanded = isExpanded
         self.overrideWidth = overrideWidth
         self._measuredWidth = measuredWidth
-        self.collapsedLineLimit = collapsedLineLimit
         self.onRetry = onRetry
     }
     
@@ -94,10 +77,7 @@ struct ArticleContentCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header (包含展开/折叠按钮)
             headerSection
-            
-            // Content (根据状态渲染)
             contentSection
         }
         .overlay(widthMeasurer)
@@ -121,11 +101,6 @@ struct ArticleContentCardView: View {
                 .foregroundColor(.secondary)
             
             Spacer()
-            
-            // 展开/折叠按钮（放在标题栏右侧）
-            if shouldShowToggle {
-                toggleButton
-            }
         }
         .padding(.bottom, 4)
     }
@@ -138,9 +113,6 @@ struct ArticleContentCardView: View {
             switch loadState {
             case .notLoaded:
                 notLoadedContent
-                
-            case .preview(let content, _):
-                previewContent(content)
                 
             case .loadingFull:
                 loadingFullContent
@@ -165,7 +137,7 @@ struct ArticleContentCardView: View {
     
     // MARK: - State-specific Content Views
     
-    /// 加载中状态（预览自动加载）
+    /// 加载中状态
     private var notLoadedContent: some View {
         HStack(spacing: 8) {
             ProgressView()
@@ -175,15 +147,6 @@ struct ArticleContentCardView: View {
                 .foregroundColor(.secondary)
         }
         .fixedSize(horizontal: false, vertical: true)
-    }
-    
-    /// 预览状态：显示预览内容，提示用户展开查看完整内容
-    private func previewContent(_ content: String) -> some View {
-        Text(content)
-            .scaledFont(.body)
-            .foregroundColor(.primary)
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
     }
     
     /// 正在加载完整内容
@@ -202,8 +165,7 @@ struct ArticleContentCardView: View {
     
     private func loadedContent(_ content: String) -> some View {
         Group {
-            if isExpanded,
-               let htmlContent,
+            if let htmlContent,
                !htmlContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 HTMLWebView(
                     html: htmlContent,
@@ -217,8 +179,7 @@ struct ArticleContentCardView: View {
                     .scaledFont(.body)
                     .foregroundColor(.primary)
                     .textSelection(.enabled)
-                    .lineLimit(isExpanded ? nil : collapsedLineLimit)
-                    .fixedSize(horizontal: false, vertical: isExpanded)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -259,20 +220,6 @@ struct ArticleContentCardView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
     
-    // MARK: - Toggle Button
-    
-    private var toggleButton: some View {
-        Button(action: { isExpanded.toggle() }) {
-            HStack(spacing: 6) {
-                Text(isExpanded ? "Collapse" : "Expand")
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .imageScale(.small)
-            }
-            .scaledFont(.caption)
-        }
-        .buttonStyle(.link)
-    }
-    
     // MARK: - Width Measurer
     
     private var widthMeasurer: some View {
@@ -290,33 +237,11 @@ struct ArticleContentCardView: View {
     
     private var wordCount: Int {
         switch loadState {
-        case .preview(_, let count), .loaded(_, let count):
+        case .loaded(_, let count):
             return count
         default:
             return 0
         }
     }
     
-    private var shouldShowToggle: Bool {
-        switch loadState {
-        case .notLoaded:
-            // 未加载时不显示按钮
-            return false
-        case .preview:
-            // 预览时显示 Expand 按钮
-            return true
-        case .loadingFull:
-            // 加载完整内容中显示 Collapse 按钮
-            return true
-        case .loaded(let content, _):
-            // 已加载完整内容时显示 Collapse 按钮（内容足够长时）
-            return content.count > 200
-        case .empty:
-            // 空内容时不显示按钮（没有内容可以展开/折叠）
-            return false
-        case .error:
-            // 错误时不显示按钮
-            return false
-        }
-    }
 }
