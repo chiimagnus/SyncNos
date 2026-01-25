@@ -43,6 +43,12 @@ struct ArticleContentCardView: View {
 
     /// HTML baseURL（用于相对链接/图片）
     let htmlBaseURL: URL?
+
+    /// 原网页 URL（用于视频等不稳定内容的“打开原网页观看”兜底）
+    let originalPageURL: URL?
+
+    /// 触发“重新抓取正文”（走完整抓取链路）
+    let onRefetchRequested: (() -> Void)?
     
     /// 可选：覆盖宽度（用于 live resize 冻结）
     let overrideWidth: CGFloat?
@@ -61,6 +67,8 @@ struct ArticleContentCardView: View {
         loadState: ArticleLoadState,
         htmlContent: String? = nil,
         htmlBaseURL: URL? = nil,
+        originalPageURL: URL? = nil,
+        onRefetchRequested: (() -> Void)? = nil,
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
         onRetry: (() async -> Void)? = nil
@@ -68,6 +76,8 @@ struct ArticleContentCardView: View {
         self.loadState = loadState
         self.htmlContent = htmlContent
         self.htmlBaseURL = htmlBaseURL
+        self.originalPageURL = originalPageURL
+        self.onRefetchRequested = onRefetchRequested
         self.overrideWidth = overrideWidth
         self._measuredWidth = measuredWidth
         self.onRetry = onRetry
@@ -170,7 +180,9 @@ struct ArticleContentCardView: View {
                 HTMLWebView(
                     html: htmlContent,
                     baseURL: htmlBaseURL,
+                    originalPageURL: originalPageURL,
                     openLinksInExternalBrowser: true,
+                    onRefetchRequested: onRefetchRequested,
                     contentHeight: $htmlContentHeight
                 )
                 .frame(height: max(320, htmlContentHeight))
