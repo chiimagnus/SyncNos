@@ -155,7 +155,7 @@ struct NotionSyncContext {
     let notionConfig: NotionConfigStoreProtocol
     
     /// Notion 服务
-    let notionService: NotionServiceProtocol
+    let notionService: NotionClientProtocol
     
     /// 日志服务
     let logger: LoggerServiceProtocol

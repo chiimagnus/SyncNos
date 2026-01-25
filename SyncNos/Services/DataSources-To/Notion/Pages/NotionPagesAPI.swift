@@ -1,11 +1,11 @@
 import Foundation
 
 /// Notion 页面操作类
-class NotionPageOperations {
-    private let requestHelper: NotionRequestHelper
+class NotionPagesAPI {
+    private let requestHelper: NotionAPIClient
     private let helperMethods: NotionHelperMethods
 
-    init(requestHelper: NotionRequestHelper, helperMethods: NotionHelperMethods) {
+    init(requestHelper: NotionAPIClient, helperMethods: NotionHelperMethods) {
         self.requestHelper = requestHelper
         self.helperMethods = helperMethods
     }

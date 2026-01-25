@@ -1,7 +1,7 @@
 import Foundation
 
 /// Notion API 网络请求辅助方法
-class NotionRequestHelper {
+class NotionAPIClient {
     private let configStore: NotionConfigStoreProtocol
     private let apiBase: URL
     private let notionVersion: String
