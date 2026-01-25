@@ -57,8 +57,9 @@
 `WebArticleFetcher.fetchArticle(url:)` 的流程：
 
 1. **缓存命中**：若缓存存在，直接返回缓存结果
-2. **带 cookie 抓取**：若站点需要登录，尝试带 cookie 的请求
-3. **普通抓取**：否则使用普通 HTTP 请求
+2. **离屏 WebKit 渲染**：使用离屏 `WKWebView` 加载目标 URL（支持 SPA / 动态注入）
+3. **DOM 稳定性等待**：`didFinish` 后继续采样文本长度/节点数，尽量等到正文稳定再抽取
+4. **DOM 抽取**：优先 `#js_content`（公众号）→ `<article>` → `<main>` → `<body>`，克隆并导出最小 HTML
 
 缓存逻辑：
 - `WebArticleCacheService`（持久化存储，不做过期淘汰）
@@ -66,13 +67,14 @@
 相关文件：
 - SyncNos/Services/WebArticle/WebArticleFetcher.swift
 - SyncNos/Services/WebArticle/WebArticleCacheService.swift
+- SyncNos/Services/WebArticle/WebArticleWebKitExtractor.swift
 
 ### 4.2 正文提取策略
-提取逻辑由 `parseArticleFromHTMLData()` 实现：
+提取逻辑由 `WebArticleWebKitExtractor` 实现：
 
-1. 清理脚本与样式（`sanitizeHTML`）
-2. **优先提取正文容器**：`<article>` → `<main>` → `<body>`
-3. 若都不存在，退化为清理后的整页 HTML
+1. 页面渲染后，从 DOM 中选择“最可能是正文”的根节点（公众号优先 `#js_content`）
+2. 克隆正文子树并移除脚本/样式等噪声节点
+3. 同时导出 `content`（HTML）与 `textContent`（纯文本）
 
 最终得到：
 - `content` = 提取后的 HTML 片段
@@ -81,7 +83,7 @@
 相关文件：
 - SyncNos/Services/WebArticle/WebArticleFetcher.swift
 
-> 结论：`content` 不是原始 HTML，而是经过“轻量正文提取”的 HTML 片段。
+> 结论：`content` 不是原始 HTML，而是从“渲染后的 DOM”抽取的正文 HTML 片段。
 
 ## 5. Notion 同步流程（GoodLinks）
 
@@ -252,42 +254,18 @@ private func loadedContent() -> some View {
 - [SyncNos/Services/WebArticle/WebArticleFetcher.swift](../../SyncNos/Services/WebArticle/WebArticleFetcher.swift)
 
 ```swift
-private func extractMainContent(from html: String) -> String {
-    // 优先使用语义容器，尽量不要返回整页
-    if let article = extractTagBlock(html, tagName: "article") { return article }
-    if let main = extractTagBlock(html, tagName: "main") { return main }
-    if let body = extractTagBlock(html, tagName: "body") { return body }
-    return html
-}
-
-private func parseArticleFromHTMLData(_ data: Data, source: FetchSource) throws -> ArticleFetchResult {
-    guard let html = decodeHTML(data) else {
-        throw URLFetchError.decodingFailed
-    }
-
-    let cleaned = sanitizeHTML(html)
-    let title = extractTitle(from: cleaned)
-    let author = extractAuthor(from: cleaned)
-    let mainHTML = extractMainContent(from: cleaned)
-
-    guard !mainHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        throw URLFetchError.contentNotFound
-    }
-
-    let text = htmlToPlainText(mainHTML).trimmingCharacters(in: .whitespacesAndNewlines)
-    let wordCount = countWords(in: text)
-
-    return ArticleFetchResult(
-        title: title,
-        content: mainHTML,
-        textContent: text,
-        author: author,
-        publishedDate: nil,
-        wordCount: wordCount,
-        fetchedAt: Date(),
-        source: source
-    )
-}
+// 统一使用离屏 WKWebView 渲染后抽取正文（支持 SPA）
+let extracted = try await extractor.extractArticle(url: targetURL, cookieHeader: headerFromStore)
+let result = ArticleFetchResult(
+    title: extracted.title,
+    content: extracted.contentHTML,
+    textContent: extracted.textContent,
+    author: extracted.author,
+    publishedDate: nil,
+    wordCount: countWords(in: extracted.textContent),
+    fetchedAt: Date(),
+    source: source
+)
 ```
 
 ### 9.5 Notion 预加载与 HTML → Blocks（GoodLinksNotionAdapter）
