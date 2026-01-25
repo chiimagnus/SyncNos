@@ -19,7 +19,6 @@ class DIContainer {
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
-    private var _authService: AuthServiceProtocol?
     private var _syncActivityMonitor: SyncActivityMonitorProtocol?
     private var _syncQueueStore: SyncQueueStoreProtocol?
     private var _syncRunningTaskStore: SyncRunningTaskStore?
@@ -142,13 +141,6 @@ class DIContainer {
             _syncTimestampStore = SyncTimestampStore.shared
         }
         return _syncTimestampStore!
-    }
-
-    var authService: AuthServiceProtocol {
-        if _authService == nil {
-            _authService = AuthService()
-        }
-        return _authService!
     }
 
     var syncActivityMonitor: SyncActivityMonitorProtocol {
@@ -370,10 +362,6 @@ class DIContainer {
 
     func register(syncTimestampStore: SyncTimestampStoreProtocol) {
         self._syncTimestampStore = syncTimestampStore
-    }
-
-    func register(authService: AuthServiceProtocol) {
-        self._authService = authService
     }
 
     func register(syncActivityMonitor: SyncActivityMonitorProtocol) {
