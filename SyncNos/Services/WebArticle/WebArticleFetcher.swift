@@ -403,20 +403,13 @@ final class WebArticleFetcher: WebArticleFetcherProtocol {
         let aggregateLogEvery: Int
 
         static func load(userDefaults: UserDefaults) -> Config {
-            let enableCache = (userDefaults.object(forKey: DefaultsKeys.enableCache) as? Bool) ?? true
-            let enableCookieAuth = (userDefaults.object(forKey: DefaultsKeys.enableCookieAuth) as? Bool) ?? true
-            let enableRetry = (userDefaults.object(forKey: DefaultsKeys.enableRetry) as? Bool) ?? true
-
-            let maxRetries = clamp(
-                Int(userDefaults.object(forKey: DefaultsKeys.maxRetries) as? Int ?? 2),
-                min: 0,
-                max: 10
-            )
-
-            let initialBackoffSeconds = max(0.1, userDefaults.object(forKey: DefaultsKeys.initialBackoffSeconds) as? Double ?? 1.0)
-            let maxBackoffSeconds = max(initialBackoffSeconds, userDefaults.object(forKey: DefaultsKeys.maxBackoffSeconds) as? Double ?? 8.0)
-            let aggregateLogEvery = max(1, userDefaults.object(forKey: DefaultsKeys.aggregateLogEvery) as? Int ?? 20)
-
+            let enableCache = true
+            let enableCookieAuth = true
+            let enableRetry = true
+            let maxRetries = 2
+            let initialBackoffSeconds = 1.0
+            let maxBackoffSeconds = 8.0
+            let aggregateLogEvery = 20
             return Config(
                 enableCache: enableCache,
                 enableCookieAuth: enableCookieAuth,
@@ -428,9 +421,6 @@ final class WebArticleFetcher: WebArticleFetcherProtocol {
             )
         }
 
-        private static func clamp(_ value: Int, min: Int, max: Int) -> Int {
-            Swift.max(min, Swift.min(max, value))
-        }
     }
 
     enum DefaultsKeys {
@@ -549,4 +539,3 @@ final class WebArticleFetcher: WebArticleFetcherProtocol {
 
     private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)"
 }
-
