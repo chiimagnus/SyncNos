@@ -38,6 +38,11 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
     private var logger: LoggerServiceProtocol {
         DIContainer.shared.loggerService
     }
+    
+    /// 缓存内容版本：当抽取策略升级时，通过版本号触发自动重算（不依赖“过期时间”）。
+    private var currentContentVersion: Int {
+        3
+    }
 
     // MARK: - Read
 
@@ -53,6 +58,12 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
         descriptor.fetchLimit = 1
 
         guard let cached = try modelContext.fetch(descriptor).first else {
+            return nil
+        }
+        
+        // 抽取算法升级：旧缓存自动视为未命中，由上层重新抓取并覆盖。
+        if cached.contentVersion != currentContentVersion {
+            logger.debug("[WebArticleCache] Cache version mismatch, miss url=\(targetURL) cached=\(cached.contentVersion) current=\(currentContentVersion)")
             return nil
         }
 
@@ -89,6 +100,7 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
             existing.wordCount = result.wordCount
             existing.fetchedAt = result.fetchedAt
             existing.cachedAt = Date()
+            existing.contentVersion = currentContentVersion
         } else {
             let newItem = CachedWebArticle(
                 url: targetURL,
@@ -98,7 +110,8 @@ actor WebArticleCacheService: WebArticleCacheServiceProtocol {
                 textContent: result.textContent,
                 wordCount: result.wordCount,
                 fetchedAt: result.fetchedAt,
-                cachedAt: Date()
+                cachedAt: Date(),
+                contentVersion: currentContentVersion
             )
             modelContext.insert(newItem)
         }
