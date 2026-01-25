@@ -117,8 +117,8 @@ struct ArticleContentCardView: View {
             case .loadingFull:
                 loadingFullContent
                 
-            case .loaded(let content, _):
-                loadedContent(content)
+            case .loaded:
+                loadedContent()
                 
             case .empty:
                 emptyContent
@@ -163,7 +163,7 @@ struct ArticleContentCardView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
     
-    private func loadedContent(_ content: String) -> some View {
+    private func loadedContent() -> some View {
         Group {
             if let htmlContent,
                !htmlContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -175,11 +175,7 @@ struct ArticleContentCardView: View {
                 )
                 .frame(height: max(320, htmlContentHeight))
             } else {
-                Text(content)
-                    .scaledFont(.body)
-                    .foregroundColor(.primary)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                emptyContent
             }
         }
     }
