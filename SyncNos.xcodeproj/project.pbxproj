@@ -33,7 +33,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				.env,
-				architecture.svg,
 				image.png,
 				SyncNos.storekit,
 			);
