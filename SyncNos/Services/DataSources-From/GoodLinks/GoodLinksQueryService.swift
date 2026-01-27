@@ -109,4 +109,44 @@ final class GoodLinksQueryService: Sendable {
         }
         return rows
     }
+
+    // MARK: - Search (Global)
+
+    func searchHighlights(db: OpaquePointer, query: String, limit: Int) throws -> [GoodLinksHighlightRow] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, limit > 0 else { return [] }
+
+        let sql = "SELECT id, linkID, content, color, note, time FROM highlight WHERE (content LIKE ? OR note LIKE ?) ORDER BY time DESC LIMIT ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            let errCString = sqlite3_errmsg(db)
+            let errMsg = errCString != nil ? String(cString: errCString!) : "unknown sqlite3 error"
+            throw NSError(domain: "SyncNos.GoodLinks", code: 1105, userInfo: [NSLocalizedDescriptionKey: "prepare search highlights failed: \(errMsg)"])
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        let like = "%\(trimmed)%" as NSString
+        sqlite3_bind_text(stmt, 1, like.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 2, like.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_int64(stmt, 3, Int64(limit))
+
+        var rows: [GoodLinksHighlightRow] = []
+        rows.reserveCapacity(min(limit, 64))
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let c0 = sqlite3_column_text(stmt, 0),
+                  let c1 = sqlite3_column_text(stmt, 1),
+                  let c2 = sqlite3_column_text(stmt, 2) else { continue }
+            let id = String(cString: c0)
+            let linkId = String(cString: c1)
+            let content = String(cString: c2)
+            let color: Int? = sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 3))
+            let note = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
+            let time = sqlite3_column_double(stmt, 5)
+            rows.append(GoodLinksHighlightRow(id: id, linkId: linkId, content: content, color: color, note: note, time: time))
+        }
+
+        logger.debug("[GoodLinksSearch] matched highlights=\(rows.count)")
+        return rows
+    }
 }

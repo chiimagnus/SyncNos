@@ -27,6 +27,10 @@ final class GoodLinksReadOnlySession: GoodLinksReadOnlySessionProtocol {
         try query.fetchHighlightsForLink(db: db, linkId: linkId, limit: limit, offset: offset)
     }
 
+    func searchHighlights(query: String, limit: Int) throws -> [GoodLinksHighlightRow] {
+        try self.query.searchHighlights(db: db, query: query, limit: limit)
+    }
+
     func fetchHighlightCountsByLink() throws -> [GoodLinksLinkHighlightCount] {
         try query.fetchHighlightCountsByLink(db: db)
     }

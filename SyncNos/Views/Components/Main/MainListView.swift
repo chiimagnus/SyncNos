@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 键盘导航目标：当前焦点在 List 还是 Detail
 enum KeyboardNavigationTarget {
@@ -49,6 +50,12 @@ struct MainListView: View {
     @State var mainWindow: NSWindow?
     /// 键盘事件监听器
     @State var keyDownMonitor: Any?
+
+    // MARK: - Global Search
+
+    @State private var isGlobalSearchPresented: Bool = false
+    /// 详情定位目标（P4 接入各 DetailView）
+    @State private var pendingDetailScrollTarget: DetailScrollTarget?
     
     // MARK: - App Storage
     
@@ -103,6 +110,17 @@ struct MainListView: View {
     var body: some View {
         mainContent
             .background(WindowReader(window: $mainWindow))
+            .overlay {
+                if isGlobalSearchPresented {
+                    GlobalSearchPanelView(
+                        isPresented: $isGlobalSearchPresented,
+                        enabledSources: enabledContentSources,
+                        onNavigate: { target in
+                            handleGlobalSearchNavigate(target)
+                        }
+                    )
+                }
+            }
             .onAppear {
                 // 根据当前启用的数据源初始化滑动容器
                 updateDataSourceSwitchViewModel()
@@ -113,6 +131,13 @@ struct MainListView: View {
             }
             .onDisappear {
                 stopKeyboardMonitorIfNeeded()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .globalSearchPanelToggleRequested).receive(on: DispatchQueue.main)) { _ in
+                // 避免在文本输入时抢焦点（例如弹窗输入框）
+                if let window = NSApp.keyWindow, window.firstResponder is NSTextView {
+                    return
+                }
+                isGlobalSearchPresented.toggle()
             }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
@@ -134,8 +159,35 @@ struct MainListView: View {
             .onChange(of: contentSourceRawValue) { _, newValue in
                 if let source = ContentSource(rawValue: newValue) {
                     dataSourceSwitchVM.switchTo(source: source)
-                }
-            }
+    }
+
+    // MARK: - Global Search Navigation
+
+    private func handleGlobalSearchNavigate(_ target: GlobalSearchNavigationTarget) {
+        // 切换数据源
+        if contentSourceRawValue != target.source.rawValue {
+            contentSourceRawValue = target.source.rawValue
+        }
+
+        // 设置单选（跳转到对应条目）
+        selectionState.setSelection(for: target.source, ids: Set([target.containerId]))
+
+        // 记录详情定位目标（P4 用于滚动到命中块）
+        pendingDetailScrollTarget = DetailScrollTarget(
+            source: target.source,
+            containerId: target.containerId,
+            blockId: target.blockId,
+            kind: target.kind
+        )
+
+        // 尽量把焦点切到 Detail（避免用户还停留在 List）
+        guard let window = mainWindow else { return }
+        keyboardNavigationTarget = .detail
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            focusDetailIfPossible(window: window)
+        }
+    }
+}
             // 当滑动切换时，同步到菜单（加 guard 避免无意义写回）
             .onChange(of: dataSourceSwitchVM.currentDataSource) { _, newSource in
                 guard let source = newSource else { return }
