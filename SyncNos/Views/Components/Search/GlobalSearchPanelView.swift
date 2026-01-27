@@ -11,18 +11,26 @@ struct GlobalSearchPanelView: View {
 
     @StateObject private var viewModel = GlobalSearchViewModel()
     @FocusState private var isQueryFocused: Bool
-    @FocusState private var isResultsFocused: Bool
     @State private var panelWindow: NSWindow?
-    @State private var tabKeyMonitor: Any?
+    @State private var panelKeyMonitor: Any?
 
     var body: some View {
-        ZStack {
-            // 背景遮罩
-            Color.black.opacity(0.22)
-                .ignoresSafeArea()
-                .onTapGesture { isPresented = false }
+        GeometryReader { geo in
+            ZStack {
+                // 背景遮罩
+                Color.black.opacity(0.22)
+                    .ignoresSafeArea()
+                    .onTapGesture { isPresented = false }
 
-            panel
+                panel
+                    .frame(
+                        width: panelWidth(in: geo.size),
+                        height: panelHeight(in: geo.size)
+                    )
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 18)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             viewModel.updateEnabledSources(enabledSources)
@@ -31,10 +39,10 @@ struct GlobalSearchPanelView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isQueryFocused = true
             }
-            startTabTrapIfNeeded()
+            startPanelKeyMonitorIfNeeded()
         }
         .onDisappear {
-            stopTabTrapIfNeeded()
+            stopPanelKeyMonitorIfNeeded()
         }
         .onChange(of: enabledSources) { _, newValue in
             viewModel.updateEnabledSources(newValue)
@@ -43,7 +51,7 @@ struct GlobalSearchPanelView: View {
         .onExitCommand {
             isPresented = false
         }
-        // 读取所在窗口，用于过滤 NSEvent（只拦截本窗口的 Tab）
+        // 读取所在窗口，用于过滤 NSEvent（只拦截本窗口）
         .background(WindowReader(window: $panelWindow))
     }
 
@@ -55,16 +63,12 @@ struct GlobalSearchPanelView: View {
             Divider()
             resultsList
         }
-        .frame(width: 720, height: 520)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(NSColor.windowBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
+        }
+        .shadow(color: Color.black.opacity(0.20), radius: 22, x: 0, y: 12)
     }
 
     private var header: some View {
@@ -167,19 +171,24 @@ struct GlobalSearchPanelView: View {
             if viewModel.results.isEmpty {
                 emptyState
             } else {
-                List(selection: $viewModel.selectedResultId) {
-                    ForEach(viewModel.results) { r in
-                        resultRow(r)
-                            .tag(r.id)
+                ScrollViewReader { proxy in
+                    List(selection: $viewModel.selectedResultId) {
+                        ForEach(viewModel.results) { r in
+                            resultRow(r)
+                                .tag(r.id)
+                                .id(r.id)
+                        }
+                    }
+                    .onChange(of: viewModel.selectedResultId) { _, newValue in
+                        guard let id = newValue else { return }
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
                     }
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
-                .focused($isResultsFocused)
-                .onSubmit {
-                    navigateSelectedIfPossible()
-                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -259,48 +268,128 @@ struct GlobalSearchPanelView: View {
         isPresented = false
     }
 
-    // MARK: - Focus Trap (Tab)
+    // MARK: - Keyboard Navigation
 
-    private func startTabTrapIfNeeded() {
-        guard tabKeyMonitor == nil else { return }
-        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+    /// 面板大小：随主窗口尺寸自适应，避免固定 720x520 显得突兀。
+    private func panelWidth(in size: CGSize) -> CGFloat {
+        let target: CGFloat = 760
+        let maxWidth = max(520, size.width - 80)
+        return min(target, maxWidth)
+    }
+
+    private func panelHeight(in size: CGSize) -> CGFloat {
+        let target: CGFloat = 560
+        let maxHeight = max(420, size.height - 120)
+        return min(target, maxHeight)
+    }
+
+    private func hasMarkedTextInFieldEditor() -> Bool {
+        // 中文/日文输入法候选选择期间，↑↓/Enter/Tab 等按键应交给输入法处理
+        guard let w = panelWindow else { return false }
+        guard let inputClient = w.firstResponder as? NSTextInputClient else { return false }
+        return inputClient.hasMarkedText()
+    }
+
+    private func startPanelKeyMonitorIfNeeded() {
+        guard panelKeyMonitor == nil else { return }
+        panelKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // 仅处理该面板所在窗口的事件
             if let w = self.panelWindow, event.window !== w {
                 return event
             }
 
-            // Tab / Shift+Tab：只在搜索面板内部循环焦点，避免跳到主窗口视图。
-            // keyCode 48 = Tab
-            if event.keyCode == 48 {
-                let isShift = event.modifierFlags.contains(.shift)
-                DispatchQueue.main.async {
-                    if isShift {
-                        // 反向：Results -> Query
-                        if self.isResultsFocused {
-                            self.isQueryFocused = true
-                        } else {
-                            self.isResultsFocused = true
-                        }
-                    } else {
-                        // 正向：Query -> Results
-                        if self.isQueryFocused {
-                            self.isResultsFocused = true
-                        } else {
-                            self.isQueryFocused = true
-                        }
-                    }
-                }
-                return nil
+            // 输入法候选期间：完全交给系统，避免破坏候选选择/上屏体验
+            if self.hasMarkedTextInFieldEditor() {
+                return event
             }
 
-            return event
+            // 只处理“无修饰键”的面板导航；其他组合键交给系统/菜单项
+            let modifiers = event.modifierFlags
+            let hasCommand = modifiers.contains(.command)
+            let hasOption = modifiers.contains(.option)
+            let hasControl = modifiers.contains(.control)
+            guard !hasCommand && !hasOption && !hasControl else {
+                return event
+            }
+
+            switch event.keyCode {
+            case 48: // Tab：切换过滤范围（Shift+Tab 反向）
+                let forward = !modifiers.contains(.shift)
+                DispatchQueue.main.async {
+                    self.cycleScope(forward: forward)
+                    self.isQueryFocused = true
+                }
+                return nil
+
+            case 126: // ↑：结果列表上移（焦点仍留在搜索框）
+                DispatchQueue.main.async {
+                    self.moveSelection(delta: -1)
+                    self.isQueryFocused = true
+                }
+                return nil
+
+            case 125: // ↓：结果列表下移（焦点仍留在搜索框）
+                DispatchQueue.main.async {
+                    self.moveSelection(delta: 1)
+                    self.isQueryFocused = true
+                }
+                return nil
+
+            case 36, 76: // Return / Enter：跳转到选中结果
+                DispatchQueue.main.async {
+                    self.navigateSelectedIfPossible()
+                }
+                return nil
+
+            default:
+                // ←/→ 等交给 TextField，用于光标移动
+                return event
+            }
         }
     }
 
-    private func stopTabTrapIfNeeded() {
-        if let monitor = tabKeyMonitor {
+    private func stopPanelKeyMonitorIfNeeded() {
+        if let monitor = panelKeyMonitor {
             NSEvent.removeMonitor(monitor)
-            tabKeyMonitor = nil
+            panelKeyMonitor = nil
         }
+    }
+
+    private func cycleScope(forward: Bool) {
+        let scopes: [GlobalSearchScope] = [.allEnabled] + enabledSources.map { .source($0) }
+        guard !scopes.isEmpty else { return }
+
+        let currentIndex: Int = {
+            if let idx = scopes.firstIndex(where: { $0 == viewModel.scope }) {
+                return idx
+            }
+            return 0
+        }()
+
+        let nextIndex: Int = {
+            if forward {
+                return (currentIndex + 1) % scopes.count
+            }
+            return (currentIndex - 1 + scopes.count) % scopes.count
+        }()
+
+        viewModel.scope = scopes[nextIndex]
+        viewModel.scheduleSearch()
+    }
+
+    private func moveSelection(delta: Int) {
+        guard !viewModel.results.isEmpty else { return }
+
+        let currentIndex: Int = {
+            if let id = viewModel.selectedResultId,
+               let idx = viewModel.results.firstIndex(where: { $0.id == id }) {
+                return idx
+            }
+            return delta >= 0 ? -1 : viewModel.results.count
+        }()
+
+        let rawNext = currentIndex + delta
+        let next = min(max(rawNext, 0), viewModel.results.count - 1)
+        viewModel.selectedResultId = viewModel.results[next].id
     }
 }
