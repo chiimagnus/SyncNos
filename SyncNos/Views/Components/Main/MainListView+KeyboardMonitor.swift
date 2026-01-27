@@ -17,6 +17,11 @@ extension MainListView {
             guard let window = self.mainWindow, event.window === window else {
                 return event
             }
+
+            // 全局搜索面板打开时：方向键/滚动等键盘导航应只作用于搜索面板本身，禁止影响主窗口 List/Detail。
+            if self.isGlobalSearchPresented {
+                return event
+            }
             
             // 若用户正在文本输入框中（field editor），不拦截任何方向键，避免破坏光标移动体验
             if window.firstResponder is NSTextView {

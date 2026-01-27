@@ -53,7 +53,8 @@ struct MainListView: View {
 
     // MARK: - Global Search
 
-    @State private var isGlobalSearchPresented: Bool = false
+    // 需被 KeyboardMonitor 扩展读取（跨文件），不能是 private
+    @State var isGlobalSearchPresented: Bool = false
     /// 详情定位目标（P4 接入各 DetailView）
     @State private var pendingDetailScrollTarget: DetailScrollTarget?
     
@@ -121,6 +122,8 @@ struct MainListView: View {
                     )
                 }
             }
+            // 将“搜索面板是否显示”作为快捷键上下文暴露给 Commands（用于禁用 Cmd+1/2 等）
+            .focusedSceneValue(\.isGlobalSearchPresented, isGlobalSearchPresented)
             .onAppear {
                 // 根据当前启用的数据源初始化滑动容器
                 updateDataSourceSwitchViewModel()
