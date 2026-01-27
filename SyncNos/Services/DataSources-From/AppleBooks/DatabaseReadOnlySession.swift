@@ -69,6 +69,17 @@ final class DatabaseReadOnlySession: DatabaseReadOnlySessionProtocol {
         }
     }
 
+    func searchHighlights(query: String, limit: Int) throws -> [HighlightRow] {
+        try accessQueue.sync {
+            guard !isClosed, let db = handle else {
+                let error = "Database session is closed"
+                logger.debug("Session closed during query (expected during fast switching): \(error)")
+                throw NSError(domain: "SyncBookNotes", code: 11, userInfo: [NSLocalizedDescriptionKey: error])
+            }
+            return try queryService.searchHighlights(db: db, query: query, limit: limit)
+        }
+    }
+
     func close() {
         accessQueue.sync {
             guard !isClosed else { return }

@@ -40,6 +40,8 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
+        // 标记“主窗口场景”上下文：用于按窗口禁用/启用快捷键（类似 VSCode when）
+        .focusedSceneValue(\.isMainWindowSceneActive, true)
         .animation(.spring(), value: hasCompletedOnboarding)
         .animation(.spring(), value: iapPresentationMode != nil)
         .onAppear {
