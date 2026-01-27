@@ -3,6 +3,8 @@ import SwiftUI
 // MARK: - View Commands
 struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.isMainWindowSceneActive) private var isMainWindowSceneActive: Bool?
+    @FocusedValue(\.isGlobalSearchPresented) private var isGlobalSearchPresented: Bool?
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     /// 数据源自定义顺序（V2：String/RawRepresentable）
     /// 破坏性：不读取旧 Data(JSON) 顺序；首次升级会回退默认顺序，需用户重新拖拽一次
@@ -99,23 +101,28 @@ struct ViewCommands: Commands {
     var body: some Commands {
         // View 菜单 - 视图相关
         CommandGroup(after: .toolbar) {
+            let mainWindowActive = isMainWindowSceneActive ?? false
+            // 搜索面板弹出时，不允许 Cmd+1/2… 等切换主窗口数据源，避免“面板在前台但主窗口在切换”的串扰。
+            let allowMainWindowNavigationShortcuts = mainWindowActive && !((isGlobalSearchPresented ?? false))
+
             Button("Toggle Sidebar", systemImage: "sidebar.left") {
                 NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
             }
             .keyboardShortcut("\\", modifiers: .command)
+            .disabled(!mainWindowActive)
 
             // 数据源切换：上一个/下一个（⌥⌘← / ⌥⌘→）- 循环切换
             Button("Previous Data Source") {
                 switchToPreviousDataSource()
             }
             .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-            .disabled(!canSwitchDataSource)
+            .disabled(!canSwitchDataSource || !allowMainWindowNavigationShortcuts)
 
             Button("Next Data Source") {
                 switchToNextDataSource()
             }
             .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-            .disabled(!canSwitchDataSource)
+            .disabled(!canSwitchDataSource || !allowMainWindowNavigationShortcuts)
 
             Divider()
 
@@ -125,7 +132,7 @@ struct ViewCommands: Commands {
                 Button(source.displayName, systemImage: source.icon) {
                     contentSourceRawValue = source.rawValue
                 }
-                .disabled(currentSource == source)
+                .disabled(currentSource == source || !allowMainWindowNavigationShortcuts)
                 .applyKeyboardShortcut(shortcutKey(for: index), modifiers: .command)
                 // 命令项 identity = (source, index)；当顺序变化时强制重建对应 NSMenuItem，以确保快捷键立即刷新
                 .id("datasource.command.\(source.rawValue).\(index)")

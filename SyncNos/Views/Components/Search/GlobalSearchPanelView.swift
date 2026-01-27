@@ -11,6 +11,9 @@ struct GlobalSearchPanelView: View {
 
     @StateObject private var viewModel = GlobalSearchViewModel()
     @FocusState private var isQueryFocused: Bool
+    @FocusState private var isResultsFocused: Bool
+    @State private var panelWindow: NSWindow?
+    @State private var tabKeyMonitor: Any?
 
     var body: some View {
         ZStack {
@@ -24,6 +27,14 @@ struct GlobalSearchPanelView: View {
         .onAppear {
             viewModel.updateEnabledSources(enabledSources)
             isQueryFocused = true
+            // 兜底：避免首次弹出时 SwiftUI 焦点未及时生效，导致键盘事件落回主窗口。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isQueryFocused = true
+            }
+            startTabTrapIfNeeded()
+        }
+        .onDisappear {
+            stopTabTrapIfNeeded()
         }
         .onChange(of: enabledSources) { _, newValue in
             viewModel.updateEnabledSources(newValue)
@@ -32,6 +43,8 @@ struct GlobalSearchPanelView: View {
         .onExitCommand {
             isPresented = false
         }
+        // 读取所在窗口，用于过滤 NSEvent（只拦截本窗口的 Tab）
+        .background(WindowReader(window: $panelWindow))
     }
 
     // MARK: - Panel
@@ -163,6 +176,7 @@ struct GlobalSearchPanelView: View {
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
+                .focused($isResultsFocused)
                 .onSubmit {
                     navigateSelectedIfPossible()
                 }
@@ -243,5 +257,50 @@ struct GlobalSearchPanelView: View {
         onNavigate(r.navigationTarget)
         NotificationCenter.default.post(name: .globalSearchNavigateRequested, object: nil, userInfo: r.navigationTarget.userInfo)
         isPresented = false
+    }
+
+    // MARK: - Focus Trap (Tab)
+
+    private func startTabTrapIfNeeded() {
+        guard tabKeyMonitor == nil else { return }
+        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 仅处理该面板所在窗口的事件
+            if let w = self.panelWindow, event.window !== w {
+                return event
+            }
+
+            // Tab / Shift+Tab：只在搜索面板内部循环焦点，避免跳到主窗口视图。
+            // keyCode 48 = Tab
+            if event.keyCode == 48 {
+                let isShift = event.modifierFlags.contains(.shift)
+                DispatchQueue.main.async {
+                    if isShift {
+                        // 反向：Results -> Query
+                        if self.isResultsFocused {
+                            self.isQueryFocused = true
+                        } else {
+                            self.isResultsFocused = true
+                        }
+                    } else {
+                        // 正向：Query -> Results
+                        if self.isQueryFocused {
+                            self.isResultsFocused = true
+                        } else {
+                            self.isQueryFocused = true
+                        }
+                    }
+                }
+                return nil
+            }
+
+            return event
+        }
+    }
+
+    private func stopTabTrapIfNeeded() {
+        if let monitor = tabKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            tabKeyMonitor = nil
+        }
     }
 }
