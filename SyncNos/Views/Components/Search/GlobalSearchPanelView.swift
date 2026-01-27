@@ -11,6 +11,7 @@ struct GlobalSearchPanelView: View {
 
     @StateObject private var viewModel = GlobalSearchViewModel()
     @FocusState private var isQueryFocused: Bool
+    @FocusState private var isResultsFocused: Bool
     @State private var panelWindow: NSWindow?
     @State private var panelKeyMonitor: Any?
 
@@ -35,6 +36,7 @@ struct GlobalSearchPanelView: View {
         .onAppear {
             viewModel.updateEnabledSources(enabledSources)
             isQueryFocused = true
+            isResultsFocused = false
             // 兜底：避免首次弹出时 SwiftUI 焦点未及时生效，导致键盘事件落回主窗口。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isQueryFocused = true
@@ -166,34 +168,41 @@ struct GlobalSearchPanelView: View {
 
     // MARK: - Results
 
+    @ViewBuilder
     private var resultsList: some View {
-        Group {
-            if viewModel.results.isEmpty {
-                emptyState
-            } else {
-                ScrollViewReader { proxy in
-                    List(selection: $viewModel.selectedResultId) {
-                        ForEach(viewModel.results) { r in
-                            resultRow(r)
-                                .tag(r.id)
-                                .id(r.id)
-                        }
-                    }
-                    .onChange(of: viewModel.selectedResultId) { _, newValue in
-                        guard let id = newValue else { return }
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo(id, anchor: .center)
-                        }
+        if viewModel.results.isEmpty {
+            emptyState
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 2)
+                .padding(.bottom, 2)
+        } else {
+            ScrollViewReader { proxy in
+                List(selection: $viewModel.selectedResultId) {
+                    ForEach(viewModel.results) { r in
+                        resultRow(r)
+                            .tag(r.id)
+                            .id(r.id)
                     }
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
+                .onChange(of: viewModel.selectedResultId) { _, newValue in
+                    guard let id = newValue else { return }
+                    // 焦点在结果列表时，selection 变化来自用户导航；用于锁定自动选中逻辑
+                    if self.isResultsFocused {
+                        self.viewModel.markUserSelectionInteraction()
+                    }
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
+                }
             }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .focused($isResultsFocused)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 2)
-        .padding(.bottom, 2)
     }
 
     private var emptyState: some View {
@@ -216,6 +225,9 @@ struct GlobalSearchPanelView: View {
 
     private func resultRow(_ r: GlobalSearchResult) -> some View {
         Button {
+            // 单击也先同步 selection（让系统高亮与 Enter 行为一致）
+            self.viewModel.selectedResultId = r.id
+            self.viewModel.markUserSelectionInteraction()
             onNavigate(r.navigationTarget)
             NotificationCenter.default.post(name: .globalSearchNavigateRequested, object: nil, userInfo: r.navigationTarget.userInfo)
             isPresented = false
@@ -318,22 +330,42 @@ struct GlobalSearchPanelView: View {
                 DispatchQueue.main.async {
                     self.cycleScope(forward: forward)
                     self.isQueryFocused = true
+                    self.isResultsFocused = false
                 }
                 return nil
 
-            case 126: // ↑：结果列表上移（焦点仍留在搜索框）
-                DispatchQueue.main.async {
-                    self.moveSelection(delta: -1)
-                    self.isQueryFocused = true
+            case 126: // ↑：把焦点切到结果列表，并移动选中项（系统焦点样式）
+                if self.isQueryFocused {
+                    DispatchQueue.main.async {
+                        self.isResultsFocused = true
+                        self.isQueryFocused = false
+                        self.moveSelection(delta: -1)
+                    }
+                    return nil
                 }
-                return nil
+                // 已在列表：让系统 List 自己处理 ↑↓
+                return event
 
-            case 125: // ↓：结果列表下移（焦点仍留在搜索框）
-                DispatchQueue.main.async {
-                    self.moveSelection(delta: 1)
-                    self.isQueryFocused = true
+            case 125: // ↓：把焦点切到结果列表，并移动选中项（系统焦点样式）
+                if self.isQueryFocused {
+                    DispatchQueue.main.async {
+                        self.isResultsFocused = true
+                        self.isQueryFocused = false
+                        self.moveSelection(delta: 1)
+                    }
+                    return nil
                 }
-                return nil
+                return event
+
+            case 123, 124: // ← / →：把焦点切回搜索框（下一次 ←/→ 才开始移动光标）
+                if self.isResultsFocused {
+                    DispatchQueue.main.async {
+                        self.isQueryFocused = true
+                        self.isResultsFocused = false
+                    }
+                    return nil
+                }
+                return event
 
             case 36, 76: // Return / Enter：跳转到选中结果
                 DispatchQueue.main.async {
