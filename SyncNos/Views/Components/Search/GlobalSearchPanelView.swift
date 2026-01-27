@@ -176,23 +176,17 @@ struct GlobalSearchPanelView: View {
                 .padding(.horizontal, 2)
                 .padding(.bottom, 2)
         } else {
-            ScrollViewReader { proxy in
-                List(selection: $viewModel.selectedResultId) {
-                    ForEach(viewModel.results) { r in
-                        resultRow(r)
-                            .tag(r.id)
-                            .id(r.id)
-                    }
+            List(selection: $viewModel.selectedResultId) {
+                ForEach(viewModel.results) { r in
+                    resultRow(r)
+                        .tag(r.id)
+                        .id(r.id)
                 }
-                .onChange(of: viewModel.selectedResultId) { _, newValue in
-                    guard let id = newValue else { return }
-                    // 焦点在结果列表时，selection 变化来自用户导航；用于锁定自动选中逻辑
-                    if self.isResultsFocused {
-                        self.viewModel.markUserSelectionInteraction()
-                    }
-                    withAnimation(.easeOut(duration: 0.12)) {
-                        proxy.scrollTo(id, anchor: .center)
-                    }
+            }
+            .onChange(of: viewModel.selectedResultId) { _, _ in
+                // 焦点在结果列表时，selection 变化来自用户导航；用于锁定自动选中逻辑
+                if self.isResultsFocused {
+                    self.viewModel.markUserSelectionInteraction()
                 }
             }
             .listStyle(.inset)
