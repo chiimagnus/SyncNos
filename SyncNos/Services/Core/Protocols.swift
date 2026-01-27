@@ -120,7 +120,7 @@ protocol DatabaseReadOnlySessionProtocol: AnyObject, Sendable {
 }
 
 // MARK: - Bookmark Store Protocol
-protocol BookmarkStoreProtocol {
+protocol BookmarkStoreProtocol: Sendable {
     func save(folderURL: URL)
     func restore() -> URL?
     func startAccessing(url: URL) -> Bool

@@ -1,11 +1,12 @@
 import Foundation
 
-final class BookmarkStore: BookmarkStoreProtocol {
+final class BookmarkStore: BookmarkStoreProtocol, @unchecked Sendable {
     static let shared = BookmarkStore()
     private let logger = DIContainer.shared.loggerService
 
     private let bookmarkDefaultsKey = "SelectedBooksFolderBookmark"
     private var currentlyAccessingURL: URL?
+    private let accessLock = NSLock()
 
     private init() {}
     
@@ -45,11 +46,14 @@ final class BookmarkStore: BookmarkStoreProtocol {
     @discardableResult
     func startAccessing(url: URL) -> Bool {
         let normalized = url.standardizedFileURL
+        accessLock.lock()
+        defer { accessLock.unlock() }
+
         // 如果已经在访问同一个 URL，直接返回 true
         if let current = currentlyAccessingURL, current.standardizedFileURL == normalized {
             return true
         }
-        
+
         let started = normalized.startAccessingSecurityScopedResource()
         if started {
             // 如果之前在访问其他 URL，先停止
