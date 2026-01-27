@@ -5,10 +5,10 @@ import SQLite3
 /// 专门处理数据库查询的类，遵循单一职责原则
 final class DatabaseQueryService: Sendable {
     private let logger = DIContainer.shared.loggerService
-    
-    // MARK: - Queries
-    func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
-        // 首先获取表结构信息，动态构建查询语句
+
+    // MARK: - Shared Table Introspection
+
+    private func loadAnnotationTableInfo(db: OpaquePointer) throws -> (available: Set<String>, indices: [String: Int], selectColumns: [String]) {
         let tableInfoSQL = "PRAGMA table_info('ZAEANNOTATION');"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, tableInfoSQL, -1, &stmt, nil) == SQLITE_OK else {
@@ -16,8 +16,7 @@ final class DatabaseQueryService: Sendable {
             logger.error("Database error: \(error)")
             throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
         }
-        
-        // 收集可用的列名
+
         var availableColumns: Set<String> = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let columnName = sqlite3_column_text(stmt, 1) {
@@ -25,36 +24,42 @@ final class DatabaseQueryService: Sendable {
             }
         }
         sqlite3_finalize(stmt)
-        
-        // 构建查询语句，只包含存在的列
+
         var selectColumns: [String] = ["ZANNOTATIONASSETID", "ZANNOTATIONUUID", "ZANNOTATIONSELECTEDTEXT"]
         var columnIndices: [String: Int] = [
             "ZANNOTATIONASSETID": 0,
             "ZANNOTATIONUUID": 1,
             "ZANNOTATIONSELECTEDTEXT": 2
         ]
-        
-        // 检查并添加可选列
+
         let optionalColumns = [
-            "ZANNOTATIONNOTE": "note",
-            "ZANNOTATIONSTYLE": "style",
-            "ZANNOTATIONCREATIONDATE": "dateAdded",
-            "ZANNOTATIONMODIFICATIONDATE": "modified",
-            "ZANNOTATIONLOCATION": "location"
+            "ZANNOTATIONNOTE",
+            "ZANNOTATIONSTYLE",
+            "ZANNOTATIONCREATIONDATE",
+            "ZANNOTATIONMODIFICATIONDATE",
+            "ZANNOTATIONLOCATION"
         ]
-        
+
         var nextIndex = 3
-        for (column, _) in optionalColumns {
+        for column in optionalColumns {
             if availableColumns.contains(column) {
                 selectColumns.append(column)
                 columnIndices[column] = nextIndex
                 nextIndex += 1
             }
         }
+
+        return (availableColumns, columnIndices, selectColumns)
+    }
+    
+    // MARK: - Queries
+    func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
+        let (availableColumns, columnIndices, selectColumns) = try loadAnnotationTableInfo(db: db)
         
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
         logger.debug("Executing query: \(sql)")
         
+        var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             let error = "Prepare failed: annotations"
             logger.error("Database error: \(error)")
@@ -117,6 +122,108 @@ final class DatabaseQueryService: Sendable {
         }
         sqlite3_finalize(stmt)
         logger.debug("Fetched \(count) valid annotations")
+        return rows
+    }
+
+    // MARK: - Search (Global)
+
+    func searchHighlights(db: OpaquePointer, query: String, limit: Int) throws -> [HighlightRow] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, limit > 0 else { return [] }
+
+        let (availableColumns, columnIndices, selectColumns) = try loadAnnotationTableInfo(db: db)
+        let hasNote = availableColumns.contains("ZANNOTATIONNOTE")
+
+        var whereConditions = [
+            "ZANNOTATIONDELETED=0",
+            "ZANNOTATIONSELECTEDTEXT NOT NULL"
+        ]
+
+        if hasNote {
+            whereConditions.append("(ZANNOTATIONSELECTEDTEXT LIKE ? OR ZANNOTATIONNOTE LIKE ?)")
+        } else {
+            whereConditions.append("ZANNOTATIONSELECTEDTEXT LIKE ?")
+        }
+
+        let whereClause = whereConditions.joined(separator: " AND ")
+        let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE \(whereClause) ORDER BY rowid DESC LIMIT ?;"
+        logger.debug("[AppleBooksSearch] Executing query: \(sql)")
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            let error = "Prepare failed: search highlights"
+            logger.error("Database error: \(error)")
+            throw NSError(domain: "SyncBookNotes", code: 20, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        let like = "%\(trimmed)%" as NSString
+        sqlite3_bind_text(stmt, 1, like.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        var bindIndex: Int32 = 2
+        if hasNote {
+            sqlite3_bind_text(stmt, 2, like.utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            bindIndex = 3
+        }
+        sqlite3_bind_int64(stmt, bindIndex, Int64(limit))
+
+        var rows: [HighlightRow] = []
+        rows.reserveCapacity(min(limit, 64))
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let c0 = sqlite3_column_text(stmt, 0),
+                  let c1 = sqlite3_column_text(stmt, 1),
+                  let c2 = sqlite3_column_text(stmt, 2) else {
+                continue
+            }
+            let assetId = String(cString: c0)
+            let uuid = String(cString: c1)
+            let text = String(cString: c2).trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty { continue }
+
+            var note: String? = nil
+            var style: Int? = nil
+            var dateAdded: Date? = nil
+            var modified: Date? = nil
+            var location: String? = nil
+
+            if let noteIndex = columnIndices["ZANNOTATIONNOTE"], noteIndex < Int(sqlite3_column_count(stmt)) {
+                note = sqlite3_column_text(stmt, Int32(noteIndex)).map { String(cString: $0) }
+            }
+            if let styleIndex = columnIndices["ZANNOTATIONSTYLE"], styleIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(styleIndex)) != SQLITE_NULL {
+                    style = Int(sqlite3_column_int64(stmt, Int32(styleIndex)))
+                }
+            }
+            if let dateAddedIndex = columnIndices["ZANNOTATIONCREATIONDATE"], dateAddedIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(dateAddedIndex)) != SQLITE_NULL {
+                    dateAdded = Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, Int32(dateAddedIndex))))
+                }
+            }
+            if let modifiedIndex = columnIndices["ZANNOTATIONMODIFICATIONDATE"], modifiedIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(modifiedIndex)) != SQLITE_NULL {
+                    modified = Date(timeIntervalSinceReferenceDate: TimeInterval(sqlite3_column_double(stmt, Int32(modifiedIndex))))
+                }
+            }
+            if let locationIndex = columnIndices["ZANNOTATIONLOCATION"], locationIndex < Int(sqlite3_column_count(stmt)) {
+                if sqlite3_column_type(stmt, Int32(locationIndex)) != SQLITE_NULL {
+                    location = sqlite3_column_text(stmt, Int32(locationIndex)).map { String(cString: $0) }
+                }
+            }
+
+            rows.append(
+                HighlightRow(
+                    assetId: assetId,
+                    uuid: uuid,
+                    text: text,
+                    note: note,
+                    style: style,
+                    dateAdded: dateAdded,
+                    modified: modified,
+                    location: location
+                )
+            )
+        }
+
         return rows
     }
     
