@@ -27,6 +27,8 @@ final class GlobalSearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var resultMap: [String: GlobalSearchResult] = [:]
+    /// 用户是否主动移动过选中项；若是则不再在刷新排序时自动改写 selection（避免“跳来跳去”）
+    private var hasUserInteractedWithSelection: Bool = false
 
     init(
         engine: GlobalSearchEngineProtocol = DIContainer.shared.globalSearchEngine,
@@ -50,6 +52,10 @@ final class GlobalSearchViewModel: ObservableObject {
         }
     }
 
+    func markUserSelectionInteraction() {
+        hasUserInteractedWithSelection = true
+    }
+
     func clear() {
         query = ""
         scope = .allEnabled
@@ -58,6 +64,7 @@ final class GlobalSearchViewModel: ObservableObject {
         resultMap.removeAll(keepingCapacity: false)
         errorMessage = nil
         isSearching = false
+        hasUserInteractedWithSelection = false
         debounceTask?.cancel()
         searchTask?.cancel()
         refreshTask?.cancel()
@@ -76,6 +83,7 @@ final class GlobalSearchViewModel: ObservableObject {
             selectedResultId = nil
             errorMessage = nil
             isSearching = false
+            hasUserInteractedWithSelection = false
             return
         }
 
@@ -86,6 +94,7 @@ final class GlobalSearchViewModel: ObservableObject {
         selectedResultId = nil
         errorMessage = nil
         isSearching = true
+        hasUserInteractedWithSelection = false
 
         let currentScope = scope
         let sources = enabledSources
@@ -93,13 +102,12 @@ final class GlobalSearchViewModel: ObservableObject {
         let task = Task { [weak self] in
             guard let self else { return }
             do {
-                var firstResultAssigned = false
                 for try await r in engine.search(query: trimmed, scope: currentScope, enabledSources: sources, limit: 300) {
                     if Task.isCancelled { break }
                     self.upsertResult(r)
-                    if !firstResultAssigned {
+                    // 仅在“尚未排序刷新”前给一个兜底 selection（后续以 applySortedResults 的排序为准）
+                    if !self.hasUserInteractedWithSelection, self.selectedResultId == nil {
                         self.selectedResultId = r.id
-                        firstResultAssigned = true
                     }
                 }
                 self.isSearching = false
@@ -153,6 +161,17 @@ final class GlobalSearchViewModel: ObservableObject {
             return a.id < b.id
         }
         results = sorted
+
+        // 若用户未交互：让 selection 跟随“当前排序第一项”，避免首次 selection 落在中间某个结果
+        if !hasUserInteractedWithSelection {
+            selectedResultId = sorted.first?.id
+            return
+        }
+
+        // 若用户已交互：保持原选中；但如果原 id 消失则兜底到第一项
+        if let id = selectedResultId, !sorted.contains(where: { $0.id == id }) {
+            selectedResultId = sorted.first?.id
+        }
     }
 }
 
