@@ -29,7 +29,7 @@
 
 ## Plan A（主方案）
 
-### P1：基础类型 + 文本匹配/高亮（可复用）
+### P1：✅基础类型 + 文本匹配/高亮（可复用）
 
 #### Task 1: 定义全局搜索的模型与导航目标
 **Files:**
@@ -102,7 +102,7 @@ enum SearchTextMatcher {
 
 ---
 
-### P2：全局搜索引擎（Provider + 聚合 + 取消）
+### P2：✅全局搜索引擎（Provider + 聚合 + 取消）
 
 #### Task 4: 定义 Provider 协议与全局搜索引擎
 **Files:**
@@ -155,7 +155,7 @@ enum SearchTextMatcher {
 
 ---
 
-### P3：全局搜索面板 UI（⌘K）+ 结果跳转
+### P3：✅全局搜索面板 UI（⌘K）+ 结果跳转
 
 #### Task 6: 全局搜索面板 ViewModel
 **Files:**
