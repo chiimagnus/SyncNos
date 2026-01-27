@@ -149,6 +149,14 @@ extension Notification.Name {
     
     /// 循环切换消息分类
     static let chatsCycleClassification = Notification.Name("ChatsCycleClassification")
+
+    // MARK: - 搜索
+
+    /// 请求切换全局搜索面板显示状态（⌘K）
+    static let globalSearchPanelToggleRequested = Notification.Name("GlobalSearchPanelToggleRequested")
+
+    /// 全局搜索：请求跳转到某个结果（userInfo: ["target": GlobalSearchNavigationTarget]）
+    static let globalSearchNavigateRequested = Notification.Name("GlobalSearchNavigateRequested")
 }
 
 // MARK: - ContentSource 通知扩展

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Edit Commands
 struct EditCommands: Commands {
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
+    @FocusedValue(\.isMainWindowSceneActive) private var isMainWindowSceneActive: Bool?
 
     var body: some Commands {
         // Edit 菜单 - 编辑操作相关
@@ -47,6 +48,16 @@ struct EditCommands: Commands {
             }
             .keyboardShortcut(.escape)
             .disabled(!(selectionCommands?.canDeselect() ?? false))
+        }
+
+        // 全局搜索（⌘K）：Notion 风格弹出面板
+        CommandGroup(after: .pasteboard) {
+            Button("全局搜索", systemImage: "magnifyingglass") {
+                NotificationCenter.default.post(name: .globalSearchPanelToggleRequested, object: nil)
+            }
+            .keyboardShortcut("k", modifiers: .command)
+            // 仅在主窗口激活时可用，避免在 Settings/Logs 窗口触发并影响主窗口
+            .disabled(!(isMainWindowSceneActive ?? false))
         }
     }
 }

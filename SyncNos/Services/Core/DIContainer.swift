@@ -44,6 +44,8 @@ class DIContainer {
     private var _ocrAPIService: OCRAPIServiceProtocol?
     // Chats
     private var _chatsCacheService: ChatCacheServiceProtocol?
+    // Global Search
+    private var _globalSearchEngine: GlobalSearchEngineProtocol?
 
     // MARK: - Computed Properties
     var databaseService: DatabaseServiceProtocol {
@@ -327,6 +329,39 @@ class DIContainer {
         return _chatsCacheService!
     }
 
+    // MARK: - Global Search
+
+    var globalSearchEngine: GlobalSearchEngineProtocol {
+        if _globalSearchEngine == nil {
+            let providers: [ContentSource: any GlobalSearchProvider] = [
+                .appleBooks: AppleBooksSearchProvider(
+                    databaseService: databaseService,
+                    bookmarkStore: bookmarkStore,
+                    logger: loggerService
+                ),
+                .goodLinks: GoodLinksSearchProvider(
+                    goodLinksService: goodLinksService,
+                    webArticleCacheService: webArticleCacheService,
+                    logger: loggerService
+                ),
+                .weRead: WeReadSearchProvider(
+                    cacheService: weReadCacheService,
+                    logger: loggerService
+                ),
+                .dedao: DedaoSearchProvider(
+                    cacheService: dedaoCacheService,
+                    logger: loggerService
+                ),
+                .chats: ChatsSearchProvider(
+                    cacheService: chatsCacheService,
+                    logger: loggerService
+                )
+            ]
+            _globalSearchEngine = GlobalSearchEngine(providers: providers)
+        }
+        return _globalSearchEngine!
+    }
+
     // MARK: - Registration Methods
     func register(databaseService: DatabaseServiceProtocol) {
         self._databaseService = databaseService
@@ -431,6 +466,10 @@ class DIContainer {
     
     func register(chatsCacheService: ChatCacheServiceProtocol) {
         self._chatsCacheService = chatsCacheService
+    }
+
+    func register(globalSearchEngine: GlobalSearchEngineProtocol) {
+        self._globalSearchEngine = globalSearchEngine
     }
 
     func register(siteLoginsStore: SiteLoginsStoreProtocol) {
