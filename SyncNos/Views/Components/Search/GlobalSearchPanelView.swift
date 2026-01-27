@@ -14,6 +14,7 @@ struct GlobalSearchPanelView: View {
     @FocusState private var isResultsFocused: Bool
     @State private var panelWindow: NSWindow?
     @State private var panelKeyMonitor: Any?
+    @State private var shouldFixQuerySelectionAfterFocus: Bool = false
 
     var body: some View {
         GeometryReader { geo in
@@ -42,6 +43,14 @@ struct GlobalSearchPanelView: View {
                 isQueryFocused = true
             }
             startPanelKeyMonitorIfNeeded()
+        }
+        .onChange(of: isQueryFocused) { _, newValue in
+            guard newValue, shouldFixQuerySelectionAfterFocus else { return }
+            shouldFixQuerySelectionAfterFocus = false
+            // SwiftUI 切焦点到 TextField 时，AppKit 可能默认 selectAll；这里主动把光标放到末尾并取消全选。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                collapseFieldEditorSelectionToEnd()
+            }
         }
         .onDisappear {
             stopPanelKeyMonitorIfNeeded()
@@ -356,6 +365,7 @@ struct GlobalSearchPanelView: View {
                     DispatchQueue.main.async {
                         self.isQueryFocused = true
                         self.isResultsFocused = false
+                        self.shouldFixQuerySelectionAfterFocus = true
                     }
                     return nil
                 }
@@ -379,6 +389,17 @@ struct GlobalSearchPanelView: View {
             NSEvent.removeMonitor(monitor)
             panelKeyMonitor = nil
         }
+    }
+
+    /// 取消 TextField 获得焦点后的默认全选：把插入点放到文本末尾。
+    private func collapseFieldEditorSelectionToEnd() {
+        guard let w = panelWindow else { return }
+        guard let tv = w.firstResponder as? NSTextView else { return }
+        // 输入法候选期间不要干预选区
+        if let client = tv as? NSTextInputClient, client.hasMarkedText() { return }
+        let length = (tv.string as NSString).length
+        tv.setSelectedRange(NSRange(location: length, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: length, length: 0))
     }
 
     private func cycleScope(forward: Bool) {
