@@ -54,7 +54,7 @@ final class DatabaseQueryService: Sendable {
     
     // MARK: - Queries
     func fetchAnnotations(db: OpaquePointer) throws -> [HighlightRow] {
-        let (availableColumns, columnIndices, selectColumns) = try loadAnnotationTableInfo(db: db)
+        let (_, columnIndices, selectColumns) = try loadAnnotationTableInfo(db: db)
         
         let sql = "SELECT \(selectColumns.joined(separator: ",")) FROM ZAEANNOTATION WHERE ZANNOTATIONDELETED=0 AND ZANNOTATIONSELECTEDTEXT NOT NULL;"
         logger.debug("Executing query: \(sql)")

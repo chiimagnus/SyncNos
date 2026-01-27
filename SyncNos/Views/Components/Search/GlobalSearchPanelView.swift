@@ -396,7 +396,7 @@ struct GlobalSearchPanelView: View {
         guard let w = panelWindow else { return }
         guard let tv = w.firstResponder as? NSTextView else { return }
         // 输入法候选期间不要干预选区
-        if let client = tv as? NSTextInputClient, client.hasMarkedText() { return }
+        if tv.hasMarkedText() { return }
         let length = (tv.string as NSString).length
         tv.setSelectedRange(NSRange(location: length, length: 0))
         tv.scrollRangeToVisible(NSRange(location: length, length: 0))
