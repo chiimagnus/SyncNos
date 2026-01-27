@@ -48,5 +48,13 @@ struct EditCommands: Commands {
             .keyboardShortcut(.escape)
             .disabled(!(selectionCommands?.canDeselect() ?? false))
         }
+
+        // 全局搜索（⌘K）：Notion 风格弹出面板
+        CommandGroup(after: .pasteboard) {
+            Button("全局搜索", systemImage: "magnifyingglass") {
+                NotificationCenter.default.post(name: .globalSearchPanelToggleRequested, object: nil)
+            }
+            .keyboardShortcut("k", modifiers: .command)
+        }
     }
 }
