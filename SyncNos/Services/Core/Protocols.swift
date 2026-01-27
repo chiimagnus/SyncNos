@@ -111,6 +111,8 @@ protocol DatabaseReadOnlySessionProtocol: AnyObject, Sendable {
     func fetchHighlightPage(assetId: String, limit: Int, offset: Int, since: Date?) throws -> [HighlightRow]
     func fetchHighlightCountsByAsset() throws -> [AssetHighlightCount]
     func fetchBooks(assetIds: [String]) throws -> [BookRow]
+    /// 全局搜索：搜索高亮/笔记内容（Apple Books）
+    func searchHighlights(query: String, limit: Int) throws -> [HighlightRow]
     func close()
     // New methods for filtering and sorting
     func fetchHighlightStatsByAsset() throws -> [AssetHighlightStats]
@@ -118,7 +120,7 @@ protocol DatabaseReadOnlySessionProtocol: AnyObject, Sendable {
 }
 
 // MARK: - Bookmark Store Protocol
-protocol BookmarkStoreProtocol {
+protocol BookmarkStoreProtocol: Sendable {
     func save(folderURL: URL)
     func restore() -> URL?
     func startAccessing(url: URL) -> Bool
