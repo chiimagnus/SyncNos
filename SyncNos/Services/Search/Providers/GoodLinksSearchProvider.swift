@@ -75,7 +75,8 @@ final class GoodLinksSearchProvider: GlobalSearchProvider {
                         for link in links.prefix(maxArticleScan) {
                             if Task.isCancelled { break }
                             guard let cached = try await webArticleCacheService.getArticle(url: link.url) else { continue }
-                            guard let text = cached.textContent, !text.isEmpty else { continue }
+                            let text = cached.textContent
+                            guard !text.isEmpty else { continue }
                             guard let m = SearchTextMatcher.match(text: text, query: query, snippetLimit: 200) else { continue }
 
                             let title = (link.title?.isEmpty == false ? link.title : nil) ?? link.url
@@ -172,4 +173,3 @@ final class GoodLinksSearchProvider: GlobalSearchProvider {
         return url.host
     }
 }
-
