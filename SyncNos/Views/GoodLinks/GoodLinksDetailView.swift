@@ -26,7 +26,6 @@ struct GoodLinksDetailView: View {
     @State private var activeMatchIndex: Int = 0
     @State private var detailScrollProxy: ScrollViewProxy?
     @State private var webActiveMatchIndex: Int = 0
-    @FocusState private var isDetailSearchFocused: Bool
 
     private var selectedLink: GoodLinksLinkRow? {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
@@ -303,7 +302,6 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-                .searchFocused($isDetailSearchFocused)
                 .onSubmit(of: .search) {
                     if let proxy = detailScrollProxy {
                         scrollToNextMatch(proxy: proxy)
@@ -388,7 +386,9 @@ struct GoodLinksDetailView: View {
             layoutWidthDebounceTask = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
-            isDetailSearchFocused = true
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshBooksRequested).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
