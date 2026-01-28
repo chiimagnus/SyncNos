@@ -46,7 +46,7 @@ struct OnboardingWelcomeView: View {
             (icon: "bookmark", color: Color("BrandGoodLinks"), angle: -18),
             (icon: "w.square", color: Color("BrandWeRead"), angle: 54),
             (icon: "d.square", color: Color("BrandDedao"), angle: 126),
-            (icon: "message", color: .green, angle: 198)
+            (icon: "message", color: Color("BrandChat"), angle: 198)
         ]
     }
 
@@ -297,7 +297,7 @@ struct OnboardingSourcesView: View {
     private func sourceCardView(for provider: any DataSourceUIProvider) -> some View {
         SourceCard(
             icon: provider.iconName,
-            color: provider.accentColor,
+            color: provider.brandColor,
             title: provider.displayName,
             isOn: viewModel.enabledBinding(for: provider)
         )
