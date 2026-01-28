@@ -5,6 +5,11 @@ import Combine
 
 @MainActor
 final class GlobalSearchViewModel: ObservableObject {
+    private struct ResultEntry: Sendable {
+        var result: GlobalSearchResult
+        let firstSeenOrder: Int
+    }
+
     // MARK: - Published
 
     @Published var query: String = ""
@@ -26,7 +31,8 @@ final class GlobalSearchViewModel: ObservableObject {
     private var debounceTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-    private var resultMap: [String: GlobalSearchResult] = [:]
+    private var resultEntries: [String: ResultEntry] = [:]
+    private var nextResultOrder: Int = 0
     /// 用户是否主动移动过选中项；若是则不再在刷新排序时自动改写 selection（避免“跳来跳去”）
     private var hasUserInteractedWithSelection: Bool = false
 
@@ -44,7 +50,7 @@ final class GlobalSearchViewModel: ObservableObject {
 
     func scheduleSearch() {
         debounceTask?.cancel()
-        debounceTask = Task { [weak self] in
+        debounceTask = Task { @MainActor [weak self] in
             guard let self else { return }
             try? await Task.sleep(nanoseconds: 280_000_000) // 280ms
             if Task.isCancelled { return }
@@ -61,7 +67,8 @@ final class GlobalSearchViewModel: ObservableObject {
         scope = .allEnabled
         selectedResultId = nil
         results.removeAll(keepingCapacity: false)
-        resultMap.removeAll(keepingCapacity: false)
+        resultEntries.removeAll(keepingCapacity: false)
+        nextResultOrder = 0
         errorMessage = nil
         isSearching = false
         hasUserInteractedWithSelection = false
@@ -79,7 +86,8 @@ final class GlobalSearchViewModel: ObservableObject {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             results = []
-            resultMap = [:]
+            resultEntries = [:]
+            nextResultOrder = 0
             selectedResultId = nil
             errorMessage = nil
             isSearching = false
@@ -89,7 +97,8 @@ final class GlobalSearchViewModel: ObservableObject {
 
         searchTask?.cancel()
         refreshTask?.cancel()
-        resultMap.removeAll(keepingCapacity: true)
+        resultEntries.removeAll(keepingCapacity: true)
+        nextResultOrder = 0
         results.removeAll(keepingCapacity: true)
         selectedResultId = nil
         errorMessage = nil
@@ -98,53 +107,68 @@ final class GlobalSearchViewModel: ObservableObject {
 
         let currentScope = scope
         let sources = enabledSources
+        let engine = engine
+        let logger = logger
 
         let task = Task { [weak self] in
             guard let self else { return }
             do {
-                for try await r in engine.search(query: trimmed, scope: currentScope, enabledSources: sources, limit: 300) {
+                for try await r in engine.search(query: trimmed, scope: currentScope, enabledSources: sources, limit: 500) {
                     if Task.isCancelled { break }
-                    self.upsertResult(r)
-                    // 仅在“尚未排序刷新”前给一个兜底 selection（后续以 applySortedResults 的排序为准）
-                    if !self.hasUserInteractedWithSelection, self.selectedResultId == nil {
-                        self.selectedResultId = r.id
-                    }
+                    await self.receiveIncomingResult(r)
                 }
-                self.isSearching = false
+                await MainActor.run {
+                    self.isSearching = false
+                }
             } catch {
-                self.logger.error("[GlobalSearch] failed: \(error.localizedDescription)")
-                self.errorMessage = error.localizedDescription
-                self.isSearching = false
+                logger.error("[GlobalSearch] failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isSearching = false
+                }
             }
         }
         searchTask = task
     }
 
+    private func receiveIncomingResult(_ r: GlobalSearchResult) {
+        upsertResult(r)
+
+        // 仅在“尚未排序刷新”前给一个兜底 selection（后续以 applySortedResults 的排序为准）
+        if !hasUserInteractedWithSelection, selectedResultId == nil {
+            selectedResultId = r.id
+        }
+    }
+
     private func upsertResult(_ r: GlobalSearchResult) {
-        if let existing = resultMap[r.id] {
+        if var existing = resultEntries[r.id] {
             // 保留更高分的结果（同 id 可能来自不同字段）
-            if r.score > existing.score {
-                resultMap[r.id] = r
+            if r.score > existing.result.score {
+                existing.result = r
+                resultEntries[r.id] = existing
             }
         } else {
-            resultMap[r.id] = r
+            resultEntries[r.id] = ResultEntry(result: r, firstSeenOrder: nextResultOrder)
+            nextResultOrder += 1
         }
         scheduleRefresh()
     }
 
     private func scheduleRefresh() {
         guard refreshTask == nil else { return }
-        refreshTask = Task { [weak self] in
+        refreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.refreshTask = nil }
-            try? await Task.sleep(nanoseconds: 35_000_000) // 35ms
+            try? await Task.sleep(nanoseconds: 16_000_000) // 16ms
             if Task.isCancelled { return }
             self.applySortedResults()
         }
     }
 
     private func applySortedResults() {
-        let sorted = resultMap.values.sorted { a, b in
+        let sortedEntries = resultEntries.values.sorted { ea, eb in
+            let a = ea.result
+            let b = eb.result
             if a.score != b.score { return a.score > b.score }
             switch (a.timestamp, b.timestamp) {
             case let (ta?, tb?):
@@ -158,8 +182,10 @@ final class GlobalSearchViewModel: ObservableObject {
             }
             if a.source != b.source { return a.source.rawValue < b.source.rawValue }
             if a.containerTitle != b.containerTitle { return a.containerTitle < b.containerTitle }
+            if ea.firstSeenOrder != eb.firstSeenOrder { return ea.firstSeenOrder < eb.firstSeenOrder }
             return a.id < b.id
         }
+        let sorted = sortedEntries.map(\.result)
         results = sorted
 
         // 若用户未交互：让 selection 跟随“当前排序第一项”，避免首次 selection 落在中间某个结果
@@ -174,4 +200,3 @@ final class GlobalSearchViewModel: ObservableObject {
         }
     }
 }
-
