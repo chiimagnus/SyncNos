@@ -99,7 +99,7 @@ struct GlobalSearchPanelView: View {
                     }
 
                 if !viewModel.query.isEmpty {
-                    Button {
+                Button {
                         viewModel.query = ""
                         viewModel.scheduleSearch()
                         isQueryFocused = true
@@ -234,10 +234,10 @@ struct GlobalSearchPanelView: View {
             onNavigate(r.navigationTarget)
             NotificationCenter.default.post(name: .globalSearchNavigateRequested, object: nil, userInfo: r.navigationTarget.userInfo)
             isPresented = false
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: r.source.iconName)
-                    .foregroundColor(r.source.accentColor)
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: r.source.iconName)
+                    .foregroundColor(r.source.brandColor)
                     .frame(width: 18, height: 18)
 
                 VStack(alignment: .leading, spacing: 4) {
