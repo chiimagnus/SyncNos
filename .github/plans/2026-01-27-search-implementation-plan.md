@@ -258,18 +258,24 @@ enum SearchTextMatcher {
 
 ---
 
-### P5：相关度排序与性能收尾（可选增强）
+### P5：✅相关度排序与性能收尾（可选增强）
 
 #### Task 11: 结果去重、稳定排序与限流
 **Files:**
 - Modify: `SyncNos/ViewModels/Search/GlobalSearchViewModel.swift`
 - Modify: `SyncNos/Services/Search/GlobalSearchEngine.swift`
+- Modify: `SyncNos/Services/Search/Providers/WeReadSearchProvider.swift`
+- Modify: `SyncNos/Services/Search/Providers/DedaoSearchProvider.swift`
+- Modify: `SyncNos/Services/Search/Providers/ChatsSearchProvider.swift`
 
 **实现要点:**
 - 去重 key：`source + containerId + blockId + kind`  
-- 每个 provider 限制 `limit`（例如 200），Engine 总上限（例如 500）  
-- 并发控制：WeRead/Dedao/Chats 扫描时限制并发（例如 `TaskGroup` 最大 4）  
-- UI 更新节流：results append 后用 `@MainActor` + `Task.sleep(16ms)` 合并刷新（避免频繁重排）
+- 每个 provider 限制 `limit = 200`；Engine 总上限 `limit = 500`（ViewModel 调用时使用 500）  
+- 并发控制：WeRead/Dedao/Chats 扫描限制并发 `TaskGroup` 最大 4  
+- 去重与“只保留更高分”：同一 key 仅放行 score 更高的结果（低分直接丢弃）  
+- 达到 Engine 总上限后：对“新 key”停止继续扫描（避免无意义的全量扫）  
+- UI 更新节流：results 刷新合并为 ~16ms 一次（避免频繁重排）  
+- 稳定排序：同分时按首次出现顺序稳定（避免列表抖动）
 
 **验证:**
 - Run: `xcodebuild -scheme SyncNos build`
@@ -280,4 +286,3 @@ enum SearchTextMatcher {
 - 全局搜索 panel：是否需要“字段筛选”（只搜标题/只搜内容）？MVP 可以先不做，仅保留数据源筛选。  
 - Detail 搜索的“筛选策略”：默认是“只高亮不隐藏不匹配项”，还是“只展示命中项”？（计划按“只高亮 + 可选下一处定位”实现；如你希望默认过滤，我会把过滤做成开关。）  
 - ⌘G/⌘⇧G：是否需要作为“下一个/上一个命中”的快捷键（可选增强）。  
-
