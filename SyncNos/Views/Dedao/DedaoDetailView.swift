@@ -25,8 +25,6 @@ struct DedaoDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchId: String?
-    @State private var detailScrollProxy: ScrollViewProxy?
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -86,15 +84,9 @@ struct DedaoDetailView: View {
             }
             .navigationTitle("Dedao")
             .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-            .onSubmit(of: .search) {
-                if let proxy = detailScrollProxy {
-                    scrollToNextMatch(proxy: proxy)
-                }
-            }
             .toolbar { toolbarContent(book: book) }
             // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
             .onAppear {
-                detailScrollProxy = proxy
                 DispatchQueue.main.async {
                     proxy.scrollTo("dedaoDetailTop", anchor: .top)
                 }
@@ -110,10 +102,6 @@ struct DedaoDetailView: View {
             }
             .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
                 applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
-            }
-            .onChange(of: detailSearchText) { _, _ in
-                activeMatchId = nil
-                scrollToFirstMatchIfNeeded(proxy: proxy)
             }
             // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
             .task(id: selectedBookId) {
@@ -277,28 +265,6 @@ struct DedaoDetailView: View {
     
     @ToolbarContentBuilder
     private func toolbarContent(book: DedaoBookListItem) -> some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                if let proxy = detailScrollProxy {
-                    scrollToPrevMatch(proxy: proxy)
-                }
-            } label: {
-                Image(systemName: "chevron.up")
-            }
-            .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .help("上一个")
-
-            Button {
-                if let proxy = detailScrollProxy {
-                    scrollToNextMatch(proxy: proxy)
-                }
-            } label: {
-                Image(systemName: "chevron.down")
-            }
-            .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .help("下一个")
-        }
-
         ToolbarItem(placement: .automatic) {
             FilterSortBar(
                 noteFilter: $detailViewModel.noteFilter,
@@ -392,74 +358,7 @@ struct DedaoDetailView: View {
             }
         }
     }
-
-    // MARK: - Match Navigation
-
-    private func matchedHighlightIds() -> [String] {
-        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
-
-        var result: [String] = []
-        result.reserveCapacity(32)
-        var seen: Set<String> = []
-
-        for h in detailViewModel.visibleHighlights {
-            let id = h.id
-            if seen.contains(id) { continue }
-
-            if SearchTextMatcher.matchRangesUTF16(text: h.text, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-
-            if let note = h.note, !note.isEmpty,
-               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-        }
-
-        return result
-    }
-
-    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard let first = ids.first else { return }
-        activeMatchId = first
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(first, anchor: .center) }
-        }
-    }
-
-    private func scrollToNextMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
-        let nextIndex = (currentIndex + 1) % ids.count
-        let targetId = ids[nextIndex]
-        activeMatchId = targetId
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-        }
-    }
-
-    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
-        let prevIndex = (currentIndex - 1 + ids.count) % ids.count
-        let targetId = ids[prevIndex]
-        activeMatchId = targetId
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-        }
-    }
-
+    
     // MARK: - External Scroll Target
 
     private func applyExternalScrollTargetIfNeeded(bookId: String, proxy: ScrollViewProxy) {

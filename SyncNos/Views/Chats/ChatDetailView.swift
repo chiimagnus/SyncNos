@@ -32,7 +32,6 @@ struct ChatDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchId: UUID?
     @State private var isApplyingExternalScrollTarget: Bool = false
 
     private var selectedContact: ChatBookListItem? {
@@ -106,39 +105,12 @@ struct ChatDetailView: View {
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
             .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-            .onSubmit(of: .search) {
-                if let proxy = scrollProxy {
-                    scrollToNextMatch(proxy: proxy)
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
                 Task { @MainActor in
                     ToolbarSearchFocus.focusIfPossible()
                 }
             }
             .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button {
-                            if let proxy = scrollProxy {
-                                scrollToPrevMatch(proxy: proxy)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.up")
-                        }
-                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help("上一个")
-
-                        Button {
-                            if let proxy = scrollProxy {
-                                scrollToNextMatch(proxy: proxy)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.down")
-                        }
-                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help("下一个")
-                    }
-
                     ToolbarItem(placement: .automatic) {
                         Spacer()
                     }
@@ -472,10 +444,6 @@ struct ChatDetailView: View {
                 .onChange(of: messages.count) { _, _ in
                     applyExternalScrollTargetIfNeeded(contactId: contact.contactId, proxy: proxy)
                 }
-                .onChange(of: detailSearchText) { _, _ in
-                    activeMatchId = nil
-                    scrollToFirstMatchIfNeeded(proxy: proxy)
-                }
                 // 监听来自 MainListView 的消息导航通知
                 .onReceive(NotificationCenter.default.publisher(for: .chatsNavigateMessage).receive(on: DispatchQueue.main)) { notification in
                     guard let userInfo = notification.userInfo,
@@ -529,77 +497,6 @@ struct ChatDetailView: View {
     /// 生成复合 ID，用于 ScrollViewReader 导航和视图标识
     private func compositeId(for message: ChatMessage) -> String {
         "\(message.id.uuidString)-\(message.kind.rawValue)"
-    }
-
-    // MARK: - Detail Search
-
-    private func searchableText(for message: ChatMessage) -> String {
-        switch message.kind {
-        case .text, .system, .card:
-            return message.content
-        case .image, .voice:
-            return ""
-        }
-    }
-
-    private func matchedMessageIds() -> [UUID] {
-        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
-
-        var result: [UUID] = []
-        result.reserveCapacity(64)
-
-        for m in messages {
-            let text = searchableText(for: m)
-            if text.isEmpty { continue }
-            if SearchTextMatcher.matchRangesUTF16(text: text, query: q) != nil {
-                result.append(m.id)
-            }
-        }
-
-        return result
-    }
-
-    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
-        let ids = matchedMessageIds()
-        guard let first = ids.first,
-              let message = messages.first(where: { $0.id == first }) else { return }
-        activeMatchId = message.id
-        selectedMessageId = message.id
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
-        }
-    }
-
-    private func scrollToNextMatch(proxy: ScrollViewProxy) {
-        let ids = matchedMessageIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
-        let nextIndex = (currentIndex + 1) % ids.count
-        let id = ids[nextIndex]
-        guard let message = messages.first(where: { $0.id == id }) else { return }
-        activeMatchId = message.id
-        selectedMessageId = message.id
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
-        }
-    }
-
-    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
-        let ids = matchedMessageIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
-        let prevIndex = (currentIndex - 1 + ids.count) % ids.count
-        let id = ids[prevIndex]
-        guard let message = messages.first(where: { $0.id == id }) else { return }
-        activeMatchId = message.id
-        selectedMessageId = message.id
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
-        }
     }
 
     // MARK: - External Scroll Target

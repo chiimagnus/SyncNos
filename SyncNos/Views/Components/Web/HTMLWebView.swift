@@ -14,7 +14,6 @@ struct HTMLWebView: NSViewRepresentable {
     let openLinksInExternalBrowser: Bool
     let onRefetchRequested: (() -> Void)?
     let searchQuery: String?
-    let activeMatchIndex: Int?
     @Binding var contentHeight: CGFloat
 
     init(
@@ -24,7 +23,6 @@ struct HTMLWebView: NSViewRepresentable {
         openLinksInExternalBrowser: Bool = true,
         onRefetchRequested: (() -> Void)? = nil,
         searchQuery: String? = nil,
-        activeMatchIndex: Int? = nil,
         contentHeight: Binding<CGFloat>
     ) {
         self.html = html
@@ -33,7 +31,6 @@ struct HTMLWebView: NSViewRepresentable {
         self.openLinksInExternalBrowser = openLinksInExternalBrowser
         self.onRefetchRequested = onRefetchRequested
         self.searchQuery = searchQuery
-        self.activeMatchIndex = activeMatchIndex
         self._contentHeight = contentHeight
     }
 
@@ -63,7 +60,7 @@ struct HTMLWebView: NSViewRepresentable {
             )
         )
 
-        // 正文搜索（Detail ⌘F）：命中高亮与定位
+        // 正文搜索（Detail ⌘F）：命中高亮
         userContentController.addUserScript(
             WKUserScript(
                 source: Coordinator.searchScript,
@@ -105,7 +102,7 @@ struct HTMLWebView: NSViewRepresentable {
             }
         }
 
-        context.coordinator.updateSearch(webView: webView, query: searchQuery, activeMatchIndex: activeMatchIndex)
+        context.coordinator.updateSearch(webView: webView, query: searchQuery)
     }
 
     func makeCoordinator() -> Coordinator {
@@ -121,7 +118,6 @@ struct HTMLWebView: NSViewRepresentable {
           if (window.SyncNosSearch) return;
 
           const HIT_CLASS = 'syncnos-search-hit';
-          const ACTIVE_CLASS = 'syncnos-search-active';
 
           function tokenize(query) {
             if (!query) return [];
@@ -239,39 +235,18 @@ struct HTMLWebView: NSViewRepresentable {
             return hitIndex;
           }
 
-          function scrollToIndex(index) {
-            const marks = Array.from(document.querySelectorAll('mark.' + HIT_CLASS));
-            const count = marks.length;
-            if (!count) return -1;
-
-            for (const m of marks) m.classList.remove(ACTIVE_CLASS);
-
-            let i = Number(index || 0);
-            if (!Number.isFinite(i)) i = 0;
-            i = ((i % count) + count) % count;
-            const target = marks[i];
-            if (!target) return -1;
-            target.classList.add(ACTIVE_CLASS);
-            try {
-              target.scrollIntoView({ block: 'center', behavior: 'auto' });
-            } catch (e) {}
-            return i;
-          }
-
-          function setQuery(query, activeIndex) {
+          function setQuery(query) {
             if (!query || !String(query).trim()) {
               clearHighlights();
               return 0;
             }
             const count = highlight(query);
-            if (count > 0) scrollToIndex(activeIndex || 0);
             return count;
           }
 
           window.SyncNosSearch = {
             setQuery,
             highlight,
-            scrollToIndex,
             clearHighlights
           };
         })();
@@ -373,7 +348,6 @@ struct HTMLWebView: NSViewRepresentable {
         var openLinksInExternalBrowser: Bool
         var onContentHeightChange: ((CGFloat) -> Void)?
         var lastSearchQuery: String?
-        var lastActiveMatchIndex: Int?
 
         init(openLinksInExternalBrowser: Bool) {
             self.openLinksInExternalBrowser = openLinksInExternalBrowser
@@ -412,7 +386,7 @@ struct HTMLWebView: NSViewRepresentable {
             }
 
             // 页面刷新后需要重新应用搜索高亮（mark 会丢失）
-            updateSearch(webView: webView, query: lastSearchQuery, activeMatchIndex: lastActiveMatchIndex, force: true)
+            updateSearch(webView: webView, query: lastSearchQuery, force: true)
         }
 
         private func measureContentHeight(webView: WKWebView) {
@@ -432,45 +406,32 @@ struct HTMLWebView: NSViewRepresentable {
 
         // MARK: - Search Highlight
 
-        func updateSearch(webView: WKWebView, query: String?, activeMatchIndex: Int?, force: Bool = false) {
+        func updateSearch(webView: WKWebView, query: String?, force: Bool = false) {
             let normalizedQuery = query?.trimmingCharacters(in: .whitespacesAndNewlines)
             let effectiveQuery = (normalizedQuery?.isEmpty == false) ? normalizedQuery : nil
-            let effectiveIndex = activeMatchIndex ?? 0
 
             if force {
                 lastSearchQuery = effectiveQuery
-                lastActiveMatchIndex = effectiveIndex
-                applyQuery(webView: webView, query: effectiveQuery, activeMatchIndex: effectiveIndex)
+                applyQuery(webView: webView, query: effectiveQuery)
                 return
             }
 
             if effectiveQuery != lastSearchQuery {
                 lastSearchQuery = effectiveQuery
-                lastActiveMatchIndex = effectiveIndex
-                applyQuery(webView: webView, query: effectiveQuery, activeMatchIndex: effectiveIndex)
+                applyQuery(webView: webView, query: effectiveQuery)
                 return
-            }
-
-            if effectiveQuery != nil, lastActiveMatchIndex != effectiveIndex {
-                lastActiveMatchIndex = effectiveIndex
-                scrollToIndex(webView: webView, index: effectiveIndex)
             }
         }
 
-        private func applyQuery(webView: WKWebView, query: String?, activeMatchIndex: Int) {
+        private func applyQuery(webView: WKWebView, query: String?) {
             if let query {
                 let jsQuery = escapeJSString(query)
-                let script = "window.SyncNosSearch && window.SyncNosSearch.setQuery('\(jsQuery)', \(activeMatchIndex));"
+                let script = "window.SyncNosSearch && window.SyncNosSearch.setQuery('\(jsQuery)');"
                 webView.evaluateJavaScript(script, completionHandler: nil)
             } else {
                 let script = "window.SyncNosSearch && window.SyncNosSearch.clearHighlights();"
                 webView.evaluateJavaScript(script, completionHandler: nil)
             }
-        }
-
-        private func scrollToIndex(webView: WKWebView, index: Int) {
-            let script = "window.SyncNosSearch && window.SyncNosSearch.scrollToIndex(\(index));"
-            webView.evaluateJavaScript(script, completionHandler: nil)
         }
 
         private func escapeJSString(_ s: String) -> String {

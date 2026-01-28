@@ -23,9 +23,6 @@ struct GoodLinksDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchId: String?
-    @State private var detailScrollProxy: ScrollViewProxy?
-    @State private var webActiveMatchIndex: Int = 0
 
     private var selectedLink: GoodLinksLinkRow? {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
@@ -274,7 +271,6 @@ struct GoodLinksDetailView: View {
                         }
                     }
                     .onAppear {
-                        detailScrollProxy = proxy
                         applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
                     }
                     .onChange(of: scrollTarget) { _, _ in
@@ -282,11 +278,6 @@ struct GoodLinksDetailView: View {
                     }
                     .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
                         applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
-                    }
-                    .onChange(of: detailSearchText) { _, _ in
-                        activeMatchId = nil
-                        webActiveMatchIndex = 0
-                        scrollToFirstMatchIfNeeded(proxy: proxy)
                     }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
@@ -302,34 +293,7 @@ struct GoodLinksDetailView: View {
                 }
                 .navigationTitle("GoodLinks")
                 .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-                .onSubmit(of: .search) {
-                    if let proxy = detailScrollProxy {
-                        scrollToNextMatch(proxy: proxy)
-                    }
-                }
                 .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button {
-                            if let proxy = detailScrollProxy {
-                                scrollToPrevMatch(proxy: proxy)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.up")
-                        }
-                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help("上一个")
-
-                        Button {
-                            if let proxy = detailScrollProxy {
-                                scrollToNextMatch(proxy: proxy)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.down")
-                        }
-                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .help("下一个")
-                    }
-
                     // Filter 控件
                     ToolbarItem(placement: .automatic) {
                         FilterSortBar(
@@ -457,90 +421,6 @@ struct GoodLinksDetailView: View {
         }
     }
 
-    // MARK: - Match Navigation
-
-    private func matchedHighlightIds() -> [String] {
-        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
-
-        var result: [String] = []
-        result.reserveCapacity(32)
-        var seen: Set<String> = []
-
-        for h in filteredHighlights {
-            let id = h.id
-            if seen.contains(id) { continue }
-
-            if SearchTextMatcher.matchRangesUTF16(text: h.content, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-
-            if let note = h.note, !note.isEmpty,
-               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-        }
-
-        return result
-    }
-
-    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard let first = ids.first else { return }
-        activeMatchId = first
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(first, anchor: .center) }
-        }
-    }
-
-    private func scrollToNextMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        if !ids.isEmpty {
-            let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
-            let nextIndex = (currentIndex + 1) % ids.count
-            let targetId = ids[nextIndex]
-            activeMatchId = targetId
-            Task { @MainActor in
-                await Task.yield()
-                withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-            }
-            return
-        }
-
-        // 若高亮区无命中，则尝试在正文内定位（由 HTMLWebView 内部滚动）
-        webActiveMatchIndex += 1
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
-        }
-    }
-
-    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        if !ids.isEmpty {
-            let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
-            let prevIndex = (currentIndex - 1 + ids.count) % ids.count
-            let targetId = ids[prevIndex]
-            activeMatchId = targetId
-            Task { @MainActor in
-                await Task.yield()
-                withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-            }
-            return
-        }
-
-        webActiveMatchIndex = max(0, webActiveMatchIndex - 1)
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
-        }
-    }
-
     // MARK: - External Scroll Target
 
     private func applyExternalScrollTargetIfNeeded(linkId: String, proxy: ScrollViewProxy) {
@@ -641,7 +521,6 @@ struct GoodLinksDetailView: View {
                 }
             },
             searchQuery: detailSearchText,
-            activeMatchIndex: webActiveMatchIndex,
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in
