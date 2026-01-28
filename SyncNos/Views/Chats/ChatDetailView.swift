@@ -107,7 +107,7 @@ struct ChatDetailView: View {
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
             .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-            .applySearchFocusIfAvailable($isDetailSearchFocused)
+            .searchFocused($isDetailSearchFocused)
             .onSubmit(of: .search) {
                 if let proxy = scrollProxy {
                     scrollToNextMatch(proxy: proxy)
