@@ -214,7 +214,7 @@ struct WeReadDetailView: View {
         }
         .navigationTitle("WeRead")
         .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-        .applySearchFocusIfAvailable($isDetailSearchFocused)
+        .searchFocused($isDetailSearchFocused)
         .onSubmit(of: .search) {
             if let proxy = detailScrollProxy {
                 scrollToNextMatch(proxy: proxy)
