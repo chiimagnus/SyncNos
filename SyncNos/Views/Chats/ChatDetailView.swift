@@ -104,7 +104,7 @@ struct ChatDetailView: View {
             }
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
-            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
             .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
                 Task { @MainActor in
                     ToolbarSearchFocus.focusIfPossible()

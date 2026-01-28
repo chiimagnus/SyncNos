@@ -53,14 +53,14 @@ struct EditCommands: Commands {
 
         // 全局搜索（⌘K）：Notion 风格弹出面板
         CommandGroup(after: .pasteboard) {
-            Button("全局搜索", systemImage: "magnifyingglass") {
+            Button("Global Search", systemImage: "magnifyingglass") {
                 NotificationCenter.default.post(name: .globalSearchPanelToggleRequested, object: nil)
             }
             .keyboardShortcut("k", modifiers: .command)
             // 仅在主窗口激活时可用，避免在 Settings/Logs 窗口触发并影响主窗口
             .disabled(!(isMainWindowSceneActive ?? false))
 
-            Button("在详情中查找", systemImage: "text.magnifyingglass") {
+            Button("Find in Detail", systemImage: "text.magnifyingglass") {
                 NotificationCenter.default.post(name: .detailSearchFocusRequested, object: nil)
             }
             .keyboardShortcut("f", modifiers: .command)

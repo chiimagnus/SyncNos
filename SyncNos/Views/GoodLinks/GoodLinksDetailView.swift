@@ -292,7 +292,7 @@ struct GoodLinksDetailView: View {
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
                 .navigationTitle("GoodLinks")
-                .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+                .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
                 .toolbar {
                     // Filter 控件
                     ToolbarItem(placement: .automatic) {

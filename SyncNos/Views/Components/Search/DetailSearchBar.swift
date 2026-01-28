@@ -10,7 +10,7 @@ struct DetailSearchBar: View {
 
     init(
         searchText: Binding<String>,
-        placeholder: String = "搜索当前内容",
+        placeholder: String = "Search current content",
         isFocused: FocusState<Bool>.Binding
     ) {
         self._searchText = searchText
@@ -35,7 +35,7 @@ struct DetailSearchBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("清空")
+                .help("Clear")
             }
 
         }
