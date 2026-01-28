@@ -22,8 +22,8 @@ protocol DataSourceUIProvider {
     /// SF Symbol 图标名称
     var iconName: String { get }
     
-    /// 品牌强调色
-    var accentColor: Color { get }
+    /// 数据源品牌色
+    var brandColor: Color { get }
     
     // MARK: - 通知配置
     
