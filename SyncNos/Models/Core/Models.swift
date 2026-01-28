@@ -37,14 +37,14 @@ enum ContentSource: String, Codable, CaseIterable {
         title
     }
     
-    /// 数据源强调色
-    var accentColor: Color {
+    /// 数据源品牌色
+    var brandColor: Color {
         switch self {
         case .appleBooks: return Color("BrandAppleBooks")
         case .goodLinks: return Color("BrandGoodLinks")
         case .weRead: return Color("BrandWeRead")
         case .dedao: return Color("BrandDedao")
-        case .chats: return Color.green
+        case .chats: return Color("BrandChat")
         }
     }
     
@@ -61,9 +61,6 @@ enum ContentSource: String, Codable, CaseIterable {
     
     /// SF Symbol 图标名称（别名，与 icon 相同）
     var iconName: String { icon }
-    
-    /// 品牌颜色（别名，与 accentColor 相同）
-    var brandColor: Color { accentColor }
     
     /// UserDefaults 启用状态键
     var enabledKey: String {

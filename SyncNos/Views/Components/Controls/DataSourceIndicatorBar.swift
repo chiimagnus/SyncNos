@@ -198,7 +198,7 @@ private struct DataSourceIndicatorItem: View {
                         .lineLimit(1)
                 }
             }
-            .foregroundStyle(isCurrentlyActive ? source.accentColor : .secondary)
+            .foregroundStyle(isCurrentlyActive ? source.brandColor : .secondary)
             .padding(.horizontal, isCurrentlyActive ? 8 : 6)
             .padding(.vertical, 4)
             .background(
@@ -220,9 +220,9 @@ private struct DataSourceIndicatorItem: View {
     
     private var backgroundColor: Color {
         if isDragging {
-            return source.accentColor.opacity(0.3)
+            return source.brandColor.opacity(0.3)
         } else if isCurrentlyActive {
-            return source.accentColor.opacity(0.15)
+            return source.brandColor.opacity(0.15)
         } else if isHovering {
             return Color.primary.opacity(0.08)
         }

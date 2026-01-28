@@ -804,7 +804,7 @@ struct ChatDetailView: View {
                 Label("Import Screenshot", systemImage: "photo.badge.plus")
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(Color("BrandChat"))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

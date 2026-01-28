@@ -8,7 +8,7 @@ struct AppleBooksUIProvider: DataSourceUIProvider {
     let source: ContentSource = .appleBooks
     let displayName = "Apple Books"
     let iconName = "book"
-    var accentColor: Color { Color("BrandAppleBooks") }
+    var brandColor: Color { Color("BrandAppleBooks") }
     
     // MARK: - 通知配置
     
