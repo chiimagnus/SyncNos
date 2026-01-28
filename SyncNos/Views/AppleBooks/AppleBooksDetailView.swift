@@ -23,7 +23,6 @@ struct AppleBooksDetailView: View {
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
     @State private var detailScrollProxy: ScrollViewProxy?
-    @FocusState private var isDetailSearchFocused: Bool
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -201,9 +200,13 @@ struct AppleBooksDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
+        }
         .navigationTitle("Apple Books")
         .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-        .searchFocused($isDetailSearchFocused)
         .onSubmit(of: .search) {
             if let proxy = detailScrollProxy {
                 scrollToNextMatch(proxy: proxy)
@@ -278,9 +281,6 @@ struct AppleBooksDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(syncErrorMessage)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
-            isDetailSearchFocused = true
         }
         // Notion 配置弹窗已移至 MainListView 统一处理
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）

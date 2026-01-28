@@ -33,7 +33,6 @@ struct ChatDetailView: View {
 
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
-    @FocusState private var isDetailSearchFocused: Bool
     @State private var isApplyingExternalScrollTarget: Bool = false
 
     private var selectedContact: ChatBookListItem? {
@@ -107,14 +106,15 @@ struct ChatDetailView: View {
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
             .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-            .searchFocused($isDetailSearchFocused)
             .onSubmit(of: .search) {
                 if let proxy = scrollProxy {
                     scrollToNextMatch(proxy: proxy)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
-                isDetailSearchFocused = true
+                Task { @MainActor in
+                    ToolbarSearchFocus.focusIfPossible()
+                }
             }
             .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
