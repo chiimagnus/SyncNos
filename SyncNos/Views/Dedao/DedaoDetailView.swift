@@ -83,7 +83,7 @@ struct DedaoDetailView: View {
                 .padding()
             }
             .navigationTitle("Dedao")
-            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
             .toolbar { toolbarContent(book: book) }
             // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
             .onAppear {
