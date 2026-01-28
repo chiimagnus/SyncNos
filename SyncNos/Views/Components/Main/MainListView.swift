@@ -86,6 +86,20 @@ struct MainListView: View {
         ContentSource(rawValue: contentSourceRawValue) ?? .appleBooks
     }
 
+    private var mainWindowBackground: some View {
+        let color = contentSource.brandColor
+        return LinearGradient(
+            colors: [
+                color.opacity(0.22),
+                color.opacity(0.10),
+                Color.clear
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
     /// 当前启用的数据源集合（按用户自定义顺序排列）
     private var enabledContentSources: [ContentSource] {
         ContentSource.orderedEnabledSources(isEnabled: isSourceEnabled)
@@ -277,20 +291,7 @@ struct MainListView: View {
                 handleSyncQueueTaskSelection(source: source, id: id)
             }
             .background {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.red.opacity(0.3),
-                        Color.orange.opacity(0.3),
-                        Color.yellow.opacity(0.3),
-                        Color.green.opacity(0.3),
-                        Color.blue.opacity(0.3),
-                        Color.purple.opacity(0.3),
-                        Color.pink.opacity(0.3)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                mainWindowBackground
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
             // MARK: - Chats New Chat Alert
