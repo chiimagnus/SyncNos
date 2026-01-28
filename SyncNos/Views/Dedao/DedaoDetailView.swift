@@ -25,7 +25,7 @@ struct DedaoDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchIndex: Int = 0
+    @State private var activeMatchId: String?
     @State private var detailScrollProxy: ScrollViewProxy?
 
     private static let dateFormatter: DateFormatter = {
@@ -112,7 +112,7 @@ struct DedaoDetailView: View {
                 applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
             }
             .onChange(of: detailSearchText) { _, _ in
-                activeMatchIndex = 0
+                activeMatchId = nil
                 scrollToFirstMatchIfNeeded(proxy: proxy)
             }
             // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
@@ -427,21 +427,37 @@ struct DedaoDetailView: View {
     private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         guard let first = ids.first else { return }
-        withAnimation { proxy.scrollTo(first, anchor: .center) }
+        activeMatchId = first
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(first, anchor: .center) }
+        }
     }
 
     private func scrollToNextMatch(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         guard !ids.isEmpty else { return }
-        activeMatchIndex = (activeMatchIndex + 1) % ids.count
-        withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
+        let nextIndex = (currentIndex + 1) % ids.count
+        let targetId = ids[nextIndex]
+        activeMatchId = targetId
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
+        }
     }
 
     private func scrollToPrevMatch(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         guard !ids.isEmpty else { return }
-        activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
-        withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
+        let prevIndex = (currentIndex - 1 + ids.count) % ids.count
+        let targetId = ids[prevIndex]
+        activeMatchId = targetId
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
+        }
     }
 
     // MARK: - External Scroll Target
