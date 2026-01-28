@@ -106,10 +106,39 @@ struct ChatDetailView: View {
             }
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
+            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+            .searchFocused($isDetailSearchFocused)
+            .onSubmit(of: .search) {
+                if let proxy = scrollProxy {
+                    scrollToNextMatch(proxy: proxy)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
                 isDetailSearchFocused = true
             }
             .toolbar {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            if let proxy = scrollProxy {
+                                scrollToPrevMatch(proxy: proxy)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("上一个")
+
+                        Button {
+                            if let proxy = scrollProxy {
+                                scrollToNextMatch(proxy: proxy)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("下一个")
+                    }
+
                     ToolbarItem(placement: .automatic) {
                         Spacer()
                     }
@@ -302,17 +331,6 @@ struct ChatDetailView: View {
                             }
                         )
                 }
-                .safeAreaInset(edge: .top) {
-                    DetailSearchBar(
-                        searchText: $detailSearchText,
-                        isFocused: $isDetailSearchFocused,
-                        onPrev: { },
-                        onNext: { }
-                    )
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
-                }
                 .id(contact.contactId)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
@@ -340,17 +358,6 @@ struct ChatDetailView: View {
                                 onScrollViewResolved(scrollView)
                             }
                         )
-                }
-                .safeAreaInset(edge: .top) {
-                    DetailSearchBar(
-                        searchText: $detailSearchText,
-                        isFocused: $isDetailSearchFocused,
-                        onPrev: { },
-                        onNext: { }
-                    )
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
                 }
                 .id(contact.contactId)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -449,17 +456,6 @@ struct ChatDetailView: View {
                         }
                     }
                     .padding()
-                }
-                .safeAreaInset(edge: .top) {
-                    DetailSearchBar(
-                        searchText: $detailSearchText,
-                        isFocused: $isDetailSearchFocused,
-                        onPrev: { scrollToPrevMatch(proxy: proxy) },
-                        onNext: { scrollToNextMatch(proxy: proxy) }
-                    )
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
                 }
                 .id(contact.contactId) // 为不同对话创建独立的 ScrollView 实例，避免滚动状态在对话间串联
                 .defaultScrollAnchor(.bottom) // 默认显示底部（最新消息）

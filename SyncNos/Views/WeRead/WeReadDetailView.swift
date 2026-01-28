@@ -26,6 +26,7 @@ struct WeReadDetailView: View {
 
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
+    @State private var detailScrollProxy: ScrollViewProxy?
     @FocusState private var isDetailSearchFocused: Bool
 
     private static let dateFormatter: DateFormatter = {
@@ -191,18 +192,8 @@ struct WeReadDetailView: View {
                     }
                         .padding()
                     }
-                    .safeAreaInset(edge: .top) {
-                        DetailSearchBar(
-                            searchText: $detailSearchText,
-                            isFocused: $isDetailSearchFocused,
-                            onPrev: { scrollToPrevMatch(proxy: proxy) },
-                            onNext: { scrollToNextMatch(proxy: proxy) }
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
-                        .padding(.bottom, 6)
-                    }
                     .onAppear {
+                        detailScrollProxy = proxy
                         applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
                     }
                     .onChange(of: scrollTarget) { _, _ in
@@ -222,7 +213,36 @@ struct WeReadDetailView: View {
             }
         }
         .navigationTitle("WeRead")
+        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+        .searchFocused($isDetailSearchFocused)
+        .onSubmit(of: .search) {
+            if let proxy = detailScrollProxy {
+                scrollToNextMatch(proxy: proxy)
+            }
+        }
         .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    if let proxy = detailScrollProxy {
+                        scrollToPrevMatch(proxy: proxy)
+                    }
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("上一个")
+
+                Button {
+                    if let proxy = detailScrollProxy {
+                        scrollToNextMatch(proxy: proxy)
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("下一个")
+            }
+
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
                     noteFilter: $detailViewModel.noteFilter,
