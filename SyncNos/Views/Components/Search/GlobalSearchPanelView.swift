@@ -88,7 +88,7 @@ struct GlobalSearchPanelView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
 
-                TextField("搜索：标题 / 作者 / 高亮 / 正文 / 消息", text: $viewModel.query)
+                TextField("Search: Title / Author / Highlights / Body / Messages", text: $viewModel.query)
                     .textFieldStyle(.plain)
                     .focused($isQueryFocused)
                     .onChange(of: viewModel.query) { _, _ in
@@ -108,7 +108,7 @@ struct GlobalSearchPanelView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("清空")
+                    .help("Clear")
                 }
             }
             .padding(.horizontal, 14)
@@ -139,7 +139,7 @@ struct GlobalSearchPanelView: View {
             if viewModel.isSearching {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.7)
-                    Text("搜索中…")
+                    Text("Searching…")
                         .scaledFont(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -213,7 +213,7 @@ struct GlobalSearchPanelView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 28))
                 .foregroundStyle(.secondary)
-            Text(viewModel.query.isEmpty ? "输入关键词开始搜索" : "没有找到匹配结果")
+            Text(viewModel.query.isEmpty ? "Type to start searching" : "No matches found")
                 .scaledFont(.body)
                 .foregroundStyle(.secondary)
             if let err = viewModel.errorMessage, !err.isEmpty {
@@ -253,7 +253,7 @@ struct GlobalSearchPanelView: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        Text(r.kind == .textBlock ? "内容" : "标题")
+                        Text(r.kind == .textBlock ? "Content" : "Title")
                             .scaledFont(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.horizontal, 6)

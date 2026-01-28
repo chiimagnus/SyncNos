@@ -3,6 +3,7 @@ import SwiftUI
 struct AppleBooksDetailView: View {
     @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var viewModel = AppleBooksDetailViewModel()
@@ -16,6 +17,10 @@ struct AppleBooksDetailView: View {
     // External (batch) sync state for the currently selected book
     @State private var externalIsSyncing: Bool = false
     @State private var externalSyncProgress: String? = nil
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -79,6 +84,7 @@ struct AppleBooksDetailView: View {
                                     HighlightCardView(
                                         colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
                                         content: highlight.text,
+                                        highlightQuery: detailSearchText,
                                         note: highlight.note,
                                         createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
                                         modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
@@ -100,6 +106,7 @@ struct AppleBooksDetailView: View {
                                         .help("Open in Apple Books")
                                         .accessibilityLabel("Open in Apple Books")
                                     }
+                                    .id(highlight.uuid)
                                 }
                             }
                             .padding(.top)
@@ -154,6 +161,15 @@ struct AppleBooksDetailView: View {
                             proxy.scrollTo("appleBooksDetailTop", anchor: .top)
                         }
                     }
+                    .onAppear {
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: scrollTarget) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: viewModel.highlights.count) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
                 }
             }
         }
@@ -177,7 +193,13 @@ struct AppleBooksDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
+        }
         .navigationTitle("Apple Books")
+        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
         .toolbar {
             // Filter 控件
             ToolbarItem(placement: .automatic) {
@@ -258,6 +280,46 @@ struct AppleBooksDetailView: View {
             }
         }
     }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(bookId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .appleBooks,
+              target.containerId == bookId else { return }
+
+        Task { @MainActor in
+            if target.kind == .titleOnly || target.blockId == nil {
+                withAnimation { proxy.scrollTo("appleBooksDetailTop", anchor: .top) }
+                scrollTarget = nil
+                return
+            }
+
+            guard let blockId = target.blockId else { return }
+
+            await ensureHighlightLoadedIfNeeded(blockId: blockId, bookId: bookId)
+
+            if viewModel.highlights.contains(where: { $0.uuid == blockId }) {
+                withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+            } else {
+                withAnimation { proxy.scrollTo("appleBooksDetailTop", anchor: .top) }
+            }
+            scrollTarget = nil
+        }
+    }
+
+    private func ensureHighlightLoadedIfNeeded(blockId: String, bookId: String) async {
+        if viewModel.highlights.contains(where: { $0.uuid == blockId }) { return }
+        guard viewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !viewModel.highlights.contains(where: { $0.uuid == blockId }),
+              viewModel.canLoadMore,
+              attempts < 30 {
+            attempts += 1
+            await viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: bookId)
+        }
+    }
 }
 
 struct AppleBooksDetailView_Previews: PreviewProvider {
@@ -273,6 +335,7 @@ struct AppleBooksDetailView_Previews: PreviewProvider {
         return AppleBooksDetailView(
             viewModelList: listVM,
             selectedBookId: .constant(sampleBook.bookId),
+            scrollTarget: .constant(nil),
             onScrollViewResolved: { _ in }
         )
     }

@@ -3,6 +3,7 @@ import SwiftUI
 struct WeReadDetailView: View {
     @ObservedObject var listViewModel: WeReadViewModel
     @Binding var selectedBookId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var detailViewModel = WeReadDetailViewModel()
@@ -20,6 +21,10 @@ struct WeReadDetailView: View {
     // 弹窗状态
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -42,8 +47,9 @@ struct WeReadDetailView: View {
     var body: some View {
         Group {
             if let book = selectedBook {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
                         // Top anchor used for programmatic scrolling when content changes
                         Color.clear
                             .frame(height: 0)
@@ -100,6 +106,7 @@ struct WeReadDetailView: View {
                                     HighlightCardView(
                                         colorMark: color(for: h.colorIndex),
                                         content: h.text,
+                                        highlightQuery: detailSearchText,
                                         note: h.note,
                                         reviewContents: h.reviewContents,
                                         createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
@@ -109,6 +116,7 @@ struct WeReadDetailView: View {
                                         // 当卡片出现时，检查是否需要加载更多
                                         detailViewModel.loadMoreIfNeeded(currentItem: h)
                                     }
+                                    .id(h.id)
                                 }
                             }
                             .padding(.top)
@@ -179,11 +187,25 @@ struct WeReadDetailView: View {
                             .padding(.vertical, 4)
                         }
                     }
-                    .padding()
+                        .padding()
+                    }
+                    .onAppear {
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: scrollTarget) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: selectedBookId) { _, _ in
+                        withAnimation { proxy.scrollTo("weReadDetailTop", anchor: .top) }
+                    }
                 }
             }
         }
         .navigationTitle("WeRead")
+        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
@@ -245,6 +267,11 @@ struct WeReadDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
+        }
         // 监听批量同步进度更新
         .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
             guard let info = n.userInfo as? [String: Any], let bookId = info["bookId"] as? String else { return }
@@ -283,5 +310,42 @@ struct WeReadDetailView: View {
             Text(syncErrorMessage)
         }
         // Notion 配置弹窗已移至 MainListView 统一处理
+    }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(bookId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .weRead,
+              target.containerId == bookId else { return }
+
+        if target.kind == .titleOnly || target.blockId == nil {
+            withAnimation { proxy.scrollTo("weReadDetailTop", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        guard let blockId = target.blockId else { return }
+        ensureHighlightLoadedIfNeeded(blockId: blockId)
+
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) {
+            withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+        } else {
+            withAnimation { proxy.scrollTo("weReadDetailTop", anchor: .top) }
+        }
+        scrollTarget = nil
+    }
+
+    private func ensureHighlightLoadedIfNeeded(blockId: String) {
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) { return }
+        guard detailViewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }),
+              detailViewModel.canLoadMore,
+              attempts < 60 {
+            attempts += 1
+            detailViewModel.loadNextPage()
+        }
     }
 }

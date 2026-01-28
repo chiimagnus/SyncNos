@@ -3,6 +3,7 @@ import SwiftUI
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @Environment(\.openWindow) private var openWindow
@@ -18,6 +19,10 @@ struct GoodLinksDetailView: View {
     @State private var syncErrorMessage = ""
     @State private var externalIsSyncing: Bool = false
     @State private var externalSyncProgress: String? = nil
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
 
     private var selectedLink: GoodLinksLinkRow? {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
@@ -133,6 +138,7 @@ struct GoodLinksDetailView: View {
                         
                         // 全文内容 - 根据加载状态显示不同 UI
                         articleContentSection(linkId: linkId)
+                            .id("goodlinksArticleContent")
 
                         // 高亮列表
                         VStack(alignment: .leading, spacing: 8) {
@@ -172,6 +178,7 @@ struct GoodLinksDetailView: View {
                                         HighlightCardView(
                                             colorMark: item.color.map { HighlightColorUI.color(for: $0, source: .goodLinks) } ?? Color.gray.opacity(0.5),
                                             content: item.content,
+                                            highlightQuery: detailSearchText,
                                             note: item.note,
                                             createdDate: formatDate(item.time),
                                             modifiedDate: nil
@@ -193,6 +200,7 @@ struct GoodLinksDetailView: View {
                                             // 滚动加载更多
                                             detailViewModel.loadMoreIfNeeded(currentItem: item)
                                         }
+                                        .id(item.id)
                                     }
                                 }
                                 .overlay(
@@ -262,6 +270,15 @@ struct GoodLinksDetailView: View {
                             proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                         }
                     }
+                    .onAppear {
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
+                    .onChange(of: scrollTarget) { _, _ in
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
+                    .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
                 // 加载高亮与全文内容
@@ -275,6 +292,7 @@ struct GoodLinksDetailView: View {
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
                 .navigationTitle("GoodLinks")
+                .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
                 .toolbar {
                     // Filter 控件
                     ToolbarItem(placement: .automatic) {
@@ -330,6 +348,11 @@ struct GoodLinksDetailView: View {
         .onDisappear {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshBooksRequested).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
@@ -397,6 +420,51 @@ struct GoodLinksDetailView: View {
             }
         }
     }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(linkId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .goodLinks,
+              target.containerId == linkId else { return }
+
+        if target.kind == .titleOnly || target.blockId == nil {
+            withAnimation { proxy.scrollTo("goodlinksDetailTop", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        guard let blockId = target.blockId else { return }
+
+        if blockId.hasPrefix("article:") {
+            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        ensureHighlightLoadedIfNeeded(highlightId: blockId)
+
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) {
+            withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+        } else {
+            withAnimation { proxy.scrollTo("goodlinksDetailTop", anchor: .top) }
+        }
+
+        scrollTarget = nil
+    }
+
+    private func ensureHighlightLoadedIfNeeded(highlightId: String) {
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == highlightId }) { return }
+        guard detailViewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !detailViewModel.visibleHighlights.contains(where: { $0.id == highlightId }),
+              detailViewModel.canLoadMore,
+              attempts < 60 {
+            attempts += 1
+            detailViewModel.loadNextPage()
+        }
+    }
     
     // MARK: - Helper Functions
     
@@ -452,6 +520,7 @@ struct GoodLinksDetailView: View {
                     await detailViewModel?.refetchContent(for: link)
                 }
             },
+            searchQuery: detailSearchText,
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in

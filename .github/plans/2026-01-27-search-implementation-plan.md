@@ -209,7 +209,7 @@ enum SearchTextMatcher {
 
 ---
 
-### P4：Detail 搜索（⌘F）+ 高亮 + 定位
+### P4：✅Detail 搜索（⌘F）+ 高亮 + 定位
 
 #### Task 9: 通用 DetailSearchBar 组件
 **Files:**
