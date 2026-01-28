@@ -56,7 +56,7 @@ struct MainListView: View {
     // 需被 KeyboardMonitor 扩展读取（跨文件），不能是 private
     @State var isGlobalSearchPresented: Bool = false
     /// 详情定位目标（P4 接入各 DetailView）
-    @State private var pendingDetailScrollTarget: DetailScrollTarget?
+    @State var pendingDetailScrollTarget: DetailScrollTarget?
     
     // MARK: - App Storage
     
