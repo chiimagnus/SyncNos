@@ -114,7 +114,7 @@ struct SelectionPlaceholderView: View {
                         .fontWidth(.compressed)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
-                        .foregroundColor(source.accentColor)
+                        .foregroundColor(source.brandColor)
 
                     if isMultipleSelection, let count {
                         Button {

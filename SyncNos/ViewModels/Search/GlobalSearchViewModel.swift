@@ -115,7 +115,7 @@ final class GlobalSearchViewModel: ObservableObject {
             do {
                 for try await r in engine.search(query: trimmed, scope: currentScope, enabledSources: sources, limit: 500) {
                     if Task.isCancelled { break }
-                    await self.receiveIncomingResult(r)
+                    self.receiveIncomingResult(r)
                 }
                 await MainActor.run {
                     self.isSearching = false

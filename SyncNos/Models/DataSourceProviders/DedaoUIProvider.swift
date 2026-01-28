@@ -8,7 +8,7 @@ struct DedaoUIProvider: DataSourceUIProvider {
     let source: ContentSource = .dedao
     let displayName = "Dedao"
     let iconName = "d.square"
-    var accentColor: Color { Color("BrandDedao") }
+    var brandColor: Color { Color("BrandDedao") }
     
     // MARK: - 通知配置
     

@@ -8,7 +8,7 @@ struct ChatsUIProvider: DataSourceUIProvider {
     let source: ContentSource = .chats
     let displayName = "Chats"
     let iconName = "message"
-    var accentColor: Color { .green }
+    var brandColor: Color { Color("BrandChat") }
     
     // MARK: - 通知配置
     

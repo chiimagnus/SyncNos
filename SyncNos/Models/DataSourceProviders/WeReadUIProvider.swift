@@ -8,7 +8,7 @@ struct WeReadUIProvider: DataSourceUIProvider {
     let source: ContentSource = .weRead
     let displayName = "WeRead"
     let iconName = "w.square"
-    var accentColor: Color { Color("BrandWeRead") }
+    var brandColor: Color { Color("BrandWeRead") }
     
     // MARK: - 通知配置
     

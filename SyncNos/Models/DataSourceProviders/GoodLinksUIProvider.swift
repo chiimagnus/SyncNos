@@ -8,7 +8,7 @@ struct GoodLinksUIProvider: DataSourceUIProvider {
     let source: ContentSource = .goodLinks
     let displayName = "GoodLinks"
     let iconName = "bookmark"
-    var accentColor: Color { Color("BrandGoodLinks") }
+    var brandColor: Color { Color("BrandGoodLinks") }
     
     // MARK: - 通知配置
     
