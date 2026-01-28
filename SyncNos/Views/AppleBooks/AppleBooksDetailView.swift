@@ -22,6 +22,7 @@ struct AppleBooksDetailView: View {
 
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
+    @State private var detailScrollProxy: ScrollViewProxy?
     @FocusState private var isDetailSearchFocused: Bool
     
     static let dateFormatter: DateFormatter = {
@@ -157,17 +158,6 @@ struct AppleBooksDetailView: View {
                         }
                         .padding()
                     }
-                    .safeAreaInset(edge: .top) {
-                        DetailSearchBar(
-                            searchText: $detailSearchText,
-                            isFocused: $isDetailSearchFocused,
-                            onPrev: { scrollToPrevMatch(proxy: proxy) },
-                            onNext: { scrollToNextMatch(proxy: proxy) }
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
-                        .padding(.bottom, 6)
-                    }
                     // Scroll to top when selected book changes
                     .onChange(of: selectedBookId) { _, _ in
                         withAnimation {
@@ -175,6 +165,7 @@ struct AppleBooksDetailView: View {
                         }
                     }
                     .onAppear {
+                        detailScrollProxy = proxy
                         applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
                     }
                     .onChange(of: scrollTarget) { _, _ in
@@ -211,7 +202,36 @@ struct AppleBooksDetailView: View {
             layoutWidthDebounceTask = nil
         }
         .navigationTitle("Apple Books")
+        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+        .searchFocused($isDetailSearchFocused)
+        .onSubmit(of: .search) {
+            if let proxy = detailScrollProxy {
+                scrollToNextMatch(proxy: proxy)
+            }
+        }
         .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    if let proxy = detailScrollProxy {
+                        scrollToPrevMatch(proxy: proxy)
+                    }
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("上一个")
+
+                Button {
+                    if let proxy = detailScrollProxy {
+                        scrollToNextMatch(proxy: proxy)
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("下一个")
+            }
+
             // Filter 控件
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
