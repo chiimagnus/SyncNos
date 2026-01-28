@@ -3,6 +3,7 @@ import SwiftUI
 struct GoodLinksDetailView: View {
     @ObservedObject var viewModel: GoodLinksViewModel
     @Binding var selectedLinkId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @Environment(\.openWindow) private var openWindow
@@ -18,6 +19,13 @@ struct GoodLinksDetailView: View {
     @State private var syncErrorMessage = ""
     @State private var externalIsSyncing: Bool = false
     @State private var externalSyncProgress: String? = nil
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
+    @State private var activeMatchIndex: Int = 0
+    @State private var webActiveMatchIndex: Int = 0
+    @FocusState private var isDetailSearchFocused: Bool
 
     private var selectedLink: GoodLinksLinkRow? {
         viewModel.links.first { $0.id == (selectedLinkId ?? "") }
@@ -133,6 +141,7 @@ struct GoodLinksDetailView: View {
                         
                         // 全文内容 - 根据加载状态显示不同 UI
                         articleContentSection(linkId: linkId)
+                            .id("goodlinksArticleContent")
 
                         // 高亮列表
                         VStack(alignment: .leading, spacing: 8) {
@@ -172,6 +181,7 @@ struct GoodLinksDetailView: View {
                                         HighlightCardView(
                                             colorMark: item.color.map { HighlightColorUI.color(for: $0, source: .goodLinks) } ?? Color.gray.opacity(0.5),
                                             content: item.content,
+                                            highlightQuery: detailSearchText,
                                             note: item.note,
                                             createdDate: formatDate(item.time),
                                             modifiedDate: nil
@@ -193,6 +203,7 @@ struct GoodLinksDetailView: View {
                                             // 滚动加载更多
                                             detailViewModel.loadMoreIfNeeded(currentItem: item)
                                         }
+                                        .id(item.id)
                                     }
                                 }
                                 .overlay(
@@ -256,11 +267,36 @@ struct GoodLinksDetailView: View {
                         }
                         .padding()
                     }
+                    .safeAreaInset(edge: .top) {
+                        DetailSearchBar(
+                            searchText: $detailSearchText,
+                            isFocused: $isDetailSearchFocused,
+                            onPrev: { scrollToPrevMatch(proxy: proxy) },
+                            onNext: { scrollToNextMatch(proxy: proxy) }
+                        )
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        .padding(.bottom, 6)
+                    }
                     // Scroll to top when selected link changes
                     .onChange(of: linkId) { _, _ in
                         withAnimation {
                             proxy.scrollTo("goodlinksDetailTop", anchor: .top)
                         }
+                    }
+                    .onAppear {
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
+                    .onChange(of: scrollTarget) { _, _ in
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
+                    .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
+                        applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
+                    }
+                    .onChange(of: detailSearchText) { _, _ in
+                        activeMatchIndex = 0
+                        webActiveMatchIndex = 0
+                        scrollToFirstMatchIfNeeded(proxy: proxy)
                     }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
@@ -331,6 +367,9 @@ struct GoodLinksDetailView: View {
             layoutWidthDebounceTask?.cancel()
             layoutWidthDebounceTask = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            isDetailSearchFocused = true
+        }
         .onReceive(NotificationCenter.default.publisher(for: .refreshBooksRequested).receive(on: DispatchQueue.main)) { _ in
             if let linkId = selectedLinkId, !linkId.isEmpty {
                 detailViewModel.clear()
@@ -397,6 +436,115 @@ struct GoodLinksDetailView: View {
             }
         }
     }
+
+    // MARK: - Match Navigation
+
+    private func matchedHighlightIds() -> [String] {
+        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+
+        var result: [String] = []
+        result.reserveCapacity(32)
+        var seen: Set<String> = []
+
+        for h in filteredHighlights {
+            let id = h.id
+            if seen.contains(id) { continue }
+
+            if SearchTextMatcher.matchRangesUTF16(text: h.content, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+
+            if let note = h.note, !note.isEmpty,
+               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+        }
+
+        return result
+    }
+
+    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard let first = ids.first else { return }
+        withAnimation {
+            proxy.scrollTo(first, anchor: .center)
+        }
+    }
+
+    private func scrollToNextMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        if !ids.isEmpty {
+            activeMatchIndex = (activeMatchIndex + 1) % ids.count
+            withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+            return
+        }
+
+        // 若高亮区无命中，则尝试在正文内定位（由 HTMLWebView 内部滚动）
+        webActiveMatchIndex += 1
+        withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+    }
+
+    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        if !ids.isEmpty {
+            activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
+            withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+            return
+        }
+
+        webActiveMatchIndex = max(0, webActiveMatchIndex - 1)
+        withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+    }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(linkId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .goodLinks,
+              target.containerId == linkId else { return }
+
+        if target.kind == .titleOnly || target.blockId == nil {
+            withAnimation { proxy.scrollTo("goodlinksDetailTop", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        guard let blockId = target.blockId else { return }
+
+        if blockId.hasPrefix("article:") {
+            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        ensureHighlightLoadedIfNeeded(highlightId: blockId)
+
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) {
+            withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+        } else {
+            withAnimation { proxy.scrollTo("goodlinksDetailTop", anchor: .top) }
+        }
+
+        scrollTarget = nil
+    }
+
+    private func ensureHighlightLoadedIfNeeded(highlightId: String) {
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == highlightId }) { return }
+        guard detailViewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !detailViewModel.visibleHighlights.contains(where: { $0.id == highlightId }),
+              detailViewModel.canLoadMore,
+              attempts < 60 {
+            attempts += 1
+            detailViewModel.loadNextPage()
+        }
+    }
     
     // MARK: - Helper Functions
     
@@ -452,6 +600,8 @@ struct GoodLinksDetailView: View {
                     await detailViewModel?.refetchContent(for: link)
                 }
             },
+            searchQuery: detailSearchText,
+            activeMatchIndex: webActiveMatchIndex,
             overrideWidth: debouncedLayoutWidth > 0 ? debouncedLayoutWidth : nil,
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in

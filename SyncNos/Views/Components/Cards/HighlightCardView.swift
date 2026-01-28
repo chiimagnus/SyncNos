@@ -6,6 +6,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
     
     let colorMark: Color
     let content: String
+    let highlightQuery: String?
     let note: String?
     let reviewContents: [String]  // 多条想法内容
     let createdDate: String?
@@ -15,6 +16,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
     init(
         colorMark: Color,
         content: String,
+        highlightQuery: String? = nil,
         note: String? = nil,
         reviewContents: [String] = [],
         createdDate: String? = nil,
@@ -23,6 +25,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
     ) {
         self.colorMark = colorMark
         self.content = content
+        self.highlightQuery = highlightQuery
         self.note = note
         self.reviewContents = reviewContents
         self.createdDate = createdDate
@@ -41,18 +44,11 @@ struct HighlightCardView<AccessoryContent: View>: View {
                 // 右侧内容区域
                 VStack(alignment: .leading, spacing: 8) {
                     // 高亮内容
-                    Text(content)
-                        .scaledFont(.body)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    highlightedText(content, style: .body)
                     
                     // 用户笔记（如果有）
                     if let note = note, !note.isEmpty {
-                        Text(note)
-                            .scaledFont(.callout)
-                            .foregroundColor(.primary)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
+                        highlightedText(note, style: .callout)
                             .padding(10)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
@@ -63,11 +59,7 @@ struct HighlightCardView<AccessoryContent: View>: View {
                     // 多条想法（如果有，如 weread）
                     if !reviewContents.isEmpty {
                         ForEach(Array(reviewContents.enumerated()), id: \.offset) { _, reviewContent in
-                            Text(reviewContent)
-                                .scaledFont(.callout)
-                                .foregroundColor(.primary)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
+                            highlightedText(reviewContent, style: .callout)
                                 .padding(10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
@@ -120,5 +112,24 @@ struct HighlightCardView<AccessoryContent: View>: View {
                 .padding(8)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - Highlight Helpers
+
+    @ViewBuilder
+    private func highlightedText(_ text: String, style: Font.TextStyle) -> some View {
+        if let query = highlightQuery,
+           !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let ranges = SearchTextMatcher.matchRangesUTF16(text: text, query: query) {
+            HighlightedText(text: text, matchRangesUTF16: ranges)
+                .scaledFont(style)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(text)
+                .scaledFont(style)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

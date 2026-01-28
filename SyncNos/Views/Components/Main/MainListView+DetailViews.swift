@@ -35,6 +35,7 @@ extension MainListView {
             AppleBooksDetailView(
                 viewModelList: appleBooksVM,
                 selectedBookId: singleBookBinding,
+                scrollTarget: $pendingDetailScrollTarget,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
                 }
@@ -63,6 +64,7 @@ extension MainListView {
             GoodLinksDetailView(
                 viewModel: goodLinksVM,
                 selectedLinkId: singleLinkBinding,
+                scrollTarget: $pendingDetailScrollTarget,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
                 }
@@ -91,6 +93,7 @@ extension MainListView {
             WeReadDetailView(
                 listViewModel: weReadVM,
                 selectedBookId: singleWeReadBinding,
+                scrollTarget: $pendingDetailScrollTarget,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
                 }
@@ -119,6 +122,7 @@ extension MainListView {
             DedaoDetailView(
                 listViewModel: dedaoVM,
                 selectedBookId: singleDedaoBookBinding,
+                scrollTarget: $pendingDetailScrollTarget,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
                 }
@@ -147,6 +151,7 @@ extension MainListView {
             ChatDetailView(
                 listViewModel: chatsVM,
                 selectedContactId: singleContactBinding,
+                scrollTarget: $pendingDetailScrollTarget,
                 onScrollViewResolved: { scrollView in
                     currentDetailScrollView = scrollView
                 }
@@ -189,4 +194,3 @@ extension MainListView {
         chatsVM.batchSync(contactIds: selectionState.selection(for: .chats), concurrency: NotionSyncConfig.batchConcurrency)
     }
 }
-

@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatSystemMessageRow: View {
     let message: ChatMessage
     let isSelected: Bool
+    let searchQuery: String?
     let onTap: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
@@ -12,7 +13,7 @@ struct ChatSystemMessageRow: View {
     private let selectedBorderColor = Color.accentColor
 
     var body: some View {
-        Text(message.content)
+        messageTextView
             .scaledFont(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -44,6 +45,16 @@ struct ChatSystemMessageRow: View {
                 )
             }
     }
-}
 
+    @ViewBuilder
+    private var messageTextView: some View {
+        if let q = searchQuery,
+           !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let ranges = SearchTextMatcher.matchRangesUTF16(text: message.content, query: q) {
+            HighlightedText(text: message.content, matchRangesUTF16: ranges)
+        } else {
+            Text(message.content)
+        }
+    }
+}
 

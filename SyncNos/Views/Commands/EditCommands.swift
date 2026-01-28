@@ -4,6 +4,7 @@ import SwiftUI
 struct EditCommands: Commands {
     @FocusedValue(\.selectionCommands) private var selectionCommands: SelectionCommands?
     @FocusedValue(\.isMainWindowSceneActive) private var isMainWindowSceneActive: Bool?
+    @FocusedValue(\.isGlobalSearchPresented) private var isGlobalSearchPresented: Bool?
 
     var body: some Commands {
         // Edit 菜单 - 编辑操作相关
@@ -58,6 +59,13 @@ struct EditCommands: Commands {
             .keyboardShortcut("k", modifiers: .command)
             // 仅在主窗口激活时可用，避免在 Settings/Logs 窗口触发并影响主窗口
             .disabled(!(isMainWindowSceneActive ?? false))
+
+            Button("在详情中查找", systemImage: "text.magnifyingglass") {
+                NotificationCenter.default.post(name: .detailSearchFocusRequested, object: nil)
+            }
+            .keyboardShortcut("f", modifiers: .command)
+            // 仅在主窗口激活时可用；全局搜索面板打开时避免抢焦点
+            .disabled(!(isMainWindowSceneActive ?? false) || (isGlobalSearchPresented ?? false))
         }
     }
 }

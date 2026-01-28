@@ -157,6 +157,9 @@ extension Notification.Name {
 
     /// 全局搜索：请求跳转到某个结果（userInfo: ["target": GlobalSearchNavigationTarget]）
     static let globalSearchNavigateRequested = Notification.Name("GlobalSearchNavigateRequested")
+
+    /// Detail 搜索：请求聚焦当前 Detail 的搜索框（⌘F）
+    static let detailSearchFocusRequested = Notification.Name("DetailSearchFocusRequested")
 }
 
 // MARK: - ContentSource 通知扩展
