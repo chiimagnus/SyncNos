@@ -25,8 +25,6 @@ struct WeReadDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchId: String?
-    @State private var detailScrollProxy: ScrollViewProxy?
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -192,7 +190,6 @@ struct WeReadDetailView: View {
                         .padding()
                     }
                     .onAppear {
-                        detailScrollProxy = proxy
                         applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
                     }
                     .onChange(of: scrollTarget) { _, _ in
@@ -200,10 +197,6 @@ struct WeReadDetailView: View {
                     }
                     .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
                         applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
-                    }
-                    .onChange(of: detailSearchText) { _, _ in
-                        activeMatchId = nil
-                        scrollToFirstMatchIfNeeded(proxy: proxy)
                     }
                     .onChange(of: selectedBookId) { _, _ in
                         withAnimation { proxy.scrollTo("weReadDetailTop", anchor: .top) }
@@ -213,34 +206,7 @@ struct WeReadDetailView: View {
         }
         .navigationTitle("WeRead")
         .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-        .onSubmit(of: .search) {
-            if let proxy = detailScrollProxy {
-                scrollToNextMatch(proxy: proxy)
-            }
-        }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    if let proxy = detailScrollProxy {
-                        scrollToPrevMatch(proxy: proxy)
-                    }
-                } label: {
-                    Image(systemName: "chevron.up")
-                }
-                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .help("上一个")
-
-                Button {
-                    if let proxy = detailScrollProxy {
-                        scrollToNextMatch(proxy: proxy)
-                    }
-                } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .help("下一个")
-            }
-
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
                     noteFilter: $detailViewModel.noteFilter,
@@ -344,81 +310,6 @@ struct WeReadDetailView: View {
             Text(syncErrorMessage)
         }
         // Notion 配置弹窗已移至 MainListView 统一处理
-    }
-
-    // MARK: - Match Navigation
-
-    private func matchedHighlightIds() -> [String] {
-        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
-
-        var result: [String] = []
-        result.reserveCapacity(32)
-        var seen: Set<String> = []
-
-        for h in detailViewModel.visibleHighlights {
-            let id = h.id
-            if seen.contains(id) { continue }
-
-            if SearchTextMatcher.matchRangesUTF16(text: h.text, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-
-            if let note = h.note, !note.isEmpty,
-               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
-                seen.insert(id)
-                result.append(id)
-                continue
-            }
-
-            if !h.reviewContents.isEmpty {
-                for r in h.reviewContents where SearchTextMatcher.matchRangesUTF16(text: r, query: q) != nil {
-                    seen.insert(id)
-                    result.append(id)
-                    break
-                }
-            }
-        }
-
-        return result
-    }
-
-    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard let first = ids.first else { return }
-        activeMatchId = first
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(first, anchor: .center) }
-        }
-    }
-
-    private func scrollToNextMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
-        let nextIndex = (currentIndex + 1) % ids.count
-        let targetId = ids[nextIndex]
-        activeMatchId = targetId
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-        }
-    }
-
-    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
-        let ids = matchedHighlightIds()
-        guard !ids.isEmpty else { return }
-        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
-        let prevIndex = (currentIndex - 1 + ids.count) % ids.count
-        let targetId = ids[prevIndex]
-        activeMatchId = targetId
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation { proxy.scrollTo(targetId, anchor: .center) }
-        }
     }
 
     // MARK: - External Scroll Target
