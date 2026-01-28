@@ -20,60 +20,24 @@ enum SearchTextMatcher {
         let rangeUTF16: Range<Int>
     }
 
+    // MARK: - Public API
+
+    /// 用于全文高亮：返回原文中的命中范围（UTF16 offset）。
+    /// 规则与 `match(text:query:)` 一致：query 多 token 时为 AND 匹配。
+    static func matchRangesUTF16(text: String, query: String) -> [Range<Int>]? {
+        guard let tokens = tokenize(query: query) else { return nil }
+        guard let occurrences = findOccurrences(text: text, tokens: tokens) else { return nil }
+        let merged = mergeRanges(occurrences.map(\.rangeUTF16))
+        return merged.isEmpty ? nil : merged
+    }
+
     static func match(text: String, query: String, snippetLimit: Int = 180) -> SearchTextMatch? {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return nil }
-
-        let tokens = trimmedQuery
-            .split(whereSeparator: { $0.isWhitespace })
-            .map { String($0) }
-            .filter { !$0.isEmpty }
-
-        guard !tokens.isEmpty else { return nil }
+        guard let tokens = tokenize(query: query) else { return nil }
 
         let textUTF16Count = text.utf16.count
         guard textUTF16Count > 0 else { return nil }
 
-        var occurrences: [Occurrence] = []
-        occurrences.reserveCapacity(16)
-
-        for (tokenIndex, token) in tokens.enumerated() {
-            let tokenTrimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !tokenTrimmed.isEmpty else { continue }
-
-            var foundAny = false
-            var searchRange = text.startIndex..<text.endIndex
-
-            while let r = text.range(
-                of: tokenTrimmed,
-                options: [.caseInsensitive, .diacriticInsensitive],
-                range: searchRange
-            ) {
-                foundAny = true
-                let lower = r.lowerBound.utf16Offset(in: text)
-                let upper = r.upperBound.utf16Offset(in: text)
-                if lower < upper {
-                    occurrences.append(
-                        Occurrence(tokenIndex: tokenIndex, rangeUTF16: lower..<upper)
-                    )
-                }
-                if r.upperBound >= text.endIndex { break }
-                searchRange = r.upperBound..<text.endIndex
-            }
-
-            // AND 匹配：任一 token 未命中则整体不命中
-            if !foundAny {
-                return nil
-            }
-        }
-
-        guard !occurrences.isEmpty else { return nil }
-        occurrences.sort { a, b in
-            if a.rangeUTF16.lowerBound == b.rangeUTF16.lowerBound {
-                return a.rangeUTF16.upperBound < b.rangeUTF16.upperBound
-            }
-            return a.rangeUTF16.lowerBound < b.rangeUTF16.lowerBound
-        }
+        guard let occurrences = findOccurrences(text: text, tokens: tokens) else { return nil }
 
         // 选择“最紧凑”的命中窗口（至少包含每个 token 的一次命中）
         let bestWindow = bestCoverWindow(occurrences: occurrences, tokenCount: tokens.count)
@@ -124,6 +88,67 @@ enum SearchTextMatcher {
             matchCount: matchCount,
             compactness: compactness
         )
+    }
+
+    // MARK: - Tokenize & Occurrences
+
+    private static func tokenize(query: String) -> [String]? {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return nil }
+
+        let tokens = trimmedQuery
+            .split(whereSeparator: { $0.isWhitespace })
+            .map { String($0) }
+            .filter { !$0.isEmpty }
+
+        return tokens.isEmpty ? nil : tokens
+    }
+
+    /// 扫描所有 token 的命中（AND 匹配：任一 token 未命中则返回 nil）
+    private static func findOccurrences(text: String, tokens: [String]) -> [Occurrence]? {
+        guard !text.isEmpty, !tokens.isEmpty else { return nil }
+
+        var occurrences: [Occurrence] = []
+        occurrences.reserveCapacity(16)
+
+        for (tokenIndex, token) in tokens.enumerated() {
+            let tokenTrimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !tokenTrimmed.isEmpty else { continue }
+
+            var foundAny = false
+            var searchRange = text.startIndex..<text.endIndex
+
+            while let r = text.range(
+                of: tokenTrimmed,
+                options: [.caseInsensitive, .diacriticInsensitive],
+                range: searchRange
+            ) {
+                foundAny = true
+                let lower = r.lowerBound.utf16Offset(in: text)
+                let upper = r.upperBound.utf16Offset(in: text)
+                if lower < upper {
+                    occurrences.append(
+                        Occurrence(tokenIndex: tokenIndex, rangeUTF16: lower..<upper)
+                    )
+                }
+                if r.upperBound >= text.endIndex { break }
+                searchRange = r.upperBound..<text.endIndex
+            }
+
+            // AND 匹配：任一 token 未命中则整体不命中
+            if !foundAny {
+                return nil
+            }
+        }
+
+        guard !occurrences.isEmpty else { return nil }
+        occurrences.sort { a, b in
+            if a.rangeUTF16.lowerBound == b.rangeUTF16.lowerBound {
+                return a.rangeUTF16.upperBound < b.rangeUTF16.upperBound
+            }
+            return a.rangeUTF16.lowerBound < b.rangeUTF16.lowerBound
+        }
+        return occurrences
     }
 
     // MARK: - Window Selection
@@ -262,4 +287,3 @@ enum SearchTextMatcher {
         return result
     }
 }
-

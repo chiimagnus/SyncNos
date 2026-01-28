@@ -13,6 +13,8 @@ struct HTMLWebView: NSViewRepresentable {
     let originalPageURL: URL?
     let openLinksInExternalBrowser: Bool
     let onRefetchRequested: (() -> Void)?
+    let searchQuery: String?
+    let activeMatchIndex: Int?
     @Binding var contentHeight: CGFloat
 
     init(
@@ -21,6 +23,8 @@ struct HTMLWebView: NSViewRepresentable {
         originalPageURL: URL? = nil,
         openLinksInExternalBrowser: Bool = true,
         onRefetchRequested: (() -> Void)? = nil,
+        searchQuery: String? = nil,
+        activeMatchIndex: Int? = nil,
         contentHeight: Binding<CGFloat>
     ) {
         self.html = html
@@ -28,6 +32,8 @@ struct HTMLWebView: NSViewRepresentable {
         self.originalPageURL = originalPageURL
         self.openLinksInExternalBrowser = openLinksInExternalBrowser
         self.onRefetchRequested = onRefetchRequested
+        self.searchQuery = searchQuery
+        self.activeMatchIndex = activeMatchIndex
         self._contentHeight = contentHeight
     }
 
@@ -52,6 +58,15 @@ struct HTMLWebView: NSViewRepresentable {
         userContentController.addUserScript(
             WKUserScript(
                 source: Coordinator.heightObserverScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
+        // 正文搜索（Detail ⌘F）：命中高亮与定位
+        userContentController.addUserScript(
+            WKUserScript(
+                source: Coordinator.searchScript,
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
             )
@@ -89,6 +104,8 @@ struct HTMLWebView: NSViewRepresentable {
                 webView?.reload()
             }
         }
+
+        context.coordinator.updateSearch(webView: webView, query: searchQuery, activeMatchIndex: activeMatchIndex)
     }
 
     func makeCoordinator() -> Coordinator {
@@ -99,6 +116,166 @@ struct HTMLWebView: NSViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         static let heightMessageHandlerName = "syncnosHeight"
+        static let searchScript = #"""
+        (() => {
+          if (window.SyncNosSearch) return;
+
+          const HIT_CLASS = 'syncnos-search-hit';
+          const ACTIVE_CLASS = 'syncnos-search-active';
+
+          function tokenize(query) {
+            if (!query) return [];
+            return String(query).trim().split(/\s+/).map(s => s.trim()).filter(Boolean);
+          }
+
+          function clearHighlights() {
+            const marks = Array.from(document.querySelectorAll('mark.' + HIT_CLASS));
+            for (const mark of marks) {
+              const parent = mark.parentNode;
+              if (!parent) continue;
+              while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+              parent.removeChild(mark);
+              parent.normalize();
+            }
+          }
+
+          function bodyContainsAllTokens(tokens) {
+            if (!tokens.length) return true;
+            const haystack = (document.body ? document.body.innerText : '').toLowerCase();
+            for (const t of tokens) {
+              if (haystack.indexOf(String(t).toLowerCase()) < 0) return false;
+            }
+            return true;
+          }
+
+          function collectMatchesInText(text, tokens) {
+            const lower = String(text).toLowerCase();
+            const matches = [];
+            for (const rawToken of tokens) {
+              const token = String(rawToken).toLowerCase();
+              if (!token) continue;
+              let idx = 0;
+              while (true) {
+                const pos = lower.indexOf(token, idx);
+                if (pos < 0) break;
+                matches.push([pos, pos + token.length]);
+                idx = pos + token.length;
+              }
+            }
+            if (!matches.length) return [];
+            matches.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+            const merged = [];
+            let cur = matches[0];
+            for (let i = 1; i < matches.length; i++) {
+              const m = matches[i];
+              if (m[0] <= cur[1]) {
+                cur[1] = Math.max(cur[1], m[1]);
+              } else {
+                merged.push(cur);
+                cur = m;
+              }
+            }
+            merged.push(cur);
+            return merged;
+          }
+
+          function highlight(query) {
+            clearHighlights();
+            const tokens = tokenize(query);
+            if (!tokens.length) return 0;
+            if (!bodyContainsAllTokens(tokens)) return 0;
+
+            const walker = document.createTreeWalker(
+              document.body,
+              NodeFilter.SHOW_TEXT,
+              {
+                acceptNode(node) {
+                  if (!node || !node.nodeValue) return NodeFilter.FILTER_REJECT;
+                  const v = String(node.nodeValue);
+                  if (!v.trim()) return NodeFilter.FILTER_REJECT;
+                  const p = node.parentNode;
+                  if (!p) return NodeFilter.FILTER_REJECT;
+                  const tag = (p.nodeName || '').toLowerCase();
+                  if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || tag === 'input') {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  if (p.closest && p.closest('mark.' + HIT_CLASS)) return NodeFilter.FILTER_REJECT;
+                  return NodeFilter.FILTER_ACCEPT;
+                }
+              }
+            );
+
+            let hitIndex = 0;
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+
+            for (const node of nodes) {
+              const text = node.nodeValue;
+              const matches = collectMatchesInText(text, tokens);
+              if (!matches.length) continue;
+
+              const frag = document.createDocumentFragment();
+              let cursor = 0;
+              for (const m of matches) {
+                const start = m[0];
+                const end = m[1];
+                if (start > cursor) {
+                  frag.appendChild(document.createTextNode(text.slice(cursor, start)));
+                }
+                const mark = document.createElement('mark');
+                mark.className = HIT_CLASS;
+                mark.dataset.syncnosHitIndex = String(hitIndex);
+                hitIndex += 1;
+                mark.appendChild(document.createTextNode(text.slice(start, end)));
+                frag.appendChild(mark);
+                cursor = end;
+              }
+              if (cursor < text.length) {
+                frag.appendChild(document.createTextNode(text.slice(cursor)));
+              }
+              node.parentNode.replaceChild(frag, node);
+            }
+
+            return hitIndex;
+          }
+
+          function scrollToIndex(index) {
+            const marks = Array.from(document.querySelectorAll('mark.' + HIT_CLASS));
+            const count = marks.length;
+            if (!count) return -1;
+
+            for (const m of marks) m.classList.remove(ACTIVE_CLASS);
+
+            let i = Number(index || 0);
+            if (!Number.isFinite(i)) i = 0;
+            i = ((i % count) + count) % count;
+            const target = marks[i];
+            if (!target) return -1;
+            target.classList.add(ACTIVE_CLASS);
+            try {
+              target.scrollIntoView({ block: 'center', behavior: 'auto' });
+            } catch (e) {}
+            return i;
+          }
+
+          function setQuery(query, activeIndex) {
+            if (!query || !String(query).trim()) {
+              clearHighlights();
+              return 0;
+            }
+            const count = highlight(query);
+            if (count > 0) scrollToIndex(activeIndex || 0);
+            return count;
+          }
+
+          window.SyncNosSearch = {
+            setQuery,
+            highlight,
+            scrollToIndex,
+            clearHighlights
+          };
+        })();
+        """#
         static let imageNormalizationScript = #"""
         (() => {
           function isPlaceholder(src) {
@@ -195,6 +372,8 @@ struct HTMLWebView: NSViewRepresentable {
         var lastLoadedBaseURL: URL?
         var openLinksInExternalBrowser: Bool
         var onContentHeightChange: ((CGFloat) -> Void)?
+        var lastSearchQuery: String?
+        var lastActiveMatchIndex: Int?
 
         init(openLinksInExternalBrowser: Bool) {
             self.openLinksInExternalBrowser = openLinksInExternalBrowser
@@ -231,6 +410,9 @@ struct HTMLWebView: NSViewRepresentable {
                 guard let self, let webView else { return }
                 self.measureContentHeight(webView: webView)
             }
+
+            // 页面刷新后需要重新应用搜索高亮（mark 会丢失）
+            updateSearch(webView: webView, query: lastSearchQuery, activeMatchIndex: lastActiveMatchIndex, force: true)
         }
 
         private func measureContentHeight(webView: WKWebView) {
@@ -246,6 +428,60 @@ struct HTMLWebView: NSViewRepresentable {
                     self.onContentHeightChange?(CGFloat(value))
                 }
             }
+        }
+
+        // MARK: - Search Highlight
+
+        func updateSearch(webView: WKWebView, query: String?, activeMatchIndex: Int?, force: Bool = false) {
+            let normalizedQuery = query?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let effectiveQuery = (normalizedQuery?.isEmpty == false) ? normalizedQuery : nil
+            let effectiveIndex = activeMatchIndex ?? 0
+
+            if force {
+                lastSearchQuery = effectiveQuery
+                lastActiveMatchIndex = effectiveIndex
+                applyQuery(webView: webView, query: effectiveQuery, activeMatchIndex: effectiveIndex)
+                return
+            }
+
+            if effectiveQuery != lastSearchQuery {
+                lastSearchQuery = effectiveQuery
+                lastActiveMatchIndex = effectiveIndex
+                applyQuery(webView: webView, query: effectiveQuery, activeMatchIndex: effectiveIndex)
+                return
+            }
+
+            if effectiveQuery != nil, lastActiveMatchIndex != effectiveIndex {
+                lastActiveMatchIndex = effectiveIndex
+                scrollToIndex(webView: webView, index: effectiveIndex)
+            }
+        }
+
+        private func applyQuery(webView: WKWebView, query: String?, activeMatchIndex: Int) {
+            if let query {
+                let jsQuery = escapeJSString(query)
+                let script = "window.SyncNosSearch && window.SyncNosSearch.setQuery('\(jsQuery)', \(activeMatchIndex));"
+                webView.evaluateJavaScript(script, completionHandler: nil)
+            } else {
+                let script = "window.SyncNosSearch && window.SyncNosSearch.clearHighlights();"
+                webView.evaluateJavaScript(script, completionHandler: nil)
+            }
+        }
+
+        private func scrollToIndex(webView: WKWebView, index: Int) {
+            let script = "window.SyncNosSearch && window.SyncNosSearch.scrollToIndex(\(index));"
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
+
+        private func escapeJSString(_ s: String) -> String {
+            var result = s
+            result = result.replacingOccurrences(of: "\\\\", with: "\\\\\\\\")
+            result = result.replacingOccurrences(of: "'", with: "\\\\'")
+            result = result.replacingOccurrences(of: "\n", with: "\\\\n")
+            result = result.replacingOccurrences(of: "\r", with: "")
+            result = result.replacingOccurrences(of: "\u{2028}", with: "\\\\u2028")
+            result = result.replacingOccurrences(of: "\u{2029}", with: "\\\\u2029")
+            return result
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -349,6 +585,16 @@ struct HTMLWebView: NSViewRepresentable {
           hr {
             background: rgba(255, 255, 255, 0.18);
           }
+        }
+
+        mark.syncnos-search-hit {
+          background: rgba(255, 230, 0, 0.35);
+          padding: 0 0.08em;
+          border-radius: 0.18em;
+        }
+
+        mark.syncnos-search-hit.syncnos-search-active {
+          background: rgba(255, 200, 0, 0.60);
         }
 
         img {

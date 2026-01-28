@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 struct ChatDetailView: View {
     @ObservedObject var listViewModel: ChatViewModel
     @Binding var selectedContactId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
 
@@ -27,6 +28,13 @@ struct ChatDetailView: View {
     /// 用于在切换对话时卸载旧对话消息，确保 Detail 内存可释放
     @State private var lastContactUUID: UUID?
     @Environment(\.fontScale) private var fontScale
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
+    @State private var activeMatchIndex: Int = 0
+    @FocusState private var isDetailSearchFocused: Bool
+    @State private var isApplyingExternalScrollTarget: Bool = false
 
     private var selectedContact: ChatBookListItem? {
         guard let id = selectedContactId else { return nil }
@@ -98,6 +106,9 @@ struct ChatDetailView: View {
             }
             .navigationTitle(contact.name)
             .navigationSubtitle("\(contact.messageCount) messages")
+            .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+                isDetailSearchFocused = true
+            }
             .toolbar {
                     ToolbarItem(placement: .automatic) {
                         Spacer()
@@ -291,6 +302,17 @@ struct ChatDetailView: View {
                             }
                         )
                 }
+                .safeAreaInset(edge: .top) {
+                    DetailSearchBar(
+                        searchText: $detailSearchText,
+                        isFocused: $isDetailSearchFocused,
+                        onPrev: { },
+                        onNext: { }
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
+                }
                 .id(contact.contactId)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
@@ -318,6 +340,17 @@ struct ChatDetailView: View {
                                 onScrollViewResolved(scrollView)
                             }
                         )
+                }
+                .safeAreaInset(edge: .top) {
+                    DetailSearchBar(
+                        searchText: $detailSearchText,
+                        isFocused: $isDetailSearchFocused,
+                        onPrev: { },
+                        onNext: { }
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
                 }
                 .id(contact.contactId)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -376,6 +409,7 @@ struct ChatDetailView: View {
                                     ChatSystemMessageRow(
                                         message: message,
                                         isSelected: selectedMessageId == message.id,
+                                        searchQuery: detailSearchText,
                                         onTap: { selectedMessageId = message.id },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
@@ -394,6 +428,7 @@ struct ChatDetailView: View {
                                     ChatMessageBubble(
                                         message: message,
                                         isSelected: selectedMessageId == message.id,
+                                        searchQuery: detailSearchText,
                                         onTap: { selectedMessageId = message.id },
                                         onClassify: { isFromMe, kind in
                                             handleClassification(message, isFromMe: isFromMe, kind: kind, for: contact)
@@ -415,13 +450,35 @@ struct ChatDetailView: View {
                     }
                     .padding()
                 }
+                .safeAreaInset(edge: .top) {
+                    DetailSearchBar(
+                        searchText: $detailSearchText,
+                        isFocused: $isDetailSearchFocused,
+                        onPrev: { scrollToPrevMatch(proxy: proxy) },
+                        onNext: { scrollToNextMatch(proxy: proxy) }
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
+                }
                 .id(contact.contactId) // 为不同对话创建独立的 ScrollView 实例，避免滚动状态在对话间串联
                 .defaultScrollAnchor(.bottom) // 默认显示底部（最新消息）
                 .onAppear {
                     scrollProxy = proxy
+                    applyExternalScrollTargetIfNeeded(contactId: contact.contactId, proxy: proxy)
                 }
                 .onChange(of: selectedContactId) { _, _ in
                     selectedMessageId = nil
+                }
+                .onChange(of: scrollTarget) { _, _ in
+                    applyExternalScrollTargetIfNeeded(contactId: contact.contactId, proxy: proxy)
+                }
+                .onChange(of: messages.count) { _, _ in
+                    applyExternalScrollTargetIfNeeded(contactId: contact.contactId, proxy: proxy)
+                }
+                .onChange(of: detailSearchText) { _, _ in
+                    activeMatchIndex = 0
+                    scrollToFirstMatchIfNeeded(proxy: proxy)
                 }
                 // 监听来自 MainListView 的消息导航通知
                 .onReceive(NotificationCenter.default.publisher(for: .chatsNavigateMessage).receive(on: DispatchQueue.main)) { notification in
@@ -476,6 +533,103 @@ struct ChatDetailView: View {
     /// 生成复合 ID，用于 ScrollViewReader 导航和视图标识
     private func compositeId(for message: ChatMessage) -> String {
         "\(message.id.uuidString)-\(message.kind.rawValue)"
+    }
+
+    // MARK: - Detail Search
+
+    private func searchableText(for message: ChatMessage) -> String {
+        switch message.kind {
+        case .text, .system, .card:
+            return message.content
+        case .image, .voice:
+            return ""
+        }
+    }
+
+    private func matchedMessageIds() -> [UUID] {
+        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+
+        var result: [UUID] = []
+        result.reserveCapacity(64)
+
+        for m in messages {
+            let text = searchableText(for: m)
+            if text.isEmpty { continue }
+            if SearchTextMatcher.matchRangesUTF16(text: text, query: q) != nil {
+                result.append(m.id)
+            }
+        }
+
+        return result
+    }
+
+    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
+        let ids = matchedMessageIds()
+        guard let first = ids.first,
+              let message = messages.first(where: { $0.id == first }) else { return }
+        selectedMessageId = message.id
+        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+    }
+
+    private func scrollToNextMatch(proxy: ScrollViewProxy) {
+        let ids = matchedMessageIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex + 1) % ids.count
+        let id = ids[activeMatchIndex]
+        guard let message = messages.first(where: { $0.id == id }) else { return }
+        selectedMessageId = message.id
+        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+    }
+
+    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
+        let ids = matchedMessageIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
+        let id = ids[activeMatchIndex]
+        guard let message = messages.first(where: { $0.id == id }) else { return }
+        selectedMessageId = message.id
+        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+    }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(contactId: UUID, proxy: ScrollViewProxy) {
+        guard !isApplyingExternalScrollTarget else { return }
+        guard let target = scrollTarget,
+              target.source == .chats,
+              target.containerId == contactId.uuidString else { return }
+
+        isApplyingExternalScrollTarget = true
+
+        Task { @MainActor in
+            defer { isApplyingExternalScrollTarget = false }
+
+            if target.kind == .titleOnly || target.blockId == nil {
+                withAnimation { proxy.scrollTo("chatsDetailTop", anchor: .top) }
+                scrollTarget = nil
+                return
+            }
+
+            guard let blockId = target.blockId else { return }
+
+            var attempts = 0
+            while !messages.contains(where: { $0.id.uuidString == blockId }),
+                  listViewModel.canLoadMore(for: contactId),
+                  attempts < 80 {
+                attempts += 1
+                await listViewModel.loadMoreMessages(for: contactId)
+            }
+
+            if let message = messages.first(where: { $0.id.uuidString == blockId }) {
+                selectedMessageId = message.id
+                withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+            } else {
+                withAnimation { proxy.scrollTo("chatsDetailTop", anchor: .top) }
+            }
+
+            scrollTarget = nil
+        }
     }
     
     /// 消息分类状态（用于循环切换）
@@ -753,6 +907,7 @@ struct ChatDetailView: View {
     ChatDetailView(
         listViewModel: ChatViewModel(),
         selectedContactId: .constant(nil),
+        scrollTarget: .constant(nil),
         onScrollViewResolved: { _ in }
     )
     .applyFontScale()

@@ -3,6 +3,7 @@ import SwiftUI
 struct DedaoDetailView: View {
     @ObservedObject var listViewModel: DedaoViewModel
     @Binding var selectedBookId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var detailViewModel = DedaoDetailViewModel()
@@ -21,6 +22,12 @@ struct DedaoDetailView: View {
     @State private var showingSyncError = false
     @State private var syncErrorMessage = ""
 
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
+    @State private var activeMatchIndex: Int = 0
+    @FocusState private var isDetailSearchFocused: Bool
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .short
@@ -34,6 +41,9 @@ struct DedaoDetailView: View {
 
     var body: some View {
         mainContent
+            .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+                isDetailSearchFocused = true
+            }
     }
     
     // MARK: - Main Content
@@ -72,6 +82,17 @@ struct DedaoDetailView: View {
                 }
                 .padding()
             }
+            .safeAreaInset(edge: .top) {
+                DetailSearchBar(
+                    searchText: $detailSearchText,
+                    isFocused: $isDetailSearchFocused,
+                    onPrev: { scrollToPrevMatch(proxy: proxy) },
+                    onNext: { scrollToNextMatch(proxy: proxy) }
+                )
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            }
             .navigationTitle("Dedao")
             .toolbar { toolbarContent(book: book) }
             // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
@@ -79,11 +100,22 @@ struct DedaoDetailView: View {
                 DispatchQueue.main.async {
                     proxy.scrollTo("dedaoDetailTop", anchor: .top)
                 }
+                applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
             }
             .onChange(of: selectedBookId) { _, _ in
                 DispatchQueue.main.async {
                     proxy.scrollTo("dedaoDetailTop", anchor: .top)
                 }
+            }
+            .onChange(of: scrollTarget) { _, _ in
+                applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+            }
+            .onChange(of: detailViewModel.visibleHighlights.count) { _, _ in
+                applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+            }
+            .onChange(of: detailSearchText) { _, _ in
+                activeMatchIndex = 0
+                scrollToFirstMatchIfNeeded(proxy: proxy)
             }
             // 将加载绑定到 SwiftUI 生命周期：当 bookId 变化或 Detail 消失时自动取消旧任务
             .task(id: selectedBookId) {
@@ -174,6 +206,7 @@ struct DedaoDetailView: View {
                 HighlightCardView(
                     colorMark: Color("BrandDedao"),
                     content: h.text,
+                    highlightQuery: detailSearchText,
                     note: h.note,
                     reviewContents: [],
                     createdDate: h.createdAt.map { Self.dateFormatter.string(from: $0) },
@@ -182,6 +215,7 @@ struct DedaoDetailView: View {
                 .onAppear {
                     detailViewModel.loadMoreIfNeeded(currentItem: h)
                 }
+                .id(h.id)
             }
         }
         .padding(.top)
@@ -336,6 +370,94 @@ struct DedaoDetailView: View {
             if !Task.isCancelled {
                 debouncedLayoutWidth = width
             }
+        }
+    }
+
+    // MARK: - Match Navigation
+
+    private func matchedHighlightIds() -> [String] {
+        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+
+        var result: [String] = []
+        result.reserveCapacity(32)
+        var seen: Set<String> = []
+
+        for h in detailViewModel.visibleHighlights {
+            let id = h.id
+            if seen.contains(id) { continue }
+
+            if SearchTextMatcher.matchRangesUTF16(text: h.text, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+
+            if let note = h.note, !note.isEmpty,
+               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+        }
+
+        return result
+    }
+
+    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard let first = ids.first else { return }
+        withAnimation { proxy.scrollTo(first, anchor: .center) }
+    }
+
+    private func scrollToNextMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex + 1) % ids.count
+        withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+    }
+
+    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
+        withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+    }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(bookId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .dedao,
+              target.containerId == bookId else { return }
+
+        if target.kind == .titleOnly || target.blockId == nil {
+            withAnimation { proxy.scrollTo("dedaoDetailTop", anchor: .top) }
+            scrollTarget = nil
+            return
+        }
+
+        guard let blockId = target.blockId else { return }
+        ensureHighlightLoadedIfNeeded(blockId: blockId)
+
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) {
+            withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+        } else {
+            withAnimation { proxy.scrollTo("dedaoDetailTop", anchor: .top) }
+        }
+        scrollTarget = nil
+    }
+
+    private func ensureHighlightLoadedIfNeeded(blockId: String) {
+        if detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }) { return }
+        guard detailViewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !detailViewModel.visibleHighlights.contains(where: { $0.id == blockId }),
+              detailViewModel.canLoadMore,
+              attempts < 60 {
+            attempts += 1
+            detailViewModel.loadNextPage()
         }
     }
     
