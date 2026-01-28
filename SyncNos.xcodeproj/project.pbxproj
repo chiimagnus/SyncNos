@@ -25,7 +25,6 @@
 				"Services/DataSources-To/添加新同步目标完整指南.md",
 				"Services/DataSources-To/Notion/Config/NotionConfig.swift.example",
 				"Services/WebArticle/Readability/UPSTREAM-README.md",
-				"Views/Components/Main/键盘导航技术文档.md",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
 		};
