@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatMessageBubble: View {
     let message: ChatMessage
     let isSelected: Bool
+    let searchQuery: String?
     let onTap: () -> Void
     let onClassify: (_ isFromMe: Bool, _ kind: ChatMessageKind) -> Void
     let onSetSenderName: () -> Void
@@ -39,7 +40,7 @@ struct ChatMessageBubble: View {
     }
 
     private var bubbleBody: some View {
-        Text(messageContent)
+        messageTextView
             .foregroundStyle(.black)
             .scaledFont(.body)
             .fixedSize(horizontal: false, vertical: true)
@@ -72,6 +73,17 @@ struct ChatMessageBubble: View {
             }
     }
 
+    @ViewBuilder
+    private var messageTextView: some View {
+        if let q = searchQuery,
+           !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let ranges = SearchTextMatcher.matchRangesUTF16(text: messageContent, query: q) {
+            HighlightedText(text: messageContent, matchRangesUTF16: ranges)
+        } else {
+            Text(messageContent)
+        }
+    }
+
     private var messageContent: String {
         switch message.kind {
         case .system:
@@ -87,5 +99,4 @@ struct ChatMessageBubble: View {
         }
     }
 }
-
 
