@@ -27,7 +27,6 @@ struct WeReadDetailView: View {
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
     @State private var detailScrollProxy: ScrollViewProxy?
-    @FocusState private var isDetailSearchFocused: Bool
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -214,7 +213,6 @@ struct WeReadDetailView: View {
         }
         .navigationTitle("WeRead")
         .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-        .searchFocused($isDetailSearchFocused)
         .onSubmit(of: .search) {
             if let proxy = detailScrollProxy {
                 scrollToNextMatch(proxy: proxy)
@@ -304,7 +302,9 @@ struct WeReadDetailView: View {
             layoutWidthDebounceTask = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
-            isDetailSearchFocused = true
+            Task { @MainActor in
+                ToolbarSearchFocus.focusIfPossible()
+            }
         }
         // 监听批量同步进度更新
         .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
