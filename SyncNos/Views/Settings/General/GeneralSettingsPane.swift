@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct GeneralSettingsPane: View {
@@ -7,6 +8,22 @@ struct GeneralSettingsPane: View {
     var body: some View {
         List {
             LanguageView()
+
+            Button(action: openSystemProxySettings) {
+                HStack {
+                    Label("Proxy", systemImage: "network")
+                        .scaledFont(.body)
+                    Spacer()
+                    Text("System")
+                        .scaledFont(.subheadline)
+                        .foregroundColor(.secondary)
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .scaledFont(.body)
+                }
+            }
+            .buttonStyle(.plain)
+            .help("SyncNos follows macOS system proxy settings for web requests")
 
             // 字体大小设置
             NavigationLink(destination: TextSizeSettingsView()) {
@@ -77,5 +94,23 @@ struct GeneralSettingsPane: View {
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("General")
+    }
+
+    // MARK: - Actions
+
+    private func openSystemProxySettings() {
+        let candidates = [
+            "x-apple.systempreferences:com.apple.Network-Settings.extension?Proxies",
+            "x-apple.systempreferences:com.apple.NetworkSettings-Settings.extension?Proxies",
+            "x-apple.systempreferences:com.apple.preference.network?Proxies",
+            "x-apple.systempreferences:com.apple.Network-Settings.extension",
+            "x-apple.systempreferences:com.apple.preference.network"
+        ]
+
+        for raw in candidates {
+            if let url = URL(string: raw), NSWorkspace.shared.open(url) {
+                return
+            }
+        }
     }
 }
