@@ -85,7 +85,7 @@ struct DedaoDetailView: View {
             }
             .navigationTitle("Dedao")
             .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
-            .searchFocused($isDetailSearchFocused)
+            .applySearchFocusIfAvailable($isDetailSearchFocused)
             .onSubmit(of: .search) {
                 if let proxy = detailScrollProxy {
                     scrollToNextMatch(proxy: proxy)
