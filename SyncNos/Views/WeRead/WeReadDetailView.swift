@@ -205,7 +205,7 @@ struct WeReadDetailView: View {
             }
         }
         .navigationTitle("WeRead")
-        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+        .searchable(text: $detailSearchText, placement: .toolbar, prompt: "Search current content")
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 FilterSortBar(
