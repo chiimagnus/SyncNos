@@ -26,6 +26,7 @@ struct DedaoDetailView: View {
 
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
+    @State private var detailScrollProxy: ScrollViewProxy?
     @FocusState private var isDetailSearchFocused: Bool
 
     private static let dateFormatter: DateFormatter = {
@@ -82,21 +83,18 @@ struct DedaoDetailView: View {
                 }
                 .padding()
             }
-            .safeAreaInset(edge: .top) {
-                DetailSearchBar(
-                    searchText: $detailSearchText,
-                    isFocused: $isDetailSearchFocused,
-                    onPrev: { scrollToPrevMatch(proxy: proxy) },
-                    onNext: { scrollToNextMatch(proxy: proxy) }
-                )
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
-            }
             .navigationTitle("Dedao")
+            .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+            .searchFocused($isDetailSearchFocused)
+            .onSubmit(of: .search) {
+                if let proxy = detailScrollProxy {
+                    scrollToNextMatch(proxy: proxy)
+                }
+            }
             .toolbar { toolbarContent(book: book) }
             // 取消“滚动位置记住”：只要切书/返回，就强制滚回顶部
             .onAppear {
+                detailScrollProxy = proxy
                 DispatchQueue.main.async {
                     proxy.scrollTo("dedaoDetailTop", anchor: .top)
                 }
@@ -279,6 +277,28 @@ struct DedaoDetailView: View {
     
     @ToolbarContentBuilder
     private func toolbarContent(book: DedaoBookListItem) -> some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                if let proxy = detailScrollProxy {
+                    scrollToPrevMatch(proxy: proxy)
+                }
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .help("上一个")
+
+            Button {
+                if let proxy = detailScrollProxy {
+                    scrollToNextMatch(proxy: proxy)
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .help("下一个")
+        }
+
         ToolbarItem(placement: .automatic) {
             FilterSortBar(
                 noteFilter: $detailViewModel.noteFilter,

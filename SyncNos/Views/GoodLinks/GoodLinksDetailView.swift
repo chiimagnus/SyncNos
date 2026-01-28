@@ -24,6 +24,7 @@ struct GoodLinksDetailView: View {
 
     @State private var detailSearchText: String = ""
     @State private var activeMatchIndex: Int = 0
+    @State private var detailScrollProxy: ScrollViewProxy?
     @State private var webActiveMatchIndex: Int = 0
     @FocusState private var isDetailSearchFocused: Bool
 
@@ -267,17 +268,6 @@ struct GoodLinksDetailView: View {
                         }
                         .padding()
                     }
-                    .safeAreaInset(edge: .top) {
-                        DetailSearchBar(
-                            searchText: $detailSearchText,
-                            isFocused: $isDetailSearchFocused,
-                            onPrev: { scrollToPrevMatch(proxy: proxy) },
-                            onNext: { scrollToNextMatch(proxy: proxy) }
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
-                        .padding(.bottom, 6)
-                    }
                     // Scroll to top when selected link changes
                     .onChange(of: linkId) { _, _ in
                         withAnimation {
@@ -285,6 +275,7 @@ struct GoodLinksDetailView: View {
                         }
                     }
                     .onAppear {
+                        detailScrollProxy = proxy
                         applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
                     }
                     .onChange(of: scrollTarget) { _, _ in
@@ -311,7 +302,36 @@ struct GoodLinksDetailView: View {
                     if !externalIsSyncing { externalSyncProgress = nil }
                 }
                 .navigationTitle("GoodLinks")
+                .searchable(text: $detailSearchText, placement: .toolbar, prompt: "搜索当前内容")
+                .searchFocused($isDetailSearchFocused)
+                .onSubmit(of: .search) {
+                    if let proxy = detailScrollProxy {
+                        scrollToNextMatch(proxy: proxy)
+                    }
+                }
                 .toolbar {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            if let proxy = detailScrollProxy {
+                                scrollToPrevMatch(proxy: proxy)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("上一个")
+
+                        Button {
+                            if let proxy = detailScrollProxy {
+                                scrollToNextMatch(proxy: proxy)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .disabled(detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("下一个")
+                    }
+
                     // Filter 控件
                     ToolbarItem(placement: .automatic) {
                         FilterSortBar(
