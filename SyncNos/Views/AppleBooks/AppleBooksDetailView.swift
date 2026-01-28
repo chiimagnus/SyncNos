@@ -3,6 +3,7 @@ import SwiftUI
 struct AppleBooksDetailView: View {
     @ObservedObject var viewModelList: AppleBooksViewModel
     @Binding var selectedBookId: String?
+    @Binding var scrollTarget: DetailScrollTarget?
     /// 由外部（MainListView）注入：解析当前 Detail 的 NSScrollView，供键盘滚动使用
     var onScrollViewResolved: (NSScrollView) -> Void
     @StateObject private var viewModel = AppleBooksDetailViewModel()
@@ -16,6 +17,12 @@ struct AppleBooksDetailView: View {
     // External (batch) sync state for the currently selected book
     @State private var externalIsSyncing: Bool = false
     @State private var externalSyncProgress: String? = nil
+
+    // MARK: - Detail Search (⌘F)
+
+    @State private var detailSearchText: String = ""
+    @State private var activeMatchIndex: Int = 0
+    @FocusState private var isDetailSearchFocused: Bool
     
     static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -79,6 +86,7 @@ struct AppleBooksDetailView: View {
                                     HighlightCardView(
                                         colorMark: highlight.style.map { Self.highlightStyleColor(for: $0) } ?? Color.gray.opacity(0.5),
                                         content: highlight.text,
+                                        highlightQuery: detailSearchText,
                                         note: highlight.note,
                                         createdDate: highlight.dateAdded.map { Self.dateFormatter.string(from: $0) },
                                         modifiedDate: highlight.modified.map { Self.dateFormatter.string(from: $0) }
@@ -100,6 +108,7 @@ struct AppleBooksDetailView: View {
                                         .help("Open in Apple Books")
                                         .accessibilityLabel("Open in Apple Books")
                                     }
+                                    .id(highlight.uuid)
                                 }
                             }
                             .padding(.top)
@@ -148,11 +157,35 @@ struct AppleBooksDetailView: View {
                         }
                         .padding()
                     }
+                    .safeAreaInset(edge: .top) {
+                        DetailSearchBar(
+                            searchText: $detailSearchText,
+                            isFocused: $isDetailSearchFocused,
+                            onPrev: { scrollToPrevMatch(proxy: proxy) },
+                            onNext: { scrollToNextMatch(proxy: proxy) }
+                        )
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        .padding(.bottom, 6)
+                    }
                     // Scroll to top when selected book changes
                     .onChange(of: selectedBookId) { _, _ in
                         withAnimation {
                             proxy.scrollTo("appleBooksDetailTop", anchor: .top)
                         }
+                    }
+                    .onAppear {
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: scrollTarget) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: viewModel.highlights.count) { _, _ in
+                        applyExternalScrollTargetIfNeeded(bookId: book.bookId, proxy: proxy)
+                    }
+                    .onChange(of: detailSearchText) { _, _ in
+                        activeMatchIndex = 0
+                        scrollToFirstMatchIfNeeded(proxy: proxy)
                     }
                 }
             }
@@ -226,6 +259,9 @@ struct AppleBooksDetailView: View {
         } message: {
             Text(syncErrorMessage)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .detailSearchFocusRequested).receive(on: DispatchQueue.main)) { _ in
+            isDetailSearchFocused = true
+        }
         // Notion 配置弹窗已移至 MainListView 统一处理
         // 监听来自批量同步的进度更新（仅当该进度对应当前选中的 book 时显示）
         .onReceive(NotificationCenter.default.publisher(for: .syncProgressUpdated).receive(on: DispatchQueue.main)) { n in
@@ -258,6 +294,103 @@ struct AppleBooksDetailView: View {
             }
         }
     }
+
+    // MARK: - Match Navigation
+
+    private func matchedHighlightIds() -> [String] {
+        let q = detailSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+
+        var result: [String] = []
+        result.reserveCapacity(32)
+        var seen: Set<String> = []
+
+        for h in viewModel.highlights {
+            let id = h.uuid
+            if seen.contains(id) { continue }
+
+            if SearchTextMatcher.matchRangesUTF16(text: h.text, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+
+            if let note = h.note, !note.isEmpty,
+               SearchTextMatcher.matchRangesUTF16(text: note, query: q) != nil {
+                seen.insert(id)
+                result.append(id)
+                continue
+            }
+        }
+
+        return result
+    }
+
+    private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard let first = ids.first else { return }
+        withAnimation {
+            proxy.scrollTo(first, anchor: .center)
+        }
+    }
+
+    private func scrollToNextMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex + 1) % ids.count
+        withAnimation {
+            proxy.scrollTo(ids[activeMatchIndex], anchor: .center)
+        }
+    }
+
+    private func scrollToPrevMatch(proxy: ScrollViewProxy) {
+        let ids = matchedHighlightIds()
+        guard !ids.isEmpty else { return }
+        activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
+        withAnimation {
+            proxy.scrollTo(ids[activeMatchIndex], anchor: .center)
+        }
+    }
+
+    // MARK: - External Scroll Target
+
+    private func applyExternalScrollTargetIfNeeded(bookId: String, proxy: ScrollViewProxy) {
+        guard let target = scrollTarget,
+              target.source == .appleBooks,
+              target.containerId == bookId else { return }
+
+        Task { @MainActor in
+            if target.kind == .titleOnly || target.blockId == nil {
+                withAnimation { proxy.scrollTo("appleBooksDetailTop", anchor: .top) }
+                scrollTarget = nil
+                return
+            }
+
+            guard let blockId = target.blockId else { return }
+
+            await ensureHighlightLoadedIfNeeded(blockId: blockId, bookId: bookId)
+
+            if viewModel.highlights.contains(where: { $0.uuid == blockId }) {
+                withAnimation { proxy.scrollTo(blockId, anchor: .center) }
+            } else {
+                withAnimation { proxy.scrollTo("appleBooksDetailTop", anchor: .top) }
+            }
+            scrollTarget = nil
+        }
+    }
+
+    private func ensureHighlightLoadedIfNeeded(blockId: String, bookId: String) async {
+        if viewModel.highlights.contains(where: { $0.uuid == blockId }) { return }
+        guard viewModel.canLoadMore else { return }
+
+        var attempts = 0
+        while !viewModel.highlights.contains(where: { $0.uuid == blockId }),
+              viewModel.canLoadMore,
+              attempts < 30 {
+            attempts += 1
+            await viewModel.loadNextPage(dbPath: viewModelList.annotationDatabasePath, assetId: bookId)
+        }
+    }
 }
 
 struct AppleBooksDetailView_Previews: PreviewProvider {
@@ -273,6 +406,7 @@ struct AppleBooksDetailView_Previews: PreviewProvider {
         return AppleBooksDetailView(
             viewModelList: listVM,
             selectedBookId: .constant(sampleBook.bookId),
+            scrollTarget: .constant(nil),
             onScrollViewResolved: { _ in }
         )
     }
