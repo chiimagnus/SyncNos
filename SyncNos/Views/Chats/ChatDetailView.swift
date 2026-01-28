@@ -32,7 +32,7 @@ struct ChatDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchIndex: Int = 0
+    @State private var activeMatchId: UUID?
     @State private var isApplyingExternalScrollTarget: Bool = false
 
     private var selectedContact: ChatBookListItem? {
@@ -473,7 +473,7 @@ struct ChatDetailView: View {
                     applyExternalScrollTargetIfNeeded(contactId: contact.contactId, proxy: proxy)
                 }
                 .onChange(of: detailSearchText) { _, _ in
-                    activeMatchIndex = 0
+                    activeMatchId = nil
                     scrollToFirstMatchIfNeeded(proxy: proxy)
                 }
                 // 监听来自 MainListView 的消息导航通知
@@ -564,28 +564,42 @@ struct ChatDetailView: View {
         let ids = matchedMessageIds()
         guard let first = ids.first,
               let message = messages.first(where: { $0.id == first }) else { return }
+        activeMatchId = message.id
         selectedMessageId = message.id
-        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        }
     }
 
     private func scrollToNextMatch(proxy: ScrollViewProxy) {
         let ids = matchedMessageIds()
         guard !ids.isEmpty else { return }
-        activeMatchIndex = (activeMatchIndex + 1) % ids.count
-        let id = ids[activeMatchIndex]
+        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
+        let nextIndex = (currentIndex + 1) % ids.count
+        let id = ids[nextIndex]
         guard let message = messages.first(where: { $0.id == id }) else { return }
+        activeMatchId = message.id
         selectedMessageId = message.id
-        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        }
     }
 
     private func scrollToPrevMatch(proxy: ScrollViewProxy) {
         let ids = matchedMessageIds()
         guard !ids.isEmpty else { return }
-        activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
-        let id = ids[activeMatchIndex]
+        let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
+        let prevIndex = (currentIndex - 1 + ids.count) % ids.count
+        let id = ids[prevIndex]
         guard let message = messages.first(where: { $0.id == id }) else { return }
+        activeMatchId = message.id
         selectedMessageId = message.id
-        withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(compositeId(for: message), anchor: .center) }
+        }
     }
 
     // MARK: - External Scroll Target

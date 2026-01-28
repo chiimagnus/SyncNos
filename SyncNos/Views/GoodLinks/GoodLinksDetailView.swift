@@ -23,7 +23,7 @@ struct GoodLinksDetailView: View {
     // MARK: - Detail Search (⌘F)
 
     @State private var detailSearchText: String = ""
-    @State private var activeMatchIndex: Int = 0
+    @State private var activeMatchId: String?
     @State private var detailScrollProxy: ScrollViewProxy?
     @State private var webActiveMatchIndex: Int = 0
 
@@ -284,7 +284,7 @@ struct GoodLinksDetailView: View {
                         applyExternalScrollTargetIfNeeded(linkId: linkId, proxy: proxy)
                     }
                     .onChange(of: detailSearchText) { _, _ in
-                        activeMatchIndex = 0
+                        activeMatchId = nil
                         webActiveMatchIndex = 0
                         scrollToFirstMatchIfNeeded(proxy: proxy)
                     }
@@ -491,34 +491,54 @@ struct GoodLinksDetailView: View {
     private func scrollToFirstMatchIfNeeded(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         guard let first = ids.first else { return }
-        withAnimation {
-            proxy.scrollTo(first, anchor: .center)
+        activeMatchId = first
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(first, anchor: .center) }
         }
     }
 
     private func scrollToNextMatch(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         if !ids.isEmpty {
-            activeMatchIndex = (activeMatchIndex + 1) % ids.count
-            withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+            let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? -1
+            let nextIndex = (currentIndex + 1) % ids.count
+            let targetId = ids[nextIndex]
+            activeMatchId = targetId
+            Task { @MainActor in
+                await Task.yield()
+                withAnimation { proxy.scrollTo(targetId, anchor: .center) }
+            }
             return
         }
 
         // 若高亮区无命中，则尝试在正文内定位（由 HTMLWebView 内部滚动）
         webActiveMatchIndex += 1
-        withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+        }
     }
 
     private func scrollToPrevMatch(proxy: ScrollViewProxy) {
         let ids = matchedHighlightIds()
         if !ids.isEmpty {
-            activeMatchIndex = (activeMatchIndex - 1 + ids.count) % ids.count
-            withAnimation { proxy.scrollTo(ids[activeMatchIndex], anchor: .center) }
+            let currentIndex = activeMatchId.flatMap { ids.firstIndex(of: $0) } ?? 0
+            let prevIndex = (currentIndex - 1 + ids.count) % ids.count
+            let targetId = ids[prevIndex]
+            activeMatchId = targetId
+            Task { @MainActor in
+                await Task.yield()
+                withAnimation { proxy.scrollTo(targetId, anchor: .center) }
+            }
             return
         }
 
         webActiveMatchIndex = max(0, webActiveMatchIndex - 1)
-        withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo("goodlinksArticleContent", anchor: .top) }
+        }
     }
 
     // MARK: - External Scroll Target
