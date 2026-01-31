@@ -1,33 +1,4 @@
 import SwiftUI
-import Combine
-
-// MARK: - SyncQueueCollapseStore
-
-/// 会话级的 Sync Queue 折叠状态（随应用重启重置）
-/// 当有任务入队时自动展开
-private final class SyncQueueCollapseStore: ObservableObject {
-    static let shared = SyncQueueCollapseStore()
-    @Published var isCollapsed: Bool = true
-    
-    private var cancellables = Set<AnyCancellable>()
-    private var previousTaskCount: Int = 0
-    
-    init() {
-        DIContainer.shared.syncQueueStore.tasksPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] tasks in
-                guard let self else { return }
-                let currentCount = tasks.count
-                if currentCount > self.previousTaskCount && self.isCollapsed {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        self.isCollapsed = false
-                    }
-                }
-                self.previousTaskCount = currentCount
-            }
-            .store(in: &cancellables)
-    }
-}
 
 // MARK: - TimestampInfo
 
@@ -72,7 +43,6 @@ struct TimestampItemView: View {
 /// 统一占位视图：空状态与多选占位合并，确保 SyncQueueView 视图身份稳定
 struct SelectionPlaceholderView: View {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
-    @StateObject private var syncQueueCollapseStore = SyncQueueCollapseStore.shared
     
     let source: ContentSource
     let count: Int?
@@ -140,30 +110,6 @@ struct SelectionPlaceholderView: View {
                         .padding(.bottom, 16)
                     }
 
-                    // Sync Queue 区块
-                    VStack(alignment: .leading, spacing: 12) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                syncQueueCollapseStore.isCollapsed.toggle()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: syncQueueCollapseStore.isCollapsed ? "chevron.right" : "chevron.down")
-                                    .foregroundStyle(.secondary)
-                                Text("Sync Queue")
-                                    .scaledFont(.title2, weight: .semibold)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-
-                        if !syncQueueCollapseStore.isCollapsed {
-                            SyncQueueView()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
