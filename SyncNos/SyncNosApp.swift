@@ -6,33 +6,6 @@ import StoreKit
 struct SyncNosApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    /// 使用 AppStorage 监听图标显示模式变化，自动控制 MenuBarExtra 可见性
-    /// 默认值为 0（.both），即同时在菜单栏和 Dock 显示
-    @AppStorage(AppIconDisplayMode.userDefaultsKey) private var iconDisplayModeRaw: Int = 0
-    
-    /// 计算菜单栏图标是否应该显示（Binding 用于 MenuBarExtra isInserted 参数）
-    private var menuBarIconInserted: Binding<Bool> {
-        Binding(
-            get: {
-                let mode = AppIconDisplayMode(rawValue: iconDisplayModeRaw) ?? .both
-                return mode.showsMenuBarIcon
-            },
-            set: { newValue in
-                // 只在用户从菜单栏手动移除图标时处理
-                // 如果当前模式已经是 dockOnly，说明是我们主动设置的，不需要再处理
-                let currentMode = AppIconDisplayMode(rawValue: iconDisplayModeRaw) ?? .both
-                if !newValue && currentMode != .dockOnly {
-                    // 用户从菜单栏手动移除了图标，切换到 dockOnly 模式
-                    iconDisplayModeRaw = AppIconDisplayMode.dockOnly.rawValue
-                    // 延迟执行以避免 UI 更新冲突
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        AppIconDisplayViewModel.applyStoredMode()
-                    }
-                }
-            }
-        )
-    }
-    
     init() {
         // 注意：图标显示模式的应用延迟到 AppDelegate.applicationDidFinishLaunching
         // 因为 NSApp 在 App.init() 阶段尚未初始化
@@ -105,10 +78,5 @@ struct SyncNosApp: App {
                 .applyFontScale()
         }
         .windowResizability(.contentSize)
-        
-        // 菜单栏项（根据图标显示模式动态显示/隐藏）
-        MenuBarExtra("SyncNos", image: "MenuBarIcon", isInserted: menuBarIconInserted) {
-            MenuBarView()
-        }
     }
 }
