@@ -9,6 +9,8 @@ struct SyncSourceBadge: View {
     var body: some View {
         Label(source.displayName, systemImage: source.iconName)
             .scaledFont(.caption2)
+            .lineLimit(1)
+            .truncationMode(.tail)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .foregroundStyle(source.brandColor)
@@ -46,88 +48,34 @@ struct SyncTaskRowView: View {
     // MARK: - Running Row
     
     private var runningRow: some View {
-        HStack(spacing: 12) {
-            statusIndicator
-            
-            Button(action: onSelect) {
-                taskInfo(showProgress: true)
-            }
-            .buttonStyle(.plain)
-            
-            Spacer()
-            
-            ProgressView()
-                .controlSize(.small)
-            
-            if let onCancel {
-                Button(action: onCancel) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(String(localized: "Cancel this task"))
-            }
-        }
+        commonRow(showProgressText: true, showErrorMessage: false)
     }
     
     // MARK: - Queued Row
     
     private var queuedRow: some View {
-        HStack(spacing: 12) {
-            statusIndicator
-            
-            Button(action: onSelect) {
-                taskInfo(showProgress: false)
-            }
-            .buttonStyle(.plain)
-            
-            Spacer()
-            
-            if let onCancel {
-                Button(action: onCancel) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(String(localized: "Cancel this task"))
-            }
-        }
+        commonRow(showProgressText: false, showErrorMessage: false)
     }
     
     // MARK: - Failed Row
     
     private var failedRow: some View {
-            VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                // 错误类型图标
-                if let errorType = task.errorType {
-                    Image(systemName: errorType.iconName)
-                        .foregroundStyle(.red)
-                        .frame(width: 16, height: 16)
-                } else {
-                    statusIndicator
-                }
-                
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
                 Button(action: onSelect) {
                     VStack(alignment: .leading, spacing: 4) {
                         taskTitleRow
                         subtitleIfNeeded
                         errorMessageIfNeeded
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                
-                Spacer()
-                
-                // 展开/收起详情按钮
+
                 if task.errorDetails != nil {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            if expandedErrorTaskId == task.id {
-                                expandedErrorTaskId = nil
-                    } else {
-                                expandedErrorTaskId = task.id
-                            }
+                            expandedErrorTaskId = (expandedErrorTaskId == task.id) ? nil : task.id
                         }
                     } label: {
                         Image(systemName: expandedErrorTaskId == task.id ? "chevron.up" : "chevron.down")
@@ -137,14 +85,11 @@ struct SyncTaskRowView: View {
                     .help(String(localized: "Show error details"))
                 }
             }
-            
-            // 详细错误信息
+
             if expandedErrorTaskId == task.id, let details = task.errorDetails {
                 Text(details)
                     .scaledFont(.caption2)
                     .foregroundStyle(.secondary)
-                    .padding(.leading, 28)
-                    .padding(.trailing, 12)
                     .textSelection(.enabled)
             }
         }
@@ -152,43 +97,13 @@ struct SyncTaskRowView: View {
     
     // MARK: - Shared Components
     
-    private var statusIndicator: some View {
-        Group {
-            switch task.state {
-            case .queued:
-                Color.secondary.opacity(0.5)
-            case .running:
-                LinearGradient(
-                    colors: [.yellow, .orange],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            case .succeeded:
-                Color.green
-            case .failed:
-                Color.red
-            case .cancelled:
-                Color.gray
-            }
-        }
-        .frame(width: 8, height: 8)
-        .clipShape(Circle())
-    }
-    
-    private func taskInfo(showProgress: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            taskTitleRow
-            subtitleIfNeeded
-            if showProgress {
-                progressTextIfNeeded
-            }
-        }
-    }
-    
     private var taskTitleRow: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(task.title)
                 .scaledFont(.body)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             SyncSourceBadge(source: task.source)
         }
     }
@@ -218,6 +133,34 @@ struct SyncTaskRowView: View {
                 .scaledFont(.caption)
                 .foregroundStyle(.red.opacity(0.8))
                 .lineLimit(1)
+        }
+    }
+
+    private func commonRow(showProgressText: Bool, showErrorMessage: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: onSelect) {
+                VStack(alignment: .leading, spacing: 4) {
+                    taskTitleRow
+                    subtitleIfNeeded
+                    if showProgressText {
+                        progressTextIfNeeded
+                    }
+                    if showErrorMessage {
+                        errorMessageIfNeeded
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            if let onCancel {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Cancel this task"))
+            }
         }
     }
 }
@@ -420,7 +363,7 @@ struct SyncQueueView: View {
                             }
                         }
                     )
-                    .listRowInsets(EdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 }
             }
             .listStyle(.inset)
