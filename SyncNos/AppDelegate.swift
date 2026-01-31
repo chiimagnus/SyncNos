@@ -1,18 +1,24 @@
 import SwiftUI
 
+@MainActor
 @objc final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var bypassNextTerminationOnce: Bool = false
     private var bypassObserver: NSObjectProtocol?
+    private var iconModeObserver: NSObjectProtocol?
+    private var menuBarPopoverController: MenuBarPopoverController?
 
     override init() {
         super.init()
         bypassObserver = NotificationCenter.default.addObserver(forName: .bypassQuitConfirmationOnce, object: nil, queue: .main) { _ in
-            Self.bypassNextTerminationOnce = true
+            Task { @MainActor in
+                Self.bypassNextTerminationOnce = true
+            }
         }
     }
 
     deinit {
         if let token = bypassObserver { NotificationCenter.default.removeObserver(token) }
+        if let token = iconModeObserver { NotificationCenter.default.removeObserver(token) }
     }
     
     // MARK: - Application Launch
@@ -20,6 +26,24 @@ import SwiftUI
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 应用保存的图标显示模式设置（NSApp 此时已初始化）
         AppIconDisplayViewModel.applyStoredMode()
+
+        // 菜单栏 Popover（带箭头）
+        let controller = MenuBarPopoverController(iconImageName: "MenuBarIcon") {
+            MenuBarView().applyFontScale()
+        }
+        controller.setVisible(AppIconDisplayMode.current.showsMenuBarIcon)
+        menuBarPopoverController = controller
+
+        iconModeObserver = NotificationCenter.default.addObserver(
+            forName: .appIconDisplayModeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] n in
+            let mode = (n.object as? AppIconDisplayMode) ?? AppIconDisplayMode.current
+            Task { @MainActor in
+                self?.menuBarPopoverController?.setVisible(mode.showsMenuBarIcon)
+            }
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
