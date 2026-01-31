@@ -312,6 +312,14 @@ protocol AutoSyncServiceProtocol: AnyObject {
     func triggerChatsNow()
 }
 
+// MARK: - Auto Fetch Service Protocol
+protocol AutoFetchServiceProtocol: AnyObject {
+    var isRunning: Bool { get }
+    func start()
+    func stop()
+    func triggerFetchNow()
+}
+
 // MARK: - Sync Timestamp Store Protocol
 /// 抽象同步时间戳存取，避免直接依赖具体实现与单例
 protocol SyncTimestampStoreProtocol: AnyObject {
