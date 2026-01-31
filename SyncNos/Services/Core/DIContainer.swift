@@ -18,7 +18,6 @@ class DIContainer {
     private var _webArticleCacheService: WebArticleCacheServiceProtocol?
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
-    private var _autoFetchService: AutoFetchServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
     private var _syncActivityMonitor: SyncActivityMonitorProtocol?
     private var _syncQueueStore: SyncQueueStoreProtocol?
@@ -137,13 +136,6 @@ class DIContainer {
             _autoSyncService = AutoSyncService()
         }
         return _autoSyncService!
-    }
-
-    var autoFetchService: AutoFetchServiceProtocol {
-        if _autoFetchService == nil {
-            _autoFetchService = AutoFetchService()
-        }
-        return _autoFetchService!
     }
 
     var syncTimestampStore: SyncTimestampStoreProtocol {
@@ -401,10 +393,6 @@ class DIContainer {
 
     func register(autoSyncService: AutoSyncServiceProtocol) {
         self._autoSyncService = autoSyncService
-    }
-
-    func register(autoFetchService: AutoFetchServiceProtocol) {
-        self._autoFetchService = autoFetchService
     }
 
     func register(syncTimestampStore: SyncTimestampStoreProtocol) {

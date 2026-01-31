@@ -4,17 +4,6 @@ import Combine
 // 使用 NotificationNames.swift 中定义的统一通知名称常量
 // 已删除私有 GLNotifications 枚举
 
-// MARK: - Auto Fetch Progress
-
-struct GoodLinksAutoFetchProgress: Equatable {
-    let processed: Int
-    let total: Int
-    let cached: Int
-    let fetched: Int
-    let skipped: Int
-    let running: Bool
-}
-
 // MARK: - GoodLinksViewModel (List)
 
 /// GoodLinks 列表 ViewModel
@@ -24,8 +13,8 @@ final class GoodLinksViewModel: ObservableObject {
     // MARK: - UserDefaults Keys
     
     private enum Keys {
-        static let sortKey = GoodLinksListOrderBuilder.UserDefaultsKeys.sortKey
-        static let sortAscending = GoodLinksListOrderBuilder.UserDefaultsKeys.sortAscending
+        static let sortKey = "goodlinks_sort_key"
+        static let sortAscending = "goodlinks_sort_ascending"
         static let showStarredOnly = "goodlinks_show_starred_only"
         static let searchText = "goodlinks_search_text"
     }
@@ -51,9 +40,6 @@ final class GoodLinksViewModel: ObservableObject {
     
     @Published var syncingLinkIds: Set<String> = []
     @Published var syncedLinkIds: Set<String> = []
-
-    /// GoodLinks 自动预取进度（由后台 provider 通知驱动）
-    @Published var autoFetchProgress: GoodLinksAutoFetchProgress?
     
     // MARK: - Pagination
     
@@ -132,30 +118,6 @@ final class GoodLinksViewModel: ObservableObject {
                 default:
                     break
                 }
-            }
-            .store(in: &cancellables)
-
-        // 订阅 GoodLinks 自动预取进度通知（用于 ListView 展示）
-        NotificationCenter.default.publisher(for: .goodLinksAutoFetchProgressUpdated)
-            .compactMap { $0.userInfo as? [String: Any] }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] userInfo in
-                guard let self else { return }
-                guard let processed = userInfo["processed"] as? Int,
-                      let total = userInfo["total"] as? Int,
-                      let cached = userInfo["cached"] as? Int,
-                      let fetched = userInfo["fetched"] as? Int,
-                      let skipped = userInfo["skipped"] as? Int,
-                      let running = userInfo["running"] as? Bool else { return }
-
-                self.autoFetchProgress = GoodLinksAutoFetchProgress(
-                    processed: processed,
-                    total: total,
-                    cached: cached,
-                    fetched: fetched,
-                    skipped: skipped,
-                    running: running
-                )
             }
             .store(in: &cancellables)
         
@@ -297,13 +259,42 @@ final class GoodLinksViewModel: ObservableObject {
                 return inTitle || inAuthor || inURL || inTags
             }
         }
-
-        return GoodLinksListOrderBuilder.sortedLinks(
-            arr,
-            sortKey: sortKey,
-            sortAscending: sortAscending,
-            syncTimestampStore: syncTimestampStore
-        )
+        
+        // 预取 lastSync 映射
+        var lastSyncCache: [String: Date?] = [:]
+        if sortKey == .lastSync {
+            lastSyncCache = Dictionary(uniqueKeysWithValues: arr.map { ($0.id, syncTimestampStore.getLastSyncTime(for: $0.id)) })
+        }
+        
+        arr.sort { a, b in
+            switch sortKey {
+            case .title:
+                let t1 = (a.title?.isEmpty == false ? a.title! : a.url)
+                let t2 = (b.title?.isEmpty == false ? b.title! : b.url)
+                let cmp = t1.localizedCaseInsensitiveCompare(t2)
+                return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+            case .highlightCount:
+                let c1 = a.highlightTotal ?? 0
+                let c2 = b.highlightTotal ?? 0
+                if c1 == c2 { return false }
+                return sortAscending ? (c1 < c2) : (c1 > c2)
+            case .added:
+                if a.addedAt == b.addedAt { return false }
+                return sortAscending ? (a.addedAt < b.addedAt) : (a.addedAt > b.addedAt)
+            case .modified:
+                if a.modifiedAt == b.modifiedAt { return false }
+                return sortAscending ? (a.modifiedAt < b.modifiedAt) : (a.modifiedAt > b.modifiedAt)
+            case .lastSync:
+                let t1 = lastSyncCache[a.id] ?? nil
+                let t2 = lastSyncCache[b.id] ?? nil
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return sortAscending }
+                if t2 == nil { return !sortAscending }
+                if t1! == t2! { return false }
+                return sortAscending ? (t1! < t2!) : (t1! > t2!)
+            }
+        }
+        return arr
     }
     
     // MARK: - Pagination
