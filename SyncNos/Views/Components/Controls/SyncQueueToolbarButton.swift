@@ -125,11 +125,10 @@ private struct SyncQueueToolbarIcon: View {
 
 private struct SyncQueuePopoverView: View {
     var body: some View {
-        ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
             SyncQueueView()
-                .padding(12)
         }
-        .frame(width: 420, height: 520)
+        .frame(width: 300, height: 400, alignment: .topLeading)
     }
 }
 
