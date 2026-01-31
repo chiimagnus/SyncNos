@@ -253,6 +253,11 @@ struct MainListView: View {
                             self.keyboardNavigationTarget = .list
                         }
                     )
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            SyncQueueToolbarButton()
+                        }
+                    }
             } detail: {
                 detailColumn
                     // 提供一个稳定可聚焦的 NSView，作为 Detail 抢 firstResponder 的兜底“落点”
