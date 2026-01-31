@@ -254,34 +254,7 @@ struct SyncQueueView: View {
     }
 
     private var footerWaiting: some View {
-        HStack(spacing: 10) {
-            if viewModel.queuedTotalCount > viewModel.queuedTasks.count {
-                Button {
-                    viewModel.showAllQueued()
-                } label: {
-                    Text("Show all (\(viewModel.queuedTotalCount))")
-                }
-                .buttonStyle(.link)
-            } else if viewModel.queuedDisplayLimit == nil, viewModel.queuedTotalCount > 50 {
-                Button {
-                    viewModel.showQueued(limit: 50)
-                } label: {
-                    Text("Show less")
-                }
-                .buttonStyle(.link)
-            }
-
-            Spacer()
-
-            if viewModel.hasQueuedTasks {
-                Button {
-                    viewModel.cancelAllQueued()
-                } label: {
-                    Label("Cancel All", systemImage: "xmark.circle")
-                }
-                .controlSize(.small)
-            }
-        }
+        EmptyView()
     }
 
     private var footerFailed: some View {
@@ -365,6 +338,12 @@ struct SyncQueueView: View {
                             }
                         }
                     )
+                    .listRowSeparator(.hidden)
+                    .onAppear {
+                        if variant == .queued {
+                            viewModel.loadMoreQueuedIfNeeded(currentTask: task)
+                        }
+                    }
 //                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 }
             }
