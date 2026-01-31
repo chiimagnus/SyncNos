@@ -181,12 +181,14 @@ struct SyncQueueView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .padding(.horizontal, 12)
 
             content
 
             footer
+//                 .padding(.horizontal, 12)
         }
-        .padding(12)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 12)
@@ -363,10 +365,10 @@ struct SyncQueueView: View {
                             }
                         }
                     )
-                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+//                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 }
             }
-            .listStyle(.inset)
+//            .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .frame(minHeight: 220)
         }
