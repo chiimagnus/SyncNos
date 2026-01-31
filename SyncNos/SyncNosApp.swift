@@ -41,6 +41,9 @@ struct SyncNosApp: App {
             || UserDefaults.standard.bool(forKey: "autoSync.weRead")
         if autoSyncEnabled { DIContainer.shared.autoSyncService.start() }
 
+        // 启动 Auto Fetch 服务（独立于 Notion 同步；数据源未启用时 provider 会自动 no-op）
+        DIContainer.shared.autoFetchService.start()
+
         // 初始化同步状态监控，确保尽早开始监听通知
         _ = DIContainer.shared.syncActivityMonitor
         // 初始化同步队列存储，确保尽早开始监听入队/状态事件

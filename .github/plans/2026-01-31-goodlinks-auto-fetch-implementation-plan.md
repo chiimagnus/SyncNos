@@ -67,7 +67,7 @@ final class AutoFetchService: AutoFetchServiceProtocol {
 
     func start() { /* set up timer + notifications */ }
     func stop() { /* cancel */ }
-    func triggerFetchNow() { providers.values.forEach { $0.triggerScheduledFetchIfEnabled() } }
+    func triggerFetchNow() { providers.values.forEach { $0.triggerScheduledFetch() } }
 }
 ```
 
@@ -123,7 +123,7 @@ final class GoodLinksAutoFetchProvider: AutoFetchSourceProvider {
 
     private var isFetching = false
 
-    func triggerScheduledFetchIfEnabled() { runIfNeeded() }
+    func triggerScheduledFetch() { runIfNeeded() }
     func triggerManualFetchNow() { runIfNeeded() }
 }
 ```
@@ -166,3 +166,10 @@ final class GoodLinksAutoFetchProvider: AutoFetchSourceProvider {
 
 ## 不确定项（执行前确认）
 - 是否需要“仅在应用前台/空闲时运行”的策略？（默认建议：先不做复杂的空闲检测，P2 再优化）
+- “按 ListView 顺序”的口径已确认：**只做排序，不做过滤**（不考虑 starred-only / searchText 等任何过滤项）
+
+---
+
+## Follow-ups（后续问题）
+
+- DetailView 不应“进入即触发下载”；改为用户点击按钮才下载，并且该任务要插队到自动下载队列最前（详见独立计划）。
