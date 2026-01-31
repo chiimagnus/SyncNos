@@ -82,6 +82,12 @@ extension Notification.Name {
     
     /// 自动同步状态变更
     static let autoSyncStatusChanged = Notification.Name("AutoSyncStatusChanged")
+
+    // MARK: - 自动预取（Auto Fetch）
+
+    /// GoodLinks 自动预取进度更新
+    /// userInfo: ["processed": Int, "total": Int, "cached": Int, "fetched": Int, "skipped": Int, "running": Bool]
+    static let goodLinksAutoFetchProgressUpdated = Notification.Name("GoodLinksAutoFetchProgressUpdated")
     
     // MARK: - 字体缩放通知
     
