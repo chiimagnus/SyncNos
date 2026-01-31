@@ -15,10 +15,12 @@ final class SyncQueueViewModel: ObservableObject {
     /// 已取消任务总数
     @Published var cancelledTotalCount: Int = 0
 
-    /// 等待队列在 UI 中最多展示的任务数量（完整数据仍保存在 `SyncQueueStore` 中）
-    private let maxQueuedDisplayCount: Int = 5
-    /// 失败队列在 UI 中最多展示的任务数量
-    private let maxFailedDisplayCount: Int = 5
+    // MARK: - UI Display Limits
+
+    /// 等待队列在 UI 中最多展示的任务数量（nil 表示显示全部）
+    @Published private(set) var queuedDisplayLimit: Int? = 50
+    /// 失败队列在 UI 中最多展示的任务数量（nil 表示显示全部）
+    @Published private(set) var failedDisplayLimit: Int? = 50
 
     var concurrencyLimit: Int { NotionSyncConfig.batchConcurrency }
     
@@ -30,6 +32,8 @@ final class SyncQueueViewModel: ObservableObject {
 
     private let store: SyncQueueStoreProtocol
     private var cancellables: Set<AnyCancellable> = []
+    private let queuedLimitSubject = CurrentValueSubject<Int?, Never>(50)
+    private let failedLimitSubject = CurrentValueSubject<Int?, Never>(50)
 
     /// 内部使用的小型任务分组结构，便于 `removeDuplicates` 直接基于 `Equatable` 比较
     private struct TaskGroups: Equatable {
@@ -42,16 +46,27 @@ final class SyncQueueViewModel: ObservableObject {
         var cancelledTotal: Int
     }
 
-    private func groupTasks(_ tasks: [SyncQueueTask]) -> TaskGroups {
+    private func groupTasks(_ tasks: [SyncQueueTask], queuedLimit: Int?, failedLimit: Int?) -> TaskGroups {
         // 运行中的任务数量由全局并发限制器控制，保持全部展示即可
         let running = tasks.filter { $0.state == .running }
-        // 等待与失败任务只截取前 N 项，避免 ForEach 渲染上千条导致卡顿
         let queuedAll = tasks.filter { $0.state == .queued }
         let failedAll = tasks.filter { $0.state == .failed }
         let cancelledAll = tasks.filter { $0.state == .cancelled }
-        let queued = Array(queuedAll.prefix(maxQueuedDisplayCount))
-        // 失败任务保持完整列表，默认在 UI 中折叠，只有在用户展开时才渲染
-        let failed = failedAll
+
+        let queued: [SyncQueueTask]
+        if let queuedLimit {
+            queued = Array(queuedAll.prefix(queuedLimit))
+        } else {
+            queued = queuedAll
+        }
+
+        let failed: [SyncQueueTask]
+        if let failedLimit {
+            failed = Array(failedAll.prefix(failedLimit))
+        } else {
+            failed = failedAll
+        }
+
         let cancelled = cancelledAll
         return TaskGroups(
             running: running,
@@ -71,11 +86,12 @@ final class SyncQueueViewModel: ObservableObject {
         store.tasksPublisher
             // 将底层频繁的进度更新合并到每 120ms 一次的 UI 更新中，避免主线程高频重绘
             .throttle(for: .milliseconds(120), scheduler: DispatchQueue.main, latest: true)
-            .map { [weak self] tasks -> TaskGroups in
+            .combineLatest(queuedLimitSubject, failedLimitSubject)
+            .map { [weak self] tasks, queuedLimit, failedLimit -> TaskGroups in
                 guard let self else {
                     return TaskGroups(running: [], queued: [], failed: [], cancelled: [], queuedTotal: 0, failedTotal: 0, cancelledTotal: 0)
                 }
-                return self.groupTasks(tasks)
+                return self.groupTasks(tasks, queuedLimit: queuedLimit, failedLimit: failedLimit)
             }
             // 若三组任务内容完全一致，则跳过 UI 更新
             .removeDuplicates()
@@ -89,6 +105,28 @@ final class SyncQueueViewModel: ObservableObject {
                 self?.cancelledTotalCount = groups.cancelledTotal
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Display Limit Controls
+
+    func showAllQueued() {
+        queuedDisplayLimit = nil
+        queuedLimitSubject.send(nil)
+    }
+
+    func showQueued(limit: Int) {
+        queuedDisplayLimit = limit
+        queuedLimitSubject.send(limit)
+    }
+
+    func showAllFailed() {
+        failedDisplayLimit = nil
+        failedLimitSubject.send(nil)
+    }
+
+    func showFailed(limit: Int) {
+        failedDisplayLimit = limit
+        failedLimitSubject.send(limit)
     }
     
     // MARK: - 取消操作
