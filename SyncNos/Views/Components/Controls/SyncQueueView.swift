@@ -16,90 +16,6 @@ struct SyncSourceBadge: View {
     }
 }
 
-// MARK: - SyncQueueSectionHeader
-
-/// 同步队列区块标题栏
-struct SyncQueueSectionHeader: View {
-    let title: LocalizedStringKey
-    let count: Int
-    let isExpanded: Bool?
-    let actionLabel: LocalizedStringKey?
-    let actionIcon: String?
-    let showAction: Bool
-    var onToggle: (() -> Void)?
-    var onAction: (() -> Void)?
-    
-    init(
-        title: LocalizedStringKey,
-        count: Int,
-        isExpanded: Bool? = nil,
-        actionLabel: LocalizedStringKey? = nil,
-        actionIcon: String? = nil,
-        showAction: Bool = false,
-        onToggle: (() -> Void)? = nil,
-        onAction: (() -> Void)? = nil
-    ) {
-        self.title = title
-        self.count = count
-        self.isExpanded = isExpanded
-        self.actionLabel = actionLabel
-        self.actionIcon = actionIcon
-        self.showAction = showAction
-        self.onToggle = onToggle
-        self.onAction = onAction
-    }
-    
-    var body: some View {
-        HStack {
-            // 折叠指示器（可选）
-            if let isExpanded, let onToggle {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        onToggle()
-                    }
-                } label: {
-                    headerContent(showChevron: true, isExpanded: isExpanded)
-                }
-                .buttonStyle(.plain)
-            } else {
-                headerContent(showChevron: false, isExpanded: false)
-            }
-            
-            Spacer()
-            
-            // 操作按钮（可选）
-            if showAction, let actionLabel, let actionIcon, let onAction {
-                Button(action: onAction) {
-                    Label(actionLabel, systemImage: actionIcon)
-                        .scaledFont(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-        }
-                .padding(.horizontal, 12)
-    }
-
-    @ViewBuilder
-    private func headerContent(showChevron: Bool, isExpanded: Bool) -> some View {
-                HStack {
-            if showChevron {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .foregroundStyle(.secondary)
-            }
-            Text(title)
-                        .scaledFont(.headline)
-                        .foregroundStyle(.primary)
-            if count > 0 {
-                Text("\(count)")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-        .contentShape(Rectangle())
-    }
-}
-
 // MARK: - SyncTaskRowView
 
 /// 同步任务行视图
@@ -310,25 +226,25 @@ struct SyncTaskRowView: View {
 
 struct SyncQueueView: View {
     @StateObject private var viewModel = SyncQueueViewModel()
-    @State private var isFailedExpanded: Bool = false
     @State private var expandedErrorTaskId: String? = nil
+    @State private var selectedTab: Tab = .running
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            runningSection
-            
-            Divider()
-                .padding(.horizontal, 12)
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $selectedTab) {
+                Text("Running (\(viewModel.runningTasks.count))").tag(Tab.running)
+                Text("Waiting (\(viewModel.queuedTotalCount))").tag(Tab.waiting)
+                Text("Failed (\(viewModel.failedTotalCount))").tag(Tab.failed)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-            queuedSection
-            
-            Divider()
-                .padding(.horizontal, 12)
+            content
 
-            failedSection
+            footer
         }
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.06))
@@ -337,102 +253,179 @@ struct SyncQueueView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
         )
-    }
-    
-    // MARK: - Running Section
-    
-    private var runningSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SyncQueueSectionHeader(
-                title: "Running",
-                count: viewModel.runningTasks.count
-            )
-            
-            if viewModel.runningTasks.isEmpty {
-                emptyStateText("No active sync tasks")
-            } else {
-                taskList(viewModel.runningTasks, variant: .running)
-            }
+        .onChange(of: viewModel.runningTasks.count) { _, _ in
+            normalizeSelectedTab()
         }
-    }
-    
-    // MARK: - Queued Section
-    
-    private var queuedSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SyncQueueSectionHeader(
-                title: "Waiting",
-                count: viewModel.queuedTotalCount,
-                actionLabel: "Cancel All",
-                actionIcon: "xmark.circle",
-                showAction: viewModel.hasQueuedTasks,
-                onAction: { viewModel.cancelAllQueued() }
-            )
-            
-            if viewModel.queuedTasks.isEmpty {
-                emptyStateText("No queued tasks")
-            } else {
-                taskList(viewModel.queuedTasks, variant: .queued)
-            }
+        .onChange(of: viewModel.queuedTotalCount) { _, _ in
+            normalizeSelectedTab()
         }
-    }
-    
-    // MARK: - Failed Section
-    
-    private var failedSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SyncQueueSectionHeader(
-                title: "Failed",
-                count: viewModel.failedTotalCount,
-                isExpanded: isFailedExpanded,
-                actionLabel: "Clear",
-                actionIcon: "trash",
-                showAction: viewModel.hasCompletedTasks,
-                onToggle: { isFailedExpanded.toggle() },
-                onAction: { viewModel.clearCompleted() }
-            )
-
-            if isFailedExpanded {
-                if viewModel.failedTasks.isEmpty {
-                    emptyStateText("No failed tasks")
-                } else {
-                    taskList(viewModel.failedTasks, variant: .failed)
-                }
-            }
+        .onChange(of: viewModel.failedTotalCount) { _, _ in
+            normalizeSelectedTab()
         }
     }
     
     // MARK: - Helpers
-    
-    private func emptyStateText(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .scaledFont(.body)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+
+    private enum Tab: Hashable {
+        case running
+        case waiting
+        case failed
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch selectedTab {
+        case .running:
+            tasksList(
+                tasks: viewModel.runningTasks,
+                variant: .running,
+                emptyText: "No active sync tasks"
+            )
+        case .waiting:
+            tasksList(
+                tasks: viewModel.queuedTasks,
+                variant: .queued,
+                emptyText: "No queued tasks"
+            )
+        case .failed:
+            tasksList(
+                tasks: viewModel.failedTasks,
+                variant: .failed,
+                emptyText: "No failed tasks"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        switch selectedTab {
+        case .running:
+            EmptyView()
+        case .waiting:
+            footerWaiting
+        case .failed:
+            footerFailed
+        }
+    }
+
+    private var footerWaiting: some View {
+        HStack(spacing: 10) {
+            if viewModel.queuedTotalCount > viewModel.queuedTasks.count {
+                Button {
+                    viewModel.showAllQueued()
+                } label: {
+                    Text("Show all (\(viewModel.queuedTotalCount))")
+                }
+                .buttonStyle(.link)
+            } else if viewModel.queuedDisplayLimit == nil, viewModel.queuedTotalCount > 50 {
+                Button {
+                    viewModel.showQueued(limit: 50)
+                } label: {
+                    Text("Show less")
+                }
+                .buttonStyle(.link)
+            }
+
+            Spacer()
+
+            if viewModel.hasQueuedTasks {
+                Button {
+                    viewModel.cancelAllQueued()
+                } label: {
+                    Label("Cancel All", systemImage: "xmark.circle")
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var footerFailed: some View {
+        HStack(spacing: 10) {
+            if viewModel.failedTotalCount > viewModel.failedTasks.count {
+                Button {
+                    viewModel.showAllFailed()
+                } label: {
+                    Text("Show all (\(viewModel.failedTotalCount))")
+                }
+                .buttonStyle(.link)
+            } else if viewModel.failedDisplayLimit == nil, viewModel.failedTotalCount > 50 {
+                Button {
+                    viewModel.showFailed(limit: 50)
+                } label: {
+                    Text("Show less")
+                }
+                .buttonStyle(.link)
+            }
+
+            Spacer()
+
+            if viewModel.hasCompletedTasks {
+                Button {
+                    viewModel.clearCompleted()
+                } label: {
+                    Label("Clear", systemImage: "trash")
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private func normalizeSelectedTab() {
+        // 若当前 tab 为空，则优先跳到有内容的 tab，避免出现“空白页”
+        switch selectedTab {
+        case .running:
+            if !viewModel.runningTasks.isEmpty { return }
+        case .waiting:
+            if viewModel.queuedTotalCount > 0 { return }
+        case .failed:
+            if viewModel.failedTotalCount > 0 { return }
+        }
+
+        if !viewModel.runningTasks.isEmpty {
+            selectedTab = .running
+        } else if viewModel.queuedTotalCount > 0 {
+            selectedTab = .waiting
+        } else if viewModel.failedTotalCount > 0 {
+            selectedTab = .failed
+        }
     }
     
-    private func taskList(_ tasks: [SyncQueueTask], variant: SyncTaskRowView.Variant) -> some View {
-        VStack(spacing: 8) {
-            ForEach(tasks) { task in
-                SyncTaskRowView(
-                    task: task,
-                    variant: variant,
-                    expandedErrorTaskId: $expandedErrorTaskId,
-                    onSelect: { selectTask(task) },
-                    onCancel: {
-                        switch variant {
-                        case .running:
-                            viewModel.cancelRunningTask(task)
-                        case .queued:
-                            viewModel.cancelTask(task)
-                        case .failed:
-                            break
+    @ViewBuilder
+    private func tasksList(
+        tasks: [SyncQueueTask],
+        variant: SyncTaskRowView.Variant,
+        emptyText: LocalizedStringKey
+    ) -> some View {
+        if tasks.isEmpty {
+            Text(emptyText)
+                .scaledFont(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+        } else {
+            List {
+                ForEach(tasks) { task in
+                    SyncTaskRowView(
+                        task: task,
+                        variant: variant,
+                        expandedErrorTaskId: $expandedErrorTaskId,
+                        onSelect: { selectTask(task) },
+                        onCancel: {
+                            switch variant {
+                            case .running:
+                                viewModel.cancelRunningTask(task)
+                            case .queued:
+                                viewModel.cancelTask(task)
+                            case .failed:
+                                break
+                            }
                         }
-                    }
-                )
-                .padding(.horizontal, 12)
+                    )
+                    .listRowInsets(EdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10))
+                }
             }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 220)
         }
     }
     
