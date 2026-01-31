@@ -43,30 +43,6 @@ struct GoodLinksListView: View {
                 }
             } else {
                 List(selection: $selectionIds) {
-                    if let p = viewModel.autoFetchProgress, p.total > 0, (p.running || p.cached < p.total) {
-                        Section {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ProgressView(value: Double(p.cached), total: Double(p.total))
-                                    .progressViewStyle(.linear)
-                                HStack(spacing: 10) {
-                                    Text("\(p.cached)/\(p.total)")
-                                        .scaledFont(.caption)
-                                        .foregroundColor(.secondary)
-                                    if p.skipped > 0 {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "exclamationmark.triangle")
-                                                .foregroundColor(.orange)
-                                                .scaledFont(.caption)
-                                            Text("\(p.skipped)")
-                                                .scaledFont(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
                     ForEach(viewModel.visibleLinks, id: \.id) { link in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
