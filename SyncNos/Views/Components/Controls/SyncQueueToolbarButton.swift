@@ -144,11 +144,13 @@ struct SyncQueueToolbarButton: View {
             isPopoverPresented.toggle()
         } label: {
             SyncQueueToolbarIcon(status: viewModel.status)
+                .frame(width: 28, height: 28, alignment: .center)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help("Sync Tasks")
         .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
             SyncQueuePopoverView()
         }
     }
 }
-
