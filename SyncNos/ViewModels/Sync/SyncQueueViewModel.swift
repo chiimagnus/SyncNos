@@ -17,8 +17,8 @@ final class SyncQueueViewModel: ObservableObject {
 
     // MARK: - UI Display Limits
 
-    /// 等待队列在 UI 中最多展示的任务数量（nil 表示显示全部）
-    @Published private(set) var queuedDisplayLimit: Int? = 50
+    /// 等待队列在 UI 中最多展示的任务数量（动态递增）
+    @Published private(set) var queuedDisplayLimit: Int = 50
     /// 失败队列在 UI 中最多展示的任务数量（nil 表示显示全部）
     @Published private(set) var failedDisplayLimit: Int? = 50
 
@@ -32,8 +32,10 @@ final class SyncQueueViewModel: ObservableObject {
 
     private let store: SyncQueueStoreProtocol
     private var cancellables: Set<AnyCancellable> = []
-    private let queuedLimitSubject = CurrentValueSubject<Int?, Never>(50)
+    private let queuedLimitSubject = CurrentValueSubject<Int, Never>(50)
     private let failedLimitSubject = CurrentValueSubject<Int?, Never>(50)
+    private let queuedPageSize: Int = 50
+    private let queuedPrefetchThreshold: Int = 6
 
     /// 内部使用的小型任务分组结构，便于 `removeDuplicates` 直接基于 `Equatable` 比较
     private struct TaskGroups: Equatable {
@@ -46,19 +48,14 @@ final class SyncQueueViewModel: ObservableObject {
         var cancelledTotal: Int
     }
 
-    private func groupTasks(_ tasks: [SyncQueueTask], queuedLimit: Int?, failedLimit: Int?) -> TaskGroups {
+    private func groupTasks(_ tasks: [SyncQueueTask], queuedLimit: Int, failedLimit: Int?) -> TaskGroups {
         // 运行中的任务数量由全局并发限制器控制，保持全部展示即可
         let running = tasks.filter { $0.state == .running }
         let queuedAll = tasks.filter { $0.state == .queued }
         let failedAll = tasks.filter { $0.state == .failed }
         let cancelledAll = tasks.filter { $0.state == .cancelled }
 
-        let queued: [SyncQueueTask]
-        if let queuedLimit {
-            queued = Array(queuedAll.prefix(queuedLimit))
-        } else {
-            queued = queuedAll
-        }
+        let queued = Array(queuedAll.prefix(queuedLimit))
 
         let failed: [SyncQueueTask]
         if let failedLimit {
@@ -109,14 +106,19 @@ final class SyncQueueViewModel: ObservableObject {
 
     // MARK: - Display Limit Controls
 
-    func showAllQueued() {
-        queuedDisplayLimit = nil
-        queuedLimitSubject.send(nil)
+    func loadMoreQueuedIfNeeded(currentTask: SyncQueueTask) {
+        guard queuedTasks.count < queuedTotalCount else { return }
+        guard let currentIndex = queuedTasks.firstIndex(where: { $0.id == currentTask.id }) else { return }
+        let thresholdIndex = max(queuedTasks.count - queuedPrefetchThreshold, 0)
+        guard currentIndex >= thresholdIndex else { return }
+        increaseQueuedLimit()
     }
 
-    func showQueued(limit: Int) {
-        queuedDisplayLimit = limit
-        queuedLimitSubject.send(limit)
+    private func increaseQueuedLimit() {
+        let nextLimit = min(queuedDisplayLimit + queuedPageSize, queuedTotalCount)
+        guard nextLimit > queuedDisplayLimit else { return }
+        queuedDisplayLimit = nextLimit
+        queuedLimitSubject.send(nextLimit)
     }
 
     func showAllFailed() {
