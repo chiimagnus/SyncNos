@@ -224,6 +224,13 @@ final class GoodLinksViewModel: ObservableObject {
                 loggerForTask.info("[GoodLinks] loaded links: \(rows.count)")
                 self.isLoading = false
             }
+            
+            // 列表加载完成后，自动预取所有“未命中持久化缓存”的正文
+            // 注意：本次启动会话内失败/无正文不会重试（由 service 内部保证）
+            let linksForPrefetch = rows
+            Task.detached(priority: .utility) {
+                await DIContainer.shared.goodLinksArticleAutoFetchService.enqueuePrefetch(links: linksForPrefetch)
+            }
         } catch {
             let desc = error.localizedDescription
             await MainActor.run {
