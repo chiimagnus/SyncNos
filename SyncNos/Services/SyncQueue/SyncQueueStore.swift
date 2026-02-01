@@ -60,10 +60,10 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
     /// - Parameters:
     ///   - source: 数据源类型
     ///   - items: 待入队的任务列表
-    /// - Returns: 实际被接受入队的任务 ID 集合
+    /// - Returns: 实际被接受入队的任务 ID 列表（按入队顺序）
     @MainActor
-    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> Set<String> {
-        var acceptedIds: Set<String> = []
+    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> [String] {
+        var acceptedIds: [String] = []
         
         stateQueue.sync {
             cancelScheduledCleanup_locked()
@@ -93,7 +93,7 @@ final class SyncQueueStore: SyncQueueStoreProtocol {
                 )
                 tasksById[taskId] = task
                 enqueuedOrder.append(taskId)
-                acceptedIds.insert(item.id)
+                acceptedIds.append(item.id)
             }
         }
         

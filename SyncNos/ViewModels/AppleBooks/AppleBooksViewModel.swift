@@ -10,9 +10,9 @@ import Combine
 final class AppleBooksViewModel: ObservableObject {
     // Centralized UserDefaults keys
     private enum Keys {
-        static let sortKey = "bookList_sort_key"
-        static let sortAscending = "bookList_sort_ascending"
-        static let showWithTitleOnly = "bookList_showWithTitleOnly"
+        static let sortKey = ListSortPreferenceKeys.AppleBooks.sortKey
+        static let sortAscending = ListSortPreferenceKeys.AppleBooks.sortAscending
+        static let showWithTitleOnly = ListSortPreferenceKeys.AppleBooks.showWithTitleOnly
     }
     @Published var books: [BookListItem] = []
     // 后台计算产物：用于列表渲染的派生结果
@@ -71,8 +71,8 @@ final class AppleBooksViewModel: ObservableObject {
            let sortKey = BookListSortKey(rawValue: savedSortKey) {
             self.sortKey = sortKey
         }
-        self.sortAscending = UserDefaults.standard.bool(forKey: Keys.sortAscending)
-        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: Keys.showWithTitleOnly)
+        self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? true
+        self.showWithTitleOnly = UserDefaults.standard.object(forKey: Keys.showWithTitleOnly) as? Bool ?? false
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: .appleBooksFilterChanged)
@@ -430,9 +430,9 @@ extension AppleBooksViewModel {
         
         // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
         let syncQueueStore = DIContainer.shared.syncQueueStore
-        let enqueueItems = bookIds.compactMap { id -> SyncEnqueueItem? in
-            guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return SyncEnqueueItem(id: id, title: b.bookTitle, subtitle: b.authorName)
+        let orderedSelectedBooks = displayBooks.filter { bookIds.contains($0.bookId) }
+        let enqueueItems = orderedSelectedBooks.map { book in
+            SyncEnqueueItem(id: book.bookId, title: book.bookTitle, subtitle: book.authorName)
         }
         
         let acceptedIds = syncQueueStore.enqueue(source: .appleBooks, items: enqueueItems)
@@ -446,7 +446,6 @@ extension AppleBooksViewModel {
             syncingBookIds.insert(id)
         }
 
-        let ids = Array(acceptedIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
@@ -454,70 +453,46 @@ extension AppleBooksViewModel {
         let runningTaskStore = DIContainer.shared.syncRunningTaskStore
 
         Task {
-            await withTaskGroup(of: Void.self) { group in
-                for id in ids {
-                    guard let book = itemsById[id] else { continue }
-                    group.addTask { [weak self] in
-                        guard let self else { return }
-                        
-                        let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
-                        let task = Task { [weak self] in
-                            guard let self else { return }
-                            let syncQueueStore = DIContainer.shared.syncQueueStore
-                            guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
-                            
+            await OrderedTaskRunner.runOrdered(ids: acceptedIds, concurrency: concurrency) { [weak self] id in
+                guard let self else { return }
+                guard let book = itemsById[id] else { return }
+                
+                let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
+                let task = Task { [weak self] in
+                    guard let self else { return }
+                    let syncQueueStore = DIContainer.shared.syncQueueStore
+                    guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
+                    
+                    do {
+                        try await limiter.withPermit {
+                            // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
+                            await MainActor.run {
+                                NotificationCenter.default.post(
+                                    name: .syncBookStatusChanged,
+                                    object: self,
+                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
+                                )
+                            }
                             do {
-                                try await limiter.withPermit {
-                                    // 真正获得并发许可后再发布 started，以保证 UI running 数只反映实际并发
-                                    await MainActor.run {
+                                let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
+                                try await syncEngine.syncSmart(source: adapter) { progress in
+                                    // 广播该书的同步进度，供详情页监听并显示
+                                    Task { @MainActor in
                                         NotificationCenter.default.post(
-                                            name: .syncBookStatusChanged,
+                                            name: .syncProgressUpdated,
                                             object: self,
-                                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
+                                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progress]
                                         )
                                     }
-                                    do {
-                                        let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPath, notionConfig: notionConfig)
-                                        try await syncEngine.syncSmart(source: adapter) { progress in
-                                            // 广播该书的同步进度，供详情页监听并显示
-                                            Task { @MainActor in
-                                                NotificationCenter.default.post(
-                                                    name: .syncProgressUpdated,
-                                                    object: self,
-                                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progress]
-                                                )
-                                            }
-                                        }
-                                        await MainActor.run {
-                                            self.syncingBookIds.remove(id)
-                                            self.syncedBookIds.insert(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
-                                            )
-                                        }
-                                    } catch is CancellationError {
-                                        await MainActor.run {
-                                            self.syncingBookIds.remove(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
-                                            )
-                                        }
-                                    } catch {
-                                        let errorInfo = SyncErrorInfo.from(error)
-                                        await MainActor.run {
-                                            self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
-                                            self.syncingBookIds.remove(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
-                                            )
-                                        }
-                                    }
+                                }
+                                await MainActor.run {
+                                    self.syncingBookIds.remove(id)
+                                    self.syncedBookIds.insert(id)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
+                                    )
                                 }
                             } catch is CancellationError {
                                 await MainActor.run {
@@ -531,7 +506,7 @@ extension AppleBooksViewModel {
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[AppleBooks] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[AppleBooks] batchSync error for id=\(id): \(error.localizedDescription)")
                                     self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
@@ -541,13 +516,32 @@ extension AppleBooksViewModel {
                                 }
                             }
                         }
-                        
-                        await runningTaskStore.register(taskId: taskId, task: task)
-                        await task.value
-                        await runningTaskStore.unregister(taskId: taskId)
+                    } catch is CancellationError {
+                        await MainActor.run {
+                            self.syncingBookIds.remove(id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                            )
+                        }
+                    } catch {
+                        let errorInfo = SyncErrorInfo.from(error)
+                        await MainActor.run {
+                            self.logger.error("[AppleBooks] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                            self.syncingBookIds.remove(id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                            )
+                        }
                     }
                 }
-                await group.waitForAll()
+                
+                await runningTaskStore.register(taskId: taskId, task: task)
+                await task.value
+                await runningTaskStore.unregister(taskId: taskId)
             }
         }
     }
