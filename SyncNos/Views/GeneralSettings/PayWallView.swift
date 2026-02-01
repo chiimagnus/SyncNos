@@ -37,7 +37,6 @@ struct PayWallView: View {
             // 底部区域 - Onboarding 风格布局
             bottomSection
         }
-        .frame(width: 600, height: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color("BackgroundColor"))
         .onAppear {
