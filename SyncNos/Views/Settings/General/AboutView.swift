@@ -51,8 +51,9 @@ struct AboutView: View {
     private var appIconView: some View {
         Image(nsImage: NSApp.applicationIconImage)
             .resizable()
+            .scaledToFill()
             .frame(width: iconSize, height: iconSize)
-            .cornerRadius(24)
+            // .cornerRadius(24)
             #if DEBUG
             .overlay(
                 RoundedRectangle(cornerRadius: 24)
@@ -104,24 +105,12 @@ struct AboutView: View {
     }
 
     private var authorAvatarView: some View {
-        ZStack {
-            Circle()
-                .fill(Color.primary.opacity(0.06))
-                .frame(width: iconSize, height: iconSize)
+        Image("AuthorAvatar")
+            .resizable()
+            .scaledToFill()
+            .frame(width: iconSize, height: iconSize)
+            .clipShape(Circle())
 
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: iconSize * 0.92))
-                .foregroundStyle(Color.secondary.opacity(0.35))
-
-            Image("AuthorAvatar")
-                .resizable()
-                .scaledToFill()
-                .frame(width: iconSize, height: iconSize)
-                .clipShape(Circle())
-                .overlay(
-                    Circle().stroke(Color.primary.opacity(0.10), lineWidth: 1)
-                )
-        }
         #if DEBUG
         .overlay(
             Circle()
