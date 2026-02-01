@@ -49,18 +49,11 @@ struct AboutView: View {
     }
 
     private var appIconView: some View {
-        Image(nsImage: NSApp.applicationIconImage)
+        // Image(nsImage: NSApp.applicationIconImage)
+        Image("SyncNosLogo")
             .resizable()
             .scaledToFill()
             .frame(width: iconSize, height: iconSize)
-            // .cornerRadius(24)
-            #if DEBUG
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.red, lineWidth: 1)
-            )
-            #endif
-            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
 
     private var appInfoView: some View {
@@ -76,8 +69,8 @@ struct AboutView: View {
                 .padding(.vertical, 4)
 
             VStack(alignment: .leading, spacing: 8) {
-                AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
-                AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
+                // AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
+                // AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
                 AboutLinkButton(symbol: "chevron.left.forwardslash.chevron.right", title: "Source Code", action: openGitHubRepo)
                 AboutLinkButton(symbol: "doc.text.fill", title: "Privacy Policy", action: openPrivacyPolicy)
                 AboutLinkButton(symbol: "clock.arrow.circlepath", title: "Changelog", action: openChangelog)
@@ -110,14 +103,6 @@ struct AboutView: View {
             .scaledToFill()
             .frame(width: iconSize, height: iconSize)
             .clipShape(Circle())
-
-        #if DEBUG
-        .overlay(
-            Circle()
-                .stroke(Color.red, lineWidth: 1)
-        )
-        #endif
-        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 
     private var authorInfoView: some View {

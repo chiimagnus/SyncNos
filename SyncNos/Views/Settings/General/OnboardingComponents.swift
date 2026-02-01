@@ -361,7 +361,6 @@ struct OnboardingTouchMeView: View {
                     .buttonStyle(.link)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
                     // .scaledFont(.callout)
-                    .help("chii_magnus@outlook.com")
 
                     OnboardingNextButton {
                         viewModel.nextStep()
