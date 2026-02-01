@@ -123,12 +123,73 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             }
         }
 
+        let sortKey: BookListSortKey = {
+            guard let raw = UserDefaults.standard.string(forKey: ListSortPreferenceKeys.AppleBooks.sortKey),
+                  let k = BookListSortKey(rawValue: raw) else {
+                return .title
+            }
+            return k
+        }()
+        let sortAscending = UserDefaults.standard.object(forKey: ListSortPreferenceKeys.AppleBooks.sortAscending) as? Bool ?? true
+
+        // 全量列表排序（不受筛选影响），用于确定启动顺序
+        var allBookItems: [BookListItem] = assetIds.map { id in
+            let meta = bookMeta[id]
+            let rawTitle = meta?.title ?? ""
+            let title = rawTitle.isEmpty ? id : rawTitle
+            let author = meta?.author ?? ""
+            let stats = statsDict[id]
+            return BookListItem(
+                bookId: id,
+                authorName: author,
+                bookTitle: title,
+                ibooksURL: "ibooks://assetid/\(id)",
+                highlightCount: stats?.count ?? 0,
+                createdAt: stats?.minCreationDate,
+                modifiedAt: stats?.maxModifiedDate,
+                hasTitle: !rawTitle.isEmpty
+            )
+        }
+
+        var lastSyncCache: [String: Date?] = [:]
+        if sortKey == .lastSync {
+            lastSyncCache = Dictionary(uniqueKeysWithValues: allBookItems.map { ($0.bookId, syncTimestampStore.getLastSyncTime(for: $0.bookId)) })
+        }
+        allBookItems.sort { book1, book2 in
+            switch sortKey {
+            case .title:
+                let cmp = book1.bookTitle.localizedCaseInsensitiveCompare(book2.bookTitle)
+                return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+            case .highlightCount:
+                if book1.highlightCount == book2.highlightCount { return false }
+                return sortAscending ? (book1.highlightCount < book2.highlightCount) : (book1.highlightCount > book2.highlightCount)
+            case .lastSync:
+                let time1 = lastSyncCache[book1.bookId] ?? nil
+                let time2 = lastSyncCache[book2.bookId] ?? nil
+                if time1 == nil && time2 == nil { return false }
+                if time1 == nil { return sortAscending }
+                if time2 == nil { return !sortAscending }
+                if time1! == time2! { return false }
+                return sortAscending ? (time1! < time2!) : (time1! > time2!)
+            case .lastEdited:
+                let time1 = book1.modifiedAt ?? Date.distantPast
+                let time2 = book2.modifiedAt ?? Date.distantPast
+                if time1 == time2 { return false }
+                return sortAscending ? (time1 < time2) : (time1 > time2)
+            case .created:
+                let time1 = book1.createdAt ?? Date.distantPast
+                let time2 = book2.createdAt ?? Date.distantPast
+                if time1 == time2 { return false }
+                return sortAscending ? (time1 < time2) : (time1 > time2)
+            }
+        }
+
         // 并发上限（书本级并行数）
         let maxConcurrentBooks = NotionSyncConfig.batchConcurrency
 
         // 智能增量过滤：只同步有变更的书籍
         var eligibleIds: [String] = []
-        for id in assetIds {
+        for id in allBookItems.map(\.bookId) {
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
             let bookStats = statsDict[id]
             let meta = bookMeta[id]
@@ -177,97 +238,59 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
             logger.info("[SmartSync] AppleBooks: no tasks accepted (all in cooldown)")
             return
         }
-        
-        // 过滤出被接受的书籍 ID
-        let acceptedIdList = eligibleIds.filter { acceptedIds.contains($0) }
 
         // 局部引用，避免在并发闭包中强捕获 self 成员
         let logger = self.logger
         let syncEngine = self.syncEngine
         let notionConfig = self.notionConfig
         let dbPathLocal = annotationDBPath
+        let bookById = Dictionary(uniqueKeysWithValues: allBookItems.map { ($0.bookId, $0) })
 
-        // 有界并发：最多同时处理 maxConcurrentBooks 本书
-        var nextIndex = 0
-        await withTaskGroup(of: Void.self) { group in
-            func addTaskIfPossible() {
-                guard nextIndex < acceptedIdList.count else { return }
-                let id = acceptedIdList[nextIndex]; nextIndex += 1
-                let meta = bookMeta[id]
-                let title = meta?.title ?? id
-                let author = meta?.author ?? ""
-                let book = BookListItem(
-                    bookId: id,
-                    authorName: author,
-                    bookTitle: title,
-                    ibooksURL: "ibooks://assetid/\(id)",
-                    highlightCount: 0
-                )
-
-                group.addTask {
-                    // 与手动批量共享全局并发限制器，确保全局并发不超过 NotionSyncConfig.batchConcurrency
-                    let limiter = DIContainer.shared.syncConcurrencyLimiter
-                    let runningTaskStore = DIContainer.shared.syncRunningTaskStore
-                    let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
-                    
-                    let task = Task { [logger] in
-                        let syncQueueStore = DIContainer.shared.syncQueueStore
-                        guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
+        // 有界并发：滑动窗口并发，启动顺序跟随 ListView 排序
+        await OrderedTaskRunner.runOrdered(ids: acceptedIds, concurrency: maxConcurrentBooks) { [logger] id in
+            guard let book = bookById[id] else { return }
+            let meta = bookMeta[id]
+            let title = meta?.title ?? id
+            let author = meta?.author ?? ""
+            
+            // 与手动批量共享全局并发限制器，确保全局并发不超过 NotionSyncConfig.batchConcurrency
+            let limiter = DIContainer.shared.syncConcurrencyLimiter
+            let runningTaskStore = DIContainer.shared.syncRunningTaskStore
+            let taskId = "\(ContentSource.appleBooks.rawValue):\(id)"
+            
+            let task = Task { [logger] in
+                let syncQueueStore = DIContainer.shared.syncQueueStore
+                guard syncQueueStore.isTaskActive(source: .appleBooks, rawId: id) else { return }
+                do {
+                    try await limiter.withPermit {
+                        NotificationCenter.default.post(
+                            name: .syncBookStarted,
+                            object: id
+                        )
+                        NotificationCenter.default.post(
+                            name: .syncBookStatusChanged,
+                            object: nil,
+                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
+                        )
                         do {
-                            try await limiter.withPermit {
+                            let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
+                            try await syncEngine.syncSmart(source: adapter) { progressMessage in
                                 NotificationCenter.default.post(
-                                    name: .syncBookStarted,
-                                    object: id
-                                )
-                                NotificationCenter.default.post(
-                                    name: .syncBookStatusChanged,
+                                    name: .syncProgressUpdated,
                                     object: nil,
-                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "started"]
-                                )
-                                do {
-                                    let adapter = AppleBooksNotionAdapter.create(book: book, dbPath: dbPathLocal, notionConfig: notionConfig)
-                                    try await syncEngine.syncSmart(source: adapter) { progressMessage in
-                                        NotificationCenter.default.post(
-                                            name: .syncProgressUpdated,
-                                            object: nil,
-                                            userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progressMessage]
-                                        )
-                                    }
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
-                                    )
-                                } catch is CancellationError {
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
-                                    )
-                                } catch {
-                                    let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
-                                    logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
-                                    let errorInfo = SyncErrorInfo.from(error)
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
-                                    )
-                                }
-                                NotificationCenter.default.post(
-                                    name: .syncBookFinished,
-                                    object: id
+                                    userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "progress": progressMessage]
                                 )
                             }
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: nil,
+                                userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "succeeded"]
+                            )
                         } catch is CancellationError {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
                                 object: nil,
                                 userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
-                            )
-                            NotificationCenter.default.post(
-                                name: .syncBookFinished,
-                                object: id
                             )
                         } catch {
                             let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
@@ -278,23 +301,41 @@ final class AppleBooksAutoSyncProvider: AutoSyncSourceProvider {
                                 object: nil,
                                 userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
                             )
-                            NotificationCenter.default.post(
-                                name: .syncBookFinished,
-                                object: id
-                            )
                         }
+                        NotificationCenter.default.post(
+                            name: .syncBookFinished,
+                            object: id
+                        )
                     }
-                    
-                    await runningTaskStore.register(taskId: taskId, task: task)
-                    await task.value
-                    await runningTaskStore.unregister(taskId: taskId)
+                } catch is CancellationError {
+                    NotificationCenter.default.post(
+                        name: .syncBookStatusChanged,
+                        object: nil,
+                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "cancelled"]
+                    )
+                    NotificationCenter.default.post(
+                        name: .syncBookFinished,
+                        object: id
+                    )
+                } catch {
+                    let bookLabel = self.formatBookLabel(title: title, author: author, fallbackId: id)
+                    logger.error("[SmartSync] AppleBooks: \(bookLabel) - failed: \(error.localizedDescription)")
+                    let errorInfo = SyncErrorInfo.from(error)
+                    NotificationCenter.default.post(
+                        name: .syncBookStatusChanged,
+                        object: nil,
+                        userInfo: ["bookId": id, "source": ContentSource.appleBooks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                    )
+                    NotificationCenter.default.post(
+                        name: .syncBookFinished,
+                        object: id
+                    )
                 }
             }
-
-            // 初始填充任务
-            for _ in 0..<min(maxConcurrentBooks, acceptedIdList.count) { addTaskIfPossible() }
-            // 滑动补位，始终保持最多 maxConcurrentBooks 在执行
-            while await group.next() != nil { addTaskIfPossible() }
+            
+            await runningTaskStore.register(taskId: taskId, task: task)
+            await task.value
+            await runningTaskStore.unregister(taskId: taskId)
         }
     }
     

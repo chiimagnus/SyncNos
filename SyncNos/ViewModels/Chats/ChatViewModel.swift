@@ -775,9 +775,9 @@ final class ChatViewModel: ObservableObject {
         // 创建 id -> contact 字典以优化查找性能
         let contactDict = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         
-        let enqueueItems = contactIds.compactMap { id -> SyncEnqueueItem? in
-            guard let contact = contactDict[id] else { return nil }
-            return SyncEnqueueItem(id: contact.id, title: contact.name, subtitle: nil)
+        let orderedSelectedContacts = contacts.filter { contactIds.contains($0.id) }
+        let enqueueItems = orderedSelectedContacts.map { contact in
+            SyncEnqueueItem(id: contact.id, title: contact.name, subtitle: nil)
         }
         
         // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
@@ -792,7 +792,6 @@ final class ChatViewModel: ObservableObject {
             syncingContactIds.insert(id)
         }
         
-        let ids = Array(acceptedIds)
         let itemsById = contactDict
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
@@ -800,72 +799,46 @@ final class ChatViewModel: ObservableObject {
         let runningTaskStore = DIContainer.shared.syncRunningTaskStore
         
         Task {
-            await withTaskGroup(of: Void.self) { group in
-                for id in ids {
-                    guard let contact = itemsById[id] else { continue }
-                    group.addTask { [weak self] in
-                        guard let self else { return }
-                        
-                        let taskId = "\(ContentSource.chats.rawValue):\(id)"
-                        let task = Task { [weak self] in
-                            guard let self else { return }
-                            let syncQueueStore = DIContainer.shared.syncQueueStore
-                            guard syncQueueStore.isTaskActive(source: .chats, rawId: id) else { return }
-                            
+            await OrderedTaskRunner.runOrdered(ids: acceptedIds, concurrency: concurrency) { [weak self] id in
+                guard let self else { return }
+                guard let contact = itemsById[id] else { return }
+                
+                let taskId = "\(ContentSource.chats.rawValue):\(id)"
+                let task = Task { [weak self] in
+                    guard let self else { return }
+                    let syncQueueStore = DIContainer.shared.syncQueueStore
+                    guard syncQueueStore.isTaskActive(source: .chats, rawId: id) else { return }
+                    
+                    do {
+                        try await limiter.withPermit {
+                            // 发送开始通知
+                            await MainActor.run {
+                                NotificationCenter.default.post(
+                                    name: .syncBookStatusChanged,
+                                    object: self,
+                                    userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "started"]
+                                )
+                            }
                             do {
-                                try await limiter.withPermit {
-                                    // 发送开始通知
-                                    await MainActor.run {
+                                let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
+                                try await syncEngine.syncSmart(source: adapter) { progressText in
+                                    Task { @MainActor in
+                                        self.syncProgress[id] = progressText
                                         NotificationCenter.default.post(
-                                            name: .syncBookStatusChanged,
+                                            name: .syncProgressUpdated,
                                             object: self,
-                                            userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "started"]
+                                            userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "progress": progressText]
                                         )
                                     }
-                                    do {
-                                        let adapter = ChatsNotionAdapter(contact: contact, cacheService: cacheService)
-                                        try await syncEngine.syncSmart(source: adapter) { progressText in
-                                            Task { @MainActor in
-                                                self.syncProgress[id] = progressText
-                                                NotificationCenter.default.post(
-                                                    name: .syncProgressUpdated,
-                                                    object: self,
-                                                    userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "progress": progressText]
-                                                )
-                                            }
-                                        }
-                                        await MainActor.run {
-                                            _ = self.syncingContactIds.remove(id)
-                                            self.syncProgress.removeValue(forKey: id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "succeeded"]
-                                            )
-                                        }
-                                    } catch is CancellationError {
-                                        await MainActor.run {
-                                            _ = self.syncingContactIds.remove(id)
-                                            self.syncProgress.removeValue(forKey: id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "cancelled"]
-                                            )
-                                        }
-                                    } catch {
-                                        let errorInfo = SyncErrorInfo.from(error)
-                                        await MainActor.run {
-                                            self.logger.error("[ChatsSync] batchSync error for id=\(id): \(error.localizedDescription)")
-                                            _ = self.syncingContactIds.remove(id)
-                                            self.syncProgress.removeValue(forKey: id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "failed", "errorInfo": errorInfo]
-                                            )
-                                        }
-                                    }
+                                }
+                                await MainActor.run {
+                                    _ = self.syncingContactIds.remove(id)
+                                    self.syncProgress.removeValue(forKey: id)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "succeeded"]
+                                    )
                                 }
                             } catch is CancellationError {
                                 await MainActor.run {
@@ -880,7 +853,7 @@ final class ChatViewModel: ObservableObject {
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[ChatsSync] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[ChatsSync] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingContactIds.remove(id)
                                     self.syncProgress.removeValue(forKey: id)
                                     NotificationCenter.default.post(
@@ -891,13 +864,34 @@ final class ChatViewModel: ObservableObject {
                                 }
                             }
                         }
-                        
-                        await runningTaskStore.register(taskId: taskId, task: task)
-                        await task.value
-                        await runningTaskStore.unregister(taskId: taskId)
+                    } catch is CancellationError {
+                        await MainActor.run {
+                            _ = self.syncingContactIds.remove(id)
+                            self.syncProgress.removeValue(forKey: id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "cancelled"]
+                            )
+                        }
+                    } catch {
+                        let errorInfo = SyncErrorInfo.from(error)
+                        await MainActor.run {
+                            self.logger.error("[ChatsSync] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                            _ = self.syncingContactIds.remove(id)
+                            self.syncProgress.removeValue(forKey: id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.chats.rawValue, "status": "failed", "errorInfo": errorInfo]
+                            )
+                        }
                     }
                 }
-                await group.waitForAll()
+                
+                await runningTaskStore.register(taskId: taskId, task: task)
+                await task.value
+                await runningTaskStore.unregister(taskId: taskId)
             }
         }
         

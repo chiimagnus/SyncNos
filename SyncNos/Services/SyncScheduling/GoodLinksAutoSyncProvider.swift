@@ -74,8 +74,50 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
 
         // 读取所有链接（包含高亮数为 0 的链接），确保不对链接进行预过滤
         let allLinks = try session.fetchRecentLinks(limit: 0)
-        let linkIds = allLinks.map { $0.id }.sorted()
-        if linkIds.isEmpty { return }
+        if allLinks.isEmpty { return }
+
+        let sortKey: GoodLinksSortKey = {
+            guard let raw = UserDefaults.standard.string(forKey: ListSortPreferenceKeys.GoodLinks.sortKey),
+                  let k = GoodLinksSortKey(rawValue: raw) else {
+                return .modified
+            }
+            return k
+        }()
+        let sortAscending = UserDefaults.standard.object(forKey: ListSortPreferenceKeys.GoodLinks.sortAscending) as? Bool ?? false
+
+        var orderedLinks = allLinks
+        var lastSyncCache: [String: Date?] = [:]
+        if sortKey == .lastSync {
+            lastSyncCache = Dictionary(uniqueKeysWithValues: orderedLinks.map { ($0.id, syncTimestampStore.getLastSyncTime(for: $0.id)) })
+        }
+        orderedLinks.sort { a, b in
+            switch sortKey {
+            case .title:
+                let t1 = (a.title?.isEmpty == false ? a.title! : a.url)
+                let t2 = (b.title?.isEmpty == false ? b.title! : b.url)
+                let cmp = t1.localizedCaseInsensitiveCompare(t2)
+                return sortAscending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+            case .highlightCount:
+                let c1 = a.highlightTotal ?? 0
+                let c2 = b.highlightTotal ?? 0
+                if c1 == c2 { return false }
+                return sortAscending ? (c1 < c2) : (c1 > c2)
+            case .added:
+                if a.addedAt == b.addedAt { return false }
+                return sortAscending ? (a.addedAt < b.addedAt) : (a.addedAt > b.addedAt)
+            case .modified:
+                if a.modifiedAt == b.modifiedAt { return false }
+                return sortAscending ? (a.modifiedAt < b.modifiedAt) : (a.modifiedAt > b.modifiedAt)
+            case .lastSync:
+                let t1 = lastSyncCache[a.id] ?? nil
+                let t2 = lastSyncCache[b.id] ?? nil
+                if t1 == nil && t2 == nil { return false }
+                if t1 == nil { return sortAscending }
+                if t2 == nil { return !sortAscending }
+                if t1! == t2! { return false }
+                return sortAscending ? (t1! < t2!) : (t1! > t2!)
+            }
+        }
 
         // 构造 id -> 元数据映射
         var linkMeta: [String: GoodLinksLinkRow] = [:]
@@ -86,10 +128,10 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
 
         // 智能增量过滤：只同步有变更的文章
         var eligibleIds: [String] = []
-        for id in linkIds {
+        for link in orderedLinks {
+            let id = link.id
             let lastSyncTime = syncTimestampStore.getLastSyncTime(for: id)
-            let linkInfo = linkMeta[id]
-            let articleLabel = formatArticleLabel(title: linkInfo?.title, author: linkInfo?.author, fallbackId: id)
+            let articleLabel = formatArticleLabel(title: link.title, author: link.author, fallbackId: id)
             
             // 情况 1：从未同步过 → 需要同步（首次）
             if lastSyncTime == nil {
@@ -99,8 +141,8 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             }
             
             // 情况 2：文章有变更（modifiedAt > 上次同步时间）→ 需要同步
-            if let modifiedAt = linkInfo?.modifiedAt, modifiedAt > 0 {
-                let modifiedDate = Date(timeIntervalSince1970: modifiedAt)
+            if link.modifiedAt > 0 {
+                let modifiedDate = Date(timeIntervalSince1970: link.modifiedAt)
                 if modifiedDate > lastSyncTime! {
                     logger.info("[SmartSync] GoodLinks: \(articleLabel) - changes detected")
                     eligibleIds.append(id)
@@ -138,15 +180,8 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
             return
         }
         
-        // 过滤出被接受的链接 ID
-        let acceptedIdList = eligibleIds.filter { acceptedIds.contains($0) }
-
-        // 控制并发同步
-        var nextIndex = 0
-        await withTaskGroup(of: Void.self) { group in
-            func addTaskIfPossible() {
-                guard nextIndex < acceptedIdList.count else { return }
-                let id = acceptedIdList[nextIndex]; nextIndex += 1
+        // 控制并发同步（滑动窗口并发，启动顺序跟随 ListView 排序）
+        await OrderedTaskRunner.runOrdered(ids: acceptedIds, concurrency: maxConcurrentLinks) { id in
                 let meta = linkMeta[id]
                 let title = (meta?.title?.isEmpty == false) ? meta!.title! : (meta?.url ?? id)
                 let author = meta?.author ?? ""
@@ -165,59 +200,41 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                     modifiedAt: meta?.modifiedAt ?? 0,
                     highlightTotal: meta?.highlightTotal
                 )
-
-                group.addTask {
-                    let limiter = DIContainer.shared.syncConcurrencyLimiter
-                    let runningTaskStore = DIContainer.shared.syncRunningTaskStore
-                    let taskId = "\(ContentSource.goodLinks.rawValue):\(id)"
-                    
-                    let task = Task { [weak self] in
-                        guard let self else { return }
-                        let syncQueueStore = DIContainer.shared.syncQueueStore
-                        guard syncQueueStore.isTaskActive(source: .goodLinks, rawId: id) else { return }
+            
+            let limiter = DIContainer.shared.syncConcurrencyLimiter
+            let runningTaskStore = DIContainer.shared.syncRunningTaskStore
+            let taskId = "\(ContentSource.goodLinks.rawValue):\(id)"
+            
+            let task = Task { [weak self] in
+                guard let self else { return }
+                let syncQueueStore = DIContainer.shared.syncQueueStore
+                guard syncQueueStore.isTaskActive(source: .goodLinks, rawId: id) else { return }
+                do {
+                    try await limiter.withPermit {
+                        NotificationCenter.default.post(
+                            name: .syncBookStatusChanged,
+                            object: nil,
+                            userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "started"]
+                        )
                         do {
-                            try await limiter.withPermit {
+                            // 创建适配器并使用统一同步引擎
+                            let adapter = try await GoodLinksNotionAdapter.create(
+                                link: row,
+                                dbPath: dbPath,
+                                databaseService: self.goodLinksDatabaseService
+                            )
+                            try await self.syncEngine.syncSmart(source: adapter) { progress in
                                 NotificationCenter.default.post(
-                                    name: .syncBookStatusChanged,
+                                    name: .syncProgressUpdated,
                                     object: nil,
-                                    userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "started"]
+                                    userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "progress": progress]
                                 )
-                                do {
-                                    // 创建适配器并使用统一同步引擎
-                                    let adapter = try await GoodLinksNotionAdapter.create(
-                                        link: row,
-                                        dbPath: dbPath,
-                                        databaseService: self.goodLinksDatabaseService
-                                    )
-                                    try await self.syncEngine.syncSmart(source: adapter) { progress in
-                                        NotificationCenter.default.post(
-                                            name: .syncProgressUpdated,
-                                            object: nil,
-                                            userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "progress": progress]
-                                        )
-                                    }
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "succeeded"]
-                                    )
-                                } catch is CancellationError {
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
-                                    )
-                                } catch {
-                                    let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
-                                    self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
-                                    let errorInfo = SyncErrorInfo.from(error)
-                                    NotificationCenter.default.post(
-                                        name: .syncBookStatusChanged,
-                                        object: nil,
-                                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
-                                    )
-                                }
                             }
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: nil,
+                                userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "succeeded"]
+                            )
                         } catch is CancellationError {
                             NotificationCenter.default.post(
                                 name: .syncBookStatusChanged,
@@ -235,15 +252,27 @@ final class GoodLinksAutoSyncProvider: AutoSyncSourceProvider {
                             )
                         }
                     }
-                    
-                    await runningTaskStore.register(taskId: taskId, task: task)
-                    await task.value
-                    await runningTaskStore.unregister(taskId: taskId)
+                } catch is CancellationError {
+                    NotificationCenter.default.post(
+                        name: .syncBookStatusChanged,
+                        object: nil,
+                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "cancelled"]
+                    )
+                } catch {
+                    let articleLabel = self.formatArticleLabel(title: title, author: author, fallbackId: id)
+                    self.logger.error("[SmartSync] GoodLinks: \(articleLabel) - failed: \(error.localizedDescription)")
+                    let errorInfo = SyncErrorInfo.from(error)
+                    NotificationCenter.default.post(
+                        name: .syncBookStatusChanged,
+                        object: nil,
+                        userInfo: ["bookId": id, "source": ContentSource.goodLinks.rawValue, "status": "failed", "errorInfo": errorInfo]
+                    )
                 }
             }
-
-            for _ in 0..<min(maxConcurrentLinks, acceptedIdList.count) { addTaskIfPossible() }
-            while await group.next() != nil { addTaskIfPossible() }
+            
+            await runningTaskStore.register(taskId: taskId, task: task)
+            await task.value
+            await runningTaskStore.unregister(taskId: taskId)
         }
     }
     
