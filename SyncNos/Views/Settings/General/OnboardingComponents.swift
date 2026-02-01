@@ -76,11 +76,11 @@ struct OnboardingWelcomeView: View {
                     // 文字部分
                     VStack(alignment: .leading, spacing: 8) {
                         Text("All your highlights, unified.")
-                            .scaledFont(.title2, weight: .bold)
+                            .scaledFont(.title, weight: .bold)
                             .foregroundStyle(Color("OnboardingTextColor"))
 
                         Text("Sync Apple Books, GoodLinks, WeRead, Dedao, and Chats highlights directly to your Notion database.")
-                            .scaledFont(.subheadline)
+                            .scaledFont(.callout)
                             .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                             .lineLimit(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -88,7 +88,7 @@ struct OnboardingWelcomeView: View {
 
                     Spacer()
 
-                    // 右箭头按钮
+                    // 右箭头按钮π
                     OnboardingNextButton {
                         viewModel.nextStep()
                     }
@@ -118,7 +118,6 @@ struct OnboardingNotionView: View {
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
 
     private var notionIconSize: CGFloat { 120 * fontScaleManager.scaleFactor }
-    private var subtitleFontSize: CGFloat { 24 * fontScaleManager.scaleFactor }
 
     var body: some View {
         VStack {
@@ -158,12 +157,12 @@ struct OnboardingNotionView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color("OnboardingButtonColor"))
                     Text("Connected")
-                        .font(.system(size: subtitleFontSize, weight: .bold))
+                        .scaledFont(.title, weight: .bold)
                         .foregroundStyle(Color("OnboardingTextColor"))
                 }
 
                 Text(viewModel.workspaceName ?? "Workspace")
-                    .scaledFont(.subheadline)
+                    .scaledFont(.callout)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
 
@@ -183,18 +182,18 @@ struct OnboardingNotionView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Connect Your Notion")
-                    .font(.system(size: subtitleFontSize, weight: .bold))
+                    .scaledFont(.title, weight: .bold)
                     .foregroundStyle(Color("OnboardingTextColor"))
 
                 Text("We'll create secure databases in your Notion workspace.")
-                    .scaledFont(.subheadline)
+                    .scaledFont(.callout)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     .lineLimit(2)
 
                 if let error = viewModel.notionErrorMessage {
                     Text(error)
                         .foregroundStyle(.red)
-                        .scaledFont(.caption)
+                        .scaledFont(.callout)
                 }
             }
 
@@ -206,6 +205,7 @@ struct OnboardingNotionView: View {
             }
             .buttonStyle(.link)
             .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+            // .scaledFont(.callout)
 
             // 连接按钮
             Button(action: { viewModel.connectNotion() }) {
@@ -259,7 +259,7 @@ struct OnboardingSourcesView: View {
             // 错误提示
             if let error = viewModel.sourceSelectionError {
                 Text(error)
-                    .scaledFont(.caption)
+                    .scaledFont(.callout)
                     .foregroundStyle(.red)
                     .padding(.bottom, 8)
             }
@@ -267,11 +267,11 @@ struct OnboardingSourcesView: View {
             HStack(alignment: .center, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Enable your datasources")
-                        .scaledFont(.title2, weight: .bold)
+                        .scaledFont(.title, weight: .bold)
                         .foregroundStyle(Color("OnboardingTextColor"))
 
                     Text("Select at least one source to sync your highlights: Apple Books, GoodLinks, WeRead, Dedao, and Chats.")
-                        .scaledFont(.subheadline)
+                        .scaledFont(.callout)
                         .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -311,6 +311,7 @@ struct OnboardingSourcesView: View {
 struct OnboardingTouchMeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
+    @Environment(\.openURL) private var openURL
 
     private let avatarImageName = "AuthorAvatar"
     private let githubURLString = "https://github.com/chiimagnus/SyncNos"
@@ -341,30 +342,12 @@ struct OnboardingTouchMeView: View {
                             )
                     }
 
-                    Text("I'm 𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼. \nSyncNos is open-source on GitHub.")
-                        .scaledFont(.title3, weight: .semibold)
+                    Text(aboutText)
+                        .scaledFont(.title2, weight: .bold)
                         .foregroundStyle(Color("OnboardingTextColor"))
                         .multilineTextAlignment(.leading)
-                        .lineLimit(fontScaleManager.isAccessibilitySize ? 4 : 3)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 260, alignment: .leading)
-                }
-
-                if let githubURL = URL(string: githubURLString) {
-                    Link(destination: githubURL) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "link")
-                            Text("GitHub")
-                        }
-                        .scaledFont(.headline, weight: .semibold)
-                        .foregroundColor(.white)
-                        .frame(height: 44)
-                        .padding(.horizontal, 18)
-                        .background(Color("OnboardingButtonColor"))
-                        .cornerRadius(22)
-                        .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
-                    }
-                    .buttonStyle(.plain)
+//                        .lineLimit(fontScaleManager.isAccessibilitySize ? 4 : 3)
+//                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -372,14 +355,27 @@ struct OnboardingTouchMeView: View {
             VStack {
                 Spacer()
 
-                HStack(alignment: .bottom, spacing: 20) {
+                HStack(alignment: .center, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Touch me")
-                            .scaledFont(.title2, weight: .bold)
+                            .scaledFont(.title, weight: .bold)
                             .foregroundStyle(Color("OnboardingTextColor"))
+
+                        Text("Feedback welcome.")
+                            .scaledFont(.callout)
+                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
                     }
 
                     Spacer()
+
+                    Button("Mail") {
+                        guard let mailURL = URL(string: "mailto:chii_magnus@outlook.com") else { return }
+                        openURL(mailURL)
+                    }
+                    .buttonStyle(.link)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
+                    // .scaledFont(.callout)
+                    .help("chii_magnus@outlook.com")
 
                     OnboardingNextButton {
                         viewModel.nextStep()
@@ -389,6 +385,19 @@ struct OnboardingTouchMeView: View {
                 .padding(.bottom, 40)
             }
         }
+    }
+
+    private var aboutText: AttributedString {
+        var text = AttributedString("I'm 𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼. \n\nSyncNos is open-source \non GitHub.")
+        guard let url = URL(string: githubURLString),
+              let range = text.range(of: "GitHub") else {
+            return text
+        }
+
+        text[range].link = url
+        text[range].foregroundColor = Color("OnboardingButtonColor")
+        text[range].underlineStyle = .single
+        return text
     }
 }
 
