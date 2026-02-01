@@ -450,9 +450,9 @@ protocol SyncQueueStoreProtocol: AnyObject {
     /// - Parameters:
     ///   - source: 数据源类型
     ///   - items: 待入队的任务列表
-    /// - Returns: 实际被接受入队的任务 ID 集合
+    /// - Returns: 实际被接受入队的任务 ID 列表（按入队顺序）
     @MainActor
-    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> Set<String>
+    func enqueue(source: ContentSource, items: [SyncEnqueueItem]) -> [String]
     
     /// 检查任务是否正在处理（queued 或 running）
     func isTaskActive(source: ContentSource, rawId: String) -> Bool
