@@ -16,6 +16,8 @@ struct OnboardingView: View {
                     OnboardingNotionView(viewModel: viewModel)
                 case .enableSources:
                     OnboardingSourcesView(viewModel: viewModel)
+                case .touchMe:
+                    OnboardingTouchMeView(viewModel: viewModel)
                 }
             }
             .transition(.asymmetric(
@@ -304,6 +306,92 @@ struct OnboardingSourcesView: View {
     }
 }
 
+// MARK: - Step 4: Touch Me
+
+struct OnboardingTouchMeView: View {
+    @ObservedObject var viewModel: OnboardingViewModel
+    @ObservedObject private var fontScaleManager = FontScaleManager.shared
+
+    private let avatarImageName = "AuthorAvatar"
+    private let githubURLString = "https://github.com/chiimagnus/SyncNos"
+
+    private var avatarSize: CGFloat { 160 * fontScaleManager.scaleFactor }
+
+    var body: some View {
+        ZStack {
+            // 中间：头像（更大）
+            VStack(spacing: 16) {
+                HStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(Color("OnboardingButtonColor").opacity(0.15))
+                            .frame(width: avatarSize, height: avatarSize)
+
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: avatarSize * 0.92))
+                            .foregroundStyle(Color("OnboardingButtonColor").opacity(0.35))
+
+                        Image(avatarImageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: avatarSize, height: avatarSize)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(Color("OnboardingButtonColor").opacity(0.25), lineWidth: 1)
+                            )
+                    }
+
+                    Text("I'm 𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼. \nSyncNos is open-source on GitHub.")
+                        .scaledFont(.title3, weight: .semibold)
+                        .foregroundStyle(Color("OnboardingTextColor"))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(fontScaleManager.isAccessibilitySize ? 4 : 3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 260, alignment: .leading)
+                }
+
+                if let githubURL = URL(string: githubURLString) {
+                    Link(destination: githubURL) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "link")
+                            Text("GitHub")
+                        }
+                        .scaledFont(.headline, weight: .semibold)
+                        .foregroundColor(.white)
+                        .frame(height: 44)
+                        .padding(.horizontal, 18)
+                        .background(Color("OnboardingButtonColor"))
+                        .cornerRadius(22)
+                        .shadow(color: Color("OnboardingButtonColor").opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // 底部：左下角文案 + 右下角下一步
+            VStack {
+                Spacer()
+
+                HStack(alignment: .bottom, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Touch me")
+                            .scaledFont(.title2, weight: .bold)
+                            .foregroundStyle(Color("OnboardingTextColor"))
+                    }
+
+                    Spacer()
+
+                    OnboardingNextButton {
+                        viewModel.nextStep()
+                    }
+                }
+                .padding(.horizontal, 40)
+                .padding(.bottom, 40)
+            }
+        }
+    }
+}
+
 // 统一的下一步圆形按钮
 struct OnboardingNextButton: View {
     let action: () -> Void
@@ -392,6 +480,13 @@ struct SourceCard: View {
 
 #Preview("Sources - Default") {
     OnboardingSourcesView(viewModel: OnboardingViewModel())
+        .frame(width: 600, height: 500)
+        .background(Color("BackgroundColor"))
+        .applyFontScale()
+}
+
+#Preview("Touch Me - Default") {
+    OnboardingTouchMeView(viewModel: OnboardingViewModel())
         .frame(width: 600, height: 500)
         .background(Color("BackgroundColor"))
         .applyFontScale()
