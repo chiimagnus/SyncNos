@@ -13,6 +13,24 @@ enum GoodLinksAutoFetchEventKind: String, Sendable {
     case reset
 }
 
+// MARK: - Item State
+
+enum GoodLinksAutoFetchItemState: String, Sendable {
+    case waiting
+    case running
+    case cached
+    case succeeded
+    case failed
+}
+
+struct GoodLinksAutoFetchItem: Sendable, Identifiable {
+    var id: String { url }
+    let url: String
+    let state: GoodLinksAutoFetchItemState
+    let message: String?
+    let updatedAt: Date
+}
+
 struct GoodLinksAutoFetchEvent: Sendable, Identifiable {
     let id: UUID
     let time: Date
@@ -41,6 +59,6 @@ struct GoodLinksAutoFetchSnapshot: Sendable {
     
     let startedAt: Date?
     let lastUpdatedAt: Date?
+    let items: [GoodLinksAutoFetchItem]
     let recentEvents: [GoodLinksAutoFetchEvent]
 }
-
