@@ -15,6 +15,7 @@ final class OnboardingViewModel: ObservableObject {
         case welcome = 0
         case connectNotion
         case enableSources
+        case touchMe
     }
     
     // MARK: - Published Properties
