@@ -61,6 +61,9 @@ struct ArticleContentCardView: View {
     
     /// 重试回调（仅 error 状态使用）
     let onRetry: (() async -> Void)?
+    
+    /// 手动触发“下载正文”（仅 notLoaded 状态使用）
+    let onLoadRequested: (() async -> Void)?
 
     @State private var htmlContentHeight: CGFloat = 320
     
@@ -75,7 +78,8 @@ struct ArticleContentCardView: View {
         searchQuery: String? = nil,
         overrideWidth: CGFloat? = nil,
         measuredWidth: Binding<CGFloat>,
-        onRetry: (() async -> Void)? = nil
+        onRetry: (() async -> Void)? = nil,
+        onLoadRequested: (() async -> Void)? = nil
     ) {
         self.loadState = loadState
         self.htmlContent = htmlContent
@@ -86,6 +90,7 @@ struct ArticleContentCardView: View {
         self.overrideWidth = overrideWidth
         self._measuredWidth = measuredWidth
         self.onRetry = onRetry
+        self.onLoadRequested = onLoadRequested
     }
     
     // MARK: - Body
@@ -154,14 +159,24 @@ struct ArticleContentCardView: View {
     
     /// 加载中状态
     private var notLoadedContent: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .scaleEffect(0.8)
-            Text("Loading...")
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Article content not downloaded yet.")
                 .scaledFont(.body)
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            if onLoadRequested != nil {
+                Button {
+                    Task {
+                        await onLoadRequested?()
+                    }
+                } label: {
+                    Label("Download", systemImage: "arrow.down.circle")
+                        .scaledFont(.caption)
+                }
+                .buttonStyle(.bordered)
+            }
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
     
     /// 正在加载完整内容

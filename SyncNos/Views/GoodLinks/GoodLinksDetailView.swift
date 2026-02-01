@@ -281,12 +281,12 @@ struct GoodLinksDetailView: View {
                     }
                 }
                 // 将加载绑定到 SwiftUI 生命周期：当 linkId 变化或 Detail 消失时自动取消旧任务
-                // 加载高亮与全文内容
+                // 加载高亮 + 读取正文缓存（正文下载改为手动触发）
                 .task(id: linkId) {
                     detailViewModel.clear()
                     await detailViewModel.loadHighlights(for: linkId)
                     if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                        await detailViewModel.loadContent(for: link)
+                        await detailViewModel.loadCachedContent(for: link)
                     }
                     externalIsSyncing = viewModel.syncingLinkIds.contains(linkId)
                     if !externalIsSyncing { externalSyncProgress = nil }
@@ -360,7 +360,7 @@ struct GoodLinksDetailView: View {
                 Task {
                     await detailViewModel.loadHighlights(for: linkId)
                     if let link = viewModel.links.first(where: { $0.id == linkId }) {
-                        await detailViewModel.loadContent(for: link)
+                        await detailViewModel.loadCachedContent(for: link)
                     }
                 }
             }
@@ -525,7 +525,11 @@ struct GoodLinksDetailView: View {
             measuredWidth: $measuredLayoutWidth,
             onRetry: { [weak detailViewModel] in
                 guard let link else { return }
-                await detailViewModel?.loadContent(for: link)
+                await detailViewModel?.loadContent(for: link, priority: .manual)
+            },
+            onLoadRequested: { [weak detailViewModel] in
+                guard let link else { return }
+                await detailViewModel?.loadContent(for: link, priority: .manual)
             }
         )
     }
