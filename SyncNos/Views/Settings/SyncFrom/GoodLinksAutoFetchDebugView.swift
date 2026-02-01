@@ -26,29 +26,21 @@ struct GoodLinksAutoFetchDebugView: View {
     }
     
     var body: some View {
-        rightPanel
-            .padding(16)
-            .frame(width: 760, height: 520)
-            .task {
-                await refreshLoop()
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $selectedTab) {
+                Text("Running (\(runningItems.count))").tag(Tab.running)
+                Text("Waiting (\(waitingItems.count))").tag(Tab.waiting)
+                Text("Failed (\(failedItems.count))").tag(Tab.failed)
+                Text("Completed (\(completedItems.count))").tag(Tab.completed)
             }
-    }
-    
-    private var rightPanel: some View {
-        GroupBox("Queue") {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("", selection: $selectedTab) {
-                    Text("Running (\(runningItems.count))").tag(Tab.running)
-                    Text("Waiting (\(waitingItems.count))").tag(Tab.waiting)
-                    Text("Failed (\(failedItems.count))").tag(Tab.failed)
-                    Text("Completed (\(completedItems.count))").tag(Tab.completed)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-                queueContent
-            }
-            .padding(.vertical, 4)
+            queueContent
+        }
+        .padding()
+        .task {
+            await refreshLoop()
         }
     }
 
