@@ -87,8 +87,8 @@ final class GoodLinksDetailViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let service: GoodLinksDatabaseServiceExposed
-    private let urlFetcher: WebArticleFetcherProtocol
     private let cacheService: WebArticleCacheServiceProtocol
+    private let downloadQueue: WebArticleDownloadQueueProtocol
     private let logger: LoggerServiceProtocol
     private let syncTimestampStore: SyncTimestampStoreProtocol
     
@@ -104,14 +104,14 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     init(
         service: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
         cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
+        downloadQueue: WebArticleDownloadQueueProtocol = DIContainer.shared.webArticleDownloadQueue,
         logger: LoggerServiceProtocol = DIContainer.shared.loggerService,
         syncTimestampStore: SyncTimestampStoreProtocol = DIContainer.shared.syncTimestampStore
     ) {
         self.service = service
-        self.urlFetcher = urlFetcher
         self.cacheService = cacheService
+        self.downloadQueue = downloadQueue
         self.logger = logger
         self.syncTimestampStore = syncTimestampStore
         
@@ -287,10 +287,51 @@ final class GoodLinksDetailViewModel: ObservableObject {
     
     // MARK: - 全文内容加载
     
-    /// 加载完整全文内容（进入详情时调用）
-    func loadContent(for link: GoodLinksLinkRow) async {
+    /// 仅从持久化缓存读取全文（不会触发下载）
+    func loadCachedContent(for link: GoodLinksLinkRow) async {
         let linkId = link.id
         currentLinkId = linkId
+        
+        // 取消上一次正文加载（UI 等待）
+        contentFetchTask?.cancel()
+        contentFetchTask = nil
+        
+        article = nil
+        contentLoadState = .notLoaded
+        
+        do {
+            let cached = try await cacheService.getArticle(url: link.url)
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
+            if let cached {
+                article = cached
+                contentLoadState = .loaded
+                logger.info("[GoodLinksDetail] 命中持久化正文缓存，linkId=\(linkId)")
+                return
+            }
+        } catch {
+            // 缓存读取失败：保持 notLoaded，不提示错误（避免影响主流程）
+            logger.warning("[GoodLinksDetail] 读取持久化正文缓存失败 linkId=\(linkId) url=\(link.url) error=\(error.localizedDescription)")
+        }
+        
+        // 若正文正在下载中（手动/自动），Detail 应展示“下载中”而不是“下载按钮”
+        if await downloadQueue.isActive(url: link.url) {
+            guard !Task.isCancelled, currentLinkId == linkId else { return }
+            contentLoadState = .loadingFull
+        }
+    }
+    
+    /// 下载完整全文内容（手动触发：点击“下载正文”/重试/重新抓取）
+    func loadContent(for link: GoodLinksLinkRow, priority: WebArticleDownloadPriority = .manual) async {
+        let linkId = link.id
+        currentLinkId = linkId
+        
+        // 先确保入队：即使 Detail 立刻切换导致 UI 等待任务被取消，下载也要继续写入缓存
+        let queue = downloadQueue
+        let targetURL = link.url
+        let taskPriority: TaskPriority = (priority == .manual) ? .userInitiated : .utility
+        Task.detached(priority: taskPriority) {
+            await queue.enqueue(url: targetURL, priority: priority)
+        }
         
         // 取消上一次全文加载
         contentFetchTask?.cancel()
@@ -299,13 +340,9 @@ final class GoodLinksDetailViewModel: ObservableObject {
         contentLoadState = .loadingFull
         
         do {
-            let task = Task { [urlFetcher, logger] () async throws -> ArticleFetchResult? in
-                logger.info("[GoodLinksDetail] 开始从 URL 加载全文内容，linkId=\(linkId), url=\(link.url)")
-                do {
-                    return try await urlFetcher.fetchArticle(url: link.url)
-                } catch URLFetchError.contentNotFound {
-                    return nil
-                }
+            let task = Task { [downloadQueue, logger] () async throws -> ArticleFetchResult? in
+                logger.info("[GoodLinksDetail] 开始下载全文内容，linkId=\(linkId), url=\(link.url), priority=\(priority)")
+                return try await downloadQueue.fetchArticle(url: link.url, priority: priority)
             }
             contentFetchTask = task
             
@@ -329,6 +366,10 @@ final class GoodLinksDetailViewModel: ObservableObject {
                 logger.info("[GoodLinksDetail] 该链接无全文内容，linkId=\(linkId)")
             }
             contentFetchTask = nil
+        } catch is CancellationError {
+            // Detail 切换/退出时的取消属于正常流程：不记录错误、不提示
+            contentFetchTask = nil
+            return
         } catch {
             let desc = error.localizedDescription
             logger.error("[GoodLinksDetail] loadContent error: \(desc)")
@@ -346,7 +387,7 @@ final class GoodLinksDetailViewModel: ObservableObject {
         } catch {
             logger.warning("[GoodLinksDetail] remove cached article failed url=\(link.url) error=\(error.localizedDescription)")
         }
-        await loadContent(for: link)
+        await loadContent(for: link, priority: .manual)
     }
     
     /// 清空当前数据（切换 link 时调用）
