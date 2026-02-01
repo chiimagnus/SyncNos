@@ -369,8 +369,7 @@ struct OnboardingTouchMeView: View {
                     Spacer()
 
                     Button("Mail") {
-                        guard let mailURL = URL(string: "mailto:chii_magnus@outlook.com") else { return }
-                        openURL(mailURL)
+                        openURL(mailtoURL)
                     }
                     .buttonStyle(.link)
                     .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
@@ -398,6 +397,40 @@ struct OnboardingTouchMeView: View {
         text[range].foregroundColor = Color("OnboardingButtonColor")
         text[range].underlineStyle = .single
         return text
+    }
+
+    private var mailtoURL: URL {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "chii_magnus@outlook.com"
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        let os = ProcessInfo.processInfo.operatingSystemVersionString
+
+        let versionLine: String = {
+            if !version.isEmpty && !build.isEmpty { return "\(version) (\(build))" }
+            if !version.isEmpty { return version }
+            if !build.isEmpty { return build }
+            return "unknown"
+        }()
+
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "[SyncNos] Feedback"),
+            URLQueryItem(
+                name: "body",
+                value: """
+App: SyncNos
+Version: \(versionLine)
+macOS: \(os)
+
+Message:
+
+"""
+            )
+        ]
+
+        return components.url ?? URL(string: "mailto:chii_magnus@outlook.com")!
     }
 }
 
