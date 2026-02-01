@@ -5,6 +5,13 @@ import Combine
 
 @MainActor
 final class DedaoViewModel: ObservableObject {
+    // MARK: - UserDefaults Keys
+    
+    private enum Keys {
+        static let sortKey = ListSortPreferenceKeys.Dedao.sortKey
+        static let sortAscending = ListSortPreferenceKeys.Dedao.sortAscending
+    }
+    
     // 列表数据
     @Published var books: [DedaoBookListItem] = []
     @Published var displayBooks: [DedaoBookListItem] = []
@@ -66,12 +73,21 @@ final class DedaoViewModel: ObservableObject {
         self.syncTimestampStore = syncTimestampStore
         self.notionConfig = notionConfig
         
+        loadUserDefaults()
         setupPipelines()
         subscribeSyncStatusNotifications()
         refreshLoginStatus()
     }
     
     // MARK: - Pipelines
+    
+    private func loadUserDefaults() {
+        if let raw = UserDefaults.standard.string(forKey: Keys.sortKey),
+           let k = BookListSortKey(rawValue: raw) {
+            self.sortKey = k
+        }
+        self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? true
+    }
     
     private func setupPipelines() {
         // 在后台计算 displayBooks，主线程发布结果
@@ -122,6 +138,22 @@ final class DedaoViewModel: ObservableObject {
                 }
                 
                 self.triggerRecompute()
+            }
+            .store(in: &cancellables)
+        
+        $sortKey
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.sortKey)
+            }
+            .store(in: &cancellables)
+        
+        $sortAscending
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { newValue in
+                UserDefaults.standard.set(newValue, forKey: Keys.sortAscending)
             }
             .store(in: &cancellables)
         
@@ -355,9 +387,9 @@ final class DedaoViewModel: ObservableObject {
         
         // 通过 SyncQueueStore 入队，自动处理去重和冷却检查
         let syncQueueStore = DIContainer.shared.syncQueueStore
-        let enqueueItems = bookIds.compactMap { id -> SyncEnqueueItem? in
-            guard let b = displayBooks.first(where: { $0.bookId == id }) else { return nil }
-            return SyncEnqueueItem(id: id, title: b.title, subtitle: b.author)
+        let orderedSelectedBooks = displayBooks.filter { bookIds.contains($0.bookId) }
+        let enqueueItems = orderedSelectedBooks.map { book in
+            SyncEnqueueItem(id: book.bookId, title: book.title, subtitle: book.author)
         }
         
         let acceptedIds = syncQueueStore.enqueue(source: .dedao, items: enqueueItems)
@@ -371,7 +403,6 @@ final class DedaoViewModel: ObservableObject {
             syncingBookIds.insert(id)
         }
         
-        let ids = Array(acceptedIds)
         let itemsById = Dictionary(uniqueKeysWithValues: books.map { ($0.bookId, $0) })
         let limiter = DIContainer.shared.syncConcurrencyLimiter
         let syncEngine = self.syncEngine
@@ -380,73 +411,49 @@ final class DedaoViewModel: ObservableObject {
         let runningTaskStore = DIContainer.shared.syncRunningTaskStore
         
         Task {
-            await withTaskGroup(of: Void.self) { group in
-                for id in ids {
-                    guard let book = itemsById[id] else { continue }
-                    group.addTask { [weak self] in
-                        guard let self else { return }
-                        
-                        let taskId = "\(ContentSource.dedao.rawValue):\(id)"
-                        let task = Task { [weak self] in
-                            guard let self else { return }
-                            let syncQueueStore = DIContainer.shared.syncQueueStore
-                            guard syncQueueStore.isTaskActive(source: .dedao, rawId: id) else { return }
-                            
+            await OrderedTaskRunner.runOrdered(ids: acceptedIds, concurrency: concurrency) { [weak self] id in
+                guard let self else { return }
+                guard let book = itemsById[id] else { return }
+                
+                let taskId = "\(ContentSource.dedao.rawValue):\(id)"
+                let task = Task { [weak self] in
+                    guard let self else { return }
+                    let syncQueueStore = DIContainer.shared.syncQueueStore
+                    guard syncQueueStore.isTaskActive(source: .dedao, rawId: id) else { return }
+                    
+                    do {
+                        try await limiter.withPermit {
+                            // 发送开始通知（syncingBookIds 已在外部同步设置）
+                            await MainActor.run {
+                                NotificationCenter.default.post(
+                                    name: .syncBookStatusChanged,
+                                    object: self,
+                                    userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "started"]
+                                )
+                            }
                             do {
-                                try await limiter.withPermit {
-                                    // 发送开始通知（syncingBookIds 已在外部同步设置）
-                                    await MainActor.run {
+                                let adapter = DedaoNotionAdapter(
+                                    book: book,
+                                    apiService: apiService,
+                                    cacheService: cacheService
+                                )
+                                try await syncEngine.syncSmart(source: adapter) { progressText in
+                                    Task { @MainActor in
                                         NotificationCenter.default.post(
-                                            name: .syncBookStatusChanged,
+                                            name: .syncProgressUpdated,
                                             object: self,
-                                            userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "started"]
+                                            userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "progress": progressText]
                                         )
                                     }
-                                    do {
-                                        let adapter = DedaoNotionAdapter(
-                                            book: book,
-                                            apiService: apiService,
-                                            cacheService: cacheService
-                                        )
-                                        try await syncEngine.syncSmart(source: adapter) { progressText in
-                                            Task { @MainActor in
-                                                NotificationCenter.default.post(
-                                                    name: .syncProgressUpdated,
-                                                    object: self,
-                                                    userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "progress": progressText]
-                                                )
-                                            }
-                                        }
-                                        await MainActor.run {
-                                            _ = self.syncingBookIds.remove(id)
-                                            _ = self.syncedBookIds.insert(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "succeeded"]
-                                            )
-                                        }
-                                    } catch is CancellationError {
-                                        await MainActor.run {
-                                            _ = self.syncingBookIds.remove(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "cancelled"]
-                                            )
-                                        }
-                                    } catch {
-                                        let errorInfo = SyncErrorInfo.from(error)
-                                        await MainActor.run {
-                                            self.logger.error("[Dedao] batchSync error for id=\(id): \(error.localizedDescription)")
-                                            _ = self.syncingBookIds.remove(id)
-                                            NotificationCenter.default.post(
-                                                name: .syncBookStatusChanged,
-                                                object: self,
-                                                userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "failed", "errorInfo": errorInfo]
-                                            )
-                                        }
-                                    }
+                                }
+                                await MainActor.run {
+                                    _ = self.syncingBookIds.remove(id)
+                                    _ = self.syncedBookIds.insert(id)
+                                    NotificationCenter.default.post(
+                                        name: .syncBookStatusChanged,
+                                        object: self,
+                                        userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "succeeded"]
+                                    )
                                 }
                             } catch is CancellationError {
                                 await MainActor.run {
@@ -460,7 +467,7 @@ final class DedaoViewModel: ObservableObject {
                             } catch {
                                 let errorInfo = SyncErrorInfo.from(error)
                                 await MainActor.run {
-                                    self.logger.error("[Dedao] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                                    self.logger.error("[Dedao] batchSync error for id=\(id): \(error.localizedDescription)")
                                     _ = self.syncingBookIds.remove(id)
                                     NotificationCenter.default.post(
                                         name: .syncBookStatusChanged,
@@ -470,13 +477,32 @@ final class DedaoViewModel: ObservableObject {
                                 }
                             }
                         }
-                        
-                        await runningTaskStore.register(taskId: taskId, task: task)
-                        await task.value
-                        await runningTaskStore.unregister(taskId: taskId)
+                    } catch is CancellationError {
+                        await MainActor.run {
+                            _ = self.syncingBookIds.remove(id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "cancelled"]
+                            )
+                        }
+                    } catch {
+                        let errorInfo = SyncErrorInfo.from(error)
+                        await MainActor.run {
+                            self.logger.error("[Dedao] batchSync limiter error for id=\(id): \(error.localizedDescription)")
+                            _ = self.syncingBookIds.remove(id)
+                            NotificationCenter.default.post(
+                                name: .syncBookStatusChanged,
+                                object: self,
+                                userInfo: ["bookId": id, "source": ContentSource.dedao.rawValue, "status": "failed", "errorInfo": errorInfo]
+                            )
+                        }
                     }
                 }
-                await group.waitForAll()
+                
+                await runningTaskStore.register(taskId: taskId, task: task)
+                await task.value
+                await runningTaskStore.unregister(taskId: taskId)
             }
         }
     }
