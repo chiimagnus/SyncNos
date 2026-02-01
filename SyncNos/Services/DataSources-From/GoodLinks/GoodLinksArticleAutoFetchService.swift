@@ -89,29 +89,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             recentEvents: recentEvents
         )
     }
-    
-    func resetSessionState() async {
-        for (_, task) in inFlightTasksByLinkId {
-            task.cancel()
-        }
-        
-        pendingLinkIds.removeAll(keepingCapacity: false)
-        pendingLinkIdSet.removeAll(keepingCapacity: false)
-        inFlightTasksByLinkId.removeAll(keepingCapacity: false)
-        itemsByLinkId.removeAll(keepingCapacity: false)
-        
-        cacheHitCount = 0
-        succeededCount = 0
-        failedCount = 0
-        completedCount = 0
-        
-        startedAt = nil
-        lastUpdatedAt = Date()
-        appendEvent(.init(url: "", kind: .reset, message: "Reset session state"))
-        
-        logger.info("[GoodLinksAutoFetch] Reset session state")
-    }
-    
+
     // MARK: - Queue
     
     private func enqueueLinks(_ links: [GoodLinksLinkRow]) -> Int {
@@ -158,7 +136,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             pendingLinkIds.removeFirst()
             pendingLinkIdSet.remove(first)
             if inFlightTasksByLinkId[first] != nil { continue }
-            // 可能在队列等待时被 reset 清空
+            // 可能在队列等待时被清空（例如服务生命周期变化）
             guard let item = itemsByLinkId[first], item.state == .waiting else { continue }
             return first
         }
@@ -212,7 +190,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
                 finish(linkId: linkId, outcome: .noContent)
             }
         } catch is CancellationError {
-            // 仅 DEBUG reset 时可能触发：视为结束但不计入失败/完成，避免污染统计
+            // 取消属于正常流程：不计入失败/完成，避免污染统计
             finish(linkId: linkId, outcome: .cancelled)
         } catch {
             finish(linkId: linkId, outcome: .failed(error.localizedDescription))
@@ -233,7 +211,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
         inFlightTasksByLinkId[linkId] = nil
         lastUpdatedAt = Date()
         
-        // 可能在 debug reset 时被清空：此时不再更新计数/事件，直接泵队列即可
+        // 可能在运行中被清空：此时不再更新计数/事件，直接泵队列即可
         if itemsByLinkId[linkId] == nil {
             switch outcome {
             case .cancelled:
@@ -283,7 +261,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             appendEvent(.init(url: url, kind: .failed, message: message))
             logger.warning("[GoodLinksAutoFetch] Failed url=\(url) error=\(message)")
         case .cancelled:
-            // 取消不应阻断未来重试（debug reset），因此直接移除记录
+            // 取消不应阻断未来重试，因此直接移除记录
             itemsByLinkId.removeValue(forKey: linkId)
             appendEvent(.init(url: url, kind: .skipped, message: "cancelled"))
         }
