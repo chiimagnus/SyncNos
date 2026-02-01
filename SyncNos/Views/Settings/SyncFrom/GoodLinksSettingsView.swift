@@ -3,6 +3,7 @@ import SwiftUI
 struct GoodLinksSettingsView: View {
     @StateObject private var viewModel: GoodLinksSettingsViewModel
     @State private var isPickingGoodLinks: Bool = false
+    @State private var showingAutoFetchDebugSheet: Bool = false
 
     @MainActor
     init(viewModel: GoodLinksSettingsViewModel? = nil) {
@@ -63,11 +64,36 @@ struct GoodLinksSettingsView: View {
                 Text("Sync Settings")
                     .scaledFont(.headline)
             }
+
+#if DEBUG
+            Section {
+                Button {
+                    showingAutoFetchDebugSheet = true
+                } label: {
+                    HStack {
+                        Image(systemName: "ladybug")
+                            .foregroundStyle(.orange)
+                        Text("GoodLinks Auto Fetch Debug")
+                            .scaledFont(.body)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+            } header: {
+                Text("Debug")
+                    .scaledFont(.headline)
+            }
+#endif
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("GoodLinks")
+#if DEBUG
+        .sheet(isPresented: $showingAutoFetchDebugSheet) {
+            GoodLinksAutoFetchDebugView()
+        }
+#endif
     }
 }
 
