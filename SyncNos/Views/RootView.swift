@@ -61,6 +61,9 @@ struct RootView: View {
         .onChange(of: iapPresentationMode) { _, _ in
             updateMainWindowSizeModeIfPossible()
         }
+        .onChange(of: fontScaleManager.scaleLevel) { _, _ in
+            updateMainWindowSizeModeIfPossible()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .iapServiceStatusChanged)) { _ in
             if hasCompletedOnboarding {
                 let logger = DIContainer.shared.loggerService
@@ -133,7 +136,18 @@ struct RootView: View {
 
     /// Onboarding / PayWall 采用固定内容尺寸（避免出现“可随意拉伸窗口但 UI 固定居中”的体验）
     private var fixedContentSize: NSSize {
-        NSSize(width: 600, height: 500)
+        switch fontScaleManager.scaleLevel {
+        case .extraSmall, .small, .medium:
+            return NSSize(width: 600, height: 500)
+        case .large:
+            return NSSize(width: 640, height: 540)
+        case .extraLarge:
+            return NSSize(width: 700, height: 580)
+        case .accessibility1:
+            return NSSize(width: 780, height: 650)
+        case .accessibility2:
+            return NSSize(width: 860, height: 720)
+        }
     }
 
     private func updateMainWindowSizeModeIfPossible() {
