@@ -62,14 +62,6 @@ struct GoodLinksAutoFetchDebugView: View {
             }
             Spacer()
             HStack(spacing: 10) {
-                Button("Reset Session") {
-                    Task {
-                        await service.resetSessionState()
-                        snapshot = await service.snapshot()
-                    }
-                }
-                .buttonStyle(.bordered)
-                
                 Button("Close") {
                     dismiss()
                 }

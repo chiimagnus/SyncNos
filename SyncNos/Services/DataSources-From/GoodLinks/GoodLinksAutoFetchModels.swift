@@ -10,7 +10,6 @@ enum GoodLinksAutoFetchEventKind: String, Sendable {
     case noContent
     case failed
     case skipped
-    case reset
 }
 
 // MARK: - Item State

@@ -328,9 +328,6 @@ protocol GoodLinksArticleAutoFetchServiceProtocol: Actor {
     
     /// 获取当前进度快照（用于 Debug UI）
     func snapshot() async -> GoodLinksAutoFetchSnapshot
-    
-    /// 清空本次会话状态（仅用于 DEBUG 调试）
-    func resetSessionState() async
 }
 
 // MARK: - Auto Sync Service Protocol
