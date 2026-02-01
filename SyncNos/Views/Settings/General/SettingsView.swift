@@ -11,11 +11,17 @@ struct SettingsView: View {
         case dataSource(ContentSource)
     }
 
+    enum Destination: Hashable {
+        case about
+    }
+
     @StateObject private var loginItemVM = LoginItemViewModel()
     @StateObject private var appIconDisplayVM = AppIconDisplayViewModel()
     @StateObject private var defaultsObserver = UserDefaultsObserver()
 
     @State private var selection: Pane? = .general
+    @State private var path: [Destination] = []
+    @AppStorage("syncnos.settings.pendingDestination") private var pendingDestination: String = ""
 
     var body: some View {
         NavigationSplitView {
@@ -56,8 +62,14 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
         }
         detail: {
-            NavigationStack {
+            NavigationStack(path: $path) {
                 detailView(for: selection ?? .general)
+            }
+            .navigationDestination(for: Destination.self) { destination in
+                switch destination {
+                case .about:
+                    AboutView()
+                }
             }
         }
         .frame(minWidth: 600, minHeight: 560)
@@ -65,9 +77,17 @@ struct SettingsView: View {
             // 视图出现时刷新状态，监听系统设置中的变化
             loginItemVM.refreshStatus()
             normalizeSelectionIfNeeded()
+            handlePendingDestinationIfNeeded()
+        }
+        .onChange(of: selection) { _, _ in
+            path = []
         }
         .onChange(of: defaultsObserver.changeCounter) { _, _ in
             normalizeSelectionIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToAbout).receive(on: DispatchQueue.main)) { _ in
+            pendingDestination = "about"
+            handlePendingDestinationIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToNotionSettings).receive(on: DispatchQueue.main)) { _ in
             selection = .notion
@@ -136,6 +156,21 @@ struct SettingsView: View {
 
     private func isSourceEnabled(_ provider: any DataSourceUIProvider) -> Bool {
         (UserDefaults.standard.object(forKey: provider.enabledStorageKey) as? Bool) ?? provider.defaultEnabled
+    }
+
+    // MARK: - Pending Navigation
+
+    private func handlePendingDestinationIfNeeded() {
+        guard !pendingDestination.isEmpty else { return }
+        defer { pendingDestination = "" }
+
+        switch pendingDestination {
+        case "about":
+            selection = .general
+            path = [.about]
+        default:
+            break
+        }
     }
 }
 

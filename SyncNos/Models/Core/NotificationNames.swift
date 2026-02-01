@@ -69,6 +69,9 @@ extension Notification.Name {
     /// 导航到 Notion 设置
     static let navigateToNotionSettings = Notification.Name("NavigateToNotionSettings")
 
+    /// 导航到 About（Settings → General → About）
+    static let navigateToAbout = Notification.Name("NavigateToAbout")
+
     /// 导航到 Site Logins（可选携带 source，用于自动弹出对应登录 sheet）
     static let navigateToSiteLogins = Notification.Name("NavigateToSiteLogins")
     
