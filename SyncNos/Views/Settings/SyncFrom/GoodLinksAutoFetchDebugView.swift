@@ -2,7 +2,6 @@ import SwiftUI
 
 // MARK: - GoodLinks Auto Fetch Debug View
 
-#if DEBUG
 struct GoodLinksAutoFetchDebugView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: Tab = .running
@@ -188,5 +187,3 @@ private struct AutoFetchRowView: View {
         }
     }
 }
-
-#endif

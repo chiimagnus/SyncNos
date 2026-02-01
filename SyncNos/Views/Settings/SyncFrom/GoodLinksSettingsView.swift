@@ -65,7 +65,6 @@ struct GoodLinksSettingsView: View {
                     .scaledFont(.headline)
             }
 
-#if DEBUG
             Section {
                 Button {
                     showingAutoFetchDebugSheet = true
@@ -83,17 +82,14 @@ struct GoodLinksSettingsView: View {
                 Text("Debug")
                     .scaledFont(.headline)
             }
-#endif
         }
         .listStyle(SidebarListStyle())
         .scrollContentBackground(.hidden)
         .background(VisualEffectBackground(material: .windowBackground))
         .navigationTitle("GoodLinks")
-#if DEBUG
         .sheet(isPresented: $showingAutoFetchDebugSheet) {
             GoodLinksAutoFetchDebugView()
         }
-#endif
     }
 }
 
