@@ -4,6 +4,10 @@ import SwiftUI
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
+    private var appName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "SyncNos"
+    }
+
     init() {
         // 禁用自动窗口标签，从而隐藏 "Show Tab" 和 "Show All Tabs" 菜单项
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -30,8 +34,16 @@ struct AppCommands: Commands {
     }
 
     var body: some Commands {
-        // 替换系统自带的 About 面板，改为打开我们的自定义 About 窗口
-        CommandGroup(replacing: .appInfo) {}
+        // 还原系统自带的 About 菜单入口（文案保持系统风格），但把目的地改为 Settings → About
+        CommandGroup(replacing: .appInfo) {
+            Button("About \(appName)") {
+                UserDefaults.standard.set("about", forKey: "syncnos.settings.pendingDestination")
+                openWindow(id: "setting")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    NotificationCenter.default.post(name: .navigateToAbout, object: nil)
+                }
+            }
+        }
 
         // SyncNos 应用菜单 - 应用设置相关
         CommandGroup(replacing: .appSettings) {
