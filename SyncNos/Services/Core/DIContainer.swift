@@ -17,6 +17,7 @@ class DIContainer {
     private var _webArticleFetcher: WebArticleFetcherProtocol?
     private var _webArticleCacheService: WebArticleCacheServiceProtocol?
     private var _webArticleDownloadQueue: WebArticleDownloadQueueProtocol?
+    private var _goodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol?
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
@@ -133,6 +134,17 @@ class DIContainer {
             )
         }
         return _webArticleDownloadQueue!
+    }
+    
+    var goodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol {
+        if _goodLinksArticleAutoFetchService == nil {
+            _goodLinksArticleAutoFetchService = GoodLinksArticleAutoFetchService(
+                cacheService: webArticleCacheService,
+                downloadQueue: webArticleDownloadQueue,
+                logger: loggerService
+            )
+        }
+        return _goodLinksArticleAutoFetchService!
     }
 
     // MARK: - Site Logins Services

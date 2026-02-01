@@ -319,6 +319,17 @@ protocol WebArticleDownloadQueueProtocol: Actor {
     func isActive(url: String) async -> Bool
 }
 
+// MARK: - GoodLinks Article Auto Fetch
+
+/// GoodLinks 正文自动抓取服务（列表加载完成后预取）
+protocol GoodLinksArticleAutoFetchServiceProtocol: Actor {
+    /// 批量入队（会自动去重；本次会话失败/无正文不会重试）
+    func enqueuePrefetch(links: [GoodLinksLinkRow]) async
+    
+    /// 获取当前进度快照（用于 Debug UI）
+    func snapshot() async -> GoodLinksAutoFetchSnapshot
+}
+
 // MARK: - Auto Sync Service Protocol
 protocol AutoSyncServiceProtocol: AnyObject {
     var isRunning: Bool { get }
