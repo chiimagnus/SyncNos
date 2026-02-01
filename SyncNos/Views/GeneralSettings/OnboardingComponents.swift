@@ -26,7 +26,6 @@ struct OnboardingView: View {
             ))
             .id(viewModel.currentStep) // Force transition on step change
         }
-        .frame(width: 600, height: 500) // Fixed size for onboarding window
         .frame(maxWidth: .infinity, maxHeight: .infinity) // 填满整个窗口
         .background(Color("BackgroundColor"))
     }
