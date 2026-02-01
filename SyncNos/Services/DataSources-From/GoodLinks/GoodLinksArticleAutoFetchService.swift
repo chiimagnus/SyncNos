@@ -20,12 +20,12 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     
     // MARK: - State
     
-    private var pending: [String] = []
-    private var pendingSet: Set<String> = []
-    private var inFlightTasks: [String: Task<Void, Never>] = [:]
+    private var pendingLinkIds: [String] = []
+    private var pendingLinkIdSet: Set<String> = []
+    private var inFlightTasksByLinkId: [String: Task<Void, Never>] = [:]
     
     /// 本次会话已跟踪的 URL（用于 Debug UI 显示“所有状态”）
-    private var itemsByURL: [String: GoodLinksAutoFetchItem] = [:]
+    private var itemsByLinkId: [String: GoodLinksAutoFetchItem] = [:]
     
     private var cacheHitCount: Int = 0
     private var succeededCount: Int = 0
@@ -55,8 +55,7 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     func enqueuePrefetch(links: [GoodLinksLinkRow]) async {
         guard !links.isEmpty else { return }
         
-        let urls = links.map(\.url)
-        let accepted = enqueueURLs(urls)
+        let accepted = enqueueLinks(links)
         guard accepted > 0 else { return }
         
         if startedAt == nil {
@@ -64,13 +63,13 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             logger.info("[GoodLinksAutoFetch] Started session prefetch, concurrency=\(maxConcurrentPrefetches)")
         }
         
-        logger.info("[GoodLinksAutoFetch] Enqueued urls=\(accepted) pending=\(pending.count) inFlight=\(inFlightTasks.count)")
+        logger.info("[GoodLinksAutoFetch] Enqueued links=\(accepted) pending=\(pendingLinkIds.count) inFlight=\(inFlightTasksByLinkId.count)")
         pumpIfNeeded()
     }
     
     func snapshot() async -> GoodLinksAutoFetchSnapshot {
-        let total = itemsByURL.count
-        let items = itemsByURL.values.sorted { a, b in
+        let total = itemsByLinkId.count
+        let items = itemsByLinkId.values.sorted { a, b in
             if a.state != b.state {
                 return stateSortKey(a.state) < stateSortKey(b.state)
             }
@@ -78,8 +77,8 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
         }
         return GoodLinksAutoFetchSnapshot(
             total: total,
-            pending: pending.count,
-            inFlight: inFlightTasks.count,
+            pending: pendingLinkIds.count,
+            inFlight: inFlightTasksByLinkId.count,
             completed: completedCount,
             cacheHit: cacheHitCount,
             succeeded: succeededCount,
@@ -92,14 +91,14 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     }
     
     func resetSessionState() async {
-        for (_, task) in inFlightTasks {
+        for (_, task) in inFlightTasksByLinkId {
             task.cancel()
         }
         
-        pending.removeAll(keepingCapacity: false)
-        pendingSet.removeAll(keepingCapacity: false)
-        inFlightTasks.removeAll(keepingCapacity: false)
-        itemsByURL.removeAll(keepingCapacity: false)
+        pendingLinkIds.removeAll(keepingCapacity: false)
+        pendingLinkIdSet.removeAll(keepingCapacity: false)
+        inFlightTasksByLinkId.removeAll(keepingCapacity: false)
+        itemsByLinkId.removeAll(keepingCapacity: false)
         
         cacheHitCount = 0
         succeededCount = 0
@@ -115,20 +114,25 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     
     // MARK: - Queue
     
-    private func enqueueURLs(_ urls: [String]) -> Int {
+    private func enqueueLinks(_ links: [GoodLinksLinkRow]) -> Int {
         var accepted = 0
-        for raw in urls {
-            let url = normalizeURL(raw)
-            guard !url.isEmpty else { continue }
+        for link in links {
+            let linkId = link.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            let url = normalizeURL(link.url)
+            guard !linkId.isEmpty, !url.isEmpty else { continue }
             
-            if pendingSet.contains(url) { continue }
-            if inFlightTasks[url] != nil { continue }
-            if itemsByURL[url] != nil { continue }
+            let title = normalizeTitle(link.title) ?? url
             
-            pending.append(url)
-            pendingSet.insert(url)
+            if pendingLinkIdSet.contains(linkId) { continue }
+            if inFlightTasksByLinkId[linkId] != nil { continue }
+            if itemsByLinkId[linkId] != nil { continue }
+            
+            pendingLinkIds.append(linkId)
+            pendingLinkIdSet.insert(linkId)
             accepted += 1
-            itemsByURL[url] = GoodLinksAutoFetchItem(
+            itemsByLinkId[linkId] = GoodLinksAutoFetchItem(
+                linkId: linkId,
+                title: title,
                 url: url,
                 state: .waiting,
                 message: nil,
@@ -143,53 +147,57 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     }
     
     private func pumpIfNeeded() {
-        while inFlightTasks.count < maxConcurrentPrefetches {
-            guard let next = dequeueNextURL() else { return }
-            startPrefetch(url: next)
+        while inFlightTasksByLinkId.count < maxConcurrentPrefetches {
+            guard let next = dequeueNextLinkId() else { return }
+            startPrefetch(linkId: next)
         }
     }
     
-    private func dequeueNextURL() -> String? {
-        while let first = pending.first {
-            pending.removeFirst()
-            pendingSet.remove(first)
-            if inFlightTasks[first] != nil { continue }
+    private func dequeueNextLinkId() -> String? {
+        while let first = pendingLinkIds.first {
+            pendingLinkIds.removeFirst()
+            pendingLinkIdSet.remove(first)
+            if inFlightTasksByLinkId[first] != nil { continue }
             // 可能在队列等待时被 reset 清空
-            guard let item = itemsByURL[first], item.state == .waiting else { continue }
+            guard let item = itemsByLinkId[first], item.state == .waiting else { continue }
             return first
         }
         return nil
     }
     
-    private func startPrefetch(url: String) {
-        guard inFlightTasks[url] == nil else { return }
+    private func startPrefetch(linkId: String) {
+        guard inFlightTasksByLinkId[linkId] == nil else { return }
+        guard let existing = itemsByLinkId[linkId] else { return }
         
-        if let item = itemsByURL[url] {
-            itemsByURL[url] = GoodLinksAutoFetchItem(
-                url: item.url,
-                state: .running,
-                message: nil,
-                updatedAt: Date()
-            )
-        }
+        itemsByLinkId[linkId] = GoodLinksAutoFetchItem(
+            linkId: linkId,
+            title: existing.title,
+            url: existing.url,
+            state: .running,
+            message: nil,
+            updatedAt: Date()
+        )
         
-        appendEvent(.init(url: url, kind: .started, message: nil))
-        logger.debug("[GoodLinksAutoFetch] Start url=\(url)")
+        appendEvent(.init(url: existing.url, kind: .started, message: nil))
+        logger.debug("[GoodLinksAutoFetch] Start url=\(existing.url)")
         
         let task = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            await self.prefetchOne(url: url)
+            await self.prefetchOne(linkId: linkId)
         }
-        inFlightTasks[url] = task
+        inFlightTasksByLinkId[linkId] = task
         lastUpdatedAt = Date()
     }
     
-    private func prefetchOne(url: String) async {
+    private func prefetchOne(linkId: String) async {
+        guard let item = itemsByLinkId[linkId] else { return }
+        let url = item.url
+        
         do {
             if let cached = try await cacheService.getArticle(url: url),
                (!cached.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || !cached.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
-                finish(url: url, outcome: .cacheHit)
+                finish(linkId: linkId, outcome: .cacheHit)
                 return
             }
         } catch {
@@ -199,15 +207,15 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
         do {
             let result = try await downloadQueue.fetchArticle(url: url, priority: .auto)
             if result != nil {
-                finish(url: url, outcome: .succeeded)
+                finish(linkId: linkId, outcome: .succeeded)
             } else {
-                finish(url: url, outcome: .noContent)
+                finish(linkId: linkId, outcome: .noContent)
             }
         } catch is CancellationError {
             // 仅 DEBUG reset 时可能触发：视为结束但不计入失败/完成，避免污染统计
-            finish(url: url, outcome: .cancelled)
+            finish(linkId: linkId, outcome: .cancelled)
         } catch {
-            finish(url: url, outcome: .failed(error.localizedDescription))
+            finish(linkId: linkId, outcome: .failed(error.localizedDescription))
         }
     }
     
@@ -221,12 +229,12 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
         case cancelled
     }
     
-    private func finish(url: String, outcome: Outcome) {
-        inFlightTasks[url] = nil
+    private func finish(linkId: String, outcome: Outcome) {
+        inFlightTasksByLinkId[linkId] = nil
         lastUpdatedAt = Date()
         
         // 可能在 debug reset 时被清空：此时不再更新计数/事件，直接泵队列即可
-        if itemsByURL[url] == nil {
+        if itemsByLinkId[linkId] == nil {
             switch outcome {
             case .cancelled:
                 break
@@ -236,32 +244,39 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             }
         }
         
+        guard let current = itemsByLinkId[linkId] else {
+            pumpIfNeeded()
+            return
+        }
+        
+        let url = current.url
+        
         switch outcome {
         case .cacheHit:
-            if let item = itemsByURL[url], item.state != .cached {
-                itemsByURL[url] = GoodLinksAutoFetchItem(url: url, state: .cached, message: nil, updatedAt: Date())
+            if current.state != .cached {
+                itemsByLinkId[linkId] = GoodLinksAutoFetchItem(linkId: linkId, title: current.title, url: url, state: .cached, message: nil, updatedAt: Date())
                 completedCount += 1
             }
             cacheHitCount += 1
             appendEvent(.init(url: url, kind: .cacheHit, message: nil))
         case .succeeded:
-            if let item = itemsByURL[url], item.state != .succeeded {
-                itemsByURL[url] = GoodLinksAutoFetchItem(url: url, state: .succeeded, message: nil, updatedAt: Date())
+            if current.state != .succeeded {
+                itemsByLinkId[linkId] = GoodLinksAutoFetchItem(linkId: linkId, title: current.title, url: url, state: .succeeded, message: nil, updatedAt: Date())
                 completedCount += 1
             }
             succeededCount += 1
             appendEvent(.init(url: url, kind: .succeeded, message: nil))
         case .noContent:
-            if let item = itemsByURL[url], item.state != .failed {
-                itemsByURL[url] = GoodLinksAutoFetchItem(url: url, state: .failed, message: "no content", updatedAt: Date())
+            if current.state != .failed {
+                itemsByLinkId[linkId] = GoodLinksAutoFetchItem(linkId: linkId, title: current.title, url: url, state: .failed, message: "no content", updatedAt: Date())
                 completedCount += 1
             }
             failedCount += 1
             appendEvent(.init(url: url, kind: .noContent, message: nil))
             logger.info("[GoodLinksAutoFetch] No content url=\(url)")
         case .failed(let message):
-            if let item = itemsByURL[url], item.state != .failed {
-                itemsByURL[url] = GoodLinksAutoFetchItem(url: url, state: .failed, message: message, updatedAt: Date())
+            if current.state != .failed {
+                itemsByLinkId[linkId] = GoodLinksAutoFetchItem(linkId: linkId, title: current.title, url: url, state: .failed, message: message, updatedAt: Date())
                 completedCount += 1
             }
             failedCount += 1
@@ -269,14 +284,14 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
             logger.warning("[GoodLinksAutoFetch] Failed url=\(url) error=\(message)")
         case .cancelled:
             // 取消不应阻断未来重试（debug reset），因此直接移除记录
-            itemsByURL.removeValue(forKey: url)
+            itemsByLinkId.removeValue(forKey: linkId)
             appendEvent(.init(url: url, kind: .skipped, message: "cancelled"))
         }
         
         pumpIfNeeded()
         
-        if pending.isEmpty, inFlightTasks.isEmpty {
-            logger.info("[GoodLinksAutoFetch] Finished pending session: total=\(itemsByURL.count) completed=\(completedCount) cacheHit=\(cacheHitCount) succeeded=\(succeededCount) failed=\(failedCount)")
+        if pendingLinkIds.isEmpty, inFlightTasksByLinkId.isEmpty {
+            logger.info("[GoodLinksAutoFetch] Finished pending session: total=\(itemsByLinkId.count) completed=\(completedCount) cacheHit=\(cacheHitCount) succeeded=\(succeededCount) failed=\(failedCount)")
         }
     }
     
@@ -292,6 +307,12 @@ actor GoodLinksArticleAutoFetchService: GoodLinksArticleAutoFetchServiceProtocol
     
     private func normalizeURL(_ url: String) -> String {
         url.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func normalizeTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
     
     private func stateSortKey(_ state: GoodLinksAutoFetchItemState) -> Int {

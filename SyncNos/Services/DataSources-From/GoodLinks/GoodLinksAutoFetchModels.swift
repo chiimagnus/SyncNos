@@ -24,7 +24,9 @@ enum GoodLinksAutoFetchItemState: String, Sendable {
 }
 
 struct GoodLinksAutoFetchItem: Sendable, Identifiable {
-    var id: String { url }
+    var id: String { linkId }
+    let linkId: String
+    let title: String
     let url: String
     let state: GoodLinksAutoFetchItemState
     let message: String?
