@@ -130,43 +130,19 @@ extension GoodLinksNotionAdapter {
         link: GoodLinksLinkRow,
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
-        cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
         downloadQueue: WebArticleDownloadQueueProtocol = DIContainer.shared.webArticleDownloadQueue,
         htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
         let logger = DIContainer.shared.loggerService
-
-        let result: ArticleFetchResult?
-        do {
-            result = try await cacheService.getArticle(url: link.url)
-            if result != nil {
-                logger.debug("[GoodLinks] Use persisted article cache for \(link.url)")
-            }
-        } catch {
-            logger.warning("[GoodLinks] Failed to read persisted article cache for \(link.url): \(error.localizedDescription)")
-            result = nil
-        }
-
-        var fetched: ArticleFetchResult? = nil
-        if result == nil {
-            do {
-                if let fetchedResult = try await downloadQueue.fetchArticle(url: link.url, priority: .auto) {
-                    fetched = fetchedResult
-                    do {
-                        try await cacheService.upsertArticle(url: link.url, result: fetchedResult)
-                    } catch {
-                        logger.warning("[GoodLinks] Failed to persist fetched article for \(link.url): \(error.localizedDescription)")
-                    }
-                } else {
-                    fetched = nil
-                }
-            } catch {
-                logger.warning("[GoodLinks] Failed to fetch article for \(link.url): \(error.localizedDescription)")
-                fetched = nil
-            }
-        }
         
-        let finalResult = result ?? fetched
+        let finalResult: ArticleFetchResult?
+        do {
+            // downloadQueue 内部会优先读取持久化缓存；抓取成功也会由 WebArticleFetcher 写入缓存
+            finalResult = try await downloadQueue.fetchArticle(url: link.url, priority: .auto)
+        } catch {
+            logger.warning("[GoodLinks] Failed to fetch article for \(link.url): \(error.localizedDescription)")
+            finalResult = nil
+        }
 
         var blocks: [[String: Any]]?
         if let finalResult, let baseURL = URL(string: link.url) {
