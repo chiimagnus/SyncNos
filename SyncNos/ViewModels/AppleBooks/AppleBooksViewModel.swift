@@ -71,8 +71,8 @@ final class AppleBooksViewModel: ObservableObject {
            let sortKey = BookListSortKey(rawValue: savedSortKey) {
             self.sortKey = sortKey
         }
-        self.sortAscending = UserDefaults.standard.bool(forKey: Keys.sortAscending)
-        self.showWithTitleOnly = UserDefaults.standard.bool(forKey: Keys.showWithTitleOnly)
+        self.sortAscending = UserDefaults.standard.object(forKey: Keys.sortAscending) as? Bool ?? true
+        self.showWithTitleOnly = UserDefaults.standard.object(forKey: Keys.showWithTitleOnly) as? Bool ?? false
         
         // 订阅来自 AppCommands 的过滤/排序变更通知
         NotificationCenter.default.publisher(for: .appleBooksFilterChanged)
