@@ -80,50 +80,8 @@ struct GoodLinksAutoFetchDebugView: View {
     }
     
     private var content: some View {
-        HSplitView {
-            leftPanel
-            rightPanel
-        }
+        rightPanel
         .padding(16)
-    }
-    
-    private var leftPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            GroupBox("Progress") {
-                VStack(alignment: .leading, spacing: 10) {
-                    ProgressView(value: Double(snapshot.completed), total: Double(max(snapshot.total, 1)))
-                    
-                    HStack {
-                        StatChip(label: "Total", value: "\(snapshot.total)")
-                        StatChip(label: "Pending", value: "\(snapshot.pending)")
-                        StatChip(label: "In-Flight", value: "\(snapshot.inFlight)")
-                        StatChip(label: "Completed", value: "\(snapshot.completed)")
-                    }
-                    
-                    HStack {
-                        StatChip(label: "Cache Hit", value: "\(snapshot.cacheHit)")
-                        StatChip(label: "Succeeded", value: "\(snapshot.succeeded)")
-                        StatChip(label: "Failed", value: "\(snapshot.failed)")
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            
-            GroupBox("Notes") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Auto fetch starts after GoodLinks list finishes loading.")
-                        .scaledFont(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Failures/no-content will not retry in the same app session.")
-                        .scaledFont(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-            
-            Spacer()
-        }
-        .frame(minWidth: 320)
     }
     
     private var rightPanel: some View {
@@ -142,7 +100,6 @@ struct GoodLinksAutoFetchDebugView: View {
             }
             .padding(.vertical, 4)
         }
-        .frame(minWidth: 380)
     }
 
     // MARK: - Queue
@@ -189,7 +146,9 @@ struct GoodLinksAutoFetchDebugView: View {
         } else {
             List {
                 ForEach(items) { item in
-                    AutoFetchRowView(item: item)
+                    AutoFetchRowView(item: item, onSelect: {
+                        selectItem(item)
+                    })
                         .listRowSeparator(.hidden)
                 }
             }
@@ -211,6 +170,15 @@ struct GoodLinksAutoFetchDebugView: View {
         }
     }
     
+    private func selectItem(_ item: GoodLinksAutoFetchItem) {
+        NotificationCenter.default.post(
+            name: .syncQueueTaskSelected,
+            object: nil,
+            userInfo: ["source": ContentSource.goodLinks.rawValue, "id": item.linkId]
+        )
+        dismiss()
+    }
+    
     private func refreshLoop() async {
         while !Task.isCancelled {
             snapshot = await service.snapshot()
@@ -221,39 +189,46 @@ struct GoodLinksAutoFetchDebugView: View {
 
 private struct AutoFetchRowView: View {
     let item: GoodLinksAutoFetchItem
+    var onSelect: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(item.url)
-                    .scaledFont(.body)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(item.title)
+                        .scaledFont(.body)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text(item.state.rawValue)
+                        .scaledFont(.caption2)
+                        .lineLimit(1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .foregroundStyle(color(for: item.state))
+                        .background(color(for: item.state).opacity(0.12), in: Capsule())
+                    
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(.secondary)
+                        .scaledFont(.caption)
+                }
+
+                if item.state == .failed, let msg = item.message, !msg.isEmpty {
+                    Text(msg)
+                        .scaledFont(.caption)
+                        .foregroundStyle(.red.opacity(0.8))
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                }
                 
-                Text(item.state.rawValue)
+                Text(item.updatedAt.formatted(date: .omitted, time: .standard))
                     .scaledFont(.caption2)
-                    .lineLimit(1)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .foregroundStyle(color(for: item.state))
-                    .background(color(for: item.state).opacity(0.12), in: Capsule())
+                    .foregroundStyle(.secondary)
             }
-            
-            if item.state == .failed, let msg = item.message, !msg.isEmpty {
-                Text(msg)
-                    .scaledFont(.caption)
-                    .foregroundStyle(.red.opacity(0.8))
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-            }
-            
-            Text(item.updatedAt.formatted(date: .omitted, time: .standard))
-                .scaledFont(.caption2)
-                .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 6)
+        .buttonStyle(.plain)
     }
     
     private func color(for state: GoodLinksAutoFetchItemState) -> Color {
@@ -272,23 +247,4 @@ private struct AutoFetchRowView: View {
     }
 }
 
-private struct StatChip: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .scaledFont(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .scaledFont(.body)
-                .fontWeight(.semibold)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-}
 #endif
