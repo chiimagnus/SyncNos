@@ -9,49 +9,71 @@ struct AboutView: View {
     var body: some View {
         Group {
             if fontScaleManager.isAccessibilitySize {
-                // 辅助功能大小时使用垂直布局
                 ScrollView {
-                    VStack(spacing: 24) {
-                        aboutContent
-                    }
-                    .padding(32)
+                    content
+                        .padding(32)
                 }
             } else {
-                // 标准大小时使用水平布局
-                HStack(alignment: .top, spacing: 24) {
-                    aboutContent
-                }
-                .padding(32)
+                content
+                    .padding(32)
             }
         }
-        .frame(minWidth: 450, minHeight: 320)
         .navigationTitle("About")
     }
     
-    @ViewBuilder
-    private var aboutContent: some View {
-        // App Icon
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            appSection
+            authorSection
+            Spacer()
+        }
+    }
+
+    // MARK: - App Section
+
+    private var appSection: some View {
+        Group {
+            if fontScaleManager.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 16) {
+                    appIconView
+                    appInfoView
+                }
+            } else {
+                HStack(alignment: .top, spacing: 24) {
+                    appIconView
+                    appInfoView
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private var appIconView: some View {
         Image(nsImage: NSApp.applicationIconImage)
             .resizable()
             .frame(width: iconSize, height: iconSize)
             .cornerRadius(24)
+            #if DEBUG
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.red, lineWidth: 1)
+            )
+            #endif
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-        
-        // 信息区域
+    }
+
+    private var appInfoView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // App 名称
             Text(appName)
                 .scaledFont(.largeTitle, weight: .bold)
-            
-            // 版本信息
+
             Text("Version \(Bundle.main.appVersion) (\(Bundle.main.appBuild))")
                 .scaledFont(.subheadline)
                 .foregroundStyle(.secondary)
-            
+
             Divider()
                 .padding(.vertical, 4)
-            
-            // 操作链接
+
             VStack(alignment: .leading, spacing: 8) {
                 AboutLinkButton(symbol: "heart.fill", title: "Rate & Review", action: openAppStoreReview)
                 AboutLinkButton(symbol: "ladybug.fill", title: "Report Issues", action: openGitHubIssues)
@@ -59,13 +81,68 @@ struct AboutView: View {
                 AboutLinkButton(symbol: "doc.text.fill", title: "Privacy Policy", action: openPrivacyPolicy)
                 AboutLinkButton(symbol: "clock.arrow.circlepath", title: "Changelog", action: openChangelog)
             }
-            
-            Spacer()
-            
-            // 底部信息
-            Text("Made with SwiftUI • macOS 14+")
-                .scaledFont(.footnote)
-                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: - Author Section
+
+    private var authorSection: some View {
+        Group {
+            if fontScaleManager.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 16) {
+                    authorAvatarView
+                    authorInfoView
+                }
+            } else {
+                HStack(alignment: .top, spacing: 24) {
+                    authorAvatarView
+                    authorInfoView
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private var authorAvatarView: some View {
+        ZStack {
+            Circle()
+                .fill(Color.primary.opacity(0.06))
+                .frame(width: iconSize, height: iconSize)
+
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: iconSize * 0.92))
+                .foregroundStyle(Color.secondary.opacity(0.35))
+
+            Image("AuthorAvatar")
+                .resizable()
+                .scaledToFill()
+                .frame(width: iconSize, height: iconSize)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                )
+        }
+        #if DEBUG
+        .overlay(
+            Circle()
+                .stroke(Color.red, lineWidth: 1)
+        )
+        #endif
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+    }
+
+    private var authorInfoView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼")
+                .scaledFont(.largeTitle, weight: .bold)
+
+            Divider()
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 8) {
+                AboutLinkButton(symbol: "envelope.fill", title: "Mail", action: openFeedbackMail)
+                AboutLinkButton(symbol: "person.crop.circle", title: "GitHub", action: openAuthorGitHubProfile)
+            }
         }
     }
 
@@ -130,6 +207,49 @@ private func openPrivacyPolicy() {
 private func openChangelog() {
     let url = URL(string: "https://chiimagnus.notion.site/syncnos-changelog")!
     NSWorkspace.shared.open(url)
+}
+
+private func openAuthorGitHubProfile() {
+    let url = URL(string: "https://github.com/chiimagnus")!
+    NSWorkspace.shared.open(url)
+}
+
+private func openFeedbackMail() {
+    NSWorkspace.shared.open(makeFeedbackMailtoURL())
+}
+
+private func makeFeedbackMailtoURL() -> URL {
+    var components = URLComponents()
+    components.scheme = "mailto"
+    components.path = "chii_magnus@outlook.com"
+
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+    let os = ProcessInfo.processInfo.operatingSystemVersionString
+
+    let versionLine: String = {
+        if !version.isEmpty && !build.isEmpty { return "\(version) (\(build))" }
+        if !version.isEmpty { return version }
+        if !build.isEmpty { return build }
+        return "unknown"
+    }()
+
+    components.queryItems = [
+        URLQueryItem(name: "subject", value: "[SyncNos] Feedback"),
+        URLQueryItem(
+            name: "body",
+            value: """
+App: SyncNos
+Version: \(versionLine)
+macOS: \(os)
+
+Message:
+
+"""
+        )
+    ]
+
+    return components.url ?? URL(string: "mailto:chii_magnus@outlook.com")!
 }
 
 private extension Bundle {
