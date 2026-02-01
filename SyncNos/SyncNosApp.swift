@@ -60,7 +60,9 @@ struct SyncNosApp: App {
         Window("", id: "main") {
             RootView()
         }
+        .defaultSize(width: 960, height: 640)
         .windowStyle(.hiddenTitleBar) //隐藏标题栏
+        .windowResizability(.contentMinSize)
         .commands {
             AppCommands()
         }
