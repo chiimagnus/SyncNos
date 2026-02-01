@@ -131,7 +131,7 @@ extension GoodLinksNotionAdapter {
         dbPath: String,
         databaseService: GoodLinksDatabaseServiceExposed = DIContainer.shared.goodLinksService,
         cacheService: WebArticleCacheServiceProtocol = DIContainer.shared.webArticleCacheService,
-        urlFetcher: WebArticleFetcherProtocol = DIContainer.shared.webArticleFetcher,
+        downloadQueue: WebArticleDownloadQueueProtocol = DIContainer.shared.webArticleDownloadQueue,
         htmlToBlocksConverter: NotionHTMLToBlocksConverterProtocol = DIContainer.shared.notionHTMLToBlocksConverter
     ) async throws -> GoodLinksNotionAdapter {
         let logger = DIContainer.shared.loggerService
@@ -150,14 +150,18 @@ extension GoodLinksNotionAdapter {
         var fetched: ArticleFetchResult? = nil
         if result == nil {
             do {
-                let fetchedResult = try await urlFetcher.fetchArticle(url: link.url)
-                fetched = fetchedResult
-                do {
-                    try await cacheService.upsertArticle(url: link.url, result: fetchedResult)
-                } catch {
-                    logger.warning("[GoodLinks] Failed to persist fetched article for \(link.url): \(error.localizedDescription)")
+                if let fetchedResult = try await downloadQueue.fetchArticle(url: link.url, priority: .auto) {
+                    fetched = fetchedResult
+                    do {
+                        try await cacheService.upsertArticle(url: link.url, result: fetchedResult)
+                    } catch {
+                        logger.warning("[GoodLinks] Failed to persist fetched article for \(link.url): \(error.localizedDescription)")
+                    }
+                } else {
+                    fetched = nil
                 }
-            } catch URLFetchError.contentNotFound {
+            } catch {
+                logger.warning("[GoodLinks] Failed to fetch article for \(link.url): \(error.localizedDescription)")
                 fetched = nil
             }
         }

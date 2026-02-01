@@ -16,6 +16,7 @@ class DIContainer {
     private var _goodLinksService: GoodLinksDatabaseServiceExposed?
     private var _webArticleFetcher: WebArticleFetcherProtocol?
     private var _webArticleCacheService: WebArticleCacheServiceProtocol?
+    private var _webArticleDownloadQueue: WebArticleDownloadQueueProtocol?
     private var _siteLoginsStore: SiteLoginsStoreProtocol?
     private var _autoSyncService: AutoSyncServiceProtocol?
     private var _syncTimestampStore: SyncTimestampStoreProtocol?
@@ -121,6 +122,17 @@ class DIContainer {
             }
         }
         return _webArticleCacheService!
+    }
+    
+    var webArticleDownloadQueue: WebArticleDownloadQueueProtocol {
+        if _webArticleDownloadQueue == nil {
+            _webArticleDownloadQueue = WebArticleDownloadQueueService(
+                fetcher: webArticleFetcher,
+                cacheService: webArticleCacheService,
+                logger: loggerService
+            )
+        }
+        return _webArticleDownloadQueue!
     }
 
     // MARK: - Site Logins Services

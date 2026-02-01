@@ -294,6 +294,31 @@ protocol WebArticleCacheServiceProtocol: Actor {
     func removeAll() throws
 }
 
+// MARK: - Web Article Download Queue
+
+/// 网页正文下载优先级
+enum WebArticleDownloadPriority: Sendable, Equatable {
+    /// 用户手动触发：需要插队到最前面
+    case manual
+    /// 自动/后台触发：放在队列后面
+    case auto
+}
+
+/// 网页正文下载队列（用于统一调度 WebKit 抓取，支持手动插队）
+protocol WebArticleDownloadQueueProtocol: Actor {
+    /// 下载正文并返回结果：
+    /// - 命中持久化缓存：直接返回缓存内容
+    /// - 未命中：进入队列等待下载完成
+    /// - 若目标站点无正文：返回 nil
+    func fetchArticle(url: String, priority: WebArticleDownloadPriority) async throws -> ArticleFetchResult?
+    
+    /// 仅入队（不等待结果），用于后台预取等场景
+    func enqueue(url: String, priority: WebArticleDownloadPriority) async
+    
+    /// 返回指定 URL 是否处于等待/下载中（queued 或 in-flight）
+    func isActive(url: String) async -> Bool
+}
+
 // MARK: - Auto Sync Service Protocol
 protocol AutoSyncServiceProtocol: AnyObject {
     var isRunning: Bool { get }
