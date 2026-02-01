@@ -26,7 +26,6 @@ struct OnboardingView: View {
             ))
             .id(viewModel.currentStep) // Force transition on step change
         }
-        .frame(width: 600, height: 500) // Fixed size for onboarding window
         .frame(maxWidth: .infinity, maxHeight: .infinity) // 填满整个窗口
         .background(Color("BackgroundColor"))
     }
@@ -53,50 +52,54 @@ struct OnboardingWelcomeView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            logoCluster
+            Spacer(minLength: 0)
+            bottomBar
+        }
+    }
+
+    private var logoCluster: some View {
+        // Logo Cluster：在“除去底部操作区”后的可用空间中垂直居中
         ZStack {
-            // Logo Cluster - 整个视图的正中央（水平+垂直居中）
-            ZStack {
-                Image("HeaderCard")
-                    .resizable()
-                    .scaledToFit()
-                    .shadow(radius: 6)
-                    .frame(width: logoSize, height: logoSize)
+            Image("HeaderCard")
+                .resizable()
+                .scaledToFit()
+                .shadow(radius: 6)
+                .frame(width: logoSize, height: logoSize)
 
-                // Satellite Icons
-                ForEach(Array(satelliteSources.enumerated()), id: \.offset) { _, source in
-                    satelliteIcon(source.icon, color: source.color, angle: source.angle)
-                }
-            }
-
-            // 底部区域 - 文字 + 箭头按钮
-            VStack {
-                Spacer()
-
-                HStack(alignment: .center, spacing: 20) {
-                    // 文字部分
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("All your highlights, unified.")
-                            .scaledFont(.title, weight: .bold)
-                            .foregroundStyle(Color("OnboardingTextColor"))
-
-                        Text("Sync Apple Books, GoodLinks, WeRead, Dedao, and Chats highlights directly to your Notion database.")
-                            .scaledFont(.callout)
-                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    // 右箭头按钮π
-                    OnboardingNextButton {
-                        viewModel.nextStep()
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 40)
+            // Satellite Icons
+            ForEach(Array(satelliteSources.enumerated()), id: \.offset) { _, source in
+                satelliteIcon(source.icon, color: source.color, angle: source.angle)
             }
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var bottomBar: some View {
+        HStack(alignment: .center, spacing: 20) {
+            // 文字部分
+            VStack(alignment: .leading, spacing: 8) {
+                Text("All your highlights, unified.")
+                    .scaledFont(.title, weight: .bold)
+                    .foregroundStyle(Color("OnboardingTextColor"))
+
+                Text("Sync Apple Books, GoodLinks, WeRead, Dedao, and Chats highlights directly to your Notion database.")
+                    .scaledFont(.callout)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            OnboardingNextButton {
+                viewModel.nextStep()
+            }
+        }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 40)
     }
 
     private func satelliteIcon(_ systemName: String, color: Color, angle: Double) -> some View {
@@ -289,10 +292,6 @@ struct OnboardingSourcesView: View {
     }
 
     private var sourceGridColumns: [GridItem] {
-        if fontScaleManager.isAccessibilitySize {
-            return [GridItem(.flexible())]
-        }
-
         return [GridItem(.adaptive(minimum: 140 * fontScaleManager.scaleFactor), spacing: 24)]
     }
 
@@ -319,57 +318,58 @@ struct OnboardingTouchMeView: View {
     private var avatarSize: CGFloat { 160 * fontScaleManager.scaleFactor }
 
     var body: some View {
-        ZStack {
-            // 中间：头像（更大）
-            VStack(spacing: 16) {
-                HStack(spacing: 20) {
-                    Image(avatarImageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: avatarSize, height: avatarSize)
-                        .clipShape(Circle())
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            contentSection
+            Spacer(minLength: 0)
+            bottomBar
+        }
+    }
 
-                    Text(aboutText)
-                        .scaledFont(.title2, weight: .bold)
-                        .foregroundStyle(Color("OnboardingTextColor"))
-                        .multilineTextAlignment(.leading)
-//                        .lineLimit(fontScaleManager.isAccessibilitySize ? 4 : 3)
-//                        .fixedSize(horizontal: false, vertical: true)
-                }
+    private var contentSection: some View {
+        AdaptiveStack(horizontalAlignment: .center, verticalAlignment: .leading, spacing: 20) {
+            Image(avatarImageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: avatarSize, height: avatarSize)
+                .clipShape(Circle())
+
+            Text(aboutText)
+                .scaledFont(.title2, weight: .bold)
+                .foregroundStyle(Color("OnboardingTextColor"))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 60)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var bottomBar: some View {
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Touch me")
+                    .scaledFont(.title, weight: .bold)
+                    .foregroundStyle(Color("OnboardingTextColor"))
+
+                Text("Feedback welcome.")
+                    .scaledFont(.callout)
+                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
             }
 
-            // 底部：左下角文案 + 右下角下一步
-            VStack {
-                Spacer()
+            Spacer()
 
-                HStack(alignment: .center, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Touch me")
-                            .scaledFont(.title, weight: .bold)
-                            .foregroundStyle(Color("OnboardingTextColor"))
+            Button("Mail") {
+                openURL(mailtoURL)
+            }
+            .buttonStyle(.link)
+            .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
 
-                        Text("Feedback welcome.")
-                            .scaledFont(.callout)
-                            .foregroundStyle(Color("OnboardingTextColor").opacity(0.7))
-                    }
-
-                    Spacer()
-
-                    Button("Mail") {
-                        openURL(mailtoURL)
-                    }
-                    .buttonStyle(.link)
-                    .foregroundStyle(Color("OnboardingTextColor").opacity(0.5))
-                    // .scaledFont(.callout)
-
-                    OnboardingNextButton {
-                        viewModel.nextStep()
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 40)
+            OnboardingNextButton {
+                viewModel.nextStep()
             }
         }
+        .padding(.horizontal, 40)
+        .padding(.bottom, 40)
     }
 
     private var aboutText: AttributedString {

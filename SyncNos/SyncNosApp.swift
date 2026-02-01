@@ -12,7 +12,7 @@ struct SyncNosApp: App {
 #if DEBUG
         // Debug flag：通过 UserDefaults(debug.forceOnboardingEveryLaunch) 控制是否每次启动都重置引导状态
         // 默认关闭，需要时可在 Xcode Scheme 的 Arguments 中设置，或手动在代码中临时改为 true
-        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": false])
+        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": true])
         let envDetector = DIContainer.shared.environmentDetector
         let shouldForceOnboarding = UserDefaults.standard.bool(forKey: "debug.forceOnboardingEveryLaunch")
         if envDetector.isDevEnvironment() && shouldForceOnboarding {
@@ -60,7 +60,9 @@ struct SyncNosApp: App {
         Window("", id: "main") {
             RootView()
         }
+        .defaultSize(width: 960, height: 640)
         .windowStyle(.hiddenTitleBar) //隐藏标题栏
+        .windowResizability(.contentMinSize)
         .commands {
             AppCommands()
         }
