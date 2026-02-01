@@ -26,54 +26,12 @@ struct GoodLinksAutoFetchDebugView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            content
-        }
-        .frame(width: 760, height: 520)
-        .task {
-            await refreshLoop()
-        }
-    }
-    
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("GoodLinks Auto Fetch Debug")
-                    .scaledFont(.headline)
-                HStack(spacing: 12) {
-                    if let startedAt = snapshot.startedAt {
-                        Text("Started: \(startedAt.formatted(date: .abbreviated, time: .standard))")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Not started")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let updatedAt = snapshot.lastUpdatedAt {
-                        Text("Updated: \(updatedAt.formatted(date: .omitted, time: .standard))")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            Spacer()
-            HStack(spacing: 10) {
-                Button("Close") {
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(16)
-    }
-    
-    private var content: some View {
         rightPanel
-        .padding(16)
+            .padding(16)
+            .frame(width: 760, height: 520)
+            .task {
+                await refreshLoop()
+            }
     }
     
     private var rightPanel: some View {
