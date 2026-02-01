@@ -323,24 +323,11 @@ struct OnboardingTouchMeView: View {
             // 中间：头像（更大）
             VStack(spacing: 16) {
                 HStack(spacing: 20) {
-                    ZStack {
-                        Circle()
-                            .fill(Color("OnboardingButtonColor").opacity(0.15))
-                            .frame(width: avatarSize, height: avatarSize)
-
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: avatarSize * 0.92))
-                            .foregroundStyle(Color("OnboardingButtonColor").opacity(0.35))
-
-                        Image(avatarImageName)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: avatarSize, height: avatarSize)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle().stroke(Color("OnboardingButtonColor").opacity(0.25), lineWidth: 1)
-                            )
-                    }
+                    Image(avatarImageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: avatarSize, height: avatarSize)
+                        .clipShape(Circle())
 
                     Text(aboutText)
                         .scaledFont(.title2, weight: .bold)
