@@ -5,6 +5,7 @@ struct ViewCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @FocusedValue(\.isMainWindowSceneActive) private var isMainWindowSceneActive: Bool?
     @FocusedValue(\.isGlobalSearchPresented) private var isGlobalSearchPresented: Bool?
+    @FocusedValue(\.mainWindowEnabledDataSources) private var mainWindowEnabledDataSources: [ContentSource]?
     @AppStorage("contentSource") private var contentSourceRawValue: String = ContentSource.appleBooks.rawValue
     /// 数据源自定义顺序（V2：String/RawRepresentable）
     /// 破坏性：不读取旧 Data(JSON) 顺序；首次升级会回退默认顺序，需用户重新拖拽一次
@@ -36,7 +37,10 @@ struct ViewCommands: Commands {
     }
 
     private var enabledContentSources: [ContentSource] {
-        dataSourceOrder.sources.filter { isDataSourceEnabled($0) }
+        if let sources = mainWindowEnabledDataSources {
+            return sources
+        }
+        return dataSourceOrder.sources.filter { isDataSourceEnabled($0) }
     }
 
     private func isDataSourceEnabled(_ source: ContentSource) -> Bool {
@@ -128,6 +132,7 @@ struct ViewCommands: Commands {
 
             // 数据源切换（cmd+1 / cmd+2 / ... 绑定到“第 1/2/... 个启用的数据源”）
             // 通知由 DataSourceSwitchViewModel.switchTo() 统一发送
+            let shortcutOrderToken = enabledContentSources.map(\.rawValue).joined(separator: ".")
             ForEach(Array(enabledContentSources.enumerated()), id: \.element) { index, source in
                 Button(source.displayName, systemImage: source.icon) {
                     contentSourceRawValue = source.rawValue
@@ -135,7 +140,7 @@ struct ViewCommands: Commands {
                 .disabled(currentSource == source || !allowMainWindowNavigationShortcuts)
                 .applyKeyboardShortcut(shortcutKey(for: index), modifiers: .command)
                 // 命令项 identity = (source, index)；当顺序变化时强制重建对应 NSMenuItem，以确保快捷键立即刷新
-                .id("datasource.command.\(source.rawValue).\(index)")
+                .id("datasource.command.\(shortcutOrderToken).\(source.rawValue).\(index)")
             }
 
             Divider()
