@@ -112,6 +112,9 @@ extension Notification.Name {
     
     /// 数据源顺序变更
     static let dataSourceOrderChanged = Notification.Name("DataSourceOrderChanged")
+
+    /// 数据源拖拽排序开始（userInfo: ["source": ContentSource.rawValue]）
+    static let dataSourceReorderDragStarted = Notification.Name("DataSourceReorderDragStarted")
     
     /// Apple Books 数据库容器被选中
     static let appleBooksContainerSelected = Notification.Name("AppleBooksContainerSelected")
