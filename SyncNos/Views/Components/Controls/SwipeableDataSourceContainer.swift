@@ -34,7 +34,7 @@ struct SwipeableDataSourceContainer<FilterMenu: View>: View {
             if viewModel.hasEnabledSources {
                 GeometryReader { geometry in
                     HStack(spacing: 0) {
-                        ForEach(Array(viewModel.enabledDataSources.enumerated()), id: \.offset) { _, source in
+                        ForEach(viewModel.enabledDataSources, id: \.self) { source in
                             dataSourceView(for: source)
                                 .frame(width: geometry.size.width)
                                 .safeAreaInset(edge: .bottom) {

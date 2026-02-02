@@ -104,6 +104,11 @@ struct MainListView: View {
     private var enabledContentSources: [ContentSource] {
         ContentSource.orderedEnabledSources(isEnabled: isSourceEnabled)
     }
+    
+    /// Commands 使用的数据源顺序：优先使用滑动容器的真实顺序；首次渲染兜底使用持久化顺序，避免菜单项短暂为空
+    private var mainWindowCommandSources: [ContentSource] {
+        dataSourceSwitchVM.enabledDataSources.isEmpty ? enabledContentSources : dataSourceSwitchVM.enabledDataSources
+    }
 
     private func isSourceEnabled(_ source: ContentSource) -> Bool {
         switch source {
@@ -138,6 +143,8 @@ struct MainListView: View {
             }
             // 将“搜索面板是否显示”作为快捷键上下文暴露给 Commands（用于禁用 Cmd+1/2 等）
             .focusedSceneValue(\.isGlobalSearchPresented, isGlobalSearchPresented)
+            // 将“主窗口启用数据源顺序”作为快捷键上下文暴露给 Commands（用于 Cmd+1/2/... 映射与菜单刷新）
+            .focusedSceneValue(\.mainWindowEnabledDataSources, mainWindowCommandSources)
             .onAppear {
                 // 根据当前启用的数据源初始化滑动容器
                 updateDataSourceSwitchViewModel()
@@ -155,6 +162,10 @@ struct MainListView: View {
                     return
                 }
                 isGlobalSearchPresented.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dataSourceReorderDragStarted).receive(on: DispatchQueue.main)) { _ in
+                // 开始拖拽排序时视为“进入 List”，让键盘导航目标与焦点保持一致
+                keyboardNavigationTarget = .list
             }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
