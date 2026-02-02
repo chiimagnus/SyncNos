@@ -159,14 +159,19 @@ private struct DataSourceDropDelegate: DropDelegate {
         for source in disabledSources where !newFullOrder.contains(source) {
             newFullOrder.append(source)
         }
-        
-        // 保存到 AppStorage / UserDefaults（V2）
-        storedOrder = ContentSourceOrder.encode(newFullOrder)
-        // 破坏性：清理旧 key（Data(JSON)），避免后续困惑
-        UserDefaults.standard.removeObject(forKey: ContentSource.legacyOrderKey)
-        
-        // 直接更新 ViewModel（updateEnabledDataSources 会自动保持当前活动的数据源）
+
+        // 先更新 ViewModel（确保 UI / Commands 立即按新顺序生效）
+        // updateEnabledDataSources 会自动保持当前活动的数据源
         viewModel.updateEnabledDataSources(enabledOrder)
+
+        // 持久化写入延后到下一轮 runloop，降低 drop 结束瞬间的主线程阻塞概率
+        let encoded = ContentSourceOrder.encode(newFullOrder)
+        DispatchQueue.main.async {
+            // 保存到 AppStorage / UserDefaults（V2）
+            storedOrder = encoded
+            // 破坏性：清理旧 key（Data(JSON)），避免后续困惑
+            UserDefaults.standard.removeObject(forKey: ContentSource.legacyOrderKey)
+        }
         
         // 触发触觉反馈
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .default)
