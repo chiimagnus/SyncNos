@@ -35,6 +35,18 @@ struct DataSourceIndicatorBar: View {
                 }
                 .onDrag {
                     draggingSource = source
+                    
+                    // 交互约定：开始拖拽即“进入”被拖拽的数据源（等同于点击切换）
+                    // - 仅切换到被拖拽的数据源；拖拽经过其它数据源时不跟随切换
+                    // - 即使最终取消拖拽/放回原位，也保持已切换的数据源
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.switchTo(source: source)
+                    }
+                    NotificationCenter.default.post(
+                        name: .dataSourceReorderDragStarted,
+                        object: nil,
+                        userInfo: ["source": source.rawValue]
+                    )
                     return NSItemProvider(object: source.rawValue as NSString)
                 }
                 .onDrop(of: [.text], delegate: DataSourceDropDelegate(

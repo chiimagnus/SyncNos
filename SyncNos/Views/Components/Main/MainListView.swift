@@ -163,6 +163,10 @@ struct MainListView: View {
                 }
                 isGlobalSearchPresented.toggle()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .dataSourceReorderDragStarted).receive(on: DispatchQueue.main)) { _ in
+                // 开始拖拽排序时视为“进入 List”，让键盘导航目标与焦点保持一致
+                keyboardNavigationTarget = .list
+            }
             // 当数据源启用状态变化时，更新 DataSourceSwitchViewModel
             .onChange(of: appleBooksSourceEnabled) { _, _ in
                 updateDataSourceSwitchViewModel()
