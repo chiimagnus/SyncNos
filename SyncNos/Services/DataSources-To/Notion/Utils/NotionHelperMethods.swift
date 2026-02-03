@@ -159,7 +159,10 @@ class NotionHelperMethods {
     func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [[String: Any]] {
         var rt: [[String: Any]] = []
         // Header lines
-        rt.append(contentsOf: makeHeaderLines(for: highlight, source: source))
+        // Chats 破坏性变更：不在 Notion 页面中显示 uuid / modified 元信息（增量同步依赖本地记录）
+        if source != "chats" {
+            rt.append(contentsOf: makeHeaderLines(for: highlight, source: source))
+        }
 
         // First chunk of highlight text
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
