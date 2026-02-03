@@ -78,20 +78,6 @@ protocol NotionSyncSourceProtocol {
     /// - 默认返回 nil（表示不需要做存在性检测/补齐）。
     func headerContentPresenceHeadingTitle() -> String?
 
-    // MARK: - Single Database Override (Optional)
-
-    /// 单一数据库模式下的“整页内容覆盖”输出（可选）
-    ///
-    /// 典型场景：Chats 希望以 Markdown 风格（`## @xxx`）在页面内排版，而非使用通用的高亮列表结构。
-    ///
-    /// - 注意：当返回非 nil 时，同步引擎会：
-    ///   1) 使用 `setPageChildren` 清空并重建页面 children（破坏性更新）。
-    ///   2) 清理该 page 对应的本地 SyncedHighlightRecord（避免旧的 blockId 映射残留）。
-    ///   3) 使用 `itemCount` 更新页面的 Highlight Count 与同步时间戳。
-    ///
-    /// - Returns: 覆盖内容；返回 nil 则走通用高亮同步逻辑。
-    func singleDatabasePageOverrideContent() async throws -> NotionSingleDatabasePageOverrideContent?
-
     /// 用于更新 Notion 页面 “Highlight Count” 的计数（可选）
     /// - 默认返回 `highlights.count`
     /// - 典型场景：Chats 会在高亮序列中插入分组标题（`## @xxx`），但 Highlight Count 仍希望等于真实消息数
@@ -150,24 +136,9 @@ extension NotionSyncSourceProtocol {
         nil
     }
 
-    func singleDatabasePageOverrideContent() async throws -> NotionSingleDatabasePageOverrideContent? {
-        nil
-    }
-
     func syncHighlightCount(for highlights: [UnifiedHighlight]) -> Int {
         highlights.count
     }
-}
-
-// MARK: - Single Database Override Content
-
-/// 单一数据库模式的整页内容覆盖结果
-struct NotionSingleDatabasePageOverrideContent {
-    /// Notion blocks（用于 `blocks/{pageId}/children`）
-    let children: [[String: Any]]
-
-    /// 用于更新页面的 “Highlight Count” 与同步时间戳的计数
-    let itemCount: Int
 }
 
 // MARK: - Per-Book Strategy Extension
