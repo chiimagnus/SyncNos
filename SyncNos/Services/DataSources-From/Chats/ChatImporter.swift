@@ -126,8 +126,11 @@ enum ChatImporter {
         var messageOrder = 0
         var isAfterSeparator = false
         
-        // 正则表达式
-        let titlePattern = try? NSRegularExpression(pattern: "^#\\s+(.+)$", options: [])
+        // 正则表达式（破坏性变更：统一使用 "@ 语法" 作为唯一可解析规则）
+        // - 对话标题：# @<ContactName>
+        // - 发送者分组：## @<SenderName>
+        let contactTitlePattern = try? NSRegularExpression(pattern: "^#\\s+@(.+)$", options: [])
+        let senderTitlePattern = try? NSRegularExpression(pattern: "^##\\s+@(.+)$", options: [])
         
         // 辅助函数：保存当前待处理的消息
         func flushPendingMessage() {
@@ -201,38 +204,39 @@ enum ChatImporter {
                 continue
             }
             
-            // 检测标题行 (# xxx)
-            if let titlePattern,
-               let match = titlePattern.firstMatch(in: trimmedLine, options: [], range: NSRange(trimmedLine.startIndex..., in: trimmedLine)),
-               let range = Range(match.range(at: 1), in: trimmedLine) {
-                
-                let title = String(trimmedLine[range])
-                
-                if !isAfterSeparator {
-                    // 分隔符前的标题是联系人名称
-                    if contactName == nil {
+            if !isAfterSeparator {
+                // 分隔符前：只允许对话标题 # @<ContactName>
+                if let contactTitlePattern,
+                   let match = contactTitlePattern.firstMatch(in: trimmedLine, options: [], range: NSRange(trimmedLine.startIndex..., in: trimmedLine)),
+                   let range = Range(match.range(at: 1), in: trimmedLine) {
+                    let title = String(trimmedLine[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if contactName == nil, !title.isEmpty {
                         contactName = title
                     }
-                } else {
-                    // 分隔符后的标题是发送者
+                }
+                // 其他内容（元信息行）忽略
+                continue
+            } else {
+                // 分隔符后：发送者分组标题 ## @<SenderName>
+                if let senderTitlePattern,
+                   let match = senderTitlePattern.firstMatch(in: trimmedLine, options: [], range: NSRange(trimmedLine.startIndex..., in: trimmedLine)),
+                   let range = Range(match.range(at: 1), in: trimmedLine) {
+                    let sender = String(trimmedLine[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !sender.isEmpty else { continue }
+                    
                     flushPendingMessage()
-                    currentSender = title
-                    // 支持中英文 "我" / "Me"，以及系统消息 "System"
-                    let lowerTitle = title.lowercased()
-                    if lowerTitle == "system" {
-                        // 系统消息特殊处理
+                    
+                    currentSender = sender
+                    let lowerSender = sender.lowercased()
+                    
+                    if lowerSender == "system" {
                         currentSender = "System"
                         currentIsFromMe = false
                     } else {
-                        currentIsFromMe = (title == "我" || lowerTitle == "me")
+                        currentIsFromMe = (sender == "我" || lowerSender == "me")
                     }
+                    continue
                 }
-                continue
-            }
-            
-            // 跳过元信息行（分隔符前）
-            if !isAfterSeparator {
-                continue
             }
             
             // 普通消息内容（包括 System 发送者的系统消息）
@@ -245,8 +249,12 @@ enum ChatImporter {
         flushPendingMessage()
         
         // 验证结果
+        guard isAfterSeparator else {
+            throw ChatImportError.markdownParseError("Separator '---' not found (required)")
+        }
+        
         guard let name = contactName, !name.isEmpty else {
-            throw ChatImportError.markdownParseError("Contact name not found (expected # Title at the beginning)")
+            throw ChatImportError.markdownParseError("Contact name not found (expected '# @ContactName' before '---')")
         }
         
         if messages.isEmpty {
@@ -260,4 +268,3 @@ enum ChatImporter {
         )
     }
 }
-
