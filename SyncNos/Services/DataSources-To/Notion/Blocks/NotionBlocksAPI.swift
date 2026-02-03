@@ -51,6 +51,9 @@ class NotionBlocksAPI {
             let type: String
             let has_children: Bool?
             let paragraph: RichTextHolder?
+            let heading_1: RichTextHolder?
+            let heading_2: RichTextHolder?
+            let heading_3: RichTextHolder?
             let bulleted_list_item: RichTextHolder?
             let numbered_list_item: RichTextHolder?
         }
@@ -87,6 +90,9 @@ class NotionBlocksAPI {
                 // 合并 parent rich_text 文本内容，便于解析两行头
                 var texts: [BlockChildrenResponse.RichText] = []
                 if let p = block.paragraph?.rich_text { texts = p }
+                else if let h1 = block.heading_1?.rich_text { texts = h1 }
+                else if let h2 = block.heading_2?.rich_text { texts = h2 }
+                else if let h3 = block.heading_3?.rich_text { texts = h3 }
                 else if let b = block.bulleted_list_item?.rich_text { texts = b }
                 else if let n = block.numbered_list_item?.rich_text { texts = n }
 
