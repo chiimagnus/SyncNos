@@ -37,6 +37,31 @@ class NotionHighlightsAPI {
     }
 
     func updateBlockContent(blockId: String, highlight: HighlightRow, bookId: String, source: String) async throws {
+        if source == "chats" {
+            let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: source)
+
+            if highlight.uuid.hasPrefix("chats-group:") {
+                _ = try await requestHelper.performRequest(
+                    path: "blocks/\(blockId)",
+                    method: "PATCH",
+                    body: ["heading_2": ["rich_text": parentRt]]
+                )
+                return
+            }
+
+            _ = try await requestHelper.performRequest(
+                path: "blocks/\(blockId)",
+                method: "PATCH",
+                body: ["paragraph": ["rich_text": parentRt]]
+            )
+
+            // Chats：仅处理长文本续块（children）
+            let chunkSize = NotionSyncConfig.maxTextLengthPrimary
+            let childBlocks = helperMethods.buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize)
+            try await pageOperations.replacePageChildren(pageId: blockId, with: childBlocks)
+            return
+        }
+
         // 构建 parent rich_text（高亮首段）并更新；父块类型与创建时一致：numbered_list_item
         let parentRt = helperMethods.buildParentRichText(for: highlight, bookId: bookId, maxTextLength: NotionSyncConfig.maxTextLengthPrimary, source: source)
         _ = try await requestHelper.performRequest(path: "blocks/\(blockId)", method: "PATCH", body: ["numbered_list_item": ["rich_text": parentRt]])
