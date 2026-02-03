@@ -244,27 +244,7 @@ final class NotionSyncEngine {
             }
         }
 
-        // 6. 可选：单一数据库模式下整页内容覆盖（例如 Chats 的 Markdown 风格输出）
-        // 破坏性变更：当数据源提供 overrideContent 时，将清空并重建页面 children。
-        if let overrideContent = try await source.singleDatabasePageOverrideContent() {
-            progress(NSLocalizedString("Syncing...", comment: ""))
-            try Task.checkCancellation()
-            try await notionService.setPageChildren(pageId: pageId, children: overrideContent.children)
-
-            // 清除旧的 blockId 映射，避免未来误用（该数据源已不走高亮增量更新逻辑）
-            do {
-                try await syncedHighlightStore.clearRecords(sourceKey: source.sourceKey, bookId: item.itemId)
-            } catch {
-                logger.warning("[SmartSync] Failed to clear local records for override source: \(source.sourceKey):\(item.itemId) - \(error.localizedDescription)")
-            }
-
-            // 更新计数和时间戳
-            try await updateCountAndTimestamp(pageId: pageId, count: overrideContent.itemCount, itemId: item.itemId)
-            logger.debug("[SmartSync] Replaced page children via override content for \(source.sourceKey): \(itemLabel), count=\(overrideContent.itemCount)")
-            return
-        }
-
-        // 7. 获取高亮数据
+        // 6. 获取高亮数据
         progress(NSLocalizedString("Preparing...", comment: ""))
         try Task.checkCancellation()
         let highlights: [UnifiedHighlight]
@@ -276,7 +256,7 @@ final class NotionSyncEngine {
             throw error
         }
 
-        // 8. 执行同步（允许无高亮也追加正文）
+        // 7. 执行同步（允许无高亮也追加正文）
         if created {
             // 新创建的页面：先追加头部内容（如 GoodLinks 的 Article）
             do {
@@ -362,7 +342,7 @@ final class NotionSyncEngine {
             logger.debug("[SmartSync] No highlights to sync for \(source.sourceKey): \(itemLabel)")
         }
 
-        // 9. 更新计数和时间戳（无论是否有高亮都要更新）
+        // 8. 更新计数和时间戳（无论是否有高亮都要更新）
         do {
             try Task.checkCancellation()
             let count = source.syncHighlightCount(for: highlights)
