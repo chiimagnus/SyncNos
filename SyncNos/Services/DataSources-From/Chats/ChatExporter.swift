@@ -161,7 +161,10 @@ enum ChatExporter {
         var lines: [String] = []
         
         // 标题（对话联系人名称）
-        lines.append("# \(conversation.contact.name)")
+        // 破坏性变更：统一使用 "@ 语法" 作为唯一可解析规则
+        // - 对话标题：# @<ContactName>
+        // - 发送者分组：## @<SenderName>
+        lines.append("# @\(conversation.contact.name)")
         lines.append("")
         
         // 元信息
@@ -182,7 +185,7 @@ enum ChatExporter {
             case .system:
                 // 系统消息：使用 # System 标题
                 if lastSender != "System" {
-                    lines.append("# System")
+                    lines.append("## @System")
                     lastSender = "System"
                 }
                 lines.append(message.content)
@@ -191,7 +194,7 @@ enum ChatExporter {
             case .image:
                 let sender = formatSender(message, defaultName: conversation.contact.name)
                 if lastSender != sender {
-                    lines.append("# \(sender)")
+                    lines.append("## @\(sender)")
                     lastSender = sender
                 }
                 lines.append("📷 [Image]")
@@ -200,7 +203,7 @@ enum ChatExporter {
             case .voice:
                 let sender = formatSender(message, defaultName: conversation.contact.name)
                 if lastSender != sender {
-                    lines.append("# \(sender)")
+                    lines.append("## @\(sender)")
                     lastSender = sender
                 }
                 lines.append("🎤 [Voice]")
@@ -209,7 +212,7 @@ enum ChatExporter {
             case .card:
                 let sender = formatSender(message, defaultName: conversation.contact.name)
                 if lastSender != sender {
-                    lines.append("# \(sender)")
+                    lines.append("## @\(sender)")
                     lastSender = sender
                 }
                 lines.append("📋 [Card]")
@@ -221,7 +224,7 @@ enum ChatExporter {
             case .text:
                 let sender = formatSender(message, defaultName: conversation.contact.name)
                 if lastSender != sender {
-                    lines.append("# \(sender)")
+                    lines.append("## @\(sender)")
                     lastSender = sender
                 }
                 lines.append(message.content)
@@ -244,4 +247,3 @@ enum ChatExporter {
         }
     }
 }
-

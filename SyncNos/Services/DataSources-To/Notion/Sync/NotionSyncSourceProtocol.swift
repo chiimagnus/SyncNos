@@ -77,6 +77,11 @@ protocol NotionSyncSourceProtocol {
     /// - 返回一个 heading 标题文本（例如 "Article"），引擎会调用 `pageHasHeading(pageId:title:)` 检测。
     /// - 默认返回 nil（表示不需要做存在性检测/补齐）。
     func headerContentPresenceHeadingTitle() -> String?
+
+    /// 用于更新 Notion 页面 “Highlight Count” 的计数（可选）
+    /// - 默认返回 `highlights.count`
+    /// - 典型场景：Chats 会在高亮序列中插入分组标题（`## @xxx`），但 Highlight Count 仍希望等于真实消息数
+    func syncHighlightCount(for highlights: [UnifiedHighlight]) -> Int
     
     // MARK: - Strategy Support (Optional)
     
@@ -130,6 +135,10 @@ extension NotionSyncSourceProtocol {
     func headerContentPresenceHeadingTitle() -> String? {
         nil
     }
+
+    func syncHighlightCount(for highlights: [UnifiedHighlight]) -> Int {
+        highlights.count
+    }
 }
 
 // MARK: - Per-Book Strategy Extension
@@ -169,4 +178,3 @@ struct NotionSyncContext {
     /// 是否执行增量同步
     let incremental: Bool
 }
-

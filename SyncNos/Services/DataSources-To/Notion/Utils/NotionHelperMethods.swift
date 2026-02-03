@@ -159,7 +159,10 @@ class NotionHelperMethods {
     func buildParentRichText(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [[String: Any]] {
         var rt: [[String: Any]] = []
         // Header lines
-        rt.append(contentsOf: makeHeaderLines(for: highlight, source: source))
+        // Chats 破坏性变更：不在 Notion 页面中显示 uuid / modified 元信息（增量同步依赖本地记录）
+        if source != "chats" {
+            rt.append(contentsOf: makeHeaderLines(for: highlight, source: source))
+        }
 
         // First chunk of highlight text
         let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
@@ -217,6 +220,9 @@ class NotionHelperMethods {
     // buildBulletedListItemBlock(for:bookId:maxTextLength:)：构建并返回一个完整的 Notion 列表项 block（现在使用数字列表），
     // 父级 rich_text 包含高亮文本，children 包含 note 与 metadata 子块。
     func buildBulletedListItemBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int? = nil, source: String = "appleBooks") -> [String: Any] {
+        if source == "chats" {
+            return buildChatsBlock(for: highlight, bookId: bookId, maxTextLength: maxTextLength)
+        }
         let (parentRt, childBlocks) = buildParentAndChildren(for: highlight, bookId: bookId, maxTextLength: maxTextLength, source: source)
         let numbered: [String: Any] = [
             "rich_text": parentRt,
@@ -376,5 +382,33 @@ class NotionHelperMethods {
         guard let style = style else { return nil }
         let colorName = styleName(for: style, source: source)
         return "\(colorName)_background"
+    }
+
+    // MARK: - Chats blocks
+
+    /// Chats 使用 Markdown 风格（`## @xxx`）输出：
+    /// - 分组标题：heading_2（uuid 前缀 `chats-group:`）
+    /// - 消息内容：paragraph（可带 children，用于长文本续块）
+    private func buildChatsBlock(for highlight: HighlightRow, bookId: String, maxTextLength: Int?) -> [String: Any] {
+        let chunkSize = maxTextLength ?? NotionSyncConfig.maxTextLengthPrimary
+        let parentRt = buildParentRichText(for: highlight, bookId: bookId, maxTextLength: chunkSize, source: "chats")
+
+        if highlight.uuid.hasPrefix("chats-group:") {
+            return [
+                "object": "block",
+                "heading_2": [
+                    "rich_text": parentRt
+                ]
+            ]
+        }
+
+        let childBlocks = buildHighlightContinuationChildren(for: highlight, chunkSize: chunkSize)
+        return [
+            "object": "block",
+            "paragraph": [
+                "rich_text": parentRt,
+                "children": childBlocks
+            ]
+        ]
     }
 }
