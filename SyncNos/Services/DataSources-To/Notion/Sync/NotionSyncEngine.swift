@@ -628,6 +628,17 @@ final class NotionSyncEngine {
         let useLocalRecords = !localRecords.isEmpty
         
         logger.info("[SyncEngine] Sync existing page: \(source.sourceKey):\(item.itemId) (\(item.title)), localRecords=\(localRecords.count), useLocalRecords=\(useLocalRecords)")
+
+        // Chats 破坏性变更：不再将 uuid / modified 写入 Notion blocks，因此无法在“本地记录缺失”时从 Notion 回推映射。
+        // 为避免追加重复内容，当 Chats 页面已存在但本地记录为空时，直接清空该页并重建（一次性迁移）。
+        if source.sourceKey == "chats", !useLocalRecords {
+            logger.warning("[SyncEngine] Chats page exists but local records are missing. Resetting page children to rebuild local records: \(item.itemId)")
+            progress(NSLocalizedString("Rebuilding from local records...", comment: ""))
+            try Task.checkCancellation()
+            try await notionService.setPageChildren(pageId: pageId, children: [])
+            try await appendAllHighlights(pageId: pageId, highlights: highlights, item: item, source: source, progress: progress)
+            return
+        }
         
         var existingMap: [String: (blockId: String, contentHash: String?)] = [:]
         
