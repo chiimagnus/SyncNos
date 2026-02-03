@@ -11,8 +11,8 @@ struct SyncNosApp: App {
         // 因为 NSApp 在 App.init() 阶段尚未初始化
 #if DEBUG
         // Debug flag：通过 UserDefaults(debug.forceOnboardingEveryLaunch) 控制是否每次启动都重置引导状态
-        // 默认关闭，需要时可在 Xcode Scheme 的 Arguments 中设置，或手动在代码中临时改为 true
-        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": true])
+        // 默认false，需要时可在 Xcode Scheme 的 Arguments 中设置，或手动在代码中临时改为 true
+        UserDefaults.standard.register(defaults: ["debug.forceOnboardingEveryLaunch": false])
         let envDetector = DIContainer.shared.environmentDetector
         let shouldForceOnboarding = UserDefaults.standard.bool(forKey: "debug.forceOnboardingEveryLaunch")
         if envDetector.isDevEnvironment() && shouldForceOnboarding {
