@@ -159,6 +159,16 @@ struct NotionIntegrationView: View {
                     .disabled(viewModel.isOAuthAuthorized)
                 }
             }
+
+            Section(header: Text("Link Opening").scaledFont(.headline)) {
+                Toggle(isOn: $viewModel.openNotionLinksInBrowser) {
+                    Text("Open Notion links in browser")
+                        .scaledFont(.body)
+                }
+                .onChange(of: viewModel.openNotionLinksInBrowser) { _, _ in
+                    viewModel.saveOpenLinkPreference()
+                }
+            }
             
             if let message = viewModel.message {
                 Section {

@@ -142,9 +142,14 @@ protocol NotionConfigStoreProtocol: AnyObject {
     func setDatabaseId(_ id: String?, forSource sourceKey: String)
     // Sync mode: "single" (方案1：单库+每本书一个页面) 或 "perBook" (方案2：每本书一个库+每条高亮为一条目)
     var syncMode: String? { get set }
+    /// 打开 Notion 链接时是否默认使用浏览器（true=浏览器；false=尝试 Notion App，失败则回退浏览器）
+    var openNotionLinksInBrowser: Bool { get set }
     // Per-book database id mapping helpers
     func databaseIdForBook(assetId: String) -> String?
     func setDatabaseId(_ id: String?, forBook assetId: String)
+    // Per-item page id mapping helpers (singleDatabase)
+    func pageIdForItem(sourceKey: String, assetId: String) -> String?
+    func setPageId(_ id: String?, forItem assetId: String, sourceKey: String)
 }
 
 // MARK: - Notion Client Protocol
@@ -204,6 +209,22 @@ struct NotionPageSummary: Identifiable, Decodable {
     let id: String
     let title: String
     let iconEmoji: String?
+}
+
+// MARK: - Notion Link Service
+
+enum NotionLinkTarget: Sendable, Hashable {
+    case page(id: String)
+    case database(id: String)
+}
+
+protocol NotionLinkServiceProtocol: AnyObject {
+    /// 是否“有可能”打开（用于 UI 先行决定是否禁用按钮）。最终以 `openNotionTargetForItem` 的解析结果为准。
+    func canOpenNotionTargetForItem(sourceKey: String, assetId: String) -> Bool
+
+    /// 打开指定条目对应的 Notion 页面/数据库（根据当前 syncMode 与本地映射自动决策）
+    @MainActor
+    func openNotionTargetForItem(sourceKey: String, assetId: String) async
 }
 
 // MARK: - In-App Purchase Service Protocol

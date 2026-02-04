@@ -86,6 +86,8 @@ struct ChatListView: View {
                             Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
                         .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
+
+                        NotionOpenContextMenuItem(sourceKey: "chats", assetId: contact.id)
                         
                         Divider()
                         
