@@ -81,21 +81,13 @@ struct WeReadListView: View {
                             viewModel.loadMoreIfNeeded(currentItem: book)
                         }
                         .contextMenu {
-                            Button {
-                                viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-                            } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                            SyncSelectedToNotionContextMenuItem(selectionIds: selectionIds, fallbackId: book.bookId) { ids in
+                                viewModel.batchSync(bookIds: ids, concurrency: NotionSyncConfig.batchConcurrency)
                             }
 
                             NotionOpenContextMenuItem(sourceKey: "weRead", assetId: book.bookId)
 
-                            Divider()
-                            let last = viewModel.lastSync(for: book.bookId)
-                            if let lastDate = last {
-                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
-                            } else {
-                                Text("Last Sync Time") + Text(": ") + Text("-")
-                            }
+                            LastSyncTimeContextMenuSection(lastSyncAt: viewModel.lastSync(for: book.bookId))
                         }
                     }
                 }
