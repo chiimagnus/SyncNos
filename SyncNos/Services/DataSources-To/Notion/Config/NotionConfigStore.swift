@@ -15,8 +15,10 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
     // - PER_BOOK_DB_ID_{assetId}：每本书独立数据库的 id 映射
     // - PER_SOURCE_DB_ID_{sourceKey}：按来源（appleBooks/goodLinks ...）的单库 id 映射
     private let syncModeKey = "NOTION_SYNC_MODE"
+    private let openLinksInBrowserKey = "NOTION_OPEN_LINKS_IN_BROWSER"
     private let perBookDbPrefix = "PER_BOOK_DB_ID_" // + assetId
     private let perSourceDbPrefix = "PER_SOURCE_DB_ID_" // + sourceKey
+    private let perItemPageIdPrefix = "PER_ITEM_PAGE_ID_" // + "\(sourceKey):\(assetId)"
     // Explicit per-source keys for well-known sources to avoid accidental cross-source reuse
     private let appleBooksSourceKey = "appleBooks"
     private let goodLinksSourceKey = "goodLinks"
@@ -106,6 +108,20 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         }
     }
 
+    // MARK: - Notion Link Open Preference
+    var openNotionLinksInBrowser: Bool {
+        get {
+            // 默认用浏览器打开，避免依赖 Notion App 安装与 URL scheme 的不确定性
+            if userDefaults.object(forKey: openLinksInBrowserKey) == nil {
+                return true
+            }
+            return userDefaults.bool(forKey: openLinksInBrowserKey)
+        }
+        set {
+            userDefaults.set(newValue, forKey: openLinksInBrowserKey)
+        }
+    }
+
     // MARK: - Per-book database mapping
     func databaseIdForBook(assetId: String) -> String? {
         let key = perBookDbPrefix + assetId
@@ -114,6 +130,21 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
 
     func setDatabaseId(_ id: String?, forBook assetId: String) {
         let key = perBookDbPrefix + assetId
+        if let id, !id.isEmpty {
+            userDefaults.set(id, forKey: key)
+        } else {
+            userDefaults.removeObject(forKey: key)
+        }
+    }
+
+    // MARK: - Per-item page mapping (single database)
+    func pageIdForItem(sourceKey: String, assetId: String) -> String? {
+        let key = perItemPageIdPrefix + "\(sourceKey):\(assetId)"
+        return userDefaults.string(forKey: key)
+    }
+
+    func setPageId(_ id: String?, forItem assetId: String, sourceKey: String) {
+        let key = perItemPageIdPrefix + "\(sourceKey):\(assetId)"
         if let id, !id.isEmpty {
             userDefaults.set(id, forKey: key)
         } else {
@@ -153,5 +184,5 @@ final class NotionConfigStore: NotionConfigStoreProtocol {
         setDatabaseId(id, forSource: goodLinksSourceKey)
     }
 
-    // per-page mapping removed
+    // per-page mapping removed (replaced by generic per-item page mapping above)
 }
