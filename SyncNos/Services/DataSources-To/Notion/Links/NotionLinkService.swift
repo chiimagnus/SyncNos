@@ -96,17 +96,24 @@ final class NotionLinkService: NotionLinkServiceProtocol {
         }
 
         if notionConfig.openNotionLinksInBrowser {
-            _ = NSWorkspace.shared.open(webURL)
+            // 说明：Notion.app 在 macOS 上可能通过 Universal Links “截获” https://www.notion.so/...，
+            // 导致即使用户想在浏览器打开也会直接跳到 Notion.app。
+            // 这里用 http:// 作为绕过入口，让系统先打开浏览器，再由浏览器重定向到 https。
+            if let bypassURL = buildNotionBrowserBypassURL(for: target) {
+                openInDefaultBrowser(url: bypassURL)
+            } else {
+                openInDefaultBrowser(url: webURL)
+            }
             return
         }
 
         if let appURL = buildNotionAppURL(for: target) {
             let ok = NSWorkspace.shared.open(appURL)
             if !ok {
-                _ = NSWorkspace.shared.open(webURL)
+                openInDefaultBrowser(url: webURL)
             }
         } else {
-            _ = NSWorkspace.shared.open(webURL)
+            openInDefaultBrowser(url: webURL)
         }
     }
 
@@ -123,6 +130,20 @@ final class NotionLinkService: NotionLinkServiceProtocol {
         return URL(string: "https://www.notion.so/\(cleaned)")
     }
 
+    /// 用于“强制在浏览器打开”的绕过 URL（避免被 Universal Links 直接拉起 Notion.app）
+    private func buildNotionBrowserBypassURL(for target: NotionLinkTarget) -> URL? {
+        let id: String
+        switch target {
+        case .page(let pageId):
+            id = pageId
+        case .database(let databaseId):
+            id = databaseId
+        }
+        let cleaned = id.replacingOccurrences(of: "-", with: "")
+        guard !cleaned.isEmpty else { return nil }
+        return URL(string: "http://www.notion.so/\(cleaned)")
+    }
+
     private func buildNotionAppURL(for target: NotionLinkTarget) -> URL? {
         let id: String
         switch target {
@@ -135,6 +156,30 @@ final class NotionLinkService: NotionLinkServiceProtocol {
         guard !cleaned.isEmpty else { return nil }
         // 说明：Notion App 是否支持该 scheme 与路径依赖安装版本；失败会回退浏览器。
         return URL(string: "notion://www.notion.so/\(cleaned)")
+    }
+
+    private func openInDefaultBrowser(url: URL) {
+        // 用 NSWorkspace 获取 http/https 的默认打开应用（通常是默认浏览器）
+        // 注意：这里“默认浏览器”指 URL scheme 的默认处理器，而不是 Universal Links 的目标 App。
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            _ = NSWorkspace.shared.open(url)
+            return
+        }
+
+        guard let probeURL = URL(string: "\(scheme)://example.com") else {
+            _ = NSWorkspace.shared.open(url)
+            return
+        }
+
+        guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: probeURL) else {
+            _ = NSWorkspace.shared.open(url)
+            return
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: configuration)
     }
 
     // MARK: - Alerts
@@ -157,4 +202,3 @@ final class NotionLinkService: NotionLinkServiceProtocol {
         _ = alert.runModal()
     }
 }
-
