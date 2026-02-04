@@ -12872,6 +12872,9 @@
         }
       }
     },
+    "Link Opening" : {
+
+    },
     "Load earlier messages" : {
       "localizations" : {
         "da" : {
@@ -19338,6 +19341,9 @@
           }
         }
       }
+    },
+    "Open Notion links in browser" : {
+
     },
     "Open Settings" : {
       "comment" : "A button label that opens the app's settings.",
