@@ -80,12 +80,9 @@ struct ChatListView: View {
                 )
                     .tag(contact.id)
                     .contextMenu {
-                        Button {
-                            viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-                        } label: {
-                            Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                        SyncSelectedToNotionContextMenuItem(selectionIds: selectionIds, fallbackId: contact.id) { ids in
+                            viewModel.batchSync(contactIds: ids, concurrency: NotionSyncConfig.batchConcurrency)
                         }
-                        .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
 
                         NotionOpenContextMenuItem(sourceKey: "chats", assetId: contact.id)
                         

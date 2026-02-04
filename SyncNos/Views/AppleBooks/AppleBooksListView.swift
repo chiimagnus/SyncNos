@@ -94,31 +94,23 @@ struct AppleBooksListView: View {
                             viewModel.loadMoreIfNeeded(currentItem: book)
                         }
                         .contextMenu {
-                            // Open in Apple Books (if available)
-                            if let ibooksURLString = book.ibooksURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let ibooksURL = URL(string: ibooksURLString) {
-                                Button {
-                                    NSWorkspace.shared.open(ibooksURL)
-                                } label: {
-                                    Label("Open in Apple Books", systemImage: "book")
+                            let ibooksURL: URL? = {
+                                guard let ibooksURLString = book.ibooksURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                                    return nil
                                 }
-                            }
+                                return URL(string: ibooksURLString)
+                            }()
 
-                            Button {
-                                viewModel.batchSync(bookIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-                            } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                            OpenURLContextMenuItem(title: "Open in Apple Books", systemImage: "book", url: ibooksURL)
+
+                            SyncSelectedToNotionContextMenuItem(selectionIds: selectionIds, fallbackId: book.bookId) { ids in
+                                viewModel.batchSync(bookIds: ids, concurrency: NotionSyncConfig.batchConcurrency)
                             }
 
                             NotionOpenContextMenuItem(sourceKey: "appleBooks", assetId: book.bookId)
 
                             // 显示上次同步时间（针对当前右键的行）
-                            Divider()
-                            let last = viewModel.lastSync(for: book.bookId)
-                            if let lastDate = last {
-                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
-                            } else {
-                                Text("Last Sync Time") + Text(": ") + Text("-")
-                            }
+                            LastSyncTimeContextMenuSection(lastSyncAt: viewModel.lastSync(for: book.bookId))
                         }
                     }
                 }
