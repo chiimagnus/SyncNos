@@ -96,31 +96,17 @@ struct GoodLinksListView: View {
                             viewModel.loadMoreIfNeeded(currentItem: link)
                         }
                         .contextMenu {
-                            // Open in GoodLinks
-                            if let openURL = URL(string: link.openInGoodLinksURLString) {
-                                Button {
-                                    NSWorkspace.shared.open(openURL)
-                                } label: {
-                                    Label("Open in GoodLinks", systemImage: "link")
-                                }
-                            }
+                            let openURL = URL(string: link.openInGoodLinksURLString)
+                            OpenURLContextMenuItem(title: "Open in GoodLinks", systemImage: "link", url: openURL)
 
-                            Button {
-                                viewModel.batchSync(linkIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
-                            } label: {
-                                Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                            SyncSelectedToNotionContextMenuItem(selectionIds: selectionIds, fallbackId: link.id) { ids in
+                                viewModel.batchSync(linkIds: ids, concurrency: NotionSyncConfig.batchConcurrency)
                             }
 
                             NotionOpenContextMenuItem(sourceKey: "goodLinks", assetId: link.id)
 
                             // 显示上次同步时间（针对当前右键的行）
-                            Divider()
-                            let last = viewModel.lastSync(for: link.id)
-                            if let lastDate = last {
-                                Text("Last Sync Time") + Text(": ") + Text(DateFormatter.localizedString(from: lastDate, dateStyle: .short, timeStyle: .short))
-                            } else {
-                                Text("Last Sync Time") + Text(": ") + Text("-")
-                            }
+                            LastSyncTimeContextMenuSection(lastSyncAt: viewModel.lastSync(for: link.id))
                         }
                     }
                 }
