@@ -27,6 +27,7 @@ class DIContainer {
     private var _syncConcurrencyLimiter: ConcurrencyLimiter?
     private var _loginItemService: LoginItemServiceProtocol?
     private var _notionOAuthService: NotionOAuthService?
+    private var _notionLinkService: NotionLinkServiceProtocol?
     // Notion - HTML → Blocks
     private var _notionHTMLToBlocksConverter: NotionHTMLToBlocksConverterProtocol?
     // WeRead
@@ -210,6 +211,19 @@ class DIContainer {
             _notionOAuthService = NotionOAuthService()
         }
         return _notionOAuthService!
+    }
+
+    // MARK: - Notion Link Service
+
+    var notionLinkService: NotionLinkServiceProtocol {
+        if _notionLinkService == nil {
+            _notionLinkService = NotionLinkService(
+                notionConfig: notionConfigStore,
+                notionService: notionClient,
+                logger: loggerService
+            )
+        }
+        return _notionLinkService!
     }
 
     // MARK: - Notion HTML → Blocks

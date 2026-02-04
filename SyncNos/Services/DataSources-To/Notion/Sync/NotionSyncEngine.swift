@@ -232,6 +232,9 @@ final class NotionSyncEngine {
         let pageId = ensured.id
         let created = ensured.created
 
+        // 记录该条目对应的 Notion pageId，供 UI 右键“打开 Notion 页面”使用（singleDatabase）
+        notionConfig.setPageId(pageId, forItem: item.itemId, sourceKey: source.sourceKey)
+
         // 5. 更新额外页面属性
         let additionalProps = source.additionalPageProperties()
         if !additionalProps.isEmpty {

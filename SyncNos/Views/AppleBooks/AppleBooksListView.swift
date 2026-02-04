@@ -109,6 +109,8 @@ struct AppleBooksListView: View {
                                 Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
+                            NotionOpenContextMenuItem(sourceKey: "appleBooks", assetId: book.bookId)
+
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
                             let last = viewModel.lastSync(for: book.bookId)
