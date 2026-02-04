@@ -111,6 +111,8 @@ struct GoodLinksListView: View {
                                 Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
+                            NotionOpenContextMenuItem(sourceKey: "goodLinks", assetId: link.id)
+
                             // 显示上次同步时间（针对当前右键的行）
                             Divider()
                             let last = viewModel.lastSync(for: link.id)

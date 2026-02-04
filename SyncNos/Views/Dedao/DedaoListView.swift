@@ -94,6 +94,8 @@ struct DedaoListView: View {
                                 Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                             }
 
+                            NotionOpenContextMenuItem(sourceKey: "dedao", assetId: book.bookId)
+
                             Divider()
                             let last = viewModel.lastSync(for: book.bookId)
                             if let lastDate = last {
