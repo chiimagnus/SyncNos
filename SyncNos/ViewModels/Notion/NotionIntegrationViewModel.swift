@@ -21,6 +21,9 @@ final class NotionIntegrationViewModel: ObservableObject {
     @Published var isAuthorizing: Bool = false
     // Parent page listing
     @Published var availablePages: [NotionPageSummary] = []
+
+    // Link opening preference
+    @Published var openNotionLinksInBrowser: Bool = true
     
     private let notionConfig: NotionConfigStoreProtocol
     private let notionService: NotionClientProtocol
@@ -41,6 +44,7 @@ final class NotionIntegrationViewModel: ObservableObject {
         // 检查 OAuth 授权状态
         self.isOAuthAuthorized = notionConfig.notionOAuthToken != nil
         self.workspaceName = notionConfig.notionWorkspaceName
+        self.openNotionLinksInBrowser = notionConfig.openNotionLinksInBrowser
     }
     
     func saveCredentials() {
@@ -175,6 +179,20 @@ final class NotionIntegrationViewModel: ObservableObject {
         Task {
             try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
             await MainActor.run { if self.message?.hasPrefix("Selected page:") == true { self.message = nil } }
+        }
+    }
+
+    // MARK: - Link Opening Preference
+    func saveOpenLinkPreference() {
+        notionConfig.openNotionLinksInBrowser = openNotionLinksInBrowser
+        message = openNotionLinksInBrowser ? "Links will open in browser" : "Links will try to open in Notion app"
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                if message?.hasPrefix("Links will") == true {
+                    message = nil
+                }
+            }
         }
     }
 }
