@@ -80,12 +80,15 @@ struct ChatListView: View {
                 )
                     .tag(contact.id)
                     .contextMenu {
+                        // 与其他数据源保持一致：右键某一行时即使没有显式 selection，也允许直接同步“当前行”
+                        // （SwiftUI 的 List 右键不一定会自动选中当前行，避免菜单项意外变灰/不可用）
+                        let effectiveIds: Set<String> = selectionIds.isEmpty ? Set([contact.id]) : selectionIds
+
                         Button {
-                            viewModel.batchSync(contactIds: selectionIds, concurrency: NotionSyncConfig.batchConcurrency)
+                            viewModel.batchSync(contactIds: effectiveIds, concurrency: NotionSyncConfig.batchConcurrency)
                         } label: {
                             Label("Sync Selected to Notion", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
                         }
-                        .disabled(selectionIds.isEmpty || !viewModel.syncingContactIds.intersection(selectionIds).isEmpty)
 
                         NotionOpenContextMenuItem(sourceKey: "chats", assetId: contact.id)
                         
