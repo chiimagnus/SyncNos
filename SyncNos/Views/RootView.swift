@@ -1,10 +1,13 @@
 import SwiftUI
+import AppKit
 
 /// 根视图：管理 Onboarding、PayWall 和 MainListView 的切换
 /// 确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用（如文件夹授权弹窗）
 struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var iapPresentationMode: IAPPresentationMode? = nil
+    @State private var mainWindow: NSWindow? = nil
+    @StateObject private var mainWindowStayOnTopController = MainWindowStayOnTopController()
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
     private var iapService: IAPServiceProtocol {
@@ -61,6 +64,7 @@ struct RootView: View {
         }
         // 标记“主窗口场景”上下文：用于按窗口禁用/启用快捷键（类似 VSCode when）
         .focusedSceneValue(\.isMainWindowSceneActive, true)
+        .focusedSceneValue(\.isMainWindowStayOnTopEnabled, mainWindowStayOnTopController.isEnabled)
         .animation(.spring(), value: hasCompletedOnboarding)
         .animation(.spring(), value: iapPresentationMode != nil)
         .onAppear {
@@ -68,6 +72,9 @@ struct RootView: View {
             if hasCompletedOnboarding {
                 checkTrialStatus()
             }
+        }
+        .onDisappear {
+            mainWindowStayOnTopController.reset()
         }
         .onChange(of: hasCompletedOnboarding) { _, newValue in
             // 完成引导后立即检查 PayWall 状态
@@ -82,6 +89,15 @@ struct RootView: View {
                 checkTrialStatus()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mainWindowStayOnTopSetRequested).receive(on: DispatchQueue.main)) { notification in
+            guard let enabled = notification.userInfo?["enabled"] as? Bool else { return }
+            mainWindowStayOnTopController.setEnabled(enabled)
+        }
+        .background(
+            WindowReader(window: $mainWindow) { newWindow in
+                mainWindowStayOnTopController.attachWindow(newWindow)
+            }
+        )
         .frame(minWidth: minimumWindowSize.width, minHeight: minimumWindowSize.height)
         // 应用字体缩放到整个视图层级
         .applyFontScale()
@@ -132,6 +148,7 @@ struct RootView: View {
         logger.debug("No paywall needed, hiding")
         iapPresentationMode = nil
     }
+
 }
 
 #Preview("RootView") {
