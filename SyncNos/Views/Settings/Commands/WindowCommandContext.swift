@@ -15,6 +15,10 @@ private struct MainWindowEnabledDataSourcesFocusedKey: FocusedValueKey {
     typealias Value = [ContentSource]
 }
 
+private struct MainWindowStayOnTopEnabledFocusedKey: FocusedValueKey {
+    typealias Value = Bool
+}
+
 extension FocusedValues {
     /// 当前 keyWindow 是否为主窗口（Window id: "main"）。
     var isMainWindowSceneActive: Bool? {
@@ -32,5 +36,11 @@ extension FocusedValues {
     var mainWindowEnabledDataSources: [ContentSource]? {
         get { self[MainWindowEnabledDataSourcesFocusedKey.self] }
         set { self[MainWindowEnabledDataSourcesFocusedKey.self] = newValue }
+    }
+
+    /// 主窗口是否启用置顶（用于 Window 菜单 Toggle 勾选状态）。
+    var isMainWindowStayOnTopEnabled: Bool? {
+        get { self[MainWindowStayOnTopEnabledFocusedKey.self] }
+        set { self[MainWindowStayOnTopEnabledFocusedKey.self] = newValue }
     }
 }
