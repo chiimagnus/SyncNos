@@ -26,6 +26,7 @@ struct WindowCommands: Commands {
         // MARK: - Text Size Commands
         CommandGroup(replacing: .singleWindowList) {
             Toggle("Stay on Top", isOn: stayOnTopBinding)
+                .keyboardShortcut("t", modifiers: [.control, .option, .command])
                 .disabled(isMainWindowSceneActive != true)
 
             Divider()
