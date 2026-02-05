@@ -166,6 +166,11 @@ extension Notification.Name {
 
     /// Detail 搜索：请求聚焦当前 Detail 的搜索框（⌘F）
     static let detailSearchFocusRequested = Notification.Name("DetailSearchFocusRequested")
+
+    // MARK: - 窗口（主窗口）
+
+    /// 主窗口置顶状态变更请求（userInfo: ["enabled": Bool]）
+    static let mainWindowStayOnTopSetRequested = Notification.Name("MainWindowStayOnTopSetRequested")
 }
 
 // MARK: - ContentSource 通知扩展
