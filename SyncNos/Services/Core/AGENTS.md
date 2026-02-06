@@ -135,32 +135,6 @@ logger.error("[Module] Error: \(error)")
 logger.debug("[Module] Debug info")
 ```
 
-### 日志消息格式（必遵守）
-
-- 统一格式：`[模块][动作] 关键信息（key=value）`
-- 推荐示例：`logger.info("[WeRead][SyncBook] assetId=\(assetId) step=start")`
-- 错误示例：`logger.error("[Notion][AppendBlocks] assetId=\(assetId) code=\(errorCode) message=\(errorMessage)")`
-
-### 关键字段要求
-
-- `模块`：如 `AppleBooks`、`WeRead`、`Dedao`、`Notion`、`AutoSync`
-- `动作`：如 `FetchBooks`、`SyncBook`、`EnsureDatabase`、`AppendBlocks`
-- `标识符`：优先记录 `assetId` / `bookId` / `pageId` / `taskId`
-- `结果`：记录 `step=start|success|failed` 或 `result=...`
-
-### 错误日志与隐私要求
-
-- 错误日志必须包含失败动作和至少一个业务 ID
-- 同一错误不要在同一层级重复刷屏（避免噪音）
-- 严禁记录敏感信息：API Key、OAuth Token、Cookie、用户隐私原文
-- 导出日志前确认敏感字段已脱敏
-
-### 关联追踪建议
-
-- 同一同步任务建议贯穿统一 `taskId`（从触发点传入 Service 层）
-- 重试场景追加 `attempt` 字段，便于定位失败阶段
-- 统计型日志追加 `count` 与 `durationMs` 字段，便于性能分析
-
 ### 日志级别
 
 | 级别 | 用途 |
