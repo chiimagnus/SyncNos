@@ -333,12 +333,12 @@
           const convo = await getConversationById(id);
           if (!convo) {
             results.push({ conversationId: id, ok: false, error: "conversation not found" });
-            break;
+            continue;
           }
           const dbId = convo.source === "chatgpt" ? mapping.chatgpt : convo.source === "notionai" ? mapping.notionai : "";
           if (!dbId) {
             results.push({ conversationId: id, ok: false, error: `unsupported source: ${convo.source}` });
-            break;
+            continue;
           }
           const messages = await getMessagesByConversationId(id);
           const blocks = NS.notionSyncService.messagesToBlocks(messages);
@@ -362,11 +362,16 @@
             results.push({ conversationId: id, ok: true, notionPageId: pageId });
           } catch (e) {
             results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
-            break; // Task 15 will make this non-blocking
+            // non-blocking: continue
           }
+          // Basic pacing to reduce rate limiting when syncing in batch.
+          await new Promise((r) => setTimeout(r, 250));
         }
 
-        return ok({ results });
+        const okCount = results.filter((r) => r.ok).length;
+        const failCount = results.length - okCount;
+        const failures = results.filter((r) => !r.ok);
+        return ok({ results, okCount, failCount, failures });
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};
