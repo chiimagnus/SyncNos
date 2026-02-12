@@ -4,6 +4,7 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
+  const NOTION_BTN_ID = "webclipper-notionai-btn";
 
   function send(type, payload) {
     return new Promise((resolve) => {
@@ -134,7 +135,7 @@
     const c = getCollector();
     if (!c || c.id !== "notionai") return;
     ensureInpageStylesheetInjected();
-    const id = "webclipper-notionai-btn";
+    const id = NOTION_BTN_ID;
     if (document.getElementById(id)) return;
     if (typeof getAnchorRect !== "function") return;
 
@@ -170,15 +171,51 @@
     document.documentElement.appendChild(btn);
   }
 
+  function cleanupButtons(activeCollectorId) {
+    const active = activeCollectorId || "";
+    if (active !== "chatgpt") {
+      const el = document.getElementById(INPAGE_BTN_ID);
+      if (el) el.remove();
+    }
+    if (active !== "notionai") {
+      const el = document.getElementById(NOTION_BTN_ID);
+      if (el) el.remove();
+    }
+  }
+
   function startAutoCapture() {
-    const collector = getCollector();
-    if (!collector || typeof collector.capture !== "function") return;
+    // Manual button: trigger an immediate capture and save once.
+    const clickSave = async () => {
+      try {
+        const collector = getCollector();
+        if (!collector || typeof collector.capture !== "function") return;
+        const snapshot = collector.capture();
+        if (!snapshot) return;
+        await saveSnapshot(snapshot);
+      } catch (_e) {
+        // ignore
+      }
+    };
 
     const observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
       debounceMs: 600,
-      getRoot: collector.getRoot,
+      getRoot: () => {
+        const c = getCollector();
+        return c && typeof c.getRoot === "function" ? c.getRoot() : null;
+      },
       onTick: async () => {
         try {
+          const collector = getCollector();
+          cleanupButtons(collector && collector.id);
+          ensureChatGPTButton({ onClick: clickSave });
+          ensureNotionAttachedButton({
+            onClick: clickSave,
+            getAnchorRect: () => {
+              const c = getCollector();
+              return c && typeof c.getAnchorRect === "function" ? c.getAnchorRect() : null;
+            }
+          });
+          if (!collector || typeof collector.capture !== "function") return;
           const snapshot = collector.capture();
           if (!snapshot) return;
           const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
@@ -191,20 +228,6 @@
     });
 
     observer && observer.start && observer.start();
-
-    // Manual button: trigger an immediate capture and save once.
-    const clickSave = async () => {
-      try {
-        const snapshot = collector.capture();
-        if (!snapshot) return;
-        await saveSnapshot(snapshot);
-      } catch (_e) {
-        // ignore
-      }
-    };
-
-    ensureChatGPTButton({ onClick: clickSave });
-    ensureNotionAttachedButton({ onClick: clickSave, getAnchorRect: collector.getAnchorRect });
   }
 
   startAutoCapture();

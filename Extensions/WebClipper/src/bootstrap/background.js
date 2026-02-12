@@ -79,6 +79,10 @@
       conversationKey: payload.conversationKey,
       title: payload.title || "",
       url: payload.url || "",
+      // Optional metadata (mainly for `sourceType=article`, but safe for all sources).
+      author: payload.author || (existing ? existing.author || "" : ""),
+      publishedAt: payload.publishedAt || (existing ? existing.publishedAt || "" : ""),
+      description: payload.description || (existing ? existing.description || "" : ""),
       warningFlags: Array.isArray(payload.warningFlags) ? payload.warningFlags : [],
       notionPageId: payload.notionPageId || (existing ? existing.notionPageId || "" : ""),
       lastCapturedAt: payload.lastCapturedAt || now
