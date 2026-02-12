@@ -27,7 +27,7 @@
 
 ### P1（最高优先级）：本地采集与管理闭环（ChatGPT + NotionAI）
 
-### Task 1: 创建插件工程骨架（按能力分包）
+### ✅Task 1: 创建插件工程骨架（按能力分包）
 
 **Files:**
 - Create: `Extensions/WebClipper/manifest.json`
@@ -53,7 +53,7 @@
 Run: 在 `chrome://extensions` 加载 `Extensions/WebClipper`。
 Expected: 扩展可加载，无 manifest 权限报错。
 
-### Task 1A: 初始化自动化验证能力（npm scripts）
+### ✅Task 1A: 初始化自动化验证能力（npm scripts）
 
 **Files:**
 - Create: `Extensions/WebClipper/package.json`
@@ -74,7 +74,7 @@ Run: `npm --prefix Extensions/WebClipper run test`
 Run: `npm --prefix Extensions/WebClipper run build`
 Expected: 三个命令均通过，后续任务可复用同一验证入口。
 
-### Task 2: 实现统一数据模型与 IndexedDB 表结构
+### ✅Task 2: 实现统一数据模型与 IndexedDB 表结构
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
@@ -90,7 +90,7 @@ Expected: 三个命令均通过，后续任务可复用同一验证入口。
 Run: `node --check Extensions/WebClipper/src/bootstrap/background.js`
 Expected: 语法通过；首次加载扩展后 IndexedDB 创建成功（DevTools Application 面板可见对象仓库）。
 
-### Task 3: 搭建 background 消息路由与 CRUD 接口
+### ✅Task 3: 搭建 background 消息路由与 CRUD 接口
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
@@ -104,7 +104,7 @@ Expected: 语法通过；首次加载扩展后 IndexedDB 创建成功（DevTools
 Run: `node --check Extensions/WebClipper/src/bootstrap/background.js`
 Expected: 语法通过；content/popup 调用接口时可收到一致响应结构。
 
-### Task 4: 迁移并收敛 core 层（增量比对与去重）
+### ✅Task 4: 迁移并收敛 core 层（增量比对与去重）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/collectors/runtime-observer.js`
@@ -122,7 +122,7 @@ Run: `node --check Extensions/WebClipper/src/storage/incremental-updater.js`
 Run: `node --check Extensions/WebClipper/src/shared/normalize.js`
 Expected: 语法通过；消息变化检测能区分新增/更新/删除。
 
-### Task 5: 接入 ChatGPT 适配器与页面按钮
+### ✅Task 5: 接入 ChatGPT 适配器与页面按钮
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/collectors/chatgpt-collector.js`
@@ -139,7 +139,7 @@ Run: `node --check Extensions/WebClipper/src/collectors/chatgpt-collector.js`
 Manual: 打开 ChatGPT 对话，新增消息后观察本地会话消息数递增。
 Expected: 不重复写入、顺序正确、按钮可拖拽。
 
-### Task 6: 接入 NotionAI 适配器（三形态 + 黄色警告）
+### ✅Task 6: 接入 NotionAI 适配器（三形态 + 黄色警告）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/collectors/notionai-collector.js`
@@ -157,7 +157,7 @@ Run: `node --check Extensions/WebClipper/src/collectors/notionai-collector.js`
 Manual: 在 NotionAI 三形态分别发消息并检查入库；验证不混入主页笔记。
 Expected: 三形态都可采集；低置信度会话带黄色警告标记。
 
-### Task 7: 完成 popup 列表、多选、全选、导出（JSON+Markdown）
+### ✅Task 7: 完成 popup 列表、多选、全选、导出（JSON+Markdown）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/ui/popup/popup.html`
@@ -175,7 +175,7 @@ Run: `node --check Extensions/WebClipper/src/ui/popup/popup.js`
 Manual: 勾选多会话导出两种格式，检查文件内容与会话数量一致。
 Expected: 导出成功，格式正确，黄色警告项可被全选。
 
-### Task 8: 删除与清空能力
+### ✅Task 8: 删除与清空能力
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
@@ -190,7 +190,7 @@ Expected: 导出成功，格式正确，黄色警告项可被全选。
 Manual: 删除单会话后刷新 popup；执行清空后列表为空。
 Expected: 删除准确，清空彻底，无残留脏记录。
 
-### Task 9: P1 回归验证
+### ✅Task 9: P1 回归验证
 
 **Files:**
 - Modify: `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
@@ -212,7 +212,7 @@ Expected: P1 清单全项可复现。
 
 ### P2：Notion 同步闭环（OAuth + Parent Page + 自动建库）
 
-### Task 10: OAuth 数据结构与设置页入口
+### ✅Task 10: OAuth 数据结构与设置页入口
 
 **Files:**
 - Create: `Extensions/WebClipper/src/sync/notion/oauth-config.js`
@@ -229,7 +229,7 @@ Run: `node --check Extensions/WebClipper/src/sync/notion/oauth-client.js`
 Manual: 点击连接按钮能拉起 Notion 授权页。
 Expected: 授权流程可启动，UI 状态可更新。
 
-### Task 11: OAuth 回调桥接与 token 持久化
+### ✅Task 11: OAuth 回调桥接与 token 持久化
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
@@ -243,7 +243,7 @@ Expected: 授权流程可启动，UI 状态可更新。
 Manual: 完成一次授权并重开浏览器。
 Expected: 连接状态保持有效，token 可读取。
 
-### Task 12: Parent Page 列表与选择
+### ✅Task 12: Parent Page 列表与选择
 
 **Files:**
 - Create: `Extensions/WebClipper/src/sync/notion/notion-api.js`
@@ -258,7 +258,7 @@ Expected: 连接状态保持有效，token 可读取。
 Manual: 能看到页面列表并选中目标父页面。
 Expected: 选中后刷新 popup，配置仍存在。
 
-### Task 13: 按来源 ensure 数据库（ChatGPT / NotionAI）
+### ✅Task 13: 按来源 ensure 数据库（ChatGPT / NotionAI）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/sync/notion/notion-db-manager.js`
@@ -272,7 +272,7 @@ Expected: 选中后刷新 popup，配置仍存在。
 Manual: 首次同步时自动建库；第二次同步复用已建库。
 Expected: 不重复创建同名数据库。
 
-### Task 14: 会话同步服务（覆盖同页）
+### ✅Task 14: 会话同步服务（覆盖同页）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/sync/notion/notion-sync-service.js`
@@ -288,7 +288,7 @@ Expected: 不重复创建同名数据库。
 Manual: 同一会话连续同步两次。
 Expected: 只更新同一页面，不新增重复页面。
 
-### Task 15: 批量同步执行器与失败清单
+### ✅Task 15: 批量同步执行器与失败清单
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
@@ -302,7 +302,7 @@ Expected: 只更新同一页面，不新增重复页面。
 Manual: 人为制造部分失败（无权限页面/网络异常）执行批量同步。
 Expected: 其余会话继续同步，最终弹出失败清单。
 
-### Task 16: P2 回归验证
+### ✅Task 16: P2 回归验证
 
 **Files:**
 - Modify: `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
@@ -320,7 +320,7 @@ Expected: P2 验收项全通过，异常路径有明确提示。
 
 ### P3：多平台扩展（批量接入）
 
-### Task 17: 建立平台注册表与适配器模板
+### ✅Task 17: 建立平台注册表与适配器模板
 
 **Files:**
 - Create: `Extensions/WebClipper/src/collectors/registry.js`
@@ -335,7 +335,7 @@ Expected: P2 验收项全通过，异常路径有明确提示。
 Run: `node --check Extensions/WebClipper/src/collectors/registry.js`
 Expected: 页面加载时仅激活匹配平台适配器。
 
-### Task 18: 批次 A 平台接入（Claude / Gemini）
+### ✅Task 18: 批次 A 平台接入（Claude / Gemini）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/collectors/claude-collector.js`
