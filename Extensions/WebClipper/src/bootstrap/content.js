@@ -3,6 +3,8 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  const INPAGE_BTN_ID = "webclipper-inpage-btn";
+
   function send(type, payload) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res));
@@ -34,6 +36,106 @@
     });
   }
 
+  function ensureInpageStylesheetInjected() {
+    const id = "webclipper-inpage-style";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = chrome.runtime.getURL("src/ui/inpage/inpage.css");
+    document.documentElement.appendChild(link);
+  }
+
+  function ensureChatGPTButton({ onClick }) {
+    if (!isChatGPT()) return;
+    ensureInpageStylesheetInjected();
+    if (document.getElementById(INPAGE_BTN_ID)) return;
+
+    const btn = document.createElement("button");
+    btn.id = INPAGE_BTN_ID;
+    btn.className = "webclipper-inpage-btn";
+    btn.type = "button";
+    btn.textContent = "WebClipper: Save";
+
+    const storageKey = "webclipper_btn_pos_chatgpt_v1";
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        if (p && Number.isFinite(p.left) && Number.isFinite(p.top)) {
+          btn.style.left = `${p.left}px`;
+          btn.style.top = `${p.top}px`;
+          btn.style.right = "auto";
+          btn.style.bottom = "auto";
+          btn.style.position = "fixed";
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    btn.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      moved = false;
+      btn.setPointerCapture(e.pointerId);
+      const rect = btn.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      btn.style.left = `${startLeft}px`;
+      btn.style.top = `${startTop}px`;
+      btn.style.right = "auto";
+      btn.style.bottom = "auto";
+    });
+
+    btn.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+      const left = clamp(startLeft + dx, 6, window.innerWidth - 6);
+      const top = clamp(startTop + dy, 6, window.innerHeight - 6);
+      btn.style.left = `${left}px`;
+      btn.style.top = `${top}px`;
+    });
+
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      const rect = btn.getBoundingClientRect();
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ left: rect.left, top: rect.top }));
+      } catch (_e) {
+        // ignore
+      }
+    }
+
+    btn.addEventListener("pointerup", () => endDrag());
+    btn.addEventListener("pointercancel", () => endDrag());
+    btn.addEventListener("click", (e) => {
+      if (moved) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      onClick && onClick();
+    });
+
+    document.documentElement.appendChild(btn);
+  }
+
   function startAutoCapture() {
     const collector = getCollector();
     if (!collector || typeof collector.capture !== "function") return;
@@ -55,6 +157,19 @@
     });
 
     observer && observer.start && observer.start();
+
+    // Manual button: trigger an immediate capture and save once.
+    ensureChatGPTButton({
+      onClick: async () => {
+        try {
+          const snapshot = collector.capture();
+          if (!snapshot) return;
+          await saveSnapshot(snapshot);
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
   }
 
   startAutoCapture();
