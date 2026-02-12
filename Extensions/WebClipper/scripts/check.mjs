@@ -51,6 +51,7 @@ const jsFiles = [
   "src/sync/notion/token-store.js",
   "src/sync/notion/notion-api.js",
   "src/sync/notion/notion-db-manager.js",
+  "src/sync/notion/notion-sync-service.js",
   "src/ui/popup/popup.js"
 ];
 
