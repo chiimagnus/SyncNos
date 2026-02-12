@@ -217,6 +217,25 @@
   - 同步结果可重复执行且不产生页面爆炸。
   - 限流与失败反馈可观测。
 
+#### P2 回归记录（开发者模式本地安装）
+
+> 说明：OAuth 与 Notion API 访问需要人工在浏览器里完成授权与权限配置；本仓库仅提供自动化命令与可复现路径。
+
+- 自动化验证：
+  - `npm --prefix Extensions/WebClipper run check`: PASS
+  - `npm --prefix Extensions/WebClipper run test`: PASS
+- 手动 smoke（需人工）：
+  - OAuth：
+    - 在 popup 填写 Notion `clientId/clientSecret` 后点击 `Connect`，完成授权后 popup 显示 workspaceName，支持 `Disconnect`。
+    - 注意：当前实现采用本地保存 `clientSecret` 以完成 code->token 交换（开发者模式可用，发布前需重新评估安全性与部署方案）。
+  - Parent Page：
+    - `Load` 拉取页面列表，`Use` 选择 Parent Page（保存 parentPageId）。
+  - Ensure DB：
+    - 首次同步会自动创建/复用 `WebClipper - ChatGPT` 与 `WebClipper - NotionAI` 两个数据库。
+  - Sync：
+    - popup 选中多个会话点击 `Sync`，批量同步不中断；结束后弹窗展示 OK/Failed 与失败清单。
+    - 同一会话重复同步：更新同一页面（覆盖 children 为最新可见内容），不新增重复页面。
+
 ### 10.3 P3：多平台扩展
 
 - 核心目标：
