@@ -40,6 +40,8 @@ for (const size of [16, 48, 128]) {
 const jsFiles = [
   "src/bootstrap/background.js",
   "src/bootstrap/content.js",
+  "src/collectors/collector-contract.js",
+  "src/collectors/registry.js",
   "src/collectors/runtime-observer.js",
   "src/storage/incremental-updater.js",
   "src/storage/schema.js",
