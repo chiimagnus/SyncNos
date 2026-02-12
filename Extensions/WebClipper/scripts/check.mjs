@@ -42,6 +42,7 @@ const jsFiles = [
   "src/bootstrap/content.js",
   "src/collectors/runtime-observer.js",
   "src/storage/incremental-updater.js",
+  "src/storage/schema.js",
   "src/shared/normalize.js",
   "src/collectors/chatgpt-collector.js",
   "src/collectors/notionai-collector.js",

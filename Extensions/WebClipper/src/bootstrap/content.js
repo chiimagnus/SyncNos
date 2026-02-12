@@ -28,7 +28,7 @@
     const convoRes = await send("upsertConversation", { payload: snapshot.conversation });
     if (!convoRes || !convoRes.ok) return;
     const convo = convoRes.data;
-    await send("upsertMessagesIncremental", {
+    await send("syncConversationMessages", {
       conversationId: convo.id,
       messages: snapshot.messages || []
     });
@@ -40,6 +40,7 @@
 
     const observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
       debounceMs: 600,
+      getRoot: collector.getRoot,
       onTick: async () => {
         try {
           const snapshot = collector.capture();
@@ -58,4 +59,3 @@
 
   startAutoCapture();
 })();
-

@@ -23,6 +23,7 @@
   const MESSAGE_TYPES = Object.freeze({
     UPSERT_CONVERSATION: "upsertConversation",
     UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
+    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
     GET_CONVERSATIONS: "getConversations",
     GET_CONVERSATION_DETAIL: "getConversationDetail",
     DELETE_CONVERSATION: "deleteConversation",
@@ -115,6 +116,63 @@
     return { upserted };
   }
 
+  async function syncConversationMessages(conversationId, messages) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["messages"], "readwrite");
+    const idx = stores.messages.index("by_conversationId_messageKey");
+
+    const presentKeys = new Set();
+    let upserted = 0;
+
+    for (const m of messages || []) {
+      if (!m || !m.messageKey) continue;
+      presentKeys.add(m.messageKey);
+      const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
+      const record = {
+        id: existing ? existing.id : undefined,
+        conversationId,
+        messageKey: m.messageKey,
+        role: m.role || "assistant",
+        contentText: m.contentText || "",
+        sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
+        updatedAt: m.updatedAt || Date.now()
+      };
+      if (existing) {
+        await reqToPromise(stores.messages.put(record));
+      } else {
+        const id = await reqToPromise(stores.messages.add(record));
+        record.id = id;
+      }
+      upserted += 1;
+    }
+
+    // Cleanup: delete messages that are no longer present in the captured snapshot.
+    let deleted = 0;
+    const seqIdx = stores.messages.index("by_conversationId_sequence");
+    const range = IDBKeyRange.bound([conversationId, -Infinity], [conversationId, Infinity]);
+    const cursorReq = seqIdx.openCursor(range);
+    await new Promise((resolve, reject) => {
+      cursorReq.onerror = () => reject(cursorReq.error || new Error("cursor failed"));
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result;
+        if (!cursor) return resolve();
+        const v = cursor.value;
+        if (v && v.messageKey && !presentKeys.has(v.messageKey)) {
+          cursor.delete();
+          deleted += 1;
+        }
+        cursor.continue();
+      };
+    });
+
+    await new Promise((r, rej) => {
+      t.oncomplete = r;
+      t.onerror = () => rej(t.error || new Error("transaction failed"));
+    });
+
+    return { upserted, deleted };
+  }
+
   async function getConversations() {
     const db = await openDb();
     const { t, stores } = tx(db, ["conversations"], "readonly");
@@ -196,6 +254,12 @@
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const res = await upsertMessagesIncremental(conversationId, msg.messages);
+        return ok(res);
+      }
+      case MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES: {
+        const conversationId = Number(msg.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
+        const res = await syncConversationMessages(conversationId, msg.messages);
         return ok(res);
       }
       case MESSAGE_TYPES.GET_CONVERSATIONS: {
