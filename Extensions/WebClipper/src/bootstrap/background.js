@@ -9,7 +9,13 @@
     // eslint-disable-next-line no-undef
     importScripts("../storage/schema.js");
     // eslint-disable-next-line no-undef
-    importScripts("../sync/notion/oauth-config.js", "../sync/notion/oauth-client.js", "../sync/notion/token-store.js");
+    importScripts(
+      "../sync/notion/oauth-config.js",
+      "../sync/notion/oauth-client.js",
+      "../sync/notion/token-store.js",
+      "../sync/notion/notion-api.js",
+      "../sync/notion/notion-db-manager.js"
+    );
   } catch (_e) {
     // ignore
   }
@@ -34,7 +40,8 @@
 
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
-    DISCONNECT: "notionDisconnect"
+    DISCONNECT: "notionDisconnect",
+    ENSURE_DATABASES: "notionEnsureDatabases"
   });
 
   // IndexedDB schema is initialized lazily; this avoids MV3 SW cold-start races.
@@ -257,6 +264,17 @@
       case NOTION_MESSAGE_TYPES.DISCONNECT: {
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
         return ok({ disconnected: true });
+      }
+      case NOTION_MESSAGE_TYPES.ENSURE_DATABASES: {
+        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
+        if (!token || !token.accessToken) return err("notion not connected");
+        const parent = await new Promise((resolve) => {
+          chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
+        });
+        if (!parent) return err("missing parentPageId");
+        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabases) return err("notion db manager missing");
+        const mapping = await NS.notionDbManager.ensureDatabases({ accessToken: token.accessToken, parentPageId: parent });
+        return ok(mapping);
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};
