@@ -2,12 +2,21 @@
 
 ## 1) 产品概述
 
-SyncNos 是一款 macOS 应用，用于将用户在多个内容来源中产生的“高亮/笔记/消息摘要”统一整理后同步到 Notion，形成可检索、可持续增量更新的知识库。
+SyncNos 是一套“把分散知识沉淀到 Notion”的工具组合，包含：
+
+- **SyncNos（macOS App）**：将多个内容来源中的高亮/笔记/消息摘要统一整理后同步到 Notion，形成可检索、可持续增量更新的知识库。
+- **WebClipper（Chrome 扩展）**：在浏览器中采集 AI 对话（如 ChatGPT、NotionAI 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion。
 
 - 给谁用：需要把分散在阅读器、稍后读、读书应用、以及聊天截图中的信息沉淀到 Notion 的用户
-- 核心体验：连接数据源与 Notion 后，按“书籍/文章/对话”维度一键同步；支持队列与进度；支持自动增量同步
-- 输入（用户/系统侧）：本地 Apple Books/GoodLinks 数据库文件、WeRead/Dedao 的登录会话（Cookie）、聊天截图（OCR）、Notion 授权信息与父页面选择
-- 输出（用户可见产物）：Notion 中按来源创建的数据库与页面/条目，以及页面属性（如最后同步时间、标签/摘要等）与高亮内容块
+- 核心体验：
+  - App：连接数据源与 Notion 后，按“书籍/文章/对话”维度一键同步；支持队列与进度；支持自动增量同步
+  - WebClipper：在对话页面自动监听内容变化并增量保存；用户在扩展弹窗中多选导出或批量同步到 Notion
+- 输入（用户/系统侧）：
+  - App：本地 Apple Books/GoodLinks 数据库文件、WeRead/Dedao 的登录会话（Cookie）、聊天截图（OCR）、Notion 授权信息与父页面选择
+  - WebClipper：浏览器页面 DOM（对话/文章）、Notion OAuth 授权信息与 Parent Page 选择
+- 输出（用户可见产物）：
+  - Notion：按来源创建的数据库与页面/条目，以及页面属性（如最后同步时间等）与内容块
+  - 本地：App 的缓存（SwiftData）与凭据（Keychain）；WebClipper 的本地数据库与导出文件（JSON/Markdown）
 
 ## 2) 核心业务能力（Capabilities）
 
@@ -121,6 +130,24 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
   - Keychain 读取失败或无 Cookie：相关来源视为未登录
   - Chats 的存储升级可能为破坏性升级（需要用户重新导入）
 
+### 2.10 WebClipper：浏览器侧 AI 对话采集与手动同步
+
+- 用户价值：把“发生在浏览器里的 AI 对话”以最小打扰的方式沉淀到 Notion；同时保留本地导出能力
+- 触发方式：
+  - 在支持站点打开对话页时自动采集并增量入库（默认开启）
+  - 用户在扩展 popup 中手动导出（JSON/Markdown）或手动批量同步 Notion
+- 输入：
+  - 当前页面可见的对话内容（或用户手动触发的文章正文抓取）
+  - Notion OAuth token 与 Parent Page 选择
+- 输出：
+  - 扩展本地数据库中的会话与消息记录
+  - 下载到本地的导出文件（JSON/Markdown）
+  - Notion 中按来源（平台）创建/复用的数据库与会话页面（`1 会话 -> 1 页面`）
+- 关键边界与失败方式（用户视角）：
+  - 页面形态复杂（如 NotionAI 侧栏/浮窗）：容器识别不确定时会标记 warning，但仍会入库
+  - 批量同步：单条失败不阻断整批，结束后给出失败清单
+  - 权限：文章抓取属于手动动作，可能需要用户授予当前站点访问权限
+
 ## 3) 核心用户流程（User Journeys）
 
 ### 3.1 首次配置并完成一次同步（主流程）
@@ -144,6 +171,14 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
 2. 系统本地 OCR 识别文字并解析为消息序列（含系统消息/气泡消息方向判定）
 3. 用户可对消息的方向、类型、昵称进行修正
 4. 用户选择对话发起同步，Notion 中生成对话页面并按发送者分组写入消息
+
+### 3.4 WebClipper：从浏览器对话到 Notion
+
+1. 用户在浏览器安装 WebClipper 扩展并授予必要站点权限
+2. 用户打开支持的 AI 对话页面并进行对话
+3. 扩展自动检测对话内容变化并增量保存到本地数据库
+4. 用户打开扩展 popup，多选会话后选择：
+5. 导出：下载 JSON/Markdown；或同步：连接 Notion、选择 Parent Page、批量同步到 Notion 页面
 
 ## 4) 业务流程图（Mermaid）
 
@@ -213,8 +248,8 @@ flowchart TD
 
 ## 8) 入口索引（读码起点，<= 5）
 
-- `SyncNos/Services/Core/DIContainer.swift`
-- `SyncNos/Services/DataSources-To/Notion/Sync/NotionSyncEngine.swift`
-- `SyncNos/Services/SyncScheduling/AutoSyncService.swift`
+- `SyncNos/Services/DataSources-To/Notion/`
 - `SyncNos/Services/DataSources-From/`
-- `SyncNos/Models/Core/UnifiedHighlight.swift`
+- `SyncNos/Services/SyncScheduling/`
+- `SyncNos/Models/`
+- `Extensions/WebClipper/`
