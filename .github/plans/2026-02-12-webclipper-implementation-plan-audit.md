@@ -163,12 +163,12 @@ Related evidence:
 - Task: `Task 6: 接入 NotionAI 适配器（三形态 + 黄色警告）`
 - Severity: `High`
 - Status: `Open`
-- Location: `Extensions/WebClipper/src/collectors/notionai-collector.js:4`
+- Location: `Extensions/WebClipper/src/collectors/notionai-collector.js:10`
 - Summary: The NotionAI collector activates on every `notion.so` page (`matches()` only checks domain; `isNotionAiPage()` always true), so it can capture regular Notion page content as “assistant” messages when no NotionAI chat is present.
 - Risk: Unexpected data capture (privacy risk), wrong data quality, and fails acceptance “不混入主页笔记”。User already observed homepage note content being saved in side panel / floating window scenarios.
 - Expected fix: Tighten activation so the collector only becomes active when a NotionAI chat is actually present (DOM-based signal), and ensure “no chat UI” returns `null` early without scanning `div[data-block-id]` across the page.
 - Validation: Manual on a normal Notion page with no NotionAI chat open: no in-page Save button, no new conversation created; manual on three NotionAI shapes: capture still works.
-- Resolution evidence: (pending)
+- Resolution evidence: Implemented a DOM signal gate: `matches()` and `isNotionAiPage()` now require `[data-agent-chat-user-step-id]` to exist, plus root scoring prefers chat containers with user turns (commit `567ee5a`). Manual validation is still required for the three NotionAI shapes.
 
 ## Finding F-03
 
@@ -180,7 +180,7 @@ Related evidence:
 - Risk: Exported article markdown loses metadata and any future sync field mapping cannot use it without a schema migration.
 - Expected fix: Extend the conversation record schema to persist article metadata (and bump `DB_VERSION` with migration), or store metadata in a dedicated article table keyed by conversationId.
 - Validation: Add/update unit test around schema + manual: fetch an article, export MD, verify metadata lines are present.
-- Resolution evidence: (pending)
+- Resolution evidence: `upsertConversation()` now persists `author/publishedAt/description` when present (commit `567ee5a`). Manual validation is still required (fetch article -> export MD shows metadata lines).
 
 Related evidence:
 - Extractor produces metadata: `Extensions/WebClipper/src/collectors/article-fetcher.js:42`
@@ -190,13 +190,13 @@ Related evidence:
 
 - Task: `Task 16: P2 回归验证` / `Task 21: P3 回归验证与平台启用清单`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Deferred`
 - Location: `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md:200`
 - Summary: P2 regression section is present but not filled; P3 required compatibility matrix doc is missing.
 - Risk: Plan acceptance requires docs as “single source of truth” for validation. Missing/unfinished docs make it easy to regress without noticing.
-- Expected fix: Fill P2 regression record with concrete steps/outcomes; add `.github/docs/Chrome插件-平台兼容性矩阵.md` and keep it consistent with manifest + collectors.
-- Validation: `rg -n \"平台兼容性矩阵\" .github/docs -S` shows the matrix doc exists; doc sections updated.
-- Resolution evidence: (pending)
+- Expected fix: Deferred by product decision: skip the standalone compatibility matrix doc for now. Keep any minimal notes inside `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md` when needed.
+- Validation: N/A (deferred)
+- Resolution evidence: User request: “跳过这个兼容性矩阵…别单独一个兼容性矩阵的文档” (2026-02-12).
 
 ## Finding F-05
 
