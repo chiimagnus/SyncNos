@@ -47,6 +47,8 @@ const jsFiles = [
   "src/storage/schema.js",
   "src/shared/normalize.js",
   "src/collectors/chatgpt-collector.js",
+  "src/collectors/claude-collector.js",
+  "src/collectors/gemini-collector.js",
   "src/collectors/notionai-collector.js",
   "src/sync/notion/oauth-config.js",
   "src/sync/notion/oauth-client.js",

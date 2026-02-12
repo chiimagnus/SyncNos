@@ -15,6 +15,8 @@
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://www.chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
     "https://*.notion.so/*",
     "https://api.notion.com/*",
     "https://chiimagnus.github.io/*"
@@ -25,6 +27,8 @@
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
         "https://www.chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
         "https://*.notion.so/*"
       ],
       "css": ["src/ui/inpage/inpage.css"],
@@ -35,6 +39,8 @@
         "src/collectors/registry.js",
         "src/collectors/runtime-observer.js",
         "src/collectors/chatgpt-collector.js",
+        "src/collectors/claude-collector.js",
+        "src/collectors/gemini-collector.js",
         "src/collectors/notionai-collector.js",
         "src/bootstrap/content.js"
       ],
