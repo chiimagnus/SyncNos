@@ -26,6 +26,18 @@
         <button id="btnExportMd" class="btn">Export MD</button>
       </section>
 
+      <section class="toolbar" id="notionBar">
+        <div class="title" style="font-weight: 650;">Notion</div>
+        <div class="spacer"></div>
+        <button id="btnNotionConnect" class="btn">Connect</button>
+      </section>
+
+      <section class="toolbar" id="notionConfig">
+        <input id="notionClientId" class="input" placeholder="Notion Client ID" />
+        <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
+        <button id="btnNotionSaveConfig" class="btn">Save</button>
+      </section>
+
       <main>
         <div id="list" class="list"></div>
       </main>
@@ -38,4 +50,3 @@
     <script src="./popup.js"></script>
   </body>
 </html>
-

@@ -61,6 +61,20 @@ body {
   color: #ffd5d5;
 }
 
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 10px;
+  outline: none;
+}
+.input::placeholder {
+  color: rgba(159, 176, 195, 0.8);
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -166,4 +180,3 @@ body {
   margin-top: 10px;
   color: var(--muted);
 }
-
