@@ -76,6 +76,8 @@
       del.className = "mini danger";
       del.textContent = "Delete";
       del.addEventListener("click", async () => {
+        const confirmed = confirm(`Delete conversation?\n\n${c.title || "(untitled)"}`);
+        if (!confirmed) return;
         await send("deleteConversation", { conversationId: c.id });
         state.selectedIds.delete(c.id);
         await refresh();
@@ -180,6 +182,8 @@
 
   els.btnRefresh.addEventListener("click", refresh);
   els.btnClearAll.addEventListener("click", async () => {
+    const confirmed = confirm("Clear ALL conversations and messages?\n\nThis cannot be undone.");
+    if (!confirmed) return;
     await send("clearAll");
     state.selectedIds.clear();
     await refresh();
