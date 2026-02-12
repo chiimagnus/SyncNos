@@ -6,49 +6,203 @@
     return /(^|\.)notion\.so$/.test(location.hostname);
   }
 
-  function findConversationRoot() {
-    // Placeholder: will be tightened in Task 6 using the Tampermonkey script heuristics.
-    // Try common NotionAI chat containers.
-    return (
-      document.querySelector("[data-testid='notion-ai-chat']") ||
-      document.querySelector("[aria-label='Notion AI']") ||
-      document.querySelector("div[role='dialog']") ||
-      document.body
-    );
+  function getAnyUserStepEl(scope) {
+    return (scope || document).querySelector("[data-agent-chat-user-step-id]");
+  }
+
+  function findScrollContainerFromSeed(seed) {
+    if (!seed) return null;
+    let el = seed.parentElement;
+    for (let i = 0; i < 20 && el; i += 1) {
+      try {
+        const style = getComputedStyle(el);
+        const overflowY = style.overflowY || "";
+        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 20) {
+          return el;
+        }
+      } catch (_e) {
+        // ignore
+      }
+      el = el.parentElement;
+    }
+    return document.scrollingElement || document.documentElement || document.body;
+  }
+
+  function isVisible(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 80 || r.height < 80) return false;
+    if (r.bottom < 0 || r.right < 0) return false;
+    if (r.top > window.innerHeight || r.left > window.innerWidth) return false;
+    return true;
+  }
+
+  function rectVisibleArea(r) {
+    const left = Math.max(0, r.left);
+    const top = Math.max(0, r.top);
+    const right = Math.min(window.innerWidth, r.right);
+    const bottom = Math.min(window.innerHeight, r.bottom);
+    const w = Math.max(0, right - left);
+    const h = Math.max(0, bottom - top);
+    return w * h;
+  }
+
+  function findCandidateRoots() {
+    const seeds = Array.from(document.querySelectorAll("[data-agent-chat-user-step-id]")).slice(0, 20);
+    const set = new Set();
+    for (const s of seeds) {
+      const root = findScrollContainerFromSeed(s);
+      if (root) set.add(root);
+    }
+    return Array.from(set).filter(isVisible);
+  }
+
+  function pickBestRoot(roots) {
+    if (!roots || !roots.length) return { root: document.body, allRoots: [], lowConfidence: true };
+    let best = roots[0];
+    let bestScore = -1;
+    for (const r of roots) {
+      const rect = r.getBoundingClientRect();
+      const score = rectVisibleArea(rect);
+      if (score > bestScore) {
+        best = r;
+        bestScore = score;
+      }
+    }
+    return { root: best, allRoots: roots, lowConfidence: roots.length !== 1 };
+  }
+
+  function getTurnWrappers(root) {
+    const uniqueNodes = new Set();
+    const scope = root || document;
+
+    // user wrapper
+    scope.querySelectorAll("[data-agent-chat-user-step-id]").forEach((el) => uniqueNodes.add(el));
+
+    // assistant wrapper: find a container for blocks, but exclude big containers that also include user steps.
+    scope.querySelectorAll("div[data-block-id]").forEach((block) => {
+      const w = block.closest(".autolayout-col.autolayout-fill-width") || block.closest("div");
+      if (!w) return;
+      if (w.querySelector("[data-agent-chat-user-step-id]")) return;
+      // Ensure it's within our scope (closest may escape shadow-like boundaries).
+      if (scope !== document && !scope.contains(w)) return;
+      uniqueNodes.add(w);
+    });
+
+    const sorted = Array.from(uniqueNodes);
+    sorted.sort((a, b) => {
+      if (a === b) return 0;
+      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    const finalNodes = [];
+    for (const node of sorted) {
+      const isChild = finalNodes.some((parent) => parent.contains(node));
+      if (!isChild) finalNodes.push(node);
+    }
+    return finalNodes;
+  }
+
+  function roleFromWrapper(wrapper) {
+    if (wrapper && wrapper.getAttribute && wrapper.getAttribute("data-agent-chat-user-step-id")) return "user";
+    return "assistant";
+  }
+
+  function extractUserText(wrapper) {
+    const leaf =
+      wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
+      wrapper.querySelector("[data-content-editable-leaf='true']");
+    const raw = leaf ? (leaf.innerText || leaf.textContent || "") : (wrapper.innerText || wrapper.textContent || "");
+    return NS.normalize.normalizeText(raw);
+  }
+
+  function extractAssistantText(wrapper) {
+    const blocks = Array.from(wrapper.querySelectorAll("div[data-block-id]"));
+    if (!blocks.length) {
+      const raw = wrapper.innerText || wrapper.textContent || "";
+      return NS.normalize.normalizeText(raw);
+    }
+    const parts = [];
+    for (const b of blocks) {
+      const raw = b.innerText || b.textContent || "";
+      const t = NS.normalize.normalizeText(raw);
+      if (t) parts.push(t);
+    }
+    return NS.normalize.normalizeText(parts.join("\n"));
+  }
+
+  function findPageIdFromUrl() {
+    const m = location.pathname.match(/[0-9a-fA-F]{32}/);
+    return m ? m[0].toLowerCase() : "";
+  }
+
+  function getChatTitleFromRoot(root) {
+    const firstUser = getAnyUserStepEl(root);
+    if (!firstUser) return "NotionAI Chat";
+    const leaf =
+      firstUser.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
+      firstUser.querySelector("[data-content-editable-leaf='true']");
+    const raw = leaf ? (leaf.innerText || leaf.textContent || "") : (firstUser.innerText || firstUser.textContent || "");
+    const title = String(raw || "").split("\n").join(" ").trim().slice(0, 60);
+    return title || "NotionAI Chat";
+  }
+
+  function getAnchorElement(root) {
+    // For floating window, Notion often uses dialog. For side panel, use nearest aside.
+    return root.closest("div[role='dialog']") || root.closest("aside") || root.parentElement || root;
   }
 
   function capture() {
     if (!isNotionAiPage()) return null;
-    const root = findConversationRoot();
+    const candidates = findCandidateRoots();
+    const picked = pickBestRoot(candidates);
+    const root = picked.root;
     if (!root) return null;
 
-    const text = root.innerText ? root.innerText.trim() : "";
-    if (!text) return null;
+    const wrappers = getTurnWrappers(root);
+    if (!wrappers.length) return null;
 
+    const messages = [];
     const warningFlags = [];
-    if (root === document.body) warningFlags.push("container_low_confidence");
 
-    // Minimal snapshot: treat each paragraph-like block as a message until proper role detection is added.
-    const parts = text.split("\n").map((s) => s.trim()).filter(Boolean);
-    const messages = parts.slice(0, 200).map((p, i) => ({
-      messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText: p, sequence: i }),
-      role: "assistant",
-      contentText: p,
-      sequence: i,
-      updatedAt: Date.now()
-    }));
+    const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
+    const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
+    if (picked.lowConfidence || root === document.body || !hasUser || !hasAssistant) warningFlags.push("container_low_confidence");
+
+    for (let i = 0; i < wrappers.length; i += 1) {
+      const w = wrappers[i];
+      const role = roleFromWrapper(w);
+      const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
+      if (!contentText) continue;
+      const userStepId = role === "user" ? w.getAttribute("data-agent-chat-user-step-id") : "";
+      const firstBlockId = role === "assistant" ? (w.querySelector("div[data-block-id]") || {}).getAttribute?.("data-block-id") : "";
+      const stableId = userStepId || firstBlockId || "";
+      const messageKey = stableId
+        ? `${role}_${stableId}`
+        : NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
+      messages.push({
+        messageKey,
+        role,
+        contentText,
+        sequence: i,
+        updatedAt: Date.now()
+      });
+    }
 
     if (!messages.length) return null;
 
-    const conversationKey = location.href; // Will be improved for side-panel / floating mode.
-    const title = document.title || "NotionAI";
+    const pageId = findPageIdFromUrl();
+    const firstUser = messages.find((m) => m.role === "user");
+    const firstUserSig = firstUser ? NS.normalize.fnv1a32(firstUser.contentText) : NS.normalize.fnv1a32(String(Date.now()));
+    const conversationKey = `notionai_${pageId || location.pathname}_${firstUserSig}`;
+    const title = getChatTitleFromRoot(root);
 
     return {
       conversation: {
         sourceType: "chat",
         source: "notionai",
         conversationKey,
-        title,
+        title: title || document.title || "NotionAI",
         url: location.href,
         warningFlags,
         lastCapturedAt: Date.now()
@@ -58,6 +212,17 @@
   }
 
   NS.collectors = NS.collectors || {};
-  NS.collectors.notionai = { capture };
+  NS.collectors.notionai = {
+    capture,
+    getRoot: () => pickBestRoot(findCandidateRoots()).root,
+    getAnchorRect: () => {
+      const picked = pickBestRoot(findCandidateRoots());
+      const root = picked.root;
+      if (!root) return null;
+      const el = getAnchorElement(root);
+      if (!el || !el.getBoundingClientRect) return null;
+      const r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+    }
+  };
 })();
-
