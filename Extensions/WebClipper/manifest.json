@@ -25,6 +25,7 @@
         "https://www.chatgpt.com/*",
         "https://*.notion.so/*"
       ],
+      "css": ["src/ui/inpage/inpage.css"],
       "js": [
         "src/shared/normalize.js",
         "src/storage/incremental-updater.js",
@@ -42,4 +43,3 @@
     "128": "icons/icon-128.png"
   }
 }
-
