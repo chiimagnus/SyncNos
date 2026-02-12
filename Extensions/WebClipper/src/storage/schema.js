@@ -13,7 +13,7 @@
       req.onupgradeneeded = () => {
         const db = req.result;
 
-        // conversations: { id, sourceType, source, conversationKey, title, url, warningFlags, notionPageId, lastCapturedAt }
+        // conversations: { id, sourceType, source, conversationKey, title, url, author, publishedAt, description, warningFlags, notionPageId, lastCapturedAt }
         if (!db.objectStoreNames.contains("conversations")) {
           const store = db.createObjectStore("conversations", { keyPath: "id", autoIncrement: true });
           store.createIndex("by_source_conversationKey", ["source", "conversationKey"], { unique: true });
@@ -42,4 +42,3 @@
   NS.storageSchema = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
