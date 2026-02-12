@@ -225,12 +225,15 @@
       alert((res && res.error && res.error.message) || "Sync failed.");
       return;
     }
-    const results = res.data && res.data.results ? res.data.results : [];
-    const failed = results.filter((r) => !r.ok);
-    if (failed.length) {
-      alert(`Sync finished with failure.\n\n${failed[0].error || "unknown error"}`);
+    const data = res.data || {};
+    const okCount = data.okCount || 0;
+    const failCount = data.failCount || 0;
+    const failures = Array.isArray(data.failures) ? data.failures : [];
+    if (failCount) {
+      const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
+      alert(`Sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}\n\n${lines.join("\n")}`);
     } else {
-      alert(`Sync ok: ${results.length}`);
+      alert(`Sync finished.\n\nOK: ${okCount}\nFailed: 0`);
     }
     await refresh();
   });
