@@ -246,6 +246,17 @@
   - 优先复用 `Resource/demo/js/adapters/` 的结构与策略。
   - 保持最小权限与可测试性，不引入与目标无关功能。
 
+#### P3 回归记录（开发者模式本地安装）
+
+- 自动化验证：
+  - `npm --prefix Extensions/WebClipper run check`: PASS
+  - `npm --prefix Extensions/WebClipper run test`: PASS
+  - `npm --prefix Extensions/WebClipper run build`: PASS
+- 手动 smoke（需人工）：
+  - 新增平台（Claude/Gemini/DeepSeek/Kimi/Doubao/Yuanbao）：每个平台至少完成一次采集、一次导出、一次同步。
+  - 文章抓取：在任意文章页打开 popup 点击 `Fetch`，授予当前站点权限后应入库，并可导出 Markdown（article 格式）。
+  - 兼容性矩阵：见 `.github/docs/Chrome插件-平台兼容性矩阵.md`。
+
 ### 10.4 P4：发布与跨浏览器
 
 - 核心目标：
