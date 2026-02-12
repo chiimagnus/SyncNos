@@ -21,6 +21,7 @@ This repository also includes a standalone Chrome extension (MV3) under `Extensi
 - Captures AI chats from supported sites into local browser storage
 - Export selected conversations as JSON/Markdown
 - Manually sync selected conversations to Notion (OAuth)
+- Docs: `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
 
 ## [Download](https://apps.apple.com/app/syncnos/id6755133888)
 
