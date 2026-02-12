@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebClipper</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="title">WebClipper</div>
+        <div class="actions">
+          <button id="btnRefresh" class="btn">Refresh</button>
+          <button id="btnClearAll" class="btn danger">Clear</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <label class="checkbox">
+          <input id="chkSelectAll" type="checkbox" />
+          <span>Select all</span>
+        </label>
+        <div class="spacer"></div>
+        <button id="btnExportJson" class="btn">Export JSON</button>
+        <button id="btnExportMd" class="btn">Export MD</button>
+      </section>
+
+      <main>
+        <div id="list" class="list"></div>
+      </main>
+
+      <footer class="footer">
+        <div id="stats" class="stats">0 conversations</div>
+      </footer>
+    </div>
+
+    <script src="./popup.js"></script>
+  </body>
+</html>
+
