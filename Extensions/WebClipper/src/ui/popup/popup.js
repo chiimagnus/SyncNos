@@ -25,7 +25,11 @@
     notionStatus: document.getElementById("notionStatus"),
     notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
-    btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig")
+    btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
+    notionPageQuery: document.getElementById("notionPageQuery"),
+    btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
+    notionPages: document.getElementById("notionPages"),
+    btnNotionSaveParent: document.getElementById("btnNotionSaveParent")
   };
 
   const state = {
@@ -228,6 +232,59 @@
     });
   }
 
+  async function getNotionAccessToken() {
+    const status = await send("getNotionAuthStatus");
+    if (!status || !status.ok || !status.data || !status.data.connected) return "";
+    return status.data.token && status.data.token.accessToken ? status.data.token.accessToken : "";
+  }
+
+  async function ensureNotionApiLoaded() {
+    if (globalThis.WebClipper && globalThis.WebClipper.notionApi) return globalThis.WebClipper.notionApi;
+    const s = document.createElement("script");
+    s.src = chrome.runtime.getURL("src/sync/notion/notion-api.js");
+    document.documentElement.appendChild(s);
+    await new Promise((r) => setTimeout(r, 80));
+    return globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
+  }
+
+  async function loadParentPages() {
+    const accessToken = await getNotionAccessToken();
+    if (!accessToken) {
+      alert("Notion not connected.");
+      return;
+    }
+    const api = await ensureNotionApiLoaded();
+    if (!api) {
+      alert("Notion API module not available.");
+      return;
+    }
+    const query = (els.notionPageQuery.value || "").trim();
+    const result = await api.searchPages({ accessToken, query, pageSize: 20 });
+    const pages = Array.isArray(result.results) ? result.results : [];
+
+    els.notionPages.innerHTML = "";
+    for (const p of pages) {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = api.getPageTitle(p);
+      els.notionPages.appendChild(opt);
+    }
+
+    // Preselect saved parent if present.
+    const saved = await storageGet(["notion_parent_page_id"]);
+    if (saved && saved.notion_parent_page_id) {
+      els.notionPages.value = saved.notion_parent_page_id;
+    }
+  }
+
+  async function saveParentPage() {
+    const id = els.notionPages.value;
+    const title = els.notionPages.selectedOptions && els.notionPages.selectedOptions[0] ? els.notionPages.selectedOptions[0].textContent : "";
+    if (!id) return;
+    await storageSet({ notion_parent_page_id: id, notion_parent_page_title: title || "" });
+    alert(`Parent page selected: ${title || id}`);
+  }
+
   function buildNotionAuthorizeUrl({ clientId, state }) {
     const redirectUri = "https://chiimagnus.github.io/syncnos-oauth/callback";
     const url = new URL("https://api.notion.com/v1/oauth/authorize");
@@ -242,6 +299,14 @@
   els.btnNotionSaveConfig.addEventListener("click", async () => {
     await saveNotionConfig();
     alert("Saved Notion OAuth client config.");
+  });
+
+  els.btnNotionLoadPages.addEventListener("click", () => {
+    loadParentPages().catch((e) => alert(e && e.message ? e.message : String(e)));
+  });
+
+  els.btnNotionSaveParent.addEventListener("click", () => {
+    saveParentPage().catch((e) => alert(e && e.message ? e.message : String(e)));
   });
 
   els.btnNotionConnect.addEventListener("click", async () => {
@@ -269,6 +334,7 @@
   });
 
   loadNotionConfig();
+  // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
     const res = await send("getNotionAuthStatus");
