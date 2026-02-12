@@ -11,18 +11,12 @@
     });
   }
 
-  function isChatGPT() {
-    return /(^|\.)chatgpt\.com$/.test(location.hostname) || /(^|\.)chat\.openai\.com$/.test(location.hostname);
-  }
-
-  function isNotion() {
-    return /(^|\.)notion\.so$/.test(location.hostname);
-  }
-
   function getCollector() {
-    if (isChatGPT()) return NS.collectors && NS.collectors.chatgpt;
-    if (isNotion()) return NS.collectors && NS.collectors.notionai;
-    return null;
+    const reg = NS.collectorsRegistry;
+    if (!reg || typeof reg.pickActive !== "function") return null;
+    const picked = reg.pickActive();
+    if (!picked || !picked.collector) return null;
+    return { id: picked.id, ...picked.collector };
   }
 
   async function saveSnapshot(snapshot) {
@@ -47,7 +41,7 @@
   }
 
   function ensureChatGPTButton({ onClick }) {
-    if (!isChatGPT()) return;
+    if (!getCollector() || getCollector().id !== "chatgpt") return;
     ensureInpageStylesheetInjected();
     if (document.getElementById(INPAGE_BTN_ID)) return;
 
@@ -137,7 +131,8 @@
   }
 
   function ensureNotionAttachedButton({ onClick, getAnchorRect }) {
-    if (!isNotion()) return;
+    const c = getCollector();
+    if (!c || c.id !== "notionai") return;
     ensureInpageStylesheetInjected();
     const id = "webclipper-notionai-btn";
     if (document.getElementById(id)) return;

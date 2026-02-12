@@ -1,6 +1,11 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  function matches(loc) {
+    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    return /(^|\.)notion\.so$/.test(hostname);
+  }
+
   function isNotionAiPage() {
     // NotionAI lives under notion.so, but DOM varies; keep permissive for now.
     return /(^|\.)notion\.so$/.test(location.hostname);
@@ -225,4 +230,8 @@
       return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
     }
   };
+
+  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
+    NS.collectorsRegistry.register({ id: "notionai", matches, collector: NS.collectors.notionai });
+  }
 })();

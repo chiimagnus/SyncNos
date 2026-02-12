@@ -1,6 +1,11 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  function matches(loc) {
+    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
+  }
+
   function isValidConversationUrl() {
     try {
       const hostname = location.hostname;
@@ -112,4 +117,8 @@
 
   NS.collectors = NS.collectors || {};
   NS.collectors.chatgpt = { capture, getRoot: getConversationRoot };
+
+  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
+    NS.collectorsRegistry.register({ id: "chatgpt", matches, collector: NS.collectors.chatgpt });
+  }
 })();
