@@ -18,6 +18,13 @@
 
 ## Plan A（主方案）
 
+### 通用小步验证基线（适用于所有任务）
+
+- 每个任务完成后至少执行一次：`npm run check`（语法/类型/清单校验）。
+- 涉及 `storage`、`shared`、`sync` 逻辑时，追加执行：`npm run test`（单元测试）。
+- 阶段收尾（P1/P2/P3/P4）执行：`npm run build`（打包/产物校验）+ 对应手动 smoke。
+- 若某任务无法执行自动化命令，必须在任务记录里标注原因与替代验证方式。
+
 ### P1（最高优先级）：本地采集与管理闭环（ChatGPT + NotionAI）
 
 ### Task 1: 创建插件工程骨架（按能力分包）
@@ -46,9 +53,26 @@
 Run: 在 `chrome://extensions` 加载 `Extensions/WebClipper`。
 Expected: 扩展可加载，无 manifest 权限报错。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper`
-Run: `git commit -m "chore: scaffold webclipper extension"`
+### Task 1A: 初始化自动化验证能力（npm scripts）
+
+**Files:**
+- Create: `Extensions/WebClipper/package.json`
+- Create: `Extensions/WebClipper/vitest.config.ts`
+- Create: `Extensions/WebClipper/tests/smoke/schema.test.ts`
+- Create: `Extensions/WebClipper/scripts/build.mjs`
+
+**Step 1: 实现功能**
+- 建立 `npm` 项目与脚本：`check`、`test`、`build`。
+- `check` 至少包含 JS/TS 语法检查与 manifest 基础校验。
+- `test` 先落最小可运行单测（schema/normalize 等纯逻辑）。
+- `build` 先输出开发可加载产物与基础打包结果（如 zip 或 dist）。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper install`
+Run: `npm --prefix Extensions/WebClipper run check`
+Run: `npm --prefix Extensions/WebClipper run test`
+Run: `npm --prefix Extensions/WebClipper run build`
+Expected: 三个命令均通过，后续任务可复用同一验证入口。
 
 ### Task 2: 实现统一数据模型与 IndexedDB 表结构
 
@@ -66,10 +90,6 @@ Run: `git commit -m "chore: scaffold webclipper extension"`
 Run: `node --check Extensions/WebClipper/src/bootstrap/background.js`
 Expected: 语法通过；首次加载扩展后 IndexedDB 创建成功（DevTools Application 面板可见对象仓库）。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/bootstrap/background.js Extensions/WebClipper/src/storage/schema.js`
-Run: `git commit -m "feat: add indexeddb schema for conversations and messages"`
-
 ### Task 3: 搭建 background 消息路由与 CRUD 接口
 
 **Files:**
@@ -83,10 +103,6 @@ Run: `git commit -m "feat: add indexeddb schema for conversations and messages"`
 **Step 2: 验证**
 Run: `node --check Extensions/WebClipper/src/bootstrap/background.js`
 Expected: 语法通过；content/popup 调用接口时可收到一致响应结构。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/bootstrap/background.js`
-Run: `git commit -m "feat: implement background message router and CRUD APIs"`
 
 ### Task 4: 迁移并收敛 core 层（增量比对与去重）
 
@@ -106,10 +122,6 @@ Run: `node --check Extensions/WebClipper/src/storage/incremental-updater.js`
 Run: `node --check Extensions/WebClipper/src/shared/normalize.js`
 Expected: 语法通过；消息变化检测能区分新增/更新/删除。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src`
-Run: `git commit -m "feat: adapt core incremental pipeline for SyncNos rules"`
-
 ### Task 5: 接入 ChatGPT 适配器与页面按钮
 
 **Files:**
@@ -126,10 +138,6 @@ Run: `git commit -m "feat: adapt core incremental pipeline for SyncNos rules"`
 Run: `node --check Extensions/WebClipper/src/collectors/chatgpt-collector.js`
 Manual: 打开 ChatGPT 对话，新增消息后观察本地会话消息数递增。
 Expected: 不重复写入、顺序正确、按钮可拖拽。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors/chatgpt-collector.js Extensions/WebClipper/src/bootstrap/content.js Extensions/WebClipper/src/ui/inpage/inpage.css`
-Run: `git commit -m "feat: add chatgpt adapter and floating action button"`
 
 ### Task 6: 接入 NotionAI 适配器（三形态 + 黄色警告）
 
@@ -149,10 +157,6 @@ Run: `node --check Extensions/WebClipper/src/collectors/notionai-collector.js`
 Manual: 在 NotionAI 三形态分别发消息并检查入库；验证不混入主页笔记。
 Expected: 三形态都可采集；低置信度会话带黄色警告标记。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors/notionai-collector.js Extensions/WebClipper/src/bootstrap/content.js Extensions/WebClipper/src/bootstrap/background.js`
-Run: `git commit -m "feat: add notionai adapter with strict container and warning flags"`
-
 ### Task 7: 完成 popup 列表、多选、全选、导出（JSON+Markdown）
 
 **Files:**
@@ -171,10 +175,6 @@ Run: `node --check Extensions/WebClipper/src/ui/popup/popup.js`
 Manual: 勾选多会话导出两种格式，检查文件内容与会话数量一致。
 Expected: 导出成功，格式正确，黄色警告项可被全选。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/ui/popup/popup.html Extensions/WebClipper/src/ui/popup/popup.js Extensions/WebClipper/src/ui/popup/popup.css Extensions/WebClipper/src/bootstrap/background.js`
-Run: `git commit -m "feat: implement popup multi-select and json/markdown export"`
-
 ### Task 8: 删除与清空能力
 
 **Files:**
@@ -190,10 +190,6 @@ Run: `git commit -m "feat: implement popup multi-select and json/markdown export
 Manual: 删除单会话后刷新 popup；执行清空后列表为空。
 Expected: 删除准确，清空彻底，无残留脏记录。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/bootstrap/background.js Extensions/WebClipper/src/ui/popup/popup.js`
-Run: `git commit -m "feat: add conversation deletion and clear-all actions"`
-
 ### Task 9: P1 回归验证
 
 **Files:**
@@ -203,16 +199,14 @@ Run: `git commit -m "feat: add conversation deletion and clear-all actions"`
 - 将 P1 验收结果补充到文档（通过/失败/问题单）。
 
 **Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run check`
+Run: `npm --prefix Extensions/WebClipper run test`
 Manual:
 - ChatGPT 自动保存通过。
 - NotionAI 三形态自动保存通过。
 - 多选+全选+导出通过。
 - 删除/清空通过。
 Expected: P1 清单全项可复现。
-
-**Step 3: 小步提交**
-Run: `git add .github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
-Run: `git commit -m "docs: record p1 validation results"`
 
 ---
 
@@ -235,10 +229,6 @@ Run: `node --check Extensions/WebClipper/src/sync/notion/oauth-client.js`
 Manual: 点击连接按钮能拉起 Notion 授权页。
 Expected: 授权流程可启动，UI 状态可更新。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/sync/notion Extensions/WebClipper/src/ui/popup/popup.js Extensions/WebClipper/src/ui/popup/popup.html`
-Run: `git commit -m "feat: add notion oauth entry and client modules"`
-
 ### Task 11: OAuth 回调桥接与 token 持久化
 
 **Files:**
@@ -252,10 +242,6 @@ Run: `git commit -m "feat: add notion oauth entry and client modules"`
 **Step 2: 验证**
 Manual: 完成一次授权并重开浏览器。
 Expected: 连接状态保持有效，token 可读取。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/bootstrap/background.js Extensions/WebClipper/src/sync/notion/token-store.js`
-Run: `git commit -m "feat: persist notion oauth token and callback handling"`
 
 ### Task 12: Parent Page 列表与选择
 
@@ -272,10 +258,6 @@ Run: `git commit -m "feat: persist notion oauth token and callback handling"`
 Manual: 能看到页面列表并选中目标父页面。
 Expected: 选中后刷新 popup，配置仍存在。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/sync/notion/notion-api.js Extensions/WebClipper/src/ui/popup/popup.js Extensions/WebClipper/src/ui/popup/popup.html`
-Run: `git commit -m "feat: add notion parent page selection"`
-
 ### Task 13: 按来源 ensure 数据库（ChatGPT / NotionAI）
 
 **Files:**
@@ -289,10 +271,6 @@ Run: `git commit -m "feat: add notion parent page selection"`
 **Step 2: 验证**
 Manual: 首次同步时自动建库；第二次同步复用已建库。
 Expected: 不重复创建同名数据库。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/sync/notion/notion-db-manager.js Extensions/WebClipper/src/bootstrap/background.js`
-Run: `git commit -m "feat: ensure per-source notion databases"`
 
 ### Task 14: 会话同步服务（覆盖同页）
 
@@ -310,10 +288,6 @@ Run: `git commit -m "feat: ensure per-source notion databases"`
 Manual: 同一会话连续同步两次。
 Expected: 只更新同一页面，不新增重复页面。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/sync/notion/notion-sync-service.js Extensions/WebClipper/src/bootstrap/background.js Extensions/WebClipper/src/ui/popup/popup.js`
-Run: `git commit -m "feat: sync conversations to notion with overwrite semantics"`
-
 ### Task 15: 批量同步执行器与失败清单
 
 **Files:**
@@ -328,10 +302,6 @@ Run: `git commit -m "feat: sync conversations to notion with overwrite semantics
 Manual: 人为制造部分失败（无权限页面/网络异常）执行批量同步。
 Expected: 其余会话继续同步，最终弹出失败清单。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/bootstrap/background.js Extensions/WebClipper/src/ui/popup/popup.js`
-Run: `git commit -m "feat: add batch sync with non-blocking failures"`
-
 ### Task 16: P2 回归验证
 
 **Files:**
@@ -341,12 +311,10 @@ Run: `git commit -m "feat: add batch sync with non-blocking failures"`
 - 记录 OAuth、Parent Page、自动建库、覆盖同步、失败清单验证结果。
 
 **Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run check`
+Run: `npm --prefix Extensions/WebClipper run test`
 Manual: 走完完整授权与批量同步路径。
 Expected: P2 验收项全通过，异常路径有明确提示。
-
-**Step 3: 小步提交**
-Run: `git add .github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
-Run: `git commit -m "docs: record p2 validation results"`
 
 ---
 
@@ -367,10 +335,6 @@ Run: `git commit -m "docs: record p2 validation results"`
 Run: `node --check Extensions/WebClipper/src/collectors/registry.js`
 Expected: 页面加载时仅激活匹配平台适配器。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors/registry.js Extensions/WebClipper/src/collectors/collector-contract.js Extensions/WebClipper/src/bootstrap/content.js`
-Run: `git commit -m "refactor: add adapter registry and template"`
-
 ### Task 18: 批次 A 平台接入（Claude / Gemini）
 
 **Files:**
@@ -388,10 +352,6 @@ Run: `node --check Extensions/WebClipper/src/collectors/gemini-collector.js`
 Manual: 在两个平台分别验证采集/导出/同步。
 Expected: 满足四项基本能力。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors/claude-collector.js Extensions/WebClipper/src/collectors/gemini-collector.js Extensions/WebClipper/manifest.json`
-Run: `git commit -m "feat: add claude and gemini adapters"`
-
 ### Task 19: 批次 B/C 平台接入（DeepSeek/Kimi/Doubao/Yuanbao）
 
 **Files:**
@@ -408,10 +368,6 @@ Run: `git commit -m "feat: add claude and gemini adapters"`
 **Step 2: 验证**
 Manual: 每平台至少完成一次采集、一次导出、一次同步。
 Expected: 平台可用且不影响已接入平台。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors Extensions/WebClipper/manifest.json`
-Run: `git commit -m "feat: add remaining platform adapters"`
 
 ### Task 20A: 网页文章 fetch 扩展骨架
 
@@ -432,10 +388,6 @@ Run: `node --check Extensions/WebClipper/src/export/article-markdown.js`
 Manual: 在任意文章页执行一次手动抓取并导出 Markdown。
 Expected: 文章可入库，导出文件结构正确且不影响聊天流程。
 
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/src/collectors/article-fetcher.js Extensions/WebClipper/src/export/article-markdown.js Extensions/WebClipper/src/collectors/collector-contract.js Extensions/WebClipper/src/bootstrap/content.js`
-Run: `git commit -m "feat: add article fetch extension scaffold"`
-
 ### Task 21: P3 回归验证与平台启用清单
 
 **Files:**
@@ -447,12 +399,10 @@ Run: `git commit -m "feat: add article fetch extension scaffold"`
 - 标注默认启用平台和灰度平台。
 
 **Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run check`
+Run: `npm --prefix Extensions/WebClipper run test`
 Manual: 按矩阵抽样复测至少 3 平台。
 Expected: 文档与实际行为一致。
-
-**Step 3: 小步提交**
-Run: `git add .github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md .github/docs/Chrome插件-平台兼容性矩阵.md`
-Run: `git commit -m "docs: add platform compatibility matrix"`
 
 ---
 
@@ -470,12 +420,10 @@ Run: `git commit -m "docs: add platform compatibility matrix"`
 - 明确本地存储、导出、同步、错误日志的隐私边界。
 
 **Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run check`
+Run: `npm --prefix Extensions/WebClipper run build`
 Manual: 逐站点回归，确认权限收紧后功能不回退。
 Expected: 权限提示合理，核心功能仍可用。
-
-**Step 3: 小步提交**
-Run: `git add Extensions/WebClipper/manifest.json Extensions/WebClipper/PRIVACY.md Extensions/WebClipper/PERMISSIONS.md`
-Run: `git commit -m "chore: harden permissions and add privacy docs"`
 
 ### Task 23: Safari 转换预演与差异清单
 
@@ -489,10 +437,6 @@ Run: `git commit -m "chore: harden permissions and add privacy docs"`
 **Step 2: 验证**
 Manual: 完成一次迁移演练检查（不要求发布）。
 Expected: 差异清单可直接用于后续 Safari 任务拆解。
-
-**Step 3: 小步提交**
-Run: `git add .github/docs/Chrome到Safari迁移差异清单.md`
-Run: `git commit -m "docs: add chrome-to-safari migration checklist"`
 
 ---
 
