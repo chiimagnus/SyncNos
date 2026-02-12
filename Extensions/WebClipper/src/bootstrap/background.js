@@ -39,6 +39,10 @@
     CLEAR_ALL: "clearAll"
   });
 
+  const ARTICLE_MESSAGE_TYPES = Object.freeze({
+    CAPTURE_ACTIVE_TAB: "captureArticleFromActiveTab"
+  });
+
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
@@ -297,6 +301,10 @@
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
     switch (msg.type) {
+      case ARTICLE_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB: {
+        const res = await captureArticleFromActiveTab();
+        return ok(res);
+      }
       case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
         return ok({ connected: !!(token && token.accessToken), token: token || null });
@@ -528,3 +536,44 @@
 
   NS.__backgroundReady = true;
 })();
+  async function captureArticleFromActiveTab() {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs && tabs[0] ? tabs[0] : null;
+    if (!tab || !tab.id || !tab.url) throw new Error("no active tab");
+    const url = tab.url;
+    if (!/^https?:\/\//.test(url)) throw new Error("unsupported tab url");
+
+    // Request optional host permission for this origin.
+    const origin = new URL(url).origin + "/*";
+    const granted = await new Promise((resolve) => {
+      chrome.permissions.request({ origins: [origin] }, (ok) => resolve(!!ok));
+    });
+    if (!granted) throw new Error("permission denied");
+
+    // Inject article fetcher and dependencies, then call capture.
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["src/shared/normalize.js", "src/collectors/article-fetcher.js"]
+    });
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        try {
+          const NS = globalThis.WebClipper;
+          const c = NS && NS.collectors && NS.collectors.article;
+          return c && c.capture ? c.capture() : null;
+        } catch (_e) {
+          return null;
+        }
+      }
+    });
+
+    const snapshot = results && results[0] ? results[0].result : null;
+    if (!snapshot || !snapshot.conversation) throw new Error("no article content captured");
+
+    // Save into IndexedDB using existing pipeline.
+    const convo = await upsertConversation(snapshot.conversation);
+    await syncConversationMessages(convo.id, snapshot.messages || []);
+    return { conversationId: convo.id };
+  }
