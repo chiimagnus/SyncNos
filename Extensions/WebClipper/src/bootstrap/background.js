@@ -20,6 +20,15 @@
     return { ok: false, data: null, error: { message, extra: extra || null } };
   }
 
+  const MESSAGE_TYPES = Object.freeze({
+    UPSERT_CONVERSATION: "upsertConversation",
+    UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
+    GET_CONVERSATIONS: "getConversations",
+    GET_CONVERSATION_DETAIL: "getConversationDetail",
+    DELETE_CONVERSATION: "deleteConversation",
+    CLEAR_ALL: "clearAll"
+  });
+
   // IndexedDB schema is initialized lazily; this avoids MV3 SW cold-start races.
   const openDb = (NS.storageSchema && NS.storageSchema.openDb) || (async () => Promise.reject(new Error("schema not loaded")));
 
@@ -176,27 +185,36 @@
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
     switch (msg.type) {
-      case "upsertConversation": {
-        const convo = await upsertConversation(msg.payload || {});
+      case MESSAGE_TYPES.UPSERT_CONVERSATION: {
+        const payload = msg.payload || {};
+        if (!payload.source) return err("missing conversation source");
+        if (!payload.conversationKey) return err("missing conversationKey");
+        const convo = await upsertConversation(payload);
         return ok(convo);
       }
-      case "upsertMessagesIncremental": {
-        const res = await upsertMessagesIncremental(msg.conversationId, msg.messages);
+      case MESSAGE_TYPES.UPSERT_MESSAGES_INCREMENTAL: {
+        const conversationId = Number(msg.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
+        const res = await upsertMessagesIncremental(conversationId, msg.messages);
         return ok(res);
       }
-      case "getConversations": {
+      case MESSAGE_TYPES.GET_CONVERSATIONS: {
         const items = await getConversations();
         return ok(items);
       }
-      case "getConversationDetail": {
-        const messages = await getMessagesByConversationId(msg.conversationId);
-        return ok({ conversationId: msg.conversationId, messages });
+      case MESSAGE_TYPES.GET_CONVERSATION_DETAIL: {
+        const conversationId = Number(msg.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
+        const messages = await getMessagesByConversationId(conversationId);
+        return ok({ conversationId, messages });
       }
-      case "deleteConversation": {
-        const res = await deleteConversation(msg.conversationId);
+      case MESSAGE_TYPES.DELETE_CONVERSATION: {
+        const conversationId = Number(msg.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
+        const res = await deleteConversation(conversationId);
         return ok(res);
       }
-      case "clearAll": {
+      case MESSAGE_TYPES.CLEAR_ALL: {
         const res = await clearAll();
         return ok(res);
       }
