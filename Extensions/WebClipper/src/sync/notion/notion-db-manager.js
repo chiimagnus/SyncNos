@@ -68,18 +68,21 @@
     return { source, databaseId: created.id, title, reused: false, database: created };
   }
 
-  async function ensureDatabases({ accessToken, parentPageId }) {
+  async function ensureDatabasesForSources({ accessToken, parentPageId, sources }) {
     if (!NS.notionApi || !NS.notionApi.notionFetch) throw new Error("notionApi missing");
     if (!accessToken) throw new Error("missing accessToken");
     if (!parentPageId) throw new Error("missing parentPageId");
 
-    const a = await ensureDatabaseForSource({ accessToken, parentPageId, source: "chatgpt" });
-    const b = await ensureDatabaseForSource({ accessToken, parentPageId, source: "notionai" });
-    return { chatgpt: a.databaseId, notionai: b.databaseId };
+    const srcs = Array.isArray(sources) && sources.length ? sources : ["chatgpt", "notionai"];
+    const out = {};
+    for (const s of srcs) {
+      const item = await ensureDatabaseForSource({ accessToken, parentPageId, source: s });
+      out[s] = item.databaseId;
+    }
+    return out;
   }
 
-  const api = { ensureDatabases, ensureDatabaseForSource, dbTitleForSource };
+  const api = { ensureDatabasesForSources, ensureDatabaseForSource, dbTitleForSource };
   NS.notionDbManager = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

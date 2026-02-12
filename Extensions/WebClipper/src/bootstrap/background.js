@@ -312,8 +312,8 @@
           chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
         });
         if (!parent) return err("missing parentPageId");
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabases) return err("notion db manager missing");
-        const mapping = await NS.notionDbManager.ensureDatabases({ accessToken: token.accessToken, parentPageId: parent });
+        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabasesForSources) return err("notion db manager missing");
+        const mapping = await NS.notionDbManager.ensureDatabasesForSources({ accessToken: token.accessToken, parentPageId: parent });
         return ok(mapping);
       }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
@@ -323,19 +323,34 @@
           chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
         });
         if (!parent) return err("missing parentPageId");
-        const mapping = await NS.notionDbManager.ensureDatabases({ accessToken: token.accessToken, parentPageId: parent });
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
         if (!ids.length) return err("no conversationIds");
         if (!NS.notionSyncService) return err("notion sync service missing");
 
-        const results = [];
+        // Resolve sources up-front and ensure databases for them.
+        const convos = [];
+        const sourceSet = new Set();
         for (const id of ids) {
           const convo = await getConversationById(id);
+          convos.push({ id, convo });
+          if (convo && convo.source) sourceSet.add(convo.source);
+        }
+        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabasesForSources) return err("notion db manager missing");
+        const mapping = await NS.notionDbManager.ensureDatabasesForSources({
+          accessToken: token.accessToken,
+          parentPageId: parent,
+          sources: Array.from(sourceSet)
+        });
+
+        const results = [];
+        for (const item of convos) {
+          const id = item.id;
+          const convo = item.convo;
           if (!convo) {
             results.push({ conversationId: id, ok: false, error: "conversation not found" });
             continue;
           }
-          const dbId = convo.source === "chatgpt" ? mapping.chatgpt : convo.source === "notionai" ? mapping.notionai : "";
+          const dbId = mapping[convo.source] || "";
           if (!dbId) {
             results.push({ conversationId: id, ok: false, error: `unsupported source: ${convo.source}` });
             continue;
