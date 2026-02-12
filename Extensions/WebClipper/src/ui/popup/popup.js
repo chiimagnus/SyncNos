@@ -5,6 +5,14 @@
     return new Promise((resolve) => chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res)));
   }
 
+  function storageGet(keys) {
+    return new Promise((resolve) => chrome.storage.local.get(keys, (res) => resolve(res || {})));
+  }
+
+  function storageSet(obj) {
+    return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
+  }
+
   const els = {
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
@@ -12,7 +20,11 @@
     btnClearAll: document.getElementById("btnClearAll"),
     chkSelectAll: document.getElementById("chkSelectAll"),
     btnExportJson: document.getElementById("btnExportJson"),
-    btnExportMd: document.getElementById("btnExportMd")
+    btnExportMd: document.getElementById("btnExportMd"),
+    btnNotionConnect: document.getElementById("btnNotionConnect"),
+    notionClientId: document.getElementById("notionClientId"),
+    notionClientSecret: document.getElementById("notionClientSecret"),
+    btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig")
   };
 
   const state = {
@@ -201,4 +213,51 @@
   els.btnExportMd.addEventListener("click", exportMd);
 
   refresh();
+
+  async function loadNotionConfig() {
+    const res = await storageGet(["notion_oauth_client_id", "notion_oauth_client_secret"]);
+    els.notionClientId.value = res.notion_oauth_client_id || "";
+    els.notionClientSecret.value = res.notion_oauth_client_secret || "";
+  }
+
+  async function saveNotionConfig() {
+    await storageSet({
+      notion_oauth_client_id: els.notionClientId.value || "",
+      notion_oauth_client_secret: els.notionClientSecret.value || ""
+    });
+  }
+
+  function buildNotionAuthorizeUrl({ clientId, state }) {
+    const redirectUri = "https://chiimagnus.github.io/syncnos-oauth/callback";
+    const url = new URL("https://api.notion.com/v1/oauth/authorize");
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("owner", "user");
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    return url.toString();
+  }
+
+  els.btnNotionSaveConfig.addEventListener("click", async () => {
+    await saveNotionConfig();
+    alert("Saved Notion OAuth client config.");
+  });
+
+  els.btnNotionConnect.addEventListener("click", async () => {
+    const clientId = (els.notionClientId.value || "").trim();
+    if (!clientId) {
+      alert("Please set Notion Client ID first.");
+      return;
+    }
+    // Save config before starting auth.
+    await saveNotionConfig();
+    // Persist state so background can validate callback.
+    const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+    await storageSet({ notion_oauth_pending_state: state });
+    const url = buildNotionAuthorizeUrl({ clientId, state });
+    window.open(url, "_blank", "noopener,noreferrer");
+    alert("Notion auth opened in a new tab. Complete authorization, then return here.");
+  });
+
+  loadNotionConfig();
 })();
