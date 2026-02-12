@@ -22,6 +22,7 @@
     btnExportJson: document.getElementById("btnExportJson"),
     btnExportMd: document.getElementById("btnExportMd"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
+    btnFetchArticle: document.getElementById("btnFetchArticle"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
     notionStatus: document.getElementById("notionStatus"),
     notionClientId: document.getElementById("notionClientId"),
@@ -160,6 +161,12 @@
   }
 
   function conversationToMarkdown({ conversation, messages }) {
+    if (conversation && conversation.sourceType === "article") {
+      const api = (globalThis.WebClipper && globalThis.WebClipper.articleMarkdown) || null;
+      if (api && typeof api.formatArticleMarkdown === "function") {
+        return api.formatArticleMarkdown({ conversation, messages });
+      }
+    }
     const lines = [];
     lines.push(`# ${conversation.title || "(untitled)"}`);
     lines.push("");
@@ -217,6 +224,15 @@
 
   els.btnExportJson.addEventListener("click", exportJson);
   els.btnExportMd.addEventListener("click", exportMd);
+  els.btnFetchArticle.addEventListener("click", async () => {
+    const res = await send("captureArticleFromActiveTab");
+    if (!res || !res.ok) {
+      alert((res && res.error && res.error.message) || "Fetch failed.");
+      return;
+    }
+    alert("Fetched article into local storage.");
+    await refresh();
+  });
   els.btnSyncNotion.addEventListener("click", async () => {
     const ids = getSelectedIds();
     if (!ids.length) return;
