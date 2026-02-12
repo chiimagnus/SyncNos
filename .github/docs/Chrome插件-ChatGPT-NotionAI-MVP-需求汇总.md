@@ -8,7 +8,7 @@
 
 - 目标产品：独立于 SyncNos App 的 Chrome 插件（先开发者模式安装）。
 - 插件目录命名：`WebClipper`（避免冗长命名）。
-- 目标站点：`chatgpt.com` 与 `notion.so/chat`（NotionAI）。
+- 目标站点：`chatgpt.com` 与 `notion.so`（NotionAI）。
 - 核心目标：
   - 自动监听聊天页面 DOM 变化并增量保存到插件本地数据库。
   - 用户手动选择会话后，执行导出（JSON + Markdown）或同步到 Notion。

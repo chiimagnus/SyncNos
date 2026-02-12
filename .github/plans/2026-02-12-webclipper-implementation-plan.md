@@ -40,7 +40,7 @@
 **Step 1: 实现功能**
 - 参考 `Resource/demo/js` 的能力实现，按本计划定义的能力分包目录搭建插件工程。
 - 仅保留当前阶段需要的模块；不复制多平台适配器和无关页面。
-- `manifest.json` 仅声明 `chatgpt.com`、`chat.openai.com`、`notion.so/chat` 所需权限。
+- `manifest.json` 仅声明 `chatgpt.com`、`chat.openai.com`、`notion.so` 所需权限。
 
 **Step 2: 验证**
 Run: 在 `chrome://extensions` 加载 `Extensions/WebClipper`。
