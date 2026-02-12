@@ -114,24 +114,66 @@
   }
 
   async function exportJson() {
-    // Placeholder: full export implemented in Task 7.
     const ids = getSelectedIds();
     if (!ids.length) return;
-    const payload = { ids, exportedAt: Date.now() };
+    const selected = state.conversations.filter((c) => state.selectedIds.has(c.id));
+    const items = [];
+    for (const c of selected) {
+      const detail = await send("getConversationDetail", { conversationId: c.id });
+      items.push({
+        conversation: c,
+        messages: (detail && detail.ok && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : []
+      });
+    }
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      count: items.length,
+      items
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    chrome.downloads.download({ url, filename: "webclipper-export.json", saveAs: true }, () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    chrome.downloads.download({ url, filename: `webclipper-export-${stamp}.json`, saveAs: true }, () => {
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     });
+  }
+
+  function conversationToMarkdown({ conversation, messages }) {
+    const lines = [];
+    lines.push(`# ${conversation.title || "(untitled)"}`);
+    lines.push("");
+    lines.push(`- Source: ${conversation.source || ""}`);
+    if (conversation.url) lines.push(`- URL: ${conversation.url}`);
+    if (conversation.lastCapturedAt) lines.push(`- CapturedAt: ${new Date(conversation.lastCapturedAt).toISOString()}`);
+    if (hasWarningFlags(conversation)) lines.push(`- Warnings: ${(conversation.warningFlags || []).join(", ")}`);
+    lines.push("");
+    for (const m of messages || []) {
+      const role = m.role || "assistant";
+      lines.push(`## ${role}`);
+      lines.push("");
+      lines.push(String(m.contentText || ""));
+      lines.push("");
+    }
+    return lines.join("\n");
   }
 
   async function exportMd() {
     const ids = getSelectedIds();
     if (!ids.length) return;
-    const text = `# WebClipper Export\n\n- conversations: ${ids.length}\n- exportedAt: ${new Date().toISOString()}\n`;
+    const selected = state.conversations.filter((c) => state.selectedIds.has(c.id));
+    const docs = [];
+    for (const c of selected) {
+      const detail = await send("getConversationDetail", { conversationId: c.id });
+      const messages = (detail && detail.ok && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
+      docs.push(conversationToMarkdown({ conversation: c, messages }));
+    }
+
+    const text = docs.join("\n---\n\n");
     const blob = new Blob([text], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
-    chrome.downloads.download({ url, filename: "webclipper-export.md", saveAs: true }, () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    chrome.downloads.download({ url, filename: `webclipper-export-${stamp}.md`, saveAs: true }, () => {
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     });
   }
@@ -156,4 +198,3 @@
 
   refresh();
 })();
-
