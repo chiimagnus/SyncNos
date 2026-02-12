@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebClipper</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="title">WebClipper</div>
+        <div class="actions">
+          <button id="btnRefresh" class="btn">Refresh</button>
+          <button id="btnClearAll" class="btn danger">Clear</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <label class="checkbox">
+          <input id="chkSelectAll" type="checkbox" />
+          <span>Select all</span>
+        </label>
+        <div class="spacer"></div>
+        <button id="btnExportJson" class="btn">Export JSON</button>
+        <button id="btnExportMd" class="btn">Export MD</button>
+        <button id="btnSyncNotion" class="btn">Sync</button>
+        <button id="btnFetchArticle" class="btn">Fetch</button>
+      </section>
+
+      <section class="toolbar" id="notionBar">
+        <div class="title" style="font-weight: 650;">Notion</div>
+        <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+        <div class="spacer"></div>
+        <button id="btnNotionConnect" class="btn">Connect</button>
+      </section>
+
+      <section class="toolbar" id="notionConfig">
+        <input id="notionClientId" class="input" placeholder="Notion Client ID" />
+        <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
+        <button id="btnNotionSaveConfig" class="btn">Save</button>
+      </section>
+
+      <section class="toolbar" id="notionParent">
+        <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
+        <button id="btnNotionLoadPages" class="btn">Load</button>
+      </section>
+
+      <section class="toolbar" id="notionParentSelect">
+        <select id="notionPages" class="input"></select>
+        <button id="btnNotionSaveParent" class="btn">Use</button>
+      </section>
+
+      <main>
+        <div id="list" class="list"></div>
+      </main>
+
+      <footer class="footer">
+        <div id="stats" class="stats">0 conversations</div>
+      </footer>
+    </div>
+
+    <script src="../../export/article-markdown.js"></script>
+    <script src="./popup.js"></script>
+  </body>
+</html>

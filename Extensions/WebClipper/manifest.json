@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "SyncNos-WebClipper",
+  "version": "0.1.0",
+  "description": "Clip AI chats (ChatGPT, NotionAI) into local storage, export, and sync to Notion.",
+  "action": {
+    "default_title": "SyncNos-WebClipper",
+    "default_popup": "src/ui/popup/popup.html"
+  },
+  "background": {
+    "service_worker": "src/bootstrap/background.js"
+  },
+  "permissions": ["storage", "downloads", "tabs", "webNavigation", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://www.chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://kimi.moonshot.cn/*",
+    "https://kimi.com/*",
+    "https://*.kimi.com/*",
+    "https://www.doubao.com/*",
+    "https://yuanbao.tencent.com/*",
+    "https://*.notion.so/*",
+    "https://api.notion.com/*",
+    "https://chiimagnus.github.io/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://www.chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://kimi.moonshot.cn/*",
+        "https://kimi.com/*",
+        "https://*.kimi.com/*",
+        "https://www.doubao.com/*",
+        "https://yuanbao.tencent.com/*",
+        "https://*.notion.so/*"
+      ],
+      "css": ["src/ui/inpage/inpage.css"],
+      "js": [
+        "src/shared/normalize.js",
+        "src/storage/incremental-updater.js",
+        "src/collectors/collector-contract.js",
+        "src/collectors/registry.js",
+        "src/collectors/runtime-observer.js",
+        "src/collectors/chatgpt-collector.js",
+        "src/collectors/claude-collector.js",
+        "src/collectors/gemini-collector.js",
+        "src/collectors/deepseek-collector.js",
+        "src/collectors/kimi-collector.js",
+        "src/collectors/doubao-collector.js",
+        "src/collectors/yuanbao-collector.js",
+        "src/collectors/notionai-collector.js",
+        "src/bootstrap/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

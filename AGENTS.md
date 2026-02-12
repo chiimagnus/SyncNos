@@ -16,6 +16,8 @@ SyncNos/
 │       ├── Core/                # 核心服务（DI、日志、加密）
 │       ├── DataSources-From/    # 数据源适配器
 │       └── DataSources-To/      # 同步目标适配器
+├── Extensions/                  # 浏览器扩展
+│   └── WebClipper/              # Chrome Extension (MV3)
 ├── .github/docs/                 # 开发指南文档
 └── Resource/                    # 资源文件
 ```
@@ -46,6 +48,7 @@ xcodebuild -scheme SyncNos build # 构建
 | 动态字体 | `SyncNos/Services/Core/AGENTS.md` |
 | OCR 技术 | `SyncNos/Services/DataSources-From/OCR/AppleVisionOCR技术文档.md` |
 | 键盘导航 | `.github/docs/键盘导航与焦点管理技术文档（全项目）.md` |
+| WebClipper 扩展 | `Extensions/WebClipper/AGENTS.md` |
 
 ## 开发指南
 
