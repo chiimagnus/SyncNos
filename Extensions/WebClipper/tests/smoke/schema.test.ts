@@ -26,5 +26,12 @@ describe("smoke", () => {
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(false);
     expect(incrementalUpdater.computeIncremental(snap3).changed).toBe(true);
   });
-});
 
+  it("computeIncremental detects content update for same messageKey", () => {
+    incrementalUpdater.__resetForTests();
+    const snap1 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const snap2 = { conversation: { conversationKey: "c1" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi!" }] };
+    expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(true);
+  });
+});
