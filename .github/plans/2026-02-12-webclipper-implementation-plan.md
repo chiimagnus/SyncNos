@@ -352,7 +352,7 @@ Run: `node --check Extensions/WebClipper/src/collectors/gemini-collector.js`
 Manual: 在两个平台分别验证采集/导出/同步。
 Expected: 满足四项基本能力。
 
-### Task 19: 批次 B/C 平台接入（DeepSeek/Kimi/Doubao/Yuanbao）
+### ✅Task 19: 批次 B/C 平台接入（DeepSeek/Kimi/Doubao/Yuanbao）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/collectors/deepseek-collector.js`
@@ -369,7 +369,7 @@ Expected: 满足四项基本能力。
 Manual: 每平台至少完成一次采集、一次导出、一次同步。
 Expected: 平台可用且不影响已接入平台。
 
-### Task 20A: 网页文章 fetch 扩展骨架
+### ✅Task 20A: 网页文章 fetch 扩展骨架
 
 **Files:**
 - Create: `Extensions/WebClipper/src/collectors/article-fetcher.js`
@@ -388,7 +388,7 @@ Run: `node --check Extensions/WebClipper/src/export/article-markdown.js`
 Manual: 在任意文章页执行一次手动抓取并导出 Markdown。
 Expected: 文章可入库，导出文件结构正确且不影响聊天流程。
 
-### Task 21: P3 回归验证与平台启用清单
+### ✅Task 21: P3 回归验证与平台启用清单
 
 **Files:**
 - Modify: `.github/docs/Chrome插件-ChatGPT-NotionAI-MVP-需求汇总.md`
@@ -408,7 +408,7 @@ Expected: 文档与实际行为一致。
 
 ### P4：发布与跨浏览器迁移准备
 
-### Task 22: 权限最小化与隐私文档
+### ✅Task 22: 权限最小化与隐私文档
 
 **Files:**
 - Modify: `Extensions/WebClipper/manifest.json`
@@ -425,7 +425,7 @@ Run: `npm --prefix Extensions/WebClipper run build`
 Manual: 逐站点回归，确认权限收紧后功能不回退。
 Expected: 权限提示合理，核心功能仍可用。
 
-### Task 23: Safari 转换预演与差异清单
+### ✅Task 23: Safari 转换预演与差异清单
 
 **Files:**
 - Create: `.github/docs/Chrome到Safari迁移差异清单.md`
