@@ -22,6 +22,7 @@
     btnExportJson: document.getElementById("btnExportJson"),
     btnExportMd: document.getElementById("btnExportMd"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
+    notionStatus: document.getElementById("notionStatus"),
     notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
     btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig")
@@ -244,6 +245,14 @@
   });
 
   els.btnNotionConnect.addEventListener("click", async () => {
+    // If connected, allow disconnect.
+    const status = await send("getNotionAuthStatus");
+    if (status && status.ok && status.data && status.data.connected) {
+      await send("notionDisconnect");
+      await refreshNotionStatus();
+      return;
+    }
+
     const clientId = (els.notionClientId.value || "").trim();
     if (!clientId) {
       alert("Please set Notion Client ID first.");
@@ -260,4 +269,23 @@
   });
 
   loadNotionConfig();
+
+  async function refreshNotionStatus() {
+    const res = await send("getNotionAuthStatus");
+    if (!res || !res.ok || !res.data) {
+      els.notionStatus.textContent = "";
+      els.btnNotionConnect.textContent = "Connect";
+      return;
+    }
+    if (res.data.connected) {
+      const name = res.data.token && res.data.token.workspaceName ? res.data.token.workspaceName : "Connected";
+      els.notionStatus.textContent = name;
+      els.btnNotionConnect.textContent = "Disconnect";
+    } else {
+      els.notionStatus.textContent = "Not connected";
+      els.btnNotionConnect.textContent = "Connect";
+    }
+  }
+
+  refreshNotionStatus();
 })();

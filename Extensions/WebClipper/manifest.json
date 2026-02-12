@@ -10,12 +10,14 @@
   "background": {
     "service_worker": "src/bootstrap/background.js"
   },
-  "permissions": ["storage", "downloads"],
+  "permissions": ["storage", "downloads", "tabs", "webNavigation"],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://www.chatgpt.com/*",
-    "https://*.notion.so/*"
+    "https://*.notion.so/*",
+    "https://api.notion.com/*",
+    "https://chiimagnus.github.io/*"
   ],
   "content_scripts": [
     {

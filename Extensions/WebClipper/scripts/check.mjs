@@ -48,6 +48,7 @@ const jsFiles = [
   "src/collectors/notionai-collector.js",
   "src/sync/notion/oauth-config.js",
   "src/sync/notion/oauth-client.js",
+  "src/sync/notion/token-store.js",
   "src/ui/popup/popup.js"
 ];
 
