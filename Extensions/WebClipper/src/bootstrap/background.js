@@ -8,6 +8,8 @@
   try {
     // eslint-disable-next-line no-undef
     importScripts("../storage/schema.js");
+    // eslint-disable-next-line no-undef
+    importScripts("../sync/notion/oauth-config.js", "../sync/notion/oauth-client.js", "../sync/notion/token-store.js");
   } catch (_e) {
     // ignore
   }
@@ -28,6 +30,11 @@
     GET_CONVERSATION_DETAIL: "getConversationDetail",
     DELETE_CONVERSATION: "deleteConversation",
     CLEAR_ALL: "clearAll"
+  });
+
+  const NOTION_MESSAGE_TYPES = Object.freeze({
+    GET_AUTH_STATUS: "getNotionAuthStatus",
+    DISCONNECT: "notionDisconnect"
   });
 
   // IndexedDB schema is initialized lazily; this avoids MV3 SW cold-start races.
@@ -243,6 +250,14 @@
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
     switch (msg.type) {
+      case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
+        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
+        return ok({ connected: !!(token && token.accessToken), token: token || null });
+      }
+      case NOTION_MESSAGE_TYPES.DISCONNECT: {
+        await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
+        return ok({ disconnected: true });
+      }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};
         if (!payload.source) return err("missing conversation source");
@@ -294,6 +309,92 @@
       .catch((e) => sendResponse(err(e && e.message ? e.message : "unknown error", String(e))));
     return true;
   });
+
+  async function exchangeNotionCodeForToken({ code }) {
+    const cfg = NS.notionOAuthConfig && NS.notionOAuthConfig.getDefaults ? NS.notionOAuthConfig.getDefaults() : null;
+    if (!cfg) throw new Error("notion oauth config missing");
+    const client = NS.notionOAuthConfig && NS.notionOAuthConfig.loadClientConfig ? await NS.notionOAuthConfig.loadClientConfig() : { clientId: "", clientSecret: "" };
+    if (!client.clientId || !client.clientSecret) throw new Error("notion clientId/clientSecret not configured");
+
+    const form = new URLSearchParams();
+    form.set("grant_type", "authorization_code");
+    form.set("code", code);
+    form.set("redirect_uri", cfg.redirectUri);
+    form.set("client_id", client.clientId);
+    form.set("client_secret", client.clientSecret);
+
+    const basic = btoa(`${client.clientId}:${client.clientSecret}`);
+    const res = await fetch(cfg.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+        Authorization: `Basic ${basic}`
+      },
+      body: form.toString()
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`token exchange failed: HTTP ${res.status} ${text}`);
+    const json = JSON.parse(text);
+    if (!json || !json.access_token) throw new Error("no access_token in response");
+    return json;
+  }
+
+  function parseQueryFromUrl(url) {
+    try {
+      const u = new URL(url);
+      return {
+        code: u.searchParams.get("code") || "",
+        state: u.searchParams.get("state") || "",
+        error: u.searchParams.get("error") || ""
+      };
+    } catch (_e) {
+      return { code: "", state: "", error: "invalid_url" };
+    }
+  }
+
+  async function handleNotionCallbackNavigation(details) {
+    const cfg = NS.notionOAuthConfig && NS.notionOAuthConfig.getDefaults ? NS.notionOAuthConfig.getDefaults() : null;
+    if (!cfg) return;
+    const redirectBase = cfg.redirectUri;
+    if (!details || !details.url || !details.url.startsWith(redirectBase)) return;
+
+    const { code, state, error } = parseQueryFromUrl(details.url);
+    if (error) {
+      chrome.storage.local.set({ notion_oauth_last_error: error });
+      return;
+    }
+    if (!code || !state) return;
+
+    chrome.storage.local.get(["notion_oauth_pending_state"], async (res) => {
+      const pending = (res && res.notion_oauth_pending_state) || "";
+      if (!pending || pending !== state) return;
+
+      try {
+        const tokenJson = await exchangeNotionCodeForToken({ code });
+        const token = {
+          accessToken: tokenJson.access_token,
+          workspaceId: tokenJson.workspace && tokenJson.workspace.id ? tokenJson.workspace.id : "",
+          workspaceName: tokenJson.workspace && tokenJson.workspace.name ? tokenJson.workspace.name : "",
+          createdAt: Date.now()
+        };
+        await (NS.notionTokenStore && NS.notionTokenStore.setToken ? NS.notionTokenStore.setToken(token) : Promise.resolve());
+        chrome.storage.local.remove(["notion_oauth_pending_state"]);
+        chrome.storage.local.set({ notion_oauth_last_error: "" });
+        if (details.tabId >= 0 && chrome.tabs && chrome.tabs.remove) {
+          chrome.tabs.remove(details.tabId);
+        }
+      } catch (e) {
+        chrome.storage.local.set({ notion_oauth_last_error: e && e.message ? e.message : String(e) });
+      }
+    });
+  }
+
+  if (chrome.webNavigation && chrome.webNavigation.onCommitted) {
+    chrome.webNavigation.onCommitted.addListener((details) => {
+      handleNotionCallbackNavigation(details).catch(() => {});
+    });
+  }
 
   NS.__backgroundReady = true;
 })();
