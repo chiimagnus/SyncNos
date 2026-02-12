@@ -136,6 +136,45 @@
     document.documentElement.appendChild(btn);
   }
 
+  function ensureNotionAttachedButton({ onClick, getAnchorRect }) {
+    if (!isNotion()) return;
+    ensureInpageStylesheetInjected();
+    const id = "webclipper-notionai-btn";
+    if (document.getElementById(id)) return;
+    if (typeof getAnchorRect !== "function") return;
+
+    const btn = document.createElement("button");
+    btn.id = id;
+    btn.className = "webclipper-inpage-btn";
+    btn.type = "button";
+    btn.textContent = "Save";
+    btn.style.padding = "8px 10px";
+    btn.style.borderRadius = "12px";
+
+    function updatePos() {
+      const r = getAnchorRect();
+      if (!r) return;
+      // Attach near the top-left of the NotionAI window area.
+      btn.style.left = `${Math.max(6, r.left + 10)}px`;
+      btn.style.top = `${Math.max(6, r.top + 10)}px`;
+      btn.style.right = "auto";
+      btn.style.bottom = "auto";
+      btn.style.position = "fixed";
+    }
+
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, { passive: true });
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick && onClick();
+    });
+
+    document.documentElement.appendChild(btn);
+  }
+
   function startAutoCapture() {
     const collector = getCollector();
     if (!collector || typeof collector.capture !== "function") return;
@@ -159,17 +198,18 @@
     observer && observer.start && observer.start();
 
     // Manual button: trigger an immediate capture and save once.
-    ensureChatGPTButton({
-      onClick: async () => {
-        try {
-          const snapshot = collector.capture();
-          if (!snapshot) return;
-          await saveSnapshot(snapshot);
-        } catch (_e) {
-          // ignore
-        }
+    const clickSave = async () => {
+      try {
+        const snapshot = collector.capture();
+        if (!snapshot) return;
+        await saveSnapshot(snapshot);
+      } catch (_e) {
+        // ignore
       }
-    });
+    };
+
+    ensureChatGPTButton({ onClick: clickSave });
+    ensureNotionAttachedButton({ onClick: clickSave, getAnchorRect: collector.getAnchorRect });
   }
 
   startAutoCapture();
