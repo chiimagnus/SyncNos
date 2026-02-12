@@ -14,7 +14,8 @@
       "../sync/notion/oauth-client.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",
-      "../sync/notion/notion-db-manager.js"
+      "../sync/notion/notion-db-manager.js",
+      "../sync/notion/notion-sync-service.js"
     );
   } catch (_e) {
     // ignore
@@ -41,7 +42,8 @@
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
-    ENSURE_DATABASES: "notionEnsureDatabases"
+    ENSURE_DATABASES: "notionEnsureDatabases",
+    SYNC_CONVERSATIONS: "notionSyncConversations"
   });
 
   // IndexedDB schema is initialized lazily; this avoids MV3 SW cold-start races.
@@ -253,6 +255,44 @@
     return { cleared: true };
   }
 
+  async function getConversationById(conversationId) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations"], "readonly");
+    const item = await reqToPromise(stores.conversations.get(conversationId));
+    await new Promise((r, rej) => {
+      t.oncomplete = r;
+      t.onerror = () => rej(t.error || new Error("transaction failed"));
+    });
+    return item || null;
+  }
+
+  async function setConversationNotionPageId(conversationId, notionPageId) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations", "sync_mappings"], "readwrite");
+    const convo = await reqToPromise(stores.conversations.get(conversationId));
+    if (!convo) throw new Error("conversation not found");
+    convo.notionPageId = notionPageId || "";
+    await reqToPromise(stores.conversations.put(convo));
+
+    const idx = stores.sync_mappings.index("by_source_conversationKey");
+    const existing = await reqToPromise(idx.get([convo.source, convo.conversationKey]));
+    const mapping = {
+      id: existing ? existing.id : undefined,
+      source: convo.source,
+      conversationKey: convo.conversationKey,
+      notionPageId: notionPageId || "",
+      updatedAt: Date.now()
+    };
+    if (existing) await reqToPromise(stores.sync_mappings.put(mapping));
+    else await reqToPromise(stores.sync_mappings.add(mapping));
+
+    await new Promise((r, rej) => {
+      t.oncomplete = r;
+      t.onerror = () => rej(t.error || new Error("transaction failed"));
+    });
+    return true;
+  }
+
   async function handleMessage(msg) {
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
@@ -275,6 +315,58 @@
         if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabases) return err("notion db manager missing");
         const mapping = await NS.notionDbManager.ensureDatabases({ accessToken: token.accessToken, parentPageId: parent });
         return ok(mapping);
+      }
+      case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
+        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
+        if (!token || !token.accessToken) return err("notion not connected");
+        const parent = await new Promise((resolve) => {
+          chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
+        });
+        if (!parent) return err("missing parentPageId");
+        const mapping = await NS.notionDbManager.ensureDatabases({ accessToken: token.accessToken, parentPageId: parent });
+        const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
+        if (!ids.length) return err("no conversationIds");
+        if (!NS.notionSyncService) return err("notion sync service missing");
+
+        const results = [];
+        for (const id of ids) {
+          const convo = await getConversationById(id);
+          if (!convo) {
+            results.push({ conversationId: id, ok: false, error: "conversation not found" });
+            break;
+          }
+          const dbId = convo.source === "chatgpt" ? mapping.chatgpt : convo.source === "notionai" ? mapping.notionai : "";
+          if (!dbId) {
+            results.push({ conversationId: id, ok: false, error: `unsupported source: ${convo.source}` });
+            break;
+          }
+          const messages = await getMessagesByConversationId(id);
+          const blocks = NS.notionSyncService.messagesToBlocks(messages);
+          try {
+            let pageId = convo.notionPageId || "";
+            if (pageId) {
+              await NS.notionSyncService.updatePageProperties(token.accessToken, { pageId, title: convo.title, url: convo.url });
+              await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
+              await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+            } else {
+              const created = await NS.notionSyncService.createPageInDatabase(token.accessToken, {
+                databaseId: dbId,
+                title: convo.title,
+                url: convo.url
+              });
+              pageId = created && created.id ? created.id : "";
+              if (!pageId) throw new Error("create page failed");
+              await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+              await setConversationNotionPageId(id, pageId);
+            }
+            results.push({ conversationId: id, ok: true, notionPageId: pageId });
+          } catch (e) {
+            results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
+            break; // Task 15 will make this non-blocking
+          }
+        }
+
+        return ok({ results });
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};

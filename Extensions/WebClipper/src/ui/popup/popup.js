@@ -21,6 +21,7 @@
     chkSelectAll: document.getElementById("chkSelectAll"),
     btnExportJson: document.getElementById("btnExportJson"),
     btnExportMd: document.getElementById("btnExportMd"),
+    btnSyncNotion: document.getElementById("btnSyncNotion"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
     notionStatus: document.getElementById("notionStatus"),
     notionClientId: document.getElementById("notionClientId"),
@@ -216,6 +217,23 @@
 
   els.btnExportJson.addEventListener("click", exportJson);
   els.btnExportMd.addEventListener("click", exportMd);
+  els.btnSyncNotion.addEventListener("click", async () => {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    const res = await send("notionSyncConversations", { conversationIds: ids });
+    if (!res || !res.ok) {
+      alert((res && res.error && res.error.message) || "Sync failed.");
+      return;
+    }
+    const results = res.data && res.data.results ? res.data.results : [];
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length) {
+      alert(`Sync finished with failure.\n\n${failed[0].error || "unknown error"}`);
+    } else {
+      alert(`Sync ok: ${results.length}`);
+    }
+    await refresh();
+  });
 
   refresh();
 
