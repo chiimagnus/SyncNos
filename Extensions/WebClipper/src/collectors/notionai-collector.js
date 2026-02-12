@@ -1,14 +1,21 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  function hasChatSignals(scope) {
+    const s = scope || document;
+    // NotionAI chat turns include this marker on user messages (observed across page/side-panel/floating dialog).
+    return !!s.querySelector("[data-agent-chat-user-step-id]");
+  }
+
   function matches(loc) {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
-    return /(^|\.)notion\.so$/.test(hostname);
+    if (!/(^|\.)notion\.so$/.test(hostname)) return false;
+    // Important: do not activate on normal Notion pages, otherwise we can capture page blocks as "assistant" turns.
+    return hasChatSignals(document);
   }
 
   function isNotionAiPage() {
-    // NotionAI lives under notion.so, but DOM varies; keep permissive for now.
-    return /(^|\.)notion\.so$/.test(location.hostname);
+    return /(^|\.)notion\.so$/.test(location.hostname) && hasChatSignals(document);
   }
 
   function getAnyUserStepEl(scope) {
@@ -54,6 +61,7 @@
 
   function findCandidateRoots() {
     const seeds = Array.from(document.querySelectorAll("[data-agent-chat-user-step-id]")).slice(0, 20);
+    if (!seeds.length) return [];
     const set = new Set();
     for (const s of seeds) {
       const root = findScrollContainerFromSeed(s);
@@ -62,19 +70,29 @@
     return Array.from(set).filter(isVisible);
   }
 
+  function rootScore(root) {
+    if (!root) return -Infinity;
+    const userCount = root.querySelectorAll("[data-agent-chat-user-step-id]").length;
+    const blockCount = root.querySelectorAll("div[data-block-id]").length;
+    const rect = root.getBoundingClientRect ? root.getBoundingClientRect() : { left: 0, top: 0, right: 0, bottom: 0 };
+    const area = rectVisibleArea(rect);
+    // Prefer containers with many user turns but fewer generic Notion blocks (reduce capturing page content).
+    return userCount * 100000 - blockCount * 10 + area / 1000;
+  }
+
   function pickBestRoot(roots) {
-    if (!roots || !roots.length) return { root: document.body, allRoots: [], lowConfidence: true };
+    if (!roots || !roots.length) return { root: null, allRoots: [], lowConfidence: true };
     let best = roots[0];
-    let bestScore = -1;
+    let bestScore = -Infinity;
     for (const r of roots) {
-      const rect = r.getBoundingClientRect();
-      const score = rectVisibleArea(rect);
+      const score = rootScore(r);
       if (score > bestScore) {
         best = r;
         bestScore = score;
       }
     }
-    return { root: best, allRoots: roots, lowConfidence: roots.length !== 1 };
+    const userCount = best ? best.querySelectorAll("[data-agent-chat-user-step-id]").length : 0;
+    return { root: best, allRoots: roots, lowConfidence: roots.length !== 1 || userCount < 1 };
   }
 
   function getTurnWrappers(root) {
