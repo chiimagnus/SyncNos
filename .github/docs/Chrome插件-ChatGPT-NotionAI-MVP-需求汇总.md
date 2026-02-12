@@ -192,6 +192,19 @@
   - NotionAI 三形态可采集，且不混入主页内容。
   - 数据去重稳定（messageId 优先、hash 回退）。
 
+#### P1 回归记录（开发者模式本地安装）
+
+> 说明：以下为“实现完成后的验证入口与现状记录”。其中涉及 ChatGPT/NotionAI 的页面形态验证需要人工在浏览器中复现（本仓库无法自动化跑 UI）。
+
+- 自动化验证：
+  - `npm --prefix Extensions/WebClipper run check`: PASS
+  - `npm --prefix Extensions/WebClipper run test`: PASS
+  - `npm --prefix Extensions/WebClipper run build`: PASS
+- 手动 smoke（需人工）：
+  - ChatGPT：打开对话页后新增消息，IndexedDB 会话/消息递增入库；右下角 `Save` 按钮可拖拽且可手动触发一次采集。
+  - NotionAI：三形态（侧边栏/右下角浮窗/全屏）下，基于“当前聊天滚动容器根节点”向下采集；当容器定位不确定时会话带 `container_low_confidence` 并在 popup 显示黄色 warning。
+  - popup：会话列表多选/全选（包含 warning 会话）；导出 JSON/Markdown；会话级删除与清空全部（带确认弹窗）。
+
 ### 10.2 P2：Notion 同步闭环
 
 - 核心目标：
