@@ -10,7 +10,8 @@
   "background": {
     "service_worker": "src/bootstrap/background.js"
   },
-  "permissions": ["storage", "downloads", "tabs", "webNavigation"],
+  "permissions": ["storage", "downloads", "tabs", "webNavigation", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",

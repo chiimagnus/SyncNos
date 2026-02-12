@@ -54,12 +54,14 @@ const jsFiles = [
   "src/collectors/doubao-collector.js",
   "src/collectors/yuanbao-collector.js",
   "src/collectors/notionai-collector.js",
+  "src/collectors/article-fetcher.js",
   "src/sync/notion/oauth-config.js",
   "src/sync/notion/oauth-client.js",
   "src/sync/notion/token-store.js",
   "src/sync/notion/notion-api.js",
   "src/sync/notion/notion-db-manager.js",
   "src/sync/notion/notion-sync-service.js",
+  "src/export/article-markdown.js",
   "src/ui/popup/popup.js"
 ];
 
