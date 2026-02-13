@@ -259,7 +259,7 @@ body {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  min-width: 220px;
+  min-width: 150px;
   padding: 6px;
   border-radius: 14px;
   border: 1px solid var(--border);
