@@ -10,6 +10,7 @@
   const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
   const EDGE_GAP = 8;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
+  const INPAGE_OK_FLASH_COOLDOWN_MS = 2500;
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -140,12 +141,65 @@
     return { conversationId: convo.id };
   }
 
+  const inpageOkState = {
+    lastAt: 0,
+    timer: null
+  };
+
+  function ensureInpageOkDecor(btn) {
+    if (!btn || !btn.appendChild) return;
+    let check = btn.querySelector(".webclipper-inpage-btn__check");
+    if (!check) {
+      check = document.createElement("span");
+      check.className = "webclipper-inpage-btn__check";
+      check.setAttribute("aria-hidden", "true");
+      check.textContent = "✓";
+      btn.appendChild(check);
+    }
+
+    // Defensive: Notion's global styles (or cached older extension CSS) can leak into our badge.
+    // Force the "popup-style" white badge here so it stays visually consistent.
+    try {
+      check.style.background = "#ffffff";
+      check.style.border = "1px solid rgba(31, 157, 85, 0.38)";
+      check.style.color = "#1f9d55";
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function flashInpageOk() {
+    const btn = document.getElementById(INPAGE_BTN_ID);
+    if (!btn) return;
+    ensureInpageOkDecor(btn);
+    const now = Date.now();
+    if (now - inpageOkState.lastAt < INPAGE_OK_FLASH_COOLDOWN_MS) return;
+    inpageOkState.lastAt = now;
+
+    if (inpageOkState.timer) {
+      clearTimeout(inpageOkState.timer);
+      inpageOkState.timer = null;
+    }
+
+    btn.classList.remove("is-flash-ok");
+    // Force reflow so re-adding the class re-triggers the animation reliably.
+    void btn.offsetWidth;
+    btn.classList.add("is-flash-ok");
+    inpageOkState.timer = setTimeout(() => {
+      btn.classList.remove("is-flash-ok");
+      inpageOkState.timer = null;
+    }, 1400);
+  }
+
   function ensureInpageButton({ collectorId, onClick }) {
     if (!collectorId) return;
 
     const existing = document.getElementById(INPAGE_BTN_ID);
     if (existing) {
-      if (existing.dataset.sourceId === collectorId) return;
+      if (existing.dataset.sourceId === collectorId) {
+        ensureInpageOkDecor(existing);
+        return;
+      }
       existing.remove();
     }
     const btn = document.createElement("button");
@@ -174,6 +228,8 @@
     } else {
       btn.textContent = INPAGE_BUTTON_LABEL;
     }
+
+    ensureInpageOkDecor(btn);
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
@@ -310,7 +366,7 @@
           return;
         }
         await saveSnapshot(snapshot);
-        showSaveTip("Saved");
+        flashInpageOk();
       } catch (_e) {
         showSaveTip("Save failed");
       }
@@ -338,6 +394,7 @@
           const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
           if (!inc || !inc.changed) return;
           await saveSnapshot(inc.snapshot);
+          flashInpageOk();
         } catch (_e) {
           if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
             stop();

@@ -189,23 +189,8 @@
       sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}`;
       meta.appendChild(sub);
 
-      const right = document.createElement("div");
-      right.className = "right";
-      const del = document.createElement("button");
-      del.className = "mini danger";
-      del.textContent = "Delete";
-      del.addEventListener("click", async () => {
-        const confirmed = confirm(`Delete conversation?\n\n${c.title || "(untitled)"}`);
-        if (!confirmed) return;
-        await send("deleteConversation", { conversationId: c.id });
-        state.selectedIds.delete(c.id);
-        await refresh();
-      });
-      right.appendChild(del);
-
       row.appendChild(left);
       row.appendChild(meta);
-      row.appendChild(right);
 
       els.list.appendChild(row);
     }

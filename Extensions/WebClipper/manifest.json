@@ -43,7 +43,7 @@
         "https://yuanbao.tencent.com/*",
         "https://*.notion.so/*"
       ],
-      "css": ["src/ui/inpage/inpage.css"],
+      "css": ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/inpage.css"],
       "js": [
         "src/shared/normalize.js",
         "src/shared/runtime-client.js",
