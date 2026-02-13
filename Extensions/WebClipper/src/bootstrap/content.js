@@ -4,16 +4,10 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
-  const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v1";
+  const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
   const EDGE_GAP = 8;
-  const INPAGE_BUTTON_CONFIG = {
-    chatgpt: {
-      label: "WebClipper: Save"
-    },
-    notionai: {
-      label: "WebClipper: Save"
-    }
-  };
+  const INPAGE_BUTTON_LABEL = "WebClipper: Save";
+  const SUPPORTED_INPAGE_COLLECTORS = new Set(["chatgpt", "notionai"]);
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -150,9 +144,8 @@
     return;
   }
 
-  function ensureInpageButton({ collectorId, onClick, getAnchorRect }) {
-    const cfg = collectorId ? INPAGE_BUTTON_CONFIG[collectorId] : null;
-    if (!cfg) return;
+  function ensureInpageButton({ collectorId, onClick }) {
+    if (!SUPPORTED_INPAGE_COLLECTORS.has(collectorId || "")) return;
     ensureInpageStylesheetInjected();
 
     const existing = document.getElementById(INPAGE_BTN_ID);
@@ -165,7 +158,7 @@
     btn.className = "webclipper-inpage-btn";
     btn.type = "button";
     btn.dataset.sourceId = collectorId;
-    btn.textContent = cfg.label;
+    btn.textContent = INPAGE_BUTTON_LABEL;
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
@@ -241,13 +234,8 @@
       }
 
       if (!snappedState) {
-        const r = typeof getAnchorRect === "function" ? getAnchorRect() : null;
-        if (r && Number.isFinite(r.left) && Number.isFinite(r.top)) {
-          snappedState = snapToClosestEdge(btn, r.left + 10, r.top + 10);
-        } else {
-          const rect = btn.getBoundingClientRect();
-          snappedState = snapToClosestEdge(btn, rect.left, rect.top);
-        }
+        const rect = btn.getBoundingClientRect();
+        snappedState = snapToClosestEdge(btn, rect.left, rect.top);
       }
 
       if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
@@ -271,7 +259,7 @@
 
   function cleanupButtons(activeCollectorId) {
     const active = activeCollectorId || "";
-    const isSupported = !!INPAGE_BUTTON_CONFIG[active];
+    const isSupported = SUPPORTED_INPAGE_COLLECTORS.has(active);
     if (!isSupported) {
       const el = document.getElementById(INPAGE_BTN_ID);
       if (el) el.remove();
@@ -311,11 +299,7 @@
           cleanupButtons(collector && collector.id);
           ensureInpageButton({
             collectorId: collector && collector.id,
-            onClick: clickSave,
-            getAnchorRect: () => {
-              const c = getCollector();
-              return c && typeof c.getAnchorRect === "function" ? c.getAnchorRect() : null;
-            }
+            onClick: clickSave
           });
           if (!collector || typeof collector.capture !== "function") return;
           const snapshot = collector.capture();
