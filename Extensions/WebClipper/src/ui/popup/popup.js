@@ -1,8 +1,25 @@
 /* global chrome */
 
 (function () {
+  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const runtime = NS.runtimeClient && typeof NS.runtimeClient.createRuntimeClient === "function"
+    ? NS.runtimeClient.createRuntimeClient()
+    : null;
+
+  function toErrorMessage(err, fallback) {
+    if (!err) return fallback || "Unknown error";
+    if (err instanceof Error) return err.message || fallback || "Unknown error";
+    if (typeof err === "string") return err;
+    return String(err);
+  }
+
   function send(type, payload) {
-    return new Promise((resolve) => chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res)));
+    if (!runtime || typeof runtime.send !== "function") {
+      return Promise.resolve({ ok: false, data: null, error: { message: "runtime client unavailable", extra: null } });
+    }
+    return runtime.send(type, payload).catch((e) => {
+      return { ok: false, data: null, error: { message: toErrorMessage(e, "runtime.sendMessage failed"), extra: null } };
+    });
   }
 
   function storageGet(keys) {
@@ -438,7 +455,9 @@
   async function ensureNotionApiLoaded() {
     if (globalThis.WebClipper && globalThis.WebClipper.notionApi) return globalThis.WebClipper.notionApi;
     const s = document.createElement("script");
-    s.src = chrome.runtime.getURL("src/sync/notion/notion-api.js");
+    const url = runtime && typeof runtime.getURL === "function" ? runtime.getURL("src/sync/notion/notion-api.js") : "";
+    if (!url) return null;
+    s.src = url;
     document.documentElement.appendChild(s);
     await new Promise((r) => setTimeout(r, 80));
     return globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
