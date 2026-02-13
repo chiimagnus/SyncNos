@@ -35,22 +35,13 @@
             </label>
             <div class="exportWrap">
               <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
-                <span class="label">Export as Markdown</span>
-                <span class="divider" aria-hidden="true"></span>
+                <span class="label">Export</span>
                 <span class="caret" aria-hidden="true">▾</span>
               </button>
               <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
-                <button id="menuExportJson" class="menu-item" type="button" role="menuitem">Export as JSON</button>
-                <button
-                  id="menuMergeMarkdown"
-                  class="menu-item"
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked="false"
-                  title="Merge selected conversations into one markdown file"
-                >
-                  Export as Merge Markdown
-                </button>
+                <button id="menuExportSingleMarkdown" class="menu-item" type="button" role="menuitem">Single Markdown</button>
+                <button id="menuExportMultiMarkdown" class="menu-item" type="button" role="menuitem">Multi Markdown</button>
+                <button id="menuExportJsons" class="menu-item" type="button" role="menuitem">JSONs</button>
               </div>
             </div>
             <button id="btnSyncNotion" class="btn">Sync</button>
