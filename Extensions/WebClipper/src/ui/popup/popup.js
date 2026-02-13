@@ -126,6 +126,13 @@
     }
   }
 
+  function isSameLocalDay(a, b) {
+    if (!(a instanceof Date) || !(b instanceof Date)) return false;
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+  }
+
   function hasWarningFlags(c) {
     return Array.isArray(c.warningFlags) && c.warningFlags.length > 0;
   }
@@ -188,7 +195,17 @@
       els.list.appendChild(row);
     }
 
-    els.stats.textContent = `${state.conversations.length} conversations`;
+    const total = state.conversations.length;
+    const now = new Date();
+    const today = state.conversations.filter((c) => {
+      if (!c || !c.lastCapturedAt) return false;
+      try {
+        return isSameLocalDay(new Date(c.lastCapturedAt), now);
+      } catch (_e) {
+        return false;
+      }
+    }).length;
+    els.stats.textContent = `today:${today}\n total:${total}`;
     syncSelectAllCheckbox();
   }
 
