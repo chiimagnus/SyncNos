@@ -40,6 +40,10 @@
     return document.scrollingElement || document.documentElement || document.body;
   }
 
+  function findScrollContainer() {
+    return findScrollContainerFromSeed(getAnyUserStepEl());
+  }
+
   function isVisible(el) {
     if (!el || !el.getBoundingClientRect) return false;
     const r = el.getBoundingClientRect();
@@ -67,7 +71,12 @@
       const root = findScrollContainerFromSeed(s);
       if (root) set.add(root);
     }
-    return Array.from(set).filter(isVisible);
+    const roots = Array.from(set).filter(isVisible);
+    if (!roots.length) {
+      const fallback = findScrollContainer();
+      if (fallback) roots.push(fallback);
+    }
+    return roots;
   }
 
   function rootScore(root) {
@@ -160,7 +169,7 @@
   }
 
   function getChatTitleFromRoot(root) {
-    const firstUser = getAnyUserStepEl(root);
+    const firstUser = getAnyUserStepEl(root) || getAnyUserStepEl(document);
     if (!firstUser) return "NotionAI Chat";
     const leaf =
       firstUser.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
@@ -180,9 +189,8 @@
     const candidates = findCandidateRoots();
     const picked = pickBestRoot(candidates);
     const root = picked.root;
-    if (!root) return null;
-
-    const wrappers = getTurnWrappers(root);
+    const wrappersInRoot = root ? getTurnWrappers(root) : [];
+    const wrappers = wrappersInRoot.length ? wrappersInRoot : getTurnWrappers(document);
     if (!wrappers.length) return null;
 
     const messages = [];
@@ -190,7 +198,9 @@
 
     const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
     const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
-    if (picked.lowConfidence || root === document.body || !hasUser || !hasAssistant) warningFlags.push("container_low_confidence");
+    if (picked.lowConfidence || !wrappersInRoot.length || root === document.body || !hasUser || !hasAssistant) {
+      warningFlags.push("container_low_confidence");
+    }
 
     for (let i = 0; i < wrappers.length; i += 1) {
       const w = wrappers[i];
@@ -218,7 +228,7 @@
     const firstUser = messages.find((m) => m.role === "user");
     const firstUserSig = firstUser ? NS.normalize.fnv1a32(firstUser.contentText) : NS.normalize.fnv1a32(String(Date.now()));
     const conversationKey = `notionai_${pageId || location.pathname}_${firstUserSig}`;
-    const title = getChatTitleFromRoot(root);
+    const title = getChatTitleFromRoot(root || document);
 
     return {
       conversation: {
