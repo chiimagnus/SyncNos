@@ -65,6 +65,11 @@
     });
   }
 
+  function withOptionalId(existingId, payload) {
+    if (Number.isFinite(existingId) && existingId > 0) return { id: existingId, ...payload };
+    return { ...payload };
+  }
+
   async function upsertConversation(payload) {
     const db = await openDb();
     const { t, stores } = tx(db, ["conversations"], "readwrite");
@@ -72,8 +77,7 @@
     const existing = await reqToPromise(idx.get([payload.source, payload.conversationKey]));
 
     const now = Date.now();
-    const record = {
-      id: existing ? existing.id : undefined,
+    const baseRecord = {
       sourceType: payload.sourceType || "chat",
       source: payload.source,
       conversationKey: payload.conversationKey,
@@ -87,6 +91,7 @@
       notionPageId: payload.notionPageId || (existing ? existing.notionPageId || "" : ""),
       lastCapturedAt: payload.lastCapturedAt || now
     };
+    const record = withOptionalId(existing && existing.id, baseRecord);
 
     if (existing) {
       await reqToPromise(stores.conversations.put(record));
@@ -115,8 +120,7 @@
     for (const m of messages || []) {
       if (!m || !m.messageKey) continue;
       const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
-      const record = {
-        id: existing ? existing.id : undefined,
+      const baseRecord = {
         conversationId,
         messageKey: m.messageKey,
         role: m.role || "assistant",
@@ -124,6 +128,7 @@
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
         updatedAt: m.updatedAt || Date.now()
       };
+      const record = withOptionalId(existing && existing.id, baseRecord);
       if (existing) {
         await reqToPromise(stores.messages.put(record));
       } else {
@@ -152,8 +157,7 @@
       if (!m || !m.messageKey) continue;
       presentKeys.add(m.messageKey);
       const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
-      const record = {
-        id: existing ? existing.id : undefined,
+      const baseRecord = {
         conversationId,
         messageKey: m.messageKey,
         role: m.role || "assistant",
@@ -161,6 +165,7 @@
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
         updatedAt: m.updatedAt || Date.now()
       };
+      const record = withOptionalId(existing && existing.id, baseRecord);
       if (existing) {
         await reqToPromise(stores.messages.put(record));
       } else {
@@ -284,13 +289,12 @@
 
     const idx = stores.sync_mappings.index("by_source_conversationKey");
     const existing = await reqToPromise(idx.get([convo.source, convo.conversationKey]));
-    const mapping = {
-      id: existing ? existing.id : undefined,
+    const mapping = withOptionalId(existing && existing.id, {
       source: convo.source,
       conversationKey: convo.conversationKey,
       notionPageId: notionPageId || "",
       updatedAt: Date.now()
-    };
+    });
     if (existing) await reqToPromise(stores.sync_mappings.put(mapping));
     else await reqToPromise(stores.sync_mappings.add(mapping));
 
