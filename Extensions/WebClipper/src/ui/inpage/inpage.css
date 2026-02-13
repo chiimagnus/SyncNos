@@ -8,9 +8,9 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(15, 23, 34, 0.78);
-  color: rgba(230, 237, 243, 0.95);
+  border: 1px solid rgba(255, 198, 173, 0.45);
+  background: linear-gradient(180deg, rgba(255, 198, 173, 0.24), rgba(42, 28, 22, 0.88));
+  color: rgba(255, 242, 235, 0.98);
   font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   cursor: pointer;
   user-select: none;
@@ -18,7 +18,6 @@
 }
 
 .webclipper-inpage-btn:hover {
-  background: rgba(15, 23, 34, 0.88);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(255, 198, 173, 0.34), rgba(52, 34, 27, 0.92));
+  border-color: rgba(255, 198, 173, 0.6);
 }
-
