@@ -9,7 +9,7 @@
     };
   }
 
-  function createObserver({ debounceMs, onTick, getRoot }) {
+  function createObserver({ debounceMs, onTick, getRoot, leading }) {
     const tick = debounce(() => onTick && onTick(), typeof debounceMs === "number" ? debounceMs : 500);
     let mo = null;
     let observedRoot = null;
@@ -39,7 +39,11 @@
         // Allow callers to narrow observation to a platform-specific root.
         // If getRoot isn't provided, we observe the whole document.
         ensureObservedRoot(typeof getRoot === "function" ? getRoot() : getDefaultRoot());
-        tick();
+        if (leading !== false) {
+          onTick && onTick();
+        } else {
+          tick();
+        }
       },
       stop() {
         if (!mo) return;
