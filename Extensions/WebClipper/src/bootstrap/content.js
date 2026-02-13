@@ -4,15 +4,13 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
+  const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v1";
   const EDGE_GAP = 8;
   const INPAGE_BUTTON_CONFIG = {
     chatgpt: {
-      storageKey: "webclipper_btn_pos_chatgpt_v2",
-      legacyStorageKey: "webclipper_btn_pos_chatgpt_v1",
       label: "WebClipper: Save"
     },
     notionai: {
-      storageKey: "webclipper_btn_pos_notionai_v1",
       label: "WebClipper: Save"
     }
   };
@@ -169,7 +167,7 @@
     btn.dataset.sourceId = collectorId;
     btn.textContent = cfg.label;
 
-    const storageKey = cfg.storageKey;
+    const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
 
     let dragging = false;
@@ -239,17 +237,6 @@
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.edge === "string" && Number.isFinite(parsed.offset)) {
           snappedState = applySnappedPosition(btn, parsed);
-        }
-      }
-
-      if (!snappedState && cfg.legacyStorageKey) {
-        const legacySaved = localStorage.getItem(cfg.legacyStorageKey);
-        if (legacySaved) {
-          const legacyParsed = JSON.parse(legacySaved);
-          if (legacyParsed && Number.isFinite(legacyParsed.left) && Number.isFinite(legacyParsed.top)) {
-            // Backward compatibility for old free-floating position.
-            snappedState = snapToClosestEdge(btn, legacyParsed.left, legacyParsed.top);
-          }
         }
       }
 
