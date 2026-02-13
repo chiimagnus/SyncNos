@@ -1,8 +1,4 @@
 .webclipper-inpage-btn {
-  --ok: #1f9d55;
-  --ok-bg: rgba(31, 157, 85, 0.14);
-  --ok-border: rgba(31, 157, 85, 0.38);
-
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -44,45 +40,8 @@
   z-index: 1;
 }
 
-/* Match popup: .btn.is-flash-ok */
-.webclipper-inpage-btn.is-flash-ok {
-  border-color: var(--ok-border);
-  box-shadow: 0 0 0 3px var(--ok-bg);
-}
-
-/* Match popup: .btn.is-flash-ok::after (implemented as a real node for robustness) */
-.webclipper-inpage-btn__check {
-  position: absolute;
-  right: -7px;
-  top: -7px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: #ffffff !important;
-  border: 1px solid var(--ok-border) !important;
-  color: var(--ok) !important;
-  font-size: 12px;
-  font-weight: 900;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
-  pointer-events: none;
-  opacity: 0;
-  transform: scale(0.92);
-  z-index: 2;
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
-.webclipper-inpage-btn.is-flash-ok .webclipper-inpage-btn__check {
-  opacity: 1;
-  transform: scale(1);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .webclipper-inpage-btn {
-    transition: none;
-  }
-  .webclipper-inpage-btn__check {
     transition: none;
   }
 }

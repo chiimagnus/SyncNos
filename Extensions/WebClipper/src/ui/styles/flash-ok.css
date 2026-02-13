@@ -1,0 +1,59 @@
+/* Shared "success flash" styles used by popup + inpage button. */
+
+/* Popup buttons */
+.btn.is-flash-ok {
+  border-color: var(--wc-ok-border);
+  box-shadow: 0 0 0 3px var(--wc-ok-bg);
+}
+
+.btn.is-flash-ok::after {
+  content: "✓";
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  border: 1px solid var(--wc-ok-border);
+  color: var(--wc-ok);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Inpage button */
+.webclipper-inpage-btn.is-flash-ok {
+  border-color: var(--wc-ok-border);
+  box-shadow: 0 0 0 3px var(--wc-ok-bg);
+}
+
+.webclipper-inpage-btn__check {
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ffffff !important;
+  border: 1px solid var(--wc-ok-border) !important;
+  color: var(--wc-ok) !important;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.92);
+  z-index: 2;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.webclipper-inpage-btn.is-flash-ok .webclipper-inpage-btn__check {
+  opacity: 1;
+  transform: scale(1);
+}
+
