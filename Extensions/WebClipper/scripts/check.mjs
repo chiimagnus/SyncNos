@@ -62,6 +62,7 @@ const jsFiles = [
   "src/sync/notion/notion-db-manager.js",
   "src/sync/notion/notion-sync-service.js",
   "src/export/article-markdown.js",
+  "src/export/zip-utils.js",
   "src/ui/popup/popup.js"
 ];
 

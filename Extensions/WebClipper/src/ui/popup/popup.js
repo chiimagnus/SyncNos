@@ -91,7 +91,7 @@
 
       const sub = document.createElement("div");
       sub.className = "sub";
-      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}${c.url ? " · " + c.url : ""}`;
+      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}`;
       meta.appendChild(sub);
 
       const right = document.createElement("div");
@@ -157,12 +157,12 @@
       count: items.length,
       items
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    chrome.downloads.download({ url, filename: `webclipper-export-${stamp}.json`, saveAs: true }, () => {
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    });
+    const jsonFilename = `webclipper-export-${stamp}.json`;
+    const zipBlob = await createZipBlob([
+      { name: jsonFilename, data: JSON.stringify(payload, null, 2) }
+    ]);
+    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
   }
 
   function sanitizeFilenamePart(input, fallback) {
@@ -177,9 +177,17 @@
 
   function downloadBlob({ blob, filename, saveAs }) {
     const url = URL.createObjectURL(blob);
-    chrome.downloads.download({ url, filename, saveAs: !!saveAs }, () => {
+    chrome.downloads.download({ url, filename, saveAs: typeof saveAs === "boolean" ? saveAs : false }, () => {
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     });
+  }
+
+  async function createZipBlob(files) {
+    const api = (globalThis.WebClipper && globalThis.WebClipper.zipUtils) || null;
+    if (!api || typeof api.createZipBlob !== "function") {
+      throw new Error("ZIP module not available");
+    }
+    return api.createZipBlob(files);
   }
 
   function conversationToMarkdown({ conversation, messages }) {
@@ -220,23 +228,24 @@
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const mergeSingle = !!(els.chkMergeMd && els.chkMergeMd.checked);
+    const files = [];
 
     if (mergeSingle) {
       const text = docs.map((d) => d.markdown).join("\n---\n\n");
-      const blob = new Blob([text], { type: "text/markdown" });
-      downloadBlob({ blob, filename: `webclipper-export-${stamp}.md`, saveAs: true });
-      return;
+      files.push({ name: `webclipper-export-${stamp}.md`, data: text });
+    } else {
+      for (let i = 0; i < docs.length; i += 1) {
+        const item = docs[i];
+        const conversation = item.conversation || {};
+        const source = sanitizeFilenamePart(conversation.source || "unknown", "unknown");
+        const title = sanitizeFilenamePart(conversation.title || "untitled", "untitled");
+        const file = `webclipper-${source}-${title}-${i + 1}-${stamp}.md`;
+        files.push({ name: file, data: item.markdown });
+      }
     }
 
-    for (let i = 0; i < docs.length; i += 1) {
-      const item = docs[i];
-      const conversation = item.conversation || {};
-      const source = sanitizeFilenamePart(conversation.source || "unknown", "unknown");
-      const title = sanitizeFilenamePart(conversation.title || "untitled", "untitled");
-      const file = `webclipper-${source}-${title}-${i + 1}-${stamp}.md`;
-      const blob = new Blob([item.markdown], { type: "text/markdown" });
-      downloadBlob({ blob, filename: file, saveAs: docs.length === 1 });
-    }
+    const zipBlob = await createZipBlob(files);
+    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
   }
 
   async function loadExportPrefs() {
@@ -269,8 +278,16 @@
     render();
   });
 
-  els.btnExportJson.addEventListener("click", exportJson);
-  els.btnExportMd.addEventListener("click", exportMd);
+  els.btnExportJson.addEventListener("click", () => {
+    exportJson().catch((e) => {
+      alert((e && e.message) || "Export JSON failed.");
+    });
+  });
+  els.btnExportMd.addEventListener("click", () => {
+    exportMd().catch((e) => {
+      alert((e && e.message) || "Export Markdown failed.");
+    });
+  });
   if (els.chkMergeMd) {
     els.chkMergeMd.addEventListener("change", () => {
       saveExportPrefs().catch(() => {});
