@@ -19,6 +19,7 @@
     btnRefresh: document.getElementById("btnRefresh"),
     btnClearAll: document.getElementById("btnClearAll"),
     chkSelectAll: document.getElementById("chkSelectAll"),
+    chkMergeMd: document.getElementById("chkMergeMd"),
     btnExportJson: document.getElementById("btnExportJson"),
     btnExportMd: document.getElementById("btnExportMd"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
@@ -37,6 +38,10 @@
   const state = {
     conversations: [],
     selectedIds: new Set()
+  };
+
+  const STORAGE_KEYS = {
+    exportMdMergeSingle: "export_md_merge_single"
   };
 
   function formatTime(ts) {
@@ -160,6 +165,23 @@
     });
   }
 
+  function sanitizeFilenamePart(input, fallback) {
+    const text = String(input || "").trim();
+    if (!text) return fallback;
+    const cleaned = text
+      .replace(/[\\/:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned.slice(0, 80) || fallback;
+  }
+
+  function downloadBlob({ blob, filename, saveAs }) {
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({ url, filename, saveAs: !!saveAs }, () => {
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    });
+  }
+
   function conversationToMarkdown({ conversation, messages }) {
     if (conversation && conversation.sourceType === "article") {
       const api = (globalThis.WebClipper && globalThis.WebClipper.articleMarkdown) || null;
@@ -193,15 +215,40 @@
     for (const c of selected) {
       const detail = await send("getConversationDetail", { conversationId: c.id });
       const messages = (detail && detail.ok && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
-      docs.push(conversationToMarkdown({ conversation: c, messages }));
+      docs.push({ conversation: c, markdown: conversationToMarkdown({ conversation: c, messages }) });
     }
 
-    const text = docs.join("\n---\n\n");
-    const blob = new Blob([text], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    chrome.downloads.download({ url, filename: `webclipper-export-${stamp}.md`, saveAs: true }, () => {
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    const mergeSingle = !!(els.chkMergeMd && els.chkMergeMd.checked);
+
+    if (mergeSingle) {
+      const text = docs.map((d) => d.markdown).join("\n---\n\n");
+      const blob = new Blob([text], { type: "text/markdown" });
+      downloadBlob({ blob, filename: `webclipper-export-${stamp}.md`, saveAs: true });
+      return;
+    }
+
+    for (let i = 0; i < docs.length; i += 1) {
+      const item = docs[i];
+      const conversation = item.conversation || {};
+      const source = sanitizeFilenamePart(conversation.source || "unknown", "unknown");
+      const title = sanitizeFilenamePart(conversation.title || "untitled", "untitled");
+      const file = `webclipper-${source}-${title}-${i + 1}-${stamp}.md`;
+      const blob = new Blob([item.markdown], { type: "text/markdown" });
+      downloadBlob({ blob, filename: file, saveAs: docs.length === 1 });
+    }
+  }
+
+  async function loadExportPrefs() {
+    const res = await storageGet([STORAGE_KEYS.exportMdMergeSingle]);
+    const mergeSingle = !!res[STORAGE_KEYS.exportMdMergeSingle];
+    if (els.chkMergeMd) els.chkMergeMd.checked = mergeSingle;
+  }
+
+  async function saveExportPrefs() {
+    if (!els.chkMergeMd) return;
+    await storageSet({
+      [STORAGE_KEYS.exportMdMergeSingle]: !!els.chkMergeMd.checked
     });
   }
 
@@ -224,6 +271,11 @@
 
   els.btnExportJson.addEventListener("click", exportJson);
   els.btnExportMd.addEventListener("click", exportMd);
+  if (els.chkMergeMd) {
+    els.chkMergeMd.addEventListener("change", () => {
+      saveExportPrefs().catch(() => {});
+    });
+  }
   els.btnFetchArticle.addEventListener("click", async () => {
     const res = await send("captureArticleFromActiveTab");
     if (!res || !res.ok) {
@@ -371,6 +423,7 @@
   });
 
   loadNotionConfig();
+  loadExportPrefs();
   // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
