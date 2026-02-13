@@ -1,4 +1,8 @@
 .webclipper-inpage-btn {
+  --ok: #1f9d55;
+  --ok-bg: rgba(31, 157, 85, 0.14);
+  --ok-border: rgba(31, 157, 85, 0.38);
+
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -7,7 +11,8 @@
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border: 0;
+  border: 1px solid transparent;
+  border-radius: 11px;
   background: transparent;
   color: inherit;
   font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -15,51 +20,17 @@
   user-select: none;
   box-shadow: none;
   isolation: isolate;
-  transition: transform 120ms ease, filter 120ms ease;
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
-.webclipper-inpage-btn.is-ok {
-  animation: webclipper-inpage-ok-bounce 320ms ease;
+.webclipper-inpage-btn:hover {
+  transform: translateY(-1px);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
 }
 
-.webclipper-inpage-btn__ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(22, 163, 74, 0.28), rgba(22, 163, 74, 0) 62%);
-  pointer-events: none;
-  opacity: 0;
-  z-index: 0;
-}
-
-.webclipper-inpage-btn__check {
-  position: absolute;
-  right: -3px;
-  top: -3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: #16a34a;
-  color: #fff;
-  font-weight: 800;
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
-  pointer-events: none;
-  opacity: 0;
-  transform: scale(0.6);
-  z-index: 2;
-}
-
-.webclipper-inpage-btn.is-ok .webclipper-inpage-btn__ring {
-  opacity: 1;
-  animation: webclipper-inpage-ok-pulse 900ms ease-out;
-}
-
-.webclipper-inpage-btn.is-ok .webclipper-inpage-btn__check {
-  opacity: 1;
-  animation: webclipper-inpage-ok-pop 1200ms ease;
+.webclipper-inpage-btn:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.35);
+  outline-offset: 2px;
 }
 
 .webclipper-inpage-btn__icon {
@@ -73,67 +44,46 @@
   z-index: 1;
 }
 
-.webclipper-inpage-btn:hover {
-  transform: translateY(-1px);
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
+/* Match popup: .btn.is-flash-ok */
+.webclipper-inpage-btn.is-flash-ok {
+  border-color: var(--ok-border);
+  box-shadow: 0 0 0 3px var(--ok-bg);
 }
 
-.webclipper-inpage-btn:focus-visible {
-  outline: 2px solid rgba(0, 0, 0, 0.35);
-  outline-offset: 2px;
-  border-radius: 8px;
+/* Match popup: .btn.is-flash-ok::after (implemented as a real node for robustness) */
+.webclipper-inpage-btn__check {
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  border: 1px solid var(--ok-border);
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.92);
+  z-index: 2;
+  transition: opacity 120ms ease, transform 120ms ease;
 }
 
-@keyframes webclipper-inpage-ok-bounce {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.06);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes webclipper-inpage-ok-pulse {
-  0% {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  20% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.24);
-  }
-}
-
-@keyframes webclipper-inpage-ok-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  18% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.9);
-  }
+.webclipper-inpage-btn.is-flash-ok .webclipper-inpage-btn__check {
+  opacity: 1;
+  transform: scale(1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .webclipper-inpage-btn.is-ok,
-  .webclipper-inpage-btn.is-ok .webclipper-inpage-btn__ring,
-  .webclipper-inpage-btn.is-ok .webclipper-inpage-btn__check {
-    animation: none;
+  .webclipper-inpage-btn {
+    transition: none;
+  }
+  .webclipper-inpage-btn__check {
+    transition: none;
   }
 }
+

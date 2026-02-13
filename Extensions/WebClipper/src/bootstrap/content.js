@@ -148,18 +148,13 @@
 
   function ensureInpageOkDecor(btn) {
     if (!btn || !btn.appendChild) return;
-    if (btn.querySelector(".webclipper-inpage-btn__ring")) return;
-
-    const ring = document.createElement("span");
-    ring.className = "webclipper-inpage-btn__ring";
-    ring.setAttribute("aria-hidden", "true");
+    if (btn.querySelector(".webclipper-inpage-btn__check")) return;
 
     const check = document.createElement("span");
     check.className = "webclipper-inpage-btn__check";
     check.setAttribute("aria-hidden", "true");
     check.textContent = "✓";
 
-    btn.appendChild(ring);
     btn.appendChild(check);
   }
 
@@ -176,12 +171,12 @@
       inpageOkState.timer = null;
     }
 
-    btn.classList.remove("is-ok");
+    btn.classList.remove("is-flash-ok");
     // Force reflow so re-adding the class re-triggers the animation reliably.
     void btn.offsetWidth;
-    btn.classList.add("is-ok");
+    btn.classList.add("is-flash-ok");
     inpageOkState.timer = setTimeout(() => {
-      btn.classList.remove("is-ok");
+      btn.classList.remove("is-flash-ok");
       inpageOkState.timer = null;
     }, 1400);
   }
