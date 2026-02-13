@@ -3,11 +3,11 @@ name: WebClipper Release Assets
 on:
   push:
     tags:
-      - 'webv*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name to attach assets to (e.g. webv0.1.0). Required for manual runs.'
+        description: 'Tag name to attach assets to (e.g. v0.1.0). Required for manual runs.'
         required: true
         type: string
 
