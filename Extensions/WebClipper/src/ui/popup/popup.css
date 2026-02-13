@@ -25,6 +25,7 @@ body {
   padding: 0;
   width: 380px;
   min-height: 500px;
+  height: 100%;
   background: var(--bg);
   color: var(--text);
   font: 13px/1.45 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
@@ -32,6 +33,9 @@ body {
 
 .app {
   padding: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #viewSettings .toolbar {
@@ -95,6 +99,19 @@ body {
 
 .view.is-active {
   display: block;
+}
+
+#viewChats.view.is-active {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#viewSettings.view.is-active {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .title {
@@ -350,16 +367,39 @@ main {
   max-height: 280px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 2px;
 }
 
-main::-webkit-scrollbar {
-  width: 8px;
+#viewChats .chatsMain {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+
+  /* Full-bleed horizontally so the scrollbar sits on the popup edge. */
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
-main::-webkit-scrollbar-thumb {
-  border-radius: 10px;
+/* "Jelly" scrollbar (Chromium/WebKit). Scoped to chats list only. */
+#viewChats .chatsMain::-webkit-scrollbar {
+  width: 10px;
+}
+
+#viewChats .chatsMain::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#viewChats .chatsMain::-webkit-scrollbar-thumb {
+  border-radius: 999px;
   background: rgba(217, 89, 38, 0.22);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+#viewChats .chatsMain::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 89, 38, 0.34);
+  background-clip: padding-box;
 }
 
 .list {
@@ -463,6 +503,26 @@ main::-webkit-scrollbar-thumb {
   color: var(--muted);
   font-size: 12px;
   font-weight: 560;
+}
+
+.bottomDock {
+  margin-top: 10px;
+}
+
+.statsRow {
+  padding: 4px 2px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.toolbar.is-docked {
+  margin-bottom: 0;
+}
+
+.toolbar.is-docked .menu {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 @keyframes rise-in {
