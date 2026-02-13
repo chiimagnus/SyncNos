@@ -1,30 +1,49 @@
 :root {
-  --bg: #0b0f14;
-  --panel: #0f1722;
-  --text: #e6edf3;
-  --muted: #9fb0c3;
-  --border: rgba(255, 255, 255, 0.08);
-  --btn: rgba(255, 255, 255, 0.08);
-  --btn-hover: rgba(255, 255, 255, 0.12);
-  --danger: #e24a4a;
-  --warn: #f2c94c;
+  --bg: #07111e;
+  --panel: rgba(11, 26, 44, 0.7);
+  --panel-strong: rgba(10, 24, 40, 0.9);
+  --text: #edf5ff;
+  --muted: #9fb3c9;
+  --border: rgba(159, 196, 236, 0.2);
+  --border-strong: rgba(159, 196, 236, 0.35);
+  --btn: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  --danger: #f47a7a;
+  --warn: #ffd76a;
+  --shadow: 0 14px 38px rgba(0, 0, 0, 0.35);
+  --brand: #5eb9ff;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  width: 360px;
-  min-height: 460px;
-  background: radial-gradient(1200px 600px at -20% -10%, rgba(58, 160, 255, 0.18), transparent 55%),
-    radial-gradient(900px 600px at 120% 10%, rgba(242, 201, 76, 0.12), transparent 60%),
-    var(--bg);
+  width: 380px;
+  min-height: 500px;
+  background:
+    radial-gradient(640px 420px at -12% -15%, rgba(94, 185, 255, 0.24), transparent 58%),
+    radial-gradient(500px 400px at 108% 0%, rgba(255, 215, 106, 0.18), transparent 62%),
+    linear-gradient(160deg, #05101a 0%, #081a2d 46%, #071120 100%);
   color: var(--text);
-  font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font: 13px/1.45 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
 
 .app {
+  position: relative;
   padding: 12px;
+}
+
+.app::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 20px;
+  pointer-events: none;
+  border: 1px solid rgba(159, 196, 236, 0.14);
 }
 
 .header {
@@ -36,8 +55,23 @@ body {
 }
 
 .title {
-  font-weight: 700;
+  font-weight: 760;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(110deg, #f4fbff 0%, #b2dcff 52%, #f8de9f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+#notionBar .title {
+  font-size: 14px;
   letter-spacing: 0.2px;
+  color: #d9ebff;
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
 }
 
 .actions {
@@ -49,42 +83,87 @@ body {
   border: 1px solid var(--border);
   background: var(--btn);
   color: var(--text);
-  padding: 6px 10px;
-  border-radius: 10px;
+  padding: 7px 12px;
+  border-radius: 11px;
   cursor: pointer;
+  font-weight: 620;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
+
 .btn:hover {
   background: var(--btn-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
+
+.btn:active {
+  transform: translateY(0);
+}
+
 .btn.danger {
-  border-color: rgba(226, 74, 74, 0.35);
-  color: #ffd5d5;
+  border-color: rgba(244, 122, 122, 0.44);
+  color: #ffd9d9;
+}
+
+#btnSyncNotion {
+  border-color: rgba(94, 185, 255, 0.45);
+  background: linear-gradient(180deg, rgba(94, 185, 255, 0.3), rgba(94, 185, 255, 0.18));
+}
+
+#btnFetchArticle {
+  border-color: rgba(255, 215, 106, 0.48);
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(159, 196, 236, 0.18);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  padding: 6px 10px;
-  border-radius: 10px;
+  padding: 8px 11px;
+  border-radius: 11px;
   outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
 }
+
 .input::placeholder {
-  color: rgba(159, 176, 195, 0.8);
+  color: rgba(159, 179, 201, 0.86);
+}
+
+.input:focus {
+  border-color: rgba(94, 185, 255, 0.55);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px;
-  background: rgba(15, 23, 34, 0.6);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  gap: 9px;
+  padding: 11px;
+  background: linear-gradient(170deg, rgba(14, 32, 54, 0.7), rgba(8, 20, 35, 0.84));
+  border: 1px solid rgba(159, 196, 236, 0.18);
+  border-radius: 15px;
   margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  animation: rise-in 220ms ease both;
+}
+
+.toolbar:nth-of-type(2) {
+  animation-delay: 40ms;
+}
+
+.toolbar:nth-of-type(3) {
+  animation-delay: 80ms;
+}
+
+.toolbar:nth-of-type(4) {
+  animation-delay: 120ms;
+}
+
+.toolbar:nth-of-type(5) {
+  animation-delay: 160ms;
 }
 
 .spacer {
@@ -93,10 +172,11 @@ body {
 }
 
 .checkbox {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   color: var(--muted);
+  font-weight: 560;
 }
 
 .checkbox.compact {
@@ -105,10 +185,24 @@ body {
   white-space: nowrap;
 }
 
+input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+  margin: 0;
+}
+
 .toolbar .btn,
 .toolbar .mini,
 .toolbar .checkbox {
   flex: 0 0 auto;
+}
+
+#notionStatus {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(159, 196, 236, 0.26);
+  background: rgba(94, 185, 255, 0.1);
 }
 
 #notionConfig .input {
@@ -120,6 +214,21 @@ body {
   flex: 1 1 180px;
 }
 
+main {
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+main::-webkit-scrollbar {
+  width: 8px;
+}
+
+main::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: rgba(159, 196, 236, 0.28);
+}
+
 .list {
   display: grid;
   gap: 8px;
@@ -129,14 +238,16 @@ body {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 10px;
-  background: rgba(15, 23, 34, 0.75);
-  border: 1px solid var(--border);
+  padding: 11px;
+  background: linear-gradient(180deg, rgba(9, 22, 37, 0.9), rgba(5, 16, 29, 0.92));
+  border: 1px solid rgba(159, 196, 236, 0.18);
   border-radius: 14px;
+  transition: border-color 140ms ease, transform 140ms ease;
 }
 
 .row:hover {
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(159, 196, 236, 0.42);
+  transform: translateY(-1px);
 }
 
 .row .meta {
@@ -145,14 +256,17 @@ body {
 }
 
 .name {
-  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 670;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sub {
-  margin-top: 2px;
+  margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
   overflow: hidden;
@@ -164,16 +278,17 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 8px;
   padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--muted);
   font-size: 11px;
 }
+
 .pill.warn {
-  border-color: rgba(242, 201, 76, 0.35);
-  color: rgba(242, 201, 76, 0.95);
+  border-color: rgba(255, 215, 106, 0.45);
+  color: #ffd76a;
+  background: rgba(255, 215, 106, 0.08);
 }
 
 .row .right {
@@ -188,18 +303,37 @@ body {
   color: var(--text);
   border-radius: 10px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 9px;
   font-size: 12px;
+  font-weight: 620;
+  transition: border-color 120ms ease, background 120ms ease;
 }
+
 .mini:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(159, 196, 236, 0.4);
 }
+
 .mini.danger {
-  border-color: rgba(226, 74, 74, 0.35);
+  border-color: rgba(244, 122, 122, 0.44);
   color: #ffd5d5;
 }
 
 .footer {
   margin-top: 10px;
+  padding: 4px 2px 0;
   color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
