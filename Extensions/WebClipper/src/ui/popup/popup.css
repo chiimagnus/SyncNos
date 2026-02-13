@@ -33,17 +33,7 @@ body {
 }
 
 .app {
-  position: relative;
   padding: 12px;
-}
-
-.app::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  border-radius: 20px;
-  pointer-events: none;
-  border: 1px solid rgba(255, 198, 173, 0.18);
 }
 
 .header {
