@@ -9,7 +9,10 @@
   <body>
     <div class="app">
       <header class="header">
-        <div class="title">SyncNos</div>
+        <div class="title">
+          <img class="appLogo" src="../../../icons/icon-48.png" alt="" />
+          <span>SyncNos</span>
+        </div>
         <nav class="tabs" role="tablist" aria-label="Popup tabs">
           <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
             Chats
@@ -21,41 +24,31 @@
       </header>
 
       <section id="viewChats" class="view is-active" role="tabpanel" aria-labelledby="tabChats">
-        <section class="toolbar">
-          <label class="checkbox">
-            <input id="chkSelectAll" type="checkbox" />
-            <span>Select all</span>
-          </label>
-          <div class="spacer"></div>
-          <div class="exportWrap">
-            <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="label">Export as Markdown</span>
-              <span class="divider" aria-hidden="true"></span>
-              <span class="caret" aria-hidden="true">▾</span>
-            </button>
-            <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
-              <button id="menuExportJson" class="menu-item" type="button" role="menuitem">Export as JSON</button>
-              <button
-                id="menuMergeMarkdown"
-                class="menu-item"
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked="false"
-                title="Merge selected conversations into one markdown file"
-              >
-                Export as Merge Markdown
-              </button>
-            </div>
-          </div>
-          <button id="btnSyncNotion" class="btn">Sync</button>
-        </section>
-
-        <main>
+        <main class="chatsMain">
           <div id="list" class="list"></div>
         </main>
 
-        <footer class="footer">
-          <div id="stats" class="stats">0 conversations</div>
+        <footer class="bottomDock" aria-label="Actions">
+          <section class="toolbar is-docked bottomBar" aria-label="Chat actions">
+            <div id="stats" class="stats">0 conversations</div>
+            <div class="spacer"></div>
+            <label class="checkbox compact">
+              <input id="chkSelectAll" type="checkbox" aria-label="Select all" />
+              <span class="srOnly">Select all</span>
+            </label>
+            <div class="exportWrap">
+              <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
+                <span class="label">Export</span>
+                <span class="caret" aria-hidden="true">▾</span>
+              </button>
+              <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
+                <button id="menuExportSingleMarkdown" class="menu-item" type="button" role="menuitem">Single Markdown</button>
+                <button id="menuExportMultiMarkdown" class="menu-item" type="button" role="menuitem">Multi Markdown</button>
+                <button id="menuExportJsons" class="menu-item" type="button" role="menuitem">JSONs</button>
+              </div>
+            </div>
+            <button id="btnSyncNotion" class="btn">Sync</button>
+          </section>
         </footer>
       </section>
 
@@ -85,6 +78,7 @@
       </section>
     </div>
 
+    <script src="../../shared/runtime-client.js"></script>
     <script src="../../export/article-markdown.js"></script>
     <script src="../../export/zip-utils.js"></script>
     <script src="./popup.js"></script>
