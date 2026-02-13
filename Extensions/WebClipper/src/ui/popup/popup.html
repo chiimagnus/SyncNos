@@ -21,41 +21,43 @@
       </header>
 
       <section id="viewChats" class="view is-active" role="tabpanel" aria-labelledby="tabChats">
-        <section class="toolbar">
-          <label class="checkbox">
-            <input id="chkSelectAll" type="checkbox" />
-            <span>Select all</span>
-          </label>
-          <div class="spacer"></div>
-          <div class="exportWrap">
-            <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span class="label">Export as Markdown</span>
-              <span class="divider" aria-hidden="true"></span>
-              <span class="caret" aria-hidden="true">▾</span>
-            </button>
-            <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
-              <button id="menuExportJson" class="menu-item" type="button" role="menuitem">Export as JSON</button>
-              <button
-                id="menuMergeMarkdown"
-                class="menu-item"
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked="false"
-                title="Merge selected conversations into one markdown file"
-              >
-                Export as Merge Markdown
-              </button>
-            </div>
-          </div>
-          <button id="btnSyncNotion" class="btn">Sync</button>
-        </section>
-
-        <main>
+        <main class="chatsMain">
           <div id="list" class="list"></div>
         </main>
 
-        <footer class="footer">
-          <div id="stats" class="stats">0 conversations</div>
+        <footer class="bottomDock" aria-label="Actions">
+          <div class="statsRow">
+            <div id="stats" class="stats">0 conversations</div>
+          </div>
+
+          <section class="toolbar is-docked" aria-label="Chat actions">
+            <label class="checkbox">
+              <input id="chkSelectAll" type="checkbox" />
+              <span>Select all</span>
+            </label>
+            <div class="spacer"></div>
+            <div class="exportWrap">
+              <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
+                <span class="label">Export as Markdown</span>
+                <span class="divider" aria-hidden="true"></span>
+                <span class="caret" aria-hidden="true">▾</span>
+              </button>
+              <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
+                <button id="menuExportJson" class="menu-item" type="button" role="menuitem">Export as JSON</button>
+                <button
+                  id="menuMergeMarkdown"
+                  class="menu-item"
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked="false"
+                  title="Merge selected conversations into one markdown file"
+                >
+                  Export as Merge Markdown
+                </button>
+              </div>
+            </div>
+            <button id="btnSyncNotion" class="btn">Sync</button>
+          </section>
         </footer>
       </section>
 
