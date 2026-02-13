@@ -13,8 +13,9 @@ const dist = join(root, "dist");
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 
-// Create a loadable extension directly in dist/ (flat layout).
-const out = dist;
+// Copy a loadable extension folder into dist/extension (manifest at root).
+const out = join(dist, "extension");
+mkdirSync(out, { recursive: true });
 
 function readText(p) {
   return readFileSync(p, "utf-8");
@@ -81,20 +82,21 @@ async function minifyJsFile(file) {
   writeText(file, result.code);
 }
 
-// Copy only minimal runtime assets into dist root.
-cpSync(join(root, "icons/icon-16.png"), join(out, "icon-16.png"));
-cpSync(join(root, "icons/icon-48.png"), join(out, "icon-48.png"));
-cpSync(join(root, "icons/icon-128.png"), join(out, "icon-128.png"));
-cpSync(join(root, "src/ui/popup/popup.css"), join(out, "popup.css"));
-cpSync(join(root, "src/ui/inpage/inpage.css"), join(out, "inpage.css"));
+// Copy only the minimal runtime assets; bundle JS into a small number of files.
+cpSync(join(root, "icons"), join(out, "icons"), { recursive: true });
+
+mkdirSync(join(out, "src/ui/popup"), { recursive: true });
+mkdirSync(join(out, "src/ui/inpage"), { recursive: true });
+cpSync(join(root, "src/ui/popup/popup.css"), join(out, "src/ui/popup/popup.css"));
+cpSync(join(root, "src/ui/inpage/inpage.css"), join(out, "src/ui/inpage/inpage.css"));
 
 // Bundle content scripts into one file.
-const contentBundle = join(out, "content.js");
+mkdirSync(join(out, "bundle"), { recursive: true });
+const contentBundle = join(out, "bundle/content.js");
 concatFiles({
   outFile: contentBundle,
   files: [
     "src/shared/normalize.js",
-    "src/shared/runtime-client.js",
     "src/storage/incremental-updater.js",
     "src/collectors/collector-contract.js",
     "src/collectors/registry.js",
@@ -113,7 +115,7 @@ concatFiles({
 await minifyJsFile(contentBundle);
 
 // Bundle background SW (including previously importScripts-loaded modules).
-const backgroundBundle = join(out, "background.js");
+const backgroundBundle = join(out, "bundle/background.js");
 const backgroundText = stripBackgroundImportScripts(readText(join(root, "src/bootstrap/background.js")));
 concatParts({
   outFile: backgroundBundle,
@@ -131,11 +133,10 @@ concatParts({
 await minifyJsFile(backgroundBundle);
 
 // Bundle popup JS (export utils + notion api + popup logic).
-const popupBundle = join(out, "popup.js");
+const popupBundle = join(out, "bundle/popup.js");
 concatFiles({
   outFile: popupBundle,
   files: [
-    "src/shared/runtime-client.js",
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
     "src/sync/notion/notion-api.js",
@@ -147,35 +148,20 @@ await minifyJsFile(popupBundle);
 // Rewrite popup.html to load the bundled script only.
 const popupHtmlSrc = readText(join(root, "src/ui/popup/popup.html"));
 const popupHtml = popupHtmlSrc
-  .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
-writeText(join(out, "popup.html"), popupHtml);
+  .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="../../../bundle/popup.js"></script>\n');
+writeText(join(out, "src/ui/popup/popup.html"), popupHtml);
 
 // Rewrite manifest.json for bundled entrypoints.
 const manifest = JSON.parse(readText(join(root, "manifest.json")));
-manifest.background = { service_worker: "background.js" };
-manifest.action = { ...(manifest.action || {}), default_popup: "popup.html" };
+manifest.background = { service_worker: "bundle/background.js" };
+manifest.action = { ...(manifest.action || {}), default_popup: "src/ui/popup/popup.html" };
 if (Array.isArray(manifest.content_scripts) && manifest.content_scripts[0]) {
   manifest.content_scripts[0] = {
     ...manifest.content_scripts[0],
-    css: ["inpage.css"],
-    js: ["content.js"]
-  };
-}
-if (Array.isArray(manifest.web_accessible_resources)) {
-  manifest.web_accessible_resources = manifest.web_accessible_resources.map((item) => ({
-    ...item,
-    resources: (item.resources || []).map((resource) => resource === "icons/icon-128.png" ? "icon-128.png" : resource)
-  }));
-}
-if (manifest.icons && typeof manifest.icons === "object") {
-  manifest.icons = {
-    ...manifest.icons,
-    "16": "icon-16.png",
-    "48": "icon-48.png",
-    "128": "icon-128.png"
+    css: ["src/ui/inpage/inpage.css"],
+    js: ["bundle/content.js"]
   };
 }
 writeText(join(out, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
