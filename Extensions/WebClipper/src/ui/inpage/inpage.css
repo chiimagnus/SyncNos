@@ -8,16 +8,20 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 198, 173, 0.45);
-  background: linear-gradient(180deg, rgba(255, 198, 173, 0.24), rgba(42, 28, 22, 0.88));
-  color: rgba(255, 242, 235, 0.98);
+  border: 1px solid #f0a486;
+  background: #ffc6ad;
+  color: #d95926;
   font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 640;
   cursor: pointer;
   user-select: none;
-  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(217, 89, 38, 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
 .webclipper-inpage-btn:hover {
-  background: linear-gradient(180deg, rgba(255, 198, 173, 0.34), rgba(52, 34, 27, 0.92));
-  border-color: rgba(255, 198, 173, 0.6);
+  background: #ffb899;
+  border-color: #d95926;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(217, 89, 38, 0.24);
 }
