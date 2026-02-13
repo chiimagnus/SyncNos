@@ -179,11 +179,6 @@
     return title || "NotionAI Chat";
   }
 
-  function getAnchorElement(root) {
-    // For floating window, Notion often uses dialog. For side panel, use nearest aside.
-    return root.closest("div[role='dialog']") || root.closest("aside") || root.parentElement || root;
-  }
-
   function capture() {
     if (!isNotionAiPage()) return null;
     const candidates = findCandidateRoots();
@@ -247,16 +242,7 @@
   NS.collectors = NS.collectors || {};
   NS.collectors.notionai = {
     capture,
-    getRoot: () => pickBestRoot(findCandidateRoots()).root,
-    getAnchorRect: () => {
-      const picked = pickBestRoot(findCandidateRoots());
-      const root = picked.root;
-      if (!root) return null;
-      const el = getAnchorElement(root);
-      if (!el || !el.getBoundingClientRect) return null;
-      const r = el.getBoundingClientRect();
-      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
-    }
+    getRoot: () => pickBestRoot(findCandidateRoots()).root
   };
 
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
