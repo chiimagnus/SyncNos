@@ -13,6 +13,9 @@
   --danger-bg: #ffe5e1;
   --warn-bg: #fff0e8;
   --shadow: 0 8px 18px rgba(217, 89, 38, 0.14);
+  --ok: #1f9d55;
+  --ok-bg: rgba(31, 157, 85, 0.14);
+  --ok-border: rgba(31, 157, 85, 0.38);
 }
 
 * {
@@ -138,12 +141,16 @@ body {
 }
 
 .header .title::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--theme);
-  box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.22);
+  content: none;
+}
+
+.appLogo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.12);
+  background: var(--panel-strong);
+  flex: 0 0 auto;
 }
 
 #notionBar .title {
@@ -163,6 +170,7 @@ body {
 }
 
 .btn {
+  position: relative;
   min-height: 34px;
   border: 1px solid var(--border);
   background: var(--btn-bg);
@@ -196,6 +204,29 @@ body {
   border-color: rgba(199, 55, 47, 0.45);
   background: var(--danger-bg);
   color: var(--danger);
+}
+
+.btn.is-flash-ok {
+  border-color: var(--ok-border);
+  box-shadow: 0 0 0 3px var(--ok-bg);
+}
+
+.btn.is-flash-ok::after {
+  content: "✓";
+  position: absolute;
+  right: -7px;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  border: 1px solid var(--ok-border);
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 
 #btnExport {
