@@ -194,7 +194,6 @@ body {
 }
 
 .btn:focus-visible,
-.mini:focus-visible,
 .input:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 2px;
@@ -377,7 +376,6 @@ input[type="checkbox"] {
 }
 
 .toolbar .btn,
-.toolbar .mini,
 .toolbar .checkbox {
   flex: 0 0 auto;
 }
@@ -483,35 +481,6 @@ main {
   background: var(--warn-bg);
 }
 
-.row .right {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mini {
-  border: 1px solid var(--border);
-  background: var(--btn-bg);
-  color: var(--text);
-  border-radius: 10px;
-  cursor: pointer;
-  padding: 5px 9px;
-  font-size: 12px;
-  font-weight: 620;
-  transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.mini:hover {
-  background: var(--btn-bg-hover);
-  border-color: var(--border-strong);
-}
-
-.mini.danger {
-  border-color: rgba(199, 55, 47, 0.45);
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
 .footer {
   margin-top: 10px;
   padding: 4px 2px 0;
@@ -583,7 +552,6 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .toolbar,
   .btn,
-  .mini,
   .row,
   .input {
     animation: none !important;
