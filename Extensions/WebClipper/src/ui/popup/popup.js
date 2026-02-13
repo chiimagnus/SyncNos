@@ -21,9 +21,10 @@
     viewChats: document.getElementById("viewChats"),
     viewSettings: document.getElementById("viewSettings"),
     chkSelectAll: document.getElementById("chkSelectAll"),
-    chkMergeMd: document.getElementById("chkMergeMd"),
-    btnExportJson: document.getElementById("btnExportJson"),
-    btnExportMd: document.getElementById("btnExportMd"),
+    btnExport: document.getElementById("btnExport"),
+    exportMenu: document.getElementById("exportMenu"),
+    menuExportJson: document.getElementById("menuExportJson"),
+    menuMergeMarkdown: document.getElementById("menuMergeMarkdown"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
     btnFetchArticle: document.getElementById("btnFetchArticle"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
@@ -39,13 +40,33 @@
 
   const state = {
     conversations: [],
-    selectedIds: new Set()
+    selectedIds: new Set(),
+    exportMdMergeSingle: false
   };
 
   const STORAGE_KEYS = {
     popupActiveTab: "popup_active_tab",
     exportMdMergeSingle: "export_md_merge_single"
   };
+
+  function isExportMenuOpen() {
+    return !!(els.exportMenu && !els.exportMenu.hidden);
+  }
+
+  function closeExportMenu() {
+    if (els.exportMenu) els.exportMenu.hidden = true;
+    if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "false");
+  }
+
+  function openExportMenu() {
+    if (els.exportMenu) els.exportMenu.hidden = false;
+    if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
+  }
+
+  function syncMergeMarkdownMenuItem() {
+    if (!els.menuMergeMarkdown) return;
+    els.menuMergeMarkdown.setAttribute("aria-checked", state.exportMdMergeSingle ? "true" : "false");
+  }
 
   function setActiveTab(tabId) {
     const next = tabId === "settings" ? "settings" : "chats";
@@ -263,7 +284,7 @@
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const mergeSingle = !!(els.chkMergeMd && els.chkMergeMd.checked);
+    const mergeSingle = !!state.exportMdMergeSingle;
     const files = [];
 
     if (mergeSingle) {
@@ -286,14 +307,13 @@
 
   async function loadExportPrefs() {
     const res = await storageGet([STORAGE_KEYS.exportMdMergeSingle]);
-    const mergeSingle = !!res[STORAGE_KEYS.exportMdMergeSingle];
-    if (els.chkMergeMd) els.chkMergeMd.checked = mergeSingle;
+    state.exportMdMergeSingle = !!res[STORAGE_KEYS.exportMdMergeSingle];
+    syncMergeMarkdownMenuItem();
   }
 
   async function saveExportPrefs() {
-    if (!els.chkMergeMd) return;
     await storageSet({
-      [STORAGE_KEYS.exportMdMergeSingle]: !!els.chkMergeMd.checked
+      [STORAGE_KEYS.exportMdMergeSingle]: !!state.exportMdMergeSingle
     });
   }
 
@@ -306,21 +326,60 @@
     render();
   });
 
-  els.btnExportJson.addEventListener("click", () => {
-    exportJson().catch((e) => {
-      alert((e && e.message) || "Export JSON failed.");
-    });
-  });
-  els.btnExportMd.addEventListener("click", () => {
+  function safeExportMd() {
     exportMd().catch((e) => {
       alert((e && e.message) || "Export Markdown failed.");
     });
-  });
-  if (els.chkMergeMd) {
-    els.chkMergeMd.addEventListener("change", () => {
+  }
+
+  function safeExportJson() {
+    exportJson().catch((e) => {
+      alert((e && e.message) || "Export JSON failed.");
+    });
+  }
+
+  if (els.btnExport) {
+    els.btnExport.addEventListener("click", (e) => {
+      if (!e) return;
+      const rect = els.btnExport.getBoundingClientRect();
+      const isCaretClick = e.clientX >= rect.right - 34;
+      if (isCaretClick) {
+        if (isExportMenuOpen()) closeExportMenu();
+        else openExportMenu();
+        return;
+      }
+      closeExportMenu();
+      safeExportMd();
+    });
+  }
+
+  if (els.menuExportJson) {
+    els.menuExportJson.addEventListener("click", () => {
+      closeExportMenu();
+      safeExportJson();
+    });
+  }
+
+  if (els.menuMergeMarkdown) {
+    els.menuMergeMarkdown.addEventListener("click", () => {
+      state.exportMdMergeSingle = !state.exportMdMergeSingle;
+      syncMergeMarkdownMenuItem();
       saveExportPrefs().catch(() => {});
     });
   }
+
+  document.addEventListener("click", (e) => {
+    if (!isExportMenuOpen()) return;
+    const t = e && e.target ? e.target : null;
+    if (t && ((els.exportMenu && els.exportMenu.contains(t)) || (els.btnExport && els.btnExport.contains(t)))) return;
+    closeExportMenu();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (!isExportMenuOpen()) return;
+    if (e && e.key === "Escape") closeExportMenu();
+  });
+
   els.btnFetchArticle.addEventListener("click", async () => {
     const res = await send("captureArticleFromActiveTab");
     if (!res || !res.ok) {
