@@ -29,15 +29,14 @@
     return { ok: false, data: null, error: { message, extra: extra || null } };
   }
 
-  const MESSAGE_TYPES = Object.freeze({
-    UPSERT_CONVERSATION: "upsertConversation",
-    UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
-    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
-    GET_CONVERSATIONS: "getConversations",
-    GET_CONVERSATION_DETAIL: "getConversationDetail",
-    DELETE_CONVERSATION: "deleteConversation",
-    CLEAR_ALL: "clearAll"
-  });
+	  const MESSAGE_TYPES = Object.freeze({
+	    UPSERT_CONVERSATION: "upsertConversation",
+	    UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
+	    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
+	    GET_CONVERSATIONS: "getConversations",
+	    GET_CONVERSATION_DETAIL: "getConversationDetail",
+	    CLEAR_ALL: "clearAll"
+	  });
 
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
@@ -223,32 +222,6 @@
     return items;
   }
 
-  async function deleteConversation(conversationId) {
-    const db = await openDb();
-    const { t, stores } = tx(db, ["conversations", "messages"], "readwrite");
-    await reqToPromise(stores.conversations.delete(conversationId));
-
-    // Delete messages for conversation by scanning index. OK for MVP scale.
-    const idx = stores.messages.index("by_conversationId_sequence");
-    const range = IDBKeyRange.bound([conversationId, -Infinity], [conversationId, Infinity]);
-    const cursorReq = idx.openCursor(range);
-    await new Promise((resolve, reject) => {
-      cursorReq.onerror = () => reject(cursorReq.error || new Error("cursor failed"));
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (!cursor) return resolve();
-        cursor.delete();
-        cursor.continue();
-      };
-    });
-
-    await new Promise((r, rej) => {
-      t.oncomplete = r;
-      t.onerror = () => rej(t.error || new Error("transaction failed"));
-    });
-    return { deleted: true };
-  }
-
   async function clearAll() {
     const db = await openDb();
     const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readwrite");
@@ -424,12 +397,6 @@
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const messages = await getMessagesByConversationId(conversationId);
         return ok({ conversationId, messages });
-      }
-      case MESSAGE_TYPES.DELETE_CONVERSATION: {
-        const conversationId = Number(msg.conversationId);
-        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
-        const res = await deleteConversation(conversationId);
-        return ok(res);
       }
       case MESSAGE_TYPES.CLEAR_ALL: {
         const res = await clearAll();
