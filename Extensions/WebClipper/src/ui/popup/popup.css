@@ -1,17 +1,17 @@
 :root {
-  --bg: #07111e;
-  --panel: rgba(11, 26, 44, 0.7);
-  --panel-strong: rgba(10, 24, 40, 0.9);
-  --text: #edf5ff;
-  --muted: #9fb3c9;
-  --border: rgba(159, 196, 236, 0.2);
-  --border-strong: rgba(159, 196, 236, 0.35);
+  --bg: #140f0d;
+  --panel: rgba(40, 26, 20, 0.72);
+  --panel-strong: rgba(36, 23, 18, 0.92);
+  --text: #fff5f0;
+  --muted: #d4b5a7;
+  --border: rgba(255, 198, 173, 0.24);
+  --border-strong: rgba(255, 198, 173, 0.42);
   --btn: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
   --danger: #f47a7a;
-  --warn: #ffd76a;
+  --warn: #ffc6ad;
   --shadow: 0 14px 38px rgba(0, 0, 0, 0.35);
-  --brand: #5eb9ff;
+  --brand: #ffc6ad;
 }
 
 * {
@@ -25,9 +25,9 @@ body {
   width: 380px;
   min-height: 500px;
   background:
-    radial-gradient(640px 420px at -12% -15%, rgba(94, 185, 255, 0.24), transparent 58%),
-    radial-gradient(500px 400px at 108% 0%, rgba(255, 215, 106, 0.18), transparent 62%),
-    linear-gradient(160deg, #05101a 0%, #081a2d 46%, #071120 100%);
+    radial-gradient(640px 420px at -12% -15%, rgba(255, 198, 173, 0.26), transparent 58%),
+    radial-gradient(500px 400px at 108% 0%, rgba(255, 160, 127, 0.2), transparent 62%),
+    linear-gradient(160deg, #120d0c 0%, #1f1411 46%, #140f0d 100%);
   color: var(--text);
   font: 13px/1.45 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
@@ -43,7 +43,7 @@ body {
   inset: 8px;
   border-radius: 20px;
   pointer-events: none;
-  border: 1px solid rgba(159, 196, 236, 0.14);
+  border: 1px solid rgba(255, 198, 173, 0.18);
 }
 
 .header {
@@ -59,7 +59,7 @@ body {
   font-size: 28px;
   line-height: 1;
   letter-spacing: -0.02em;
-  background: linear-gradient(110deg, #f4fbff 0%, #b2dcff 52%, #f8de9f 100%);
+  background: linear-gradient(110deg, #fff8f4 0%, #ffc6ad 52%, #ffd8c8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -68,7 +68,7 @@ body {
 #notionBar .title {
   font-size: 14px;
   letter-spacing: 0.2px;
-  color: #d9ebff;
+  color: #ffe8de;
   background: none;
   -webkit-background-clip: initial;
   background-clip: initial;
@@ -107,18 +107,18 @@ body {
 }
 
 #btnSyncNotion {
-  border-color: rgba(94, 185, 255, 0.45);
-  background: linear-gradient(180deg, rgba(94, 185, 255, 0.3), rgba(94, 185, 255, 0.18));
+  border-color: rgba(255, 198, 173, 0.58);
+  background: linear-gradient(180deg, rgba(255, 198, 173, 0.38), rgba(255, 198, 173, 0.22));
 }
 
 #btnFetchArticle {
-  border-color: rgba(255, 215, 106, 0.48);
+  border-color: rgba(255, 198, 173, 0.5);
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  border: 1px solid rgba(159, 196, 236, 0.18);
+  border: 1px solid rgba(255, 198, 173, 0.22);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   padding: 8px 11px;
@@ -128,11 +128,11 @@ body {
 }
 
 .input::placeholder {
-  color: rgba(159, 179, 201, 0.86);
+  color: rgba(212, 181, 167, 0.86);
 }
 
 .input:focus {
-  border-color: rgba(94, 185, 255, 0.55);
+  border-color: rgba(255, 198, 173, 0.6);
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -142,8 +142,8 @@ body {
   flex-wrap: wrap;
   gap: 9px;
   padding: 11px;
-  background: linear-gradient(170deg, rgba(14, 32, 54, 0.7), rgba(8, 20, 35, 0.84));
-  border: 1px solid rgba(159, 196, 236, 0.18);
+  background: linear-gradient(170deg, rgba(55, 35, 28, 0.72), rgba(34, 23, 19, 0.86));
+  border: 1px solid rgba(255, 198, 173, 0.22);
   border-radius: 15px;
   margin-bottom: 10px;
   box-shadow: var(--shadow);
@@ -201,8 +201,8 @@ input[type="checkbox"] {
 #notionStatus {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(159, 196, 236, 0.26);
-  background: rgba(94, 185, 255, 0.1);
+  border: 1px solid rgba(255, 198, 173, 0.32);
+  background: rgba(255, 198, 173, 0.14);
 }
 
 #notionConfig .input {
@@ -226,7 +226,7 @@ main::-webkit-scrollbar {
 
 main::-webkit-scrollbar-thumb {
   border-radius: 10px;
-  background: rgba(159, 196, 236, 0.28);
+  background: rgba(255, 198, 173, 0.28);
 }
 
 .list {
@@ -239,14 +239,14 @@ main::-webkit-scrollbar-thumb {
   gap: 10px;
   align-items: flex-start;
   padding: 11px;
-  background: linear-gradient(180deg, rgba(9, 22, 37, 0.9), rgba(5, 16, 29, 0.92));
-  border: 1px solid rgba(159, 196, 236, 0.18);
+  background: linear-gradient(180deg, rgba(34, 22, 19, 0.92), rgba(24, 16, 14, 0.94));
+  border: 1px solid rgba(255, 198, 173, 0.22);
   border-radius: 14px;
   transition: border-color 140ms ease, transform 140ms ease;
 }
 
 .row:hover {
-  border-color: rgba(159, 196, 236, 0.42);
+  border-color: rgba(255, 198, 173, 0.48);
   transform: translateY(-1px);
 }
 
@@ -286,9 +286,9 @@ main::-webkit-scrollbar-thumb {
 }
 
 .pill.warn {
-  border-color: rgba(255, 215, 106, 0.45);
-  color: #ffd76a;
-  background: rgba(255, 215, 106, 0.08);
+  border-color: rgba(255, 198, 173, 0.55);
+  color: #ffd8c8;
+  background: rgba(255, 198, 173, 0.16);
 }
 
 .row .right {
@@ -311,7 +311,7 @@ main::-webkit-scrollbar-thumb {
 
 .mini:hover {
   background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(159, 196, 236, 0.4);
+  border-color: rgba(255, 198, 173, 0.44);
 }
 
 .mini.danger {
