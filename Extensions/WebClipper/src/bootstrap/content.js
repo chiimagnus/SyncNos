@@ -148,14 +148,24 @@
 
   function ensureInpageOkDecor(btn) {
     if (!btn || !btn.appendChild) return;
-    if (btn.querySelector(".webclipper-inpage-btn__check")) return;
+    let check = btn.querySelector(".webclipper-inpage-btn__check");
+    if (!check) {
+      check = document.createElement("span");
+      check.className = "webclipper-inpage-btn__check";
+      check.setAttribute("aria-hidden", "true");
+      check.textContent = "✓";
+      btn.appendChild(check);
+    }
 
-    const check = document.createElement("span");
-    check.className = "webclipper-inpage-btn__check";
-    check.setAttribute("aria-hidden", "true");
-    check.textContent = "✓";
-
-    btn.appendChild(check);
+    // Defensive: Notion's global styles (or cached older extension CSS) can leak into our badge.
+    // Force the "popup-style" white badge here so it stays visually consistent.
+    try {
+      check.style.background = "#ffffff";
+      check.style.border = "1px solid rgba(31, 157, 85, 0.38)";
+      check.style.color = "#1f9d55";
+    } catch (_e) {
+      // ignore
+    }
   }
 
   function flashInpageOk() {

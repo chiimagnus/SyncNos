@@ -60,9 +60,9 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: #ffffff;
-  border: 1px solid var(--ok-border);
-  color: var(--ok);
+  background: #ffffff !important;
+  border: 1px solid var(--ok-border) !important;
+  color: var(--ok) !important;
   font-size: 12px;
   font-weight: 900;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
@@ -86,4 +86,3 @@
     transition: none;
   }
 }
-
