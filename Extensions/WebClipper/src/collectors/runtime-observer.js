@@ -13,6 +13,7 @@
     const tick = debounce(() => onTick && onTick(), typeof debounceMs === "number" ? debounceMs : 500);
     let mo = null;
     let observedRoot = null;
+    let rootRefreshTimer = null;
 
     function getDefaultRoot() {
       return document.documentElement || document.body;
@@ -38,11 +39,32 @@
         if (mo) return;
         // Allow callers to narrow observation to a platform-specific root.
         // If getRoot isn't provided, we observe the whole document.
-        ensureObservedRoot(typeof getRoot === "function" ? getRoot() : getDefaultRoot());
+        const hasCustomRoot = typeof getRoot === "function";
+        ensureObservedRoot(hasCustomRoot ? getRoot() : getDefaultRoot());
         if (leading !== false) {
           onTick && onTick();
         } else {
           tick();
+        }
+
+        // SPAs (e.g. NotionAI) often replace the chat root without triggering mutations
+        // on the previously observed node. Periodically re-pick the root to avoid
+        // "stuck" observers and delayed UI (inpage button) updates.
+        if (hasCustomRoot && !rootRefreshTimer) {
+          rootRefreshTimer = setInterval(() => {
+            if (!mo) return;
+            let next = null;
+            try {
+              next = getRoot();
+            } catch (_e) {
+              next = null;
+            }
+            if (next && next !== observedRoot) {
+              ensureObservedRoot(next);
+              // Root changed: run an immediate tick so UI appears quickly.
+              onTick && onTick();
+            }
+          }, 800);
         }
       },
       stop() {
@@ -50,6 +72,10 @@
         mo.disconnect();
         mo = null;
         observedRoot = null;
+        if (rootRefreshTimer) {
+          clearInterval(rootRefreshTimer);
+          rootRefreshTimer = null;
+        }
       }
     };
   }
