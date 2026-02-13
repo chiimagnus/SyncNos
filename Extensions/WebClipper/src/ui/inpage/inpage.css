@@ -6,32 +6,33 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid #f0a486;
-  background: #ffc6ad;
-  color: #d95926;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font: 12px/1 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 8px 20px rgba(217, 89, 38, 0.18);
-  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  box-shadow: none;
+  transition: transform 120ms ease, filter 120ms ease;
 }
 
 .webclipper-inpage-btn__icon {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   pointer-events: none;
   -webkit-user-drag: none;
   user-select: none;
 }
 
 .webclipper-inpage-btn:hover {
-  background: #ffb899;
-  border-color: #d95926;
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(217, 89, 38, 0.24);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.18));
+}
+
+.webclipper-inpage-btn:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.35);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
