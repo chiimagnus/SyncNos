@@ -16,8 +16,10 @@
   const els = {
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
-    btnRefresh: document.getElementById("btnRefresh"),
-    btnClearAll: document.getElementById("btnClearAll"),
+    tabChats: document.getElementById("tabChats"),
+    tabSettings: document.getElementById("tabSettings"),
+    viewChats: document.getElementById("viewChats"),
+    viewSettings: document.getElementById("viewSettings"),
     chkSelectAll: document.getElementById("chkSelectAll"),
     chkMergeMd: document.getElementById("chkMergeMd"),
     btnExportJson: document.getElementById("btnExportJson"),
@@ -41,8 +43,42 @@
   };
 
   const STORAGE_KEYS = {
+    popupActiveTab: "popup_active_tab",
     exportMdMergeSingle: "export_md_merge_single"
   };
+
+  function setActiveTab(tabId) {
+    const next = tabId === "settings" ? "settings" : "chats";
+
+    if (els.tabChats) {
+      const active = next === "chats";
+      els.tabChats.classList.toggle("is-active", active);
+      els.tabChats.setAttribute("aria-selected", active ? "true" : "false");
+      els.tabChats.tabIndex = active ? 0 : -1;
+    }
+
+    if (els.tabSettings) {
+      const active = next === "settings";
+      els.tabSettings.classList.toggle("is-active", active);
+      els.tabSettings.setAttribute("aria-selected", active ? "true" : "false");
+      els.tabSettings.tabIndex = active ? 0 : -1;
+    }
+
+    if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
+    if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
+
+    storageSet({ [STORAGE_KEYS.popupActiveTab]: next }).catch(() => {});
+  }
+
+  function onTabKeyDown(e) {
+    if (!e) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = e.key === "ArrowRight" ? "settings" : "chats";
+    setActiveTab(next);
+    const el = next === "settings" ? els.tabSettings : els.tabChats;
+    if (el && typeof el.focus === "function") el.focus();
+  }
 
   function formatTime(ts) {
     if (!ts) return "";
@@ -261,14 +297,6 @@
     });
   }
 
-  els.btnRefresh.addEventListener("click", refresh);
-  els.btnClearAll.addEventListener("click", async () => {
-    const confirmed = confirm("Clear ALL conversations and messages?\n\nThis cannot be undone.");
-    if (!confirmed) return;
-    await send("clearAll");
-    state.selectedIds.clear();
-    await refresh();
-  });
   els.chkSelectAll.addEventListener("change", () => {
     if (els.chkSelectAll.checked) {
       for (const c of state.conversations) state.selectedIds.add(c.id);
@@ -322,6 +350,20 @@
     }
     await refresh();
   });
+
+  if (els.tabChats) {
+    els.tabChats.addEventListener("click", () => setActiveTab("chats"));
+    els.tabChats.addEventListener("keydown", onTabKeyDown);
+  }
+  if (els.tabSettings) {
+    els.tabSettings.addEventListener("click", () => setActiveTab("settings"));
+    els.tabSettings.addEventListener("keydown", onTabKeyDown);
+  }
+
+  (async () => {
+    const saved = await storageGet([STORAGE_KEYS.popupActiveTab]);
+    setActiveTab(saved[STORAGE_KEYS.popupActiveTab] || "chats");
+  })();
 
   refresh();
 

@@ -7,7 +7,6 @@
   const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
   const EDGE_GAP = 8;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
-  const SUPPORTED_INPAGE_COLLECTORS = new Set(["chatgpt", "notionai"]);
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -145,7 +144,7 @@
   }
 
   function ensureInpageButton({ collectorId, onClick }) {
-    if (!SUPPORTED_INPAGE_COLLECTORS.has(collectorId || "")) return;
+    if (!collectorId) return;
     ensureInpageStylesheetInjected();
 
     const existing = document.getElementById(INPAGE_BTN_ID);
@@ -158,7 +157,22 @@
     btn.className = "webclipper-inpage-btn";
     btn.type = "button";
     btn.dataset.sourceId = collectorId;
-    btn.textContent = INPAGE_BUTTON_LABEL;
+    btn.title = INPAGE_BUTTON_LABEL;
+    btn.setAttribute("aria-label", INPAGE_BUTTON_LABEL);
+
+    const icon = document.createElement("img");
+    icon.className = "webclipper-inpage-btn__icon";
+    icon.alt = "";
+    icon.decoding = "async";
+    icon.loading = "eager";
+    icon.draggable = false;
+    icon.setAttribute("aria-hidden", "true");
+    icon.src = chrome.runtime.getURL("icons/icon-128.png");
+    icon.addEventListener("dragstart", (e) => e.preventDefault());
+    icon.addEventListener("error", () => {
+      btn.textContent = INPAGE_BUTTON_LABEL;
+    });
+    btn.appendChild(icon);
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
@@ -259,8 +273,7 @@
 
   function cleanupButtons(activeCollectorId) {
     const active = activeCollectorId || "";
-    const isSupported = SUPPORTED_INPAGE_COLLECTORS.has(active);
-    if (!isSupported) {
+    if (!active) {
       const el = document.getElementById(INPAGE_BTN_ID);
       if (el) el.remove();
     }
