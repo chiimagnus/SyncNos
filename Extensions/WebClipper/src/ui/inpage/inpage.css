@@ -24,6 +24,9 @@
   display: block;
   width: 20px;
   height: 20px;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .webclipper-inpage-btn:hover {

@@ -166,8 +166,10 @@
     icon.alt = "";
     icon.decoding = "async";
     icon.loading = "eager";
+    icon.draggable = false;
     icon.setAttribute("aria-hidden", "true");
     icon.src = chrome.runtime.getURL("icons/icon-128.png");
+    icon.addEventListener("dragstart", (e) => e.preventDefault());
     icon.addEventListener("error", () => {
       btn.textContent = INPAGE_BUTTON_LABEL;
     });
