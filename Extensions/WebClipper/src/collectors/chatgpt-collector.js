@@ -62,44 +62,58 @@
     return NS.normalize.normalizeText(text);
   }
 
+  function getTurnWrappers(root) {
+    const scope = root || document;
+    const uniqueNodes = new Set();
+
+    scope.querySelectorAll("div[data-testid='conversation-turn']").forEach((el) => uniqueNodes.add(el));
+    scope.querySelectorAll("[data-message-author-role]").forEach((el) => uniqueNodes.add(el));
+    scope.querySelectorAll(".agent-turn").forEach((el) => uniqueNodes.add(el));
+
+    const sorted = Array.from(uniqueNodes);
+    sorted.sort((a, b) => {
+      if (a === b) return 0;
+      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    const finalNodes = [];
+    for (const node of sorted) {
+      const isChild = finalNodes.some((parent) => parent.contains(node));
+      if (!isChild) finalNodes.push(node);
+    }
+    return finalNodes;
+  }
+
+  function roleFromWrapper(wrapper) {
+    const direct = wrapper && wrapper.getAttribute ? wrapper.getAttribute("data-message-author-role") : "";
+    if (direct === "user" || direct === "assistant") return direct;
+
+    const inner = wrapper && wrapper.querySelector ? wrapper.querySelector("[data-message-author-role]") : null;
+    const innerRole = inner && inner.getAttribute ? inner.getAttribute("data-message-author-role") : "";
+    if (innerRole === "user" || innerRole === "assistant") return innerRole;
+
+    if (wrapper && wrapper.classList && wrapper.classList.contains("agent-turn")) return "assistant";
+    if (wrapper && wrapper.querySelector && wrapper.querySelector("div[class*='user']")) return "user";
+    return "assistant";
+  }
+
   function collectMessages({ allowEditing } = {}) {
     const root = getConversationRoot();
     if (!root) return [];
     if (!allowEditing && inEditMode(root)) return [];
 
-    const all = [];
-    const userNodes = Array.from(root.querySelectorAll("div[data-message-author-role='user']"));
-    const assistantNodes = Array.from(root.querySelectorAll("div[data-message-author-role='assistant']"));
-    for (const el of userNodes) all.push({ el, role: "user" });
-    for (const el of assistantNodes) all.push({ el, role: "assistant" });
+    const wrappers = getTurnWrappers(root);
 
-    // Fallback for newer layouts where role attributes are unstable/missing.
-    if (!all.length) {
+    // Extra fallback for some recent layouts where only turn articles are present.
+    if (!wrappers.length) {
       const turns = Array.from(root.querySelectorAll("article[data-testid^='conversation-turn-']"));
-      for (const turn of turns) {
-        const assistantMarker = turn.querySelector(".markdown.prose, .markdown");
-        if (assistantMarker) {
-          all.push({ el: turn, role: "assistant" });
-          continue;
-        }
-        const userMarker = turn.querySelector(".whitespace-pre-wrap");
-        if (userMarker) {
-          all.push({ el: turn, role: "user" });
-        }
-      }
+      for (const turn of turns) wrappers.push(turn);
     }
 
-    // Sort by DOM order.
-    all.sort((a, b) => {
-      const pos = a.el.compareDocumentPosition(b.el);
-      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-      if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-      return 0;
-    });
-
     const out = [];
-    for (let i = 0; i < all.length; i += 1) {
-      const { el, role } = all[i];
+    for (let i = 0; i < wrappers.length; i += 1) {
+      const el = wrappers[i];
+      const role = roleFromWrapper(el);
       const contentText = role === "user" ? extractUserText(el) : extractAssistantText(el);
       if (!contentText) continue;
       const messageId = el.getAttribute && (el.getAttribute("data-message-id") || el.id);
