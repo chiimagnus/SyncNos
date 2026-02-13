@@ -6,22 +6,27 @@
     return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl() {
+  function isChatHost() {
     try {
       const hostname = location.hostname;
-      const pathname = location.pathname;
       if (!hostname.includes("chatgpt.com") && !hostname.includes("chat.openai.com")) return false;
-      return /^\/c\/[^/]+$/.test(pathname) || /^\/g\/[^/]+\/c\/[^/]+$/.test(pathname);
+      return true;
     } catch (_e) {
       return false;
     }
   }
 
-  function findConversationKey() {
+  function findConversationIdFromUrl() {
     // Prefer URL path for ChatGPT. Works for both chat.openai.com and chatgpt.com.
     const m = location.pathname.match(/^\/c\/([^/?#]+)/) || location.pathname.match(/^\/g\/[^/]+\/c\/([^/?#]+)/);
-    if (m && m[1]) return m[1];
-    return location.href.split("?")[0];
+    return m && m[1] ? m[1] : "";
+  }
+
+  function makeFallbackConversationKey(messages) {
+    const firstUser = Array.isArray(messages) ? messages.find((m) => m && m.role === "user" && m.contentText) : null;
+    const seed = `${location.hostname}|${location.pathname}|${firstUser ? firstUser.contentText : ""}`;
+    const hash = NS.normalize && NS.normalize.fnv1a32 ? NS.normalize.fnv1a32(seed) : String(Date.now());
+    return `fallback_${hash}`;
   }
 
   function findTitle() {
@@ -57,17 +62,32 @@
     return NS.normalize.normalizeText(text);
   }
 
-  function collectMessages() {
+  function collectMessages({ allowEditing } = {}) {
     const root = getConversationRoot();
     if (!root) return [];
-    if (inEditMode(root)) return [];
-
-    const userNodes = Array.from(root.querySelectorAll("div[data-message-author-role='user']"));
-    const assistantNodes = Array.from(root.querySelectorAll("div[data-message-author-role='assistant']"));
+    if (!allowEditing && inEditMode(root)) return [];
 
     const all = [];
+    const userNodes = Array.from(root.querySelectorAll("div[data-message-author-role='user']"));
+    const assistantNodes = Array.from(root.querySelectorAll("div[data-message-author-role='assistant']"));
     for (const el of userNodes) all.push({ el, role: "user" });
     for (const el of assistantNodes) all.push({ el, role: "assistant" });
+
+    // Fallback for newer layouts where role attributes are unstable/missing.
+    if (!all.length) {
+      const turns = Array.from(root.querySelectorAll("article[data-testid^='conversation-turn-']"));
+      for (const turn of turns) {
+        const assistantMarker = turn.querySelector(".markdown.prose, .markdown");
+        if (assistantMarker) {
+          all.push({ el: turn, role: "assistant" });
+          continue;
+        }
+        const userMarker = turn.querySelector(".whitespace-pre-wrap");
+        if (userMarker) {
+          all.push({ el: turn, role: "user" });
+        }
+      }
+    }
 
     // Sort by DOM order.
     all.sort((a, b) => {
@@ -96,11 +116,11 @@
     return out;
   }
 
-  function capture() {
-    if (!isValidConversationUrl()) return null;
-    const conversationKey = findConversationKey();
-    const messages = collectMessages();
+  function capture(options) {
+    if (!isChatHost()) return null;
+    const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
+    const conversationKey = findConversationIdFromUrl() || makeFallbackConversationKey(messages);
     return {
       conversation: {
         sourceType: "chat",
