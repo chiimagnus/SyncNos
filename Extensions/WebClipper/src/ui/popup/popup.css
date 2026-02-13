@@ -1,17 +1,18 @@
 :root {
-  --bg: #140f0d;
-  --panel: rgba(40, 26, 20, 0.72);
-  --panel-strong: rgba(36, 23, 18, 0.92);
-  --text: #fff5f0;
-  --muted: #d4b5a7;
-  --border: rgba(255, 198, 173, 0.24);
-  --border-strong: rgba(255, 198, 173, 0.42);
-  --btn: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
-  --danger: #f47a7a;
-  --warn: #ffc6ad;
-  --shadow: 0 14px 38px rgba(0, 0, 0, 0.35);
-  --brand: #ffc6ad;
+  --theme: #ffc6ad;
+  --text: #d95926;
+  --muted: #b85e3a;
+  --bg: #fff7f3;
+  --panel: #fff1ea;
+  --panel-strong: #ffe7dc;
+  --border: #f4b89e;
+  --border-strong: #e8916f;
+  --btn-bg: #ffe6da;
+  --btn-bg-hover: #ffd8c4;
+  --danger: #c7372f;
+  --danger-bg: #ffe5e1;
+  --warn-bg: #fff0e8;
+  --shadow: 0 8px 18px rgba(217, 89, 38, 0.14);
 }
 
 * {
@@ -24,10 +25,7 @@ body {
   padding: 0;
   width: 380px;
   min-height: 500px;
-  background:
-    radial-gradient(640px 420px at -12% -15%, rgba(255, 198, 173, 0.26), transparent 58%),
-    radial-gradient(500px 400px at 108% 0%, rgba(255, 160, 127, 0.2), transparent 62%),
-    linear-gradient(160deg, #120d0c 0%, #1f1411 46%, #140f0d 100%);
+  background: var(--bg);
   color: var(--text);
   font: 13px/1.45 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
@@ -45,23 +43,34 @@ body {
 }
 
 .title {
-  font-weight: 760;
-  font-size: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 24px;
   line-height: 1;
-  letter-spacing: -0.02em;
-  background: linear-gradient(110deg, #fff8f4 0%, #ffc6ad 52%, #ffd8c8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.header .title::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--theme);
+  box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.22);
 }
 
 #notionBar .title {
   font-size: 14px;
-  letter-spacing: 0.2px;
-  color: #ffe8de;
-  background: none;
-  -webkit-background-clip: initial;
-  background-clip: initial;
+  font-weight: 760;
+  letter-spacing: 0.1px;
+}
+
+#notionBar .title::before {
+  width: 8px;
+  height: 8px;
 }
 
 .actions {
@@ -70,74 +79,92 @@ body {
 }
 
 .btn {
+  min-height: 34px;
   border: 1px solid var(--border);
-  background: var(--btn);
+  background: var(--btn-bg);
   color: var(--text);
   padding: 7px 12px;
   border-radius: 11px;
   cursor: pointer;
   font-weight: 620;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 
 .btn:hover {
-  background: var(--btn-hover);
+  background: var(--btn-bg-hover);
   border-color: var(--border-strong);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow);
 }
 
 .btn:active {
   transform: translateY(0);
 }
 
+.btn:focus-visible,
+.mini:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
 .btn.danger {
-  border-color: rgba(244, 122, 122, 0.44);
-  color: #ffd9d9;
+  border-color: rgba(199, 55, 47, 0.45);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
-#btnSyncNotion {
-  border-color: rgba(255, 198, 173, 0.58);
-  background: linear-gradient(180deg, rgba(255, 198, 173, 0.38), rgba(255, 198, 173, 0.22));
-}
-
+#btnSyncNotion,
 #btnFetchArticle {
-  border-color: rgba(255, 198, 173, 0.5);
+  border-color: var(--border-strong);
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  border: 1px solid rgba(255, 198, 173, 0.22);
-  background: rgba(255, 255, 255, 0.04);
+  min-height: 34px;
+  border: 1px solid var(--border);
+  background: #fff9f6;
   color: var(--text);
   padding: 8px 11px;
   border-radius: 11px;
   outline: none;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .input::placeholder {
-  color: rgba(212, 181, 167, 0.86);
+  color: rgba(217, 89, 38, 0.62);
 }
 
 .input:focus {
-  border-color: rgba(255, 198, 173, 0.6);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 2px rgba(255, 198, 173, 0.6);
 }
 
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
   padding: 11px;
-  background: linear-gradient(170deg, rgba(55, 35, 28, 0.72), rgba(34, 23, 19, 0.86));
-  border: 1px solid rgba(255, 198, 173, 0.22);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 15px;
   margin-bottom: 10px;
   box-shadow: var(--shadow);
   animation: rise-in 220ms ease both;
+}
+
+.toolbar::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 2px;
+  background: var(--theme);
+  border-radius: 0 0 999px 999px;
 }
 
 .toolbar:nth-of-type(2) {
@@ -178,7 +205,7 @@ body {
 input[type="checkbox"] {
   width: 15px;
   height: 15px;
-  accent-color: var(--brand);
+  accent-color: var(--text);
   margin: 0;
 }
 
@@ -191,8 +218,9 @@ input[type="checkbox"] {
 #notionStatus {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 198, 173, 0.32);
-  background: rgba(255, 198, 173, 0.14);
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
 }
 
 #notionConfig .input {
@@ -217,7 +245,7 @@ main::-webkit-scrollbar {
 
 main::-webkit-scrollbar-thumb {
   border-radius: 10px;
-  background: rgba(255, 198, 173, 0.28);
+  background: rgba(217, 89, 38, 0.22);
 }
 
 .list {
@@ -230,16 +258,18 @@ main::-webkit-scrollbar-thumb {
   gap: 10px;
   align-items: flex-start;
   padding: 11px;
-  background: linear-gradient(180deg, rgba(34, 22, 19, 0.92), rgba(24, 16, 14, 0.94));
-  border: 1px solid rgba(255, 198, 173, 0.22);
+  background: #fffaf7;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--theme);
   border-radius: 14px;
-  transition: border-color 140ms ease, transform 140ms ease;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
   min-width: 0;
 }
 
 .row:hover {
-  border-color: rgba(255, 198, 173, 0.48);
+  border-color: var(--border-strong);
   transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .row .meta {
@@ -251,7 +281,8 @@ main::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-weight: 670;
+  font-weight: 680;
+  color: var(--text);
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -272,15 +303,16 @@ main::-webkit-scrollbar-thumb {
   gap: 6px;
   padding: 1px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
   color: var(--muted);
+  background: #fff8f3;
   font-size: 11px;
 }
 
 .pill.warn {
-  border-color: rgba(255, 198, 173, 0.55);
-  color: #ffd8c8;
-  background: rgba(255, 198, 173, 0.16);
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--warn-bg);
 }
 
 .row .right {
@@ -291,24 +323,25 @@ main::-webkit-scrollbar-thumb {
 
 .mini {
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--btn-bg);
   color: var(--text);
   border-radius: 10px;
   cursor: pointer;
   padding: 5px 9px;
   font-size: 12px;
   font-weight: 620;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color 120ms ease, background-color 120ms ease;
 }
 
 .mini:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 198, 173, 0.44);
+  background: var(--btn-bg-hover);
+  border-color: var(--border-strong);
 }
 
 .mini.danger {
-  border-color: rgba(244, 122, 122, 0.44);
-  color: #ffd5d5;
+  border-color: rgba(199, 55, 47, 0.45);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .footer {
@@ -316,7 +349,7 @@ main::-webkit-scrollbar-thumb {
   padding: 4px 2px 0;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 560;
 }
 
 @keyframes rise-in {
@@ -327,5 +360,16 @@ main::-webkit-scrollbar-thumb {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar,
+  .btn,
+  .mini,
+  .row,
+  .input {
+    animation: none !important;
+    transition: none !important;
   }
 }
