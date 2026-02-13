@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WebClipper</title>
+    <title>SyncNos</title>
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
     <div class="app">
       <header class="header">
-        <div class="title">WebClipper</div>
+        <div class="title">SyncNos</div>
         <nav class="tabs" role="tablist" aria-label="Popup tabs">
           <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
             Chats
@@ -27,12 +27,26 @@
             <span>Select all</span>
           </label>
           <div class="spacer"></div>
-          <button id="btnExportJson" class="btn">Export JSON</button>
-          <button id="btnExportMd" class="btn">Export MD</button>
-          <label class="checkbox compact" title="Merge selected conversations into one markdown file">
-            <input id="chkMergeMd" type="checkbox" />
-            <span>Merge MD</span>
-          </label>
+          <div class="exportWrap">
+            <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span class="label">Export as Markdown</span>
+              <span class="divider" aria-hidden="true"></span>
+              <span class="caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="exportMenu" class="menu" role="menu" aria-label="Export options" hidden>
+              <button id="menuExportJson" class="menu-item" type="button" role="menuitem">Export as JSON</button>
+              <button
+                id="menuMergeMarkdown"
+                class="menu-item"
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked="false"
+                title="Merge selected conversations into one markdown file"
+              >
+                Export as Merge Markdown
+              </button>
+            </div>
+          </div>
           <button id="btnSyncNotion" class="btn">Sync</button>
           <button id="btnFetchArticle" class="btn">Fetch</button>
         </section>

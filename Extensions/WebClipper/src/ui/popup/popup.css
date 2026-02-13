@@ -169,6 +169,77 @@ body {
   color: var(--danger);
 }
 
+#btnExport {
+  padding-right: 10px;
+}
+
+.exportWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn.export {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
+}
+
+.btn.export .divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  opacity: 0.85;
+}
+
+.btn.export .caret {
+  width: 14px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  user-select: none;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.menu-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 11px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.menu-item:hover {
+  background: var(--btn-bg);
+  border-color: var(--border);
+}
+
+.menu-item[aria-checked="true"]::after {
+  content: "✓";
+  float: right;
+  color: var(--text);
+}
+
 #btnSyncNotion,
 #btnFetchArticle {
   border-color: var(--border-strong);
