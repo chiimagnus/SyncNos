@@ -509,13 +509,6 @@ main {
   margin-top: 10px;
 }
 
-.statsRow {
-  padding: 4px 2px 8px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 560;
-}
-
 .toolbar.is-docked {
   margin-bottom: 0;
 }
@@ -523,6 +516,41 @@ main {
 .toolbar.is-docked .menu {
   top: auto;
   bottom: calc(100% + 8px);
+}
+
+.bottomBar {
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px;
+}
+
+.bottomBar .stats {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.bottomBar .exportWrap {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.bottomBar .btn.export {
+  max-width: 170px;
+}
+
+.bottomBar .btn.export .label {
+  display: block;
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes rise-in {
