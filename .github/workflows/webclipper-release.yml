@@ -1,0 +1,63 @@
+name: WebClipper Release Assets
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to attach assets to (e.g. v0.1.0). Required for manual runs.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  webclipper_assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Extensions/WebClipper/package-lock.json
+
+      - name: Install WebClipper deps
+        run: npm ci --prefix Extensions/WebClipper
+
+      - name: Build WebClipper package
+        run: npm --prefix Extensions/WebClipper run build
+
+      - name: Prepare release artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+          cp Extensions/WebClipper/dist/webclipper.zip "release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip"
+          cp Extensions/WebClipper/dist/webclipper.zip "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
+          cp Extensions/WebClipper/dist/webclipper.zip "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
+
+      - name: Upload assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          files: |
+            release-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
