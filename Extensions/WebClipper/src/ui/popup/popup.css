@@ -34,12 +34,67 @@ body {
   padding: 12px;
 }
 
+#viewSettings .toolbar {
+  animation: none;
+}
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.tabs {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  width: 176px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tab {
+  min-height: 34px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.tab:hover {
+  transform: translateY(-1px);
+  background: var(--btn-bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.tab.is-active {
+  background: var(--panel-strong);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.view {
+  display: none;
+}
+
+.view.is-active {
+  display: block;
 }
 
 .title {
@@ -156,17 +211,6 @@ body {
   animation: rise-in 220ms ease both;
 }
 
-.toolbar::before {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 0;
-  height: 2px;
-  background: var(--theme);
-  border-radius: 0 0 999px 999px;
-}
-
 .toolbar:nth-of-type(2) {
   animation-delay: 40ms;
 }
@@ -260,7 +304,6 @@ main::-webkit-scrollbar-thumb {
   padding: 11px;
   background: #fffaf7;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--theme);
   border-radius: 14px;
   transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
   min-width: 0;
