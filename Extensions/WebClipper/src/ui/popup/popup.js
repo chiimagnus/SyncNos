@@ -23,7 +23,13 @@
   }
 
   function storageGet(keys) {
-    return new Promise((resolve) => chrome.storage.local.get(keys, (res) => resolve(res || {})));
+    const normalized = (() => {
+      if (typeof keys === "string") return keys;
+      if (Array.isArray(keys)) return keys.filter((k) => typeof k === "string" && k);
+      if (keys && typeof keys === "object") return keys;
+      return [];
+    })();
+    return new Promise((resolve) => chrome.storage.local.get(normalized, (res) => resolve(res || {})));
   }
 
   function storageSet(obj) {
