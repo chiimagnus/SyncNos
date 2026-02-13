@@ -78,6 +78,7 @@ body {
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px;
   background: rgba(15, 23, 34, 0.6);
@@ -88,6 +89,7 @@ body {
 
 .spacer {
   flex: 1;
+  min-width: 0;
 }
 
 .checkbox {
@@ -101,6 +103,21 @@ body {
   gap: 6px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.toolbar .btn,
+.toolbar .mini,
+.toolbar .checkbox {
+  flex: 0 0 auto;
+}
+
+#notionConfig .input {
+  flex: 1 1 140px;
+}
+
+#notionParent .input,
+#notionParentSelect .input {
+  flex: 1 1 180px;
 }
 
 .list {
