@@ -10,58 +10,71 @@
     <div class="app">
       <header class="header">
         <div class="title">WebClipper</div>
-        <div class="actions">
+        <div id="headerActions" class="actions" data-view-only="chats">
           <button id="btnRefresh" class="btn">Refresh</button>
           <button id="btnClearAll" class="btn danger">Clear</button>
         </div>
       </header>
 
-      <section class="toolbar">
-        <label class="checkbox">
-          <input id="chkSelectAll" type="checkbox" />
-          <span>Select all</span>
-        </label>
-        <div class="spacer"></div>
-        <button id="btnExportJson" class="btn">Export JSON</button>
-        <button id="btnExportMd" class="btn">Export MD</button>
-        <label class="checkbox compact" title="Merge selected conversations into one markdown file">
-          <input id="chkMergeMd" type="checkbox" />
-          <span>Merge MD</span>
-        </label>
-        <button id="btnSyncNotion" class="btn">Sync</button>
-        <button id="btnFetchArticle" class="btn">Fetch</button>
+      <nav class="tabs" role="tablist" aria-label="Popup tabs">
+        <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
+          Chats
+        </button>
+        <button id="tabSettings" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewSettings">
+          Settings
+        </button>
+      </nav>
+
+      <section id="viewChats" class="view is-active" role="tabpanel" aria-labelledby="tabChats">
+        <section class="toolbar">
+          <label class="checkbox">
+            <input id="chkSelectAll" type="checkbox" />
+            <span>Select all</span>
+          </label>
+          <div class="spacer"></div>
+          <button id="btnExportJson" class="btn">Export JSON</button>
+          <button id="btnExportMd" class="btn">Export MD</button>
+          <label class="checkbox compact" title="Merge selected conversations into one markdown file">
+            <input id="chkMergeMd" type="checkbox" />
+            <span>Merge MD</span>
+          </label>
+          <button id="btnSyncNotion" class="btn">Sync</button>
+          <button id="btnFetchArticle" class="btn">Fetch</button>
+        </section>
+
+        <main>
+          <div id="list" class="list"></div>
+        </main>
+
+        <footer class="footer">
+          <div id="stats" class="stats">0 conversations</div>
+        </footer>
       </section>
 
-      <section class="toolbar" id="notionBar">
-        <div class="title" style="font-weight: 650;">Notion</div>
-        <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
-        <div class="spacer"></div>
-        <button id="btnNotionConnect" class="btn">Connect</button>
+      <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
+        <section class="toolbar" id="notionBar">
+          <div class="title" style="font-weight: 650;">Notion</div>
+          <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+          <div class="spacer"></div>
+          <button id="btnNotionConnect" class="btn">Connect</button>
+        </section>
+
+        <section class="toolbar" id="notionConfig">
+          <input id="notionClientId" class="input" placeholder="Notion Client ID" />
+          <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
+          <button id="btnNotionSaveConfig" class="btn">Save</button>
+        </section>
+
+        <section class="toolbar" id="notionParent">
+          <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
+          <button id="btnNotionLoadPages" class="btn">Load</button>
+        </section>
+
+        <section class="toolbar" id="notionParentSelect">
+          <select id="notionPages" class="input"></select>
+          <button id="btnNotionSaveParent" class="btn">Use</button>
+        </section>
       </section>
-
-      <section class="toolbar" id="notionConfig">
-        <input id="notionClientId" class="input" placeholder="Notion Client ID" />
-        <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
-        <button id="btnNotionSaveConfig" class="btn">Save</button>
-      </section>
-
-      <section class="toolbar" id="notionParent">
-        <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
-        <button id="btnNotionLoadPages" class="btn">Load</button>
-      </section>
-
-      <section class="toolbar" id="notionParentSelect">
-        <select id="notionPages" class="input"></select>
-        <button id="btnNotionSaveParent" class="btn">Use</button>
-      </section>
-
-      <main>
-        <div id="list" class="list"></div>
-      </main>
-
-      <footer class="footer">
-        <div id="stats" class="stats">0 conversations</div>
-      </footer>
     </div>
 
     <script src="../../export/article-markdown.js"></script>

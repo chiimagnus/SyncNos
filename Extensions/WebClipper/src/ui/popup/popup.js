@@ -16,6 +16,11 @@
   const els = {
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
+    headerActions: document.getElementById("headerActions"),
+    tabChats: document.getElementById("tabChats"),
+    tabSettings: document.getElementById("tabSettings"),
+    viewChats: document.getElementById("viewChats"),
+    viewSettings: document.getElementById("viewSettings"),
     btnRefresh: document.getElementById("btnRefresh"),
     btnClearAll: document.getElementById("btnClearAll"),
     chkSelectAll: document.getElementById("chkSelectAll"),
@@ -41,8 +46,43 @@
   };
 
   const STORAGE_KEYS = {
+    popupActiveTab: "popup_active_tab",
     exportMdMergeSingle: "export_md_merge_single"
   };
+
+  function setActiveTab(tabId) {
+    const next = tabId === "settings" ? "settings" : "chats";
+
+    if (els.tabChats) {
+      const active = next === "chats";
+      els.tabChats.classList.toggle("is-active", active);
+      els.tabChats.setAttribute("aria-selected", active ? "true" : "false");
+      els.tabChats.tabIndex = active ? 0 : -1;
+    }
+
+    if (els.tabSettings) {
+      const active = next === "settings";
+      els.tabSettings.classList.toggle("is-active", active);
+      els.tabSettings.setAttribute("aria-selected", active ? "true" : "false");
+      els.tabSettings.tabIndex = active ? 0 : -1;
+    }
+
+    if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
+    if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
+    if (els.headerActions) els.headerActions.style.display = next === "chats" ? "flex" : "none";
+
+    storageSet({ [STORAGE_KEYS.popupActiveTab]: next }).catch(() => {});
+  }
+
+  function onTabKeyDown(e) {
+    if (!e) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = e.key === "ArrowRight" ? "settings" : "chats";
+    setActiveTab(next);
+    const el = next === "settings" ? els.tabSettings : els.tabChats;
+    if (el && typeof el.focus === "function") el.focus();
+  }
 
   function formatTime(ts) {
     if (!ts) return "";
@@ -322,6 +362,20 @@
     }
     await refresh();
   });
+
+  if (els.tabChats) {
+    els.tabChats.addEventListener("click", () => setActiveTab("chats"));
+    els.tabChats.addEventListener("keydown", onTabKeyDown);
+  }
+  if (els.tabSettings) {
+    els.tabSettings.addEventListener("click", () => setActiveTab("settings"));
+    els.tabSettings.addEventListener("keydown", onTabKeyDown);
+  }
+
+  (async () => {
+    const saved = await storageGet([STORAGE_KEYS.popupActiveTab]);
+    setActiveTab(saved[STORAGE_KEYS.popupActiveTab] || "chats");
+  })();
 
   refresh();
 
