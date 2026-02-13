@@ -13,9 +13,6 @@
   --danger-bg: #ffe5e1;
   --warn-bg: #fff0e8;
   --shadow: 0 8px 18px rgba(217, 89, 38, 0.14);
-  --ok: #1f9d55;
-  --ok-bg: rgba(31, 157, 85, 0.14);
-  --ok-border: rgba(31, 157, 85, 0.38);
 }
 
 * {
@@ -194,7 +191,6 @@ body {
 }
 
 .btn:focus-visible,
-.mini:focus-visible,
 .input:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 2px;
@@ -204,29 +200,6 @@ body {
   border-color: rgba(199, 55, 47, 0.45);
   background: var(--danger-bg);
   color: var(--danger);
-}
-
-.btn.is-flash-ok {
-  border-color: var(--ok-border);
-  box-shadow: 0 0 0 3px var(--ok-bg);
-}
-
-.btn.is-flash-ok::after {
-  content: "✓";
-  position: absolute;
-  right: -7px;
-  top: -7px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: #ffffff;
-  border: 1px solid var(--ok-border);
-  color: var(--ok);
-  font-size: 12px;
-  font-weight: 900;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 
 #btnExport {
@@ -377,7 +350,6 @@ input[type="checkbox"] {
 }
 
 .toolbar .btn,
-.toolbar .mini,
 .toolbar .checkbox {
   flex: 0 0 auto;
 }
@@ -483,35 +455,6 @@ main {
   background: var(--warn-bg);
 }
 
-.row .right {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mini {
-  border: 1px solid var(--border);
-  background: var(--btn-bg);
-  color: var(--text);
-  border-radius: 10px;
-  cursor: pointer;
-  padding: 5px 9px;
-  font-size: 12px;
-  font-weight: 620;
-  transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.mini:hover {
-  background: var(--btn-bg-hover);
-  border-color: var(--border-strong);
-}
-
-.mini.danger {
-  border-color: rgba(199, 55, 47, 0.45);
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
 .footer {
   margin-top: 10px;
   padding: 4px 2px 0;
@@ -583,7 +526,6 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .toolbar,
   .btn,
-  .mini,
   .row,
   .input {
     animation: none !important;
