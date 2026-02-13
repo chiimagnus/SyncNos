@@ -60,13 +60,10 @@
   }
 
   function ensureInpageStylesheetInjected() {
-    const id = "webclipper-inpage-style";
-    if (document.getElementById(id)) return;
-    const link = document.createElement("link");
-    link.id = id;
-    link.rel = "stylesheet";
-    link.href = chrome.runtime.getURL("src/ui/inpage/inpage.css");
-    document.documentElement.appendChild(link);
+    // CSS is already injected by manifest `content_scripts.css`.
+    // Keep this as a no-op to avoid `chrome-extension://invalid/` fetch errors
+    // from stale content-script contexts after extension reload.
+    return;
   }
 
   function ensureChatGPTButton({ onClick }) {
