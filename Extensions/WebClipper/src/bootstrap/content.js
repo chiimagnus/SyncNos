@@ -5,6 +5,82 @@
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const NOTION_BTN_ID = "webclipper-notionai-btn";
+  const EDGE_GAP = 8;
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function getButtonSize(el) {
+    const rect = el.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width || el.offsetWidth || 1));
+    const height = Math.max(1, Math.round(rect.height || el.offsetHeight || 1));
+    return { width, height };
+  }
+
+  function applySnappedPosition(el, state) {
+    if (!state || !state.edge) return null;
+    const { width, height } = getButtonSize(el);
+    const maxLeft = Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP);
+    const maxTop = Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP);
+    const offset = Number.isFinite(state.offset) ? state.offset : EDGE_GAP;
+    const edge = state.edge;
+
+    el.style.position = "fixed";
+    if (edge === "left") {
+      const top = clamp(offset, EDGE_GAP, maxTop);
+      el.style.left = `${EDGE_GAP}px`;
+      el.style.right = "auto";
+      el.style.top = `${top}px`;
+      el.style.bottom = "auto";
+      return { edge, offset: top };
+    }
+    if (edge === "right") {
+      const top = clamp(offset, EDGE_GAP, maxTop);
+      el.style.left = "auto";
+      el.style.right = `${EDGE_GAP}px`;
+      el.style.top = `${top}px`;
+      el.style.bottom = "auto";
+      return { edge, offset: top };
+    }
+    if (edge === "top") {
+      const left = clamp(offset, EDGE_GAP, maxLeft);
+      el.style.left = `${left}px`;
+      el.style.right = "auto";
+      el.style.top = `${EDGE_GAP}px`;
+      el.style.bottom = "auto";
+      return { edge, offset: left };
+    }
+    if (edge === "bottom") {
+      const left = clamp(offset, EDGE_GAP, maxLeft);
+      el.style.left = `${left}px`;
+      el.style.right = "auto";
+      el.style.top = "auto";
+      el.style.bottom = `${EDGE_GAP}px`;
+      return { edge, offset: left };
+    }
+    return null;
+  }
+
+  function snapToClosestEdge(el, desiredLeft, desiredTop) {
+    const { width, height } = getButtonSize(el);
+    const maxLeft = Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP);
+    const maxTop = Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP);
+    const left = clamp(desiredLeft, EDGE_GAP, maxLeft);
+    const top = clamp(desiredTop, EDGE_GAP, maxTop);
+
+    const distances = [
+      { edge: "left", distance: left - EDGE_GAP },
+      { edge: "right", distance: window.innerWidth - (left + width) - EDGE_GAP },
+      { edge: "top", distance: top - EDGE_GAP },
+      { edge: "bottom", distance: window.innerHeight - (top + height) - EDGE_GAP }
+    ];
+    distances.sort((a, b) => a.distance - b.distance);
+
+    const closest = distances[0];
+    const offset = closest.edge === "left" || closest.edge === "right" ? top : left;
+    return applySnappedPosition(el, { edge: closest.edge, offset });
+  }
 
   function send(type, payload) {
     return new Promise((resolve) => {
@@ -77,22 +153,8 @@
     btn.type = "button";
     btn.textContent = "WebClipper: Save";
 
-    const storageKey = "webclipper_btn_pos_chatgpt_v1";
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const p = JSON.parse(saved);
-        if (p && Number.isFinite(p.left) && Number.isFinite(p.top)) {
-          btn.style.left = `${p.left}px`;
-          btn.style.top = `${p.top}px`;
-          btn.style.right = "auto";
-          btn.style.bottom = "auto";
-          btn.style.position = "fixed";
-        }
-      } catch (_e) {
-        // ignore
-      }
-    }
+    const storageKey = "webclipper_btn_pos_chatgpt_v2";
+    let snappedState = null;
 
     let dragging = false;
     let moved = false;
@@ -100,10 +162,6 @@
     let startY = 0;
     let startLeft = 0;
     let startTop = 0;
-
-    function clamp(v, min, max) {
-      return Math.max(min, Math.min(max, v));
-    }
 
     btn.addEventListener("pointerdown", (e) => {
       dragging = true;
@@ -122,11 +180,12 @@
 
     btn.addEventListener("pointermove", (e) => {
       if (!dragging) return;
+      const { width, height } = getButtonSize(btn);
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      const left = clamp(startLeft + dx, 6, window.innerWidth - 6);
-      const top = clamp(startTop + dy, 6, window.innerHeight - 6);
+      const left = clamp(startLeft + dx, EDGE_GAP, Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP));
+      const top = clamp(startTop + dy, EDGE_GAP, Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP));
       btn.style.left = `${left}px`;
       btn.style.top = `${top}px`;
     });
@@ -135,8 +194,9 @@
       if (!dragging) return;
       dragging = false;
       const rect = btn.getBoundingClientRect();
+      snappedState = snapToClosestEdge(btn, rect.left, rect.top);
       try {
-        localStorage.setItem(storageKey, JSON.stringify({ left: rect.left, top: rect.top }));
+        if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
       } catch (_e) {
         // ignore
       }
@@ -154,6 +214,39 @@
     });
 
     document.documentElement.appendChild(btn);
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.edge === "string" && Number.isFinite(parsed.offset)) {
+          snappedState = applySnappedPosition(btn, parsed);
+        } else if (parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top)) {
+          // Backward compatibility for v1 free-floating position.
+          snappedState = snapToClosestEdge(btn, parsed.left, parsed.top);
+        }
+      }
+      if (!snappedState) {
+        const rect = btn.getBoundingClientRect();
+        snappedState = snapToClosestEdge(btn, rect.left, rect.top);
+      }
+      if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
+    } catch (_e) {
+      const rect = btn.getBoundingClientRect();
+      snappedState = snapToClosestEdge(btn, rect.left, rect.top);
+    }
+
+    window.addEventListener("resize", () => {
+      if (!btn.isConnected) return;
+      const nextState = applySnappedPosition(btn, snappedState);
+      if (!nextState) return;
+      snappedState = nextState;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(snappedState));
+      } catch (_e) {
+        // ignore
+      }
+    });
   }
 
   function ensureNotionAttachedButton({ onClick, getAnchorRect }) {
@@ -175,12 +268,8 @@
     function updatePos() {
       const r = getAnchorRect();
       if (!r) return;
-      // Attach near the top-left of the NotionAI window area.
-      btn.style.left = `${Math.max(6, r.left + 10)}px`;
-      btn.style.top = `${Math.max(6, r.top + 10)}px`;
-      btn.style.right = "auto";
-      btn.style.bottom = "auto";
-      btn.style.position = "fixed";
+      // Keep the button close to Notion AI area, then snap to nearest viewport edge.
+      snapToClosestEdge(btn, r.left + 10, r.top + 10);
     }
 
     updatePos();
