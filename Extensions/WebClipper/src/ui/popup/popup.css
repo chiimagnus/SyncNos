@@ -206,7 +206,8 @@ input[type="checkbox"] {
 
 main {
   max-height: 280px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 2px;
 }
 
@@ -233,6 +234,7 @@ main::-webkit-scrollbar-thumb {
   border: 1px solid rgba(255, 198, 173, 0.22);
   border-radius: 14px;
   transition: border-color 140ms ease, transform 140ms ease;
+  min-width: 0;
 }
 
 .row:hover {
@@ -250,18 +252,18 @@ main::-webkit-scrollbar-thumb {
   align-items: center;
   gap: 6px;
   font-weight: 670;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .sub {
   margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pill {
