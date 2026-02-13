@@ -4,7 +4,7 @@
 
 > **SyncNos** - Sync Everything to Notion, including AppleBooks, GoodLinks, WeRead, AI Chats, Chats(OCR version) and etc.
 
-## MacOS App (App Store) 
+##  MacOS App (App Store) 
 
 ### Sync Data From
 
@@ -22,7 +22,7 @@
 
 - [MacOS App (App Store) ↗](https://apps.apple.com/app/syncnos/id6755133888)
 
-## Browser Extension (WebClipper)
+## 🧩 Browser Extension (WebClipper)
 
 This repository also includes a standalone browser extension (MV3) under `Extensions/WebClipper/` (Chrome / Edge / Arc / Zen / Firefox compatible).
 
