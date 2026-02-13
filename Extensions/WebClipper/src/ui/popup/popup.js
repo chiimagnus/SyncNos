@@ -30,22 +30,23 @@
     return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
   }
 
-  const els = {
-    list: document.getElementById("list"),
-    stats: document.getElementById("stats"),
-    tabChats: document.getElementById("tabChats"),
-    tabSettings: document.getElementById("tabSettings"),
-    viewChats: document.getElementById("viewChats"),
-    viewSettings: document.getElementById("viewSettings"),
-    chkSelectAll: document.getElementById("chkSelectAll"),
-    btnExport: document.getElementById("btnExport"),
-    exportMenu: document.getElementById("exportMenu"),
-    menuExportJson: document.getElementById("menuExportJson"),
-    menuMergeMarkdown: document.getElementById("menuMergeMarkdown"),
-    btnSyncNotion: document.getElementById("btnSyncNotion"),
-    btnNotionConnect: document.getElementById("btnNotionConnect"),
-    notionStatus: document.getElementById("notionStatus"),
-    notionClientId: document.getElementById("notionClientId"),
+	  const els = {
+	    list: document.getElementById("list"),
+	    stats: document.getElementById("stats"),
+	    tabChats: document.getElementById("tabChats"),
+	    tabSettings: document.getElementById("tabSettings"),
+	    viewChats: document.getElementById("viewChats"),
+	    viewSettings: document.getElementById("viewSettings"),
+	    chkSelectAll: document.getElementById("chkSelectAll"),
+	    btnExport: document.getElementById("btnExport"),
+	    exportMenu: document.getElementById("exportMenu"),
+	    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
+	    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
+	    menuExportJsons: document.getElementById("menuExportJsons"),
+	    btnSyncNotion: document.getElementById("btnSyncNotion"),
+	    btnNotionConnect: document.getElementById("btnNotionConnect"),
+	    notionStatus: document.getElementById("notionStatus"),
+	    notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
     btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
     notionPageQuery: document.getElementById("notionPageQuery"),
@@ -54,16 +55,14 @@
     btnNotionSaveParent: document.getElementById("btnNotionSaveParent")
   };
 
-  const state = {
-    conversations: [],
-    selectedIds: new Set(),
-    exportMdMergeSingle: false
-  };
+	  const state = {
+	    conversations: [],
+	    selectedIds: new Set()
+	  };
 
-  const STORAGE_KEYS = {
-    popupActiveTab: "popup_active_tab",
-    exportMdMergeSingle: "export_md_merge_single"
-  };
+	  const STORAGE_KEYS = {
+	    popupActiveTab: "popup_active_tab"
+	  };
 
   function isExportMenuOpen() {
     return !!(els.exportMenu && !els.exportMenu.hidden);
@@ -79,13 +78,8 @@
     if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
   }
 
-  function syncMergeMarkdownMenuItem() {
-    if (!els.menuMergeMarkdown) return;
-    els.menuMergeMarkdown.setAttribute("aria-checked", state.exportMdMergeSingle ? "true" : "false");
-  }
-
-  function setActiveTab(tabId) {
-    const next = tabId === "settings" ? "settings" : "chats";
+	  function setActiveTab(tabId) {
+	    const next = tabId === "settings" ? "settings" : "chats";
 
     if (els.tabChats) {
       const active = next === "chats";
@@ -305,7 +299,7 @@
     return lines.join("\n");
   }
 
-  async function exportMd() {
+  async function exportMd({ mergeSingle }) {
     const ids = getSelectedIds();
     if (!ids.length) return;
     const selected = state.conversations.filter((c) => state.selectedIds.has(c.id));
@@ -317,7 +311,6 @@
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const mergeSingle = !!state.exportMdMergeSingle;
     const files = [];
 
     if (mergeSingle) {
@@ -338,18 +331,6 @@
     downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
   }
 
-  async function loadExportPrefs() {
-    const res = await storageGet([STORAGE_KEYS.exportMdMergeSingle]);
-    state.exportMdMergeSingle = !!res[STORAGE_KEYS.exportMdMergeSingle];
-    syncMergeMarkdownMenuItem();
-  }
-
-  async function saveExportPrefs() {
-    await storageSet({
-      [STORAGE_KEYS.exportMdMergeSingle]: !!state.exportMdMergeSingle
-    });
-  }
-
   els.chkSelectAll.addEventListener("change", () => {
     if (els.chkSelectAll.checked) {
       for (const c of state.conversations) state.selectedIds.add(c.id);
@@ -359,13 +340,19 @@
     render();
   });
 
-  function safeExportMd() {
-    exportMd().catch((e) => {
+  function safeExportSingleMarkdown() {
+    exportMd({ mergeSingle: true }).catch((e) => {
       alert((e && e.message) || "Export Markdown failed.");
     });
   }
 
-  function safeExportJson() {
+  function safeExportMultiMarkdown() {
+    exportMd({ mergeSingle: false }).catch((e) => {
+      alert((e && e.message) || "Export Markdown failed.");
+    });
+  }
+
+  function safeExportJsons() {
     exportJson().catch((e) => {
       alert((e && e.message) || "Export JSON failed.");
     });
@@ -374,30 +361,30 @@
   if (els.btnExport) {
     els.btnExport.addEventListener("click", (e) => {
       if (!e) return;
-      const rect = els.btnExport.getBoundingClientRect();
-      const isCaretClick = e.clientX >= rect.right - 34;
-      if (isCaretClick) {
-        if (isExportMenuOpen()) closeExportMenu();
-        else openExportMenu();
-        return;
-      }
-      closeExportMenu();
-      safeExportMd();
+      e.preventDefault();
+      if (isExportMenuOpen()) closeExportMenu();
+      else openExportMenu();
     });
   }
 
-  if (els.menuExportJson) {
-    els.menuExportJson.addEventListener("click", () => {
+  if (els.menuExportSingleMarkdown) {
+    els.menuExportSingleMarkdown.addEventListener("click", () => {
       closeExportMenu();
-      safeExportJson();
+      safeExportSingleMarkdown();
     });
   }
 
-  if (els.menuMergeMarkdown) {
-    els.menuMergeMarkdown.addEventListener("click", () => {
-      state.exportMdMergeSingle = !state.exportMdMergeSingle;
-      syncMergeMarkdownMenuItem();
-      saveExportPrefs().catch(() => {});
+  if (els.menuExportMultiMarkdown) {
+    els.menuExportMultiMarkdown.addEventListener("click", () => {
+      closeExportMenu();
+      safeExportMultiMarkdown();
+    });
+  }
+
+  if (els.menuExportJsons) {
+    els.menuExportJsons.addEventListener("click", () => {
+      closeExportMenu();
+      safeExportJsons();
     });
   }
 
@@ -567,7 +554,6 @@
   });
 
   loadNotionConfig();
-  loadExportPrefs();
   // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
