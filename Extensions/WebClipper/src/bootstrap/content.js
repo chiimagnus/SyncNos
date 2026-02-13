@@ -158,7 +158,20 @@
     btn.className = "webclipper-inpage-btn";
     btn.type = "button";
     btn.dataset.sourceId = collectorId;
-    btn.textContent = INPAGE_BUTTON_LABEL;
+    btn.title = INPAGE_BUTTON_LABEL;
+    btn.setAttribute("aria-label", INPAGE_BUTTON_LABEL);
+
+    const icon = document.createElement("img");
+    icon.className = "webclipper-inpage-btn__icon";
+    icon.alt = "";
+    icon.decoding = "async";
+    icon.loading = "eager";
+    icon.setAttribute("aria-hidden", "true");
+    icon.src = chrome.runtime.getURL("icons/icon-128.png");
+    icon.addEventListener("error", () => {
+      btn.textContent = INPAGE_BUTTON_LABEL;
+    });
+    btn.appendChild(icon);
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
