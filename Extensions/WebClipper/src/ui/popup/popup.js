@@ -26,7 +26,6 @@
     menuExportJson: document.getElementById("menuExportJson"),
     menuMergeMarkdown: document.getElementById("menuMergeMarkdown"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
-    btnFetchArticle: document.getElementById("btnFetchArticle"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
     notionStatus: document.getElementById("notionStatus"),
     notionClientId: document.getElementById("notionClientId"),
@@ -380,15 +379,6 @@
     if (e && e.key === "Escape") closeExportMenu();
   });
 
-  els.btnFetchArticle.addEventListener("click", async () => {
-    const res = await send("captureArticleFromActiveTab");
-    if (!res || !res.ok) {
-      alert((res && res.error && res.error.message) || "Fetch failed.");
-      return;
-    }
-    alert("Fetched article into local storage.");
-    await refresh();
-  });
   els.btnSyncNotion.addEventListener("click", async () => {
     const ids = getSelectedIds();
     if (!ids.length) return;

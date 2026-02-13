@@ -240,8 +240,7 @@ body {
   color: var(--text);
 }
 
-#btnSyncNotion,
-#btnFetchArticle {
+#btnSyncNotion {
   border-color: var(--border-strong);
 }
 
