@@ -210,17 +210,6 @@ body {
   animation: rise-in 220ms ease both;
 }
 
-.toolbar::before {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 0;
-  height: 2px;
-  background: var(--theme);
-  border-radius: 0 0 999px 999px;
-}
-
 .toolbar:nth-of-type(2) {
   animation-delay: 40ms;
 }
@@ -314,7 +303,6 @@ main::-webkit-scrollbar-thumb {
   padding: 11px;
   background: #fffaf7;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--theme);
   border-radius: 14px;
   transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
   min-width: 0;
