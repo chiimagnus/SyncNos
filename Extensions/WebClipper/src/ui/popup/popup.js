@@ -162,7 +162,7 @@
     const zipBlob = await createZipBlob([
       { name: jsonFilename, data: JSON.stringify(payload, null, 2) }
     ]);
-    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: true });
+    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
   }
 
   function sanitizeFilenamePart(input, fallback) {
@@ -177,7 +177,7 @@
 
   function downloadBlob({ blob, filename, saveAs }) {
     const url = URL.createObjectURL(blob);
-    chrome.downloads.download({ url, filename, saveAs: !!saveAs }, () => {
+    chrome.downloads.download({ url, filename, saveAs: typeof saveAs === "boolean" ? saveAs : false }, () => {
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     });
   }
@@ -245,7 +245,7 @@
     }
 
     const zipBlob = await createZipBlob(files);
-    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: true });
+    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
   }
 
   async function loadExportPrefs() {
