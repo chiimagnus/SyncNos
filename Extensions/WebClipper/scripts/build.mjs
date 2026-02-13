@@ -35,6 +35,16 @@ function concatFiles({ outFile, files }) {
   writeText(outFile, `${parts.join("\n;\n")}\n`);
 }
 
+function concatCssFiles({ outFile, files }) {
+  const parts = [];
+  for (const f of files) {
+    const p = join(root, f);
+    const text = readText(p);
+    parts.push(text);
+  }
+  writeText(outFile, `${parts.join("\n\n")}\n`);
+}
+
 function concatParts({ outFile, parts }) {
   writeText(outFile, `${parts.join("\n;\n")}\n`);
 }
@@ -85,8 +95,14 @@ async function minifyJsFile(file) {
 cpSync(join(root, "icons/icon-16.png"), join(out, "icon-16.png"));
 cpSync(join(root, "icons/icon-48.png"), join(out, "icon-48.png"));
 cpSync(join(root, "icons/icon-128.png"), join(out, "icon-128.png"));
-cpSync(join(root, "src/ui/popup/popup.css"), join(out, "popup.css"));
-cpSync(join(root, "src/ui/inpage/inpage.css"), join(out, "inpage.css"));
+concatCssFiles({
+  outFile: join(out, "popup.css"),
+  files: ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/popup.css"]
+});
+concatCssFiles({
+  outFile: join(out, "inpage.css"),
+  files: ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/inpage.css"]
+});
 
 // Bundle content scripts into one file.
 const contentBundle = join(out, "content.js");
@@ -147,6 +163,7 @@ await minifyJsFile(popupBundle);
 // Rewrite popup.html to load the bundled script only.
 const popupHtmlSrc = readText(join(root, "src/ui/popup/popup.html"));
 const popupHtml = popupHtmlSrc
+  .replace(/<title>SyncNos<\/title>\s*(?:<link\s+rel="stylesheet"[^>]*>\s*)+/g, '<title>SyncNos</title>\n    <link rel="stylesheet" href="./popup.css" />\n')
   .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
