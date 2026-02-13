@@ -16,13 +16,10 @@
   const els = {
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
-    headerActions: document.getElementById("headerActions"),
     tabChats: document.getElementById("tabChats"),
     tabSettings: document.getElementById("tabSettings"),
     viewChats: document.getElementById("viewChats"),
     viewSettings: document.getElementById("viewSettings"),
-    btnRefresh: document.getElementById("btnRefresh"),
-    btnClearAll: document.getElementById("btnClearAll"),
     chkSelectAll: document.getElementById("chkSelectAll"),
     chkMergeMd: document.getElementById("chkMergeMd"),
     btnExportJson: document.getElementById("btnExportJson"),
@@ -69,7 +66,6 @@
 
     if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
     if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
-    if (els.headerActions) els.headerActions.style.display = next === "chats" ? "flex" : "none";
 
     storageSet({ [STORAGE_KEYS.popupActiveTab]: next }).catch(() => {});
   }
@@ -301,14 +297,6 @@
     });
   }
 
-  els.btnRefresh.addEventListener("click", refresh);
-  els.btnClearAll.addEventListener("click", async () => {
-    const confirmed = confirm("Clear ALL conversations and messages?\n\nThis cannot be undone.");
-    if (!confirmed) return;
-    await send("clearAll");
-    state.selectedIds.clear();
-    await refresh();
-  });
   els.chkSelectAll.addEventListener("change", () => {
     if (els.chkSelectAll.checked) {
       for (const c of state.conversations) state.selectedIds.add(c.id);
