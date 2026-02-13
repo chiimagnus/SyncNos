@@ -84,9 +84,25 @@
   }
 
   function send(type, payload) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res));
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => {
+          const runtimeErr = chrome.runtime && chrome.runtime.lastError;
+          if (runtimeErr) {
+            reject(new Error(runtimeErr.message || "runtime.sendMessage failed"));
+            return;
+          }
+          resolve(res);
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
+  }
+
+  function isInvalidExtensionContextError(err) {
+    const message = String((err && err.message) || err || "");
+    return /Extension context invalidated/i.test(message);
   }
 
   function getCollector() {
@@ -321,6 +337,10 @@
           if (!inc || !inc.changed) return;
           await saveSnapshot(inc.snapshot);
         } catch (_e) {
+          if (isInvalidExtensionContextError(_e)) {
+            observer && observer.stop && observer.stop();
+            return;
+          }
           // Keep auto-save non-blocking, but leave a debug trail for DevTools.
           console.error("WebClipper auto-save failed:", _e);
         }
