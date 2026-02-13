@@ -4,8 +4,18 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
-  const NOTION_BTN_ID = "webclipper-notionai-btn";
   const EDGE_GAP = 8;
+  const INPAGE_BUTTON_CONFIG = {
+    chatgpt: {
+      storageKey: "webclipper_btn_pos_chatgpt_v2",
+      legacyStorageKey: "webclipper_btn_pos_chatgpt_v1",
+      label: "WebClipper: Save"
+    },
+    notionai: {
+      storageKey: "webclipper_btn_pos_notionai_v1",
+      label: "WebClipper: Save"
+    }
+  };
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -142,18 +152,24 @@
     return;
   }
 
-  function ensureChatGPTButton({ onClick }) {
-    if (!getCollector() || getCollector().id !== "chatgpt") return;
+  function ensureInpageButton({ collectorId, onClick, getAnchorRect }) {
+    const cfg = collectorId ? INPAGE_BUTTON_CONFIG[collectorId] : null;
+    if (!cfg) return;
     ensureInpageStylesheetInjected();
-    if (document.getElementById(INPAGE_BTN_ID)) return;
 
+    const existing = document.getElementById(INPAGE_BTN_ID);
+    if (existing) {
+      if (existing.dataset.sourceId === collectorId) return;
+      existing.remove();
+    }
     const btn = document.createElement("button");
     btn.id = INPAGE_BTN_ID;
     btn.className = "webclipper-inpage-btn";
     btn.type = "button";
-    btn.textContent = "WebClipper: Save";
+    btn.dataset.sourceId = collectorId;
+    btn.textContent = cfg.label;
 
-    const storageKey = "webclipper_btn_pos_chatgpt_v2";
+    const storageKey = cfg.storageKey;
     let snappedState = null;
 
     let dragging = false;
@@ -210,6 +226,8 @@
         e.stopPropagation();
         return;
       }
+      e.preventDefault();
+      e.stopPropagation();
       onClick && onClick();
     });
 
@@ -221,15 +239,30 @@
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.edge === "string" && Number.isFinite(parsed.offset)) {
           snappedState = applySnappedPosition(btn, parsed);
-        } else if (parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top)) {
-          // Backward compatibility for v1 free-floating position.
-          snappedState = snapToClosestEdge(btn, parsed.left, parsed.top);
         }
       }
-      if (!snappedState) {
-        const rect = btn.getBoundingClientRect();
-        snappedState = snapToClosestEdge(btn, rect.left, rect.top);
+
+      if (!snappedState && cfg.legacyStorageKey) {
+        const legacySaved = localStorage.getItem(cfg.legacyStorageKey);
+        if (legacySaved) {
+          const legacyParsed = JSON.parse(legacySaved);
+          if (legacyParsed && Number.isFinite(legacyParsed.left) && Number.isFinite(legacyParsed.top)) {
+            // Backward compatibility for old free-floating position.
+            snappedState = snapToClosestEdge(btn, legacyParsed.left, legacyParsed.top);
+          }
+        }
       }
+
+      if (!snappedState) {
+        const r = typeof getAnchorRect === "function" ? getAnchorRect() : null;
+        if (r && Number.isFinite(r.left) && Number.isFinite(r.top)) {
+          snappedState = snapToClosestEdge(btn, r.left + 10, r.top + 10);
+        } else {
+          const rect = btn.getBoundingClientRect();
+          snappedState = snapToClosestEdge(btn, rect.left, rect.top);
+        }
+      }
+
       if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
     } catch (_e) {
       const rect = btn.getBoundingClientRect();
@@ -249,52 +282,16 @@
     });
   }
 
-  function ensureNotionAttachedButton({ onClick, getAnchorRect }) {
-    const c = getCollector();
-    if (!c || c.id !== "notionai") return;
-    ensureInpageStylesheetInjected();
-    const id = NOTION_BTN_ID;
-    if (document.getElementById(id)) return;
-    if (typeof getAnchorRect !== "function") return;
-
-    const btn = document.createElement("button");
-    btn.id = id;
-    btn.className = "webclipper-inpage-btn";
-    btn.type = "button";
-    btn.textContent = "Save";
-    btn.style.padding = "8px 10px";
-    btn.style.borderRadius = "12px";
-
-    function updatePos() {
-      const r = getAnchorRect();
-      if (!r) return;
-      // Keep the button close to Notion AI area, then snap to nearest viewport edge.
-      snapToClosestEdge(btn, r.left + 10, r.top + 10);
-    }
-
-    updatePos();
-    window.addEventListener("resize", updatePos);
-    window.addEventListener("scroll", updatePos, { passive: true });
-
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClick && onClick();
-    });
-
-    document.documentElement.appendChild(btn);
-  }
-
   function cleanupButtons(activeCollectorId) {
     const active = activeCollectorId || "";
-    if (active !== "chatgpt") {
+    const isSupported = !!INPAGE_BUTTON_CONFIG[active];
+    if (!isSupported) {
       const el = document.getElementById(INPAGE_BTN_ID);
       if (el) el.remove();
     }
-    if (active !== "notionai") {
-      const el = document.getElementById(NOTION_BTN_ID);
-      if (el) el.remove();
-    }
+    // Cleanup legacy Notion button id from older versions.
+    const legacyNotionBtn = document.getElementById("webclipper-notionai-btn");
+    if (legacyNotionBtn) legacyNotionBtn.remove();
   }
 
   function startAutoCapture() {
@@ -325,8 +322,8 @@
         try {
           const collector = getCollector();
           cleanupButtons(collector && collector.id);
-          ensureChatGPTButton({ onClick: clickSave });
-          ensureNotionAttachedButton({
+          ensureInpageButton({
+            collectorId: collector && collector.id,
             onClick: clickSave,
             getAnchorRect: () => {
               const c = getCollector();
