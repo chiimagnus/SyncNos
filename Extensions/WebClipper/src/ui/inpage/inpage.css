@@ -5,9 +5,11 @@
   z-index: 2147483647;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 999px;
   border: 1px solid #f0a486;
   background: #ffc6ad;
   color: #d95926;
@@ -16,6 +18,12 @@
   user-select: none;
   box-shadow: 0 8px 20px rgba(217, 89, 38, 0.18);
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.webclipper-inpage-btn__icon {
+  display: block;
+  width: 20px;
+  height: 20px;
 }
 
 .webclipper-inpage-btn:hover {
