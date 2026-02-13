@@ -47,11 +47,12 @@ body {
 }
 
 .tabs {
-  display: grid;
+  display: inline-grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 6px;
-  margin-bottom: 10px;
+  margin: 0;
+  width: 176px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 16px;
