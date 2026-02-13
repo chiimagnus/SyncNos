@@ -97,6 +97,12 @@ body {
   color: var(--muted);
 }
 
+.checkbox.compact {
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .list {
   display: grid;
   gap: 8px;
