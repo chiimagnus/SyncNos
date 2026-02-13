@@ -30,10 +30,25 @@
     return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
   }
 
-	  const els = {
-	    list: document.getElementById("list"),
-	    stats: document.getElementById("stats"),
-	    tabChats: document.getElementById("tabChats"),
+  const flashTimers = new WeakMap();
+
+  function flashOk(el, durationMs) {
+    if (!el) return;
+    const ms = typeof durationMs === "number" ? durationMs : 1400;
+    const prev = flashTimers.get(el);
+    if (prev) clearTimeout(prev);
+    el.classList.add("is-flash-ok");
+    const t = setTimeout(() => {
+      el.classList.remove("is-flash-ok");
+      flashTimers.delete(el);
+    }, ms);
+    flashTimers.set(el, t);
+  }
+
+  const els = {
+    list: document.getElementById("list"),
+    stats: document.getElementById("stats"),
+    tabChats: document.getElementById("tabChats"),
 	    tabSettings: document.getElementById("tabSettings"),
 	    viewChats: document.getElementById("viewChats"),
 	    viewSettings: document.getElementById("viewSettings"),
@@ -247,6 +262,7 @@
       { name: jsonFilename, data: JSON.stringify(payload, null, 2) }
     ]);
     downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
+    flashOk(els.btnExport);
   }
 
   function sanitizeFilenamePart(input, fallback) {
@@ -329,6 +345,7 @@
 
     const zipBlob = await createZipBlob(files);
     downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
+    flashOk(els.btnExport);
   }
 
   els.chkSelectAll.addEventListener("change", () => {
@@ -416,6 +433,7 @@
       const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
       alert(`Sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}\n\n${lines.join("\n")}`);
     } else {
+      flashOk(els.btnSyncNotion);
       alert(`Sync finished.\n\nOK: ${okCount}\nFailed: 0`);
     }
     await refresh();
@@ -518,15 +536,19 @@
 
   els.btnNotionSaveConfig.addEventListener("click", async () => {
     await saveNotionConfig();
-    alert("Saved Notion OAuth client config.");
+    flashOk(els.btnNotionSaveConfig);
   });
 
   els.btnNotionLoadPages.addEventListener("click", () => {
-    loadParentPages().catch((e) => alert(e && e.message ? e.message : String(e)));
+    loadParentPages()
+      .then(() => flashOk(els.btnNotionLoadPages))
+      .catch((e) => alert(e && e.message ? e.message : String(e)));
   });
 
   els.btnNotionSaveParent.addEventListener("click", () => {
-    saveParentPage().catch((e) => alert(e && e.message ? e.message : String(e)));
+    saveParentPage()
+      .then(() => flashOk(els.btnNotionSaveParent))
+      .catch((e) => alert(e && e.message ? e.message : String(e)));
   });
 
   els.btnNotionConnect.addEventListener("click", async () => {
