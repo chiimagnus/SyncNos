@@ -91,7 +91,7 @@
 
       const sub = document.createElement("div");
       sub.className = "sub";
-      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}${c.url ? " · " + c.url : ""}`;
+      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}`;
       meta.appendChild(sub);
 
       const right = document.createElement("div");
