@@ -20,15 +20,43 @@
     return { id: picked.id, ...picked.collector };
   }
 
+  function showSaveTip(text) {
+    const id = "webclipper-save-tip";
+    const old = document.getElementById(id);
+    if (old) old.remove();
+    const el = document.createElement("div");
+    el.id = id;
+    el.textContent = text;
+    el.style.position = "fixed";
+    el.style.right = "16px";
+    el.style.bottom = "76px";
+    el.style.padding = "8px 10px";
+    el.style.borderRadius = "10px";
+    el.style.fontSize = "12px";
+    el.style.color = "#fff";
+    el.style.background = "rgba(0,0,0,0.78)";
+    el.style.zIndex = "2147483647";
+    document.documentElement.appendChild(el);
+    setTimeout(() => {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 1800);
+  }
+
   async function saveSnapshot(snapshot) {
     if (!snapshot || !snapshot.conversation) return;
     const convoRes = await send("upsertConversation", { payload: snapshot.conversation });
-    if (!convoRes || !convoRes.ok) return;
+    if (!convoRes || !convoRes.ok) {
+      throw new Error((convoRes && convoRes.error && convoRes.error.message) || "upsertConversation failed");
+    }
     const convo = convoRes.data;
-    await send("syncConversationMessages", {
+    const msgRes = await send("syncConversationMessages", {
       conversationId: convo.id,
       messages: snapshot.messages || []
     });
+    if (!msgRes || !msgRes.ok) {
+      throw new Error((msgRes && msgRes.error && msgRes.error.message) || "syncConversationMessages failed");
+    }
+    return { conversationId: convo.id };
   }
 
   function ensureInpageStylesheetInjected() {
@@ -189,11 +217,15 @@
       try {
         const collector = getCollector();
         if (!collector || typeof collector.capture !== "function") return;
-        const snapshot = collector.capture();
-        if (!snapshot) return;
+        const snapshot = collector.capture({ manual: true });
+        if (!snapshot) {
+          showSaveTip("No visible conversation found");
+          return;
+        }
         await saveSnapshot(snapshot);
+        showSaveTip("Saved");
       } catch (_e) {
-        // ignore
+        showSaveTip("Save failed");
       }
     };
 
@@ -222,7 +254,8 @@
           if (!inc || !inc.changed) return;
           await saveSnapshot(inc.snapshot);
         } catch (_e) {
-          // Swallow errors in content script; surface via popup in later tasks.
+          // Keep auto-save non-blocking, but leave a debug trail for DevTools.
+          console.error("WebClipper auto-save failed:", _e);
         }
       }
     });
