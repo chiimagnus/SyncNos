@@ -46,6 +46,7 @@
       "css": ["src/ui/inpage/inpage.css"],
       "js": [
         "src/shared/normalize.js",
+        "src/shared/runtime-client.js",
         "src/storage/incremental-updater.js",
         "src/collectors/collector-contract.js",
         "src/collectors/registry.js",

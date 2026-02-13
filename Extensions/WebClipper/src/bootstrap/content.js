@@ -2,6 +2,9 @@
 
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const runtime = NS.runtimeClient && typeof NS.runtimeClient.createRuntimeClient === "function"
+    ? NS.runtimeClient.createRuntimeClient()
+    : null;
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
@@ -84,9 +87,10 @@
   }
 
   function send(type, payload) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res));
-    });
+    if (!runtime || typeof runtime.send !== "function") {
+      return Promise.reject(new Error("runtime client unavailable"));
+    }
+    return runtime.send(type, payload);
   }
 
   function getCollector() {
@@ -136,16 +140,8 @@
     return { conversationId: convo.id };
   }
 
-  function ensureInpageStylesheetInjected() {
-    // CSS is already injected by manifest `content_scripts.css`.
-    // Keep this as a no-op to avoid `chrome-extension://invalid/` fetch errors
-    // from stale content-script contexts after extension reload.
-    return;
-  }
-
   function ensureInpageButton({ collectorId, onClick }) {
     if (!collectorId) return;
-    ensureInpageStylesheetInjected();
 
     const existing = document.getElementById(INPAGE_BTN_ID);
     if (existing) {
@@ -167,12 +163,17 @@
     icon.loading = "eager";
     icon.draggable = false;
     icon.setAttribute("aria-hidden", "true");
-    icon.src = chrome.runtime.getURL("icons/icon-128.png");
+    const iconUrl = runtime && typeof runtime.getURL === "function" ? runtime.getURL("icons/icon-128.png") : "";
+    if (iconUrl) icon.src = iconUrl;
     icon.addEventListener("dragstart", (e) => e.preventDefault());
     icon.addEventListener("error", () => {
       btn.textContent = INPAGE_BUTTON_LABEL;
     });
-    btn.appendChild(icon);
+    if (iconUrl) {
+      btn.appendChild(icon);
+    } else {
+      btn.textContent = INPAGE_BUTTON_LABEL;
+    }
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
@@ -282,9 +283,24 @@
     if (legacyNotionBtn) legacyNotionBtn.remove();
   }
 
-  function startAutoCapture() {
+  function createAutoCaptureController() {
+    let stopped = false;
+    let observer = null;
+
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      cleanupButtons("");
+      observer && observer.stop && observer.stop();
+    }
+
+    if (runtime && typeof runtime.onInvalidated === "function") {
+      runtime.onInvalidated(() => stop());
+    }
+
     // Manual button: trigger an immediate capture and save once.
     const clickSave = async () => {
+      if (stopped) return;
       try {
         const collector = getCollector();
         if (!collector || typeof collector.capture !== "function") return;
@@ -300,13 +316,15 @@
       }
     };
 
-    const observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
+    observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
       debounceMs: 600,
       getRoot: () => {
+        if (stopped) return null;
         const c = getCollector();
         return c && typeof c.getRoot === "function" ? c.getRoot() : null;
       },
       onTick: async () => {
+        if (stopped) return;
         try {
           const collector = getCollector();
           cleanupButtons(collector && collector.id);
@@ -321,14 +339,25 @@
           if (!inc || !inc.changed) return;
           await saveSnapshot(inc.snapshot);
         } catch (_e) {
+          if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
+            stop();
+            return;
+          }
           // Keep auto-save non-blocking, but leave a debug trail for DevTools.
           console.error("WebClipper auto-save failed:", _e);
         }
       }
     });
 
-    observer && observer.start && observer.start();
+    return {
+      start() {
+        if (stopped) return;
+        observer && observer.start && observer.start();
+      },
+      stop
+    };
   }
 
-  startAutoCapture();
+  const controller = createAutoCaptureController();
+  controller.start();
 })();

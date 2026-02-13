@@ -1,34 +1,73 @@
 /* global chrome */
 
 (function () {
+  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const runtime = NS.runtimeClient && typeof NS.runtimeClient.createRuntimeClient === "function"
+    ? NS.runtimeClient.createRuntimeClient()
+    : null;
+
+  function toErrorMessage(err, fallback) {
+    if (!err) return fallback || "Unknown error";
+    if (err instanceof Error) return err.message || fallback || "Unknown error";
+    if (typeof err === "string") return err;
+    return String(err);
+  }
+
   function send(type, payload) {
-    return new Promise((resolve) => chrome.runtime.sendMessage({ type, ...(payload || {}) }, (res) => resolve(res)));
+    if (!runtime || typeof runtime.send !== "function") {
+      return Promise.resolve({ ok: false, data: null, error: { message: "runtime client unavailable", extra: null } });
+    }
+    return runtime.send(type, payload).catch((e) => {
+      return { ok: false, data: null, error: { message: toErrorMessage(e, "runtime.sendMessage failed"), extra: null } };
+    });
   }
 
   function storageGet(keys) {
-    return new Promise((resolve) => chrome.storage.local.get(keys, (res) => resolve(res || {})));
+    const normalized = (() => {
+      if (typeof keys === "string") return keys;
+      if (Array.isArray(keys)) return keys.filter((k) => typeof k === "string" && k);
+      if (keys && typeof keys === "object") return keys;
+      return [];
+    })();
+    return new Promise((resolve) => chrome.storage.local.get(normalized, (res) => resolve(res || {})));
   }
 
   function storageSet(obj) {
     return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
   }
 
+  const flashTimers = new WeakMap();
+
+  function flashOk(el, durationMs) {
+    if (!el) return;
+    const ms = typeof durationMs === "number" ? durationMs : 1400;
+    const prev = flashTimers.get(el);
+    if (prev) clearTimeout(prev);
+    el.classList.add("is-flash-ok");
+    const t = setTimeout(() => {
+      el.classList.remove("is-flash-ok");
+      flashTimers.delete(el);
+    }, ms);
+    flashTimers.set(el, t);
+  }
+
   const els = {
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
     tabChats: document.getElementById("tabChats"),
-    tabSettings: document.getElementById("tabSettings"),
-    viewChats: document.getElementById("viewChats"),
-    viewSettings: document.getElementById("viewSettings"),
-    chkSelectAll: document.getElementById("chkSelectAll"),
-    btnExport: document.getElementById("btnExport"),
-    exportMenu: document.getElementById("exportMenu"),
-    menuExportJson: document.getElementById("menuExportJson"),
-    menuMergeMarkdown: document.getElementById("menuMergeMarkdown"),
-    btnSyncNotion: document.getElementById("btnSyncNotion"),
-    btnNotionConnect: document.getElementById("btnNotionConnect"),
-    notionStatus: document.getElementById("notionStatus"),
-    notionClientId: document.getElementById("notionClientId"),
+	    tabSettings: document.getElementById("tabSettings"),
+	    viewChats: document.getElementById("viewChats"),
+	    viewSettings: document.getElementById("viewSettings"),
+	    chkSelectAll: document.getElementById("chkSelectAll"),
+	    btnExport: document.getElementById("btnExport"),
+	    exportMenu: document.getElementById("exportMenu"),
+	    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
+	    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
+	    menuExportJsons: document.getElementById("menuExportJsons"),
+	    btnSyncNotion: document.getElementById("btnSyncNotion"),
+	    btnNotionConnect: document.getElementById("btnNotionConnect"),
+	    notionStatus: document.getElementById("notionStatus"),
+	    notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
     btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
     notionPageQuery: document.getElementById("notionPageQuery"),
@@ -37,16 +76,14 @@
     btnNotionSaveParent: document.getElementById("btnNotionSaveParent")
   };
 
-  const state = {
-    conversations: [],
-    selectedIds: new Set(),
-    exportMdMergeSingle: false
-  };
+	  const state = {
+	    conversations: [],
+	    selectedIds: new Set()
+	  };
 
-  const STORAGE_KEYS = {
-    popupActiveTab: "popup_active_tab",
-    exportMdMergeSingle: "export_md_merge_single"
-  };
+	  const STORAGE_KEYS = {
+	    popupActiveTab: "popup_active_tab"
+	  };
 
   function isExportMenuOpen() {
     return !!(els.exportMenu && !els.exportMenu.hidden);
@@ -62,13 +99,8 @@
     if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
   }
 
-  function syncMergeMarkdownMenuItem() {
-    if (!els.menuMergeMarkdown) return;
-    els.menuMergeMarkdown.setAttribute("aria-checked", state.exportMdMergeSingle ? "true" : "false");
-  }
-
-  function setActiveTab(tabId) {
-    const next = tabId === "settings" ? "settings" : "chats";
+	  function setActiveTab(tabId) {
+	    const next = tabId === "settings" ? "settings" : "chats";
 
     if (els.tabChats) {
       const active = next === "chats";
@@ -107,6 +139,13 @@
     } catch (_e) {
       return "";
     }
+  }
+
+  function isSameLocalDay(a, b) {
+    if (!(a instanceof Date) || !(b instanceof Date)) return false;
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
   }
 
   function hasWarningFlags(c) {
@@ -171,7 +210,17 @@
       els.list.appendChild(row);
     }
 
-    els.stats.textContent = `${state.conversations.length} conversations`;
+    const total = state.conversations.length;
+    const now = new Date();
+    const today = state.conversations.filter((c) => {
+      if (!c || !c.lastCapturedAt) return false;
+      try {
+        return isSameLocalDay(new Date(c.lastCapturedAt), now);
+      } catch (_e) {
+        return false;
+      }
+    }).length;
+    els.stats.textContent = `today:${today}\n total:${total}`;
     syncSelectAllCheckbox();
   }
 
@@ -219,6 +268,7 @@
       { name: jsonFilename, data: JSON.stringify(payload, null, 2) }
     ]);
     downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
+    flashOk(els.btnExport);
   }
 
   function sanitizeFilenamePart(input, fallback) {
@@ -271,7 +321,7 @@
     return lines.join("\n");
   }
 
-  async function exportMd() {
+  async function exportMd({ mergeSingle }) {
     const ids = getSelectedIds();
     if (!ids.length) return;
     const selected = state.conversations.filter((c) => state.selectedIds.has(c.id));
@@ -283,7 +333,6 @@
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const mergeSingle = !!state.exportMdMergeSingle;
     const files = [];
 
     if (mergeSingle) {
@@ -302,18 +351,7 @@
 
     const zipBlob = await createZipBlob(files);
     downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
-  }
-
-  async function loadExportPrefs() {
-    const res = await storageGet([STORAGE_KEYS.exportMdMergeSingle]);
-    state.exportMdMergeSingle = !!res[STORAGE_KEYS.exportMdMergeSingle];
-    syncMergeMarkdownMenuItem();
-  }
-
-  async function saveExportPrefs() {
-    await storageSet({
-      [STORAGE_KEYS.exportMdMergeSingle]: !!state.exportMdMergeSingle
-    });
+    flashOk(els.btnExport);
   }
 
   els.chkSelectAll.addEventListener("change", () => {
@@ -325,13 +363,19 @@
     render();
   });
 
-  function safeExportMd() {
-    exportMd().catch((e) => {
+  function safeExportSingleMarkdown() {
+    exportMd({ mergeSingle: true }).catch((e) => {
       alert((e && e.message) || "Export Markdown failed.");
     });
   }
 
-  function safeExportJson() {
+  function safeExportMultiMarkdown() {
+    exportMd({ mergeSingle: false }).catch((e) => {
+      alert((e && e.message) || "Export Markdown failed.");
+    });
+  }
+
+  function safeExportJsons() {
     exportJson().catch((e) => {
       alert((e && e.message) || "Export JSON failed.");
     });
@@ -340,30 +384,30 @@
   if (els.btnExport) {
     els.btnExport.addEventListener("click", (e) => {
       if (!e) return;
-      const rect = els.btnExport.getBoundingClientRect();
-      const isCaretClick = e.clientX >= rect.right - 34;
-      if (isCaretClick) {
-        if (isExportMenuOpen()) closeExportMenu();
-        else openExportMenu();
-        return;
-      }
-      closeExportMenu();
-      safeExportMd();
+      e.preventDefault();
+      if (isExportMenuOpen()) closeExportMenu();
+      else openExportMenu();
     });
   }
 
-  if (els.menuExportJson) {
-    els.menuExportJson.addEventListener("click", () => {
+  if (els.menuExportSingleMarkdown) {
+    els.menuExportSingleMarkdown.addEventListener("click", () => {
       closeExportMenu();
-      safeExportJson();
+      safeExportSingleMarkdown();
     });
   }
 
-  if (els.menuMergeMarkdown) {
-    els.menuMergeMarkdown.addEventListener("click", () => {
-      state.exportMdMergeSingle = !state.exportMdMergeSingle;
-      syncMergeMarkdownMenuItem();
-      saveExportPrefs().catch(() => {});
+  if (els.menuExportMultiMarkdown) {
+    els.menuExportMultiMarkdown.addEventListener("click", () => {
+      closeExportMenu();
+      safeExportMultiMarkdown();
+    });
+  }
+
+  if (els.menuExportJsons) {
+    els.menuExportJsons.addEventListener("click", () => {
+      closeExportMenu();
+      safeExportJsons();
     });
   }
 
@@ -395,6 +439,7 @@
       const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
       alert(`Sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}\n\n${lines.join("\n")}`);
     } else {
+      flashOk(els.btnSyncNotion);
       alert(`Sync finished.\n\nOK: ${okCount}\nFailed: 0`);
     }
     await refresh();
@@ -438,7 +483,9 @@
   async function ensureNotionApiLoaded() {
     if (globalThis.WebClipper && globalThis.WebClipper.notionApi) return globalThis.WebClipper.notionApi;
     const s = document.createElement("script");
-    s.src = chrome.runtime.getURL("src/sync/notion/notion-api.js");
+    const url = runtime && typeof runtime.getURL === "function" ? runtime.getURL("src/sync/notion/notion-api.js") : "";
+    if (!url) return null;
+    s.src = url;
     document.documentElement.appendChild(s);
     await new Promise((r) => setTimeout(r, 80));
     return globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
@@ -495,15 +542,19 @@
 
   els.btnNotionSaveConfig.addEventListener("click", async () => {
     await saveNotionConfig();
-    alert("Saved Notion OAuth client config.");
+    flashOk(els.btnNotionSaveConfig);
   });
 
   els.btnNotionLoadPages.addEventListener("click", () => {
-    loadParentPages().catch((e) => alert(e && e.message ? e.message : String(e)));
+    loadParentPages()
+      .then(() => flashOk(els.btnNotionLoadPages))
+      .catch((e) => alert(e && e.message ? e.message : String(e)));
   });
 
   els.btnNotionSaveParent.addEventListener("click", () => {
-    saveParentPage().catch((e) => alert(e && e.message ? e.message : String(e)));
+    saveParentPage()
+      .then(() => flashOk(els.btnNotionSaveParent))
+      .catch((e) => alert(e && e.message ? e.message : String(e)));
   });
 
   els.btnNotionConnect.addEventListener("click", async () => {
@@ -531,7 +582,6 @@
   });
 
   loadNotionConfig();
-  loadExportPrefs();
   // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
