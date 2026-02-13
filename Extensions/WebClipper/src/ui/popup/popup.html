@@ -10,20 +10,15 @@
     <div class="app">
       <header class="header">
         <div class="title">WebClipper</div>
-        <div id="headerActions" class="actions" data-view-only="chats">
-          <button id="btnRefresh" class="btn">Refresh</button>
-          <button id="btnClearAll" class="btn danger">Clear</button>
-        </div>
+        <nav class="tabs" role="tablist" aria-label="Popup tabs">
+          <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
+            Chats
+          </button>
+          <button id="tabSettings" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewSettings">
+            Settings
+          </button>
+        </nav>
       </header>
-
-      <nav class="tabs" role="tablist" aria-label="Popup tabs">
-        <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
-          Chats
-        </button>
-        <button id="tabSettings" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewSettings">
-          Settings
-        </button>
-      </nav>
 
       <section id="viewChats" class="view is-active" role="tabpanel" aria-labelledby="tabChats">
         <section class="toolbar">
