@@ -71,7 +71,6 @@
     btnNotionConnect: document.getElementById("btnNotionConnect"),
     notionAuthCard: document.getElementById("notionAuthCard"),
     notionStatusTitle: document.getElementById("notionStatusTitle"),
-    notionStatus: document.getElementById("notionStatus"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
     aboutVersion: document.getElementById("aboutVersion"),
@@ -863,7 +862,6 @@
     const url = buildNotionAuthorizeUrl({ clientId, state });
     setNotionConnectBusy(true);
     if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Connecting…";
-    if (els.notionStatus) els.notionStatus.textContent = "Opening Notion OAuth…";
     const opened = await openNotionAuthorizeTab(url);
     if (!opened) {
       setNotionConnectBusy(false);
@@ -872,7 +870,6 @@
       return;
     }
     if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Authorize in Notion";
-    if (els.notionStatus) els.notionStatus.textContent = "Complete authorization in the opened tab…";
     startNotionConnectPolling();
   });
   }
@@ -885,7 +882,6 @@
     if (!res || !res.ok || !res.data) {
       if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
-      els.notionStatus.textContent = "";
       els.btnNotionConnect.textContent = "Connect";
       setNotionParentControlsEnabled(false);
       setNotionConnectBusy(false);
@@ -895,10 +891,10 @@
       return;
     }
     if (res.data.connected) {
-      const name = res.data.token && res.data.token.workspaceName ? res.data.token.workspaceName : "Connected";
+      const workspaceName = (res.data.token && res.data.token.workspaceName) ? String(res.data.token.workspaceName).trim() : "";
       if (els.notionAuthCard) els.notionAuthCard.classList.add("is-connected");
-      if (els.notionStatusTitle) els.notionStatusTitle.textContent = "OAuth Authorized";
-      els.notionStatus.textContent = name ? `Workspace: ${name}` : "Workspace: Connected";
+      const showWorkspace = workspaceName && workspaceName.toLowerCase() !== "connected";
+      if (els.notionStatusTitle) els.notionStatusTitle.textContent = showWorkspace ? `Connected ✅ (${workspaceName})` : "Connected ✅";
       els.btnNotionConnect.textContent = "Disconnect";
       setNotionParentControlsEnabled(true);
       setNotionConnectBusy(false);
@@ -911,16 +907,18 @@
     } else {
       if (meta && meta.lastError) {
         if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
-        if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Authorization failed";
-        els.notionStatus.textContent = `Error: ${meta.lastError}`;
+        if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Error";
+        // Keep UI compact: show "Error" in header and notify once.
+        if (!refreshNotionStatus.__lastAlert || refreshNotionStatus.__lastAlert !== meta.lastError) {
+          refreshNotionStatus.__lastAlert = meta.lastError;
+          alert(`Notion OAuth error: ${meta.lastError}`);
+        }
       } else if (meta && meta.pendingState) {
         if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Waiting…";
-        els.notionStatus.textContent = "Waiting for authorization…";
       } else {
         if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
-        els.notionStatus.textContent = "";
       }
       els.btnNotionConnect.textContent = "Connect";
       setNotionParentControlsEnabled(false);
