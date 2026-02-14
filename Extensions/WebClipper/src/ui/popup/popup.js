@@ -719,8 +719,11 @@
       alert("Notion API module not available.");
       return;
     }
-    const result = await api.searchPages({ accessToken, query: "", pageSize: 20 });
-    const pages = Array.isArray(result.results) ? result.results : [];
+    const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
+    const pagesRaw = Array.isArray(result.results) ? result.results : [];
+    const withoutDatabaseEntries = pagesRaw.filter((p) => !(p && p.parent && p.parent.type === "database_id"));
+    const rootPages = withoutDatabaseEntries.filter((p) => p && p.parent && p.parent.type === "workspace");
+    const pages = rootPages.length ? rootPages : withoutDatabaseEntries;
 
     els.notionPages.innerHTML = "";
     for (const p of pages) {
