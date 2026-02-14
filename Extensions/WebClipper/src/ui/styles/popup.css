@@ -816,7 +816,16 @@ main {
 }
 
 .chatPreviewMsg--user {
-  background: #fff7f0;
+  background: #69BB84;
+  border-color: rgba(14, 52, 32, 0.28);
+}
+
+.chatPreviewMsg--user .chatPreviewMsgRole {
+  color: #124629;
+}
+
+.chatPreviewMsg--user .chatPreviewMsgText {
+  color: #0e3420;
 }
 
 .chatPreviewMsg--assistant {
