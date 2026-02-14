@@ -5,7 +5,7 @@
   const core = NS.popupCore;
   if (!core) return;
 
-  const { els, openUrl } = core;
+  const { els, openUrl, disableImageDrag } = core;
 
   function init() {
     const manifest = chrome && chrome.runtime && typeof chrome.runtime.getManifest === "function" ? chrome.runtime.getManifest() : null;
@@ -21,6 +21,8 @@
     if (els.btnAboutMacApp) els.btnAboutMacApp.addEventListener("click", () => openUrl("https://apps.apple.com/app/syncnos/id6755133888"));
     if (els.btnAboutGitHub) els.btnAboutGitHub.addEventListener("click", () => openUrl("https://github.com/chiimagnus"));
     if (els.btnAboutMail) els.btnAboutMail.addEventListener("click", () => openUrl("mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback"));
+    disableImageDrag(els.viewAbout);
+    disableImageDrag(els.appLogo);
   }
 
   NS.popupAbout = { init };

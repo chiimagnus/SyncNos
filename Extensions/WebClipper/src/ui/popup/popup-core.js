@@ -52,6 +52,7 @@
   }
 
   const els = {
+    appLogo: document.querySelector(".appLogo"),
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
     tabChats: document.getElementById("tabChats"),
@@ -185,6 +186,18 @@
     }
   }
 
+  function disableImageDrag(target) {
+    if (!target) return;
+    const isImage = target.tagName && String(target.tagName).toLowerCase() === "img";
+    const images = isImage ? [target] : (typeof target.querySelectorAll === "function" ? target.querySelectorAll("img") : []);
+    for (const image of images) {
+      image.setAttribute("draggable", "false");
+      image.addEventListener("dragstart", (e) => {
+        if (e) e.preventDefault();
+      });
+    }
+  }
+
   NS.popupCore = {
     runtime,
     send,
@@ -202,6 +215,7 @@
     downloadBlob,
     createZipBlob,
     conversationToMarkdown,
-    openUrl
+    openUrl,
+    disableImageDrag
   };
 })();
