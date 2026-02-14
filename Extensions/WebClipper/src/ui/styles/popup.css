@@ -161,11 +161,6 @@ body {
   height: 8px;
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
 .btn {
   position: relative;
   min-height: 34px;
@@ -350,7 +345,9 @@ input[type="checkbox"] {
 }
 
 .toolbar .btn,
-.toolbar .checkbox {
+.toolbar .checkbox,
+.bottomBar .btn,
+.bottomBar .checkbox {
   flex: 0 0 auto;
 }
 
@@ -455,14 +452,6 @@ main {
   background: var(--warn-bg);
 }
 
-.footer {
-  margin-top: 10px;
-  padding: 4px 2px 0;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 560;
-}
-
 .bottomDock {
   margin-top: 10px;
 }
@@ -478,11 +467,6 @@ main {
   flex-wrap: nowrap;
   gap: 6px;
   padding: 6px 8px;
-}
-
-.bottomBar .btn,
-.bottomBar .checkbox {
-  flex: 0 0 auto;
 }
 
 .bottomBar .stats {
