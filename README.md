@@ -1,55 +1,84 @@
 # SyncNos
 
+English | [中文](README.zh-CN.md)
+
 [<img src="Resource/image.png" alt="Download" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
 
-> **SyncNos** - Sync Everything to Notion, including AppleBooks, GoodLinks, WeRead, AI Chats, Chats(OCR version) and etc.
+This project has two parts:
 
-##  MacOS App (App Store) 
+1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
+2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**.
 
-### Sync Data From
+## macOS App
+
+- Supported: **macOS 14.0+**
+- Download (App Store): https://apps.apple.com/app/syncnos/id6755133888
+
+### Sync Scope
+
+#### Sync From
 
 - Apple Books
 - GoodLinks
-- WeRead
-- Dedao
-- Chat History beta - OCR version (with local storage encryption)
+- WeRead (微信读书)
+- Dedao (得到)
+- Chat history (beta)
+  - OCR version supported
+  - Local storage encryption
 
-### Sync Data To
+#### Sync To
 
 - Notion
 
-### MacOS App (App Store) Download
+### Development
 
-- [MacOS App (App Store) ↗](https://apps.apple.com/app/syncnos/id6755133888)
+```bash
+open SyncNos.xcodeproj
+xcodebuild -scheme SyncNos -configuration Debug build
+```
 
-## 🧩 Browser Extension (WebClipper)
+## WebClipper (Browser Extension)
 
-This repository also includes a standalone browser extension (MV3) under `Extensions/WebClipper/` (Chrome / Edge / Arc / Zen / Firefox compatible).
+This repository includes a standalone MV3 browser extension under `Extensions/WebClipper/`.
+
+- Supported browsers: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**
+- Download (Releases): https://github.com/chiimagnus/SyncNos/releases
+
+### What It Does
 
 - Captures AI chats from supported sites into local browser storage
-- Export selected conversations as JSON/Markdown
-- Manually sync selected conversations to Notion (OAuth)
-- Supported sites: ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI
+- Exports selected conversations as JSON/Markdown
+- Manually syncs selected conversations to Notion (OAuth)
 
-### Download WebClipper from Releases
+### Supported Sites
 
-- Go to [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) and download the attached assets:
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI
+
+### Install From Releases
+
+- Go to GitHub Releases and download the attached assets:
   - `syncnos-webclipper-chrome-v*.zip` (Chrome)
   - `syncnos-webclipper-edge-v*.zip` (Edge)
   - `syncnos-webclipper-firefox-v*.xpi` (Firefox, unsigned)
 - Chrome/Edge: unzip, then load unpacked in `chrome://extensions` / `edge://extensions` (Developer mode).
 - Firefox: use `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on…” and select the `.xpi` (or unzip and select `manifest.json`).
 
+### Development
+
+```bash
+npm --prefix Extensions/WebClipper install
+npm --prefix Extensions/WebClipper run check
+npm --prefix Extensions/WebClipper run test
+npm --prefix Extensions/WebClipper run build
+```
+
+## Docs
+
+- Repository guide: `AGENTS.md`
+- Business logic map: `.github/docs/business-logic.md`
+- Keyboard navigation: `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
+- WebClipper guide: `Extensions/WebClipper/AGENTS.md`
+
 ## License
 
 This project is licensed under the [AGPL-3.0 License](LICENSE).
-
----
-
-<div align="center">
-
-**⭐ If this project helps you, please give us a Star!**
-
-Made with ❤️ by [Chii Magnus](https://github.com/chiimagnus)
-
-</div>
