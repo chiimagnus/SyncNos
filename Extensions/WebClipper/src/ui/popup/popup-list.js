@@ -14,25 +14,12 @@
     isSameLocalDay
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
-    hoverEnter: "popup:conversation-hover-enter",
-    hoverLeave: "popup:conversation-hover-leave",
-    focusEnter: "popup:conversation-focus-enter",
-    focusLeave: "popup:conversation-focus-leave"
+    click: "popup:conversation-click"
   };
 
   function dispatchPreviewEvent(type, detail) {
     if (!els.list) return;
     els.list.dispatchEvent(new CustomEvent(type, { detail }));
-  }
-
-  function focusSiblingRow(row, delta) {
-    if (!row || !els.list || !Number.isFinite(delta) || delta === 0) return;
-    const rows = Array.from(els.list.querySelectorAll(".row[data-conversation-id]"));
-    const currentIndex = rows.indexOf(row);
-    if (currentIndex < 0) return;
-    const nextIndex = Math.min(rows.length - 1, Math.max(0, currentIndex + delta));
-    const next = rows[nextIndex];
-    if (next && typeof next.focus === "function") next.focus();
   }
 
   function renderStats({ today, total }) {
@@ -134,36 +121,11 @@
       }
       meta.appendChild(sub);
 
-      let focusWithin = false;
-      row.addEventListener("mouseenter", () => {
-        dispatchPreviewEvent(previewEvents.hoverEnter, { conversationId: conversation.id, anchorEl: row });
-      });
-      row.addEventListener("mouseleave", () => {
-        dispatchPreviewEvent(previewEvents.hoverLeave, { conversationId: conversation.id, anchorEl: row });
-      });
-      row.addEventListener("focusin", () => {
-        if (focusWithin) return;
-        focusWithin = true;
-        dispatchPreviewEvent(previewEvents.focusEnter, { conversationId: conversation.id, anchorEl: row });
-      });
-      row.addEventListener("focusout", (e) => {
-        const next = e && e.relatedTarget;
-        if (next && row.contains(next)) return;
-        if (!focusWithin) return;
-        focusWithin = false;
-        dispatchPreviewEvent(previewEvents.focusLeave, { conversationId: conversation.id, anchorEl: row });
-      });
-      row.addEventListener("keydown", (e) => {
-        if (!e) return;
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          focusSiblingRow(row, 1);
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          focusSiblingRow(row, -1);
-        }
+      row.addEventListener("click", (e) => {
+        if (!e || e.button !== 0) return;
+        const target = e.target;
+        if (target && target.closest && target.closest("input[type='checkbox'], label.checkbox")) return;
+        dispatchPreviewEvent(previewEvents.click, { conversationId: conversation.id, anchorEl: row });
       });
 
       row.appendChild(left);

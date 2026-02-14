@@ -96,10 +96,7 @@
   };
 
   const PREVIEW_EVENTS = {
-    hoverEnter: "popup:conversation-hover-enter",
-    hoverLeave: "popup:conversation-hover-leave",
-    focusEnter: "popup:conversation-focus-enter",
-    focusLeave: "popup:conversation-focus-leave"
+    click: "popup:conversation-click"
   };
 
   function formatTime(ts) {
