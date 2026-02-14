@@ -70,13 +70,6 @@ body {
   padding: 11px;
 }
 
-.settingsSectionTitle {
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.2px;
-  color: var(--text);
-}
-
 #notionAuthCard .notionLogo {
   width: 18px;
   height: 18px;
@@ -119,26 +112,6 @@ body {
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.settingsSectionSub {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.25;
-}
-
-.settingsForm {
-  display: grid;
-  gap: 10px;
-  padding: 11px;
-}
-
-.settingsField {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  align-items: center;
-  gap: 10px;
 }
 
 .settingsLabel {
