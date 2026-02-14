@@ -54,6 +54,28 @@ body {
   animation: none;
 }
 
+.toolbar.settingsPanel {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 0;
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 11px;
+}
+
+.settingsDivider {
+  height: 1px;
+  background: rgba(217, 89, 38, 0.14);
+  margin: 0 11px;
+}
+
 .header {
   display: flex;
   align-items: center;
