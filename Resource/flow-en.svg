@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 530" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+<style>
+.sg{fill:#F9FAFB;stroke:#E5E7EB;stroke-width:1.5}.sg-t{fill:#4B5563;font-size:13px;font-weight:600}
+.sc{fill:#EEF2FF;stroke:#6366F1;stroke-width:1.5}.sc-t{fill:#312E81;font-size:11px;font-weight:500}.sc-s{fill:#312E81;font-size:9px;opacity:.6}
+.hb{fill:#111827}.hb-t{fill:#fff;font-size:12px;font-weight:700}.hb-s{fill:#fff;font-size:10px}
+.ca{fill:#FFF7ED;stroke:#F97316;stroke-width:1.2}.ca-t{fill:#9A3412;font-size:10px}.ca-s{fill:#9A3412;font-size:8px;opacity:.7}
+.oc{fill:#ECFDF5;stroke:#10B981;stroke-width:1.5}.oc-t{fill:#065F46;font-size:12px;font-weight:500}
+.at{stroke:#6B7280;stroke-width:3;fill:none}.al{stroke:#9CA3AF;stroke-width:1.5;fill:none}
+.af{fill:#6B7280}.af2{fill:#9CA3AF}
+@media(prefers-color-scheme:dark){
+.sg{fill:#161B22;stroke:#30363D}.sg-t{fill:#8B949E}
+.sc{fill:#1E1B4B;stroke:#818CF8}.sc-t,.sc-s{fill:#C4B5FD}
+.hb{fill:#E5E7EB}.hb-t,.hb-s{fill:#0D1117}
+.ca{fill:#451A03;stroke:#FB923C}.ca-t,.ca-s{fill:#FED7AA}
+.oc{fill:#022C22;stroke:#34D399}.oc-t{fill:#A7F3D0}
+.at{stroke:#8B949E}.al{stroke:#484F58}.af{fill:#8B949E}.af2{fill:#484F58}
+}
+</style>
+<defs>
+<marker id="a1" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0,0 10,3.5 0,7" class="af"/></marker>
+<marker id="a2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" class="af2"/></marker>
+</defs>
+<!-- 📚 macOS App 数据来源 -->
+<rect class="sg" x="10" y="5" width="320" height="242" rx="12"/>
+<text class="sg-t" x="170" y="28" text-anchor="middle">📚 macOS App 数据来源</text>
+<rect class="sc" x="22" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="63" text-anchor="middle">📖 Apple Books</text><text class="sc-s" x="93" y="80" text-anchor="middle">高亮 &amp; 笔记</text>
+<rect class="sc" x="175" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="63" text-anchor="middle">🔗 GoodLinks</text><text class="sc-s" x="246" y="80" text-anchor="middle">高亮</text>
+<rect class="sc" x="22" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="125" text-anchor="middle">📚 微信读书</text><text class="sc-s" x="93" y="142" text-anchor="middle">高亮 &amp; 笔记</text>
+<rect class="sc" x="175" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="125" text-anchor="middle">🎓 得到</text><text class="sc-s" x="246" y="142" text-anchor="middle">高亮 &amp; 笔记</text>
+<rect class="sc" x="22" y="166" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="187" text-anchor="middle">📱 聊天记录 OCR</text><text class="sc-s" x="93" y="204" text-anchor="middle">高亮</text>
+<!-- 🤖 WebClipper 数据来源 -->
+<rect class="sg" x="10" y="264" width="320" height="252" rx="12"/>
+<text class="sg-t" x="170" y="287" text-anchor="middle">🤖 WebClipper 数据来源</text>
+<rect class="sc" x="22" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="326" text-anchor="middle">ChatGPT</text>
+<rect class="sc" x="123" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="326" text-anchor="middle">Claude</text>
+<rect class="sc" x="224" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="326" text-anchor="middle">Gemini</text>
+<rect class="sc" x="22" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="378" text-anchor="middle">DeepSeek</text>
+<rect class="sc" x="123" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="378" text-anchor="middle">Kimi</text>
+<rect class="sc" x="224" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="378" text-anchor="middle">豆包</text>
+<rect class="sc" x="22" y="404" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="430" text-anchor="middle">元宝</text>
+<rect class="sc" x="123" y="404" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="430" text-anchor="middle">Notion AI</text>
+<!-- ⚙️ Hub -->
+<circle class="hb" cx="470" cy="126" r="55"/>
+<text class="hb-t" x="470" y="121" text-anchor="middle">⚙️ SyncNos</text>
+<text class="hb-s" x="470" y="139" text-anchor="middle">macOS App</text>
+<circle class="hb" cx="470" cy="390" r="55"/>
+<text class="hb-t" x="470" y="385" text-anchor="middle">⚙️ WebClipper</text>
+<text class="hb-s" x="470" y="403" text-anchor="middle">MV3 扩展</text>
+<!-- 🔒 Cache -->
+<rect class="ca" x="422" y="202" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="218" text-anchor="middle">🔒 本地缓存</text><text class="ca-s" x="470" y="232" text-anchor="middle">加密存储</text>
+<rect class="ca" x="422" y="280" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="296" text-anchor="middle">🔒 浏览器存储</text><text class="ca-s" x="470" y="310" text-anchor="middle">IndexedDB</text>
+<!-- 📤 输出 -->
+<rect class="sg" x="620" y="130" width="190" height="255" rx="12"/>
+<text class="sg-t" x="715" y="153" text-anchor="middle">📤 输出</text>
+<rect class="oc" x="635" y="168" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="197" text-anchor="middle">☁️ 同步到 Notion</text>
+<rect class="oc" x="635" y="232" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="261" text-anchor="middle">📄 导出 JSON</text>
+<rect class="oc" x="635" y="296" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="325" text-anchor="middle">📝 导出 Markdown</text>
+<!-- Arrows -->
+<line class="at" x1="330" y1="126" x2="412" y2="126" marker-end="url(#a1)"/>
+<line class="at" x1="330" y1="390" x2="412" y2="390" marker-end="url(#a1)"/>
+<line class="al" x1="470" y1="181" x2="470" y2="200" marker-end="url(#a2)"/>
+<line class="al" x1="470" y1="335" x2="470" y2="320" marker-end="url(#a2)"/>
+<path class="at" d="M525,126 C575,126 595,240 618,240" marker-end="url(#a1)"/>
+<path class="at" d="M525,390 C575,390 595,275 618,275" marker-end="url(#a1)"/>
+</svg>

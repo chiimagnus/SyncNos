@@ -7,41 +7,9 @@ This project has two parts:
 1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
 2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**.
 
-## How It Works (Diagram)
+## How It Works
 
-```mermaid
-%%{init: {'theme':'neutral'}}%%
-flowchart LR
-    subgraph APP[" 📚 macOS App Data Sources "]
-        direction TB
-        AB["📖 Apple Books<br>Highlights & Notes"] ~~~ GL["🔗 GoodLinks<br>Highlights"]
-        WR["📚 WeRead<br>Highlights & Notes"] ~~~ DD["🎓 Dedao<br>Highlights & Notes"]
-        OCR["📱 Chat Logs OCR<br>Highlights"]
-    end
-
-    subgraph WEB[" 🤖 WebClipper Data Sources "]
-        direction TB
-        CGPT["ChatGPT"] ~~~ CLD["Claude"] ~~~ GEM["Gemini"]
-        DS["DeepSeek"] ~~~ KIMI["Kimi"] ~~~ DOU["Doubao"]
-        YUAN["Yuanbao"] ~~~ NA["Notion AI"]
-    end
-
-    APP ===> SyncNos(("⚙️ SyncNos<br>macOS App"))
-    WEB ===> WebClipper(("⚙️ WebClipper<br>MV3 Extension"))
-
-    SyncNos --> CACHE1[("🔒 Local Cache<br>Encrypted")]
-    WebClipper --> CACHE2[("🔒 Browser Storage<br>IndexedDB")]
-
-    subgraph OUT[" 📤 Output "]
-        direction TB
-        NOTION["☁️ Sync to Notion"]
-        JSON["📄 Export JSON"]
-        MD["📝 Export Markdown"]
-    end
-
-    SyncNos ===> OUT
-    WebClipper ===> OUT
-```
+![](Resource/flow-en.svg)
 
 ## macOS App
 
