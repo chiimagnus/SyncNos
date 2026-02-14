@@ -240,8 +240,17 @@
 
   function handleClickPreview(e) {
     if (!e || !e.detail) return;
+    const conversationId = Number(e.detail.conversationId);
+    if (Number.isFinite(conversationId)
+      && conversationId > 0
+      && preview.activeConversationId === conversationId
+      && els.chatPreviewPopover
+      && !els.chatPreviewPopover.hidden) {
+      hideNow();
+      return;
+    }
     showPreview({
-      conversationId: e.detail.conversationId,
+      conversationId,
       anchorEl: e.detail.anchorEl
     }).catch(() => {});
   }
