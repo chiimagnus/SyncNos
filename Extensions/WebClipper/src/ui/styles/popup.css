@@ -467,19 +467,22 @@ main {
   margin-top: 10px;
 }
 
-.toolbar.is-docked {
-  margin-bottom: 0;
-}
-
-.toolbar.is-docked .menu {
+.bottomBar .menu {
   top: auto;
   bottom: calc(100% + 8px);
 }
 
 .bottomBar {
+  display: flex;
+  align-items: center;
   flex-wrap: nowrap;
   gap: 8px;
   padding: 10px;
+}
+
+.bottomBar .btn,
+.bottomBar .checkbox {
+  flex: 0 0 auto;
 }
 
 .bottomBar .stats {
