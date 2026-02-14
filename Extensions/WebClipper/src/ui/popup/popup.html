@@ -59,34 +59,39 @@
       </section>
 
       <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
-        <section class="toolbar settingsPanel" aria-label="Notion settings">
+        <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
+          <div class="settingsSectionHeader">
+            <div class="settingsSectionTitle">Authorization</div>
+            <div class="settingsSectionSub">Connect SyncNos WebClipper to your Notion workspace via OAuth.</div>
+          </div>
+
           <div class="settingsRow" id="notionBar">
-            <div class="title" style="font-weight: 650;">Notion</div>
-            <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+            <div class="authStatus">
+              <div class="authHeadline">
+                <span id="notionAuthDot" class="authDot" aria-hidden="true"></span>
+                <span id="notionStatusTitle">Not connected</span>
+              </div>
+              <div id="notionStatus" class="authSub"></div>
+            </div>
             <div class="spacer"></div>
-            <button id="btnNotionConnect" class="btn">Connect</button>
+            <button id="btnNotionConnect" class="btn primary">Connect</button>
           </div>
 
           <div class="settingsDivider" role="presentation"></div>
 
-          <div class="settingsRow" id="notionConfig">
-            <input id="notionClientId" class="input" placeholder="Notion Client ID" />
-            <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
-            <button id="btnNotionSaveConfig" class="btn">Save</button>
+          <div class="settingsSectionHeader">
+            <div class="settingsSectionTitle">Parent Page</div>
+            <div class="settingsSectionSub">Choose where databases will be created.</div>
           </div>
 
-          <div class="settingsDivider" role="presentation"></div>
-
-          <div class="settingsRow" id="notionParent">
-            <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
-            <button id="btnNotionLoadPages" class="btn">Load</button>
-          </div>
-
-          <div class="settingsDivider" role="presentation"></div>
-
-          <div class="settingsRow" id="notionParentSelect">
-            <select id="notionPages" class="input"></select>
-            <button id="btnNotionSaveParent" class="btn">Use</button>
+          <div class="settingsForm" aria-label="Parent page selector">
+            <div class="settingsField">
+              <div class="settingsLabel">Page</div>
+              <div class="settingsControl">
+                <select id="notionPages" class="input"></select>
+                <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
+              </div>
+            </div>
           </div>
         </section>
       </section>
