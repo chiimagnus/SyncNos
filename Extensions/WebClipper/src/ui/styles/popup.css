@@ -742,7 +742,7 @@ main {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 650;
   line-height: 1.1;
 }
@@ -760,11 +760,13 @@ main {
 .bottomBar .todayCount {
   color: var(--wc-ok);
   font-weight: 800;
+  font-size: 30px;
 }
 
 .bottomBar .totalCount {
   color: #2563eb;
   font-weight: 800;
+  font-size: 30px;
 }
 
 .chatPreviewPopover {
