@@ -476,8 +476,8 @@ main {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 6px 8px;
 }
 
 .bottomBar .btn,
@@ -488,12 +488,12 @@ main {
 .bottomBar .stats {
   flex: 0 0 auto;
   white-space: pre-line;
-  padding: 4px 9px;
+  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel-strong);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 650;
   line-height: 1.2;
 }
