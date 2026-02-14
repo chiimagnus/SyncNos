@@ -154,6 +154,7 @@ concatFiles({
     "src/shared/runtime-client.js",
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
+    "src/vendor/markdown-it.min.js",
     "src/sync/notion/notion-api.js",
     "src/ui/popup/popup-core.js",
     "src/ui/popup/popup-tabs.js",
@@ -174,6 +175,7 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\.\/\.\.\/vendor\/markdown-it\.min\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-core\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-tabs\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-list\.js"><\/script>\s*/g, "")
