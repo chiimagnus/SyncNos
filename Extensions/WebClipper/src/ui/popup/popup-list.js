@@ -7,11 +7,20 @@
     els,
     state,
     send,
+    PREVIEW_EVENTS,
     formatTime,
     getSourceMeta,
     hasWarningFlags,
     isSameLocalDay
   } = core;
+  const previewEvents = PREVIEW_EVENTS || {
+    click: "popup:conversation-click"
+  };
+
+  function dispatchPreviewEvent(type, detail) {
+    if (!els.list) return;
+    els.list.dispatchEvent(new CustomEvent(type, { detail }));
+  }
 
   function renderStats({ today, total }) {
     if (!els.stats) return;
@@ -58,6 +67,8 @@
     for (const conversation of state.conversations) {
       const row = document.createElement("div");
       row.className = "row";
+      row.dataset.conversationId = String(conversation.id);
+      row.setAttribute("aria-label", conversation.title || "(untitled)");
 
       const left = document.createElement("label");
       left.className = "checkbox";
@@ -108,6 +119,13 @@
         sub.appendChild(time);
       }
       meta.appendChild(sub);
+
+      row.addEventListener("click", (e) => {
+        if (!e || e.button !== 0) return;
+        const target = e.target;
+        if (target && target.closest && target.closest("input[type='checkbox'], label.checkbox")) return;
+        dispatchPreviewEvent(previewEvents.click, { conversationId: conversation.id, anchorEl: row });
+      });
 
       row.appendChild(left);
       row.appendChild(meta);
