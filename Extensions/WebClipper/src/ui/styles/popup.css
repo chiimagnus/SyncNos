@@ -70,6 +70,49 @@ body {
   padding: 11px;
 }
 
+.settingsSectionHeader {
+  padding: 11px 11px 0;
+}
+
+.settingsSectionTitle {
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+
+.settingsSectionSub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settingsForm {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+}
+
+.settingsField {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.settingsLabel {
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--muted);
+}
+
+.settingsControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .settingsDivider {
   height: 1px;
   background: rgba(217, 89, 38, 0.14);
@@ -279,6 +322,34 @@ body {
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 
+.btn.primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #c84f23;
+  border-color: #c84f23;
+}
+
+.btn.icon {
+  min-width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.btn[disabled] {
+  opacity: 0.65;
+  cursor: default;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .btn:hover {
   background: var(--btn-bg-hover);
   border-color: var(--border-strong);
@@ -386,6 +457,11 @@ body {
   box-shadow: 0 0 0 2px rgba(255, 198, 173, 0.6);
 }
 
+.input:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .toolbar {
   position: relative;
   display: flex;
@@ -451,20 +527,56 @@ input[type="checkbox"] {
 }
 
 #notionStatus {
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--panel-strong);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.authStatus {
+  min-width: 0;
+}
+
+.authHeadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 850;
   color: var(--text);
 }
 
-#notionConfig .input {
-  flex: 1 1 140px;
+.authSub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#notionParent .input,
-#notionParentSelect .input {
-  flex: 1 1 180px;
+.authDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(184, 94, 58, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(217, 89, 38, 0.18);
+}
+
+#notionAuthCard.is-connected .authDot {
+  background: rgba(16, 185, 129, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.26);
+}
+
+#notionAuthCard.is-connected .btn.primary {
+  background: var(--btn-bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+#notionAuthCard.is-connected .btn.primary:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--border-strong);
 }
 
 main {
