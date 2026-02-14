@@ -61,7 +61,10 @@
       <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
         <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
           <div class="settingsSectionHeader">
-            <div class="settingsSectionTitle">Notion</div>
+            <div class="settingsTitleRow">
+              <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
+              <div class="settingsSectionTitle">Notion</div>
+            </div>
             <div class="settingsSectionSub">Connect via OAuth.</div>
           </div>
 
@@ -79,18 +82,11 @@
 
           <div class="settingsDivider" role="presentation"></div>
 
-          <div class="settingsSectionHeader">
-            <div class="settingsSectionTitle">Parent Page</div>
-            <div class="settingsSectionSub">Where databases are created.</div>
-          </div>
-
-          <div class="settingsForm" aria-label="Parent page selector">
-            <div class="settingsField">
-              <div class="settingsLabel">Page</div>
-              <div class="settingsControl">
-                <select id="notionPages" class="input"></select>
-                <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
-              </div>
+          <div class="settingsRow settingsRow--compact" aria-label="Parent page selector">
+            <div class="settingsLabel settingsLabel--inline">Parent Page</div>
+            <div class="settingsControl settingsControl--grow">
+              <select id="notionPages" class="input"></select>
+              <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
             </div>
           </div>
         </section>
