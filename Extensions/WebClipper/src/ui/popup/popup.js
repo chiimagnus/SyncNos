@@ -55,35 +55,43 @@
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
     tabChats: document.getElementById("tabChats"),
-	    tabSettings: document.getElementById("tabSettings"),
-	    viewChats: document.getElementById("viewChats"),
-	    viewSettings: document.getElementById("viewSettings"),
-	    chkSelectAll: document.getElementById("chkSelectAll"),
-	    btnExport: document.getElementById("btnExport"),
-	    exportMenu: document.getElementById("exportMenu"),
-	    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
-	    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
-	    menuExportJsons: document.getElementById("menuExportJsons"),
-	    btnSyncNotion: document.getElementById("btnSyncNotion"),
-	    btnNotionConnect: document.getElementById("btnNotionConnect"),
-	    notionStatus: document.getElementById("notionStatus"),
-	    notionClientId: document.getElementById("notionClientId"),
+    tabSettings: document.getElementById("tabSettings"),
+    tabAbout: document.getElementById("tabAbout"),
+    viewChats: document.getElementById("viewChats"),
+    viewSettings: document.getElementById("viewSettings"),
+    viewAbout: document.getElementById("viewAbout"),
+    chkSelectAll: document.getElementById("chkSelectAll"),
+    btnExport: document.getElementById("btnExport"),
+    exportMenu: document.getElementById("exportMenu"),
+    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
+    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
+    menuExportJsons: document.getElementById("menuExportJsons"),
+    btnSyncNotion: document.getElementById("btnSyncNotion"),
+    btnNotionConnect: document.getElementById("btnNotionConnect"),
+    notionStatus: document.getElementById("notionStatus"),
+    notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
     btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
     notionPageQuery: document.getElementById("notionPageQuery"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
-    btnNotionSaveParent: document.getElementById("btnNotionSaveParent")
+    btnNotionSaveParent: document.getElementById("btnNotionSaveParent"),
+    aboutVersion: document.getElementById("aboutVersion"),
+    btnAboutSource: document.getElementById("btnAboutSource"),
+    btnAboutPrivacy: document.getElementById("btnAboutPrivacy"),
+    btnAboutChangelog: document.getElementById("btnAboutChangelog"),
+    btnAboutMail: document.getElementById("btnAboutMail"),
+    btnAboutGitHub: document.getElementById("btnAboutGitHub")
   };
 
-	  const state = {
-	    conversations: [],
-	    selectedIds: new Set()
-	  };
+  const state = {
+    conversations: [],
+    selectedIds: new Set()
+  };
 
-	  const STORAGE_KEYS = {
-	    popupActiveTab: "popup_active_tab"
-	  };
+  const STORAGE_KEYS = {
+    popupActiveTab: "popup_active_tab"
+  };
 
   function isExportMenuOpen() {
     return !!(els.exportMenu && !els.exportMenu.hidden);
@@ -99,25 +107,29 @@
     if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
   }
 
-	  function setActiveTab(tabId) {
-	    const next = tabId === "settings" ? "settings" : "chats";
+  const TAB_IDS = ["chats", "settings", "about"];
 
-    if (els.tabChats) {
-      const active = next === "chats";
-      els.tabChats.classList.toggle("is-active", active);
-      els.tabChats.setAttribute("aria-selected", active ? "true" : "false");
-      els.tabChats.tabIndex = active ? 0 : -1;
-    }
+  function normalizeTabId(tabId) {
+    return TAB_IDS.includes(tabId) ? tabId : "chats";
+  }
 
-    if (els.tabSettings) {
-      const active = next === "settings";
-      els.tabSettings.classList.toggle("is-active", active);
-      els.tabSettings.setAttribute("aria-selected", active ? "true" : "false");
-      els.tabSettings.tabIndex = active ? 0 : -1;
-    }
+  function setTabButtonState({ el, active }) {
+    if (!el) return;
+    el.classList.toggle("is-active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+    el.tabIndex = active ? 0 : -1;
+  }
+
+  function setActiveTab(tabId) {
+    const next = normalizeTabId(tabId);
+
+    setTabButtonState({ el: els.tabChats, active: next === "chats" });
+    setTabButtonState({ el: els.tabSettings, active: next === "settings" });
+    setTabButtonState({ el: els.tabAbout, active: next === "about" });
 
     if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
     if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
+    if (els.viewAbout) els.viewAbout.classList.toggle("is-active", next === "about");
 
     storageSet({ [STORAGE_KEYS.popupActiveTab]: next }).catch(() => {});
   }
@@ -126,9 +138,16 @@
     if (!e) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    const next = e.key === "ArrowRight" ? "settings" : "chats";
+    const current = normalizeTabId((document.activeElement && document.activeElement.id === "tabSettings")
+      ? "settings"
+      : (document.activeElement && document.activeElement.id === "tabAbout")
+        ? "about"
+        : "chats");
+    const idx = TAB_IDS.indexOf(current);
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    const next = TAB_IDS[(idx + dir + TAB_IDS.length) % TAB_IDS.length];
     setActiveTab(next);
-    const el = next === "settings" ? els.tabSettings : els.tabChats;
+    const el = next === "settings" ? els.tabSettings : next === "about" ? els.tabAbout : els.tabChats;
     if (el && typeof el.focus === "function") el.focus();
   }
 
@@ -438,13 +457,44 @@
     els.tabSettings.addEventListener("click", () => setActiveTab("settings"));
     els.tabSettings.addEventListener("keydown", onTabKeyDown);
   }
+  if (els.tabAbout) {
+    els.tabAbout.addEventListener("click", () => setActiveTab("about"));
+    els.tabAbout.addEventListener("keydown", onTabKeyDown);
+  }
 
   (async () => {
     const saved = await storageGet([STORAGE_KEYS.popupActiveTab]);
-    setActiveTab(saved[STORAGE_KEYS.popupActiveTab] || "chats");
+    setActiveTab(normalizeTabId(saved[STORAGE_KEYS.popupActiveTab] || "chats"));
   })();
 
   refresh();
+
+  function openUrl(url) {
+    if (!url) return;
+    try {
+      chrome.tabs.create({ url: String(url) });
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function initAbout() {
+    const m = chrome && chrome.runtime && typeof chrome.runtime.getManifest === "function" ? chrome.runtime.getManifest() : null;
+    const version = m && m.version ? m.version : "";
+    const name = m && m.name ? m.name : "SyncNos WebClipper";
+    if (els.aboutVersion) {
+      els.aboutVersion.textContent = version ? `Version ${version}` : "Version";
+      els.aboutVersion.title = name;
+    }
+
+    if (els.btnAboutSource) els.btnAboutSource.addEventListener("click", () => openUrl("https://github.com/chiimagnus/SyncNos"));
+    if (els.btnAboutPrivacy) els.btnAboutPrivacy.addEventListener("click", () => openUrl("https://chiimagnus.notion.site/privacypolicyandtermsofuse"));
+    if (els.btnAboutChangelog) els.btnAboutChangelog.addEventListener("click", () => openUrl("https://chiimagnus.notion.site/syncnos-changelog"));
+    if (els.btnAboutGitHub) els.btnAboutGitHub.addEventListener("click", () => openUrl("https://github.com/chiimagnus"));
+    if (els.btnAboutMail) els.btnAboutMail.addEventListener("click", () => openUrl("mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback"));
+  }
+
+  initAbout();
 
   async function loadNotionConfig() {
     const res = await storageGet(["notion_oauth_client_id", "notion_oauth_client_secret"]);
