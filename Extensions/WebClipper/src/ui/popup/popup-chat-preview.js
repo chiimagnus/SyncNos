@@ -7,9 +7,7 @@
     els,
     state,
     send,
-    PREVIEW_EVENTS,
-    formatTime,
-    getSourceMeta
+    PREVIEW_EVENTS
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
@@ -135,53 +133,30 @@
     els.chatPreviewPopover.removeAttribute("data-state");
   }
 
-  function formatSubtitle(conversation) {
-    if (!conversation) return "";
-    const parts = [];
-    const sourceRaw = conversation.sourceName || conversation.source || "";
-    const sourceMeta = getSourceMeta(sourceRaw);
-    if (sourceMeta && sourceMeta.label) parts.push(sourceMeta.label);
-    const lastCapturedAt = formatTime(conversation.lastCapturedAt);
-    if (lastCapturedAt) parts.push(lastCapturedAt);
-    return parts.join(" · ");
-  }
-
-  function renderShell({ conversation, bodyHtml, stateName }) {
+  function renderShell({ bodyHtml, stateName }) {
     if (!els.chatPreviewPopover) return;
-    const title = (conversation && conversation.title) ? conversation.title : "(untitled)";
-    const subtitle = formatSubtitle(conversation);
-
-    els.chatPreviewPopover.innerHTML = `
-      <div class="chatPreviewHeader">
-        <div class="chatPreviewTitle">${escapeHtml(title)}</div>
-        <div class="chatPreviewSub">${escapeHtml(subtitle || "Conversation preview")}</div>
-      </div>
-      <div class="chatPreviewBody">${bodyHtml}</div>
-    `;
+    els.chatPreviewPopover.innerHTML = `<div class="chatPreviewBody">${bodyHtml}</div>`;
     els.chatPreviewPopover.dataset.state = String(stateName || "ready");
   }
 
-  function renderLoading(conversation) {
+  function renderLoading() {
     renderShell({
-      conversation,
       stateName: "loading",
       bodyHtml: '<div class="chatPreviewPlaceholder">Loading...</div>'
     });
   }
 
-  function renderError(conversation, message) {
+  function renderError(message) {
     renderShell({
-      conversation,
       stateName: "error",
       bodyHtml: `<div class="chatPreviewPlaceholder chatPreviewPlaceholder--error">${escapeHtml(message || "Failed to load messages.")}</div>`
     });
   }
 
-  function renderMessages(conversation, messages) {
+  function renderMessages(messages) {
     const list = Array.isArray(messages) ? messages : [];
     if (!list.length) {
       renderShell({
-        conversation,
         stateName: "empty",
         bodyHtml: '<div class="chatPreviewPlaceholder">No messages yet.</div>'
       });
@@ -201,7 +176,6 @@
     }).join("");
 
     renderShell({
-      conversation,
       stateName: "ready",
       bodyHtml
     });
@@ -213,10 +187,10 @@
     const popoverRect = els.chatPreviewPopover.getBoundingClientRect();
 
     let left = anchorRect.right + POPOVER_GAP;
-    if (left + popoverRect.width > window.innerWidth - POPOVER_MARGIN) {
-      left = anchorRect.left - popoverRect.width - POPOVER_GAP;
-    }
-    left = Math.max(POPOVER_MARGIN, Math.min(left, window.innerWidth - popoverRect.width - POPOVER_MARGIN));
+    const maxLeft = window.innerWidth - popoverRect.width - POPOVER_MARGIN;
+    left = Math.max(POPOVER_MARGIN, Math.min(left, maxLeft));
+    const safeLeftBoundary = anchorRect.left + 64;
+    if (left < safeLeftBoundary && maxLeft >= safeLeftBoundary) left = safeLeftBoundary;
 
     let top = anchorRect.top;
     if (top + popoverRect.height > window.innerHeight - POPOVER_MARGIN) {
@@ -266,12 +240,12 @@
     const cache = getPreviewCache();
     const cached = cache.get(id);
     if (cached && Array.isArray(cached.messages)) {
-      renderMessages(conversation, cached.messages);
+      renderMessages(cached.messages);
       positionPopover();
       return;
     }
 
-    renderLoading(conversation);
+    renderLoading();
     positionPopover();
 
     invalidatePendingRequests();
@@ -280,12 +254,12 @@
       const payload = await fetchMessages(id);
       if (token !== state.previewRequestToken) return;
       if (preview.activeConversationId !== id) return;
-      renderMessages(conversation, payload.messages);
+      renderMessages(payload.messages);
       positionPopover();
     } catch (e) {
       if (token !== state.previewRequestToken) return;
       if (preview.activeConversationId !== id) return;
-      renderError(conversation, e && e.message ? e.message : "Failed to load messages.");
+      renderError(e && e.message ? e.message : "Failed to load messages.");
       positionPopover();
     }
   }
