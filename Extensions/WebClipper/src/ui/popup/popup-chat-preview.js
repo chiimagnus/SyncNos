@@ -21,6 +21,7 @@
     activeConversationId: null,
     activeAnchorEl: null
   };
+  let markdownRenderer;
 
   function escapeHtml(value) {
     return String(value || "").replace(/[&<>"']/g, (char) => {
@@ -46,6 +47,57 @@
     if (role === "user") return "User";
     if (role === "assistant") return "Assistant";
     return "Message";
+  }
+
+  function sanitizeHref(href) {
+    const text = String(href || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text)) return text;
+    return "";
+  }
+
+  function getMarkdownRenderer() {
+    if (markdownRenderer !== undefined) return markdownRenderer;
+    const factory = globalThis.markdownit;
+    if (typeof factory !== "function") {
+      markdownRenderer = null;
+      return markdownRenderer;
+    }
+
+    const md = factory({
+      html: false,
+      breaks: true,
+      linkify: true,
+      typographer: false
+    });
+    const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, _env, self) => {
+      return self.renderToken(tokens, idx, options);
+    });
+    md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+      const token = tokens[idx];
+      const hrefIdx = token.attrIndex("href");
+      const href = hrefIdx >= 0 && token.attrs && token.attrs[hrefIdx] ? token.attrs[hrefIdx][1] : "";
+      const safeHref = sanitizeHref(href);
+      if (!safeHref) token.attrSet("href", "#");
+      token.attrSet("target", "_blank");
+      token.attrSet("rel", "noopener noreferrer");
+      return defaultLinkOpen(tokens, idx, options, env, self);
+    };
+
+    markdownRenderer = md;
+    return markdownRenderer;
+  }
+
+  function renderMarkdown(contentText) {
+    const raw = String(contentText || "");
+    if (!raw.trim()) return "<p></p>";
+    const md = getMarkdownRenderer();
+    if (!md) return `<p>${escapeHtml(raw).replace(/\n/g, "<br>")}</p>`;
+    try {
+      return md.render(raw);
+    } catch (_e) {
+      return `<p>${escapeHtml(raw).replace(/\n/g, "<br>")}</p>`;
+    }
   }
 
   function getPreviewCache() {
@@ -139,11 +191,11 @@
     const bodyHtml = list.map((message) => {
       const normalizedRole = normalizeRole(message && message.role);
       const label = roleLabel(normalizedRole);
-      const content = escapeHtml((message && message.contentText) || "");
+      const content = renderMarkdown((message && message.contentText) || "");
       return `
         <article class="chatPreviewMsg chatPreviewMsg--${normalizedRole}">
           <header class="chatPreviewMsgRole">${label}</header>
-          <pre class="chatPreviewMsgText">${content}</pre>
+          <div class="chatPreviewMsgMarkdown">${content}</div>
         </article>
       `;
     }).join("");
