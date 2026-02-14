@@ -22,7 +22,6 @@
 				"Services/DataSources-From/添加新数据源完整指南.md",
 				"Services/DataSources-From/OCR/AppleVisionOCR技术文档.md",
 				"Services/DataSources-To/添加新同步目标完整指南.md",
-				"Services/DataSources-To/Notion/Config/NotionConfig.swift.example",
 				"Services/WebArticle/Readability/UPSTREAM-README.md",
 			);
 			target = D8CE88D92E713DB50025AD6E /* SyncNos */;
