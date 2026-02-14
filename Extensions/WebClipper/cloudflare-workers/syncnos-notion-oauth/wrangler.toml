@@ -1,0 +1,13 @@
+name = "syncnos-notion-oauth"
+main = "index.ts"
+compatibility_date = "2024-06-27"
+
+[vars]
+# Public (safe to commit): Notion OAuth Client ID
+NOTION_CLIENT_ID = "2a8d872b-594c-8060-9a2b-00377c27ec32"
+
+# Secrets (DO NOT COMMIT):
+# - NOTION_CLIENT_SECRET
+# Set via:
+#   wrangler secret put NOTION_CLIENT_SECRET
+

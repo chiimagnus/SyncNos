@@ -59,34 +59,26 @@
       </section>
 
       <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
-        <section class="toolbar settingsPanel" aria-label="Notion settings">
-          <div class="settingsRow" id="notionBar">
-            <div class="title" style="font-weight: 650;">Notion</div>
-            <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+        <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
+          <div class="settingsRow settingsRow--header" id="notionBar">
+            <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
+            <div class="notionHeaderText" aria-label="Notion OAuth status">
+              <span class="notionHeaderTitle">Notion OAuth</span>
+              <span class="notionHeaderSep" aria-hidden="true">|</span>
+              <span id="notionStatusTitle" class="notionHeaderStatus">Not connected</span>
+            </div>
             <div class="spacer"></div>
             <button id="btnNotionConnect" class="btn">Connect</button>
           </div>
 
           <div class="settingsDivider" role="presentation"></div>
 
-          <div class="settingsRow" id="notionConfig">
-            <input id="notionClientId" class="input" placeholder="Notion Client ID" />
-            <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
-            <button id="btnNotionSaveConfig" class="btn">Save</button>
-          </div>
-
-          <div class="settingsDivider" role="presentation"></div>
-
-          <div class="settingsRow" id="notionParent">
-            <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
-            <button id="btnNotionLoadPages" class="btn">Load</button>
-          </div>
-
-          <div class="settingsDivider" role="presentation"></div>
-
-          <div class="settingsRow" id="notionParentSelect">
-            <select id="notionPages" class="input"></select>
-            <button id="btnNotionSaveParent" class="btn">Use</button>
+          <div class="settingsRow settingsRow--compact" aria-label="Parent page selector">
+            <div class="settingsLabel settingsLabel--inline">Parent Page</div>
+            <div class="settingsControl settingsControl--grow">
+              <select id="notionPages" class="input"></select>
+              <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
+            </div>
           </div>
         </section>
       </section>
