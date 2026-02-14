@@ -57,6 +57,7 @@
     tabChats: document.getElementById("tabChats"),
     tabSettings: document.getElementById("tabSettings"),
     tabAbout: document.getElementById("tabAbout"),
+    tabIndicator: document.querySelector(".tabs .tabIndicator"),
     viewChats: document.getElementById("viewChats"),
     viewSettings: document.getElementById("viewSettings"),
     viewAbout: document.getElementById("viewAbout"),
@@ -120,12 +121,21 @@
     el.tabIndex = active ? 0 : -1;
   }
 
+  function updateTabIndicator(tabId) {
+    const tabsEl = (els.tabChats && els.tabChats.closest) ? els.tabChats.closest(".tabs") : null;
+    if (!tabsEl) return;
+    const normalized = normalizeTabId(tabId);
+    const idx = Math.max(0, TAB_IDS.indexOf(normalized));
+    tabsEl.style.setProperty("--tab-i", String(idx));
+  }
+
   function setActiveTab(tabId) {
     const next = normalizeTabId(tabId);
 
     setTabButtonState({ el: els.tabChats, active: next === "chats" });
     setTabButtonState({ el: els.tabSettings, active: next === "settings" });
     setTabButtonState({ el: els.tabAbout, active: next === "about" });
+    updateTabIndicator(next);
 
     if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
     if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
