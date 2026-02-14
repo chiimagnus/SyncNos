@@ -341,8 +341,39 @@
         return false;
       }
     }).length;
-    els.stats.textContent = `today:${today}\n total:${total}`;
+    renderStats({ today, total });
     syncSelectAllCheckbox();
+  }
+
+  function renderStats({ today, total }) {
+    if (!els.stats) return;
+    els.stats.textContent = "";
+
+    const todayLabel = document.createElement("span");
+    todayLabel.className = "statsLabel";
+    todayLabel.textContent = "Today:";
+
+    const todayValue = document.createElement("span");
+    todayValue.className = "todayCount";
+    todayValue.textContent = String(today);
+
+    const divider = document.createElement("span");
+    divider.className = "statsDivider";
+    divider.textContent = " \u00b7 ";
+
+    const totalLabel = document.createElement("span");
+    totalLabel.className = "statsLabel";
+    totalLabel.textContent = "Total:";
+
+    const totalValue = document.createElement("span");
+    totalValue.className = "totalCount";
+    totalValue.textContent = String(total);
+
+    els.stats.appendChild(todayLabel);
+    els.stats.appendChild(todayValue);
+    els.stats.appendChild(divider);
+    els.stats.appendChild(totalLabel);
+    els.stats.appendChild(totalValue);
   }
 
   function syncSelectAllCheckbox() {
