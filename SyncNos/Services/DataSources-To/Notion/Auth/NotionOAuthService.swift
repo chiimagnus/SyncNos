@@ -157,11 +157,24 @@ final class NotionOAuthService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 12
         request.httpBody = try JSONEncoder().encode(ExchangeRequest(code: code, redirectUri: redirectURI))
 
         logger.info("Exchanging authorization code for access token (via Cloudflare Worker)")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        func doRequest() async throws -> (Data, URLResponse) {
+            return try await URLSession.shared.data(for: request)
+        }
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await doRequest()
+        } catch {
+            // Best-effort retry once for transient network issues.
+            logger.error("Token exchange request failed, retrying once: \(error.localizedDescription)")
+            try await Task.sleep(nanoseconds: 700_000_000)
+            (data, response) = try await doRequest()
+        }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NSError(
