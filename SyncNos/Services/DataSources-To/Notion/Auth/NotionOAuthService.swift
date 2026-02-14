@@ -6,14 +6,10 @@ final class NotionOAuthService {
     // Notion OAuth 配置
     // 配置值从 NotionOAuthConfig 加载：
     // - 优先从 Keychain 读取；
-    // - 若 Keychain 为空，则从本地 `NotionConfig.swift` 中读取并自动写入 Keychain。
+    // - 若 Keychain 为空，则使用默认 Client ID。
     // 不再依赖 Bundle 中的 `.env` 文件。
     var clientId: String {
         NotionOAuthConfig.clientId
-    }
-    
-    var clientSecret: String {
-        NotionOAuthConfig.clientSecret
     }
     
     var redirectURI: String {
@@ -22,7 +18,7 @@ final class NotionOAuthService {
     
     // Notion OAuth 端点
     private static let authorizationURL = "https://api.notion.com/v1/oauth/authorize"
-    private static let tokenURL = "https://api.notion.com/v1/oauth/token"
+    private static let tokenExchangeProxyURL = "https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange"
     
     private let logger: LoggerServiceProtocol
     
@@ -35,14 +31,6 @@ final class NotionOAuthService {
     /// 注意：此方法必须在主线程调用（ASWebAuthenticationSession 要求）
     @MainActor
     func startAuthorization() async throws -> String? {
-        guard clientId != "YOUR_CLIENT_ID" else {
-            throw NSError(
-                domain: "NotionOAuthService",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Notion OAuth Client ID not configured. 请在本地 NotionConfig.swift 中配置 clientId / clientSecret。"]
-            )
-        }
-        
         // 生成 state 参数用于防止 CSRF 攻击
         let state = UUID().uuidString
         
@@ -152,42 +140,41 @@ final class NotionOAuthService {
     /// - Parameter code: 授权码
     /// - Returns: 访问令牌和相关信息
     func exchangeCodeForToken(code: String) async throws -> NotionOAuthTokenResponse {
-        guard let tokenURL = URL(string: Self.tokenURL) else {
+        guard let proxyURL = URL(string: Self.tokenExchangeProxyURL) else {
             throw NSError(
                 domain: "NotionOAuthService",
                 code: 8,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid token URL"]
+                userInfo: [NSLocalizedDescriptionKey: "Invalid token exchange URL"]
             )
         }
-        
-        // Use application/x-www-form-urlencoded per OAuth2 token endpoint expectations.
-        // Some providers (including variations of OAuth implementations) may expect
-        // form-encoded body or HTTP Basic auth. Send form-encoded body and also
-        // include Basic Authorization header to maximize compatibility.
-        var formComponents = URLComponents()
-        formComponents.queryItems = [
-            URLQueryItem(name: "grant_type", value: "authorization_code"),
-            URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "client_secret", value: clientSecret)
-        ]
 
-        var request = URLRequest(url: tokenURL)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = formComponents.percentEncodedQuery?.data(using: .utf8)
-
-        // Add HTTP Basic auth header as an additional client authentication method.
-        if let credentialsData = "\(clientId):\(clientSecret)".data(using: .utf8) {
-            let base64Credentials = credentialsData.base64EncodedString()
-            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        struct ExchangeRequest: Encodable {
+            let code: String
+            let redirectUri: String
         }
-        
-        logger.info("Exchanging authorization code for access token")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        var request = URLRequest(url: proxyURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 12
+        request.httpBody = try JSONEncoder().encode(ExchangeRequest(code: code, redirectUri: redirectURI))
+
+        logger.info("Exchanging authorization code for access token (via Cloudflare Worker)")
+
+        func doRequest() async throws -> (Data, URLResponse) {
+            return try await URLSession.shared.data(for: request)
+        }
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await doRequest()
+        } catch {
+            // Best-effort retry once for transient network issues.
+            logger.error("Token exchange request failed, retrying once: \(error.localizedDescription)")
+            try await Task.sleep(nanoseconds: 700_000_000)
+            (data, response) = try await doRequest()
+        }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NSError(
@@ -265,4 +252,3 @@ struct NotionOAuthTokenResponse {
     let workspaceId: String?
     let workspaceName: String?
 }
-
