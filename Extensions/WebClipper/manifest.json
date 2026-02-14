@@ -25,6 +25,7 @@
     "https://yuanbao.tencent.com/*",
     "https://*.notion.so/*",
     "https://api.notion.com/*",
+    "https://syncnos-notion-oauth.chiimagnus.workers.dev/*",
     "https://chiimagnus.github.io/*"
   ],
   "content_scripts": [
