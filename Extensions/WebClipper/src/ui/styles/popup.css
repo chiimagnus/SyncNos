@@ -92,7 +92,7 @@ body {
   width: calc((100% - (var(--seg-pad) * 2)) / var(--seg-count));
   transform: translate3d(calc(var(--tab-i, 0) * 100%), 0, 0);
   border-radius: var(--seg-radius);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--btn-bg);
   box-shadow:
     0 1px 1px rgba(30, 41, 59, 0.08),
     0 6px 14px rgba(217, 89, 38, 0.12);
