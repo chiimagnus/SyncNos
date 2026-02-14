@@ -194,6 +194,16 @@ body {
   flex: 0 0 auto;
 }
 
+.aboutAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.12);
+  background: var(--panel-strong);
+}
+
 .aboutInfo {
   min-width: 0;
 }
@@ -205,7 +215,9 @@ body {
 }
 
 .aboutAuthorName {
-  font-weight: 750;
+  font-family: "Snell Roundhand", "Apple Chancery", "Zapfino", "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 #notionBar .title {
