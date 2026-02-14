@@ -60,24 +60,15 @@
 
       <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
         <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
-          <div class="settingsSectionHeader">
-            <div class="settingsTitleRow">
-              <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
-              <div class="settingsSectionTitle">Notion</div>
-            </div>
-            <div class="settingsSectionSub">Connect via OAuth.</div>
-          </div>
-
-          <div class="settingsRow" id="notionBar">
-            <div class="authStatus">
-              <div class="authHeadline">
-                <span id="notionAuthDot" class="authDot" aria-hidden="true"></span>
-                <span id="notionStatusTitle">Not connected</span>
-              </div>
-              <div id="notionStatus" class="authSub"></div>
+          <div class="settingsRow settingsRow--header" id="notionBar">
+            <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
+            <div class="notionHeaderText" aria-label="Notion OAuth status">
+              <span class="notionHeaderTitle">Notion OAuth</span>
+              <span class="notionHeaderSep" aria-hidden="true">|</span>
+              <span id="notionStatusTitle" class="notionHeaderStatus">Not connected</span>
             </div>
             <div class="spacer"></div>
-            <button id="btnNotionConnect" class="btn primary">Connect</button>
+            <button id="btnNotionConnect" class="btn">Connect</button>
           </div>
 
           <div class="settingsDivider" role="presentation"></div>
