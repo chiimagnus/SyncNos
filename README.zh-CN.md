@@ -9,7 +9,7 @@
 
 ## 工作流程
 
-![](Resource/flow-zh.svg)
+![](Resource/flows.svg)
 
 ## macOS App
 
