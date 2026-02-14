@@ -78,6 +78,7 @@
     notionPages: document.getElementById("notionPages"),
     btnNotionSaveParent: document.getElementById("btnNotionSaveParent"),
     aboutVersion: document.getElementById("aboutVersion"),
+    btnAboutMacApp: document.getElementById("btnAboutMacApp"),
     btnAboutSource: document.getElementById("btnAboutSource"),
     btnAboutChangelog: document.getElementById("btnAboutChangelog"),
     btnAboutMail: document.getElementById("btnAboutMail"),
@@ -606,6 +607,7 @@
 
     if (els.btnAboutSource) els.btnAboutSource.addEventListener("click", () => openUrl("https://github.com/chiimagnus/SyncNos"));
     if (els.btnAboutChangelog) els.btnAboutChangelog.addEventListener("click", () => openUrl("https://chiimagnus.notion.site/syncnos-changelog"));
+    if (els.btnAboutMacApp) els.btnAboutMacApp.addEventListener("click", () => openUrl("https://apps.apple.com/app/syncnos/id6755133888"));
     if (els.btnAboutGitHub) els.btnAboutGitHub.addEventListener("click", () => openUrl("https://github.com/chiimagnus"));
     if (els.btnAboutMail) els.btnAboutMail.addEventListener("click", () => openUrl("mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback"));
   }
