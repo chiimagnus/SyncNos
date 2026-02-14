@@ -10,33 +10,29 @@
 ## 工作流程（示意图）
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
-    classDef src fill:#F4F7FF,stroke:#4F46E5,color:#1E1B4B,stroke-width:1.5px,rx:8,ry:8;
-    classDef hub fill:#111827,stroke:#111827,color:#F9FAFB,stroke-width:2px,rx:50,ry:50;
-    classDef cache fill:#FFF7ED,stroke:#F97316,color:#7C2D12,stroke-width:1.5px;
-    classDef out fill:#ECFDF5,stroke:#10B981,color:#065F46,stroke-width:1.5px,rx:8,ry:8;
-
     subgraph APP_SRC[" 📚 数据来源 · macOS App "]
-        AB["Apple Books<br>高亮 & 笔记"]:::src
-        GL["GoodLinks<br>高亮"]:::src
-        WR["微信读书 WeRead<br>高亮 & 笔记"]:::src
-        DD["得到 Dedao<br>高亮 & 笔记"]:::src
-        OCR["聊天记录 OCR<br>高亮"]:::src
+        AB["Apple Books<br>高亮 & 笔记"]
+        GL["GoodLinks<br>高亮"]
+        WR["微信读书 WeRead<br>高亮 & 笔记"]
+        DD["得到 Dedao<br>高亮 & 笔记"]
+        OCR["聊天记录 OCR<br>高亮"]
     end
 
     subgraph WC_SRC[" 🤖 数据来源 · WebClipper "]
-        CGPT["ChatGPT"]:::src
-        CLD["Claude"]:::src
-        GEM["Gemini"]:::src
-        DS["DeepSeek"]:::src
-        KIMI["Kimi"]:::src
-        DOU["豆包 Doubao"]:::src
-        YUAN["元宝 Yuanbao"]:::src
-        NA["Notion AI"]:::src
+        CGPT["ChatGPT"]
+        CLD["Claude"]
+        GEM["Gemini"]
+        DS["DeepSeek"]
+        KIMI["Kimi"]
+        DOU["豆包 Doubao"]
+        YUAN["元宝 Yuanbao"]
+        NA["Notion AI"]
     end
 
-    SyncNos(("⚙️ SyncNos<br>macOS App")):::hub
-    WebClipper(("⚙️ WebClipper<br>浏览器扩展 MV3")):::hub
+    SyncNos(("⚙️ SyncNos<br>macOS App"))
+    WebClipper(("⚙️ WebClipper<br>浏览器扩展 MV3"))
 
     AB --> SyncNos
     GL --> SyncNos
@@ -53,13 +49,13 @@ flowchart LR
     YUAN --> WebClipper
     NA --> WebClipper
 
-    SyncNos --> LOCAL_APP[("🔒 本地缓存<br>加密存储")]:::cache
-    WebClipper --> LOCAL_WC[("🔒 浏览器本地存储<br>IndexedDB + chrome.storage")]:::cache
+    SyncNos --> LOCAL_APP[("🔒 本地缓存<br>加密存储")]
+    WebClipper --> LOCAL_WC[("🔒 浏览器本地存储<br>IndexedDB + chrome.storage")]
 
-    SyncNos --> NOTION["☁️ 同步到 Notion"]:::out
+    SyncNos --> NOTION["☁️ 同步到 Notion"]
     WebClipper --> NOTION
-    WebClipper --> JSON["📄 导出 JSON"]:::out
-    WebClipper --> MD["📝 导出 Markdown"]:::out
+    WebClipper --> JSON["📄 导出 JSON"]
+    WebClipper --> MD["📝 导出 Markdown"]
 ```
 
 ## macOS App
