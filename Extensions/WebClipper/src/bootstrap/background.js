@@ -436,25 +436,54 @@
     chrome.runtime.onInstalled.addListener(() => ensureDefaultNotionOAuthClientId());
   }
 
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function fetchWithTimeout(url, init, timeoutMs) {
+    const ms = Number.isFinite(timeoutMs) ? timeoutMs : 12_000;
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), ms);
+    try {
+      const merged = { ...(init || {}), signal: controller.signal };
+      return await fetch(url, merged);
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   async function exchangeNotionCodeForToken({ code }) {
     const cfg = NS.notionOAuthConfig && NS.notionOAuthConfig.getDefaults ? NS.notionOAuthConfig.getDefaults() : null;
     if (!cfg) throw new Error("notion oauth config missing");
     const proxyUrl = cfg.tokenExchangeProxyUrl || "";
     if (!proxyUrl) throw new Error("token exchange proxy url not configured");
 
-    const res = await fetch(proxyUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      },
-      body: JSON.stringify({ code, redirectUri: cfg.redirectUri })
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`token exchange failed: HTTP ${res.status} ${text}`);
-    const json = JSON.parse(text);
-    if (!json || !json.access_token) throw new Error("no access_token in response");
-    return json;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const res = await fetchWithTimeout(proxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          },
+          body: JSON.stringify({ code, redirectUri: cfg.redirectUri })
+        }, 12_000);
+        const text = await res.text();
+        if (!res.ok) throw new Error(`token exchange failed: HTTP ${res.status} ${text}`);
+        const json = JSON.parse(text);
+        if (!json || !json.access_token) throw new Error("no access_token in response");
+        return json;
+      } catch (e) {
+        lastErr = e;
+        // Only retry for transient failures.
+        const msg = String((e && e.message) || e || "");
+        const transient = /aborted|timeout|network|fetch/i.test(msg);
+        if (attempt >= 2 || !transient) break;
+        await sleep(700);
+      }
+    }
+    throw lastErr || new Error("token exchange failed");
   }
 
   function parseQueryFromUrl(url) {
