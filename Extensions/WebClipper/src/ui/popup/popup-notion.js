@@ -5,7 +5,7 @@
   const core = NS.popupCore;
   if (!core) return;
 
-  const { els, runtime, send, storageGet, storageSet, flashOk } = core;
+  const { els, runtime, send, storageGet, storageSet, flashOk, disableImageDrag } = core;
 
   async function getNotionOAuthMeta() {
     const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
@@ -250,6 +250,7 @@
   }
 
   function init() {
+    disableImageDrag(els.viewSettings);
     bindEvents();
     refreshNotionStatus().catch(() => {});
   }
