@@ -70,6 +70,79 @@ body {
   padding: 11px;
 }
 
+#notionAuthCard .notionLogo {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  /* Keep icon readable on tinted theme. */
+  filter: grayscale(1) contrast(1.1);
+}
+
+.settingsRow--header {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.notionHeaderText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.notionHeaderTitle {
+  font-size: 16px;
+  font-weight: 920;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.notionHeaderSep {
+  font-size: 12px;
+  font-weight: 850;
+  color: rgba(184, 94, 58, 0.6);
+}
+
+.notionHeaderStatus {
+  font-size: 12px;
+  font-weight: 780;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settingsLabel {
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--muted);
+}
+
+.settingsLabel--inline {
+  padding-left: 0;
+  min-width: 92px;
+}
+
+.settingsControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settingsControl--grow {
+  flex: 1 1 auto;
+}
+
+.settingsRow--compact {
+  padding-top: 9px;
+  padding-bottom: 11px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
 .settingsDivider {
   height: 1px;
   background: rgba(217, 89, 38, 0.14);
@@ -279,6 +352,23 @@ body {
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 
+.btn.icon {
+  min-width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.btn[disabled] {
+  opacity: 0.65;
+  cursor: default;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .btn:hover {
   background: var(--btn-bg-hover);
   border-color: var(--border-strong);
@@ -386,6 +476,11 @@ body {
   box-shadow: 0 0 0 2px rgba(255, 198, 173, 0.6);
 }
 
+.input:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .toolbar {
   position: relative;
   display: flex;
@@ -448,23 +543,6 @@ input[type="checkbox"] {
 .bottomBar .btn,
 .bottomBar .checkbox {
   flex: 0 0 auto;
-}
-
-#notionStatus {
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--panel-strong);
-  color: var(--text);
-}
-
-#notionConfig .input {
-  flex: 1 1 140px;
-}
-
-#notionParent .input,
-#notionParentSelect .input {
-  flex: 1 1 180px;
 }
 
 main {

@@ -69,14 +69,9 @@
     menuExportJsons: document.getElementById("menuExportJsons"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
-    notionStatus: document.getElementById("notionStatus"),
-    notionClientId: document.getElementById("notionClientId"),
-    notionClientSecret: document.getElementById("notionClientSecret"),
-    btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
-    notionPageQuery: document.getElementById("notionPageQuery"),
+    notionStatusTitle: document.getElementById("notionStatusTitle"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
-    btnNotionSaveParent: document.getElementById("btnNotionSaveParent"),
     aboutVersion: document.getElementById("aboutVersion"),
     btnAboutMacApp: document.getElementById("btnAboutMacApp"),
     btnAboutSource: document.getElementById("btnAboutSource"),
@@ -681,17 +676,17 @@
 
   initAbout();
 
-  async function loadNotionConfig() {
-    const res = await storageGet(["notion_oauth_client_id", "notion_oauth_client_secret"]);
-    els.notionClientId.value = res.notion_oauth_client_id || "";
-    els.notionClientSecret.value = res.notion_oauth_client_secret || "";
+  async function getNotionOAuthMeta() {
+    const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
+    return {
+      lastError: (res && res.notion_oauth_last_error) ? String(res.notion_oauth_last_error) : "",
+      pendingState: (res && res.notion_oauth_pending_state) ? String(res.notion_oauth_pending_state) : ""
+    };
   }
 
-  async function saveNotionConfig() {
-    await storageSet({
-      notion_oauth_client_id: els.notionClientId.value || "",
-      notion_oauth_client_secret: els.notionClientSecret.value || ""
-    });
+  async function getNotionOAuthClientId() {
+    const res = await storageGet(["notion_oauth_client_id"]);
+    return (res && res.notion_oauth_client_id) ? String(res.notion_oauth_client_id).trim() : "";
   }
 
   async function getNotionAccessToken() {
@@ -722,9 +717,11 @@
       alert("Notion API module not available.");
       return;
     }
-    const query = (els.notionPageQuery.value || "").trim();
-    const result = await api.searchPages({ accessToken, query, pageSize: 20 });
-    const pages = Array.isArray(result.results) ? result.results : [];
+    const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
+    const pagesRaw = Array.isArray(result.results) ? result.results : [];
+    const withoutDatabaseEntries = pagesRaw.filter((p) => !(p && p.parent && p.parent.type === "database_id"));
+    const rootPages = withoutDatabaseEntries.filter((p) => p && p.parent && p.parent.type === "workspace");
+    const pages = rootPages.length ? rootPages : withoutDatabaseEntries;
 
     els.notionPages.innerHTML = "";
     for (const p of pages) {
@@ -743,10 +740,8 @@
 
   async function saveParentPage() {
     const id = els.notionPages.value;
-    const title = els.notionPages.selectedOptions && els.notionPages.selectedOptions[0] ? els.notionPages.selectedOptions[0].textContent : "";
     if (!id) return;
-    await storageSet({ notion_parent_page_id: id, notion_parent_page_title: title || "" });
-    alert(`Parent page selected: ${title || id}`);
+    await storageSet({ notion_parent_page_id: id });
   }
 
   function buildNotionAuthorizeUrl({ clientId, state }) {
@@ -760,24 +755,89 @@
     return url.toString();
   }
 
-  els.btnNotionSaveConfig.addEventListener("click", async () => {
-    await saveNotionConfig();
-    flashOk(els.btnNotionSaveConfig);
-  });
+  if (els.btnNotionLoadPages) {
+    els.btnNotionLoadPages.addEventListener("click", () => {
+      loadParentPages()
+        .then(() => flashOk(els.btnNotionLoadPages))
+        .catch((e) => alert(e && e.message ? e.message : String(e)));
+    });
+  }
 
-  els.btnNotionLoadPages.addEventListener("click", () => {
-    loadParentPages()
-      .then(() => flashOk(els.btnNotionLoadPages))
-      .catch((e) => alert(e && e.message ? e.message : String(e)));
-  });
+  if (els.notionPages) {
+    els.notionPages.addEventListener("change", () => {
+      saveParentPage().catch(() => {});
+    });
+  }
 
-  els.btnNotionSaveParent.addEventListener("click", () => {
-    saveParentPage()
-      .then(() => flashOk(els.btnNotionSaveParent))
-      .catch((e) => alert(e && e.message ? e.message : String(e)));
-  });
+  let notionConnectPollTimer = null;
+  let notionParentPagesLoaded = false;
 
-  els.btnNotionConnect.addEventListener("click", async () => {
+  function setNotionConnectBusy(busy) {
+    if (!els.btnNotionConnect) return;
+    els.btnNotionConnect.disabled = !!busy;
+  }
+
+  async function openNotionAuthorizeTab(url) {
+    if (!url) return false;
+    try {
+      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
+        await new Promise((resolve) => chrome.tabs.create({ url: String(url) }, () => resolve(true)));
+        return true;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      window.open(String(url), "_blank", "noopener,noreferrer");
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function saveNotionReturnTarget() {
+    try {
+      if (!chrome || !chrome.tabs || typeof chrome.tabs.query !== "function") return;
+      const tab = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(Array.isArray(tabs) ? tabs[0] : null));
+      });
+      const tabId = tab && Number.isFinite(tab.id) ? tab.id : null;
+      const windowId = tab && Number.isFinite(tab.windowId) ? tab.windowId : null;
+      const payload = {};
+      if (tabId != null) payload.notion_oauth_return_tab_id = tabId;
+      if (windowId != null) payload.notion_oauth_return_window_id = windowId;
+      if (Object.keys(payload).length) await storageSet(payload);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function startNotionConnectPolling() {
+    if (notionConnectPollTimer) clearInterval(notionConnectPollTimer);
+    const startedAt = Date.now();
+    notionConnectPollTimer = setInterval(() => {
+      if (Date.now() - startedAt > 60_000) {
+        stopNotionConnectPolling();
+        return;
+      }
+      refreshNotionStatus().catch(() => {});
+    }, 750);
+  }
+
+  function stopNotionConnectPolling() {
+    if (!notionConnectPollTimer) return;
+    clearInterval(notionConnectPollTimer);
+    notionConnectPollTimer = null;
+  }
+
+  function setNotionParentControlsEnabled(enabled) {
+    const on = !!enabled;
+    if (els.btnNotionLoadPages) els.btnNotionLoadPages.disabled = !on;
+    if (els.notionPages) els.notionPages.disabled = !on;
+  }
+
+  if (els.btnNotionConnect) {
+    els.btnNotionConnect.addEventListener("click", async () => {
     // If connected, allow disconnect.
     const status = await send("getNotionAuthStatus");
     if (status && status.ok && status.data && status.data.connected) {
@@ -786,38 +846,76 @@
       return;
     }
 
-    const clientId = (els.notionClientId.value || "").trim();
+    const clientId = await getNotionOAuthClientId();
     if (!clientId) {
-      alert("Please set Notion Client ID first.");
+      alert("Notion OAuth client is not configured.");
+      await refreshNotionStatus();
       return;
     }
-    // Save config before starting auth.
-    await saveNotionConfig();
     // Persist state so background can validate callback.
     const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
     await storageSet({ notion_oauth_pending_state: state });
+    await saveNotionReturnTarget();
     const url = buildNotionAuthorizeUrl({ clientId, state });
-    window.open(url, "_blank", "noopener,noreferrer");
-    alert("Notion auth opened in a new tab. Complete authorization, then return here.");
+    setNotionConnectBusy(true);
+    if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Connecting…";
+    const opened = await openNotionAuthorizeTab(url);
+    if (!opened) {
+      setNotionConnectBusy(false);
+      alert("Failed to open Notion OAuth tab. Please check your browser popup settings.");
+      await refreshNotionStatus();
+      return;
+    }
+    if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Authorize in Notion";
+    startNotionConnectPolling();
   });
+  }
 
-  loadNotionConfig();
   // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
     const res = await send("getNotionAuthStatus");
+    const meta = await getNotionOAuthMeta();
     if (!res || !res.ok || !res.data) {
-      els.notionStatus.textContent = "";
+      if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
       els.btnNotionConnect.textContent = "Connect";
+      setNotionParentControlsEnabled(false);
+      setNotionConnectBusy(false);
+      stopNotionConnectPolling();
+      notionParentPagesLoaded = false;
+      if (els.notionPages) els.notionPages.innerHTML = "";
       return;
     }
     if (res.data.connected) {
-      const name = res.data.token && res.data.token.workspaceName ? res.data.token.workspaceName : "Connected";
-      els.notionStatus.textContent = name;
+      const workspaceName = (res.data.token && res.data.token.workspaceName) ? String(res.data.token.workspaceName).trim() : "";
+      const showWorkspace = workspaceName && workspaceName.toLowerCase() !== "connected";
+      if (els.notionStatusTitle) els.notionStatusTitle.textContent = showWorkspace ? `Connected ✅ (${workspaceName})` : "Connected ✅";
       els.btnNotionConnect.textContent = "Disconnect";
+      setNotionParentControlsEnabled(true);
+      setNotionConnectBusy(false);
+      stopNotionConnectPolling();
+
+      if (!notionParentPagesLoaded) {
+        notionParentPagesLoaded = true;
+        loadParentPages().catch(() => {});
+      }
     } else {
-      els.notionStatus.textContent = "Not connected";
+      if (meta && meta.lastError) {
+        if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Error";
+        // Keep UI compact: show "Error" in header and notify once.
+        if (!refreshNotionStatus.__lastAlert || refreshNotionStatus.__lastAlert !== meta.lastError) {
+          refreshNotionStatus.__lastAlert = meta.lastError;
+          alert(`Notion OAuth error: ${meta.lastError}`);
+        }
+      } else if (meta && meta.pendingState) {
+        if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Waiting…";
+      } else {
+        if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
+      }
       els.btnNotionConnect.textContent = "Connect";
+      setNotionParentControlsEnabled(false);
+      setNotionConnectBusy(false);
+      notionParentPagesLoaded = false;
     }
   }
 
