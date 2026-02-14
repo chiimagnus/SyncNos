@@ -7,41 +7,9 @@
 1. **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion。支持：**macOS 14.0+**。
 2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（JSON/Markdown）与手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（未签名，临时加载）**。
 
-## 工作流程（示意图）
+## 工作流程
 
-```mermaid
-%%{init: {'theme':'neutral'}}%%
-flowchart LR
-    subgraph APP[" 📚 macOS App 数据来源 "]
-        direction TB
-        AB["📖 Apple Books<br>高亮 & 笔记"] ~~~ GL["🔗 GoodLinks<br>高亮"]
-        WR["📚 微信读书<br>高亮 & 笔记"] ~~~ DD["🎓 得到<br>高亮 & 笔记"]
-        OCR["📱 聊天记录 OCR<br>高亮"]
-    end
-
-    subgraph WEB[" 🤖 WebClipper 数据来源 "]
-        direction TB
-        CGPT["ChatGPT"] ~~~ CLD["Claude"] ~~~ GEM["Gemini"]
-        DS["DeepSeek"] ~~~ KIMI["Kimi"] ~~~ DOU["豆包"]
-        YUAN["元宝"] ~~~ NA["Notion AI"]
-    end
-
-    APP ===> SyncNos(("⚙️ SyncNos<br>macOS App"))
-    WEB ===> WebClipper(("⚙️ WebClipper<br>MV3 扩展"))
-
-    SyncNos --> CACHE1[("🔒 本地缓存<br>加密存储")]
-    WebClipper --> CACHE2[("🔒 浏览器存储<br>IndexedDB")]
-
-    subgraph OUT[" 📤 输出 "]
-        direction TB
-        NOTION["☁️ 同步到 Notion"]
-        JSON["📄 导出 JSON"]
-        MD["📝 导出 Markdown"]
-    end
-
-    SyncNos ===> OUT
-    WebClipper ===> OUT
-```
+![](Resource/flow-zh.svg)
 
 ## macOS App
 
