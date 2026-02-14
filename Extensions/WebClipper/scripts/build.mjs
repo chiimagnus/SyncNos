@@ -155,6 +155,12 @@ concatFiles({
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
     "src/sync/notion/notion-api.js",
+    "src/ui/popup/popup-core.js",
+    "src/ui/popup/popup-tabs.js",
+    "src/ui/popup/popup-list.js",
+    "src/ui/popup/popup-export.js",
+    "src/ui/popup/popup-notion.js",
+    "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
   ]
 });
@@ -167,6 +173,12 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-core\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-tabs\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-list\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-export\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-notion\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-about\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
 writeText(join(out, "popup.html"), popupHtml);
 
