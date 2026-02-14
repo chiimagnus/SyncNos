@@ -7,6 +7,61 @@ This project has two parts:
 1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
 2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**.
 
+## How It Works (Diagram)
+
+```mermaid
+flowchart LR
+    classDef src fill:#F4F7FF,stroke:#4F46E5,color:#1E1B4B,stroke-width:1.5px,rx:8,ry:8;
+    classDef hub fill:#111827,stroke:#111827,color:#F9FAFB,stroke-width:2px,rx:50,ry:50;
+    classDef cache fill:#FFF7ED,stroke:#F97316,color:#7C2D12,stroke-width:1.5px;
+    classDef out fill:#ECFDF5,stroke:#10B981,color:#065F46,stroke-width:1.5px,rx:8,ry:8;
+
+    subgraph APP_SRC[" 📚 Data Sources · macOS App "]
+        AB["Apple Books<br>Highlights & Notes"]:::src
+        GL["GoodLinks<br>Highlights"]:::src
+        WR["WeRead<br>Highlights & Notes"]:::src
+        DD["Dedao<br>Highlights & Notes"]:::src
+        OCR["Chat Logs (OCR)<br>Highlights"]:::src
+    end
+
+    subgraph WC_SRC[" 🤖 Data Sources · WebClipper "]
+        CGPT["ChatGPT"]:::src
+        CLD["Claude"]:::src
+        GEM["Gemini"]:::src
+        DS["DeepSeek"]:::src
+        KIMI["Kimi"]:::src
+        DOU["Doubao"]:::src
+        YUAN["Yuanbao"]:::src
+        NA["Notion AI"]:::src
+    end
+
+    SyncNos(("⚙️ SyncNos<br>macOS App")):::hub
+    WebClipper(("⚙️ WebClipper<br>Browser Extension MV3")):::hub
+
+    AB --> SyncNos
+    GL --> SyncNos
+    WR --> SyncNos
+    DD --> SyncNos
+    OCR --> SyncNos
+
+    CGPT --> WebClipper
+    CLD --> WebClipper
+    GEM --> WebClipper
+    DS --> WebClipper
+    KIMI --> WebClipper
+    DOU --> WebClipper
+    YUAN --> WebClipper
+    NA --> WebClipper
+
+    SyncNos --> LOCAL_APP[("🔒 Local Cache<br>Encrypted Storage")]:::cache
+    WebClipper --> LOCAL_WC[("🔒 Browser Local Storage<br>IndexedDB + chrome.storage")]:::cache
+
+    SyncNos --> NOTION["☁️ Sync to Notion"]:::out
+    WebClipper --> NOTION
+    WebClipper --> JSON["📄 Export JSON"]:::out
+    WebClipper --> MD["📝 Export Markdown"]:::out
+```
+
 ## macOS App
 
 - Supported: **macOS 14.0+**
