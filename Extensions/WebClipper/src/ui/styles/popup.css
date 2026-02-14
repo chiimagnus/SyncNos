@@ -81,6 +81,26 @@ body {
   color: var(--text);
 }
 
+#notionAuthCard .settingsTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#notionAuthCard .notionLogo {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  /* Keep icon readable on tinted theme. */
+  filter: grayscale(1) contrast(1.1);
+}
+
+#notionAuthCard .settingsSectionHeader:first-child .settingsSectionTitle {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
 .settingsSectionSub {
   margin-top: 3px;
   font-size: 12px;
@@ -107,11 +127,27 @@ body {
   color: var(--muted);
 }
 
+.settingsLabel--inline {
+  padding-left: 0;
+  min-width: 92px;
+}
+
 .settingsControl {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.settingsControl--grow {
+  flex: 1 1 auto;
+}
+
+.settingsRow--compact {
+  padding-top: 9px;
+  padding-bottom: 11px;
+  gap: 10px;
+  flex-wrap: nowrap;
 }
 
 .settingsDivider {
