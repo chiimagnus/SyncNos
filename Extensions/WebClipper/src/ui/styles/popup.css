@@ -64,11 +64,11 @@ body {
 
 .tabs {
   display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
   padding: 0;
   margin: 0;
-  width: 176px;
+  width: 264px;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -148,6 +148,33 @@ body {
   box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.12);
   background: var(--panel-strong);
   flex: 0 0 auto;
+}
+
+.aboutHero {
+  align-items: center;
+}
+
+.aboutLogo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgba(217, 89, 38, 0.12);
+  background: var(--panel-strong);
+  flex: 0 0 auto;
+}
+
+.aboutInfo {
+  min-width: 0;
+}
+
+.aboutName {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.aboutAuthorName {
+  font-weight: 750;
 }
 
 #notionBar .title {

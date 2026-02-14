@@ -22,6 +22,9 @@
           <button id="tabSettings" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewSettings">
             Settings
           </button>
+          <button id="tabAbout" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewAbout">
+            About
+          </button>
         </nav>
       </header>
 
@@ -76,6 +79,32 @@
         <section class="toolbar" id="notionParentSelect">
           <select id="notionPages" class="input"></select>
           <button id="btnNotionSaveParent" class="btn">Use</button>
+        </section>
+      </section>
+
+      <section id="viewAbout" class="view" role="tabpanel" aria-labelledby="tabAbout">
+        <section class="toolbar aboutHero" aria-label="About SyncNos WebClipper">
+          <img class="aboutLogo" src="../../../icons/icon-48.png" alt="" />
+          <div class="aboutInfo">
+            <div class="aboutName">SyncNos WebClipper</div>
+            <div class="sub" id="aboutVersion">Version</div>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Links">
+          <button id="btnAboutSource" class="btn" type="button">Source Code</button>
+          <button id="btnAboutPrivacy" class="btn" type="button">Privacy Policy</button>
+          <button id="btnAboutChangelog" class="btn" type="button">Changelog</button>
+        </section>
+
+        <section class="toolbar" aria-label="Author">
+          <div class="aboutAuthor">
+            <div class="aboutAuthorName">Chii Magnus</div>
+            <div class="sub">Feedback and updates</div>
+          </div>
+          <div class="spacer"></div>
+          <button id="btnAboutMail" class="btn" type="button">Mail</button>
+          <button id="btnAboutGitHub" class="btn" type="button">GitHub</button>
         </section>
       </section>
     </div>
