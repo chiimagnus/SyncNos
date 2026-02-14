@@ -2,8 +2,6 @@
 
 English | [中文](README.zh-CN.md)
 
-[<img src="Resource/image.png" alt="Download" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
-
 This project has two parts:
 
 1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
