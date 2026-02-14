@@ -55,35 +55,44 @@
     list: document.getElementById("list"),
     stats: document.getElementById("stats"),
     tabChats: document.getElementById("tabChats"),
-	    tabSettings: document.getElementById("tabSettings"),
-	    viewChats: document.getElementById("viewChats"),
-	    viewSettings: document.getElementById("viewSettings"),
-	    chkSelectAll: document.getElementById("chkSelectAll"),
-	    btnExport: document.getElementById("btnExport"),
-	    exportMenu: document.getElementById("exportMenu"),
-	    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
-	    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
-	    menuExportJsons: document.getElementById("menuExportJsons"),
-	    btnSyncNotion: document.getElementById("btnSyncNotion"),
-	    btnNotionConnect: document.getElementById("btnNotionConnect"),
-	    notionStatus: document.getElementById("notionStatus"),
-	    notionClientId: document.getElementById("notionClientId"),
+    tabSettings: document.getElementById("tabSettings"),
+    tabAbout: document.getElementById("tabAbout"),
+    tabIndicator: document.querySelector(".tabs .tabIndicator"),
+    viewChats: document.getElementById("viewChats"),
+    viewSettings: document.getElementById("viewSettings"),
+    viewAbout: document.getElementById("viewAbout"),
+    chkSelectAll: document.getElementById("chkSelectAll"),
+    btnExport: document.getElementById("btnExport"),
+    exportMenu: document.getElementById("exportMenu"),
+    menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
+    menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
+    menuExportJsons: document.getElementById("menuExportJsons"),
+    btnSyncNotion: document.getElementById("btnSyncNotion"),
+    btnNotionConnect: document.getElementById("btnNotionConnect"),
+    notionStatus: document.getElementById("notionStatus"),
+    notionClientId: document.getElementById("notionClientId"),
     notionClientSecret: document.getElementById("notionClientSecret"),
     btnNotionSaveConfig: document.getElementById("btnNotionSaveConfig"),
     notionPageQuery: document.getElementById("notionPageQuery"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
-    btnNotionSaveParent: document.getElementById("btnNotionSaveParent")
+    btnNotionSaveParent: document.getElementById("btnNotionSaveParent"),
+    aboutVersion: document.getElementById("aboutVersion"),
+    btnAboutMacApp: document.getElementById("btnAboutMacApp"),
+    btnAboutSource: document.getElementById("btnAboutSource"),
+    btnAboutChangelog: document.getElementById("btnAboutChangelog"),
+    btnAboutMail: document.getElementById("btnAboutMail"),
+    btnAboutGitHub: document.getElementById("btnAboutGitHub")
   };
 
-	  const state = {
-	    conversations: [],
-	    selectedIds: new Set()
-	  };
+  const state = {
+    conversations: [],
+    selectedIds: new Set()
+  };
 
-	  const STORAGE_KEYS = {
-	    popupActiveTab: "popup_active_tab"
-	  };
+  const STORAGE_KEYS = {
+    popupActiveTab: "popup_active_tab"
+  };
 
   function isExportMenuOpen() {
     return !!(els.exportMenu && !els.exportMenu.hidden);
@@ -99,36 +108,163 @@
     if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
   }
 
-	  function setActiveTab(tabId) {
-	    const next = tabId === "settings" ? "settings" : "chats";
+  const TAB_IDS = ["chats", "settings", "about"];
 
-    if (els.tabChats) {
-      const active = next === "chats";
-      els.tabChats.classList.toggle("is-active", active);
-      els.tabChats.setAttribute("aria-selected", active ? "true" : "false");
-      els.tabChats.tabIndex = active ? 0 : -1;
-    }
+  function normalizeTabId(tabId) {
+    return TAB_IDS.includes(tabId) ? tabId : "chats";
+  }
 
-    if (els.tabSettings) {
-      const active = next === "settings";
-      els.tabSettings.classList.toggle("is-active", active);
-      els.tabSettings.setAttribute("aria-selected", active ? "true" : "false");
-      els.tabSettings.tabIndex = active ? 0 : -1;
-    }
+  function setTabButtonState({ el, active }) {
+    if (!el) return;
+    el.classList.toggle("is-active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+    el.tabIndex = active ? 0 : -1;
+  }
+
+  function updateTabIndicator(tabId) {
+    const tabsEl = (els.tabChats && els.tabChats.closest) ? els.tabChats.closest(".tabs") : null;
+    if (!tabsEl) return;
+    const normalized = normalizeTabId(tabId);
+    const idx = Math.max(0, TAB_IDS.indexOf(normalized));
+    tabsEl.style.setProperty("--tab-i", String(idx));
+  }
+
+  function setActiveTab(tabId) {
+    const next = normalizeTabId(tabId);
+
+    setTabButtonState({ el: els.tabChats, active: next === "chats" });
+    setTabButtonState({ el: els.tabSettings, active: next === "settings" });
+    setTabButtonState({ el: els.tabAbout, active: next === "about" });
+    updateTabIndicator(next);
 
     if (els.viewChats) els.viewChats.classList.toggle("is-active", next === "chats");
     if (els.viewSettings) els.viewSettings.classList.toggle("is-active", next === "settings");
+    if (els.viewAbout) els.viewAbout.classList.toggle("is-active", next === "about");
 
     storageSet({ [STORAGE_KEYS.popupActiveTab]: next }).catch(() => {});
+  }
+
+  function activeTabIdFromDom() {
+    const tabsEl = (els.tabChats && els.tabChats.closest) ? els.tabChats.closest(".tabs") : null;
+    if (!tabsEl) return "chats";
+    const active = tabsEl.querySelector(".tab.is-active");
+    if (!active) return "chats";
+    if (active.id === "tabSettings") return "settings";
+    if (active.id === "tabAbout") return "about";
+    return "chats";
+  }
+
+  function clamp(num, min, max) {
+    return Math.min(max, Math.max(min, num));
+  }
+
+  function indicatorValueForClientX({ tabsEl, clientX }) {
+    const rect = tabsEl.getBoundingClientRect();
+    const styles = getComputedStyle(tabsEl);
+    const segPad = parseFloat(styles.getPropertyValue("--seg-pad")) || 0;
+    const segCount = TAB_IDS.length || 3;
+    const innerWidth = Math.max(1, rect.width - segPad * 2);
+    const segWidth = innerWidth / segCount;
+    const x = clientX - rect.left;
+    // Align thumb to pointer center: middle of first segment => 0, middle of second => 1, etc.
+    const raw = (x - segPad) / segWidth - 0.5;
+    return clamp(raw, 0, segCount - 1);
+  }
+
+  function setIndicatorValue(tabsEl, value) {
+    tabsEl.style.setProperty("--tab-i", String(value));
+  }
+
+  function initTabsDrag() {
+    const tabsEl = (els.tabChats && els.tabChats.closest) ? els.tabChats.closest(".tabs") : null;
+    if (!tabsEl) return;
+
+    const drag = {
+      pending: false,
+      dragging: false,
+      pointerId: null,
+      startX: 0
+    };
+
+    function stopDragging({ snap }) {
+      if (!drag.pending && !drag.dragging) return;
+      if (drag.pointerId != null) {
+        try { tabsEl.releasePointerCapture(drag.pointerId); } catch (_e) {}
+      }
+      tabsEl.classList.remove("is-dragging");
+      const currentValue = parseFloat(getComputedStyle(tabsEl).getPropertyValue("--tab-i")) || 0;
+      drag.pending = false;
+      drag.dragging = false;
+      drag.pointerId = null;
+
+      if (snap) {
+        const idx = clamp(Math.round(currentValue), 0, TAB_IDS.length - 1);
+        setActiveTab(TAB_IDS[idx]);
+      } else {
+        updateTabIndicator(activeTabIdFromDom());
+      }
+    }
+
+    tabsEl.addEventListener("pointerdown", (e) => {
+      if (!e || e.button !== 0) return;
+      drag.pending = true;
+      drag.dragging = false;
+      drag.pointerId = e.pointerId;
+      drag.startX = e.clientX;
+    });
+
+    tabsEl.addEventListener("pointermove", (e) => {
+      if (!drag.pending || drag.pointerId !== e.pointerId) return;
+      const dx = Math.abs(e.clientX - drag.startX);
+      if (!drag.dragging && dx < 4) return;
+
+      if (!drag.dragging) {
+        drag.dragging = true;
+        tabsEl.classList.add("is-dragging");
+        try { tabsEl.setPointerCapture(e.pointerId); } catch (_err) {}
+      }
+
+      e.preventDefault();
+      const v = indicatorValueForClientX({ tabsEl, clientX: e.clientX });
+      setIndicatorValue(tabsEl, v);
+    });
+
+    tabsEl.addEventListener("pointerup", (e) => {
+      if (!drag.pending || drag.pointerId !== e.pointerId) return;
+      if (drag.dragging) {
+        e.preventDefault();
+        stopDragging({ snap: true });
+      } else {
+        // Let normal click handlers run.
+        stopDragging({ snap: false });
+      }
+    });
+
+    tabsEl.addEventListener("pointercancel", (e) => {
+      if (!drag.pending || drag.pointerId !== e.pointerId) return;
+      stopDragging({ snap: false });
+    });
+
+    tabsEl.addEventListener("lostpointercapture", () => {
+      if (!drag.pending && !drag.dragging) return;
+      stopDragging({ snap: true });
+    });
   }
 
   function onTabKeyDown(e) {
     if (!e) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    const next = e.key === "ArrowRight" ? "settings" : "chats";
+    const current = normalizeTabId((document.activeElement && document.activeElement.id === "tabSettings")
+      ? "settings"
+      : (document.activeElement && document.activeElement.id === "tabAbout")
+        ? "about"
+        : "chats");
+    const idx = TAB_IDS.indexOf(current);
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    const next = TAB_IDS[(idx + dir + TAB_IDS.length) % TAB_IDS.length];
     setActiveTab(next);
-    const el = next === "settings" ? els.tabSettings : els.tabChats;
+    const el = next === "settings" ? els.tabSettings : next === "about" ? els.tabAbout : els.tabChats;
     if (el && typeof el.focus === "function") el.focus();
   }
 
@@ -139,6 +275,23 @@
     } catch (_e) {
       return "";
     }
+  }
+
+  function getSourceMeta(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return { key: "unknown", label: "" };
+    const normalized = text.toLowerCase().replace(/[\s_-]+/g, "");
+    const map = {
+      chatgpt: { key: "chatgpt", label: "ChatGPT" },
+      claude: { key: "claude", label: "Claude" },
+      deepseek: { key: "deepseek", label: "DeepSeek" },
+      notionai: { key: "notionai", label: "Notion AI" },
+      gemini: { key: "gemini", label: "Gemini" },
+      kimi: { key: "kimi", label: "Kimi" },
+      doubao: { key: "doubao", label: "Doubao" },
+      yuanbao: { key: "yuanbao", label: "Yuanbao" }
+    };
+    return map[normalized] || { key: "unknown", label: text };
   }
 
   function isSameLocalDay(a, b) {
@@ -186,7 +339,26 @@
 
       const sub = document.createElement("div");
       sub.className = "sub";
-      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}`;
+      const sourceRaw = c.sourceName || c.source || "";
+      const { key: sourceKey, label: sourceLabel } = getSourceMeta(sourceRaw);
+
+      const sourceTag = document.createElement("span");
+      sourceTag.className = `sourceTag sourceTag--${sourceKey}`;
+      sourceTag.textContent = sourceLabel;
+      sub.appendChild(sourceTag);
+
+      const timeLabel = formatTime(c.lastCapturedAt);
+      if (timeLabel) {
+        const divider = document.createElement("span");
+        divider.className = "metaDivider";
+        divider.textContent = " \u00b7 ";
+        sub.appendChild(divider);
+
+        const time = document.createElement("span");
+        time.className = "timeLabel";
+        time.textContent = timeLabel;
+        sub.appendChild(time);
+      }
       meta.appendChild(sub);
 
       row.appendChild(left);
@@ -205,8 +377,39 @@
         return false;
       }
     }).length;
-    els.stats.textContent = `today:${today}\n total:${total}`;
+    renderStats({ today, total });
     syncSelectAllCheckbox();
+  }
+
+  function renderStats({ today, total }) {
+    if (!els.stats) return;
+    els.stats.textContent = "";
+
+    const todayLabel = document.createElement("span");
+    todayLabel.className = "statsLabel";
+    todayLabel.textContent = "Today:";
+
+    const todayValue = document.createElement("span");
+    todayValue.className = "todayCount";
+    todayValue.textContent = String(today);
+
+    const divider = document.createElement("span");
+    divider.className = "statsDivider";
+    divider.textContent = " \u00b7 ";
+
+    const totalLabel = document.createElement("span");
+    totalLabel.className = "statsLabel";
+    totalLabel.textContent = "Total:";
+
+    const totalValue = document.createElement("span");
+    totalValue.className = "totalCount";
+    totalValue.textContent = String(total);
+
+    els.stats.appendChild(todayLabel);
+    els.stats.appendChild(todayValue);
+    els.stats.appendChild(divider);
+    els.stats.appendChild(totalLabel);
+    els.stats.appendChild(totalValue);
   }
 
   function syncSelectAllCheckbox() {
@@ -291,7 +494,7 @@
     const lines = [];
     lines.push(`# ${conversation.title || "(untitled)"}`);
     lines.push("");
-    lines.push(`- Source: ${conversation.source || ""}`);
+    lines.push(`- Source: ${getSourceMeta(conversation.sourceName || conversation.source || "").label}`);
     if (conversation.url) lines.push(`- URL: ${conversation.url}`);
     if (conversation.lastCapturedAt) lines.push(`- CapturedAt: ${new Date(conversation.lastCapturedAt).toISOString()}`);
     if (hasWarningFlags(conversation)) lines.push(`- Warnings: ${(conversation.warningFlags || []).join(", ")}`);
@@ -438,13 +641,45 @@
     els.tabSettings.addEventListener("click", () => setActiveTab("settings"));
     els.tabSettings.addEventListener("keydown", onTabKeyDown);
   }
+  if (els.tabAbout) {
+    els.tabAbout.addEventListener("click", () => setActiveTab("about"));
+    els.tabAbout.addEventListener("keydown", onTabKeyDown);
+  }
 
   (async () => {
     const saved = await storageGet([STORAGE_KEYS.popupActiveTab]);
-    setActiveTab(saved[STORAGE_KEYS.popupActiveTab] || "chats");
+    setActiveTab(normalizeTabId(saved[STORAGE_KEYS.popupActiveTab] || "chats"));
   })();
 
+  initTabsDrag();
   refresh();
+
+  function openUrl(url) {
+    if (!url) return;
+    try {
+      chrome.tabs.create({ url: String(url) });
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function initAbout() {
+    const m = chrome && chrome.runtime && typeof chrome.runtime.getManifest === "function" ? chrome.runtime.getManifest() : null;
+    const version = m && m.version ? m.version : "";
+    const name = m && m.name ? m.name : "SyncNos WebClipper";
+    if (els.aboutVersion) {
+      els.aboutVersion.textContent = version ? `Version ${version}` : "Version";
+      els.aboutVersion.title = name;
+    }
+
+    if (els.btnAboutSource) els.btnAboutSource.addEventListener("click", () => openUrl("https://github.com/chiimagnus/SyncNos"));
+    if (els.btnAboutChangelog) els.btnAboutChangelog.addEventListener("click", () => openUrl("https://chiimagnus.notion.site/syncnos-changelog"));
+    if (els.btnAboutMacApp) els.btnAboutMacApp.addEventListener("click", () => openUrl("https://apps.apple.com/app/syncnos/id6755133888"));
+    if (els.btnAboutGitHub) els.btnAboutGitHub.addEventListener("click", () => openUrl("https://github.com/chiimagnus"));
+    if (els.btnAboutMail) els.btnAboutMail.addEventListener("click", () => openUrl("mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback"));
+  }
+
+  initAbout();
 
   async function loadNotionConfig() {
     const res = await storageGet(["notion_oauth_client_id", "notion_oauth_client_secret"]);
