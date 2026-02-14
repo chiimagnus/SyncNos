@@ -68,7 +68,6 @@
       const row = document.createElement("div");
       row.className = "row";
       row.dataset.conversationId = String(conversation.id);
-      row.tabIndex = 0;
       row.setAttribute("aria-label", conversation.title || "(untitled)");
 
       const left = document.createElement("label");

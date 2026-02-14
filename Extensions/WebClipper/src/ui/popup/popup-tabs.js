@@ -14,7 +14,6 @@
     if (!el) return;
     el.classList.toggle("is-active", active);
     el.setAttribute("aria-selected", active ? "true" : "false");
-    el.tabIndex = active ? 0 : -1;
   }
 
   function updateTabIndicator(tabId) {
@@ -139,35 +138,15 @@
     });
   }
 
-  function onTabKeyDown(e) {
-    if (!e) return;
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    const current = normalizeTabId((document.activeElement && document.activeElement.id === "tabSettings")
-      ? "settings"
-      : (document.activeElement && document.activeElement.id === "tabAbout")
-        ? "about"
-        : "chats");
-    const idx = TAB_IDS.indexOf(current);
-    const dir = e.key === "ArrowRight" ? 1 : -1;
-    const next = TAB_IDS[(idx + dir + TAB_IDS.length) % TAB_IDS.length];
-    setActiveTab(next);
-    const el = next === "settings" ? els.tabSettings : next === "about" ? els.tabAbout : els.tabChats;
-    if (el && typeof el.focus === "function") el.focus();
-  }
-
   async function init() {
     if (els.tabChats) {
       els.tabChats.addEventListener("click", () => setActiveTab("chats"));
-      els.tabChats.addEventListener("keydown", onTabKeyDown);
     }
     if (els.tabSettings) {
       els.tabSettings.addEventListener("click", () => setActiveTab("settings"));
-      els.tabSettings.addEventListener("keydown", onTabKeyDown);
     }
     if (els.tabAbout) {
       els.tabAbout.addEventListener("click", () => setActiveTab("about"));
-      els.tabAbout.addEventListener("keydown", onTabKeyDown);
     }
 
     const saved = await storageGet([STORAGE_KEYS.popupActiveTab]);
