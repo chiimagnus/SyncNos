@@ -3,6 +3,8 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  const DEFAULT_NOTION_OAUTH_CLIENT_ID = "2a8d872b-594c-8060-9a2b-00377c27ec32";
+
   // Load storage schema into this service worker.
   // Note: MV3 SW doesn't share globals with content scripts, so we import explicitly.
   try {
@@ -27,6 +29,20 @@
 
   function err(message, extra) {
     return { ok: false, data: null, error: { message, extra: extra || null } };
+  }
+
+  function ensureDefaultNotionOAuthClientId() {
+    try {
+      if (!chrome || !chrome.storage || !chrome.storage.local) return;
+      chrome.storage.local.get(["notion_oauth_client_id"], (res) => {
+        const currentId = (res && res.notion_oauth_client_id) ? String(res.notion_oauth_client_id) : "";
+        if (currentId) return;
+        chrome.storage.local.set({ notion_oauth_client_id: DEFAULT_NOTION_OAUTH_CLIENT_ID });
+      });
+      chrome.storage.local.remove(["notion_oauth_client_secret"]);
+    } catch (_e) {
+      // ignore
+    }
   }
 
 	  const MESSAGE_TYPES = Object.freeze({
@@ -415,28 +431,24 @@
     return true;
   });
 
+  ensureDefaultNotionOAuthClientId();
+  if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => ensureDefaultNotionOAuthClientId());
+  }
+
   async function exchangeNotionCodeForToken({ code }) {
     const cfg = NS.notionOAuthConfig && NS.notionOAuthConfig.getDefaults ? NS.notionOAuthConfig.getDefaults() : null;
     if (!cfg) throw new Error("notion oauth config missing");
-    const client = NS.notionOAuthConfig && NS.notionOAuthConfig.loadClientConfig ? await NS.notionOAuthConfig.loadClientConfig() : { clientId: "", clientSecret: "" };
-    if (!client.clientId || !client.clientSecret) throw new Error("notion clientId/clientSecret not configured");
+    const proxyUrl = cfg.tokenExchangeProxyUrl || "";
+    if (!proxyUrl) throw new Error("token exchange proxy url not configured");
 
-    const form = new URLSearchParams();
-    form.set("grant_type", "authorization_code");
-    form.set("code", code);
-    form.set("redirect_uri", cfg.redirectUri);
-    form.set("client_id", client.clientId);
-    form.set("client_secret", client.clientSecret);
-
-    const basic = btoa(`${client.clientId}:${client.clientSecret}`);
-    const res = await fetch(cfg.tokenUrl, {
+    const res = await fetch(proxyUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        Authorization: `Basic ${basic}`
+        "Content-Type": "application/json",
+        Accept: "application/json"
       },
-      body: form.toString()
+      body: JSON.stringify({ code, redirectUri: cfg.redirectUri })
     });
     const text = await res.text();
     if (!res.ok) throw new Error(`token exchange failed: HTTP ${res.status} ${text}`);

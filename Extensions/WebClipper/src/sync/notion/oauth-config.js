@@ -6,6 +6,7 @@
   const DEFAULTS = Object.freeze({
     authorizationUrl: "https://api.notion.com/v1/oauth/authorize",
     tokenUrl: "https://api.notion.com/v1/oauth/token",
+    tokenExchangeProxyUrl: "https://syncnos-notion-oauth.chiimagnus.workers.dev/notion/oauth/exchange",
     redirectUri: "https://chiimagnus.github.io/syncnos-oauth/callback",
     owner: "user",
     responseType: "code",
@@ -18,24 +19,25 @@
 
   function loadClientConfig() {
     return new Promise((resolve) => {
-      if (!chrome || !chrome.storage || !chrome.storage.local) return resolve({ clientId: "", clientSecret: "" });
-      chrome.storage.local.get(["notion_oauth_client_id", "notion_oauth_client_secret"], (res) => {
+      if (!chrome || !chrome.storage || !chrome.storage.local) return resolve({ clientId: "" });
+      chrome.storage.local.get(["notion_oauth_client_id"], (res) => {
         resolve({
-          clientId: (res && res.notion_oauth_client_id) || "",
-          clientSecret: (res && res.notion_oauth_client_secret) || ""
+          clientId: (res && res.notion_oauth_client_id) || ""
         });
       });
     });
   }
 
-  function saveClientConfig({ clientId, clientSecret }) {
+  function saveClientConfig({ clientId }) {
     return new Promise((resolve) => {
       chrome.storage.local.set(
         {
-          notion_oauth_client_id: clientId || "",
-          notion_oauth_client_secret: clientSecret || ""
+          notion_oauth_client_id: clientId || ""
         },
-        () => resolve(true)
+        () => {
+          // Best-effort cleanup: client secret should never be stored on device.
+          chrome.storage.local.remove(["notion_oauth_client_secret"], () => resolve(true));
+        }
       );
     });
   }
@@ -44,4 +46,3 @@
   NS.notionOAuthConfig = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
