@@ -85,6 +85,7 @@ body {
   margin-top: 3px;
   font-size: 12px;
   color: var(--muted);
+  line-height: 1.25;
 }
 
 .settingsForm {
