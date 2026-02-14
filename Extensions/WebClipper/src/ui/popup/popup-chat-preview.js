@@ -13,7 +13,6 @@
     click: "popup:conversation-click"
   };
 
-  const POPOVER_GAP = 8;
   const POPOVER_MARGIN = 8;
   const preview = {
     activeConversationId: null,
@@ -182,24 +181,19 @@
   }
 
   function positionPopover() {
-    if (!els.chatPreviewPopover || !preview.activeAnchorEl || els.chatPreviewPopover.hidden) return;
-    const anchorRect = preview.activeAnchorEl.getBoundingClientRect();
-    const popoverRect = els.chatPreviewPopover.getBoundingClientRect();
+    if (!els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
+    const chatsRect = (els.viewChats && typeof els.viewChats.getBoundingClientRect === "function")
+      ? els.viewChats.getBoundingClientRect()
+      : null;
+    const top = chatsRect
+      ? Math.max(0, Math.round(chatsRect.top))
+      : 0;
+    const maxHeight = Math.max(140, window.innerHeight - top - POPOVER_MARGIN);
 
-    let left = anchorRect.right + POPOVER_GAP;
-    const maxLeft = window.innerWidth - popoverRect.width - POPOVER_MARGIN;
-    left = Math.max(POPOVER_MARGIN, Math.min(left, maxLeft));
-    const safeLeftBoundary = anchorRect.left + 64;
-    if (left < safeLeftBoundary && maxLeft >= safeLeftBoundary) left = safeLeftBoundary;
-
-    let top = anchorRect.top;
-    if (top + popoverRect.height > window.innerHeight - POPOVER_MARGIN) {
-      top = window.innerHeight - popoverRect.height - POPOVER_MARGIN;
-    }
-    top = Math.max(POPOVER_MARGIN, top);
-
-    els.chatPreviewPopover.style.left = `${Math.round(left)}px`;
-    els.chatPreviewPopover.style.top = `${Math.round(top)}px`;
+    els.chatPreviewPopover.style.left = "auto";
+    els.chatPreviewPopover.style.right = `${POPOVER_MARGIN}px`;
+    els.chatPreviewPopover.style.top = `${top}px`;
+    els.chatPreviewPopover.style.maxHeight = `${Math.round(maxHeight)}px`;
   }
 
   function revealPopover(anchorEl) {
