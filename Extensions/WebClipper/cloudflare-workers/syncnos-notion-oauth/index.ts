@@ -59,6 +59,8 @@ export default {
     form.set('redirect_uri', REDIRECT_URI);
 
     const basic = btoa(`${clientId}:${clientSecret}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
     const res = await fetch(NOTION_TOKEN_URL, {
       method: 'POST',
       headers: {
@@ -66,8 +68,9 @@ export default {
         Accept: 'application/json',
         Authorization: `Basic ${basic}`
       },
-      body: form.toString()
-    });
+      body: form.toString(),
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeout));
 
     const text = await res.text();
     if (!res.ok) {
@@ -142,4 +145,3 @@ function handleOptions(request: Request) {
   }
   return new Response(null, { headers: { Allow: 'POST,OPTIONS' } });
 }
-
