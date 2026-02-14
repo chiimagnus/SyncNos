@@ -9,7 +9,7 @@ This project has two parts:
 
 ## How It Works
 
-![](Resource/flow-en.svg)
+![](Resource/flows.svg)
 
 ## macOS App
 
