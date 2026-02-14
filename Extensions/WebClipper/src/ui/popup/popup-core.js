@@ -53,7 +53,9 @@
 
   const els = {
     appLogo: document.querySelector(".appLogo"),
+    chatsMain: document.querySelector("#viewChats .chatsMain"),
     list: document.getElementById("list"),
+    chatPreviewPopover: document.getElementById("chatPreviewPopover"),
     stats: document.getElementById("stats"),
     tabChats: document.getElementById("tabChats"),
     tabSettings: document.getElementById("tabSettings"),
@@ -83,11 +85,18 @@
 
   const state = {
     conversations: [],
-    selectedIds: new Set()
+    selectedIds: new Set(),
+    hoveredConversationId: null,
+    previewCache: new Map(),
+    previewRequestToken: 0
   };
 
   const STORAGE_KEYS = {
     popupActiveTab: "popup_active_tab"
+  };
+
+  const PREVIEW_EVENTS = {
+    click: "popup:conversation-click"
   };
 
   function formatTime(ts) {
@@ -207,6 +216,7 @@
     els,
     state,
     STORAGE_KEYS,
+    PREVIEW_EVENTS,
     formatTime,
     getSourceMeta,
     isSameLocalDay,
