@@ -277,6 +277,23 @@
     }
   }
 
+  function getSourceMeta(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return { key: "unknown", label: "" };
+    const normalized = text.toLowerCase().replace(/[\s_-]+/g, "");
+    const map = {
+      chatgpt: { key: "chatgpt", label: "ChatGPT" },
+      claude: { key: "claude", label: "Claude" },
+      deepseek: { key: "deepseek", label: "DeepSeek" },
+      notionai: { key: "notionai", label: "Notion AI" },
+      gemini: { key: "gemini", label: "Gemini" },
+      kimi: { key: "kimi", label: "Kimi" },
+      doubao: { key: "doubao", label: "Doubao" },
+      yuanbao: { key: "yuanbao", label: "Yuanbao" }
+    };
+    return map[normalized] || { key: "unknown", label: text };
+  }
+
   function isSameLocalDay(a, b) {
     if (!(a instanceof Date) || !(b instanceof Date)) return false;
     return a.getFullYear() === b.getFullYear()
@@ -322,7 +339,26 @@
 
       const sub = document.createElement("div");
       sub.className = "sub";
-      sub.textContent = `${c.source || ""} · ${formatTime(c.lastCapturedAt)}`;
+      const sourceRaw = c.sourceName || c.source || "";
+      const { key: sourceKey, label: sourceLabel } = getSourceMeta(sourceRaw);
+
+      const sourceTag = document.createElement("span");
+      sourceTag.className = `sourceTag sourceTag--${sourceKey}`;
+      sourceTag.textContent = sourceLabel;
+      sub.appendChild(sourceTag);
+
+      const timeLabel = formatTime(c.lastCapturedAt);
+      if (timeLabel) {
+        const divider = document.createElement("span");
+        divider.className = "metaDivider";
+        divider.textContent = " \u00b7 ";
+        sub.appendChild(divider);
+
+        const time = document.createElement("span");
+        time.className = "timeLabel";
+        time.textContent = timeLabel;
+        sub.appendChild(time);
+      }
       meta.appendChild(sub);
 
       row.appendChild(left);
@@ -458,7 +494,7 @@
     const lines = [];
     lines.push(`# ${conversation.title || "(untitled)"}`);
     lines.push("");
-    lines.push(`- Source: ${conversation.source || ""}`);
+    lines.push(`- Source: ${getSourceMeta(conversation.sourceName || conversation.source || "").label}`);
     if (conversation.url) lines.push(`- URL: ${conversation.url}`);
     if (conversation.lastCapturedAt) lines.push(`- CapturedAt: ${new Date(conversation.lastCapturedAt).toISOString()}`);
     if (hasWarningFlags(conversation)) lines.push(`- Warnings: ${(conversation.warningFlags || []).join(", ")}`);

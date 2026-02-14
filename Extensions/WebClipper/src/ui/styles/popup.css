@@ -533,6 +533,70 @@ main {
   word-break: break-word;
 }
 
+.sourceTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.sourceTag--chatgpt {
+  background: rgba(16, 185, 129, 0.18);
+  color: #065f46;
+}
+
+.sourceTag--claude {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+}
+
+.sourceTag--deepseek {
+  background: rgba(99, 102, 241, 0.16);
+  color: #3730a3;
+}
+
+.sourceTag--notionai {
+  background: rgba(37, 99, 235, 0.16);
+  color: #1e3a8a;
+}
+
+.sourceTag--gemini {
+  background: rgba(14, 165, 233, 0.16);
+  color: #075985;
+}
+
+.sourceTag--kimi {
+  background: rgba(20, 184, 166, 0.16);
+  color: #115e59;
+}
+
+.sourceTag--doubao {
+  background: rgba(239, 68, 68, 0.14);
+  color: #991b1b;
+}
+
+.sourceTag--yuanbao {
+  background: rgba(139, 92, 246, 0.14);
+  color: #5b21b6;
+}
+
+.sourceTag--unknown {
+  background: rgba(184, 94, 58, 0.14);
+  color: var(--muted);
+}
+
+.metaDivider {
+  color: rgba(184, 94, 58, 0.7);
+  font-weight: 650;
+}
+
+.timeLabel {
+  color: var(--muted);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
