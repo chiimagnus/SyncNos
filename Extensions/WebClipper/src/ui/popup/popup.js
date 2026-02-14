@@ -3,11 +3,12 @@
   const core = NS.popupCore;
   const tabs = NS.popupTabs;
   const list = NS.popupList;
+  const chatPreview = NS.popupChatPreview;
   const popupExport = NS.popupExport;
   const notion = NS.popupNotion;
   const about = NS.popupAbout;
 
-  if (!core || !tabs || !list || !popupExport || !notion || !about) return;
+  if (!core || !tabs || !list || !chatPreview || !popupExport || !notion || !about) return;
 
   const { els, send, flashOk } = core;
 
@@ -38,6 +39,7 @@
 
   async function init() {
     list.init();
+    chatPreview.init();
     popupExport.init();
     notion.init();
     about.init();
