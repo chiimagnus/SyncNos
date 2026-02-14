@@ -328,6 +328,20 @@ body {
   letter-spacing: 0;
 }
 
+.toolbar.aboutDonate {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.aboutDonateImage {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
 #notionBar .title {
   font-size: 14px;
   font-weight: 760;
