@@ -16,11 +16,15 @@
           <span>SyncNos</span>
         </div>
         <nav class="tabs" role="tablist" aria-label="Popup tabs">
+          <span class="tabIndicator" aria-hidden="true"></span>
           <button id="tabChats" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="viewChats">
             Chats
           </button>
           <button id="tabSettings" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewSettings">
             Settings
+          </button>
+          <button id="tabAbout" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewAbout">
+            About
           </button>
         </nav>
       </header>
@@ -31,7 +35,7 @@
         </main>
 
         <footer class="bottomDock" aria-label="Actions">
-          <section class="toolbar is-docked bottomBar" aria-label="Chat actions">
+          <section class="bottomBar" aria-label="Chat actions">
             <div id="stats" class="stats">0 conversations</div>
             <div class="spacer"></div>
             <label class="checkbox compact">
@@ -55,27 +59,61 @@
       </section>
 
       <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
-        <section class="toolbar" id="notionBar">
-          <div class="title" style="font-weight: 650;">Notion</div>
-          <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+        <section class="toolbar settingsPanel" aria-label="Notion settings">
+          <div class="settingsRow" id="notionBar">
+            <div class="title" style="font-weight: 650;">Notion</div>
+            <div id="notionStatus" class="sub" style="margin: 0 8px; max-width: 160px; text-align: right;"></div>
+            <div class="spacer"></div>
+            <button id="btnNotionConnect" class="btn">Connect</button>
+          </div>
+
+          <div class="settingsDivider" role="presentation"></div>
+
+          <div class="settingsRow" id="notionConfig">
+            <input id="notionClientId" class="input" placeholder="Notion Client ID" />
+            <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
+            <button id="btnNotionSaveConfig" class="btn">Save</button>
+          </div>
+
+          <div class="settingsDivider" role="presentation"></div>
+
+          <div class="settingsRow" id="notionParent">
+            <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
+            <button id="btnNotionLoadPages" class="btn">Load</button>
+          </div>
+
+          <div class="settingsDivider" role="presentation"></div>
+
+          <div class="settingsRow" id="notionParentSelect">
+            <select id="notionPages" class="input"></select>
+            <button id="btnNotionSaveParent" class="btn">Use</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="viewAbout" class="view" role="tabpanel" aria-labelledby="tabAbout">
+        <section class="toolbar aboutHero" aria-label="About SyncNos WebClipper">
+          <img class="aboutLogo" src="../../../icons/icon-48.png" alt="" />
+          <div class="aboutInfo">
+            <div class="aboutName">SyncNos WebClipper</div>
+            <div class="sub" id="aboutVersion">Version</div>
+          </div>
+          <div class="aboutLinks" aria-label="Links">
+            <button id="btnAboutMacApp" class="btn" type="button">Mac App</button>
+            <button id="btnAboutSource" class="btn" type="button">Source Code</button>
+            <button id="btnAboutChangelog" class="btn" type="button">Changelog</button>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Author">
+          <img class="aboutAvatar" src="../../../icons/author-avatar.png" alt="Chii Magnus avatar" />
+          <div class="aboutAuthor">
+            <div class="aboutAuthorName">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
+            <div class="sub">Time Machine Creator~</div>
+          </div>
           <div class="spacer"></div>
-          <button id="btnNotionConnect" class="btn">Connect</button>
-        </section>
-
-        <section class="toolbar" id="notionConfig">
-          <input id="notionClientId" class="input" placeholder="Notion Client ID" />
-          <input id="notionClientSecret" class="input" placeholder="Notion Client Secret" />
-          <button id="btnNotionSaveConfig" class="btn">Save</button>
-        </section>
-
-        <section class="toolbar" id="notionParent">
-          <input id="notionPageQuery" class="input" placeholder="Search parent page..." />
-          <button id="btnNotionLoadPages" class="btn">Load</button>
-        </section>
-
-        <section class="toolbar" id="notionParentSelect">
-          <select id="notionPages" class="input"></select>
-          <button id="btnNotionSaveParent" class="btn">Use</button>
+          <button id="btnAboutMail" class="btn" type="button">Mail</button>
+          <button id="btnAboutGitHub" class="btn" type="button">GitHub</button>
         </section>
       </section>
     </div>
