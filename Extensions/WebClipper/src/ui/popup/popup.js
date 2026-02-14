@@ -69,7 +69,6 @@
     menuExportJsons: document.getElementById("menuExportJsons"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
-    notionAuthCard: document.getElementById("notionAuthCard"),
     notionStatusTitle: document.getElementById("notionStatusTitle"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
@@ -741,9 +740,8 @@
 
   async function saveParentPage() {
     const id = els.notionPages.value;
-    const title = els.notionPages.selectedOptions && els.notionPages.selectedOptions[0] ? els.notionPages.selectedOptions[0].textContent : "";
     if (!id) return;
-    await storageSet({ notion_parent_page_id: id, notion_parent_page_title: title || "" });
+    await storageSet({ notion_parent_page_id: id });
   }
 
   function buildNotionAuthorizeUrl({ clientId, state }) {
@@ -777,7 +775,6 @@
   function setNotionConnectBusy(busy) {
     if (!els.btnNotionConnect) return;
     els.btnNotionConnect.disabled = !!busy;
-    els.btnNotionConnect.dataset.busy = busy ? "1" : "0";
   }
 
   async function openNotionAuthorizeTab(url) {
@@ -880,7 +877,6 @@
     const res = await send("getNotionAuthStatus");
     const meta = await getNotionOAuthMeta();
     if (!res || !res.ok || !res.data) {
-      if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
       els.btnNotionConnect.textContent = "Connect";
       setNotionParentControlsEnabled(false);
@@ -892,7 +888,6 @@
     }
     if (res.data.connected) {
       const workspaceName = (res.data.token && res.data.token.workspaceName) ? String(res.data.token.workspaceName).trim() : "";
-      if (els.notionAuthCard) els.notionAuthCard.classList.add("is-connected");
       const showWorkspace = workspaceName && workspaceName.toLowerCase() !== "connected";
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = showWorkspace ? `Connected ✅ (${workspaceName})` : "Connected ✅";
       els.btnNotionConnect.textContent = "Disconnect";
@@ -906,7 +901,6 @@
       }
     } else {
       if (meta && meta.lastError) {
-        if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Error";
         // Keep UI compact: show "Error" in header and notify once.
         if (!refreshNotionStatus.__lastAlert || refreshNotionStatus.__lastAlert !== meta.lastError) {
@@ -914,10 +908,8 @@
           alert(`Notion OAuth error: ${meta.lastError}`);
         }
       } else if (meta && meta.pendingState) {
-        if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Waiting…";
       } else {
-        if (els.notionAuthCard) els.notionAuthCard.classList.remove("is-connected");
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
       }
       els.btnNotionConnect.textContent = "Connect";
