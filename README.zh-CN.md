@@ -2,8 +2,6 @@
 
 [English](README.md) | 中文
 
-[<img src="Resource/image.png" alt="Download" width="200">](https://apps.apple.com/app/syncnos/id6755133888)
-
 此项目分为两部分：
 
 1. **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion。支持：**macOS 14.0+**。
