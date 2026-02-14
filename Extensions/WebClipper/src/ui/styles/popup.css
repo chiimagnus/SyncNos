@@ -59,36 +59,36 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .tabs {
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
   margin: 0;
-  width: 264px;
-  background: transparent;
+  background: var(--panel);
   border: 0;
-  border-radius: 0;
+  border-radius: 14px;
   box-shadow: none;
 }
 
 .tab {
-  min-height: 34px;
+  min-height: 30px;
+  padding: 0 10px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
-  border-radius: 12px;
+  border-radius: 11px;
   cursor: pointer;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 760;
   letter-spacing: 0.1px;
-  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .tab:hover {
-  transform: translateY(-1px);
   background: var(--btn-bg);
   color: var(--text);
   border-color: var(--border);
@@ -131,7 +131,7 @@ body {
   align-items: center;
   gap: 8px;
   font-weight: 800;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
   letter-spacing: -0.01em;
   color: var(--text);
