@@ -20,24 +20,24 @@
 <marker id="a1" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0,0 10,3.5 0,7" class="af"/></marker>
 <marker id="a2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" class="af2"/></marker>
 </defs>
-<!-- 📚 macOS App 数据来源 -->
+<!-- 📚 macOS App Data Sources -->
 <rect class="sg" x="10" y="5" width="320" height="242" rx="12"/>
-<text class="sg-t" x="170" y="28" text-anchor="middle">📚 macOS App 数据来源</text>
-<rect class="sc" x="22" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="63" text-anchor="middle">📖 Apple Books</text><text class="sc-s" x="93" y="80" text-anchor="middle">高亮 &amp; 笔记</text>
-<rect class="sc" x="175" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="63" text-anchor="middle">🔗 GoodLinks</text><text class="sc-s" x="246" y="80" text-anchor="middle">高亮</text>
-<rect class="sc" x="22" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="125" text-anchor="middle">📚 微信读书</text><text class="sc-s" x="93" y="142" text-anchor="middle">高亮 &amp; 笔记</text>
-<rect class="sc" x="175" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="125" text-anchor="middle">🎓 得到</text><text class="sc-s" x="246" y="142" text-anchor="middle">高亮 &amp; 笔记</text>
-<rect class="sc" x="22" y="166" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="187" text-anchor="middle">📱 聊天记录 OCR</text><text class="sc-s" x="93" y="204" text-anchor="middle">高亮</text>
-<!-- 🤖 WebClipper 数据来源 -->
+<text class="sg-t" x="170" y="28" text-anchor="middle">📚 macOS App Data Sources</text>
+<rect class="sc" x="22" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="63" text-anchor="middle">📖 Apple Books</text><text class="sc-s" x="93" y="80" text-anchor="middle">Highlights &amp; Notes</text>
+<rect class="sc" x="175" y="42" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="63" text-anchor="middle">🔗 GoodLinks</text><text class="sc-s" x="246" y="80" text-anchor="middle">Highlights</text>
+<rect class="sc" x="22" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="125" text-anchor="middle">📚 WeRead</text><text class="sc-s" x="93" y="142" text-anchor="middle">Highlights &amp; Notes</text>
+<rect class="sc" x="175" y="104" width="143" height="52" rx="8"/><text class="sc-t" x="246" y="125" text-anchor="middle">🎓 Dedao</text><text class="sc-s" x="246" y="142" text-anchor="middle">Highlights &amp; Notes</text>
+<rect class="sc" x="22" y="166" width="143" height="52" rx="8"/><text class="sc-t" x="93" y="187" text-anchor="middle">📱 Chat Logs OCR</text><text class="sc-s" x="93" y="204" text-anchor="middle">Highlights</text>
+<!-- 🤖 WebClipper Data Sources -->
 <rect class="sg" x="10" y="264" width="320" height="252" rx="12"/>
-<text class="sg-t" x="170" y="287" text-anchor="middle">🤖 WebClipper 数据来源</text>
+<text class="sg-t" x="170" y="287" text-anchor="middle">🤖 WebClipper Data Sources</text>
 <rect class="sc" x="22" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="326" text-anchor="middle">ChatGPT</text>
 <rect class="sc" x="123" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="326" text-anchor="middle">Claude</text>
 <rect class="sc" x="224" y="300" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="326" text-anchor="middle">Gemini</text>
 <rect class="sc" x="22" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="378" text-anchor="middle">DeepSeek</text>
 <rect class="sc" x="123" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="378" text-anchor="middle">Kimi</text>
-<rect class="sc" x="224" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="378" text-anchor="middle">豆包</text>
-<rect class="sc" x="22" y="404" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="430" text-anchor="middle">元宝</text>
+<rect class="sc" x="224" y="352" width="95" height="42" rx="8"/><text class="sc-t" x="271" y="378" text-anchor="middle">Doubao</text>
+<rect class="sc" x="22" y="404" width="95" height="42" rx="8"/><text class="sc-t" x="69" y="430" text-anchor="middle">Yuanbao</text>
 <rect class="sc" x="123" y="404" width="95" height="42" rx="8"/><text class="sc-t" x="170" y="430" text-anchor="middle">Notion AI</text>
 <!-- ⚙️ Hub -->
 <circle class="hb" cx="470" cy="126" r="55"/>
@@ -45,16 +45,16 @@
 <text class="hb-s" x="470" y="139" text-anchor="middle">macOS App</text>
 <circle class="hb" cx="470" cy="390" r="55"/>
 <text class="hb-t" x="470" y="385" text-anchor="middle">⚙️ WebClipper</text>
-<text class="hb-s" x="470" y="403" text-anchor="middle">MV3 扩展</text>
+<text class="hb-s" x="470" y="403" text-anchor="middle">MV3 Extension</text>
 <!-- 🔒 Cache -->
-<rect class="ca" x="422" y="202" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="218" text-anchor="middle">🔒 本地缓存</text><text class="ca-s" x="470" y="232" text-anchor="middle">加密存储</text>
-<rect class="ca" x="422" y="280" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="296" text-anchor="middle">🔒 浏览器存储</text><text class="ca-s" x="470" y="310" text-anchor="middle">IndexedDB</text>
-<!-- 📤 输出 -->
+<rect class="ca" x="422" y="202" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="218" text-anchor="middle">🔒 Local Cache</text><text class="ca-s" x="470" y="232" text-anchor="middle">Encrypted</text>
+<rect class="ca" x="422" y="280" width="96" height="38" rx="16"/><text class="ca-t" x="470" y="296" text-anchor="middle">🔒 Browser Storage</text><text class="ca-s" x="470" y="310" text-anchor="middle">IndexedDB</text>
+<!-- 📤 Output -->
 <rect class="sg" x="620" y="130" width="190" height="255" rx="12"/>
-<text class="sg-t" x="715" y="153" text-anchor="middle">📤 输出</text>
-<rect class="oc" x="635" y="168" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="197" text-anchor="middle">☁️ 同步到 Notion</text>
-<rect class="oc" x="635" y="232" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="261" text-anchor="middle">📄 导出 JSON</text>
-<rect class="oc" x="635" y="296" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="325" text-anchor="middle">📝 导出 Markdown</text>
+<text class="sg-t" x="715" y="153" text-anchor="middle">📤 Output</text>
+<rect class="oc" x="635" y="168" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="197" text-anchor="middle">☁️ Sync to Notion</text>
+<rect class="oc" x="635" y="232" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="261" text-anchor="middle">📄 Export JSON</text>
+<rect class="oc" x="635" y="296" width="160" height="48" rx="8"/><text class="oc-t" x="715" y="325" text-anchor="middle">📝 Export Markdown</text>
 <!-- Arrows -->
 <line class="at" x1="330" y1="126" x2="412" y2="126" marker-end="url(#a1)"/>
 <line class="at" x1="330" y1="390" x2="412" y2="390" marker-end="url(#a1)"/>
