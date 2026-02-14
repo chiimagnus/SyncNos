@@ -10,56 +10,37 @@ This project has two parts:
 ## How It Works (Diagram)
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
-    classDef src fill:#F4F7FF,stroke:#4F46E5,color:#1E1B4B,stroke-width:1.5px,rx:8,ry:8;
-    classDef hub fill:#111827,stroke:#111827,color:#F9FAFB,stroke-width:2px,rx:50,ry:50;
-    classDef cache fill:#FFF7ED,stroke:#F97316,color:#7C2D12,stroke-width:1.5px;
-    classDef out fill:#ECFDF5,stroke:#10B981,color:#065F46,stroke-width:1.5px,rx:8,ry:8;
-
-    subgraph APP_SRC[" 📚 Data Sources · macOS App "]
-        AB["Apple Books<br>Highlights & Notes"]:::src
-        GL["GoodLinks<br>Highlights"]:::src
-        WR["WeRead<br>Highlights & Notes"]:::src
-        DD["Dedao<br>Highlights & Notes"]:::src
-        OCR["Chat Logs (OCR)<br>Highlights"]:::src
+    subgraph APP[" 📚 macOS App Data Sources "]
+        direction TB
+        AB["📖 Apple Books<br>Highlights & Notes"] ~~~ GL["🔗 GoodLinks<br>Highlights"]
+        WR["📚 WeRead<br>Highlights & Notes"] ~~~ DD["🎓 Dedao<br>Highlights & Notes"]
+        OCR["📱 Chat Logs OCR<br>Highlights"]
     end
 
-    subgraph WC_SRC[" 🤖 Data Sources · WebClipper "]
-        CGPT["ChatGPT"]:::src
-        CLD["Claude"]:::src
-        GEM["Gemini"]:::src
-        DS["DeepSeek"]:::src
-        KIMI["Kimi"]:::src
-        DOU["Doubao"]:::src
-        YUAN["Yuanbao"]:::src
-        NA["Notion AI"]:::src
+    subgraph WEB[" 🤖 WebClipper Data Sources "]
+        direction TB
+        CGPT["ChatGPT"] ~~~ CLD["Claude"] ~~~ GEM["Gemini"]
+        DS["DeepSeek"] ~~~ KIMI["Kimi"] ~~~ DOU["Doubao"]
+        YUAN["Yuanbao"] ~~~ NA["Notion AI"]
     end
 
-    SyncNos(("⚙️ SyncNos<br>macOS App")):::hub
-    WebClipper(("⚙️ WebClipper<br>Browser Extension MV3")):::hub
+    APP ===> SyncNos(("⚙️ SyncNos<br>macOS App"))
+    WEB ===> WebClipper(("⚙️ WebClipper<br>MV3 Extension"))
 
-    AB --> SyncNos
-    GL --> SyncNos
-    WR --> SyncNos
-    DD --> SyncNos
-    OCR --> SyncNos
+    SyncNos --> CACHE1[("🔒 Local Cache<br>Encrypted")]
+    WebClipper --> CACHE2[("🔒 Browser Storage<br>IndexedDB")]
 
-    CGPT --> WebClipper
-    CLD --> WebClipper
-    GEM --> WebClipper
-    DS --> WebClipper
-    KIMI --> WebClipper
-    DOU --> WebClipper
-    YUAN --> WebClipper
-    NA --> WebClipper
+    subgraph OUT[" 📤 Output "]
+        direction TB
+        NOTION["☁️ Sync to Notion"]
+        JSON["📄 Export JSON"]
+        MD["📝 Export Markdown"]
+    end
 
-    SyncNos --> LOCAL_APP[("🔒 Local Cache<br>Encrypted Storage")]:::cache
-    WebClipper --> LOCAL_WC[("🔒 Browser Local Storage<br>IndexedDB + chrome.storage")]:::cache
-
-    SyncNos --> NOTION["☁️ Sync to Notion"]:::out
-    WebClipper --> NOTION
-    WebClipper --> JSON["📄 Export JSON"]:::out
-    WebClipper --> MD["📝 Export Markdown"]:::out
+    SyncNos ===> OUT
+    WebClipper ===> OUT
 ```
 
 ## macOS App

@@ -12,50 +12,35 @@
 ```mermaid
 %%{init: {'theme':'neutral'}}%%
 flowchart LR
-    subgraph APP_SRC[" 📚 数据来源 · macOS App "]
-        AB["Apple Books<br>高亮 & 笔记"]
-        GL["GoodLinks<br>高亮"]
-        WR["微信读书 WeRead<br>高亮 & 笔记"]
-        DD["得到 Dedao<br>高亮 & 笔记"]
-        OCR["聊天记录 OCR<br>高亮"]
+    subgraph APP[" 📚 macOS App 数据来源 "]
+        direction TB
+        AB["📖 Apple Books<br>高亮 & 笔记"] ~~~ GL["🔗 GoodLinks<br>高亮"]
+        WR["📚 微信读书<br>高亮 & 笔记"] ~~~ DD["🎓 得到<br>高亮 & 笔记"]
+        OCR["📱 聊天记录 OCR<br>高亮"]
     end
 
-    subgraph WC_SRC[" 🤖 数据来源 · WebClipper "]
-        CGPT["ChatGPT"]
-        CLD["Claude"]
-        GEM["Gemini"]
-        DS["DeepSeek"]
-        KIMI["Kimi"]
-        DOU["豆包 Doubao"]
-        YUAN["元宝 Yuanbao"]
-        NA["Notion AI"]
+    subgraph WEB[" 🤖 WebClipper 数据来源 "]
+        direction TB
+        CGPT["ChatGPT"] ~~~ CLD["Claude"] ~~~ GEM["Gemini"]
+        DS["DeepSeek"] ~~~ KIMI["Kimi"] ~~~ DOU["豆包"]
+        YUAN["元宝"] ~~~ NA["Notion AI"]
     end
 
-    SyncNos(("⚙️ SyncNos<br>macOS App"))
-    WebClipper(("⚙️ WebClipper<br>浏览器扩展 MV3"))
+    APP ===> SyncNos(("⚙️ SyncNos<br>macOS App"))
+    WEB ===> WebClipper(("⚙️ WebClipper<br>MV3 扩展"))
 
-    AB --> SyncNos
-    GL --> SyncNos
-    WR --> SyncNos
-    DD --> SyncNos
-    OCR --> SyncNos
+    SyncNos --> CACHE1[("🔒 本地缓存<br>加密存储")]
+    WebClipper --> CACHE2[("🔒 浏览器存储<br>IndexedDB")]
 
-    CGPT --> WebClipper
-    CLD --> WebClipper
-    GEM --> WebClipper
-    DS --> WebClipper
-    KIMI --> WebClipper
-    DOU --> WebClipper
-    YUAN --> WebClipper
-    NA --> WebClipper
+    subgraph OUT[" 📤 输出 "]
+        direction TB
+        NOTION["☁️ 同步到 Notion"]
+        JSON["📄 导出 JSON"]
+        MD["📝 导出 Markdown"]
+    end
 
-    SyncNos --> LOCAL_APP[("🔒 本地缓存<br>加密存储")]
-    WebClipper --> LOCAL_WC[("🔒 浏览器本地存储<br>IndexedDB + chrome.storage")]
-
-    SyncNos --> NOTION["☁️ 同步到 Notion"]
-    WebClipper --> NOTION
-    WebClipper --> JSON["📄 导出 JSON"]
-    WebClipper --> MD["📝 导出 Markdown"]
+    SyncNos ===> OUT
+    WebClipper ===> OUT
 ```
 
 ## macOS App
