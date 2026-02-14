@@ -290,8 +290,11 @@
 
     document.addEventListener("keydown", (e) => {
       if (!e || e.key !== "Escape") return;
+      if (!preview.activeConversationId || !els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
+      e.preventDefault();
+      e.stopPropagation();
       hideNow();
-    });
+    }, true);
 
     window.addEventListener("resize", () => {
       if (!els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
