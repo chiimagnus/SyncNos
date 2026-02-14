@@ -229,6 +229,7 @@ body {
 .aboutAuthorName {
   font-family: "Snell Roundhand", "Apple Chancery", "Zapfino", "Times New Roman", serif;
   font-weight: 700;
+  font-size: 16px;
   letter-spacing: 0;
 }
 
