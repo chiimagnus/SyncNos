@@ -12,20 +12,14 @@
     getSourceMeta
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
-    hoverEnter: "popup:conversation-hover-enter",
-    hoverLeave: "popup:conversation-hover-leave",
-    focusEnter: "popup:conversation-focus-enter",
-    focusLeave: "popup:conversation-focus-leave"
+    click: "popup:conversation-click"
   };
 
-  const HIDE_DELAY_MS = 180;
   const POPOVER_GAP = 8;
   const POPOVER_MARGIN = 8;
   const preview = {
     activeConversationId: null,
-    activeAnchorEl: null,
-    hideTimer: null,
-    pointerInsidePopover: false
+    activeAnchorEl: null
   };
 
   function escapeHtml(value) {
@@ -65,12 +59,6 @@
     return state.conversations.find((conversation) => Number(conversation && conversation.id) === id) || null;
   }
 
-  function clearHideTimer() {
-    if (!preview.hideTimer) return;
-    clearTimeout(preview.hideTimer);
-    preview.hideTimer = null;
-  }
-
   function setAnchorActive(anchorEl, active) {
     if (!anchorEl || !anchorEl.classList) return;
     anchorEl.classList.toggle("is-preview-anchor", !!active);
@@ -82,26 +70,17 @@
   }
 
   function hideNow() {
-    clearHideTimer();
     state.hoveredConversationId = null;
     invalidatePendingRequests();
 
     if (preview.activeAnchorEl) setAnchorActive(preview.activeAnchorEl, false);
     preview.activeConversationId = null;
     preview.activeAnchorEl = null;
-    preview.pointerInsidePopover = false;
 
     if (!els.chatPreviewPopover) return;
     els.chatPreviewPopover.hidden = true;
     els.chatPreviewPopover.innerHTML = "";
     els.chatPreviewPopover.removeAttribute("data-state");
-  }
-
-  function scheduleHide() {
-    clearHideTimer();
-    preview.hideTimer = setTimeout(() => {
-      hideNow();
-    }, HIDE_DELAY_MS);
   }
 
   function formatSubtitle(conversation) {
@@ -228,7 +207,6 @@
     const conversation = findConversationById(id);
     if (!conversation) return;
 
-    clearHideTimer();
     state.hoveredConversationId = id;
     preview.activeConversationId = id;
     revealPopover(anchorEl);
@@ -260,7 +238,7 @@
     }
   }
 
-  function handleEnter(e) {
+  function handleClickPreview(e) {
     if (!e || !e.detail) return;
     showPreview({
       conversationId: e.detail.conversationId,
@@ -268,31 +246,18 @@
     }).catch(() => {});
   }
 
-  function handleLeave() {
-    if (preview.pointerInsidePopover) return;
-    scheduleHide();
-  }
-
-  function initPopoverInteraction() {
-    if (!els.chatPreviewPopover) return;
-    els.chatPreviewPopover.addEventListener("mouseenter", () => {
-      preview.pointerInsidePopover = true;
-      clearHideTimer();
-    });
-    els.chatPreviewPopover.addEventListener("mouseleave", () => {
-      preview.pointerInsidePopover = false;
-      scheduleHide();
-    });
-  }
-
   function init() {
     if (!els.list || !els.chatPreviewPopover) return;
-    initPopoverInteraction();
 
-    els.list.addEventListener(previewEvents.hoverEnter, handleEnter);
-    els.list.addEventListener(previewEvents.focusEnter, handleEnter);
-    els.list.addEventListener(previewEvents.hoverLeave, handleLeave);
-    els.list.addEventListener(previewEvents.focusLeave, handleLeave);
+    els.list.addEventListener(previewEvents.click, handleClickPreview);
+
+    document.addEventListener("click", (e) => {
+      if (!preview.activeConversationId || !els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
+      const target = e && e.target;
+      if (!target) return;
+      if ((preview.activeAnchorEl && preview.activeAnchorEl.contains(target)) || els.chatPreviewPopover.contains(target)) return;
+      hideNow();
+    });
 
     document.addEventListener("keydown", (e) => {
       if (!e || e.key !== "Escape") return;
