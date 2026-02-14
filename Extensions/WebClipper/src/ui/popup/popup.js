@@ -694,6 +694,14 @@
     });
   }
 
+  async function getNotionOAuthMeta() {
+    const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
+    return {
+      lastError: (res && res.notion_oauth_last_error) ? String(res.notion_oauth_last_error) : "",
+      pendingState: (res && res.notion_oauth_pending_state) ? String(res.notion_oauth_pending_state) : ""
+    };
+  }
+
   async function getNotionAccessToken() {
     const status = await send("getNotionAuthStatus");
     if (!status || !status.ok || !status.data || !status.data.connected) return "";
@@ -760,24 +768,92 @@
     return url.toString();
   }
 
-  els.btnNotionSaveConfig.addEventListener("click", async () => {
-    await saveNotionConfig();
-    flashOk(els.btnNotionSaveConfig);
-  });
+  if (els.btnNotionSaveConfig) {
+    els.btnNotionSaveConfig.addEventListener("click", async () => {
+      await saveNotionConfig();
+      flashOk(els.btnNotionSaveConfig);
+    });
+  }
 
-  els.btnNotionLoadPages.addEventListener("click", () => {
-    loadParentPages()
-      .then(() => flashOk(els.btnNotionLoadPages))
-      .catch((e) => alert(e && e.message ? e.message : String(e)));
-  });
+  if (els.btnNotionLoadPages) {
+    els.btnNotionLoadPages.addEventListener("click", () => {
+      loadParentPages()
+        .then(() => flashOk(els.btnNotionLoadPages))
+        .catch((e) => alert(e && e.message ? e.message : String(e)));
+    });
+  }
 
-  els.btnNotionSaveParent.addEventListener("click", () => {
-    saveParentPage()
-      .then(() => flashOk(els.btnNotionSaveParent))
-      .catch((e) => alert(e && e.message ? e.message : String(e)));
-  });
+  if (els.btnNotionSaveParent) {
+    els.btnNotionSaveParent.addEventListener("click", () => {
+      saveParentPage()
+        .then(() => flashOk(els.btnNotionSaveParent))
+        .catch((e) => alert(e && e.message ? e.message : String(e)));
+    });
+  }
 
-  els.btnNotionConnect.addEventListener("click", async () => {
+  let notionConnectPollTimer = null;
+
+  function setNotionConnectBusy(busy) {
+    if (!els.btnNotionConnect) return;
+    els.btnNotionConnect.disabled = !!busy;
+    els.btnNotionConnect.dataset.busy = busy ? "1" : "0";
+  }
+
+  async function openNotionAuthorizeTab(url) {
+    if (!url) return false;
+    try {
+      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
+        await new Promise((resolve) => chrome.tabs.create({ url: String(url) }, () => resolve(true)));
+        return true;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      window.open(String(url), "_blank", "noopener,noreferrer");
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function saveNotionReturnTarget() {
+    try {
+      if (!chrome || !chrome.tabs || typeof chrome.tabs.query !== "function") return;
+      const tab = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(Array.isArray(tabs) ? tabs[0] : null));
+      });
+      const tabId = tab && Number.isFinite(tab.id) ? tab.id : null;
+      const windowId = tab && Number.isFinite(tab.windowId) ? tab.windowId : null;
+      const payload = {};
+      if (tabId != null) payload.notion_oauth_return_tab_id = tabId;
+      if (windowId != null) payload.notion_oauth_return_window_id = windowId;
+      if (Object.keys(payload).length) await storageSet(payload);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function startNotionConnectPolling() {
+    if (notionConnectPollTimer) clearInterval(notionConnectPollTimer);
+    const startedAt = Date.now();
+    notionConnectPollTimer = setInterval(() => {
+      if (Date.now() - startedAt > 60_000) {
+        stopNotionConnectPolling();
+        return;
+      }
+      refreshNotionStatus().catch(() => {});
+    }, 750);
+  }
+
+  function stopNotionConnectPolling() {
+    if (!notionConnectPollTimer) return;
+    clearInterval(notionConnectPollTimer);
+    notionConnectPollTimer = null;
+  }
+
+  if (els.btnNotionConnect) {
+    els.btnNotionConnect.addEventListener("click", async () => {
     // If connected, allow disconnect.
     const status = await send("getNotionAuthStatus");
     if (status && status.ok && status.data && status.data.connected) {
@@ -787,8 +863,13 @@
     }
 
     const clientId = (els.notionClientId.value || "").trim();
-    if (!clientId) {
-      alert("Please set Notion Client ID first.");
+    const clientSecret = (els.notionClientSecret.value || "").trim();
+    if (!clientId || !clientSecret) {
+      const missing = [];
+      if (!clientId) missing.push("Client ID");
+      if (!clientSecret) missing.push("Client Secret");
+      alert(`Please set Notion ${missing.join(" and ")} first.`);
+      await refreshNotionStatus();
       return;
     }
     // Save config before starting auth.
@@ -796,28 +877,51 @@
     // Persist state so background can validate callback.
     const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
     await storageSet({ notion_oauth_pending_state: state });
+    await saveNotionReturnTarget();
     const url = buildNotionAuthorizeUrl({ clientId, state });
-    window.open(url, "_blank", "noopener,noreferrer");
-    alert("Notion auth opened in a new tab. Complete authorization, then return here.");
+    setNotionConnectBusy(true);
+    if (els.notionStatus) els.notionStatus.textContent = "Opening Notion OAuth…";
+    const opened = await openNotionAuthorizeTab(url);
+    if (!opened) {
+      setNotionConnectBusy(false);
+      alert("Failed to open Notion OAuth tab. Please check your browser popup settings.");
+      await refreshNotionStatus();
+      return;
+    }
+    if (els.notionStatus) els.notionStatus.textContent = "Authorize in the opened tab…";
+    startNotionConnectPolling();
   });
+  }
 
   loadNotionConfig();
   // Optional: attempt to refresh page list after connect, but don't auto prompt.
 
   async function refreshNotionStatus() {
     const res = await send("getNotionAuthStatus");
+    const meta = await getNotionOAuthMeta();
     if (!res || !res.ok || !res.data) {
       els.notionStatus.textContent = "";
       els.btnNotionConnect.textContent = "Connect";
+      setNotionConnectBusy(false);
+      stopNotionConnectPolling();
       return;
     }
     if (res.data.connected) {
       const name = res.data.token && res.data.token.workspaceName ? res.data.token.workspaceName : "Connected";
       els.notionStatus.textContent = name;
       els.btnNotionConnect.textContent = "Disconnect";
+      setNotionConnectBusy(false);
+      stopNotionConnectPolling();
     } else {
-      els.notionStatus.textContent = "Not connected";
+      if (meta && meta.lastError) {
+        els.notionStatus.textContent = `Error: ${meta.lastError}`;
+      } else if (meta && meta.pendingState) {
+        els.notionStatus.textContent = "Waiting for authorization…";
+      } else {
+        els.notionStatus.textContent = "Not connected";
+      }
       els.btnNotionConnect.textContent = "Connect";
+      setNotionConnectBusy(false);
     }
   }
 
