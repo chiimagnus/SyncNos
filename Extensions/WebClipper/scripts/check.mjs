@@ -62,6 +62,12 @@ const jsFiles = [
   "src/sync/notion/notion-sync-service.js",
   "src/export/article-markdown.js",
   "src/export/zip-utils.js",
+  "src/ui/popup/popup-core.js",
+  "src/ui/popup/popup-tabs.js",
+  "src/ui/popup/popup-list.js",
+  "src/ui/popup/popup-export.js",
+  "src/ui/popup/popup-notion.js",
+  "src/ui/popup/popup-about.js",
   "src/ui/popup/popup.js"
 ];
 
