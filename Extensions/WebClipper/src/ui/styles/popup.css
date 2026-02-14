@@ -296,12 +296,6 @@ body {
   outline-offset: 2px;
 }
 
-.btn.danger {
-  border-color: rgba(199, 55, 47, 0.45);
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
 #btnExport {
   padding-right: 10px;
 }
