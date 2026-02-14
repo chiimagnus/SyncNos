@@ -185,6 +185,18 @@ body {
   align-items: center;
 }
 
+.aboutLinks {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.aboutLinks .btn {
+  min-height: 30px;
+  padding: 6px 10px;
+}
+
 .aboutLogo {
   width: 44px;
   height: 44px;
