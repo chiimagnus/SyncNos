@@ -68,6 +68,7 @@ const jsFiles = [
   "src/ui/popup/popup-list.js",
   "src/ui/popup/popup-chat-preview.js",
   "src/ui/popup/popup-export.js",
+  "src/ui/popup/popup-delete.js",
   "src/ui/popup/popup-notion.js",
   "src/ui/popup/popup-about.js",
   "src/ui/popup/popup.js"
