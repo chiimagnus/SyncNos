@@ -47,12 +47,10 @@
 
 	  const MESSAGE_TYPES = Object.freeze({
 	    UPSERT_CONVERSATION: "upsertConversation",
-	    UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
 	    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
 	    GET_CONVERSATIONS: "getConversations",
 	    GET_CONVERSATION_DETAIL: "getConversationDetail",
 	    DELETE_CONVERSATIONS: "deleteConversations",
-	    CLEAR_ALL: "clearAll"
 	  });
 
   const NOTION_MESSAGE_TYPES = Object.freeze({
@@ -122,42 +120,6 @@
       t.onerror = () => rej(t.error || new Error("transaction failed"));
     });
     return record;
-  }
-
-  async function upsertMessagesIncremental(conversationId, messages) {
-    const db = await openDb();
-    const { t, stores } = tx(db, ["messages"], "readwrite");
-    const idx = stores.messages.index("by_conversationId_messageKey");
-
-    let upserted = 0;
-    for (const m of messages || []) {
-      if (!m || !m.messageKey) continue;
-      const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
-      const incomingMarkdown = (m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
-      const baseRecord = {
-        conversationId,
-        messageKey: m.messageKey,
-        role: m.role || "assistant",
-        contentText: m.contentText || "",
-        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || "" : ""),
-        sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-        updatedAt: m.updatedAt || Date.now()
-      };
-      const record = withOptionalId(existing && existing.id, baseRecord);
-      if (existing) {
-        await reqToPromise(stores.messages.put(record));
-      } else {
-        const id = await reqToPromise(stores.messages.add(record));
-        record.id = id;
-      }
-      upserted += 1;
-    }
-
-    await new Promise((r, rej) => {
-      t.oncomplete = r;
-      t.onerror = () => rej(t.error || new Error("transaction failed"));
-    });
-    return { upserted };
   }
 
   async function syncConversationMessages(conversationId, messages) {
@@ -242,21 +204,6 @@
     });
     items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
     return items;
-  }
-
-  async function clearAll() {
-    const db = await openDb();
-    const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readwrite");
-    await Promise.all([
-      reqToPromise(stores.conversations.clear()),
-      reqToPromise(stores.messages.clear()),
-      reqToPromise(stores.sync_mappings.clear())
-    ]);
-    await new Promise((r, rej) => {
-      t.oncomplete = r;
-      t.onerror = () => rej(t.error || new Error("transaction failed"));
-    });
-    return { cleared: true };
   }
 
   async function deleteConversationsByIds(conversationIds) {
@@ -455,12 +402,6 @@
         const convo = await upsertConversation(payload);
         return ok(convo);
       }
-      case MESSAGE_TYPES.UPSERT_MESSAGES_INCREMENTAL: {
-        const conversationId = Number(msg.conversationId);
-        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
-        const res = await upsertMessagesIncremental(conversationId, msg.messages);
-        return ok(res);
-      }
       case MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES: {
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
@@ -480,10 +421,6 @@
       case MESSAGE_TYPES.DELETE_CONVERSATIONS: {
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
         const res = await deleteConversationsByIds(ids);
-        return ok(res);
-      }
-      case MESSAGE_TYPES.CLEAR_ALL: {
-        const res = await clearAll();
         return ok(res);
       }
       default:

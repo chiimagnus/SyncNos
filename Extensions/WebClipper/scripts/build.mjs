@@ -161,6 +161,7 @@ concatFiles({
     "src/ui/popup/popup-list.js",
     "src/ui/popup/popup-chat-preview.js",
     "src/ui/popup/popup-export.js",
+    "src/ui/popup/popup-delete.js",
     "src/ui/popup/popup-notion.js",
     "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
@@ -181,6 +182,7 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\/popup-list\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-chat-preview\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-export\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-delete\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-notion\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-about\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
