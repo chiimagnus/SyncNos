@@ -180,7 +180,7 @@
       const role = m.role || "assistant";
       lines.push(`## ${role}`);
       lines.push("");
-      lines.push(String(m.contentText || ""));
+      lines.push(String(m.contentMarkdown || m.contentText || ""));
       lines.push("");
     }
     return lines.join("\n");
