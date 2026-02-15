@@ -168,7 +168,21 @@
     return m ? m[0].toLowerCase() : "";
   }
 
+  function getChatTitleFromHistoryButton() {
+    // Observed DOM (see `.github/docs/notionAIDOM.md`):
+    // <div role="button" aria-label="history"> <div>Title...</div> ... </div>
+    const btn = document.querySelector('div[role="button"][aria-label="history"]');
+    if (!btn) return "";
+    const titleEl = btn.firstElementChild;
+    const raw = titleEl ? (titleEl.innerText || titleEl.textContent || "") : (btn.innerText || btn.textContent || "");
+    const title = String(raw || "").split("\n").join(" ").trim();
+    return title ? title.slice(0, 80) : "";
+  }
+
   function getChatTitleFromRoot(root) {
+    const fromHistory = getChatTitleFromHistoryButton();
+    if (fromHistory) return fromHistory;
+
     const firstUser = getAnyUserStepEl(root) || getAnyUserStepEl(document);
     if (!firstUser) return "NotionAI Chat";
     const leaf =
