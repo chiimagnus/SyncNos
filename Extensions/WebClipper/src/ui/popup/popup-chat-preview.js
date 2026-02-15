@@ -165,7 +165,7 @@
     const bodyHtml = list.map((message) => {
       const normalizedRole = normalizeRole(message && message.role);
       const label = roleLabel(normalizedRole);
-      const content = renderMarkdown((message && message.contentText) || "");
+      const content = renderMarkdown((message && (message.contentMarkdown || message.contentText)) || "");
       return `
         <article class="chatPreviewMsg chatPreviewMsg--${normalizedRole}">
           <header class="chatPreviewMsgRole">${label}</header>

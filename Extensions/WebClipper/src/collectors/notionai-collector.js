@@ -140,6 +140,222 @@
     return "assistant";
   }
 
+  function texFromKatex(el) {
+    if (!el || !el.querySelector) return "";
+    const ann = el.querySelector('annotation[encoding="application/x-tex"]');
+    const raw = ann ? (ann.textContent || "") : "";
+    return String(raw || "").trim();
+  }
+
+  function wrapInlineCode(content) {
+    const raw = String(content || "");
+    const delimiter = raw.includes("`") ? "``" : "`";
+    const cleaned = raw.replace(/\n+/g, " ").trim();
+    return `${delimiter}${cleaned}${delimiter}`;
+  }
+
+  function elementStyleString(el) {
+    if (!el || !el.getAttribute) return "";
+    return String(el.getAttribute("style") || "");
+  }
+
+  function isBoldEl(el) {
+    if (!el) return false;
+    const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
+    if (tag === "strong" || tag === "b") return true;
+    const style = elementStyleString(el);
+    return /font-weight\s*:\s*(600|700|800|900)/i.test(style);
+  }
+
+  function isItalicEl(el) {
+    if (!el) return false;
+    const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
+    if (tag === "em" || tag === "i") return true;
+    const style = elementStyleString(el);
+    return /font-style\s*:\s*italic/i.test(style);
+  }
+
+  function isStrikeEl(el) {
+    if (!el) return false;
+    const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
+    if (tag === "s" || tag === "del") return true;
+    const style = elementStyleString(el);
+    return /text-decoration[^;]*line-through/i.test(style);
+  }
+
+  function normalizeMarkdownText(value) {
+    // Remove zero-width spaces that Notion sometimes injects.
+    return String(value || "").replace(/\u200b/g, "");
+  }
+
+  function nodeToMarkdown(node) {
+    if (!node) return "";
+    if (node.nodeType === Node.TEXT_NODE) return normalizeMarkdownText(node.nodeValue || "");
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+    const el = node;
+    const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
+
+    if (tag === "br") return "\n";
+
+    if (el.classList && el.classList.contains("notion-inline-code-container")) {
+      return wrapInlineCode(el.textContent || "");
+    }
+
+    if (el.classList && (el.classList.contains("katex") || el.classList.contains("katex-display"))) {
+      const tex = texFromKatex(el);
+      return tex ? `$${tex}$` : normalizeMarkdownText(el.textContent || "");
+    }
+
+    if (tag === "a") {
+      const href = String(el.getAttribute("href") || "").trim();
+      const text = childrenToMarkdown(el);
+      if (/^https?:\/\//i.test(href)) return `[${text || href}](${href})`;
+      return text;
+    }
+
+    if (tag === "code") {
+      return wrapInlineCode(el.textContent || "");
+    }
+
+    const inner = childrenToMarkdown(el);
+    if (!inner) return "";
+
+    // Apply emphasis wrappers (best-effort). Avoid wrapping whitespace-only.
+    const content = inner;
+    if (!content.trim()) return content;
+
+    const strike = isStrikeEl(el);
+    const bold = isBoldEl(el);
+    const italic = isItalicEl(el);
+
+    let out = content;
+    if (strike) out = `~~${out}~~`;
+    if (bold) out = `**${out}**`;
+    if (italic) out = `*${out}*`;
+    return out;
+  }
+
+  function childrenToMarkdown(el) {
+    const parts = [];
+    const nodes = el && el.childNodes ? Array.from(el.childNodes) : [];
+    for (const n of nodes) {
+      const md = nodeToMarkdown(n);
+      if (md) parts.push(md);
+    }
+    return parts.join("");
+  }
+
+  function leafToMarkdown(leaf) {
+    if (!leaf) return "";
+    const raw = childrenToMarkdown(leaf);
+    // Keep line breaks, but trim excessive leading/trailing whitespace.
+    return normalizeMarkdownText(raw).replace(/[ \t]+\n/g, "\n").trim();
+  }
+
+  function getBlockTypeName(block) {
+    if (!block || !block.classList) return "";
+    for (const c of Array.from(block.classList)) {
+      if (!c || !c.startsWith("notion-") || !c.endsWith("-block")) continue;
+      return c.slice("notion-".length, -"-block".length);
+    }
+    return "";
+  }
+
+  function isTopLevelBlock(block, scope) {
+    let p = block && block.parentElement ? block.parentElement : null;
+    while (p && p !== scope) {
+      if (p.getAttribute && p.getAttribute("data-block-id")) return false;
+      p = p.parentElement;
+    }
+    return true;
+  }
+
+  function blockLeaf(block) {
+    if (!block || !block.querySelector) return null;
+    return (
+      block.querySelector("[data-content-editable-leaf='true']") ||
+      block.querySelector("[data-content-editable-leaf=\"true\"]") ||
+      null
+    );
+  }
+
+  function blockToMarkdown(block) {
+    const type = getBlockTypeName(block);
+
+    if (type === "divider") return "---";
+
+    if (type === "equation") {
+      const tex = texFromKatex(block);
+      if (!tex) return "";
+      return `$$\n${tex}\n$$`;
+    }
+
+    const leaf = blockLeaf(block);
+    const text = leafToMarkdown(leaf);
+    if (!text) return "";
+
+    if (type === "header") return `# ${text}`;
+    if (type === "sub_header") return `## ${text}`;
+    if (type === "sub_sub_header") return `### ${text}`;
+
+    if (type === "quote") {
+      const lines = text.split("\n").map((l) => `> ${l}`.trimEnd());
+      return lines.join("\n");
+    }
+
+    if (type === "bulleted_list") return `- ${text}`;
+    if (type === "numbered_list") return `1. ${text}`;
+    if (type === "to_do_list") {
+      const checked = !!block.querySelector('[role="checkbox"][aria-checked="true"]');
+      return `- [${checked ? "x" : " "}] ${text}`;
+    }
+
+    if (type === "callout") {
+      const lines = text.split("\n").map((l) => `> ${l}`.trimEnd());
+      return lines.join("\n");
+    }
+
+    return text;
+  }
+
+  function blockKind(block) {
+    const type = getBlockTypeName(block);
+    if (type === "bulleted_list" || type === "numbered_list" || type === "to_do_list") return "list";
+    if (type === "quote" || type === "callout") return "quote";
+    return "para";
+  }
+
+  function extractUserMarkdown(wrapper) {
+    const leaf =
+      wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
+      wrapper.querySelector("[data-content-editable-leaf='true']");
+    const md = leafToMarkdown(leaf);
+    return md || "";
+  }
+
+  function extractAssistantMarkdown(wrapper) {
+    const allBlocks = Array.from(wrapper.querySelectorAll("div[data-block-id]"));
+    const blocks = allBlocks.filter((b) => isTopLevelBlock(b, wrapper));
+    if (!blocks.length) return "";
+
+    let out = "";
+    let prevKind = "";
+    for (const b of blocks) {
+      const md = blockToMarkdown(b);
+      if (!md) continue;
+      const kind = blockKind(b);
+      if (!out) {
+        out = md;
+      } else {
+        const compact = (prevKind === "list" && kind === "list") || (prevKind === "quote" && kind === "quote");
+        out += compact ? `\n${md}` : `\n\n${md}`;
+      }
+      prevKind = kind;
+    }
+    return out.trim();
+  }
+
   function extractUserText(wrapper) {
     const leaf =
       wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
@@ -154,8 +370,9 @@
       const raw = wrapper.innerText || wrapper.textContent || "";
       return NS.normalize.normalizeText(raw);
     }
+    const topBlocks = blocks.filter((b) => isTopLevelBlock(b, wrapper));
     const parts = [];
-    for (const b of blocks) {
+    for (const b of topBlocks) {
       const raw = b.innerText || b.textContent || "";
       const t = NS.normalize.normalizeText(raw);
       if (t) parts.push(t);
@@ -216,6 +433,9 @@
       const role = roleFromWrapper(w);
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
       if (!contentText) continue;
+      const contentMarkdown = role === "user"
+        ? (extractUserMarkdown(w) || contentText)
+        : (extractAssistantMarkdown(w) || contentText);
       const userStepId = role === "user" ? w.getAttribute("data-agent-chat-user-step-id") : "";
       const firstBlockId = role === "assistant" ? (w.querySelector("div[data-block-id]") || {}).getAttribute?.("data-block-id") : "";
       const stableId = userStepId || firstBlockId || "";
@@ -226,6 +446,7 @@
         messageKey,
         role,
         contentText,
+        contentMarkdown,
         sequence: i,
         updatedAt: Date.now()
       });
