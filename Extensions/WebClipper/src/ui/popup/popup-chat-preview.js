@@ -130,32 +130,48 @@
     els.chatPreviewPopover.hidden = true;
     els.chatPreviewPopover.innerHTML = "";
     els.chatPreviewPopover.removeAttribute("data-state");
+    els.chatPreviewPopover.removeAttribute("data-url");
   }
 
-  function renderShell({ bodyHtml, stateName }) {
+  function renderShell({ conversation, bodyHtml, stateName }) {
     if (!els.chatPreviewPopover) return;
-    els.chatPreviewPopover.innerHTML = `<div class="chatPreviewBody">${bodyHtml}</div>`;
+    const title = conversation && conversation.title ? String(conversation.title) : "Untitled";
+    const safeUrl = sanitizeHref(conversation && conversation.url ? conversation.url : "");
+    els.chatPreviewPopover.dataset.url = safeUrl || "";
+    const openAttrs = safeUrl
+      ? 'type="button" class="chatPreviewOpen" title="Open chat"'
+      : 'type="button" class="chatPreviewOpen" title="No link available" disabled';
+    els.chatPreviewPopover.innerHTML = `
+      <div class="chatPreviewHeader">
+        <div class="chatPreviewTitle" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+        <button ${openAttrs} aria-label="Open original chat">↗</button>
+      </div>
+      <div class="chatPreviewBody">${bodyHtml}</div>
+    `;
     els.chatPreviewPopover.dataset.state = String(stateName || "ready");
   }
 
-  function renderLoading() {
+  function renderLoading(conversation) {
     renderShell({
+      conversation,
       stateName: "loading",
       bodyHtml: '<div class="chatPreviewPlaceholder">Loading...</div>'
     });
   }
 
-  function renderError(message) {
+  function renderError(conversation, message) {
     renderShell({
+      conversation,
       stateName: "error",
       bodyHtml: `<div class="chatPreviewPlaceholder chatPreviewPlaceholder--error">${escapeHtml(message || "Failed to load messages.")}</div>`
     });
   }
 
-  function renderMessages(messages) {
+  function renderMessages(conversation, messages) {
     const list = Array.isArray(messages) ? messages : [];
     if (!list.length) {
       renderShell({
+        conversation,
         stateName: "empty",
         bodyHtml: '<div class="chatPreviewPlaceholder">No messages yet.</div>'
       });
@@ -175,6 +191,7 @@
     }).join("");
 
     renderShell({
+      conversation,
       stateName: "ready",
       bodyHtml
     });
@@ -194,6 +211,14 @@
     els.chatPreviewPopover.style.right = `${POPOVER_MARGIN}px`;
     els.chatPreviewPopover.style.top = `${top}px`;
     els.chatPreviewPopover.style.maxHeight = `${Math.round(maxHeight)}px`;
+
+    const headerEl = els.chatPreviewPopover.querySelector(".chatPreviewHeader");
+    const bodyEl = els.chatPreviewPopover.querySelector(".chatPreviewBody");
+    if (headerEl && bodyEl && typeof headerEl.getBoundingClientRect === "function") {
+      const headerH = Math.ceil(headerEl.getBoundingClientRect().height || 0);
+      const bodyMax = Math.max(140, Math.round(maxHeight) - headerH);
+      bodyEl.style.maxHeight = `${bodyMax}px`;
+    }
   }
 
   function revealPopover(anchorEl) {
@@ -234,12 +259,12 @@
     const cache = getPreviewCache();
     const cached = cache.get(id);
     if (cached && Array.isArray(cached.messages)) {
-      renderMessages(cached.messages);
+      renderMessages(conversation, cached.messages);
       positionPopover();
       return;
     }
 
-    renderLoading();
+    renderLoading(conversation);
     positionPopover();
 
     invalidatePendingRequests();
@@ -248,12 +273,12 @@
       const payload = await fetchMessages(id);
       if (token !== state.previewRequestToken) return;
       if (preview.activeConversationId !== id) return;
-      renderMessages(payload.messages);
+      renderMessages(conversation, payload.messages);
       positionPopover();
     } catch (e) {
       if (token !== state.previewRequestToken) return;
       if (preview.activeConversationId !== id) return;
-      renderError(e && e.message ? e.message : "Failed to load messages.");
+      renderError(conversation, e && e.message ? e.message : "Failed to load messages.");
       positionPopover();
     }
   }
@@ -279,6 +304,27 @@
     if (!els.list || !els.chatPreviewPopover) return;
 
     els.list.addEventListener(previewEvents.click, handleClickPreview);
+
+    els.chatPreviewPopover.addEventListener("click", (e) => {
+      const target = e && e.target;
+      if (!target || !target.closest) return;
+      const btn = target.closest(".chatPreviewOpen");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (btn.disabled) return;
+      const url = sanitizeHref(els.chatPreviewPopover && els.chatPreviewPopover.dataset ? els.chatPreviewPopover.dataset.url : "");
+      if (!url) return;
+      try {
+        if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
+          chrome.tabs.create({ url });
+        } else {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      } catch (_e) {
+        // ignore
+      }
+    });
 
     document.addEventListener("click", (e) => {
       if (!preview.activeConversationId || !els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
