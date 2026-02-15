@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
 
+function loadNotionAi() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/sync/notion/notion-ai.js");
+}
+
 describe("notion-sync-service", () => {
   it("sets AI multi_select on create", async () => {
     let lastReq: any = null;
     // @ts-expect-error test global
-    globalThis.WebClipper = {
-      notionApi: {
-        notionFetch: async (req: any) => {
-          lastReq = req;
-          return { id: "p1" };
-        }
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        lastReq = req;
+        return { id: "p1" };
       }
     };
 
@@ -29,12 +40,14 @@ describe("notion-sync-service", () => {
   it("sets AI multi_select on update", async () => {
     let lastReq: any = null;
     // @ts-expect-error test global
-    globalThis.WebClipper = {
-      notionApi: {
-        notionFetch: async (req: any) => {
-          lastReq = req;
-          return { ok: true };
-        }
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        lastReq = req;
+        return { ok: true };
       }
     };
 

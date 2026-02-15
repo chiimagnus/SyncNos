@@ -6,16 +6,10 @@
   const RATE_DELAY_MS = 250;
 
   function aiLabelForSource(source) {
-    const s = String(source || "").trim().toLowerCase();
-    if (s === "chatgpt") return "ChatGPT";
-    if (s === "claude") return "Claude";
-    if (s === "gemini") return "Gemini";
-    if (s === "deepseek") return "DeepSeek";
-    if (s === "kimi") return "Kimi";
-    if (s === "doubao") return "豆包";
-    if (s === "yuanbao") return "元宝";
-    if (s === "notionai") return "NotionAI";
-    return source ? String(source) : "Unknown";
+    const api = NS.notionAi;
+    if (api && typeof api.optionNameForSource === "function") return api.optionNameForSource(source);
+    const fallback = String(source || "").trim();
+    return fallback || "Unknown";
   }
 
   function sleep(ms) {

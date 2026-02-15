@@ -13,9 +13,9 @@
     // eslint-disable-next-line no-undef
     importScripts(
       "../sync/notion/oauth-config.js",
-      "../sync/notion/oauth-client.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",
+      "../sync/notion/notion-ai.js",
       "../sync/notion/notion-db-manager.js",
       "../sync/notion/notion-sync-service.js"
     );

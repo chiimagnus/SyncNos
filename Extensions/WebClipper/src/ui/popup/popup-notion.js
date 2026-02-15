@@ -5,7 +5,7 @@
   const core = NS.popupCore;
   if (!core) return;
 
-  const { els, runtime, send, storageGet, storageSet, flashOk, disableImageDrag } = core;
+  const { els, send, storageGet, storageSet, flashOk, disableImageDrag, openHttpUrl } = core;
 
   async function getNotionOAuthMeta() {
     const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
@@ -26,24 +26,13 @@
     return status.data.token && status.data.token.accessToken ? status.data.token.accessToken : "";
   }
 
-  async function ensureNotionApiLoaded() {
-    if (globalThis.WebClipper && globalThis.WebClipper.notionApi) return globalThis.WebClipper.notionApi;
-    const script = document.createElement("script");
-    const url = runtime && typeof runtime.getURL === "function" ? runtime.getURL("src/sync/notion/notion-api.js") : "";
-    if (!url) return null;
-    script.src = url;
-    document.documentElement.appendChild(script);
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    return globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
-  }
-
   async function loadParentPages() {
     const accessToken = await getNotionAccessToken();
     if (!accessToken) {
       alert("Notion not connected.");
       return;
     }
-    const api = await ensureNotionApiLoaded();
+    const api = globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
     if (!api) {
       alert("Notion API module not available.");
       return;
@@ -77,11 +66,17 @@
   }
 
   function buildNotionAuthorizeUrl({ clientId, state }) {
-    const redirectUri = "https://chiimagnus.github.io/syncnos-oauth/callback";
-    const url = new URL("https://api.notion.com/v1/oauth/authorize");
+    const cfg = NS.notionOAuthConfig && typeof NS.notionOAuthConfig.getDefaults === "function"
+      ? NS.notionOAuthConfig.getDefaults()
+      : null;
+    const redirectUri = cfg && cfg.redirectUri ? String(cfg.redirectUri) : "https://chiimagnus.github.io/syncnos-oauth/callback";
+    const base = cfg && cfg.authorizationUrl ? String(cfg.authorizationUrl) : "https://api.notion.com/v1/oauth/authorize";
+    const owner = cfg && cfg.owner ? String(cfg.owner) : "user";
+    const responseType = cfg && cfg.responseType ? String(cfg.responseType) : "code";
+    const url = new URL(base);
     url.searchParams.set("client_id", clientId);
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set("owner", "user");
+    url.searchParams.set("response_type", responseType);
+    url.searchParams.set("owner", owner);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("state", state);
     return url.toString();
@@ -93,41 +88,6 @@
   function setNotionConnectBusy(busy) {
     if (!els.btnNotionConnect) return;
     els.btnNotionConnect.disabled = !!busy;
-  }
-
-  async function openNotionAuthorizeTab(url) {
-    if (!url) return false;
-    try {
-      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
-        await new Promise((resolve) => chrome.tabs.create({ url: String(url) }, () => resolve(true)));
-        return true;
-      }
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      window.open(String(url), "_blank", "noopener,noreferrer");
-      return true;
-    } catch (_e) {
-      return false;
-    }
-  }
-
-  async function saveNotionReturnTarget() {
-    try {
-      if (!chrome || !chrome.tabs || typeof chrome.tabs.query !== "function") return;
-      const tab = await new Promise((resolve) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(Array.isArray(tabs) ? tabs[0] : null));
-      });
-      const tabId = tab && Number.isFinite(tab.id) ? tab.id : null;
-      const windowId = tab && Number.isFinite(tab.windowId) ? tab.windowId : null;
-      const payload = {};
-      if (tabId != null) payload.notion_oauth_return_tab_id = tabId;
-      if (windowId != null) payload.notion_oauth_return_window_id = windowId;
-      if (Object.keys(payload).length) await storageSet(payload);
-    } catch (_e) {
-      // ignore
-    }
   }
 
   function startNotionConnectPolling() {
@@ -232,11 +192,10 @@
 
         const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
         await storageSet({ notion_oauth_pending_state: state });
-        await saveNotionReturnTarget();
         const url = buildNotionAuthorizeUrl({ clientId, state });
         setNotionConnectBusy(true);
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Connecting…";
-        const opened = await openNotionAuthorizeTab(url);
+        const opened = typeof openHttpUrl === "function" ? openHttpUrl(url) : false;
         if (!opened) {
           setNotionConnectBusy(false);
           alert("Failed to open Notion OAuth tab. Please check your browser popup settings.");
