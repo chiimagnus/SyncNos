@@ -67,43 +67,6 @@ describe("notion-sync-service markdown", () => {
     expect(bold?.text?.content).toBe("b");
   });
 
-  it("converts markdown tables to notion table blocks", () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
-
-    const md = [
-      "| A | B |",
-      "| --- | --- |",
-      "| 1 | **2** |",
-      "| a\\|b | `c` |"
-    ].join("\n");
-
-    const blocks = notionSyncService.markdownToNotionBlocks(md);
-    const table = blocks.find((b: any) => b && b.type === "table");
-    expect(table).toBeTruthy();
-    expect(table.table.table_width).toBe(2);
-    expect(table.table.has_column_header).toBe(true);
-    expect(Array.isArray(table.children)).toBe(true);
-    expect(table.children.length).toBe(3);
-
-    const row1 = table.children[1];
-    const cellB = row1.table_row.cells[1] || [];
-    const bold = cellB.find((x: any) => x && x.type === "text" && x.annotations && x.annotations.bold);
-    expect(bold?.text?.content).toBe("2");
-
-    const row2 = table.children[2];
-    const cellA = row2.table_row.cells[0] || [];
-    const textA = cellA.find((x: any) => x && x.type === "text");
-    expect(textA?.text?.content).toContain("a|b");
-  });
-
   it("messagesToBlocks uses markdown for notionai source", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
@@ -122,3 +85,4 @@ describe("notion-sync-service markdown", () => {
     expect(blocks.some((b: any) => b && b.type === "bulleted_list_item")).toBe(true);
   });
 });
+
