@@ -65,6 +65,7 @@
     viewSettings: document.getElementById("viewSettings"),
     viewAbout: document.getElementById("viewAbout"),
     chkSelectAll: document.getElementById("chkSelectAll"),
+    btnDelete: document.getElementById("btnDelete"),
     btnExport: document.getElementById("btnExport"),
     exportMenu: document.getElementById("exportMenu"),
     menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),

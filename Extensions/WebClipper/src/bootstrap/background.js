@@ -51,6 +51,7 @@
 	    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
 	    GET_CONVERSATIONS: "getConversations",
 	    GET_CONVERSATION_DETAIL: "getConversationDetail",
+	    DELETE_CONVERSATIONS: "deleteConversations",
 	    CLEAR_ALL: "clearAll"
 	  });
 
@@ -258,6 +259,65 @@
     return { cleared: true };
   }
 
+  async function deleteConversationsByIds(conversationIds) {
+    const ids = Array.isArray(conversationIds)
+      ? conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+      : [];
+    if (!ids.length) return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0 };
+
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readwrite");
+
+    let deletedConversations = 0;
+    let deletedMessages = 0;
+    let deletedMappings = 0;
+
+    const msgIdx = stores.messages.index("by_conversationId_sequence");
+    const mappingIdx = stores.sync_mappings.index("by_source_conversationKey");
+
+    for (const id of ids) {
+      const convo = await reqToPromise(stores.conversations.get(id));
+      if (!convo) continue;
+
+      // Delete all messages under this conversation.
+      const range = IDBKeyRange.bound([id, -Infinity], [id, Infinity]);
+      const cursorReq = msgIdx.openCursor(range);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve, reject) => {
+        cursorReq.onerror = () => reject(cursorReq.error || new Error("cursor failed"));
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedMessages += 1;
+          cursor.continue();
+        };
+      });
+
+      // Delete notion mapping if present.
+      const source = convo.source || "";
+      const conversationKey = convo.conversationKey || "";
+      if (source && conversationKey) {
+        // eslint-disable-next-line no-await-in-loop
+        const mapping = await reqToPromise(mappingIdx.get([source, conversationKey]));
+        if (mapping && mapping.id) {
+          // eslint-disable-next-line no-await-in-loop
+          await reqToPromise(stores.sync_mappings.delete(mapping.id));
+          deletedMappings += 1;
+        }
+      }
+
+      await reqToPromise(stores.conversations.delete(id));
+      deletedConversations += 1;
+    }
+
+    await new Promise((r, rej) => {
+      t.oncomplete = r;
+      t.onerror = () => rej(t.error || new Error("transaction failed"));
+    });
+    return { deletedConversations, deletedMessages, deletedMappings };
+  }
+
   async function getConversationById(conversationId) {
     const db = await openDb();
     const { t, stores } = tx(db, ["conversations"], "readonly");
@@ -416,6 +476,11 @@
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const messages = await getMessagesByConversationId(conversationId);
         return ok({ conversationId, messages });
+      }
+      case MESSAGE_TYPES.DELETE_CONVERSATIONS: {
+        const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
+        const res = await deleteConversationsByIds(ids);
+        return ok(res);
       }
       case MESSAGE_TYPES.CLEAR_ALL: {
         const res = await clearAll();
