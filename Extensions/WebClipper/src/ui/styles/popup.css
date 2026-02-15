@@ -782,6 +782,50 @@ main {
   z-index: 50;
 }
 
+.chatPreviewHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 241, 234, 0.7);
+}
+
+.chatPreviewTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatPreviewOpen {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chatPreviewOpen:hover {
+  border-color: rgba(217, 89, 38, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.chatPreviewOpen:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .chatPreviewBody {
   max-height: 400px;
   overflow-y: auto;
