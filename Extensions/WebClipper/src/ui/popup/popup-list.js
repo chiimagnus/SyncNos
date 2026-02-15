@@ -17,32 +17,6 @@
     click: "popup:conversation-click"
   };
 
-  function sanitizeHref(href) {
-    const text = String(href || "").trim();
-    if (!text) return "";
-    if (/^https?:\/\//i.test(text)) return text;
-    return "";
-  }
-
-  function openUrl(url) {
-    const safeUrl = sanitizeHref(url);
-    if (!safeUrl) return false;
-    try {
-      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
-        chrome.tabs.create({ url: safeUrl });
-        return true;
-      }
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      window.open(safeUrl, "_blank", "noopener,noreferrer");
-      return true;
-    } catch (_e) {
-      return false;
-    }
-  }
-
   function dispatchPreviewEvent(type, detail) {
     if (!els.list) return;
     els.list.dispatchEvent(new CustomEvent(type, { detail }));
@@ -132,7 +106,7 @@
       openBtn.className = "sourceOpen";
       openBtn.setAttribute("aria-label", "Open original chat");
       openBtn.title = "Open chat";
-      const safeUrl = sanitizeHref(conversation.url || "");
+      const safeUrl = core.sanitizeHttpUrl(conversation.url || "");
       if (!safeUrl) {
         openBtn.disabled = true;
         openBtn.title = "No link available";
@@ -142,7 +116,7 @@
         e.preventDefault();
         e.stopPropagation();
         if (openBtn.disabled) return;
-        openUrl(conversation.url || "");
+        core.openHttpUrl(conversation.url || "");
       });
       sub.appendChild(openBtn);
 
