@@ -390,6 +390,17 @@ body {
   box-shadow: var(--shadow);
 }
 
+.btn.danger {
+  border-color: rgba(199, 55, 47, 0.35);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.btn.danger:hover {
+  border-color: rgba(199, 55, 47, 0.6);
+  background: #ffd6d0;
+}
+
 .btn:active {
   transform: translateY(0);
 }

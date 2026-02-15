@@ -61,6 +61,18 @@
     els.chkSelectAll.checked = total > 0 && selected === total;
   }
 
+  function syncActionButtons() {
+    const hasSelection = state.selectedIds.size > 0;
+    if (els.btnExport) els.btnExport.disabled = !hasSelection;
+    if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection;
+    if (els.btnDelete) els.btnDelete.disabled = !hasSelection;
+
+    if (!hasSelection) {
+      if (els.exportMenu) els.exportMenu.hidden = true;
+      if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "false");
+    }
+  }
+
   function render() {
     if (!els.list) return;
     els.list.innerHTML = "";
@@ -79,6 +91,7 @@
         if (checkbox.checked) state.selectedIds.add(conversation.id);
         else state.selectedIds.delete(conversation.id);
         syncSelectAllCheckbox();
+        syncActionButtons();
       });
       left.appendChild(checkbox);
 
@@ -163,6 +176,7 @@
     }).length;
     renderStats({ today, total });
     syncSelectAllCheckbox();
+    syncActionButtons();
   }
 
   async function refresh() {
@@ -187,6 +201,7 @@
       }
       render();
     });
+    syncActionButtons();
   }
 
   NS.popupList = {
