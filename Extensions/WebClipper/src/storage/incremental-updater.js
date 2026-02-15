@@ -26,7 +26,10 @@
     const n = normalizeModule();
     const role = (m && m.role) || "assistant";
     const text = (n && typeof n.normalizeText === "function") ? n.normalizeText(m && m.contentText) : String(m && m.contentText || "");
-    const hash = (n && typeof n.fnv1a32 === "function") ? n.fnv1a32(`${role}|${text}`) : `${role}|${text}`;
+    const mdRaw = (m && m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
+    const md = (n && typeof n.normalizeText === "function") ? n.normalizeText(mdRaw) : mdRaw;
+    const hashBase = md ? `${role}|${text}|md:${md}` : `${role}|${text}`;
+    const hash = (n && typeof n.fnv1a32 === "function") ? n.fnv1a32(hashBase) : hashBase;
     const key = ensureMessageKey(m, sequence);
     return { key, fp: `${key}:${hash}` };
   }

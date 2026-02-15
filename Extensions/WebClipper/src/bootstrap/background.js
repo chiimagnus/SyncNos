@@ -132,11 +132,13 @@
     for (const m of messages || []) {
       if (!m || !m.messageKey) continue;
       const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
+      const incomingMarkdown = (m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
       const baseRecord = {
         conversationId,
         messageKey: m.messageKey,
         role: m.role || "assistant",
         contentText: m.contentText || "",
+        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || "" : ""),
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
         updatedAt: m.updatedAt || Date.now()
       };
@@ -169,11 +171,13 @@
       if (!m || !m.messageKey) continue;
       presentKeys.add(m.messageKey);
       const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
+      const incomingMarkdown = (m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
       const baseRecord = {
         conversationId,
         messageKey: m.messageKey,
         role: m.role || "assistant",
         contentText: m.contentText || "",
+        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || "" : ""),
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
         updatedAt: m.updatedAt || Date.now()
       };
@@ -334,7 +338,7 @@
             continue;
           }
           const messages = await getMessagesByConversationId(id);
-          const blocks = NS.notionSyncService.messagesToBlocks(messages);
+          const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
           try {
             let pageId = convo.notionPageId || "";
             if (pageId) {
