@@ -195,6 +195,32 @@
     }
   }
 
+  function sanitizeHttpUrl(url) {
+    const text = String(url || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text)) return text;
+    return "";
+  }
+
+  function openHttpUrl(url) {
+    const safeUrl = sanitizeHttpUrl(url);
+    if (!safeUrl) return false;
+    try {
+      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
+        chrome.tabs.create({ url: safeUrl });
+        return true;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      window.open(safeUrl, "_blank", "noopener,noreferrer");
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
   function disableImageDrag(target) {
     if (!target) return;
     const isImage = target.tagName && String(target.tagName).toLowerCase() === "img";
@@ -226,6 +252,8 @@
     createZipBlob,
     conversationToMarkdown,
     openUrl,
+    sanitizeHttpUrl,
+    openHttpUrl,
     disableImageDrag
   };
 })();

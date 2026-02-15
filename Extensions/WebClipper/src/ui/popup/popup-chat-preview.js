@@ -46,12 +46,12 @@
     return "Message";
   }
 
-  function sanitizeHref(href) {
+  const sanitizeHref = core.sanitizeHttpUrl || ((href) => {
     const text = String(href || "").trim();
     if (!text) return "";
     if (/^https?:\/\//i.test(text)) return text;
     return "";
-  }
+  });
 
   function getMarkdownRenderer() {
     if (markdownRenderer !== undefined) return markdownRenderer;

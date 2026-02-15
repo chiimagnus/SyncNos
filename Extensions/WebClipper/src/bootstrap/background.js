@@ -57,7 +57,6 @@
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
-    ENSURE_DATABASES: "notionEnsureDatabases",
     SYNC_CONVERSATIONS: "notionSyncConversations"
   });
 
@@ -303,17 +302,6 @@
       case NOTION_MESSAGE_TYPES.DISCONNECT: {
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
         return ok({ disconnected: true });
-      }
-      case NOTION_MESSAGE_TYPES.ENSURE_DATABASES: {
-        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
-        if (!token || !token.accessToken) return err("notion not connected");
-        const parent = await new Promise((resolve) => {
-          chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
-        });
-        if (!parent) return err("missing parentPageId");
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
-        const res = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
-        return ok(res);
       }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
