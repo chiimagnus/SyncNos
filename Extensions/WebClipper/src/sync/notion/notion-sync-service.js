@@ -146,6 +146,33 @@
     return out;
   }
 
+  function splitRichTextItems(list) {
+    const out = [];
+    for (const item of list || []) {
+      if (!item) continue;
+      if (item.type !== "text") {
+        out.push(item);
+        continue;
+      }
+      const link = item.text && item.text.link ? item.text.link : null;
+      const content = String(item.text && item.text.content ? item.text.content : "");
+      if (content.length <= MAX_TEXT) {
+        out.push(item);
+        continue;
+      }
+      let remaining = content;
+      while (remaining.length) {
+        const take = remaining.slice(0, MAX_TEXT);
+        remaining = remaining.slice(take.length);
+        out.push({
+          ...item,
+          text: link ? { content: take, link } : { content: take }
+        });
+      }
+    }
+    return out;
+  }
+
   function chunkRichText(list) {
     const chunks = [];
     let current = [];
@@ -344,6 +371,92 @@
     const lines = src.split("\n");
     const out = [];
 
+    function isTableSeparatorLine(line) {
+      // Examples:
+      // | --- | --- |
+      // | :--- | ---: |
+      const t = String(line || "").trim();
+      if (!t) return false;
+      return /^(\|?\s*:?-{3,}:?\s*)+(\|\s*:?-{3,}:?\s*)+\|?$/.test(t);
+    }
+
+    function splitTableRow(line) {
+      // Split on unescaped pipes. Keep escaped pipes as literal `|`.
+      let s = String(line || "").trim();
+      if (!s) return [];
+      if (s.startsWith("|")) s = s.slice(1);
+      if (s.endsWith("|")) s = s.slice(0, -1);
+      const cells = [];
+      let cur = "";
+      for (let i = 0; i < s.length; i += 1) {
+        const ch = s[i];
+        const prev = i > 0 ? s[i - 1] : "";
+        if (ch === "|" && prev !== "\\") {
+          cells.push(cur.trim());
+          cur = "";
+          continue;
+        }
+        if (ch === "|" && prev === "\\") {
+          // Replace escaped pipe by removing the escape.
+          cur = cur.slice(0, -1) + "|";
+          continue;
+        }
+        cur += ch;
+      }
+      cells.push(cur.trim());
+      return cells;
+    }
+
+    function looksLikeTableRow(line) {
+      const t = String(line || "").trim();
+      if (!t) return false;
+      if (!t.includes("|")) return false;
+      const cells = splitTableRow(t);
+      return cells.length >= 2 && cells.some((c) => String(c || "").trim().length);
+    }
+
+    function cellRichText(cellText) {
+      const rich = inlineMarkdownToRichText(String(cellText || ""));
+      return splitRichTextItems(mergeRichText(rich));
+    }
+
+    function tableBlockFromMarkdown({ headerCells, bodyRows }) {
+      const tableWidth = Math.max(
+        headerCells.length,
+        ...bodyRows.map((r) => r.length)
+      );
+      if (tableWidth < 2) return null;
+
+      function padRow(row) {
+        const r = Array.isArray(row) ? row.slice() : [];
+        while (r.length < tableWidth) r.push("");
+        return r;
+      }
+
+      const rows = [];
+      rows.push(padRow(headerCells));
+      for (const r of bodyRows) rows.push(padRow(r));
+
+      const children = rows.map((cells) => ({
+        object: "block",
+        type: "table_row",
+        table_row: {
+          cells: cells.map((c) => cellRichText(c))
+        }
+      }));
+
+      return {
+        object: "block",
+        type: "table",
+        table: {
+          table_width: tableWidth,
+          has_column_header: true,
+          has_row_header: false
+        },
+        children
+      };
+    }
+
     function isBlank(line) {
       return !String(line || "").trim();
     }
@@ -384,6 +497,25 @@
       if (isBlank(line)) {
         i += 1;
         continue;
+      }
+
+      // Markdown table (convert into Notion `table` block).
+      // Require: header row + separator row.
+      if (looksLikeTableRow(line) && i + 1 < lines.length && isTableSeparatorLine(lines[i + 1])) {
+        const headerCells = splitTableRow(line);
+        i += 2; // skip header + separator
+        const bodyRows = [];
+        while (i < lines.length && looksLikeTableRow(lines[i])) {
+          bodyRows.push(splitTableRow(lines[i]));
+          i += 1;
+        }
+        const tableBlock = tableBlockFromMarkdown({ headerCells, bodyRows });
+        if (tableBlock) {
+          out.push(tableBlock);
+          continue;
+        }
+        // Fallback: if table parse failed, treat header line as normal text.
+        i -= (1 + bodyRows.length);
       }
 
       if (trimmed === "---") {
