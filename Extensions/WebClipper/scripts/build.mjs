@@ -136,9 +136,9 @@ concatParts({
   parts: [
     readText(join(root, "src/storage/schema.js")),
     readText(join(root, "src/sync/notion/oauth-config.js")),
-    readText(join(root, "src/sync/notion/oauth-client.js")),
     readText(join(root, "src/sync/notion/token-store.js")),
     readText(join(root, "src/sync/notion/notion-api.js")),
+    readText(join(root, "src/sync/notion/notion-ai.js")),
     readText(join(root, "src/sync/notion/notion-db-manager.js")),
     readText(join(root, "src/sync/notion/notion-sync-service.js")),
     backgroundText
@@ -155,6 +155,7 @@ concatFiles({
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
     "src/vendor/markdown-it.min.js",
+    "src/sync/notion/oauth-config.js",
     "src/sync/notion/notion-api.js",
     "src/ui/popup/popup-core.js",
     "src/ui/popup/popup-tabs.js",
@@ -177,6 +178,8 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/vendor\/markdown-it\.min\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/oauth-config\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/notion-api\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-core\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-tabs\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-list\.js"><\/script>\s*/g, "")
