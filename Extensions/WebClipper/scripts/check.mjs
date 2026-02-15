@@ -43,6 +43,7 @@ const jsFiles = [
   "src/collectors/collector-contract.js",
   "src/collectors/registry.js",
   "src/collectors/runtime-observer.js",
+  "src/collectors/collector-utils.js",
   "src/storage/incremental-updater.js",
   "src/storage/schema.js",
   "src/shared/normalize.js",

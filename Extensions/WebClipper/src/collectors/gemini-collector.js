@@ -18,7 +18,7 @@
   }
 
   function findConversationKey() {
-    return (location.pathname || "/").replace(/\//g, "_").replace(/^_+/, "") || location.href.split("?")[0];
+    return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
   function getConversationRoot() {
@@ -26,10 +26,7 @@
   }
 
   function inEditMode(root) {
-    if (!root) return false;
-    const ta = root.querySelector("textarea");
-    if (!ta) return false;
-    return document.activeElement === ta || ta.contains(document.activeElement);
+    return NS.collectorUtils.inEditMode(root);
   }
 
   function collectMessages() {
@@ -101,4 +98,3 @@
     NS.collectorsRegistry.register({ id: "gemini", matches, collector: api });
   }
 })();
-
