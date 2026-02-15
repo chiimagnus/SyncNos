@@ -309,9 +309,9 @@
           chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
         });
         if (!parent) return err("missing parentPageId");
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabasesForSources) return err("notion db manager missing");
-        const mapping = await NS.notionDbManager.ensureDatabasesForSources({ accessToken: token.accessToken, parentPageId: parent });
-        return ok(mapping);
+        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
+        const res = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
+        return ok(res);
       }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
@@ -324,20 +324,16 @@
         if (!ids.length) return err("no conversationIds");
         if (!NS.notionSyncService) return err("notion sync service missing");
 
-        // Resolve sources up-front and ensure databases for them.
         const convos = [];
-        const sourceSet = new Set();
         for (const id of ids) {
           const convo = await getConversationById(id);
           convos.push({ id, convo });
-          if (convo && convo.source) sourceSet.add(convo.source);
         }
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabasesForSources) return err("notion db manager missing");
-        const mapping = await NS.notionDbManager.ensureDatabasesForSources({
-          accessToken: token.accessToken,
-          parentPageId: parent,
-          sources: Array.from(sourceSet)
-        });
+
+        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
+        const db = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
+        const dbId = db && db.databaseId ? db.databaseId : "";
+        if (!dbId) return err("missing databaseId");
 
         const results = [];
         for (const item of convos) {
@@ -347,24 +343,37 @@
             results.push({ conversationId: id, ok: false, error: "conversation not found" });
             continue;
           }
-          const dbId = mapping[convo.source] || "";
-          if (!dbId) {
-            results.push({ conversationId: id, ok: false, error: `unsupported source: ${convo.source}` });
-            continue;
-          }
           const messages = await getMessagesByConversationId(id);
           const blocks = NS.notionSyncService.messagesToBlocks(messages);
           try {
             let pageId = convo.notionPageId || "";
             if (pageId) {
-              await NS.notionSyncService.updatePageProperties(token.accessToken, { pageId, title: convo.title, url: convo.url });
+              let validForTargetDb = false;
+              try {
+                const page = await NS.notionSyncService.getPage(token.accessToken, pageId);
+                validForTargetDb = NS.notionSyncService.pageBelongsToDatabase(page, dbId);
+              } catch (_e) {
+                validForTargetDb = false;
+              }
+
+              if (!validForTargetDb) pageId = "";
+            }
+
+            if (pageId) {
+              await NS.notionSyncService.updatePageProperties(token.accessToken, {
+                pageId,
+                title: convo.title,
+                url: convo.url,
+                ai: convo.source
+              });
               await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
               await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
             } else {
               const created = await NS.notionSyncService.createPageInDatabase(token.accessToken, {
                 databaseId: dbId,
                 title: convo.title,
-                url: convo.url
+                url: convo.url,
+                ai: convo.source
               });
               pageId = created && created.id ? created.id : "";
               if (!pageId) throw new Error("create page failed");
