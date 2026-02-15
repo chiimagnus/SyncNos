@@ -6,16 +6,6 @@
     return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
   }
 
-  function isChatHost() {
-    try {
-      const hostname = location.hostname;
-      if (!hostname.includes("chatgpt.com") && !hostname.includes("chat.openai.com")) return false;
-      return true;
-    } catch (_e) {
-      return false;
-    }
-  }
-
   function findConversationIdFromUrl() {
     // Prefer URL path for ChatGPT. Works for both chat.openai.com and chatgpt.com.
     const m = location.pathname.match(/^\/c\/([^/?#]+)/) || location.pathname.match(/^\/g\/[^/]+\/c\/([^/?#]+)/);
@@ -131,7 +121,7 @@
   }
 
   function capture(options) {
-    if (!isChatHost()) return null;
+    if (!matches({ hostname: location.hostname })) return null;
     const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
     const conversationKey = findConversationIdFromUrl() || makeFallbackConversationKey(messages);
