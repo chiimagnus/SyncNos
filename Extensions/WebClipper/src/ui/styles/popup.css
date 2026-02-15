@@ -857,8 +857,28 @@ main {
 .chatPreviewMsgMarkdown {
   word-break: break-word;
   overflow-wrap: anywhere;
+  overflow-x: auto;
   line-height: 1.42;
   color: var(--text);
+}
+
+.chatPreviewMsgMarkdown table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+
+.chatPreviewMsgMarkdown th,
+.chatPreviewMsgMarkdown td {
+  border: 1px solid rgba(217, 89, 38, 0.2);
+  padding: 4px 6px;
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.chatPreviewMsgMarkdown thead th {
+  background: rgba(255, 241, 234, 0.75);
+  font-weight: 700;
 }
 
 .chatPreviewMsgMarkdown > *:first-child {

@@ -67,6 +67,11 @@
       linkify: true,
       typographer: false
     });
+    try {
+      if (typeof md.enable === "function") md.enable(["table"]);
+    } catch (_e) {
+      // ignore
+    }
     const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, _env, self) => {
       return self.renderToken(tokens, idx, options);
     });
