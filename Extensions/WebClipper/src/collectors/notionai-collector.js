@@ -280,8 +280,88 @@
     );
   }
 
+  function escapeMarkdownTableCell(value) {
+    const text = String(value || "").replace(/\n+/g, " ").trim();
+    // Escape pipes to avoid breaking table columns.
+    return text.replace(/\|/g, "\\|");
+  }
+
+  function tableRowsFromHtmlTable(tableEl) {
+    const rows = Array.from(tableEl.querySelectorAll("tr"));
+    return rows.map((tr) => Array.from(tr.querySelectorAll("th, td")));
+  }
+
+  function tableRowsFromRoleGrid(gridEl) {
+    const rows = Array.from(gridEl.querySelectorAll("[role='row']"));
+    return rows.map((row) => Array.from(row.querySelectorAll("[role='gridcell'],[role='cell'],[role='columnheader'],[role='rowheader']")));
+  }
+
+  function cellToMarkdown(cellEl) {
+    if (!cellEl) return "";
+    const leaf = cellEl.querySelector ? cellEl.querySelector("[data-content-editable-leaf='true']") : null;
+    const md = leafToMarkdown(leaf);
+    if (md) return md;
+    const fallback = cellEl.innerText || cellEl.textContent || "";
+    return normalizeMarkdownText(fallback).trim();
+  }
+
+  function extractTableMarkdown(block) {
+    if (!block || !block.querySelector) return "";
+
+    const table = block.querySelector("table");
+    const grid = block.querySelector("[role='grid'],[role='table']");
+
+    let rows = [];
+    if (table) rows = tableRowsFromHtmlTable(table);
+    else if (grid) rows = tableRowsFromRoleGrid(grid);
+
+    function fallbackToTsv() {
+      const raw = String(block.innerText || block.textContent || "");
+      const lines = raw.split("\n").map((l) => l.trim()).filter((l) => l.length);
+      const hasTabs = lines.some((l) => l.includes("\t"));
+      if (hasTabs) {
+        const matrix = lines.map((l) => l.split("\t").map((c) => escapeMarkdownTableCell(c)));
+        const cols = Math.max(0, ...matrix.map((r) => r.length));
+        if (cols >= 2 && matrix.length >= 1) {
+          const header = matrix[0].concat(Array(Math.max(0, cols - matrix[0].length)).fill(""));
+          const sep = Array(cols).fill("---");
+          const out = [];
+          out.push(`| ${header.join(" | ")} |`);
+          out.push(`| ${sep.join(" | ")} |`);
+          for (const r of matrix.slice(1)) {
+            const row = r.concat(Array(Math.max(0, cols - r.length)).fill(""));
+            out.push(`| ${row.join(" | ")} |`);
+          }
+          return out.join("\n").trim();
+        }
+      }
+      return "";
+    }
+
+    // Fallback: try to interpret `innerText` as TSV (Notion often uses tabs between cells).
+    if (!rows.length) return fallbackToTsv();
+
+    const matrix = rows.map((cells) => cells.map((cell) => escapeMarkdownTableCell(cellToMarkdown(cell))));
+    const cols = Math.max(0, ...matrix.map((r) => r.length));
+    if (cols < 2 || matrix.length < 1) return fallbackToTsv();
+
+    const out = [];
+    const headerRow = matrix[0].concat(Array(Math.max(0, cols - matrix[0].length)).fill(""));
+    const sepRow = Array(cols).fill("---");
+    out.push(`| ${headerRow.join(" | ")} |`);
+    out.push(`| ${sepRow.join(" | ")} |`);
+    for (const r of matrix.slice(1)) {
+      const row = r.concat(Array(Math.max(0, cols - r.length)).fill(""));
+      out.push(`| ${row.join(" | ")} |`);
+    }
+    return out.join("\n").trim();
+  }
+
   function blockToMarkdown(block) {
     const type = getBlockTypeName(block);
+
+    const tableMd = extractTableMarkdown(block);
+    if (tableMd) return tableMd;
 
     if (type === "divider") return "---";
 
