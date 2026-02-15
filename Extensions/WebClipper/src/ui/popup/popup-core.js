@@ -87,7 +87,6 @@
   const state = {
     conversations: [],
     selectedIds: new Set(),
-    hoveredConversationId: null,
     previewCache: new Map(),
     previewRequestToken: 0
   };

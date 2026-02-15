@@ -124,7 +124,6 @@
   }
 
   function hideNow() {
-    state.hoveredConversationId = null;
     invalidatePendingRequests();
 
     if (preview.activeAnchorEl) setAnchorActive(preview.activeAnchorEl, false);
@@ -232,7 +231,6 @@
     const conversation = findConversationById(id);
     if (!conversation) return;
 
-    state.hoveredConversationId = id;
     preview.activeConversationId = id;
     revealPopover(anchorEl);
 
