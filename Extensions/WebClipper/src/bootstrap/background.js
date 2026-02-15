@@ -88,12 +88,14 @@
     const existing = await reqToPromise(idx.get([payload.source, payload.conversationKey]));
 
     const now = Date.now();
+    const nextTitle = (payload.title && String(payload.title).trim()) ? String(payload.title).trim() : "";
+    const nextUrl = (payload.url && String(payload.url).trim()) ? String(payload.url).trim() : "";
     const baseRecord = {
       sourceType: payload.sourceType || "chat",
       source: payload.source,
       conversationKey: payload.conversationKey,
-      title: payload.title || "",
-      url: payload.url || "",
+      title: nextTitle || (existing ? existing.title || "" : ""),
+      url: nextUrl || (existing ? existing.url || "" : ""),
       // Optional metadata (mainly for `sourceType=article`, but safe for all sources).
       author: payload.author || (existing ? existing.author || "" : ""),
       publishedAt: payload.publishedAt || (existing ? existing.publishedAt || "" : ""),
