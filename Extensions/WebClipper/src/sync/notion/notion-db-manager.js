@@ -5,16 +5,9 @@
   const DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
 
   function buildAiOptions() {
-    return [
-      { name: "ChatGPT", color: "green" },
-      { name: "Claude", color: "purple" },
-      { name: "Gemini", color: "yellow" },
-      { name: "DeepSeek", color: "gray" },
-      { name: "Kimi", color: "blue" },
-      { name: "豆包", color: "orange" },
-      { name: "元宝", color: "red" },
-      { name: "NotionAI", color: "brown" }
-    ];
+    const api = NS.notionAi;
+    if (api && typeof api.buildAiOptions === "function") return api.buildAiOptions();
+    return [];
   }
 
   async function getDatabase(accessToken, databaseId) {

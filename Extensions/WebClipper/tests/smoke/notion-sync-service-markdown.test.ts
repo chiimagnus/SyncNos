@@ -1,9 +1,20 @@
 import { describe, expect, it } from "vitest";
 
+function loadNotionAi() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/sync/notion/notion-ai.js");
+}
+
 describe("notion-sync-service markdown", () => {
   it("parses inline markdown into rich_text", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
+
+    loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
@@ -25,6 +36,8 @@ describe("notion-sync-service markdown", () => {
   it("converts markdown to notion blocks (basic types)", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
+
+    loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
@@ -71,6 +84,8 @@ describe("notion-sync-service markdown", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
+    loadNotionAi();
+
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -85,4 +100,3 @@ describe("notion-sync-service markdown", () => {
     expect(blocks.some((b: any) => b && b.type === "bulleted_list_item")).toBe(true);
   });
 });
-
