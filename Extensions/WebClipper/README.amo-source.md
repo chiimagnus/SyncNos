@@ -7,7 +7,7 @@ This file describes how to build the submitted Firefox add-on package (`.xpi`) f
 - Human-readable source files under `src/` (not transpiled / concatenated / minified)
 - Build scripts under `scripts/`
 - `package.json` and `package-lock.json` for reproducible installs
-- Third-party browser bundle (Markdown renderer) under `src/vendor/` with its license file
+- Third-party dependency `markdown-it` installed via npm (used for popup Markdown preview)
 
 ## Requirements
 
@@ -45,6 +45,7 @@ FIREFOX_EXTENSION_ID="your-addon-id@your.domain" FIREFOX_MIN_VERSION="142.0" \
 Notes:
 
 - The build uses `terser` to minify/mangle the final bundles in `dist-firefox/`.
+- The build reads `node_modules/markdown-it/dist/markdown-it.js` (unminified upstream bundle) and bundles it into `dist-firefox/popup.js`.
 - Firefox compatibility: the built manifest uses `background.scripts` (Firefox) and injects `browser_specific_settings.gecko.data_collection_permissions` (required by AMO).
 
 ## Build Chrome/Chromium Dist (Optional)
@@ -52,4 +53,3 @@ Notes:
 ```bash
 npm --prefix Extensions/WebClipper run build
 ```
-

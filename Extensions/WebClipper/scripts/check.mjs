@@ -97,7 +97,7 @@ if (cli.syntax) {
     "src/sync/notion/notion-sync-service.js",
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
-    "src/vendor/markdown-it.js",
+    "node_modules/markdown-it/dist/markdown-it.js",
     "src/ui/popup/popup-core.js",
     "src/ui/popup/popup-tabs.js",
     "src/ui/popup/popup-list.js",
