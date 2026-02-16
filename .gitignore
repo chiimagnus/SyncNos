@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-firefox/
+*.xpi
 .DS_Store
 
 
