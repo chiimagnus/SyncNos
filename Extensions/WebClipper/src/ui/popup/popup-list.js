@@ -75,7 +75,7 @@
 
   function render() {
     if (!els.list) return;
-    els.list.innerHTML = "";
+    els.list.replaceChildren();
     for (const conversation of state.conversations) {
       const row = document.createElement("div");
       row.className = "row";

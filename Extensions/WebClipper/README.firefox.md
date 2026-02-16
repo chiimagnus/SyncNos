@@ -34,6 +34,7 @@ Firefox 正式分发需要 AMO 签名；你需要为扩展设置稳定的 id。
 
 - 默认 id 在构建时注入的 `browser_specific_settings.gecko.id`
 - 可通过环境变量 `FIREFOX_EXTENSION_ID` / `FIREFOX_MIN_VERSION` 覆盖
+- 构建会自动注入 `browser_specific_settings.gecko.data_collection_permissions`（默认 `required: [\"none\"]`），满足 AMO 对新扩展的 manifest 要求
 
 > AMO 审核提示：如果你上传的包里包含压缩/混淆后的代码（本项目构建确实会 terser 压缩并 mangle），通常需要同时提供**未混淆的源码包**（Source code / Source package），否则很容易被要求补交或被打回。
 
