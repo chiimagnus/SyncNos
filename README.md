@@ -5,7 +5,7 @@ English | [中文](README.zh-CN.md)
 This project has two parts:
 
 1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
-2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**.
+2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**.
 
 ## How It Works
 
@@ -43,8 +43,9 @@ xcodebuild -scheme SyncNos -configuration Debug build
 
 This repository includes a standalone MV3 browser extension under `Extensions/WebClipper/`.
 
-- Supported browsers: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (unsigned, temporary load)**
+- Supported browsers: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**
 - Download (Releases): https://github.com/chiimagnus/SyncNos/releases
+- Firefox (AMO): https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
 
 ### What It Does
 
@@ -61,9 +62,9 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI
 - Go to GitHub Releases and download the attached assets:
   - `syncnos-webclipper-chrome-v*.zip` (Chrome)
   - `syncnos-webclipper-edge-v*.zip` (Edge)
-  - `syncnos-webclipper-firefox-v*.xpi` (Firefox, unsigned)
+  - `syncnos-webclipper-firefox-v*.xpi` (Firefox, for local testing only)
 - Chrome/Edge: unzip, then load unpacked in `chrome://extensions` / `edge://extensions` (Developer mode).
-- Firefox: use `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on…” and select the `.xpi` (or unzip and select `manifest.json`).
+- Firefox: install from AMO (recommended). If you need local testing, use `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on…” and select the `.xpi` (or unzip and select `manifest.json`).
 
 ### Development
 

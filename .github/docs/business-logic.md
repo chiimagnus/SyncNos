@@ -5,7 +5,7 @@
 SyncNos 是一套“把分散知识沉淀到 Notion”的工具组合，包含：
 
 - **SyncNos（macOS App）**：将多个内容来源中的高亮/笔记/消息摘要统一整理后同步到 Notion，形成可检索、可持续增量更新的知识库。
-- **WebClipper（Chrome 扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion。
+- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion；Firefox 版本已上架 AMO：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
 
 - 给谁用：需要把分散在阅读器、稍后读、读书应用、以及聊天截图中的信息沉淀到 Notion 的用户
 - 核心体验：

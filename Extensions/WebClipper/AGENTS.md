@@ -7,7 +7,7 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 - 目标目录：`Extensions/WebClipper/`
 - 平台：
   - Chrome / Chromium（开发时通过“加载已解压的扩展程序”）
-  - Firefox（发布通过 AMO 签名；开发可用临时扩展）
+  - Firefox（已上架 AMO：https://addons.mozilla.org/firefox/addon/syncnos-webclipper/；开发可用临时扩展）
 - 支持的网站（content scripts）：ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI
 - 数据：本地存储（IndexedDB + `chrome.storage.local`）；网络请求主要是手动同步时的 Notion OAuth + Notion API
 
@@ -44,6 +44,8 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
 
 ## Firefox / AMO
+
+- AMO（商店页）：https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
 
 ### 本地加载（Firefox 临时扩展）
 
