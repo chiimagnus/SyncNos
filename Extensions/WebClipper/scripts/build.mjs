@@ -161,7 +161,7 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
     : (existingGecko.id || "syncnos-webclipper@syncnos.app");
   const resolvedMinVersion = (geckoMinVersion && String(geckoMinVersion).trim())
     ? String(geckoMinVersion).trim()
-    : (existingGecko.strict_min_version || "140.0");
+    : (existingGecko.strict_min_version || "142.0");
 
   next.browser_specific_settings = {
     ...existingBss,
