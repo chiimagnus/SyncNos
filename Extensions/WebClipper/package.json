@@ -1,7 +1,7 @@
 {
   "name": "webclipper",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.14.6",
   "description": "WebClipper Chrome extension (ChatGPT + NotionAI) MVP",
   "type": "commonjs",
   "scripts": {
