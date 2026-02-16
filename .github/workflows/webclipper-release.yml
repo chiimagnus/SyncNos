@@ -53,11 +53,11 @@ jobs:
           mkdir -p release-artifacts
           (
             cd Extensions/WebClipper/dist
-            zip -r "../../release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" .
+            zip -r "${GITHUB_WORKSPACE}/release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" .
           )
           (
             cd Extensions/WebClipper/dist
-            zip -r "../../release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" .
+            zip -r "${GITHUB_WORKSPACE}/release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" .
           )
           cp Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
