@@ -9,7 +9,8 @@
     "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox --no-syntax",
     "test": "vitest run",
     "build": "node scripts/build.mjs",
-    "build:firefox": "node scripts/build.mjs --target=firefox --zip"
+    "build:firefox": "node scripts/build.mjs --target=firefox --zip",
+    "package:amo-source": "node scripts/package-amo-source.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
