@@ -163,6 +163,9 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
 cpSync(join(root, "icons/icon-16.png"), join(out, "icon-16.png"));
 cpSync(join(root, "icons/icon-48.png"), join(out, "icon-48.png"));
 cpSync(join(root, "icons/icon-128.png"), join(out, "icon-128.png"));
+// Popup HTML references icon assets under `icons/*` (source layout).
+// Keep an `icons/` folder in dist so those relative URLs keep working across browsers.
+cpSync(join(root, "icons"), join(out, "icons"), { recursive: true });
 concatCssFiles({
   outFile: join(out, "popup.css"),
   files: ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/popup.css"]
