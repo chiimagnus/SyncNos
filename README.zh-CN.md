@@ -5,7 +5,7 @@
 此项目分为两部分：
 
 1. **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion。支持：**macOS 14.0+**。
-2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（JSON/Markdown）与手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（未签名，临时加载）**。
+2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（JSON/Markdown）与手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**。
 
 ## 工作流程
 
@@ -43,8 +43,9 @@ xcodebuild -scheme SyncNos -configuration Debug build
 
 仓库内包含一个独立的 MV3 浏览器扩展，位于 `Extensions/WebClipper/`。
 
-- 支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（未签名，临时加载）**
+- 支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**
 - 下载（Releases）：https://github.com/chiimagnus/SyncNos/releases
+- Firefox（AMO）：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
 
 ### 作用
 
@@ -61,9 +62,9 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / NotionAI
 - 前往 GitHub Releases 下载对应附件：
   - `syncnos-webclipper-chrome-v*.zip`（Chrome）
   - `syncnos-webclipper-edge-v*.zip`（Edge）
-  - `syncnos-webclipper-firefox-v*.xpi`（Firefox，未签名）
+  - `syncnos-webclipper-firefox-v*.xpi`（Firefox，仅用于本地测试）
 - Chrome/Edge：解压后，在 `chrome://extensions` / `edge://extensions`（开发者模式）中“加载已解压的扩展程序”。
-- Firefox：使用 `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on...” 选择 `.xpi`（或解压后选择 `manifest.json`）。
+- Firefox：推荐从 AMO 安装；如需本地测试，使用 `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on...” 选择 `.xpi`（或解压后选择 `manifest.json`）。
 
 ### 开发
 
