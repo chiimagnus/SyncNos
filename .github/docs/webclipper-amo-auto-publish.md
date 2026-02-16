@@ -46,9 +46,13 @@ node -e "const fs=require('fs');const p='Extensions/WebClipper/manifest.json';co
 - `AMO_JWT_ISSUER`：API Key（issuer）
 - `AMO_JWT_SECRET`：API Secret
 
-同时你还需要 **AMO addon_id**（数字 id）：
+同时你还需要一个 **Add-on 标识符**（三选一即可）：
 
-- 在 AMO Developer Hub 该插件的 URL 或页面信息中能找到 `addon_id`（是一个数字）
+- **数字 addon id**（例如 `1234567`）
+- **addon slug**（公开页面 URL 里的那段，例如 `syncnos-webclipper`）
+- **addon guid**（通常等于你的扩展 ID / `gecko.id`，例如 `syncnos-webclipper@syncnos.app`）
+
+本项目的 GitHub Secret 名称仍然叫 `AMO_ADDON_ID`，但它实际可以填写 **id/slug/guid** 任意一种。
 
 ### 4) 配置 GitHub Secrets
 
@@ -111,4 +115,3 @@ GitHub Actions 对 tag 触发时会使用 **tag 指向的 commit 上的 workflow
 ## 下一步（Unlisted）
 
 当你要做 Unlisted（仅签名分发）时，推荐在 AMO 创建一个 **单独的 Unlisted Add-on**（独立 addon_id），然后复用同一套工作流/脚本，仅把 `AMO_ADDON_ID` 切换到 Unlisted 的 addon_id。
-
