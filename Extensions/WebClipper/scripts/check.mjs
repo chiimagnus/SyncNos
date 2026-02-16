@@ -57,7 +57,9 @@ try {
 }
 
 if (manifest.manifest_version !== 3) fail("manifest_version must be 3");
-if (!manifest.background?.service_worker) fail("background.service_worker missing");
+if (!manifest.background?.service_worker && !(Array.isArray(manifest.background?.scripts) && manifest.background.scripts.length > 0)) {
+  fail("background.service_worker or background.scripts missing");
+}
 if (!manifest.action?.default_popup) fail("action.default_popup missing");
 if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length === 0) fail("content_scripts missing");
 if (!manifest.icons?.["16"] || !manifest.icons?.["48"] || !manifest.icons?.["128"]) fail("icons 16/48/128 missing");

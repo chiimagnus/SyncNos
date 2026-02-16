@@ -132,13 +132,21 @@
 
     if (!els.chatPreviewPopover) return;
     els.chatPreviewPopover.hidden = true;
-    els.chatPreviewPopover.innerHTML = "";
+    els.chatPreviewPopover.replaceChildren();
     els.chatPreviewPopover.removeAttribute("data-state");
   }
 
   function renderShell({ bodyHtml, stateName }) {
     if (!els.chatPreviewPopover) return;
-    els.chatPreviewPopover.innerHTML = `<div class="chatPreviewBody">${bodyHtml}</div>`;
+    const body = document.createElement("div");
+    body.className = "chatPreviewBody";
+    const html = String(bodyHtml || "");
+    if (html) {
+      const range = document.createRange();
+      range.selectNode(body);
+      body.appendChild(range.createContextualFragment(html));
+    }
+    els.chatPreviewPopover.replaceChildren(body);
     els.chatPreviewPopover.dataset.state = String(stateName || "ready");
   }
 

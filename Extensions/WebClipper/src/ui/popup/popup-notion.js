@@ -44,7 +44,7 @@
     const pages = rootPages.length ? rootPages : withoutDatabaseEntries;
 
     if (!els.notionPages) return;
-    els.notionPages.innerHTML = "";
+    els.notionPages.replaceChildren();
     for (const page of pages) {
       const opt = document.createElement("option");
       opt.value = page.id;
@@ -124,7 +124,7 @@
       setNotionConnectBusy(false);
       stopNotionConnectPolling();
       notionParentPagesLoaded = false;
-      if (els.notionPages) els.notionPages.innerHTML = "";
+      if (els.notionPages) els.notionPages.replaceChildren();
       return;
     }
     if (res.data.connected) {
