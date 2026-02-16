@@ -390,6 +390,17 @@ body {
   box-shadow: var(--shadow);
 }
 
+.btn.danger {
+  border-color: rgba(199, 55, 47, 0.35);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.btn.danger:hover {
+  border-color: rgba(199, 55, 47, 0.6);
+  background: #ffd6d0;
+}
+
 .btn:active {
   transform: translateY(0);
 }
@@ -635,6 +646,35 @@ main {
   word-break: break-word;
 }
 
+.sourceOpen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.sourceOpen:hover {
+  border-color: rgba(217, 89, 38, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+}
+
+.sourceOpen:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .sourceTag {
   display: inline-flex;
   align-items: center;
@@ -828,8 +868,28 @@ main {
 .chatPreviewMsgMarkdown {
   word-break: break-word;
   overflow-wrap: anywhere;
+  overflow-x: auto;
   line-height: 1.42;
   color: var(--text);
+}
+
+.chatPreviewMsgMarkdown table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+
+.chatPreviewMsgMarkdown th,
+.chatPreviewMsgMarkdown td {
+  border: 1px solid rgba(217, 89, 38, 0.2);
+  padding: 4px 6px;
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.chatPreviewMsgMarkdown thead th {
+  background: rgba(255, 241, 234, 0.75);
+  font-weight: 700;
 }
 
 .chatPreviewMsgMarkdown > *:first-child {

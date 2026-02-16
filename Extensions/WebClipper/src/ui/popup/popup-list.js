@@ -61,9 +61,21 @@
     els.chkSelectAll.checked = total > 0 && selected === total;
   }
 
+  function syncActionButtons() {
+    const hasSelection = state.selectedIds.size > 0;
+    if (els.btnExport) els.btnExport.disabled = !hasSelection;
+    if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection;
+    if (els.btnDelete) els.btnDelete.disabled = !hasSelection;
+
+    if (!hasSelection) {
+      if (els.exportMenu) els.exportMenu.hidden = true;
+      if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "false");
+    }
+  }
+
   function render() {
     if (!els.list) return;
-    els.list.innerHTML = "";
+    els.list.replaceChildren();
     for (const conversation of state.conversations) {
       const row = document.createElement("div");
       row.className = "row";
@@ -79,6 +91,7 @@
         if (checkbox.checked) state.selectedIds.add(conversation.id);
         else state.selectedIds.delete(conversation.id);
         syncSelectAllCheckbox();
+        syncActionButtons();
       });
       left.appendChild(checkbox);
 
@@ -100,6 +113,25 @@
       sub.className = "sub";
       const sourceRaw = conversation.sourceName || conversation.source || "";
       const { key: sourceKey, label: sourceLabel } = getSourceMeta(sourceRaw);
+
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "sourceOpen";
+      openBtn.setAttribute("aria-label", "Open original chat");
+      openBtn.title = "Open chat";
+      const safeUrl = core.sanitizeHttpUrl(conversation.url || "");
+      if (!safeUrl) {
+        openBtn.disabled = true;
+        openBtn.title = "No link available";
+      }
+      openBtn.textContent = "↗";
+      openBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (openBtn.disabled) return;
+        core.openHttpUrl(conversation.url || "");
+      });
+      sub.appendChild(openBtn);
 
       const sourceTag = document.createElement("span");
       sourceTag.className = `sourceTag sourceTag--${sourceKey}`;
@@ -144,6 +176,7 @@
     }).length;
     renderStats({ today, total });
     syncSelectAllCheckbox();
+    syncActionButtons();
   }
 
   async function refresh() {
@@ -168,6 +201,7 @@
       }
       render();
     });
+    syncActionButtons();
   }
 
   NS.popupList = {

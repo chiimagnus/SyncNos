@@ -13,9 +13,9 @@
     // eslint-disable-next-line no-undef
     importScripts(
       "../sync/notion/oauth-config.js",
-      "../sync/notion/oauth-client.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",
+      "../sync/notion/notion-ai.js",
       "../sync/notion/notion-db-manager.js",
       "../sync/notion/notion-sync-service.js"
     );
@@ -47,17 +47,15 @@
 
 	  const MESSAGE_TYPES = Object.freeze({
 	    UPSERT_CONVERSATION: "upsertConversation",
-	    UPSERT_MESSAGES_INCREMENTAL: "upsertMessagesIncremental",
 	    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
 	    GET_CONVERSATIONS: "getConversations",
 	    GET_CONVERSATION_DETAIL: "getConversationDetail",
-	    CLEAR_ALL: "clearAll"
+	    DELETE_CONVERSATIONS: "deleteConversations",
 	  });
 
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
-    ENSURE_DATABASES: "notionEnsureDatabases",
     SYNC_CONVERSATIONS: "notionSyncConversations"
   });
 
@@ -88,12 +86,14 @@
     const existing = await reqToPromise(idx.get([payload.source, payload.conversationKey]));
 
     const now = Date.now();
+    const nextTitle = (payload.title && String(payload.title).trim()) ? String(payload.title).trim() : "";
+    const nextUrl = (payload.url && String(payload.url).trim()) ? String(payload.url).trim() : "";
     const baseRecord = {
       sourceType: payload.sourceType || "chat",
       source: payload.source,
       conversationKey: payload.conversationKey,
-      title: payload.title || "",
-      url: payload.url || "",
+      title: nextTitle || (existing ? existing.title || "" : ""),
+      url: nextUrl || (existing ? existing.url || "" : ""),
       // Optional metadata (mainly for `sourceType=article`, but safe for all sources).
       author: payload.author || (existing ? existing.author || "" : ""),
       publishedAt: payload.publishedAt || (existing ? existing.publishedAt || "" : ""),
@@ -122,40 +122,6 @@
     return record;
   }
 
-  async function upsertMessagesIncremental(conversationId, messages) {
-    const db = await openDb();
-    const { t, stores } = tx(db, ["messages"], "readwrite");
-    const idx = stores.messages.index("by_conversationId_messageKey");
-
-    let upserted = 0;
-    for (const m of messages || []) {
-      if (!m || !m.messageKey) continue;
-      const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
-      const baseRecord = {
-        conversationId,
-        messageKey: m.messageKey,
-        role: m.role || "assistant",
-        contentText: m.contentText || "",
-        sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
-        updatedAt: m.updatedAt || Date.now()
-      };
-      const record = withOptionalId(existing && existing.id, baseRecord);
-      if (existing) {
-        await reqToPromise(stores.messages.put(record));
-      } else {
-        const id = await reqToPromise(stores.messages.add(record));
-        record.id = id;
-      }
-      upserted += 1;
-    }
-
-    await new Promise((r, rej) => {
-      t.oncomplete = r;
-      t.onerror = () => rej(t.error || new Error("transaction failed"));
-    });
-    return { upserted };
-  }
-
   async function syncConversationMessages(conversationId, messages) {
     const db = await openDb();
     const { t, stores } = tx(db, ["messages"], "readwrite");
@@ -168,11 +134,13 @@
       if (!m || !m.messageKey) continue;
       presentKeys.add(m.messageKey);
       const existing = await reqToPromise(idx.get([conversationId, m.messageKey]));
+      const incomingMarkdown = (m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
       const baseRecord = {
         conversationId,
         messageKey: m.messageKey,
         role: m.role || "assistant",
         contentText: m.contentText || "",
+        contentMarkdown: incomingMarkdown || (existing ? existing.contentMarkdown || "" : ""),
         sequence: Number.isFinite(m.sequence) ? m.sequence : 0,
         updatedAt: m.updatedAt || Date.now()
       };
@@ -238,19 +206,63 @@
     return items;
   }
 
-  async function clearAll() {
+  async function deleteConversationsByIds(conversationIds) {
+    const ids = Array.isArray(conversationIds)
+      ? conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+      : [];
+    if (!ids.length) return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0 };
+
     const db = await openDb();
     const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readwrite");
-    await Promise.all([
-      reqToPromise(stores.conversations.clear()),
-      reqToPromise(stores.messages.clear()),
-      reqToPromise(stores.sync_mappings.clear())
-    ]);
+
+    let deletedConversations = 0;
+    let deletedMessages = 0;
+    let deletedMappings = 0;
+
+    const msgIdx = stores.messages.index("by_conversationId_sequence");
+    const mappingIdx = stores.sync_mappings.index("by_source_conversationKey");
+
+    for (const id of ids) {
+      const convo = await reqToPromise(stores.conversations.get(id));
+      if (!convo) continue;
+
+      // Delete all messages under this conversation.
+      const range = IDBKeyRange.bound([id, -Infinity], [id, Infinity]);
+      const cursorReq = msgIdx.openCursor(range);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve, reject) => {
+        cursorReq.onerror = () => reject(cursorReq.error || new Error("cursor failed"));
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return resolve();
+          cursor.delete();
+          deletedMessages += 1;
+          cursor.continue();
+        };
+      });
+
+      // Delete notion mapping if present.
+      const source = convo.source || "";
+      const conversationKey = convo.conversationKey || "";
+      if (source && conversationKey) {
+        // eslint-disable-next-line no-await-in-loop
+        const mapping = await reqToPromise(mappingIdx.get([source, conversationKey]));
+        if (mapping && mapping.id) {
+          // eslint-disable-next-line no-await-in-loop
+          await reqToPromise(stores.sync_mappings.delete(mapping.id));
+          deletedMappings += 1;
+        }
+      }
+
+      await reqToPromise(stores.conversations.delete(id));
+      deletedConversations += 1;
+    }
+
     await new Promise((r, rej) => {
       t.oncomplete = r;
       t.onerror = () => rej(t.error || new Error("transaction failed"));
     });
-    return { cleared: true };
+    return { deletedConversations, deletedMessages, deletedMappings };
   }
 
   async function getConversationById(conversationId) {
@@ -302,17 +314,6 @@
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
         return ok({ disconnected: true });
       }
-      case NOTION_MESSAGE_TYPES.ENSURE_DATABASES: {
-        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
-        if (!token || !token.accessToken) return err("notion not connected");
-        const parent = await new Promise((resolve) => {
-          chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
-        });
-        if (!parent) return err("missing parentPageId");
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
-        const res = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
-        return ok(res);
-      }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
         if (!token || !token.accessToken) return err("notion not connected");
@@ -344,7 +345,7 @@
             continue;
           }
           const messages = await getMessagesByConversationId(id);
-          const blocks = NS.notionSyncService.messagesToBlocks(messages);
+          const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
           try {
             let pageId = convo.notionPageId || "";
             if (pageId) {
@@ -401,12 +402,6 @@
         const convo = await upsertConversation(payload);
         return ok(convo);
       }
-      case MESSAGE_TYPES.UPSERT_MESSAGES_INCREMENTAL: {
-        const conversationId = Number(msg.conversationId);
-        if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
-        const res = await upsertMessagesIncremental(conversationId, msg.messages);
-        return ok(res);
-      }
       case MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES: {
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
@@ -423,8 +418,9 @@
         const messages = await getMessagesByConversationId(conversationId);
         return ok({ conversationId, messages });
       }
-      case MESSAGE_TYPES.CLEAR_ALL: {
-        const res = await clearAll();
+      case MESSAGE_TYPES.DELETE_CONVERSATIONS: {
+        const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
+        const res = await deleteConversationsByIds(ids);
         return ok(res);
       }
       default:

@@ -19,18 +19,29 @@ function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
   };
 }
 
+function loadNotionAi() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/sync/notion/notion-ai.js");
+}
+
 describe("notion-db-manager", () => {
   it("creates SyncNos-AI Chats database when missing", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
-    globalThis.WebClipper = {
-      notionApi: {
-        notionFetch: async (req: any) => {
-          calls.push(req);
-          if (req.method === "POST" && req.path === "/v1/search") return { results: [] };
-          if (req.method === "POST" && req.path === "/v1/databases") return { id: "db_created" };
-          throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
-        }
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "POST" && req.path === "/v1/search") return { results: [] };
+        if (req.method === "POST" && req.path === "/v1/databases") return { id: "db_created" };
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
       }
     };
     // @ts-expect-error test global
@@ -56,16 +67,18 @@ describe("notion-db-manager", () => {
   it("best-effort adds AI property when reusing cached database without AI", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
-    globalThis.WebClipper = {
-      notionApi: {
-        notionFetch: async (req: any) => {
-          calls.push(req);
-          if (req.method === "GET" && req.path === "/v1/databases/db1") {
-            return { id: "db1", properties: { Name: { type: "title" }, Date: { type: "date" }, URL: { type: "url" } } };
-          }
-          if (req.method === "PATCH" && req.path === "/v1/databases/db1") return { ok: true };
-          throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "GET" && req.path === "/v1/databases/db1") {
+          return { id: "db1", properties: { Name: { type: "title" }, Date: { type: "date" }, URL: { type: "url" } } };
         }
+        if (req.method === "PATCH" && req.path === "/v1/databases/db1") return { ok: true };
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
       }
     };
     // @ts-expect-error test global
