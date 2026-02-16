@@ -195,6 +195,9 @@ concatFiles({
     "src/bootstrap/content.js"
   ]
 });
+// Dist layout is flat (icons copied to root), but runtime code still references source paths.
+// Keep the runtime code stable by rewriting icon URLs to the dist layout.
+writeText(contentBundle, readText(contentBundle).replaceAll("icons/icon-128.png", "icon-128.png"));
 await minifyJsFile(contentBundle);
 
 // Bundle background SW (including previously importScripts-loaded modules).
