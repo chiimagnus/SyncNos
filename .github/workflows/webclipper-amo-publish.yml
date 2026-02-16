@@ -1,0 +1,74 @@
+name: WebClipper Publish to AMO (Firefox)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name (e.g. v0.14.5). Required for manual runs."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish_amo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Extensions/WebClipper/package-lock.json
+
+      - name: Install WebClipper deps
+        run: npm ci --prefix Extensions/WebClipper
+
+      - name: Verify manifest version matches tag
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const tagName = process.env.TAG_NAME;
+          const tagVersion = String(tagName || "").replace(/^v/, "");
+          const manifest = JSON.parse(fs.readFileSync("Extensions/WebClipper/manifest.json", "utf8"));
+          if (!manifest.version) throw new Error("manifest.json missing version");
+          if (manifest.version !== tagVersion) {
+            throw new Error(`manifest version mismatch: manifest=${manifest.version} tag=${tagVersion}`);
+          }
+          console.log(`[ok] manifest version: ${manifest.version}`);
+          NODE
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+
+      - name: Build Firefox XPI
+        run: npm --prefix Extensions/WebClipper run build:firefox
+
+      - name: Build AMO source zip
+        run: npm --prefix Extensions/WebClipper run package:amo-source
+
+      - name: Submit to AMO (Listed)
+        run: node Extensions/WebClipper/scripts/amo-publish.mjs
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          AMO_ADDON_ID: ${{ secrets.AMO_ADDON_ID }}
+          AMO_XPI_PATH: Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi
+          AMO_SOURCE_ZIP_PATH: Extensions/WebClipper/SyncNos-WebClipper-amo-source.zip
