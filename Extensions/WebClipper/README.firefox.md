@@ -30,14 +30,27 @@ FIREFOX_EXTENSION_ID="your-addon-id@your.domain" FIREFOX_MIN_VERSION="109.0" \
 
 ## 发布（AMO 签名）
 
-Firefox 正式分发通常需要 AMO 签名；你需要为扩展设置稳定的 id。
+Firefox 正式分发需要 AMO 签名；你需要为扩展设置稳定的 id。
 
 - 默认 id 在构建时注入的 `browser_specific_settings.gecko.id`
 - 可通过环境变量 `FIREFOX_EXTENSION_ID` / `FIREFOX_MIN_VERSION` 覆盖
 
-构建出的 `.xpi` 可以用于：
+> AMO 审核提示：如果你上传的包里包含压缩/混淆后的代码（本项目构建确实会 terser 压缩并 mangle），通常需要同时提供**未混淆的源码包**（Source code / Source package），否则很容易被要求补交或被打回。
 
-- 上传 AMO 后由 AMO 签名并分发
-- 内部分发（取决于目标环境是否允许未签名扩展）
+### 提交步骤（概览）
 
-> 注意：`build:firefox` 会调用系统的 `zip` 命令来生成 `.xpi`。
+1. 注册/登录 AMO（Firefox Add-ons）开发者账号
+2. 创建新扩展（Add-on），填写基本信息与隐私相关说明
+3. 上传 `SyncNos-WebClipper-firefox.xpi`
+4. 如被要求，补充上传未混淆源码包（与发布包对应的源码）
+5. 等待审核，通过后由 AMO 签名并分发
+
+官方提交文档：
+
+```
+https://extensionworkshop.com/documentation/publish/submitting-an-add-on/
+```
+
+### `.xpi` 为什么用 `zip` 打包
+
+`.xpi` 本质就是一个 Zip 压缩包（扩展名不同）；因此 `build:firefox` 直接调用系统 `zip` 命令即可完成打包，无需引入额外打包依赖。
