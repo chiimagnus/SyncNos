@@ -34,7 +34,6 @@ const items = [
   "vitest.config.ts",
   "package.json",
   "package-lock.json",
-  "README.firefox.md",
   "README.amo-source.md"
 ];
 
@@ -53,4 +52,3 @@ rmSync(staging, { recursive: true, force: true });
 
 // eslint-disable-next-line no-console
 console.log(`[package] amo source: ${outZip}`);
-
