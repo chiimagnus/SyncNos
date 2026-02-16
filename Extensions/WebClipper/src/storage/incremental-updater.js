@@ -3,6 +3,8 @@
 
   const state = {
     lastConversationKey: "",
+    lastConversationTitle: "",
+    lastConversationUrl: "",
     lastMessageKeys: [],
     lastMessageFingerprints: new Map()
   };
@@ -24,14 +26,32 @@
     const n = normalizeModule();
     const role = (m && m.role) || "assistant";
     const text = (n && typeof n.normalizeText === "function") ? n.normalizeText(m && m.contentText) : String(m && m.contentText || "");
-    const hash = (n && typeof n.fnv1a32 === "function") ? n.fnv1a32(`${role}|${text}`) : `${role}|${text}`;
+    const mdRaw = (m && m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
+    const md = (n && typeof n.normalizeText === "function") ? n.normalizeText(mdRaw) : mdRaw;
+    const hashBase = md ? `${role}|${text}|md:${md}` : `${role}|${text}`;
+    const hash = (n && typeof n.fnv1a32 === "function") ? n.fnv1a32(hashBase) : hashBase;
     const key = ensureMessageKey(m, sequence);
     return { key, fp: `${key}:${hash}` };
+  }
+
+  function normalizeMeta(value) {
+    return String(value || "").trim();
   }
 
   function computeIncremental(snapshot) {
     if (!snapshot || !snapshot.conversation) return { changed: false, snapshot: null };
     const conversationKey = snapshot.conversation.conversationKey || "";
+    const incomingTitle = normalizeMeta(snapshot.conversation.title);
+    const incomingUrl = normalizeMeta(snapshot.conversation.url);
+
+    // Avoid propagating empty meta values which can flicker when DOM isn't ready.
+    if (conversationKey && conversationKey === state.lastConversationKey) {
+      if (!incomingTitle && state.lastConversationTitle) snapshot.conversation.title = state.lastConversationTitle;
+      if (!incomingUrl && state.lastConversationUrl) snapshot.conversation.url = state.lastConversationUrl;
+    }
+
+    const nextTitle = normalizeMeta(snapshot.conversation.title);
+    const nextUrl = normalizeMeta(snapshot.conversation.url);
 
     const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
     const nextKeys = [];
@@ -57,10 +77,16 @@
       if (!nextFps.has(prevKey)) removed.push(prevKey);
     }
 
-    const changed = conversationKey !== state.lastConversationKey || added.length > 0 || updated.length > 0 || removed.length > 0;
+    const metaChanged = (
+      conversationKey === state.lastConversationKey
+      && (nextTitle !== state.lastConversationTitle || nextUrl !== state.lastConversationUrl)
+    );
+    const changed = conversationKey !== state.lastConversationKey || metaChanged || added.length > 0 || updated.length > 0 || removed.length > 0;
 
     if (changed) {
       state.lastConversationKey = conversationKey;
+      state.lastConversationTitle = nextTitle;
+      state.lastConversationUrl = nextUrl;
       state.lastMessageKeys = nextKeys;
       state.lastMessageFingerprints = nextFps;
     }
@@ -74,6 +100,8 @@
 
   function __resetForTests() {
     state.lastConversationKey = "";
+    state.lastConversationTitle = "";
+    state.lastConversationUrl = "";
     state.lastMessageKeys = [];
     state.lastMessageFingerprints = new Map();
   }

@@ -1,5 +1,8 @@
 node_modules/
 dist/
+dist-firefox/
+*.xpi
+*amo-source*.zip
 .DS_Store
 
 

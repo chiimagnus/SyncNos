@@ -34,4 +34,27 @@ describe("smoke", () => {
     expect(incrementalUpdater.computeIncremental(snap1).changed).toBe(true);
     expect(incrementalUpdater.computeIncremental(snap2).changed).toBe(true);
   });
+
+  it("computeIncremental detects title/url updates even without message changes", () => {
+    incrementalUpdater.__resetForTests();
+    const base = { conversation: { conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const sameMsgsNewTitle = { conversation: { conversationKey: "c1", title: "t2", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const sameMsgsNewUrl = { conversation: { conversationKey: "c1", title: "t2", url: "https://b" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(sameMsgsNewTitle).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(sameMsgsNewUrl).changed).toBe(true);
+  });
+
+  it("computeIncremental does not treat empty title/url as an update for same conversationKey", () => {
+    incrementalUpdater.__resetForTests();
+    const base = { conversation: { conversationKey: "c1", title: "t1", url: "https://a" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+    const emptyMeta = { conversation: { conversationKey: "c1", title: "", url: "" }, messages: [{ messageKey: "m1", role: "user", contentText: "hi" }] };
+
+    expect(incrementalUpdater.computeIncremental(base).changed).toBe(true);
+    expect(incrementalUpdater.computeIncremental(emptyMeta).changed).toBe(false);
+    // And it should carry forward the previous non-empty values.
+    expect(emptyMeta.conversation.title).toBe("t1");
+    expect(emptyMeta.conversation.url).toBe("https://a");
+  });
 });

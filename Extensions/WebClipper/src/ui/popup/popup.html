@@ -42,12 +42,11 @@
 
         <footer class="bottomDock" aria-label="Actions">
           <section class="bottomBar" aria-label="Chat actions">
-            <div id="stats" class="stats">0 conversations</div>
-            <div class="spacer"></div>
             <label class="checkbox compact">
               <input id="chkSelectAll" type="checkbox" aria-label="Select all" />
               <span class="srOnly">Select all</span>
             </label>
+            <button id="btnDelete" class="btn danger" type="button" title="Delete selected">Delete</button>
             <div class="exportWrap">
               <button id="btnExport" class="btn export" type="button" aria-haspopup="menu" aria-expanded="false">
                 <span class="label">Export</span>
@@ -60,6 +59,8 @@
               </div>
             </div>
             <button id="btnSyncNotion" class="btn">Sync</button>
+            <div class="spacer"></div>
+            <div id="stats" class="stats">0 conversations</div>
           </section>
         </footer>
       </section>
@@ -123,12 +124,15 @@
     <script src="../../shared/runtime-client.js"></script>
     <script src="../../export/article-markdown.js"></script>
     <script src="../../export/zip-utils.js"></script>
-    <script src="../../vendor/markdown-it.min.js"></script>
+    <script src="../../../node_modules/markdown-it/dist/markdown-it.js"></script>
+    <script src="../../sync/notion/oauth-config.js"></script>
+    <script src="../../sync/notion/notion-api.js"></script>
     <script src="./popup-core.js"></script>
     <script src="./popup-tabs.js"></script>
     <script src="./popup-list.js"></script>
     <script src="./popup-chat-preview.js"></script>
     <script src="./popup-export.js"></script>
+    <script src="./popup-delete.js"></script>
     <script src="./popup-notion.js"></script>
     <script src="./popup-about.js"></script>
     <script src="./popup.js"></script>
