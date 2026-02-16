@@ -20,19 +20,6 @@
   };
   let markdownRenderer;
 
-  function escapeHtml(value) {
-    return String(value || "").replace(/[&<>"']/g, (char) => {
-      switch (char) {
-        case "&": return "&amp;";
-        case "<": return "&lt;";
-        case ">": return "&gt;";
-        case "\"": return "&quot;";
-        case "'": return "&#39;";
-        default: return char;
-      }
-    });
-  }
-
   function normalizeRole(role) {
     const normalized = String(role || "assistant").toLowerCase();
     if (normalized === "user") return "user";
@@ -72,33 +59,140 @@
     } catch (_e) {
       // ignore
     }
-    const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, _env, self) => {
-      return self.renderToken(tokens, idx, options);
-    });
-    md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-      const token = tokens[idx];
-      const hrefIdx = token.attrIndex("href");
-      const href = hrefIdx >= 0 && token.attrs && token.attrs[hrefIdx] ? token.attrs[hrefIdx][1] : "";
-      const safeHref = sanitizeHref(href);
-      if (!safeHref) token.attrSet("href", "#");
-      token.attrSet("target", "_blank");
-      token.attrSet("rel", "noopener noreferrer");
-      return defaultLinkOpen(tokens, idx, options, env, self);
-    };
 
     markdownRenderer = md;
     return markdownRenderer;
   }
 
-  function renderMarkdown(contentText) {
+  function getAttr(token, name) {
+    if (!token || !Array.isArray(token.attrs)) return "";
+    for (const pair of token.attrs) {
+      if (pair && pair[0] === name) return pair[1] || "";
+    }
+    return "";
+  }
+
+  function appendText(parent, text) {
+    parent.appendChild(document.createTextNode(String(text || "")));
+  }
+
+  function renderInlineTokens(parent, tokens) {
+    const stack = [parent];
+    const ensureParent = () => stack[stack.length - 1] || parent;
+
+    for (const token of tokens || []) {
+      if (!token) continue;
+
+      if (token.type === "text") {
+        appendText(ensureParent(), token.content || "");
+        continue;
+      }
+      if (token.type === "softbreak" || token.type === "hardbreak") {
+        ensureParent().appendChild(document.createElement("br"));
+        continue;
+      }
+      if (token.type === "code_inline") {
+        const el = document.createElement("code");
+        el.textContent = token.content || "";
+        ensureParent().appendChild(el);
+        continue;
+      }
+      if (token.type === "image") {
+        // Avoid loading remote images inside the popup preview.
+        const alt = token.content || getAttr(token, "alt") || "";
+        if (alt) appendText(ensureParent(), alt);
+        continue;
+      }
+
+      if (token.nesting === 1) {
+        const el = token.tag ? document.createElement(token.tag) : document.createElement("span");
+        if (token.type === "link_open") {
+          const href = getAttr(token, "href");
+          const safeHref = sanitizeHref(href);
+          el.setAttribute("href", safeHref || "#");
+          el.setAttribute("target", "_blank");
+          el.setAttribute("rel", "noopener noreferrer");
+        }
+        ensureParent().appendChild(el);
+        stack.push(el);
+        continue;
+      }
+
+      if (token.nesting === -1) {
+        if (stack.length > 1) stack.pop();
+        continue;
+      }
+    }
+  }
+
+  function renderMarkdownInto(container, contentText) {
+    if (!container) return;
     const raw = String(contentText || "");
-    if (!raw.trim()) return "<p></p>";
+    container.replaceChildren();
+
+    if (!raw.trim()) {
+      container.appendChild(document.createElement("p"));
+      return;
+    }
+
     const md = getMarkdownRenderer();
-    if (!md) return `<p>${escapeHtml(raw).replace(/\n/g, "<br>")}</p>`;
+    if (!md || typeof md.parse !== "function") {
+      const p = document.createElement("p");
+      p.textContent = raw;
+      container.appendChild(p);
+      return;
+    }
+
+    let tokens;
     try {
-      return md.render(raw);
+      tokens = md.parse(raw, {});
     } catch (_e) {
-      return `<p>${escapeHtml(raw).replace(/\n/g, "<br>")}</p>`;
+      const p = document.createElement("p");
+      p.textContent = raw;
+      container.appendChild(p);
+      return;
+    }
+
+    const stack = [container];
+    const ensureParent = () => stack[stack.length - 1] || container;
+
+    for (const token of tokens || []) {
+      if (!token) continue;
+
+      if (token.type === "inline") {
+        renderInlineTokens(ensureParent(), token.children || []);
+        continue;
+      }
+
+      if (token.type === "fence" || token.type === "code_block") {
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.textContent = token.content || "";
+        pre.appendChild(code);
+        ensureParent().appendChild(pre);
+        continue;
+      }
+
+      if (token.type === "hr") {
+        ensureParent().appendChild(document.createElement("hr"));
+        continue;
+      }
+
+      if (token.nesting === 1) {
+        const el = token.tag ? document.createElement(token.tag) : document.createElement("div");
+        if (token.type === "ordered_list_open") {
+          const start = getAttr(token, "start");
+          if (start) el.setAttribute("start", String(start));
+        }
+        ensureParent().appendChild(el);
+        stack.push(el);
+        continue;
+      }
+
+      if (token.nesting === -1) {
+        if (stack.length > 1) stack.pop();
+        continue;
+      }
     }
   }
 
@@ -136,59 +230,72 @@
     els.chatPreviewPopover.removeAttribute("data-state");
   }
 
-  function renderShell({ bodyHtml, stateName }) {
+  function renderShell({ bodyNode, stateName }) {
     if (!els.chatPreviewPopover) return;
     const body = document.createElement("div");
     body.className = "chatPreviewBody";
-    const html = String(bodyHtml || "");
-    if (html) {
-      const range = document.createRange();
-      range.selectNode(body);
-      body.appendChild(range.createContextualFragment(html));
-    }
+    if (bodyNode) body.appendChild(bodyNode);
     els.chatPreviewPopover.replaceChildren(body);
     els.chatPreviewPopover.dataset.state = String(stateName || "ready");
   }
 
   function renderLoading() {
+    const el = document.createElement("div");
+    el.className = "chatPreviewPlaceholder";
+    el.textContent = "Loading...";
     renderShell({
       stateName: "loading",
-      bodyHtml: '<div class="chatPreviewPlaceholder">Loading...</div>'
+      bodyNode: el
     });
   }
 
   function renderError(message) {
+    const el = document.createElement("div");
+    el.className = "chatPreviewPlaceholder chatPreviewPlaceholder--error";
+    el.textContent = message || "Failed to load messages.";
     renderShell({
       stateName: "error",
-      bodyHtml: `<div class="chatPreviewPlaceholder chatPreviewPlaceholder--error">${escapeHtml(message || "Failed to load messages.")}</div>`
+      bodyNode: el
     });
   }
 
   function renderMessages(messages) {
     const list = Array.isArray(messages) ? messages : [];
     if (!list.length) {
+      const el = document.createElement("div");
+      el.className = "chatPreviewPlaceholder";
+      el.textContent = "No messages yet.";
       renderShell({
         stateName: "empty",
-        bodyHtml: '<div class="chatPreviewPlaceholder">No messages yet.</div>'
+        bodyNode: el
       });
       return;
     }
 
-    const bodyHtml = list.map((message) => {
+    const fragment = document.createDocumentFragment();
+    for (const message of list) {
       const normalizedRole = normalizeRole(message && message.role);
       const label = roleLabel(normalizedRole);
-      const content = renderMarkdown((message && (message.contentMarkdown || message.contentText)) || "");
-      return `
-        <article class="chatPreviewMsg chatPreviewMsg--${normalizedRole}">
-          <header class="chatPreviewMsgRole">${label}</header>
-          <div class="chatPreviewMsgMarkdown">${content}</div>
-        </article>
-      `;
-    }).join("");
+      const article = document.createElement("article");
+      article.className = `chatPreviewMsg chatPreviewMsg--${normalizedRole}`;
+
+      const header = document.createElement("header");
+      header.className = "chatPreviewMsgRole";
+      header.textContent = label;
+
+      const contentWrap = document.createElement("div");
+      contentWrap.className = "chatPreviewMsgMarkdown";
+      const content = (message && (message.contentMarkdown || message.contentText)) || "";
+      renderMarkdownInto(contentWrap, content);
+
+      article.appendChild(header);
+      article.appendChild(contentWrap);
+      fragment.appendChild(article);
+    }
 
     renderShell({
       stateName: "ready",
-      bodyHtml
+      bodyNode: fragment
     });
   }
 
