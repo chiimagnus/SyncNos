@@ -29,7 +29,7 @@
   function hidePreviewPopover() {
     if (!els.chatPreviewPopover) return;
     els.chatPreviewPopover.hidden = true;
-    els.chatPreviewPopover.innerHTML = "";
+    els.chatPreviewPopover.replaceChildren();
     els.chatPreviewPopover.removeAttribute("data-state");
   }
 

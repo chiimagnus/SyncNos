@@ -143,16 +143,36 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   if (!Array.isArray(nextBackground.scripts) || nextBackground.scripts.length === 0) {
     nextBackground.scripts = [nextBackground.service_worker || "background.js"];
   }
+  // Keep Firefox manifest clean for AMO: MV3 service_worker is ignored on Firefox.
+  // We rely on `background.scripts` for runtime compatibility.
+  delete nextBackground.service_worker;
   next.background = nextBackground;
 
   // Firefox requires a stable extension id for many workflows (AMO signing, persistent storage, etc.).
   // For local testing, users can still run it as a temporary add-on.
-  const resolvedGeckoId = (geckoId && String(geckoId).trim()) ? String(geckoId).trim() : "syncnos-webclipper@syncnos.app";
-  const resolvedMinVersion = (geckoMinVersion && String(geckoMinVersion).trim()) ? String(geckoMinVersion).trim() : "109.0";
-  next.browser_specific_settings = next.browser_specific_settings || {
+  const existingBss = (next.browser_specific_settings && typeof next.browser_specific_settings === "object")
+    ? next.browser_specific_settings
+    : {};
+  const existingGecko = (existingBss.gecko && typeof existingBss.gecko === "object")
+    ? existingBss.gecko
+    : {};
+  const resolvedGeckoId = (geckoId && String(geckoId).trim())
+    ? String(geckoId).trim()
+    : (existingGecko.id || "syncnos-webclipper@syncnos.app");
+  const resolvedMinVersion = (geckoMinVersion && String(geckoMinVersion).trim())
+    ? String(geckoMinVersion).trim()
+    : (existingGecko.strict_min_version || "140.0");
+
+  next.browser_specific_settings = {
+    ...existingBss,
     gecko: {
+      ...existingGecko,
       id: resolvedGeckoId,
-      strict_min_version: resolvedMinVersion
+      strict_min_version: resolvedMinVersion,
+      // Required by AMO for new Firefox extensions.
+      data_collection_permissions: existingGecko.data_collection_permissions || {
+        required: ["none"]
+      }
     }
   };
 
