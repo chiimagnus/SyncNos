@@ -53,13 +53,13 @@ async function amoRequest({ method, url, token, body }) {
   return json;
 }
 
-async function uploadXpi({ baseUrl, token, xpiPath }) {
+async function uploadXpi({ baseUrl, token, xpiPath, channel }) {
   const buf = readFileSync(xpiPath);
   const form = new FormData();
   form.append("upload", new Blob([buf]), "SyncNos-WebClipper-firefox.xpi");
   const json = await amoRequest({
     method: "POST",
-    url: `${baseUrl}/addons/upload/`,
+    url: `${baseUrl}/addons/upload/?channel=${encodeURIComponent(channel)}`,
     token,
     body: form
   });
@@ -101,6 +101,7 @@ async function main() {
   const addonId = requiredEnv("AMO_ADDON_ID");
 
   const baseUrl = (process.env.AMO_BASE_URL || "https://addons.mozilla.org/api/v5").replace(/\/+$/g, "");
+  const channel = (process.env.AMO_CHANNEL || "listed").trim();
   const xpiPath = process.env.AMO_XPI_PATH || fileURLToPath(new URL("../SyncNos-WebClipper-firefox.xpi", import.meta.url));
   const sourceZipPath = process.env.AMO_SOURCE_ZIP_PATH || fileURLToPath(new URL("../SyncNos-WebClipper-amo-source.zip", import.meta.url));
 
@@ -108,7 +109,7 @@ async function main() {
 
   // eslint-disable-next-line no-console
   console.log(`[amo] upload xpi: ${xpiPath}`);
-  const uuid = await uploadXpi({ baseUrl, token, xpiPath });
+  const uuid = await uploadXpi({ baseUrl, token, xpiPath, channel });
   // eslint-disable-next-line no-console
   console.log(`[amo] upload uuid: ${uuid}`);
 
