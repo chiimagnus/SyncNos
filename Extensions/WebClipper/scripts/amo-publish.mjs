@@ -56,10 +56,12 @@ async function amoRequest({ method, url, token, body }) {
 async function uploadXpi({ baseUrl, token, xpiPath, channel }) {
   const buf = readFileSync(xpiPath);
   const form = new FormData();
+  // AMO expects "channel" as a multipart field (validator error: Missing "channel" arg).
+  form.append("channel", channel);
   form.append("upload", new Blob([buf]), "SyncNos-WebClipper-firefox.xpi");
   const json = await amoRequest({
     method: "POST",
-    url: `${baseUrl}/addons/upload/?channel=${encodeURIComponent(channel)}`,
+    url: `${baseUrl}/addons/upload/`,
     token,
     body: form
   });
