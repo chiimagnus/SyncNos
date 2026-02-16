@@ -32,7 +32,7 @@ const items = [
   "scripts",
   "package.json",
   "package-lock.json",
-  "README.amo-source.md"
+  "AGENTS.md"
 ];
 
 for (const item of items) {
