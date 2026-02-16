@@ -70,5 +70,6 @@ jobs:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           AMO_ADDON_ID: ${{ secrets.AMO_ADDON_ID }}
+          AMO_CHANNEL: listed
           AMO_XPI_PATH: Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi
           AMO_SOURCE_ZIP_PATH: Extensions/WebClipper/SyncNos-WebClipper-amo-source.zip
