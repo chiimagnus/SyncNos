@@ -97,6 +97,7 @@ async function createVersion({ baseUrl, token, addonId, uploadUuid, sourceZipPat
 async function main() {
   const issuer = requiredEnv("AMO_JWT_ISSUER");
   const secret = requiredEnv("AMO_JWT_SECRET");
+  // AMO API accepts add-on numeric id, slug, or GUID for this path parameter.
   const addonId = requiredEnv("AMO_ADDON_ID");
 
   const baseUrl = (process.env.AMO_BASE_URL || "https://addons.mozilla.org/api/v5").replace(/\/+$/g, "");
