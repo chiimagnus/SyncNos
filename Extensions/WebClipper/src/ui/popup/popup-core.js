@@ -65,6 +65,7 @@
     viewSettings: document.getElementById("viewSettings"),
     viewAbout: document.getElementById("viewAbout"),
     chkSelectAll: document.getElementById("chkSelectAll"),
+    btnDelete: document.getElementById("btnDelete"),
     btnExport: document.getElementById("btnExport"),
     exportMenu: document.getElementById("exportMenu"),
     menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
@@ -86,7 +87,6 @@
   const state = {
     conversations: [],
     selectedIds: new Set(),
-    hoveredConversationId: null,
     previewCache: new Map(),
     previewRequestToken: 0
   };
@@ -180,7 +180,7 @@
       const role = m.role || "assistant";
       lines.push(`## ${role}`);
       lines.push("");
-      lines.push(String(m.contentText || ""));
+      lines.push(String(m.contentMarkdown || m.contentText || ""));
       lines.push("");
     }
     return lines.join("\n");
@@ -192,6 +192,32 @@
       chrome.tabs.create({ url: String(url) });
     } catch (_e) {
       // ignore
+    }
+  }
+
+  function sanitizeHttpUrl(url) {
+    const text = String(url || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text)) return text;
+    return "";
+  }
+
+  function openHttpUrl(url) {
+    const safeUrl = sanitizeHttpUrl(url);
+    if (!safeUrl) return false;
+    try {
+      if (chrome && chrome.tabs && typeof chrome.tabs.create === "function") {
+        chrome.tabs.create({ url: safeUrl });
+        return true;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      window.open(safeUrl, "_blank", "noopener,noreferrer");
+      return true;
+    } catch (_e) {
+      return false;
     }
   }
 
@@ -226,6 +252,8 @@
     createZipBlob,
     conversationToMarkdown,
     openUrl,
+    sanitizeHttpUrl,
+    openHttpUrl,
     disableImageDrag
   };
 })();
