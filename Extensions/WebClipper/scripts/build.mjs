@@ -136,6 +136,25 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   if (target !== "firefox") return manifest;
 
   const next = { ...manifest };
+  const nextBackground = { ...(next.background || {}) };
+
+  // AMO validator: Firefox doesn't guarantee MV3 service worker support in all channels.
+  // Provide a "background.scripts" fallback so the add-on can still run as a classic background script.
+  if (!Array.isArray(nextBackground.scripts) || nextBackground.scripts.length === 0) {
+    nextBackground.scripts = [nextBackground.service_worker || "background.js"];
+  }
+  next.background = nextBackground;
+
+  // Firefox host permission compatibility: keep MV3 `host_permissions`, but also mirror into `permissions`.
+  // This avoids validator failures on channels that expect host patterns under `permissions`.
+  const hostPermissions = Array.isArray(next.host_permissions) ? next.host_permissions.filter(Boolean) : [];
+  if (hostPermissions.length) {
+    const existingPerms = Array.isArray(next.permissions) ? next.permissions.slice() : [];
+    const merged = new Set(existingPerms);
+    for (const p of hostPermissions) merged.add(p);
+    next.permissions = Array.from(merged);
+  }
+
   // Firefox requires a stable extension id for many workflows (AMO signing, persistent storage, etc.).
   // For local testing, users can still run it as a temporary add-on.
   const resolvedGeckoId = (geckoId && String(geckoId).trim()) ? String(geckoId).trim() : "syncnos-webclipper@syncnos.app";
