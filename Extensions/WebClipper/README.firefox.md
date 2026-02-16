@@ -37,6 +37,8 @@ Firefox 正式分发需要 AMO 签名；你需要为扩展设置稳定的 id。
 
 > AMO 审核提示：如果你上传的包里包含压缩/混淆后的代码（本项目构建确实会 terser 压缩并 mangle），通常需要同时提供**未混淆的源码包**（Source code / Source package），否则很容易被要求补交或被打回。
 
+> AMO 校验提示：Firefox 对 MV3 的 `background.service_worker` 支持存在渠道差异；构建会在 manifest 里同时写入 `background.scripts` 作为兼容回退，以通过 AMO 校验并确保后台逻辑可运行。
+
 ### 提交步骤（概览）
 
 1. 注册/登录 AMO（Firefox Add-ons）开发者账号
