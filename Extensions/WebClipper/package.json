@@ -17,5 +17,7 @@
     "terser": "^5.31.6",
     "vitest": "^2.1.8"
   },
-  "dependencies": {}
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  }
 }
