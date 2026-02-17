@@ -30,7 +30,7 @@
 
 #### 同步目标
 
-- Notion
+- Notion（推荐 OAuth，也支持手动 token）
 
 ### 开发
 
@@ -52,6 +52,7 @@ xcodebuild -scheme SyncNos -configuration Debug build
 - 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
 - 导出所选对话为 JSON/Markdown
 - 手动同步所选对话到 Notion（OAuth）
+- 同步写入 Notion 数据库 `SyncNos-AI Chats`；重复同步会清空目标页面子块并重建内容以避免重复追加
 
 ### 支持站点
 
