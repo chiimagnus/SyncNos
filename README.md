@@ -30,7 +30,7 @@ This project has two parts:
 
 #### Sync To
 
-- Notion
+- Notion (OAuth recommended; API key supported)
 
 ### Development
 
@@ -52,6 +52,7 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 - Captures AI chats from supported sites into local browser storage
 - Exports selected conversations as JSON/Markdown
 - Manually syncs selected conversations to Notion (OAuth)
+- Writes to a Notion database named `SyncNos-AI Chats`; re-sync clears and rebuilds page content to avoid duplicates
 
 ### Supported Sites
 
