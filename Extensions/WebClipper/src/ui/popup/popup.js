@@ -7,9 +7,10 @@
   const popupExport = NS.popupExport;
   const popupDelete = NS.popupDelete;
   const notion = NS.popupNotion;
+  const database = NS.popupDatabase;
   const about = NS.popupAbout;
 
-  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !about) return;
+  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !database || !about) return;
 
   const { els, send, flashOk } = core;
 
@@ -44,6 +45,7 @@
     popupExport.init();
     popupDelete.init();
     notion.init();
+    database.init();
     about.init();
     initNotionSyncAction();
 

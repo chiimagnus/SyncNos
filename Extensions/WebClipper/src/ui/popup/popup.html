@@ -88,6 +88,33 @@
             </div>
           </div>
         </section>
+
+        <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
+          <div class="settingsRow settingsRow--header" aria-label="Database backup header">
+            <div class="notionHeaderText">
+              <span class="notionHeaderTitle">Database Backup</span>
+              <span class="notionHeaderSep" aria-hidden="true">|</span>
+              <span id="databaseBackupStatus" class="notionHeaderStatus">Ready</span>
+            </div>
+            <div class="spacer"></div>
+            <button id="btnDatabaseExport" class="btn" type="button">Export</button>
+          </div>
+
+          <div class="settingsDivider" role="presentation"></div>
+
+          <div class="settingsRow settingsRow--compact" aria-label="Database import controls">
+            <div class="settingsLabel settingsLabel--inline">Import</div>
+            <div class="settingsControl settingsControl--grow">
+              <input id="databaseImportFile" class="input" type="file" accept=".json,application/json" />
+              <button id="btnDatabaseImport" class="btn" type="button">Import</button>
+            </div>
+          </div>
+
+          <div class="settingsRow settingsRow--compact" aria-label="Database import note">
+            <div class="settingsLabel settingsLabel--inline">Note</div>
+            <div class="sub">Import merges by (source + conversationKey). Notion token is not included.</div>
+          </div>
+        </section>
       </section>
 
       <section id="viewAbout" class="view" role="tabpanel" aria-labelledby="tabAbout">
@@ -125,6 +152,8 @@
     <script src="../../export/article-markdown.js"></script>
     <script src="../../export/zip-utils.js"></script>
     <script src="../../../node_modules/markdown-it/dist/markdown-it.js"></script>
+    <script src="../../storage/schema.js"></script>
+    <script src="../../storage/backup-utils.js"></script>
     <script src="../../sync/notion/oauth-config.js"></script>
     <script src="../../sync/notion/notion-api.js"></script>
     <script src="./popup-core.js"></script>
@@ -134,6 +163,7 @@
     <script src="./popup-export.js"></script>
     <script src="./popup-delete.js"></script>
     <script src="./popup-notion.js"></script>
+    <script src="./popup-database.js"></script>
     <script src="./popup-about.js"></script>
     <script src="./popup.js"></script>
   </body>
