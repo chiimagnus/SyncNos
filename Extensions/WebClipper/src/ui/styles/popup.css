@@ -794,9 +794,34 @@ main {
   flex: 0 0 auto;
 }
 
+.bottomBar:not(.hasSelection) .chatActionButtons {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(10px) scale(0.98);
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-width 220ms ease 0ms,
+    opacity 140ms ease 0ms,
+    transform 220ms ease 0ms;
+}
+
+.bottomBar.hasSelection .chatActionButtons {
+  max-width: 360px;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  overflow: visible;
+  pointer-events: auto;
+  transition:
+    max-width 220ms ease 0ms,
+    opacity 160ms ease 90ms,
+    transform 220ms ease 90ms;
+}
+
 .bottomBar .stats {
   flex: 0 0 auto;
   white-space: nowrap;
+  overflow: hidden;
   padding: 3px 8px;
   border-radius: 0;
   border: 0;
@@ -805,6 +830,38 @@ main {
   font-size: 14px;
   font-weight: 650;
   line-height: 1.1;
+}
+
+.bottomBar:not(.hasSelection) .stats {
+  max-width: 360px;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  padding: 3px 8px;
+  transition:
+    max-width 220ms ease 0ms,
+    opacity 160ms ease 90ms,
+    transform 220ms ease 90ms,
+    padding 220ms ease 0ms;
+}
+
+.bottomBar.hasSelection .stats {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-10px) scale(0.98);
+  padding: 0;
+  pointer-events: none;
+  transition:
+    max-width 220ms ease 0ms,
+    opacity 140ms ease 0ms,
+    transform 220ms ease 0ms,
+    padding 220ms ease 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottomBar .chatActionButtons,
+  .bottomBar .stats {
+    transition: none !important;
+  }
 }
 
 .bottomBar .statsLabel {

@@ -57,6 +57,7 @@
     list: document.getElementById("list"),
     chatPreviewPopover: document.getElementById("chatPreviewPopover"),
     stats: document.getElementById("stats"),
+    chatBottomBar: document.getElementById("chatBottomBar"),
     chatActionButtons: document.getElementById("chatActionButtons"),
     chatBottomSpacer: document.getElementById("chatBottomSpacer"),
     tabChats: document.getElementById("tabChats"),
