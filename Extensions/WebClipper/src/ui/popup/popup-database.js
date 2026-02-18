@@ -9,6 +9,12 @@
 
   const { els, storageGet, storageSet, downloadBlob, flashOk, disableImageDrag } = core;
 
+  const uiState = {
+    busy: false,
+    importTimer: null,
+    exportTimer: null
+  };
+
   function reqToPromise(request) {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
@@ -34,16 +40,58 @@
     els.databaseBackupStatus.textContent = String(text || "");
   }
 
+  function setImportButtonLabel(text) {
+    if (!els.btnDatabaseImport) return;
+    els.btnDatabaseImport.textContent = String(text || "Import");
+  }
+
+  function setExportButtonLabel(text) {
+    if (!els.btnDatabaseExport) return;
+    els.btnDatabaseExport.textContent = String(text || "Export");
+  }
+
   function setBusy(busy) {
     const on = !!busy;
+    uiState.busy = on;
     if (els.btnDatabaseExport) els.btnDatabaseExport.disabled = on;
     if (els.databaseImportFile) els.databaseImportFile.disabled = on;
-    if (els.btnDatabaseImport) els.btnDatabaseImport.disabled = on || !getSelectedFile();
+    if (els.btnDatabaseImport) els.btnDatabaseImport.disabled = on;
+  }
+
+  function clearImportTimers() {
+    if (uiState.importTimer) clearTimeout(uiState.importTimer);
+    uiState.importTimer = null;
+  }
+
+  function clearExportTimers() {
+    if (uiState.exportTimer) clearTimeout(uiState.exportTimer);
+    uiState.exportTimer = null;
+  }
+
+  function resetImportUiDelayed(text, delayMs) {
+    clearImportTimers();
+    uiState.importTimer = setTimeout(() => {
+      setImportButtonLabel("Import");
+      setStatus("Ready");
+      clearImportTimers();
+    }, Number.isFinite(delayMs) ? delayMs : 1500);
+    setImportButtonLabel(text);
+  }
+
+  function resetExportUiDelayed(text, delayMs) {
+    clearExportTimers();
+    uiState.exportTimer = setTimeout(() => {
+      setExportButtonLabel("Export");
+      setStatus("Ready");
+      clearExportTimers();
+    }, Number.isFinite(delayMs) ? delayMs : 1200);
+    setExportButtonLabel(text);
   }
 
   async function exportDatabaseBackup() {
     setBusy(true);
     setStatus("Exporting…");
+    setExportButtonLabel("Exporting…");
     try {
       const db = await schema.openDb();
       const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readonly");
@@ -73,8 +121,10 @@
       downloadBlob({ blob, filename, saveAs: true });
       flashOk(els.btnDatabaseExport);
       setStatus("Exported");
+      resetExportUiDelayed("Exported ✓", 1300);
     } catch (e) {
       setStatus("Error");
+      setExportButtonLabel("Export failed");
       throw e;
     } finally {
       setBusy(false);
@@ -87,12 +137,30 @@
     return el.files[0] || null;
   }
 
-  async function importDatabaseBackupMerge(doc) {
+  function clearSelectedFile() {
+    if (!els.databaseImportFile) return;
+    try {
+      els.databaseImportFile.value = "";
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function formatProgress({ done, total, stage }) {
+    const safeTotal = Math.max(0, Number(total) || 0);
+    const safeDone = Math.min(safeTotal || 0, Math.max(0, Number(done) || 0));
+    const pct = safeTotal ? Math.floor((safeDone / safeTotal) * 100) : 0;
+    const labelStage = stage ? ` ${stage}` : "";
+    return { pct, text: `Importing… ${pct}% (${safeDone}/${safeTotal})${labelStage}`.trim() };
+  }
+
+  async function importDatabaseBackupMerge(doc, onProgress) {
     const validation = backupUtils.validateBackupDocument(doc);
     if (!validation.ok) throw new Error(validation.error || "Invalid backup file.");
 
     setBusy(true);
     setStatus("Importing…");
+    setImportButtonLabel("Importing… 0%");
 
     const stats = {
       conversationsAdded: 0,
@@ -111,6 +179,22 @@
       const backupMessages = Array.isArray(stores.messages) ? stores.messages : [];
       const backupMappings = Array.isArray(stores.sync_mappings) ? stores.sync_mappings : [];
 
+      const filteredSettings = backupUtils.filterStorageForBackup(doc.storageLocal || {});
+      const settingsKeys = Object.keys(filteredSettings);
+
+      const totalWork = backupConversations.length + backupMessages.length + backupMappings.length + settingsKeys.length;
+      const progress = { done: 0, total: totalWork, stage: "" };
+      const report = () => {
+        if (typeof onProgress !== "function") return;
+        onProgress({ ...progress });
+      };
+      const bump = (n, stage) => {
+        progress.done += Number(n) || 0;
+        if (stage) progress.stage = stage;
+        report();
+      };
+      report();
+
       const backupConvoIdToUnique = new Map();
       for (const c of backupConversations) {
         if (!c) continue;
@@ -128,11 +212,20 @@
         const { t, stores: s } = tx(db, ["conversations"], "readwrite");
         const idx = s.conversations.index("by_source_conversationKey");
 
-        for (const incoming of backupConversations) {
-          if (!incoming) continue;
+        progress.stage = "Conversations";
+        report();
+        for (let i = 0; i < backupConversations.length; i += 1) {
+          const incoming = backupConversations[i];
+          if (!incoming) {
+            bump(1, "Conversations");
+            continue;
+          }
           const source = incoming.source ? String(incoming.source) : "";
           const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : "";
-          if (!source || !conversationKey) continue;
+          if (!source || !conversationKey) {
+            bump(1, "Conversations");
+            continue;
+          }
 
           // eslint-disable-next-line no-await-in-loop
           const existing = await reqToPromise(idx.get([source, conversationKey]));
@@ -150,6 +243,8 @@
             stats.conversationsAdded += 1;
             uniqueToLocalId.set(`${source}||${conversationKey}`, id);
           }
+
+          bump(1, "Conversations");
         }
 
         await txDone(t);
@@ -160,18 +255,26 @@
         const { t, stores: s } = tx(db, ["messages"], "readwrite");
         const idx = s.messages.index("by_conversationId_messageKey");
 
-        for (const incoming of backupMessages) {
-          if (!incoming) continue;
+        progress.stage = "Messages";
+        report();
+        for (let i = 0; i < backupMessages.length; i += 1) {
+          const incoming = backupMessages[i];
+          if (!incoming) {
+            bump(1, "Messages");
+            continue;
+          }
           const backupConversationId = Number(incoming.conversationId);
           const messageKey = incoming.messageKey ? String(incoming.messageKey) : "";
           if (!Number.isFinite(backupConversationId) || backupConversationId <= 0 || !messageKey) {
             stats.messagesSkipped += 1;
+            bump(1, "Messages");
             continue;
           }
           const uk = backupConvoIdToUnique.get(backupConversationId) || "";
           const localConversationId = uk ? uniqueToLocalId.get(uk) : null;
           if (!localConversationId) {
             stats.messagesSkipped += 1;
+            bump(1, "Messages");
             continue;
           }
 
@@ -192,6 +295,9 @@
             await reqToPromise(s.messages.add(merged));
             stats.messagesAdded += 1;
           }
+
+          if (i % 25 === 0) report();
+          bump(1, "Messages");
         }
 
         await txDone(t);
@@ -203,11 +309,20 @@
         const idx = s.sync_mappings.index("by_source_conversationKey");
         const convoIdx = s.conversations.index("by_source_conversationKey");
 
-        for (const incoming of backupMappings) {
-          if (!incoming) continue;
+        progress.stage = "Mappings";
+        report();
+        for (let i = 0; i < backupMappings.length; i += 1) {
+          const incoming = backupMappings[i];
+          if (!incoming) {
+            bump(1, "Mappings");
+            continue;
+          }
           const source = incoming.source ? String(incoming.source) : "";
           const conversationKey = incoming.conversationKey ? String(incoming.conversationKey) : "";
-          if (!source || !conversationKey) continue;
+          if (!source || !conversationKey) {
+            bump(1, "Mappings");
+            continue;
+          }
 
           // eslint-disable-next-line no-await-in-loop
           const existing = await reqToPromise(idx.get([source, conversationKey]));
@@ -234,24 +349,29 @@
               await reqToPromise(s.conversations.put(convo));
             }
           }
+
+          bump(1, "Mappings");
         }
 
         await txDone(t);
       }
 
       // 4) Apply non-sensitive chrome.storage.local settings (merge-only).
-      const filtered = backupUtils.filterStorageForBackup(doc.storageLocal || {});
-      const keys = Object.keys(filtered);
-      if (keys.length) {
-        await storageSet(filtered);
-        stats.settingsApplied = keys.length;
+      progress.stage = "Settings";
+      report();
+      if (settingsKeys.length) {
+        await storageSet(filteredSettings);
+        stats.settingsApplied = settingsKeys.length;
+        bump(settingsKeys.length, "Settings");
       }
 
       setStatus("Imported");
       flashOk(els.btnDatabaseImport);
+      setImportButtonLabel("Imported ✓");
       return stats;
     } catch (e) {
       setStatus("Error");
+      setImportButtonLabel("Import failed");
       throw e;
     } finally {
       setBusy(false);
@@ -262,58 +382,71 @@
     try {
       await exportDatabaseBackup();
     } catch (e) {
-      alert((e && e.message) || "Export failed.");
+      resetExportUiDelayed("Export failed", 1600);
     }
   }
 
-  async function safeImport() {
-    const file = getSelectedFile();
+  async function importFromFile(file) {
     if (!file) return;
+    if (uiState.busy) return;
+
+    clearImportTimers();
+    setStatus(`Importing: ${file.name}`);
 
     let doc;
     try {
       const text = await file.text();
       doc = JSON.parse(text);
     } catch (_e) {
-      alert("Invalid JSON file.");
+      setStatus("Error");
+      resetImportUiDelayed("Invalid file", 1800);
+      clearSelectedFile();
       return;
     }
 
-    const ok = confirm("Import will MERGE the backup into your current database.\n\nContinue?");
-    if (!ok) return;
-
     try {
-      const stats = await importDatabaseBackupMerge(doc);
-      alert(
-        "Import finished.\n\n"
-        + `Conversations: +${stats.conversationsAdded} / updated ${stats.conversationsUpdated}\n`
-        + `Messages: +${stats.messagesAdded} / updated ${stats.messagesUpdated} / skipped ${stats.messagesSkipped}\n`
-        + `Mappings: +${stats.mappingsAdded} / updated ${stats.mappingsUpdated}\n`
-        + `Settings applied: ${stats.settingsApplied}\n`
-      );
-    } catch (e) {
-      alert((e && e.message) || "Import failed.");
+      await importDatabaseBackupMerge(doc, (p) => {
+        const view = formatProgress(p || {});
+        setImportButtonLabel(view.text);
+      });
+      resetImportUiDelayed("Imported ✓", 1600);
+    } catch (_e) {
+      setStatus("Error");
+      resetImportUiDelayed("Import failed", 2000);
+    } finally {
+      clearSelectedFile();
     }
-  }
-
-  function updateImportButtonState() {
-    const file = getSelectedFile();
-    if (els.btnDatabaseImport) els.btnDatabaseImport.disabled = !file;
-    if (file) setStatus(`Selected: ${file.name}`);
-    else setStatus("Ready");
   }
 
   function bindEvents() {
     if (els.btnDatabaseExport) els.btnDatabaseExport.addEventListener("click", () => safeExport());
-    if (els.btnDatabaseImport) els.btnDatabaseImport.addEventListener("click", () => safeImport());
+    if (els.btnDatabaseImport) {
+      els.btnDatabaseImport.addEventListener("click", () => {
+        if (uiState.busy) return;
+        if (!els.databaseImportFile) return;
+        try {
+          els.databaseImportFile.click();
+        } catch (_e) {
+          // ignore
+        }
+      });
+    }
     if (els.databaseImportFile) {
-      els.databaseImportFile.addEventListener("change", () => updateImportButtonState());
+      els.databaseImportFile.addEventListener("change", () => {
+        if (uiState.busy) return;
+        const file = getSelectedFile();
+        if (!file) return;
+        importFromFile(file).catch(() => {});
+      });
     }
   }
 
   function init() {
     disableImageDrag(els.viewSettings);
-    updateImportButtonState();
+    setBusy(false);
+    setStatus("Ready");
+    setImportButtonLabel("Import");
+    setExportButtonLabel("Export");
     bindEvents();
   }
 
