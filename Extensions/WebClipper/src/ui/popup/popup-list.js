@@ -63,6 +63,8 @@
 
   function syncActionButtons() {
     const hasSelection = state.selectedIds.size > 0;
+    if (els.chatBottomBar) els.chatBottomBar.classList.toggle("hasSelection", hasSelection);
+
     if (els.btnExport) els.btnExport.disabled = !hasSelection;
     if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection;
     if (els.btnDelete) els.btnDelete.disabled = !hasSelection;
@@ -70,6 +72,8 @@
     if (!hasSelection) {
       if (els.exportMenu) els.exportMenu.hidden = true;
       if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "false");
+      const deleteApi = NS.popupDelete;
+      if (deleteApi && typeof deleteApi.reset === "function") deleteApi.reset();
     }
   }
 

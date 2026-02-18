@@ -52,24 +52,29 @@
     await list.refresh();
   }
 
-  function init() {
-    if (!els.btnDelete) return;
-    setDeleteButtonArmed(false);
-    els.btnDelete.addEventListener("click", () => {
-      doDeleteSelected().catch((e) => {
-        alert((e && e.message) || "Delete failed.");
-      });
-    });
-
-    document.addEventListener("click", (e) => {
-      if (!armed) return;
-      const target = e && e.target;
-      if (target && els.btnDelete && els.btnDelete.contains(target)) return;
+    function init() {
+      if (!els.btnDelete) return;
       setDeleteButtonArmed(false);
-    });
-  }
+      els.btnDelete.addEventListener("click", () => {
+        doDeleteSelected().catch((e) => {
+          alert((e && e.message) || "Delete failed.");
+        });
+      });
 
-  NS.popupDelete = {
-    init
-  };
-})();
+      document.addEventListener("click", (e) => {
+        if (!armed) return;
+        const target = e && e.target;
+        if (target && els.btnDelete && els.btnDelete.contains(target)) return;
+        setDeleteButtonArmed(false);
+      });
+    }
+
+    NS.popupDelete = {
+      init,
+      reset: () => {
+        if (confirmTimer) clearTimeout(confirmTimer);
+        confirmTimer = null;
+        setDeleteButtonArmed(false);
+      }
+    };
+  })();
