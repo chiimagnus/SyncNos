@@ -53,10 +53,11 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 - Exports selected conversations as JSON/Markdown
 - Manually syncs selected conversations to Notion (OAuth)
 - Writes to a Notion database named `SyncNos-AI Chats`; re-sync clears and rebuilds page content to avoid duplicates
+- When `contentMarkdown` is available, sync renders Markdown into Notion blocks (headings/lists/quotes/code blocks/etc.); otherwise it falls back to plain text.
 
 ### Supported Sites
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI / z.ai
 
 ### Install From Releases
 
