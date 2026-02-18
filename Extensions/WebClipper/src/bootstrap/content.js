@@ -102,6 +102,25 @@
     return { id: picked.id, ...picked.collector };
   }
 
+  function getInpageCollector() {
+    const reg = NS.collectorsRegistry;
+    if (!reg) return null;
+    const list = typeof reg.list === "function" ? reg.list() : [];
+    if (!Array.isArray(list) || !list.length) return null;
+    const loc = { href: location.href, hostname: location.hostname, pathname: location.pathname };
+    for (const d of list) {
+      if (!d) continue;
+      const fn = typeof d.inpageMatches === "function" ? d.inpageMatches : d.matches;
+      if (typeof fn !== "function") continue;
+      try {
+        if (fn(loc)) return { id: d.id, ...(d.collector || {}) };
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return null;
+  }
+
   function showSaveTip(text) {
     const id = "webclipper-save-tip";
     const old = document.getElementById(id);
@@ -358,7 +377,7 @@
     const clickSave = async () => {
       if (stopped) return;
       try {
-        const collector = getCollector();
+        const collector = getCollector() || getInpageCollector();
         if (!collector || typeof collector.capture !== "function") return;
         const snapshot = collector.capture({ manual: true });
         if (!snapshot) {
@@ -383,9 +402,10 @@
         if (stopped) return;
         try {
           const collector = getCollector();
-          cleanupButtons(collector && collector.id);
+          const inpageCollector = collector || getInpageCollector();
+          cleanupButtons(inpageCollector && inpageCollector.id);
           ensureInpageButton({
-            collectorId: collector && collector.id,
+            collectorId: inpageCollector && inpageCollector.id,
             onClick: clickSave
           });
           if (!collector || typeof collector.capture !== "function") return;
