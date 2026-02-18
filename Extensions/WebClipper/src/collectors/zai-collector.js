@@ -97,6 +97,147 @@
     return container;
   }
 
+  function normalizeMarkdown(markdown) {
+    const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    // Keep leading indentation (important for markdown), but trim trailing whitespace.
+    const lines = s.split("\n").map((l) => l.replace(/[ \t]+$/g, ""));
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  function pickCodeLanguage(className) {
+    const raw = String(className || "");
+    if (!raw) return "";
+    const parts = raw.split(/\s+/).filter(Boolean);
+    for (const p of parts) {
+      const m = p.match(/^(language|lang)-([a-z0-9_+-]+)$/i);
+      if (m && m[2]) return String(m[2]).toLowerCase();
+    }
+    return "";
+  }
+
+  function wrapInlineCode(text) {
+    const s = String(text || "");
+    if (!s) return "``";
+    const matches = s.match(/`+/g) || [];
+    const maxTicks = matches.reduce((m, t) => Math.max(m, t.length), 0);
+    const fence = "`".repeat(Math.max(1, maxTicks + 1));
+    return `${fence}${s}${fence}`;
+  }
+
+  function htmlToMarkdown(root) {
+    if (!root) return "";
+    const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
+    const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
+
+    function renderChildren(el, ctx) {
+      const out = [];
+      const kids = el && el.childNodes ? Array.from(el.childNodes) : [];
+      for (const c of kids) out.push(renderNode(c, ctx));
+      return out.join("");
+    }
+
+    function renderList(listEl, ordered, ctx) {
+      const depth = (ctx && Number.isFinite(ctx.listDepth)) ? ctx.listDepth : 0;
+      const indent = "  ".repeat(Math.max(0, depth));
+      const items = [];
+      const children = listEl && listEl.children ? Array.from(listEl.children) : [];
+      for (const child of children) {
+        if (!child || String(child.tagName || "").toLowerCase() !== "li") continue;
+        const childCtx = { ...ctx, listDepth: depth + 1 };
+        const body = normalizeMarkdown(renderChildren(child, childCtx)).replace(/\n{2,}/g, "\n");
+        const bullet = ordered ? "1." : "-";
+        const lines = String(body || "").split("\n").filter((l) => l.length);
+        if (!lines.length) continue;
+        const first = `${indent}${bullet} ${lines[0]}`;
+        const rest = lines.slice(1).map((l) => `${indent}  ${l}`);
+        items.push([first, ...rest].join("\n"));
+      }
+      return items.join("\n") + (items.length ? "\n\n" : "");
+    }
+
+    function renderBlockquote(el, ctx) {
+      const raw = normalizeMarkdown(renderChildren(el, ctx));
+      if (!raw) return "";
+      const lines = raw.split("\n");
+      const quoted = lines.map((l) => (l ? `> ${l}` : ">")).join("\n");
+      return `${quoted}\n\n`;
+    }
+
+    function renderNode(node, ctx) {
+      if (!node) return "";
+      if (node.nodeType === TEXT_NODE) {
+        return node.nodeValue ? String(node.nodeValue) : "";
+      }
+      if (node.nodeType !== ELEMENT_NODE) return "";
+
+      const tag = node.tagName ? String(node.tagName).toLowerCase() : "";
+      if (!tag) return renderChildren(node, ctx);
+
+      if (tag === "br") return "\n";
+      if (tag === "hr") return "\n\n---\n\n";
+
+      // Skip non-content tags defensively.
+      if (tag === "script" || tag === "style" || tag === "svg" || tag === "path" || tag === "button") return "";
+
+      if (tag === "pre") {
+        const codeEl = node.querySelector ? node.querySelector("code") : null;
+        const lang = pickCodeLanguage(codeEl && codeEl.getAttribute ? codeEl.getAttribute("class") : "");
+        const text = String((codeEl ? (codeEl.textContent || "") : (node.textContent || "")) || "").replace(/\n+$/g, "");
+        if (!text.trim()) return "";
+        return `\n\n\`\`\`${lang || ""}\n${text}\n\`\`\`\n\n`;
+      }
+
+      if (tag === "code") {
+        // Inline code (code blocks handled by <pre>).
+        const text = String(node.textContent || "");
+        return wrapInlineCode(text);
+      }
+
+      if (tag === "strong" || tag === "b") return `**${renderChildren(node, ctx)}**`;
+      if (tag === "em" || tag === "i") return `*${renderChildren(node, ctx)}*`;
+      if (tag === "del" || tag === "s") return `~~${renderChildren(node, ctx)}~~`;
+
+      if (tag === "a") {
+        const href = node.getAttribute ? String(node.getAttribute("href") || "") : "";
+        const text = normalizeMarkdown(renderChildren(node, ctx));
+        if (href && /^https?:\/\//i.test(href)) {
+          return `[${text || href}](${href})`;
+        }
+        return text;
+      }
+
+      if (tag === "h1" || tag === "h2" || tag === "h3") {
+        const level = tag === "h1" ? 1 : tag === "h2" ? 2 : 3;
+        const text = normalizeMarkdown(renderChildren(node, ctx));
+        if (!text) return "";
+        return `${"#".repeat(level)} ${text}\n\n`;
+      }
+
+      if (tag === "ul") return renderList(node, false, ctx);
+      if (tag === "ol") return renderList(node, true, ctx);
+
+      if (tag === "blockquote") return renderBlockquote(node, ctx);
+
+      if (tag === "p") {
+        const text = normalizeMarkdown(renderChildren(node, ctx));
+        return text ? `${text}\n\n` : "";
+      }
+
+      if (tag === "li") {
+        // Usually handled by parent <ul>/<ol>, but keep a safe fallback.
+        const text = normalizeMarkdown(renderChildren(node, ctx));
+        return text ? `${text}\n` : "";
+      }
+
+      // Default: just render children; add paragraph breaks for common block containers.
+      const rendered = renderChildren(node, ctx);
+      if (tag === "div" || tag === "section" || tag === "article") return rendered;
+      return rendered;
+    }
+
+    return normalizeMarkdown(renderNode(root, { listDepth: 0 }));
+  }
+
   function extractTextFromSanitizedClone(clone) {
     if (!clone) return "";
 
@@ -155,6 +296,20 @@
     return parts.join("");
   }
 
+  function extractAssistantMarkdown(wrapper) {
+    if (!wrapper || !wrapper.querySelector) return "";
+    const content = wrapper.querySelector("#response-content-container") || wrapper.querySelector(".chat-assistant") || wrapper;
+    try {
+      const cloned = content.cloneNode(true);
+      removeThinkingNodes(cloned);
+      removeNonContentNodes(cloned);
+      const md = htmlToMarkdown(cloned);
+      return md || "";
+    } catch (_e) {
+      return "";
+    }
+  }
+
   function extractUserText(wrapper) {
     const node = (wrapper && wrapper.querySelector)
       ? (wrapper.querySelector(".whitespace-pre-wrap") || wrapper)
@@ -210,10 +365,14 @@
       if (!role) continue;
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
       if (!contentText) continue;
+      const contentMarkdown = role === "assistant"
+        ? (extractAssistantMarkdown(w) || contentText)
+        : contentText;
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
         contentText,
+        contentMarkdown,
         sequence: seq,
         updatedAt: Date.now()
       });
@@ -253,7 +412,10 @@
       __test: {
         removeThinkingNodes,
         removeNonContentNodes,
+        normalizeMarkdown,
+        htmlToMarkdown,
         extractTextFromSanitizedClone,
+        extractAssistantMarkdown,
         extractAssistantText
       }
     };

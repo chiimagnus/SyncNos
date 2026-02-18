@@ -65,6 +65,55 @@ describe("zai-collector", () => {
     expect(text).not.toContain("思维链内容");
   });
 
+  it("extracts assistant markdown from rendered HTML", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div id="message-3">
+        <div class="chat-assistant">
+          <div id="response-content-container">
+            <div class="markdown-prose">
+              <p><strong>Bold</strong> and <em>italic</em> with <a href="https://example.com">link</a> and <code>x = 1</code>.</p>
+              <ul>
+                <li>Item A</li>
+                <li>Item B</li>
+              </ul>
+              <pre><code class="language-js">console.log(1);\nconsole.log(2);</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://chat.z.ai/c/conv3" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    const collector = loadZaiCollector();
+
+    const wrapper = dom.window.document.querySelector("#message-3");
+    const md = collector.__test.extractAssistantMarkdown(wrapper);
+    expect(md).toContain("**Bold**");
+    expect(md).toContain("*italic*");
+    expect(md).toContain("[link](https://example.com)");
+    expect(md).toContain("`x = 1`");
+    expect(md).toContain("- Item A");
+    expect(md).toContain("- Item B");
+    expect(md).toContain("```js");
+    expect(md).toContain("console.log(1);");
+    expect(md).toContain("```");
+  });
+
   it("does not leak UI button labels when falling back to wrapper", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { JSDOM } = require("jsdom");
