@@ -120,7 +120,8 @@
       gemini: { key: "gemini", label: "Gemini" },
       kimi: { key: "kimi", label: "Kimi" },
       doubao: { key: "doubao", label: "Doubao" },
-      yuanbao: { key: "yuanbao", label: "Yuanbao" }
+      yuanbao: { key: "yuanbao", label: "Yuanbao" },
+      zai: { key: "zai", label: "z.ai" }
     };
     return map[normalized] || { key: "unknown", label: text };
   }

@@ -26,6 +26,7 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 - 弹窗 UI（`src/ui/popup/*`）：聊天列表选择、导出菜单（JSON/Markdown）、Notion 连接与父页面选择的设置页。
   - 按业务拆分为多文件：`popup-core.js`（共享能力）、`popup-tabs.js`、`popup-list.js`、`popup-chat-preview.js`（Chats 左键单击预览弹层，使用 `markdown-it` 做轻量 Markdown 渲染）、`popup-export.js`、`popup-notion.js`、`popup-about.js`、`popup.js`（初始化编排）。
 - Notion 同步（`src/sync/notion/*`）：按来源创建/复用数据库，创建/更新页面，清空子块并追加新块。
+  - 内容写入：当消息包含 `contentMarkdown` 时，优先将 Markdown 解析为 Notion blocks；否则回退为纯文本段落。
 
 ## Quick Start
 
