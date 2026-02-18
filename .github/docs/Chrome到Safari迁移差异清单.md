@@ -14,6 +14,7 @@
   - 建议在代码层集中封装一层 `browserApi` 适配，减少平台分支散落。
 - `chrome.downloads`
   - Safari 上可能行为受限或需要替代实现（例如通过 content 页面触发下载，或使用新的导出策略）。
+  - 影响范围：聊天导出（JSON/Markdown/zip）与 Database Backup（备份 JSON）的下载。
 - `chrome.webNavigation`
   - Safari 对 webNavigation 事件支持与过滤行为可能存在差异；OAuth 回调拦截需要重点验证。
 - `chrome.scripting`
@@ -41,8 +42,7 @@
 ## 6. 需要优先验证的功能清单
 
 1. 自动采集：MutationObserver + debounce 是否稳定。
-2. popup UI：列表/导出/同步按钮是否正常。
+2. popup UI：列表/导出/Database Backup（导出/导入）/同步按钮是否正常（尤其是文件选择与下载行为）。
 3. OAuth：授权跳转、回调捕获、token 持久化是否可靠。
 4. Notion API：跨域 fetch 是否可用。
 5. on-demand 文章抓取：站点授权 + 注入脚本是否可用。
-

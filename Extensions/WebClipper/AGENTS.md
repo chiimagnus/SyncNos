@@ -1,6 +1,6 @@
 # SyncNos WebClipper（浏览器扩展）Agent 指南
 
-WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，然后允许用户导出（JSON/Markdown）或手动同步到 Notion。
+WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
 
 ## 作用范围
 
@@ -13,7 +13,7 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 
 ## 关键约束
 
-- 修改应聚焦在：采集 -> 本地持久化 -> 导出 -> 手动 Notion 同步。
+- 修改应聚焦在：采集 -> 本地持久化 -> 导出/备份/导入 -> 手动 Notion 同步。
 - 权限保持最小且明确；避免添加 `*://*/*` 或无关的 Chrome API。
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
@@ -28,8 +28,9 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
   - 必选：`matches()`（自动采集 readiness）、`capture()`
   - 可选：`inpageMatches()`（inpage 按钮显示资格）
 - 后台 Service Worker（`src/bootstrap/background.js`）：IndexedDB 的 CRUD、同步映射、Notion OAuth 回调处理（通过 `webNavigation`）以及批量 Notion 同步。
-- 弹窗 UI（`src/ui/popup/*`）：聊天列表选择、导出菜单（JSON/Markdown）、Notion 连接与父页面选择的设置页。
-  - 按业务拆分为多文件：`popup-core.js`（共享能力）、`popup-tabs.js`、`popup-list.js`、`popup-chat-preview.js`（Chats 左键单击预览弹层，使用 `markdown-it` 做轻量 Markdown 渲染）、`popup-export.js`、`popup-notion.js`、`popup-about.js`、`popup.js`（初始化编排）。
+- 弹窗 UI（`src/ui/popup/*`）：聊天列表选择、导出菜单（JSON/Markdown）、Notion 连接与父页面选择、Database Backup（导出/导入）等设置项。
+  - 按业务拆分为多文件：`popup-core.js`（共享能力）、`popup-tabs.js`、`popup-list.js`、`popup-chat-preview.js`（Chats 左键单击预览弹层，使用 `markdown-it` 做轻量 Markdown 渲染）、`popup-export.js`、`popup-delete.js`、`popup-notion.js`、`popup-database.js`、`popup-about.js`、`popup.js`（初始化编排）。
+- 备份工具（`src/storage/backup-utils.js`）：负责备份文件 schema、`chrome.storage.local` 的非敏感 key 白名单、以及导入时的合并规则（按 `source + conversationKey` 合并会话；Notion token 不在备份范围内）。
 - Notion 同步（`src/sync/notion/*`）：按来源创建/复用数据库，创建/更新页面，清空子块并追加新块。
   - 内容写入：当消息包含 `contentMarkdown` 时，优先将 Markdown 解析为 Notion blocks；否则回退为纯文本段落。
 
