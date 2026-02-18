@@ -14,6 +14,13 @@
     return hasChatSignals(document);
   }
 
+  function inpageMatches(loc) {
+    const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
+    // UI eligibility: show the inpage button on Notion pages even before chat turns render.
+    // Actual capture is still guarded by `isNotionAiPage()`.
+    return /(^|\.)notion\.so$/.test(hostname);
+  }
+
   function isNotionAiPage() {
     return /(^|\.)notion\.so$/.test(location.hostname) && hasChatSignals(document);
   }
@@ -561,6 +568,16 @@
   };
 
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "notionai", matches, collector: NS.collectors.notionai });
+    NS.collectorsRegistry.register({ id: "notionai", matches, inpageMatches, collector: NS.collectors.notionai });
+  }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      ...NS.collectors.notionai,
+      __test: {
+        matches,
+        inpageMatches
+      }
+    };
   }
 })();
