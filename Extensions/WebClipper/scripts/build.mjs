@@ -211,6 +211,7 @@ concatFiles({
     "src/collectors/claude-collector.js",
     "src/collectors/gemini-collector.js",
     "src/collectors/deepseek-collector.js",
+    "src/collectors/zai-collector.js",
     "src/collectors/kimi-collector.js",
     "src/collectors/doubao-collector.js",
     "src/collectors/yuanbao-collector.js",
