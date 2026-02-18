@@ -80,7 +80,7 @@ describe("notion-sync-service markdown", () => {
     expect(bold?.text?.content).toBe("b");
   });
 
-  it("messagesToBlocks uses markdown for notionai source", () => {
+  it("messagesToBlocks uses markdown when present (notionai)", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
@@ -98,5 +98,25 @@ describe("notion-sync-service markdown", () => {
     ];
     const blocks = notionSyncService.messagesToBlocks(messages, { source: "notionai" });
     expect(blocks.some((b: any) => b && b.type === "bulleted_list_item")).toBe(true);
+  });
+
+  it("messagesToBlocks uses markdown when present (zai)", () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+
+    const messages = [
+      { role: "assistant", contentText: "plain", contentMarkdown: "```js\nconsole.log(1)\n```" }
+    ];
+    const blocks = notionSyncService.messagesToBlocks(messages, { source: "zai" });
+    expect(blocks.some((b: any) => b && b.type === "code")).toBe(true);
   });
 });
