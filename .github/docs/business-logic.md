@@ -5,18 +5,18 @@
 SyncNos 是一套“把分散知识沉淀到 Notion”的工具组合，包含：
 
 - **SyncNos（macOS App）**：将多个内容来源中的高亮/笔记/消息摘要统一整理后同步到 Notion，形成可检索、可持续增量更新的知识库。
-- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI、z.ai 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion；Firefox 版本已上架 AMO：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
+- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI、z.ai 等），自动入库到扩展本地数据库，并支持手动导出（JSON/Markdown）/数据库备份导出与导入（合并导入）/手动同步到 Notion；Firefox 版本已上架 AMO：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
 
 - 给谁用：需要把分散在阅读器、稍后读、读书应用、以及聊天截图中的信息沉淀到 Notion 的用户
 - 核心体验：
   - App：连接数据源与 Notion 后，按“书籍/文章/对话”维度一键同步；支持队列与进度；支持自动增量同步
-  - WebClipper：在对话页面自动监听内容变化并增量保存；用户在扩展弹窗中多选导出或批量同步到 Notion
+  - WebClipper：在对话页面自动监听内容变化并增量保存；用户在扩展弹窗中多选导出/批量同步到 Notion，或进行本地数据库备份/恢复
 - 输入（用户/系统侧）：
   - App：本地 Apple Books/GoodLinks 数据库文件、WeRead/Dedao 的登录会话（Cookie）、聊天截图（OCR）、Notion 授权信息与父页面选择
   - WebClipper：浏览器页面 DOM（AI 对话）、Notion OAuth 授权信息与 Parent Page 选择
 - 输出（用户可见产物）：
   - Notion：按来源创建的数据库与页面/条目，以及页面属性（如最后同步时间等）与内容块
-  - 本地：App 的缓存（SwiftData）与凭据（Keychain）；WebClipper 的本地数据库与导出文件（JSON/Markdown）
+  - 本地：App 的缓存（SwiftData）与凭据（Keychain）；WebClipper 的本地数据库与导出文件（JSON/Markdown/数据库备份 JSON）
 
 ## 2) 核心业务能力（Capabilities）
 
@@ -137,13 +137,14 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
 - 触发方式：
   - 在支持站点打开对话页时自动采集并增量入库（默认开启）
   - 页面内 inpage “Save” 按钮：满足 UI 显示资格时即出现，可手动触发一次采集（对 NotionAI 等 SPA/异步渲染页面，按钮可能早于聊天记录出现）
-  - 用户在扩展 popup 中手动导出（JSON/Markdown）或手动批量同步 Notion
+  - 用户在扩展 popup 中手动导出（JSON/Markdown）、在 Settings 的 Database Backup 中导出/导入备份（导入为合并模式），或手动批量同步 Notion
 - 输入：
   - 当前页面可见的对话内容
   - Notion OAuth token 与 Parent Page 选择
 - 输出：
   - 扩展本地数据库中的会话与消息记录
-  - 下载到本地的导出文件（Markdown / JSON；批量 JSON 导出会打包为 zip）
+  - 下载到本地的导出文件（Markdown / JSON；批量 JSON 导出会打包为 zip）与数据库备份文件（JSON，包含 IndexedDB + 非敏感 `chrome.storage.local` 设置；不包含 Notion token）
+  - 导入备份：将备份内容合并导入到现有本地数据库（不会清空现有数据；按 `source + conversationKey` 合并会话）
   - Notion 中创建/复用数据库 `SyncNos-AI Chats`（含 Name/Date/URL/AI 等属性），并按 `1 会话 -> 1 页面` 写入；重复同步会清空目标页面的子块并重建消息内容以避免重复追加
 - 内容写入策略（WebClipper -> Notion）：
   - 消息字段：`contentText` 为必填；`contentMarkdown` 为可选（当来源能提供更高保真结构时使用）
@@ -154,6 +155,7 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
   - 页面内按钮早出现但对话未渲染：点击 inpage “Save” 可能提示未找到可见对话（属于正常情况，等待对话出现后再保存）
   - 批量同步：单条失败不阻断整批，结束后给出失败清单
   - 同步覆盖：为了避免重复追加，WebClipper 的会话同步会覆盖目标 Notion 页面的子块内容（保留页面本身与属性）
+  - 备份导入：仅合并导入本地数据与非敏感设置，不会导入 Notion token；若备份文件 schema 不兼容则导入失败并提示
 
 ## 3) 核心用户流程（User Journeys）
 
@@ -184,8 +186,8 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
 1. 用户在浏览器安装 WebClipper 扩展并授予必要站点权限
 2. 用户打开支持的 AI 对话页面并进行对话
 3. 扩展自动检测对话内容变化并增量保存到本地数据库
-4. 用户打开扩展 popup，多选会话后选择导出或同步
-5. 导出：下载 JSON/Markdown；同步：连接 Notion、选择 Parent Page、批量同步到 Notion（同步会覆盖目标会话页内容）
+4. 用户打开扩展 popup，多选会话后选择导出或同步，或在 Settings 的 Database Backup 中做本地数据库备份/恢复
+5. 导出：下载 JSON/Markdown；备份：导出/导入数据库备份 JSON（合并导入）；同步：连接 Notion、选择 Parent Page、批量同步到 Notion（同步会覆盖目标会话页内容）
 
 ## 4) 业务流程图（Mermaid）
 
@@ -213,15 +215,17 @@ flowchart TD
     W1 --> W2["自动监听内容变化并本地入库"]
     W2 --> W3{用户动作}
     W3 -->|导出| W4["导出 JSON/Markdown"]
+    W3 -->|备份| W4b["Database Backup 导出/导入（合并）"]
     W3 -->|同步 Notion| W5["确保 WebClipper 数据库"]
     W5 --> W6["创建/更新会话页并覆盖内容"]
     W4 --> P
+    W4b --> P
     W6 --> P
 ```
 
 ## 5) 业务规则与约束（Rules & Constraints）
 
-- Notion 是主要同步目标：App 侧以同步为主；WebClipper 侧除同步外还支持本地导出（JSON/Markdown）
+- Notion 是主要同步目标：App 侧以同步为主；WebClipper 侧除同步外还支持本地导出（JSON/Markdown）与数据库备份导出/导入（合并导入）
 - 同步前置条件：必须具备有效的 Notion token（OAuth 或 API key）与 Parent Page
 - Apple Books 与 GoodLinks 依赖 macOS 沙盒的安全作用域授权：用户必须选择正确目录并允许访问
 - WeRead/Dedao 依赖 Cookie 会话：未登录或 Cookie 失效时不能拉取数据；WeRead 会尝试静默刷新但不保证成功
