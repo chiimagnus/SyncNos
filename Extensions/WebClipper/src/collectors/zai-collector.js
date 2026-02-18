@@ -65,7 +65,27 @@
 
   function removeThinkingNodes(container) {
     if (!container || !container.querySelectorAll) return container;
-    container.querySelectorAll(".thinking-chain-container").forEach((el) => {
+    const selectors = [
+      ".thinking-chain-container",
+      // z.ai thinking block uses `data-direct="false"` in current DOM.
+      "[data-direct='false']"
+    ];
+    for (const sel of selectors) {
+      container.querySelectorAll(sel).forEach((el) => {
+        try {
+          el.remove();
+        } catch (_e) {
+          // ignore
+        }
+      });
+    }
+    return container;
+  }
+
+  function removeNonContentNodes(container) {
+    if (!container || !container.querySelectorAll) return container;
+    // Strip UI/control elements that can leak into textContent when innerText is unreliable.
+    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el) => {
       try {
         el.remove();
       } catch (_e) {
@@ -73,6 +93,39 @@
       }
     });
     return container;
+  }
+
+  function extractTextFromSanitizedClone(clone) {
+    if (!clone) return "";
+    // Prefer innerText (preserves line breaks) but ensure the node is attached so browsers compute it reliably.
+    const body = document && document.body ? document.body : null;
+    if (!body || !body.appendChild) {
+      return String(clone.innerText || clone.textContent || "");
+    }
+
+    const host = document.createElement("div");
+    host.setAttribute("data-webclipper-temp", "true");
+    host.style.cssText = [
+      "position:fixed",
+      "left:-99999px",
+      "top:0",
+      "width:1px",
+      "height:1px",
+      "overflow:hidden",
+      "pointer-events:none"
+    ].join(";");
+
+    try {
+      host.appendChild(clone);
+      body.appendChild(host);
+      return String(clone.innerText || host.innerText || clone.textContent || "");
+    } finally {
+      try {
+        host.remove();
+      } catch (_e) {
+        // ignore
+      }
+    }
   }
 
   function extractUserText(wrapper) {
@@ -89,13 +142,15 @@
 
     let node = content;
     try {
-      node = removeThinkingNodes(content.cloneNode(true));
+      const cloned = content.cloneNode(true);
+      removeThinkingNodes(cloned);
+      removeNonContentNodes(cloned);
+      node = cloned;
     } catch (_e) {
       node = content;
     }
 
-    // Prefer visible-formatted text. Fallback to textContent when detached nodes don't support innerText reliably.
-    const raw = node && (node.innerText || node.textContent) ? (node.innerText || node.textContent) : "";
+    const raw = node ? extractTextFromSanitizedClone(node) : "";
     return NS.normalize.normalizeText(raw);
   }
 
@@ -165,6 +220,15 @@
     NS.collectorsRegistry.register({ id: "zai", matches, collector: api });
   }
 
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      ...api,
+      __test: {
+        removeThinkingNodes,
+        removeNonContentNodes,
+        extractTextFromSanitizedClone,
+        extractAssistantText
+      }
+    };
+  }
 })();
-
