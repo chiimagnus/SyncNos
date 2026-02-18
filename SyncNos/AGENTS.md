@@ -4,7 +4,7 @@
 
 **SyncNos** 是一个 SwiftUI macOS 应用程序，用于将 Apple Books、GoodLinks、WeRead、Dedao（得到）和微信聊天 OCR 中的读书高亮和笔记同步到 Notion 数据库。已发布至 [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888)。
 
-> 备注：本仓库还包含一个独立的 Chrome 扩展 `WebClipper`（路径：`Extensions/WebClipper/`），用于在浏览器侧采集 AI 对话并手动导出/同步到 Notion。扩展开发约定见 `Extensions/WebClipper/AGENTS.md`。
+> 备注：本仓库还包含一个独立的 Chrome 扩展 `WebClipper`（路径：`Extensions/WebClipper/`），用于在浏览器侧采集 AI 对话并手动导出/数据库备份导出导入/同步到 Notion。扩展开发约定见 `Extensions/WebClipper/AGENTS.md`。
 
 ### 核心功能
 - ✅ **完整数据提取**：从 SQLite 数据库中提取 Apple Books 高亮/笔记（支持时间戳、颜色标签）
