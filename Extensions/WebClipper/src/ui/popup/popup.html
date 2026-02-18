@@ -93,20 +93,17 @@
           <div class="settingsRow settingsRow--header" aria-label="Database backup header">
             <div class="notionHeaderText">
               <span class="notionHeaderTitle">Database Backup</span>
-              <span class="notionHeaderSep" aria-hidden="true">|</span>
-              <span id="databaseBackupStatus" class="notionHeaderStatus">Ready</span>
             </div>
             <div class="spacer"></div>
-            <button id="btnDatabaseExport" class="btn" type="button">Export</button>
           </div>
 
           <div class="settingsDivider" role="presentation"></div>
 
           <div class="settingsRow settingsRow--compact" aria-label="Database import controls">
-            <div class="settingsLabel settingsLabel--inline">Import</div>
             <div class="settingsControl settingsControl--grow">
-              <input id="databaseImportFile" class="fileInputHidden" type="file" accept=".json,application/json" />
+              <button id="btnDatabaseExport" class="btn" type="button">Export</button>
               <button id="btnDatabaseImport" class="btn" type="button">Import</button>
+              <input id="databaseImportFile" class="fileInputHidden" type="file" accept=".json,application/json" />
             </div>
           </div>
 
