@@ -30,7 +30,11 @@ describe("zai-collector", () => {
             <div class="markdown-prose">
               <div data-direct="false" class="w-full thinking-chain-container">
                 <button><span>思考过程</span></button>
-                <blockquote><p>这里是思维链内容，应该被忽略。</p></blockquote>
+              </div>
+              <div class="w-full overflow-hidden h-0">
+                <div class="thinking-block w-full h-full">
+                  <blockquote slot="content"><p>这里是思维链内容，应该被忽略。</p></blockquote>
+                </div>
               </div>
               <p>这是最终回答内容。</p>
             </div>
@@ -71,7 +75,11 @@ describe("zai-collector", () => {
           <div class="markdown-prose">
             <div data-direct="false" class="thinking-chain-container">
               <button><span>思考过程</span></button>
-              <blockquote><p>should be ignored</p></blockquote>
+            </div>
+            <div class="w-full overflow-hidden h-0">
+              <div class="thinking-block w-full h-full">
+                <blockquote slot="content"><p>should be ignored</p></blockquote>
+              </div>
             </div>
             <p>Hello answer</p>
           </div>
@@ -105,4 +113,3 @@ describe("zai-collector", () => {
     expect(text).not.toContain("重新生成");
   });
 });
-

@@ -67,6 +67,8 @@
     if (!container || !container.querySelectorAll) return container;
     const selectors = [
       ".thinking-chain-container",
+      // Some layouts render the thinking content in a separate block (often hidden/collapsed).
+      ".thinking-block",
       // z.ai thinking block uses `data-direct="false"` in current DOM.
       "[data-direct='false']"
     ];
@@ -97,35 +99,60 @@
 
   function extractTextFromSanitizedClone(clone) {
     if (!clone) return "";
-    // Prefer innerText (preserves line breaks) but ensure the node is attached so browsers compute it reliably.
-    const body = document && document.body ? document.body : null;
-    if (!body || !body.appendChild) {
-      return String(clone.innerText || clone.textContent || "");
-    }
 
-    const host = document.createElement("div");
-    host.setAttribute("data-webclipper-temp", "true");
-    host.style.cssText = [
-      "position:fixed",
-      "left:-99999px",
-      "top:0",
-      "width:1px",
-      "height:1px",
-      "overflow:hidden",
-      "pointer-events:none"
-    ].join(";");
+    // Prefer innerText (keeps line breaks). Must not mutate the real DOM, or we'd
+    // self-trigger the MutationObserver in auto-capture.
+    const inner = typeof clone.innerText === "string" ? clone.innerText : "";
+    if (inner && inner.trim()) return inner;
 
-    try {
-      host.appendChild(clone);
-      body.appendChild(host);
-      return String(clone.innerText || host.innerText || clone.textContent || "");
-    } finally {
-      try {
-        host.remove();
-      } catch (_e) {
-        // ignore
+    const blockTags = new Set([
+      "P",
+      "DIV",
+      "LI",
+      "UL",
+      "OL",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6",
+      "BLOCKQUOTE",
+      "PRE",
+      "SECTION",
+      "ARTICLE"
+    ]);
+
+    const parts = [];
+    const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
+    const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
+
+    function walk(node) {
+      if (!node) return;
+      const t = node.nodeType;
+      if (t === TEXT_NODE) {
+        const v = node.nodeValue ? String(node.nodeValue) : "";
+        if (v) parts.push(v);
+        return;
+      }
+      if (t !== ELEMENT_NODE) return;
+
+      const tag = node.tagName ? String(node.tagName).toUpperCase() : "";
+      if (tag === "BR") {
+        parts.push("\n");
+        return;
+      }
+
+      const children = node.childNodes ? Array.from(node.childNodes) : [];
+      for (const c of children) walk(c);
+
+      if (blockTags.has(tag)) {
+        parts.push("\n\n");
       }
     }
+
+    walk(clone);
+    return parts.join("");
   }
 
   function extractUserText(wrapper) {
