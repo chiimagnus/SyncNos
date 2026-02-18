@@ -507,7 +507,7 @@
       const label = role === "user" ? "User" : role === "assistant" ? "Assistant" : role;
       out.push(headingBlock(label, role === "user" ? "green" : "blue_background"));
       const markdown = (m && m.contentMarkdown && String(m.contentMarkdown).trim()) ? String(m.contentMarkdown) : "";
-      if (source === "notionai" && markdown) {
+      if (markdown) {
         const blocks = markdownToNotionBlocks(markdown);
         if (blocks.length) out.push(...blocks);
         else {
