@@ -5,7 +5,7 @@
 SyncNos 是一套“把分散知识沉淀到 Notion”的工具组合，包含：
 
 - **SyncNos（macOS App）**：将多个内容来源中的高亮/笔记/消息摘要统一整理后同步到 Notion，形成可检索、可持续增量更新的知识库。
-- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion；Firefox 版本已上架 AMO：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
+- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话（ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、NotionAI、z.ai 等），自动入库到扩展本地数据库，并支持手动导出/手动同步到 Notion；Firefox 版本已上架 AMO：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
 
 - 给谁用：需要把分散在阅读器、稍后读、读书应用、以及聊天截图中的信息沉淀到 Notion 的用户
 - 核心体验：
@@ -144,6 +144,10 @@ SyncNos 将不同来源统一抽象为“可列出条目 + 可按条目获取高
   - 扩展本地数据库中的会话与消息记录
   - 下载到本地的导出文件（Markdown / JSON；批量 JSON 导出会打包为 zip）
   - Notion 中创建/复用数据库 `SyncNos-AI Chats`（含 Name/Date/URL/AI 等属性），并按 `1 会话 -> 1 页面` 写入；重复同步会清空目标页面的子块并重建消息内容以避免重复追加
+- 内容写入策略（WebClipper -> Notion）：
+  - 消息字段：`contentText` 为必填；`contentMarkdown` 为可选（当来源能提供更高保真结构时使用）
+  - 当 `contentMarkdown` 存在时：优先将 Markdown 解析为 Notion blocks（标题/列表/引用/代码块/公式/分割线等）
+  - 当 `contentMarkdown` 不存在时：回退为纯文本段落写入
 - 关键边界与失败方式（用户视角）：
   - 页面形态复杂（如 NotionAI 侧栏/浮窗）：容器识别不确定时会标记 warning，但仍会入库
   - 批量同步：单条失败不阻断整批，结束后给出失败清单

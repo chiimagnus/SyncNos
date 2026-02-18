@@ -53,10 +53,11 @@ xcodebuild -scheme SyncNos -configuration Debug build
 - 导出所选对话为 JSON/Markdown
 - 手动同步所选对话到 Notion（OAuth）
 - 同步写入 Notion 数据库 `SyncNos-AI Chats`；重复同步会清空目标页面子块并重建内容以避免重复追加
+- 当消息包含 `contentMarkdown` 时，同步会优先将 Markdown 渲染为 Notion blocks（标题/列表/引用/代码块等）；否则回退为纯文本。
 
 ### 支持站点
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / NotionAI
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / NotionAI / z.ai
 
 ### 从 Releases 安装
 
