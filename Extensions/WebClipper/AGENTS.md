@@ -20,8 +20,13 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 
 ## 架构（高层）
 
-- 内容脚本（`src/bootstrap/content.js`）：选择当前活跃 collector，监听 DOM 变化，计算增量快照，向后台执行 upsert，并提供页面内“保存”按钮。
+- 内容脚本（`src/bootstrap/content.js`）：选择当前活跃 collector（用于自动采集），监听 DOM 变化，计算增量快照，向后台执行 upsert；并提供页面内“保存”按钮（inpage）。
+  - 自动采集：依赖 collector 的 `matches()`（严格判断“当前页面已可采集”）。
+  - inpage 按钮显示：优先使用 collector 的可选 `inpageMatches()`（UI 资格，允许早于内容渲染）；若未实现则回退到 `matches()`。
+  - 手动保存（点击 inpage 按钮）：当没有 active collector 时，会回退到 `inpageMatches()` 命中的 collector 做一次 `capture({ manual: true })`。
 - Collectors（`src/collectors/*-collector.js`）：各平台提取器，输出标准化 `{ conversation, messages }` 快照。
+  - 必选：`matches()`（自动采集 readiness）、`capture()`
+  - 可选：`inpageMatches()`（inpage 按钮显示资格）
 - 后台 Service Worker（`src/bootstrap/background.js`）：IndexedDB 的 CRUD、同步映射、Notion OAuth 回调处理（通过 `webNavigation`）以及批量 Notion 同步。
 - 弹窗 UI（`src/ui/popup/*`）：聊天列表选择、导出菜单（JSON/Markdown）、Notion 连接与父页面选择的设置页。
   - 按业务拆分为多文件：`popup-core.js`（共享能力）、`popup-tabs.js`、`popup-list.js`、`popup-chat-preview.js`（Chats 左键单击预览弹层，使用 `markdown-it` 做轻量 Markdown 渲染）、`popup-export.js`、`popup-notion.js`、`popup-about.js`、`popup.js`（初始化编排）。
