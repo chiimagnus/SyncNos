@@ -251,6 +251,8 @@ concatFiles({
     "src/export/article-markdown.js",
     "src/export/zip-utils.js",
     "node_modules/markdown-it/dist/markdown-it.js",
+    "src/storage/schema.js",
+    "src/storage/backup-utils.js",
     "src/sync/notion/oauth-config.js",
     "src/sync/notion/notion-api.js",
     "src/ui/popup/popup-core.js",
@@ -260,6 +262,7 @@ concatFiles({
     "src/ui/popup/popup-export.js",
     "src/ui/popup/popup-delete.js",
     "src/ui/popup/popup-notion.js",
+    "src/ui/popup/popup-database.js",
     "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
   ]
@@ -274,6 +277,8 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/\.\.\/node_modules\/markdown-it\/dist\/markdown-it\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\.\/\.\.\/storage\/schema\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\.\/\.\.\/storage\/backup-utils\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/oauth-config\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/notion-api\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-core\.js"><\/script>\s*/g, "")
@@ -283,6 +288,7 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\/popup-export\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-delete\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-notion\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-database\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-about\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
 writeText(join(out, "popup.html"), popupHtml);

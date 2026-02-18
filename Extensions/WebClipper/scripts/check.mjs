@@ -80,6 +80,7 @@ if (cli.syntax) {
     "src/collectors/collector-utils.js",
     "src/storage/incremental-updater.js",
     "src/storage/schema.js",
+    "src/storage/backup-utils.js",
     "src/shared/normalize.js",
     "src/collectors/chatgpt-collector.js",
     "src/collectors/claude-collector.js",
@@ -106,6 +107,7 @@ if (cli.syntax) {
     "src/ui/popup/popup-export.js",
     "src/ui/popup/popup-delete.js",
     "src/ui/popup/popup-notion.js",
+    "src/ui/popup/popup-database.js",
     "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
   ];
