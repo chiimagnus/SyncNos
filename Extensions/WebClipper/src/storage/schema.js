@@ -27,14 +27,6 @@
     return threadId ? `https://www.notion.so/chat?t=${threadId}&wfv=chat` : "";
   }
 
-  function txDone(t) {
-    return new Promise((resolve, reject) => {
-      t.oncomplete = () => resolve(true);
-      t.onerror = () => reject(t.error || new Error("transaction failed"));
-      t.onabort = () => reject(t.error || new Error("transaction aborted"));
-    });
-  }
-
   function migrateNotionAiThreadConversations({ db, tx }) {
     if (!db || !tx) return;
     if (!db.objectStoreNames.contains("conversations")) return;
