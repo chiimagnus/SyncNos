@@ -348,9 +348,10 @@
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onerror = () => reject(req.error || new Error("indexedDB open failed"));
-      req.onupgradeneeded = () => {
+      req.onupgradeneeded = (e) => {
         const db = req.result;
         const t = req.transaction;
+        const oldVersion = (e && typeof e.oldVersion === "number") ? e.oldVersion : 0;
 
         // conversations: { id, sourceType, source, conversationKey, title, url, author, publishedAt, description, warningFlags, notionPageId, lastCapturedAt }
         if (!db.objectStoreNames.contains("conversations")) {
@@ -375,7 +376,7 @@
 
         // v2 migration: NotionAI stable key by thread id (`t` query param).
         try {
-          if (t && req.oldVersion < 2) {
+          if (t && oldVersion < 2) {
             migrateNotionAiThreadConversations({ db, tx: t });
           }
         } catch (_e) {
