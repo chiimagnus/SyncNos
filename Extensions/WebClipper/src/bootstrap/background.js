@@ -79,19 +79,96 @@
     return { ...payload };
   }
 
+  function extractNotionAiThreadIdFromUrl(url) {
+    try {
+      const u = new URL(String(url || ""));
+      const t = String(u.searchParams.get("t") || "").trim();
+      if (/^[0-9a-fA-F]{32}$/.test(t)) return t.toLowerCase();
+      const hash = String(u.hash || "").replace(/^#/, "");
+      const m = hash.match(/(?:^|[?&])t=([0-9a-fA-F]{32})(?:[&#]|$)/);
+      return m ? String(m[1]).toLowerCase() : "";
+    } catch (_e) {
+      return "";
+    }
+  }
+
+  function notionAiStableConversationKey(threadId) {
+    return threadId ? `notionai_t_${threadId}` : "";
+  }
+
+  function notionAiCanonicalChatUrl(threadId) {
+    return threadId ? `https://www.notion.so/chat?t=${threadId}&wfv=chat` : "";
+  }
+
+  async function findExistingNotionAiConversationByThreadId(conversationsStore, threadId) {
+    if (!conversationsStore || !threadId) return null;
+    return await new Promise((resolve, reject) => {
+      const req = conversationsStore.openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return resolve(null);
+        const v = cursor.value;
+        try {
+          if (v && v.source === "notionai") {
+            const tid = extractNotionAiThreadIdFromUrl(v.url || "");
+            if (tid && tid === threadId) return resolve(v);
+          }
+        } catch (_e) {
+          // ignore and continue
+        }
+        cursor.continue();
+      };
+      req.onerror = () => reject(req.error || new Error("indexedDB cursor failed"));
+    });
+  }
+
   async function upsertConversation(payload) {
     const db = await openDb();
-    const { t, stores } = tx(db, ["conversations"], "readwrite");
+    const source = payload && payload.source ? String(payload.source) : "";
+    const conversationKeyRaw = payload && payload.conversationKey ? String(payload.conversationKey) : "";
+    const urlRaw = payload && payload.url ? String(payload.url) : "";
+
+    const notionThreadId = source === "notionai" ? extractNotionAiThreadIdFromUrl(urlRaw) : "";
+    const stableKey = notionThreadId ? notionAiStableConversationKey(notionThreadId) : "";
+    const conversationKey = stableKey || conversationKeyRaw;
+    const normalizedUrl = notionThreadId ? notionAiCanonicalChatUrl(notionThreadId) : urlRaw;
+
+    const storeNames = (source === "notionai" && notionThreadId) ? ["conversations", "sync_mappings"] : ["conversations"];
+    const { t, stores } = tx(db, storeNames, "readwrite");
     const idx = stores.conversations.index("by_source_conversationKey");
-    const existing = await reqToPromise(idx.get([payload.source, payload.conversationKey]));
+    let existing = await reqToPromise(idx.get([source, conversationKey]));
+
+    // NotionAI: migrate legacy keys (page-dependent) to stable `t=` keys when we can prove they refer to the same thread.
+    if (!existing && source === "notionai" && notionThreadId && stores.conversations) {
+      const legacy = await findExistingNotionAiConversationByThreadId(stores.conversations, notionThreadId);
+      const legacyKey = legacy && legacy.conversationKey ? String(legacy.conversationKey) : "";
+      if (legacy && legacyKey && legacyKey !== conversationKey) {
+        // If a sync mapping exists for the legacy key, migrate it too.
+        if (stores.sync_mappings) {
+          try {
+            const mappingIdx = stores.sync_mappings.index("by_source_conversationKey");
+            const existingMapping = await reqToPromise(mappingIdx.get([source, legacyKey]));
+            const targetMapping = await reqToPromise(mappingIdx.get([source, conversationKey]));
+            if (existingMapping && !targetMapping) {
+              await reqToPromise(stores.sync_mappings.put({ ...existingMapping, source, conversationKey, updatedAt: Date.now() }));
+            } else if (existingMapping && targetMapping) {
+              await reqToPromise(stores.sync_mappings.delete(existingMapping.id));
+            }
+          } catch (_e) {
+            // ignore mapping migration failures; conversation upsert still succeeds
+          }
+        }
+        existing = legacy;
+      }
+    }
 
     const now = Date.now();
     const nextTitle = (payload.title && String(payload.title).trim()) ? String(payload.title).trim() : "";
-    const nextUrl = (payload.url && String(payload.url).trim()) ? String(payload.url).trim() : "";
+    const nextUrl = (normalizedUrl && String(normalizedUrl).trim()) ? String(normalizedUrl).trim() : "";
     const baseRecord = {
       sourceType: payload.sourceType || "chat",
-      source: payload.source,
-      conversationKey: payload.conversationKey,
+      source,
+      conversationKey,
       title: nextTitle || (existing ? existing.title || "" : ""),
       url: nextUrl || (existing ? existing.url || "" : ""),
       // Optional metadata (mainly for `sourceType=article`, but safe for all sources).
