@@ -1,6 +1,6 @@
 # SyncNos WebClipper（浏览器扩展）Agent 指南
 
-WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
+[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
 
 ## 作用范围
 
@@ -18,21 +18,44 @@ WebClipper 是本仓库中的一个独立浏览器扩展（基于 WebExtensions 
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 
-## 架构（高层）
+## 工程开发规范（建议）
+以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
 
-- 内容脚本（`src/bootstrap/content.js`）：选择当前活跃 collector（用于自动采集），监听 DOM 变化，计算增量快照，向后台执行 upsert；并提供页面内“保存”按钮（inpage）。
-  - 自动采集：依赖 collector 的 `matches()`（严格判断“当前页面已可采集”）。
-  - inpage 按钮显示：优先使用 collector 的可选 `inpageMatches()`（UI 资格，允许早于内容渲染）；若未实现则回退到 `matches()`。
-  - 手动保存（点击 inpage 按钮）：当没有 active collector 时，会回退到 `inpageMatches()` 命中的 collector 做一次 `capture({ manual: true })`。
-- Collectors（`src/collectors/*-collector.js`）：各平台提取器，输出标准化 `{ conversation, messages }` 快照。
-  - 必选：`matches()`（自动采集 readiness）、`capture()`
-  - 可选：`inpageMatches()`（inpage 按钮显示资格）
-- 后台 Service Worker（`src/bootstrap/background.js`）：IndexedDB 的 CRUD、同步映射、Notion OAuth 回调处理（通过 `webNavigation`）以及批量 Notion 同步。
-- 弹窗 UI（`src/ui/popup/*`）：聊天列表选择、导出菜单（JSON/Markdown）、Notion 连接与父页面选择、Database Backup（导出/导入）等设置项。
-  - 按业务拆分为多文件：`popup-core.js`（共享能力）、`popup-tabs.js`、`popup-list.js`、`popup-chat-preview.js`（Chats 左键单击预览弹层，使用 `markdown-it` 做轻量 Markdown 渲染）、`popup-export.js`、`popup-delete.js`、`popup-notion.js`、`popup-database.js`、`popup-about.js`、`popup.js`（初始化编排）。
-- 备份工具（`src/storage/backup-utils.js`）：负责备份文件 schema、`chrome.storage.local` 的非敏感 key 白名单、以及导入时的合并规则（按 `source + conversationKey` 合并会话；Notion token 不在备份范围内）。
-- Notion 同步（`src/sync/notion/*`）：按来源创建/复用数据库，创建/更新页面，清空子块并追加新块。
-  - 内容写入：当消息包含 `contentMarkdown` 时，优先将 Markdown 解析为 Notion blocks；否则回退为纯文本段落。
+### 通用原则
+- **SOLID（适配到本项目的 JS 架构）**
+  - **S（单一职责）**：UI（popup）、数据层（IndexedDB/storage）、抓取（collectors）、同步（notion sync）分离；避免“一个模块既抓又存又同步又渲染”。
+  - **O（开闭原则）**：新增平台优先通过新增 `collector` + 注册表扩展完成，避免在多处 `switch/if` 扩散。
+  - **I（接口隔离）**：以最小能力的“contract/shape”交互（例如 collector 只暴露 `matches/capture`），避免把内部实现细节泄露到调用方。
+  - **D（依赖倒置）**：业务逻辑依赖抽象（例如 `notionApi.notionFetch` / `tokenStore`），在测试里可替换 mock。
+- **DRY**：重复逻辑抽成共享函数（`popup-core`、`collector-utils`、`notion-api`）；但不要为了抽象而抽象。
+- **KISS**：优先可读性与可调试性，避免过度封装、过度动态化。
+- **YAGNI**：不为“可能用到”提前引入权限、存储字段、复杂配置项。
+
+### 可观测性与错误处理
+- **不要静默吞错**：除非能证明是“可忽略且不影响主流程”的错误，否则必须：
+  - 返回结构化错误（`{ ok: false, error: { message, extra } }`），或
+  - 在 UI 侧给出明确提示（例如 `alert`/状态文本），并避免无限弹窗。
+- **关键路径必须可诊断**：Notion OAuth、Parent Page 选择、同步入口、数据库创建/复用、页面创建/更新、写入 blocks 都应在失败时提供明确错误上下文。
+- **避免记录敏感信息**：日志中不要输出 access token、cookie、完整页面内容；必要时只输出摘要/长度/计数。
+
+### 状态与持久化
+
+- **持久化要“显式且一致”**：任何后台流程依赖的配置值（例如 Notion parent page id）都必须在 UI 层确保写入存储；不要依赖“用户碰巧触发了 change”。
+- **迁移优先、破坏性操作谨慎**：IndexedDB schema 变更需要迁移策略；备份/导入需兼容旧版本字段与去重规则。
+
+### MV3 / WebExtensions 实务
+
+- **Popup 只负责触发与展示**：长任务放后台 Service Worker 执行，popup 通过 message 获取进度/结果。
+- **节流与速率限制**：对 Notion 写入必须做 pacing/批量；批量同步要能部分失败不影响其它项。
+- **权限变更需要理由**：新增 `permissions/host_permissions` 前先给出“为何需要、替代方案为何不行、风险与范围控制”。
+
+### 测试与回归
+
+- 涉及以下改动时优先补 `vitest`（`Extensions/WebClipper/tests`）：
+  - Notion 同步（blocks 生成、分页/批量、错误分支）
+  - OAuth 状态机（pending/error/connected）
+  - IndexedDB schema/migration、备份导入合并规则
+  - Collector 解析规则（结构变化、空态、异常 DOM）
 
 ## Quick Start
 
