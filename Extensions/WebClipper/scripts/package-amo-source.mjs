@@ -10,6 +10,7 @@ function run(cmd, args, cwd) {
 const root = new URL("..", import.meta.url).pathname;
 const staging = join(root, ".tmp-amo-source");
 const outZip = join(root, "SyncNos-WebClipper-amo-source.zip");
+const repoLicense = join(root, "..", "..", "LICENSE");
 
 rmSync(staging, { recursive: true, force: true });
 rmSync(outZip, { force: true });
@@ -21,6 +22,13 @@ function copyIntoStaging(relPath) {
   const dstDir = dst.split("/").slice(0, -1).join("/");
   mkdirSync(dstDir, { recursive: true });
   cpSync(src, dst, { recursive: true });
+}
+
+function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
+  const dst = join(staging, dstRelPath);
+  const dstDir = dst.split("/").slice(0, -1).join("/");
+  mkdirSync(dstDir, { recursive: true });
+  cpSync(srcAbsPath, dst);
 }
 
 // Minimal, reviewer-friendly source package contents.
@@ -39,6 +47,10 @@ for (const item of items) {
   const p = join(root, item);
   if (!existsSync(p)) throw new Error(`missing: ${item}`);
   copyIntoStaging(item);
+}
+
+if (existsSync(repoLicense)) {
+  copyExternalIntoStaging(repoLicense, "LICENSE");
 }
 
 // `.zip` is the required format for AMO "Source code".

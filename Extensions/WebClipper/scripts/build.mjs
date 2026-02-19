@@ -56,6 +56,7 @@ mkdirSync(dist, { recursive: true });
 
 // Create a loadable extension directly in dist/ (flat layout).
 const out = dist;
+const repoLicense = join(root, "..", "..", "LICENSE");
 
 function readText(p) {
   return readFileSync(p, "utf-8");
@@ -180,6 +181,9 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
 }
 
 // Copy only minimal runtime assets into dist root.
+if (existsSync(repoLicense)) {
+  cpSync(repoLicense, join(out, "LICENSE"));
+}
 cpSync(join(root, "icons/icon-16.png"), join(out, "icon-16.png"));
 cpSync(join(root, "icons/icon-48.png"), join(out, "icon-48.png"));
 cpSync(join(root, "icons/icon-128.png"), join(out, "icon-128.png"));
