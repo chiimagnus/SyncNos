@@ -161,11 +161,15 @@
   }
 
   function roleFromWrapper(wrapper) {
-    if (wrapper && wrapper.getAttribute && wrapper.getAttribute("data-agent-chat-user-step-id")) return "user";
-    return "assistant";
+    if (!wrapper) return "";
+    if (wrapper.getAttribute && wrapper.getAttribute("data-agent-chat-user-step-id")) return "user";
+    if (wrapper.querySelector && wrapper.querySelector("div[data-block-id]")) return "assistant";
+    return "";
   }
 
   function isTopLevelBlock(block, scope) {
+    if (!block) return false;
+    if (!scope) return true;
     let p = block && block.parentElement ? block.parentElement : null;
     while (p && p !== scope) {
       if (p.getAttribute && p.getAttribute("data-block-id")) return false;
