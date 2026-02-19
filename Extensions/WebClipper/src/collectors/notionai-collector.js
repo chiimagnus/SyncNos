@@ -165,6 +165,15 @@
     return "assistant";
   }
 
+  function isTopLevelBlock(block, scope) {
+    let p = block && block.parentElement ? block.parentElement : null;
+    while (p && p !== scope) {
+      if (p.getAttribute && p.getAttribute("data-block-id")) return false;
+      p = p.parentElement;
+    }
+    return true;
+  }
+
   function extractUserText(wrapper) {
     const leaf =
       wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
