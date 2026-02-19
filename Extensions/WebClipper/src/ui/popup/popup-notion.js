@@ -53,8 +53,26 @@
     }
 
     const saved = await storageGet(["notion_parent_page_id"]);
-    if (saved && saved.notion_parent_page_id) {
-      els.notionPages.value = saved.notion_parent_page_id;
+    const savedId = (saved && saved.notion_parent_page_id) ? String(saved.notion_parent_page_id).trim() : "";
+    const hasSavedOption = (() => {
+      if (!savedId) return false;
+      try {
+        return Array.from(els.notionPages.options || []).some((o) => o && String(o.value) === savedId);
+      } catch (_e) {
+        return false;
+      }
+    })();
+
+    if (hasSavedOption) {
+      els.notionPages.value = savedId;
+    }
+
+    // Important: `notionSyncConversations` reads `notion_parent_page_id` from storage.
+    // If the user never changes the dropdown (still on the first option), the value would
+    // never be persisted, causing sync to fail with "missing parentPageId".
+    const currentSelected = String(els.notionPages.value || "").trim();
+    if (currentSelected && (!savedId || !hasSavedOption || savedId !== currentSelected)) {
+      await storageSet({ notion_parent_page_id: currentSelected });
     }
   }
 
@@ -138,7 +156,14 @@
 
       if (!notionParentPagesLoaded) {
         notionParentPagesLoaded = true;
-        loadParentPages().catch(() => {});
+        loadParentPages().catch((e) => {
+          notionParentPagesLoaded = false;
+          const msg = e && e.message ? e.message : String(e || "Failed to load Notion pages.");
+          if (!refreshNotionStatus.__lastLoadPagesError || refreshNotionStatus.__lastLoadPagesError !== msg) {
+            refreshNotionStatus.__lastLoadPagesError = msg;
+            alert(`Failed to load Notion pages: ${msg}`);
+          }
+        });
       }
     } else {
       if (meta && meta.lastError) {

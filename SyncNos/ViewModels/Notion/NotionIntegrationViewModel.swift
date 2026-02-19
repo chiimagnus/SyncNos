@@ -46,6 +46,13 @@ final class NotionIntegrationViewModel: ObservableObject {
         self.workspaceName = notionConfig.notionWorkspaceName
         self.openNotionLinksInBrowser = notionConfig.openNotionLinksInBrowser
     }
+
+    private func silentlyPersistParentPageId(_ pageId: String) {
+        let trimmed = pageId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        notionConfig.notionPageId = trimmed
+        notionPageIdInput = trimmed
+    }
     
     func saveCredentials() {
         notionConfig.notionKey = notionKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -161,6 +168,12 @@ final class NotionIntegrationViewModel: ObservableObject {
                 let pages = try await notionService.listAccessibleParentPages(searchQuery: nil)
                 await MainActor.run {
                     self.availablePages = pages
+                    // 修复：当 notionPageId 为空时，SwiftUI Picker 可能会“看起来默认选中第一项”，
+                    // 但 selection 仍然是空字符串，导致 Notion 配置实际上未完成（同步会失败）。
+                    // 这里在首次加载可选页面后，为空配置自动持久化一个有效的默认 parentPageId。
+                    if (self.notionConfig.notionPageId ?? "").isEmpty, let first = pages.first {
+                        self.silentlyPersistParentPageId(first.id)
+                    }
                 }
             } catch {
                 await MainActor.run {
