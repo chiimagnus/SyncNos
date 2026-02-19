@@ -11,11 +11,11 @@ function loadNormalize() {
 
 function loadZaiCollector() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/zai-collector.js");
+  const modulePath = require.resolve("../../src/collectors/zai/zai-collector.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/zai-collector.js");
+  return require("../../src/collectors/zai/zai-collector.js");
 }
 
 function loadZaiMarkdown() {
