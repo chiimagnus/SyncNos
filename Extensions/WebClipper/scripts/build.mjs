@@ -211,11 +211,16 @@ concatFiles({
     "src/collectors/claude-collector.js",
     "src/collectors/gemini-collector.js",
     "src/collectors/deepseek-collector.js",
+    "src/collectors/zai/zai-markdown.js",
     "src/collectors/zai-collector.js",
     "src/collectors/kimi-collector.js",
     "src/collectors/doubao-collector.js",
     "src/collectors/yuanbao-collector.js",
+    "src/collectors/notionai/notionai-markdown.js",
     "src/collectors/notionai-collector.js",
+    "src/ui/inpage/inpage-tip.js",
+    "src/ui/inpage/inpage-button.js",
+    "src/bootstrap/content-controller.js",
     "src/bootstrap/content.js"
   ]
 });
@@ -237,6 +242,9 @@ concatParts({
     readText(join(root, "src/sync/notion/notion-ai.js")),
     readText(join(root, "src/sync/notion/notion-db-manager.js")),
     readText(join(root, "src/sync/notion/notion-sync-service.js")),
+    readText(join(root, "src/bootstrap/background-storage.js")),
+    readText(join(root, "src/bootstrap/background-notion-oauth.js")),
+    readText(join(root, "src/bootstrap/background-router.js")),
     backgroundText
   ]
 });
