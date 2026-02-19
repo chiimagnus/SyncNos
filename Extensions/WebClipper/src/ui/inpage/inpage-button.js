@@ -220,6 +220,14 @@
     function endDrag() {
       if (!dragging) return;
       dragging = false;
+      if (!moved) {
+        // Click (no actual drag): restore the previous snapped position.
+        // Otherwise, hover transforms (e.g. translateY) would slightly change
+        // getBoundingClientRect() and make the button "creep" over repeated clicks.
+        applySnappedPosition(btn, snappedState);
+        return;
+      }
+
       const rect = btn.getBoundingClientRect();
       snappedState = snapToClosestEdge(btn, rect.left, rect.top);
       try {
@@ -296,4 +304,3 @@
   };
   if (typeof module !== "undefined" && module.exports) module.exports = NS.inpageButton;
 })();
-
