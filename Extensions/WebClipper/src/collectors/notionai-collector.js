@@ -1,6 +1,24 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
+  function findChatThreadIdFromHref(href) {
+    try {
+      const u = new URL(String(href || location.href || ""));
+      const t = String(u.searchParams.get("t") || "").trim();
+      if (/^[0-9a-fA-F]{32}$/.test(t)) return t.toLowerCase();
+      const hash = String(u.hash || "").replace(/^#/, "");
+      const m = hash.match(/(?:^|[?&])t=([0-9a-fA-F]{32})(?:[&#]|$)/);
+      return m ? String(m[1]).toLowerCase() : "";
+    } catch (_e) {
+      return "";
+    }
+  }
+
+  function notionAiCanonicalChatUrl(threadId) {
+    if (!threadId) return "";
+    return `https://www.notion.so/chat?t=${threadId}&wfv=chat`;
+  }
+
   function hasChatSignals(scope) {
     const s = scope || document;
     // NotionAI chat turns include this marker on user messages (observed across page/side-panel/floating dialog).
@@ -541,11 +559,15 @@
 
     if (!messages.length) return null;
 
+    const threadId = findChatThreadIdFromHref(location.href);
     const pageId = findPageIdFromUrl();
     const firstUser = messages.find((m) => m.role === "user");
     const firstUserSig = firstUser ? NS.normalize.fnv1a32(firstUser.contentText) : NS.normalize.fnv1a32(String(Date.now()));
-    const conversationKey = `notionai_${pageId || location.pathname}_${firstUserSig}`;
+    const conversationKey = threadId
+      ? `notionai_t_${threadId}`
+      : `notionai_${pageId || location.pathname}_${firstUserSig}`;
     const title = getChatTitleFromRoot(root || document);
+    const canonicalUrl = threadId ? notionAiCanonicalChatUrl(threadId) : "";
 
     return {
       conversation: {
@@ -553,7 +575,7 @@
         source: "notionai",
         conversationKey,
         title: title || document.title || "NotionAI",
-        url: location.href,
+        url: canonicalUrl || location.href,
         warningFlags,
         lastCapturedAt: Date.now()
       },
