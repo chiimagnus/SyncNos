@@ -36,6 +36,15 @@ function loadNotionAiCollector() {
   return require("../../src/collectors/notionai-collector.js");
 }
 
+function loadNotionAiMarkdown() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/collectors/notionai/notionai-markdown.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/collectors/notionai/notionai-markdown.js");
+}
+
 describe("notionai-collector", () => {
   it("exposes inpageMatches for early UI eligibility", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -53,8 +62,10 @@ describe("notionai-collector", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
+    loadNormalize();
     loadContract();
     loadRegistry();
+    loadNotionAiMarkdown();
     const collector = loadNotionAiCollector();
 
     expect(typeof collector.__test.inpageMatches).toBe("function");
@@ -86,8 +97,10 @@ describe("notionai-collector", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
+    loadNormalize();
     loadContract();
     loadRegistry();
+    loadNotionAiMarkdown();
     loadNotionAiCollector();
 
     const active = globalThis.WebClipper.collectorsRegistry.pickActive({
@@ -131,6 +144,7 @@ describe("notionai-collector", () => {
     loadNormalize();
     loadContract();
     loadRegistry();
+    loadNotionAiMarkdown();
     const collector = loadNotionAiCollector();
 
     const snap = collector.capture();
@@ -175,6 +189,7 @@ describe("notionai-collector", () => {
       loadNormalize();
       loadContract();
       loadRegistry();
+      loadNotionAiMarkdown();
       const collector = loadNotionAiCollector();
 
       const snap = collector.capture();
