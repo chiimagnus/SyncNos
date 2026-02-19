@@ -18,6 +18,15 @@ function loadZaiCollector() {
   return require("../../src/collectors/zai-collector.js");
 }
 
+function loadZaiMarkdown() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/collectors/zai/zai-markdown.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/collectors/zai/zai-markdown.js");
+}
+
 describe("zai-collector", () => {
   it("ignores thinking-chain-container content", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -56,6 +65,7 @@ describe("zai-collector", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     loadNormalize();
+    loadZaiMarkdown();
     const collector = loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-1");
@@ -99,6 +109,7 @@ describe("zai-collector", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     loadNormalize();
+    loadZaiMarkdown();
     const collector = loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-3");
@@ -153,6 +164,7 @@ describe("zai-collector", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     loadNormalize();
+    loadZaiMarkdown();
     const collector = loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-2");

@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "fake-indexeddb": "^6.2.2",
     "jsdom": "^28.1.0",
     "terser": "^5.31.6",
     "vitest": "^2.1.8"
