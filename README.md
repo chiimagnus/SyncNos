@@ -32,13 +32,6 @@ This project has two parts:
 
 - Notion (OAuth recommended; API key supported)
 
-### Development
-
-```bash
-open SyncNos.xcodeproj
-xcodebuild -scheme SyncNos -configuration Debug build
-```
-
 ## WebClipper (Browser Extension)
 
 This repository includes a standalone MV3 browser extension under `Extensions/WebClipper/`.
@@ -55,6 +48,7 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 - Manually syncs selected conversations to Notion (OAuth)
 - Writes to a Notion database named `SyncNos-AI Chats`; re-sync clears and rebuilds page content to avoid duplicates
 - When `contentMarkdown` is available, sync renders Markdown into Notion blocks (headings/lists/quotes/code blocks/etc.); otherwise it falls back to plain text.
+- Notion AI: optionally auto-picks a preferred model when the chat is set to **Auto** (configure in popup Settings)
 
 ### Supported Sites
 
@@ -68,22 +62,6 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI / z.ai
   - `syncnos-webclipper-firefox-v*.xpi` (Firefox, for local testing only)
 - Chrome/Edge: unzip, then load unpacked in `chrome://extensions` / `edge://extensions` (Developer mode).
 - Firefox: install from AMO (recommended). If you need local testing, use `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on…” and select the `.xpi` (or unzip and select `manifest.json`).
-
-### Development
-
-```bash
-npm --prefix Extensions/WebClipper install
-npm --prefix Extensions/WebClipper run check
-npm --prefix Extensions/WebClipper run test
-npm --prefix Extensions/WebClipper run build
-```
-
-## Docs
-
-- Repository guide: `AGENTS.md`
-- Business logic map: `.github/docs/business-logic.md`
-- Keyboard navigation: `.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
-- WebClipper guide: `Extensions/WebClipper/AGENTS.md`
 
 ## License
 
