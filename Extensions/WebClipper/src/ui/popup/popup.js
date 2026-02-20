@@ -4,13 +4,14 @@
   const tabs = NS.popupTabs;
   const list = NS.popupList;
   const chatPreview = NS.popupChatPreview;
-  const popupExport = NS.popupExport;
-  const popupDelete = NS.popupDelete;
-  const notion = NS.popupNotion;
-  const database = NS.popupDatabase;
-  const about = NS.popupAbout;
+	  const popupExport = NS.popupExport;
+	  const popupDelete = NS.popupDelete;
+	  const notion = NS.popupNotion;
+	  const notionAi = NS.popupNotionAi;
+	  const database = NS.popupDatabase;
+	  const about = NS.popupAbout;
 
-  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !database || !about) return;
+	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
   const { els, send, flashOk } = core;
 
@@ -42,12 +43,13 @@
   async function init() {
     list.init();
     chatPreview.init();
-    popupExport.init();
-    popupDelete.init();
-    notion.init();
-    database.init();
-    about.init();
-    initNotionSyncAction();
+	    popupExport.init();
+	    popupDelete.init();
+	    notion.init();
+	    notionAi.init();
+	    database.init();
+	    about.init();
+	    initNotionSyncAction();
 
     await tabs.init();
     await list.refresh();

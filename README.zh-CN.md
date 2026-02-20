@@ -32,13 +32,6 @@
 
 - Notion（推荐 OAuth，也支持手动 token）
 
-### 开发
-
-```bash
-open SyncNos.xcodeproj
-xcodebuild -scheme SyncNos -configuration Debug build
-```
-
 ## WebClipper（浏览器扩展）
 
 仓库内包含一个独立的 MV3 浏览器扩展，位于 `Extensions/WebClipper/`。
@@ -55,6 +48,7 @@ xcodebuild -scheme SyncNos -configuration Debug build
 - 手动同步所选对话到 Notion（OAuth）
 - 同步写入 Notion 数据库 `SyncNos-AI Chats`；重复同步会清空目标页面子块并重建内容以避免重复追加
 - 当消息包含 `contentMarkdown` 时，同步会优先将 Markdown 渲染为 Notion blocks（标题/列表/引用/代码块等）；否则回退为纯文本。
+- Notion AI：可选“自动点选偏好的大模型”（仅在 Notion AI 当前为 **自动/Auto** 时生效，可在扩展 Settings 中配置）
 
 ### 支持站点
 
@@ -68,22 +62,6 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / NotionAI / z.ai
   - `syncnos-webclipper-firefox-v*.xpi`（Firefox，仅用于本地测试）
 - Chrome/Edge：解压后，在 `chrome://extensions` / `edge://extensions`（开发者模式）中“加载已解压的扩展程序”。
 - Firefox：推荐从 AMO 安装；如需本地测试，使用 `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on...” 选择 `.xpi`（或解压后选择 `manifest.json`）。
-
-### 开发
-
-```bash
-npm --prefix Extensions/WebClipper install
-npm --prefix Extensions/WebClipper run check
-npm --prefix Extensions/WebClipper run test
-npm --prefix Extensions/WebClipper run build
-```
-
-## 文档
-
-- 仓库指南：`AGENTS.md`
-- 业务地图：`.github/docs/business-logic.md`
-- 键盘导航：`.github/docs/键盘导航与焦点管理技术文档（全项目）.md`
-- WebClipper 指南：`Extensions/WebClipper/AGENTS.md`
 
 ## 许可证
 

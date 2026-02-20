@@ -51,11 +51,11 @@
     flashTimers.set(el, t);
   }
 
-  const els = {
-    appLogo: document.querySelector(".appLogo"),
-    chatsMain: document.querySelector("#viewChats .chatsMain"),
-    list: document.getElementById("list"),
-    chatPreviewPopover: document.getElementById("chatPreviewPopover"),
+	  const els = {
+	    appLogo: document.querySelector(".appLogo"),
+	    chatsMain: document.querySelector("#viewChats .chatsMain"),
+	    list: document.getElementById("list"),
+	    chatPreviewPopover: document.getElementById("chatPreviewPopover"),
     stats: document.getElementById("stats"),
     chatBottomBar: document.getElementById("chatBottomBar"),
     chatActionButtons: document.getElementById("chatActionButtons"),
@@ -80,16 +80,19 @@
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
     databaseBackupStatus: document.getElementById("databaseBackupStatus"),
-    btnDatabaseExport: document.getElementById("btnDatabaseExport"),
-    databaseImportFile: document.getElementById("databaseImportFile"),
-    btnDatabaseImport: document.getElementById("btnDatabaseImport"),
-    aboutVersion: document.getElementById("aboutVersion"),
-    btnAboutMacApp: document.getElementById("btnAboutMacApp"),
-    btnAboutSource: document.getElementById("btnAboutSource"),
-    btnAboutChangelog: document.getElementById("btnAboutChangelog"),
-    btnAboutMail: document.getElementById("btnAboutMail"),
-    btnAboutGitHub: document.getElementById("btnAboutGitHub")
-  };
+	    btnDatabaseExport: document.getElementById("btnDatabaseExport"),
+	    databaseImportFile: document.getElementById("databaseImportFile"),
+	    btnDatabaseImport: document.getElementById("btnDatabaseImport"),
+	    notionAiModelIndex: document.getElementById("notionAiModelIndex"),
+	    btnNotionAiModelSave: document.getElementById("btnNotionAiModelSave"),
+	    btnNotionAiModelReset: document.getElementById("btnNotionAiModelReset"),
+	    aboutVersion: document.getElementById("aboutVersion"),
+	    btnAboutMacApp: document.getElementById("btnAboutMacApp"),
+	    btnAboutSource: document.getElementById("btnAboutSource"),
+	    btnAboutChangelog: document.getElementById("btnAboutChangelog"),
+	    btnAboutMail: document.getElementById("btnAboutMail"),
+	    btnAboutGitHub: document.getElementById("btnAboutGitHub")
+	  };
 
   const state = {
     conversations: [],

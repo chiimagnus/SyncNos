@@ -101,6 +101,9 @@
         onTick: async () => {
           if (stopped) return;
           try {
+            const modelPicker = NS.notionAiModelPicker;
+            modelPicker && typeof modelPicker.maybeApply === "function" && modelPicker.maybeApply();
+
             const collector = getCollector();
             const inpageCollector = collector || getInpageCollector();
             inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
@@ -147,4 +150,3 @@
   NS.contentController = { createController };
   if (typeof module !== "undefined" && module.exports) module.exports = NS.contentController;
 })();
-
