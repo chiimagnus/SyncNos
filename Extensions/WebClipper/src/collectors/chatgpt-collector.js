@@ -37,19 +37,12 @@
     return document.activeElement === ta || ta.contains(document.activeElement);
   }
 
-  function extractUserText(element) {
-    const node = element.querySelector(".whitespace-pre-wrap") || element;
-    const text = node && node.innerText ? node.innerText : "";
-    return NS.normalize.normalizeText(text);
+  function userContentNode(element) {
+    return element.querySelector(".whitespace-pre-wrap") || element;
   }
 
-  function extractAssistantText(element) {
-    const node =
-      element.querySelector(".markdown.prose") ||
-      element.querySelector(".markdown") ||
-      element;
-    const text = node && node.innerText ? node.innerText : "";
-    return NS.normalize.normalizeText(text);
+  function assistantContentNode(element) {
+    return element.querySelector(".markdown.prose") || element.querySelector(".markdown") || element;
   }
 
   function getTurnWrappers(root) {
@@ -101,17 +94,32 @@
     }
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     for (let i = 0; i < wrappers.length; i += 1) {
       const el = wrappers[i];
       const role = roleFromWrapper(el);
-      const contentText = role === "user" ? extractUserText(el) : extractAssistantText(el);
-      if (!contentText) continue;
+      const node = role === "user" ? userContentNode(el) : assistantContentNode(el);
+      const raw = node ? (node.innerText || node.textContent || "") : "";
+      const contentText = NS.normalize.normalizeText(raw);
+      const imageUrls = (() => {
+        if (!extractImages) return [];
+        const primary = extractImages(node || el);
+        if (!node || node === el) return primary;
+        const secondary = extractImages(el);
+        return Array.from(new Set(primary.concat(secondary)));
+      })();
+      if (!contentText && !imageUrls.length) continue;
+      const baseMarkdown = contentText || "";
+      const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
       const messageId = el.getAttribute && (el.getAttribute("data-message-id") || el.id);
       const messageKey = messageId || NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
       out.push({
         messageKey,
         role,
         contentText,
+        contentMarkdown,
         sequence: i,
         updatedAt: Date.now()
       });

@@ -35,26 +35,36 @@
     if (!nodes.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const el of nodes) {
       const isUser = el.classList && el.classList.contains("_9663006");
       const role = isUser ? "user" : "assistant";
       let text = "";
+      let contentNode = el;
       if (isUser) {
         const u = el.querySelector(".fbb737a4") || el;
+        contentNode = u;
         text = NS.normalize.normalizeText(u.innerText || u.textContent || "");
       } else {
         const ds = el.querySelector(".ds-message") || el;
         // Prefer direct markdown child for formal response; avoid think blocks.
         const directMarkdown = Array.from(ds.children || []).find((c) => c && c.classList && c.classList.contains("ds-markdown"));
         const contentEl = directMarkdown || ds.querySelector(".ds-markdown") || ds;
+        contentNode = contentEl;
         text = NS.normalize.normalizeText(contentEl.innerText || contentEl.textContent || "");
       }
-      if (!text) continue;
+      const imageUrls = extractImages ? extractImages(contentNode || el) : [];
+      if (!text && !imageUrls.length) continue;
+      const contentText = text || "";
+      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
       out.push({
-        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText: text, sequence: seq }),
+        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,
-        contentText: text,
+        contentText,
+        contentMarkdown,
         sequence: seq,
         updatedAt: Date.now()
       });
