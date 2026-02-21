@@ -12,12 +12,13 @@
     getSourceMeta,
     hasWarningFlags,
     isSameLocalDay,
-    flashOk,
     conversationToMarkdown
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
   };
+
+  const copyFeedbackTimers = new WeakMap();
 
   async function copyTextToClipboard(text) {
     const content = String(text || "");
@@ -57,6 +58,26 @@
     }
     if (!ok) throw new Error("Copy failed");
     return true;
+  }
+
+  function showCopiedFeedback(buttonEl, { baseText, baseTitle } = {}) {
+    if (!buttonEl) return;
+    const prevTimer = copyFeedbackTimers.get(buttonEl);
+    if (prevTimer) clearTimeout(prevTimer);
+
+    const restoreText = baseText != null ? String(baseText) : String(buttonEl.textContent || "");
+    const restoreTitle = baseTitle != null ? String(baseTitle) : String(buttonEl.title || "");
+    buttonEl.classList.add("is-copied");
+    buttonEl.textContent = "✓";
+    buttonEl.title = "Copied";
+
+    const t = setTimeout(() => {
+      buttonEl.classList.remove("is-copied");
+      buttonEl.textContent = restoreText;
+      buttonEl.title = restoreTitle;
+      copyFeedbackTimers.delete(buttonEl);
+    }, 1100);
+    copyFeedbackTimers.set(buttonEl, t);
   }
 
   async function getMessagesForConversation(conversationId) {
@@ -210,19 +231,25 @@
       copyBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const prevText = copyBtn.textContent;
+        const baseText = copyBtn.textContent;
+        const baseTitle = copyBtn.title;
+        let copied = false;
         copyBtn.disabled = true;
         copyBtn.textContent = "…";
         try {
           const messages = await getMessagesForConversation(conversation.id);
           const md = conversationToMarkdown({ conversation, messages });
           await copyTextToClipboard(md);
-          flashOk(copyBtn);
+          copied = true;
+          showCopiedFeedback(copyBtn, { baseText, baseTitle });
         } catch (err) {
           alert((err && err.message) || "Copy failed.");
         } finally {
-          copyBtn.textContent = prevText;
           copyBtn.disabled = false;
+          if (!copied) {
+            copyBtn.textContent = baseText;
+            copyBtn.title = baseTitle;
+          }
         }
       });
       sub.appendChild(copyBtn);
