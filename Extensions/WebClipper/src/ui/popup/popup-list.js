@@ -111,6 +111,33 @@
         pill.textContent = "warning";
         name.appendChild(pill);
       }
+
+      try {
+        const syncInfo = state && state.notionSyncById && typeof state.notionSyncById.get === "function"
+          ? state.notionSyncById.get(conversation.id)
+          : null;
+        if (syncInfo && typeof syncInfo === "object") {
+          const ageMs = Date.now() - (Number(syncInfo.at) || 0);
+          if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 10 * 60 * 1000) {
+            const pill = document.createElement("span");
+            const ok = !!syncInfo.ok;
+            pill.className = ok ? "pill syncOk" : "pill syncFail";
+            const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
+            const appended = Number(syncInfo.appended);
+            if (ok && mode === "appended" && Number.isFinite(appended) && appended > 0) {
+              pill.textContent = `+${appended}`;
+            } else if (ok && mode === "no_changes") {
+              pill.textContent = "no change";
+            } else {
+              pill.textContent = ok ? mode : "sync failed";
+            }
+            if (!ok && syncInfo.error) pill.title = String(syncInfo.error);
+            name.appendChild(pill);
+          }
+        }
+      } catch (_e) {
+        // ignore
+      }
       meta.appendChild(name);
 
       const sub = document.createElement("div");

@@ -13,7 +13,7 @@
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, send, flashOk } = core;
+  const { els, state, send, flashOk } = core;
 
   function initNotionSyncAction() {
     if (!els.btnSyncNotion) return;
@@ -35,6 +35,24 @@
         const failCount = data.failCount || 0;
         const failures = Array.isArray(data.failures) ? data.failures : [];
         const results = Array.isArray(data.results) ? data.results : [];
+
+        try {
+          const now = Date.now();
+          for (const r of results) {
+            const conversationId = Number(r && r.conversationId);
+            if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+            const ok = !!(r && r.ok);
+            state && state.notionSyncById && state.notionSyncById.set(conversationId, {
+              ok,
+              mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+              appended: Number(r && r.appended),
+              error: r && r.error ? String(r.error) : "",
+              at: now
+            });
+          }
+        } catch (_e) {
+          // ignore
+        }
 
         if (failCount) {
           const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
