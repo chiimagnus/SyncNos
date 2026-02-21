@@ -128,6 +128,18 @@
     // notionPageId: only fill when missing locally.
     next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
 
+    // cursor: prefer existing local value; only fill when missing locally.
+    next.lastSyncedMessageKey = pickStringPreferExisting(a.lastSyncedMessageKey, b.lastSyncedMessageKey);
+    const aSeq = Number(a.lastSyncedSequence);
+    const bSeq = Number(b.lastSyncedSequence);
+    if (Number.isFinite(aSeq)) next.lastSyncedSequence = aSeq;
+    else if (Number.isFinite(bSeq)) next.lastSyncedSequence = bSeq;
+
+    const aAt = Number(a.lastSyncedAt);
+    const bAt = Number(b.lastSyncedAt);
+    if (Number.isFinite(aAt)) next.lastSyncedAt = aAt;
+    else if (Number.isFinite(bAt)) next.lastSyncedAt = bAt;
+
     const aUpdated = Number(a.updatedAt) || 0;
     const bUpdated = Number(b.updatedAt) || 0;
     next.updatedAt = Math.max(aUpdated, bUpdated, 0);
