@@ -662,6 +662,65 @@
     }
   }
 
+  function hasExternalImageBlocks(blocks) {
+    const list = Array.isArray(blocks) ? blocks : [];
+    return list.some((b) => b && b.type === "image" && b.image && b.image.type === "external" && b.image.external && b.image.external.url);
+  }
+
+  async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
+    const list = Array.isArray(blocks) ? blocks : [];
+    if (!list.length) return [];
+    const files = NS.notionFilesApi;
+    if (!files || typeof files.createExternalURLUpload !== "function" || typeof files.waitUntilUploaded !== "function") return list;
+
+    const cache = new Map();
+    const out = [];
+
+    for (const b of list) {
+      if (!b || b.type !== "image" || !b.image || b.image.type !== "external") {
+        out.push(b);
+        continue;
+      }
+      const url = b.image && b.image.external && b.image.external.url ? String(b.image.external.url).trim() : "";
+      if (!url) {
+        out.push(b);
+        continue;
+      }
+
+      let uploadId = cache.get(url) || "";
+      if (!uploadId) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const created = await files.createExternalURLUpload({ accessToken, url });
+          const id = created && created.id ? String(created.id).trim() : "";
+          if (!id) throw new Error("missing file upload id");
+          // eslint-disable-next-line no-await-in-loop
+          const ready = await files.waitUntilUploaded({ accessToken, id });
+          uploadId = ready && ready.id ? String(ready.id).trim() : id;
+          if (uploadId) cache.set(url, uploadId);
+        } catch (_e) {
+          uploadId = "";
+        }
+      }
+
+      if (!uploadId) {
+        out.push(b);
+        continue;
+      }
+
+      out.push({
+        ...b,
+        type: "image",
+        image: {
+          type: "file_upload",
+          file_upload: { id: uploadId }
+        }
+      });
+    }
+
+    return out;
+  }
+
   const api = {
     messagesToBlocks,
     markdownToNotionBlocks,
@@ -674,6 +733,8 @@
     isPageArchivedOrTrashed,
     isPageUsableForDatabase,
     pageBelongsToDatabase,
+    hasExternalImageBlocks,
+    upgradeImageBlocksToFileUploads,
     aiLabelForSource
   };
 
