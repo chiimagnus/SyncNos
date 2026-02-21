@@ -700,6 +700,12 @@ main {
   color: var(--text);
 }
 
+.sourceCopy.is-copied {
+  border-color: var(--wc-ok-border);
+  background: var(--wc-ok-bg);
+  color: var(--wc-ok);
+}
+
 .sourceCopy:disabled {
   opacity: 0.35;
   cursor: not-allowed;
