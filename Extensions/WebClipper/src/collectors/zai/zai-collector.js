@@ -113,20 +113,25 @@
     if (!wrappers.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const w of wrappers) {
       const role = isUserWrapper(w) ? "user" : (isAssistantWrapper(w) ? "assistant" : "");
       if (!role) continue;
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
-      if (!contentText) continue;
+      const imageUrls = extractImages ? extractImages(w) : [];
+      if (!contentText && !imageUrls.length) continue;
       const contentMarkdown = role === "assistant"
         ? (extractAssistantMarkdown(w) || contentText)
         : contentText;
+      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown || contentText || "", imageUrls) : (contentMarkdown || contentText || "");
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
-        contentText,
-        contentMarkdown,
+        contentText: contentText || "",
+        contentMarkdown: nextMarkdown,
         sequence: seq,
         updatedAt: Date.now()
       });
@@ -176,4 +181,3 @@
     };
   }
 })();
-

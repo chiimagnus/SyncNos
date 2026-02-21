@@ -243,6 +243,9 @@
 
     const messages = [];
     const warningFlags = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
     const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
     const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
@@ -254,22 +257,24 @@
       const w = wrappers[i];
       const role = roleFromWrapper(w);
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
-      if (!contentText) continue;
+      const imageUrls = extractImages ? extractImages(w) : [];
+      if (!contentText && !imageUrls.length) continue;
       const markdown = NS.notionAiMarkdown || {};
       const contentMarkdown = role === "user"
         ? ((typeof markdown.extractUserMarkdown === "function" ? markdown.extractUserMarkdown(w) : "") || contentText)
         : ((typeof markdown.extractAssistantMarkdown === "function" ? markdown.extractAssistantMarkdown(w) : "") || contentText);
+      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown || contentText || "", imageUrls) : (contentMarkdown || contentText || "");
       const userStepId = role === "user" ? w.getAttribute("data-agent-chat-user-step-id") : "";
       const firstBlockId = role === "assistant" ? (w.querySelector("div[data-block-id]") || {}).getAttribute?.("data-block-id") : "";
       const stableId = userStepId || firstBlockId || "";
       const messageKey = stableId
         ? `${role}_${stableId}`
-        : NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
+        : NS.normalize.makeFallbackMessageKey({ role, contentText: contentText || "", sequence: i });
       messages.push({
         messageKey,
         role,
-        contentText,
-        contentMarkdown,
+        contentText: contentText || "",
+        contentMarkdown: nextMarkdown,
         sequence: i,
         updatedAt: Date.now()
       });

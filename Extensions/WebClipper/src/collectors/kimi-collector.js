@@ -35,6 +35,9 @@
     if (!items.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const item of items) {
       const isUser = item.classList && item.classList.contains("chat-content-item-user");
@@ -62,11 +65,15 @@
         text = NS.normalize.normalizeText(parts.join("\n\n"));
       }
 
-      if (!text) continue;
+      const imageUrls = extractImages ? extractImages(item) : [];
+      if (!text && !imageUrls.length) continue;
+      const contentText = text || "";
+      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
       out.push({
-        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText: text, sequence: seq }),
+        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,
-        contentText: text,
+        contentText,
+        contentMarkdown,
         sequence: seq,
         updatedAt: Date.now()
       });
