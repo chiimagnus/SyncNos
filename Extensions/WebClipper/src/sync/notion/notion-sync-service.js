@@ -571,7 +571,7 @@
     }
   }
 
-  function buildPageProperties({ title, url, ai }) {
+  function buildPagePropertiesForCreate({ title, url, ai }) {
     const props = {
       Name: { title: [{ type: "text", text: { content: title || "Untitled" } }] },
       Date: { date: { start: new Date().toISOString() } },
@@ -582,17 +582,27 @@
     return props;
   }
 
+  function buildPagePropertiesForUpdate({ title, url, ai }) {
+    const props = {
+      Name: { title: [{ type: "text", text: { content: title || "Untitled" } }] },
+      URL: { url: url || "" }
+    };
+    const aiName = aiLabelForSource(ai);
+    if (aiName) props.AI = { multi_select: [{ name: aiName }] };
+    return props;
+  }
+
   async function createPageInDatabase(accessToken, { databaseId, title, url, ai }) {
     const body = {
       parent: { database_id: databaseId },
-      properties: buildPageProperties({ title, url, ai })
+      properties: buildPagePropertiesForCreate({ title, url, ai })
     };
     return NS.notionApi.notionFetch({ accessToken, method: "POST", path: "/v1/pages", body });
   }
 
   async function updatePageProperties(accessToken, { pageId, title, url, ai }) {
     const body = {
-      properties: buildPageProperties({ title, url, ai })
+      properties: buildPagePropertiesForUpdate({ title, url, ai })
     };
     return NS.notionApi.notionFetch({ accessToken, method: "PATCH", path: `/v1/pages/${pageId}`, body });
   }
