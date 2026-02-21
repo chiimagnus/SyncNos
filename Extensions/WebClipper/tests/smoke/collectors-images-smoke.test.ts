@@ -126,18 +126,20 @@ describe("collectors images (smoke)", () => {
       `<body>
         <main>
           <div id="message-1" class="user-message">
-            <div class="whitespace-pre-wrap">user</div>
-            <img src="https://img.test/z-user.png" />
+            <div class="whitespace-pre-wrap">
+              user
+              <img src="https://img.test/z-user.png" />
+            </div>
           </div>
           <div id="message-2">
             <div class="chat-assistant">
               <div id="response-content-container">
                 <div class="markdown-prose">
                   <p>assistant</p>
+                  <img src="https://img.test/z-ai.png" />
                 </div>
               </div>
             </div>
-            <img src="https://img.test/z-ai.png" />
           </div>
         </main>
       </body>`,
@@ -168,4 +170,3 @@ describe("collectors images (smoke)", () => {
     expect(snap.messages[1].contentMarkdown).toContain("![](https://img.test/z-ai.png)");
   });
 });
-
