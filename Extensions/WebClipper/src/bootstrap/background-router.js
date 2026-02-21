@@ -51,53 +51,96 @@
         if (!ids.length) return err("no conversationIds");
         if (!NS.notionSyncService) return err("notion sync service missing");
 
-        const convos = [];
-        for (const id of ids) {
-          // eslint-disable-next-line no-await-in-loop
-          const convo = await storage.getConversationById(id);
-          convos.push({ id, convo });
-        }
-
         if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
         const db = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
         const dbId = db && db.databaseId ? db.databaseId : "";
         if (!dbId) return err("missing databaseId");
 
-        const results = [];
-        for (const item of convos) {
-          const id = item.id;
-          const convo = item.convo;
-          if (!convo) {
-            results.push({ conversationId: id, ok: false, error: "conversation not found" });
-            continue;
-          }
-          // eslint-disable-next-line no-await-in-loop
-          const messages = await storage.getMessagesByConversationId(id);
-          const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
-          try {
-            let pageId = convo.notionPageId || "";
-            if (pageId) {
-              let validForTargetDb = false;
-              try {
-                const page = await NS.notionSyncService.getPage(token.accessToken, pageId);
-                validForTargetDb = NS.notionSyncService.pageBelongsToDatabase(page, dbId);
-              } catch (_e) {
-                validForTargetDb = false;
-              }
+        function toConvoLabel(convo) {
+          if (!convo) return "(missing conversation)";
+          const t = convo.title || "";
+          return t ? `"${t}"` : `conversation#${convo.id || "?"}`;
+        }
 
-              if (!validForTargetDb) pageId = "";
+        function extractCursor(mapping) {
+          const m = mapping && typeof mapping === "object" ? mapping : {};
+          const lastSyncedMessageKey = (m.lastSyncedMessageKey && String(m.lastSyncedMessageKey).trim()) ? String(m.lastSyncedMessageKey).trim() : "";
+          const lastSyncedSequence = Number(m.lastSyncedSequence);
+          const seq = Number.isFinite(lastSyncedSequence) ? lastSyncedSequence : null;
+          return { lastSyncedMessageKey, lastSyncedSequence: seq };
+        }
+
+        function computeNewMessages(messages, cursor) {
+          const list = Array.isArray(messages) ? messages : [];
+          if (!list.length) return { ok: true, mode: "empty", newMessages: [], rebuild: false };
+          const key = cursor && cursor.lastSyncedMessageKey ? String(cursor.lastSyncedMessageKey) : "";
+          const seq = cursor && Number.isFinite(cursor.lastSyncedSequence) ? Number(cursor.lastSyncedSequence) : null;
+
+          if (key) {
+            const idx = list.findIndex((m) => m && String(m.messageKey || "") === key);
+            if (idx < 0) return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
+            return { ok: true, mode: "append", newMessages: list.slice(idx + 1), rebuild: false };
+          }
+
+          if (seq != null) {
+            const next = list.filter((m) => m && Number(m.sequence) > seq);
+            return { ok: true, mode: "append", newMessages: next, rebuild: false };
+          }
+
+          return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
+        }
+
+        function lastMessageCursor(messages) {
+          const list = Array.isArray(messages) ? messages : [];
+          if (!list.length) return { lastSyncedMessageKey: "", lastSyncedSequence: null, lastSyncedAt: Date.now() };
+          const last = list[list.length - 1];
+          const key = last && last.messageKey ? String(last.messageKey) : "";
+          const seq = Number(last && last.sequence);
+          return {
+            lastSyncedMessageKey: key,
+            lastSyncedSequence: Number.isFinite(seq) ? seq : null,
+            lastSyncedAt: Date.now()
+          };
+        }
+
+        const results = [];
+        for (const id of ids) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const mapped = await (storage.getSyncMappingByConversation ? storage.getSyncMappingByConversation(id) : Promise.resolve(null));
+            const convo = mapped && mapped.conversation ? mapped.conversation : null;
+            const mapping = mapped && mapped.mapping ? mapped.mapping : null;
+            if (!convo) {
+              results.push({ conversationId: id, ok: false, error: "conversation not found" });
+              continue;
             }
 
+            // eslint-disable-next-line no-await-in-loop
+            const messages = await storage.getMessagesByConversationId(id);
+            const cursor = extractCursor(mapping);
+
+            let pageId = "";
+            if (mapping && mapping.notionPageId) pageId = String(mapping.notionPageId || "");
+            if (!pageId && convo.notionPageId) pageId = String(convo.notionPageId || "");
+
+            let page = null;
+            let pageUsable = false;
             if (pageId) {
-              await NS.notionSyncService.updatePageProperties(token.accessToken, {
-                pageId,
-                title: convo.title,
-                url: convo.url,
-                ai: convo.source
-              });
-              await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
-              await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
-            } else {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                page = await NS.notionSyncService.getPage(token.accessToken, pageId);
+                pageUsable = NS.notionSyncService.isPageUsableForDatabase
+                  ? NS.notionSyncService.isPageUsableForDatabase(page, dbId)
+                  : NS.notionSyncService.pageBelongsToDatabase(page, dbId);
+              } catch (_e) {
+                pageUsable = false;
+              }
+              if (!pageUsable) pageId = "";
+            }
+
+            if (!pageId) {
+              // Create new page (first sync or page missing/deleted/trashed).
+              // eslint-disable-next-line no-await-in-loop
               const created = await NS.notionSyncService.createPageInDatabase(token.accessToken, {
                 databaseId: dbId,
                 title: convo.title,
@@ -106,14 +149,76 @@
               });
               pageId = created && created.id ? created.id : "";
               if (!pageId) throw new Error("create page failed");
-              await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+              // eslint-disable-next-line no-await-in-loop
               await storage.setConversationNotionPageId(id, pageId);
+
+              const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              if (blocks.length) {
+                // eslint-disable-next-line no-await-in-loop
+                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+              }
+              const nextCursor = lastMessageCursor(messages);
+              if (storage.setSyncCursor) {
+                // eslint-disable-next-line no-await-in-loop
+                await storage.setSyncCursor(id, nextCursor);
+              }
+              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
+              // eslint-disable-next-line no-await-in-loop
+              await new Promise((r) => setTimeout(r, 250));
+              continue;
             }
-            results.push({ conversationId: id, ok: true, notionPageId: pageId });
+
+            // Page exists and is usable.
+            // eslint-disable-next-line no-await-in-loop
+            await NS.notionSyncService.updatePageProperties(token.accessToken, {
+              pageId,
+              title: convo.title,
+              url: convo.url,
+              ai: convo.source
+            });
+
+            const inc = computeNewMessages(messages, cursor);
+            if (inc.rebuild) {
+              if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
+              // Force clear & rebuild (cursor missing or not found).
+              // eslint-disable-next-line no-await-in-loop
+              await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
+              const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              if (blocks.length) {
+                // eslint-disable-next-line no-await-in-loop
+                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+              }
+              const nextCursor = lastMessageCursor(messages);
+              if (storage.setSyncCursor) {
+                // eslint-disable-next-line no-await-in-loop
+                await storage.setSyncCursor(id, nextCursor);
+              }
+              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
+            } else if (inc.newMessages && inc.newMessages.length) {
+              const blocks = NS.notionSyncService.messagesToBlocks(inc.newMessages, { source: convo.source });
+              if (blocks.length) {
+                // eslint-disable-next-line no-await-in-loop
+                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
+              }
+              const nextCursor = lastMessageCursor(messages);
+              if (storage.setSyncCursor) {
+                // eslint-disable-next-line no-await-in-loop
+                await storage.setSyncCursor(id, nextCursor);
+              }
+              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
+            } else {
+              // No new messages.
+              const nextCursor = lastMessageCursor(messages);
+              if (storage.setSyncCursor) {
+                // eslint-disable-next-line no-await-in-loop
+                await storage.setSyncCursor(id, nextCursor);
+              }
+              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
+            }
           } catch (e) {
             results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
-            // non-blocking: continue
           }
+
           // Basic pacing to reduce rate limiting when syncing in batch.
           // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 250));
@@ -180,4 +285,3 @@
   NS.backgroundRouter = { start };
   if (typeof module !== "undefined" && module.exports) module.exports = NS.backgroundRouter;
 })();
-
