@@ -19,6 +19,7 @@
   });
 
   const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
+  const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   function ok(data) {
     return { ok: true, data, error: null };
@@ -55,6 +56,26 @@
     }
   }
 
+  async function abortRunningJobIfFromOtherInstance() {
+    const job = await getNotionSyncJob();
+    if (!job || typeof job !== "object") return null;
+    if (job.status !== "running") return job;
+    const instanceId = job.instanceId ? String(job.instanceId) : "";
+    if (!instanceId || instanceId !== BACKGROUND_INSTANCE_ID) {
+      const now = Date.now();
+      const aborted = {
+        ...job,
+        status: "aborted",
+        updatedAt: now,
+        finishedAt: now,
+        abortedReason: "extension reloaded"
+      };
+      await setNotionSyncJob(aborted);
+      return aborted;
+    }
+    return job;
+  }
+
   function isRunningJob(job) {
     if (!job || typeof job !== "object") return false;
     if (job.status !== "running") return false;
@@ -80,11 +101,11 @@
         return ok({ disconnected: true });
       }
       case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS: {
-        const job = await getNotionSyncJob();
+        const job = await abortRunningJobIfFromOtherInstance();
         return ok({ job });
       }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
-        const existingJob = await getNotionSyncJob();
+        const existingJob = await abortRunningJobIfFromOtherInstance();
         if (isRunningJob(existingJob)) return err("sync already in progress");
 
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
@@ -154,6 +175,7 @@
         const jobStartedAt = Date.now();
         await setNotionSyncJob({
           id: jobId,
+          instanceId: BACKGROUND_INSTANCE_ID,
           status: "running",
           startedAt: jobStartedAt,
           updatedAt: jobStartedAt,
@@ -281,6 +303,7 @@
             // eslint-disable-next-line no-await-in-loop
             await setNotionSyncJob({
               id: jobId,
+              instanceId: BACKGROUND_INSTANCE_ID,
               status: "running",
               startedAt: jobStartedAt,
               updatedAt: Date.now(),
@@ -308,6 +331,7 @@
         const failures = results.filter((r) => !r.ok);
         await setNotionSyncJob({
           id: jobId,
+          instanceId: BACKGROUND_INSTANCE_ID,
           status: "done",
           startedAt: jobStartedAt,
           updatedAt: Date.now(),
@@ -360,6 +384,7 @@
   }
 
   function start() {
+    abortRunningJobIfFromOtherInstance().catch(() => {});
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       Promise.resolve()
         .then(() => handleMessage(msg))
