@@ -342,6 +342,10 @@
       return !String(line || "").trim();
     }
 
+    function isHttpUrl(url) {
+      return /^https?:\/\//i.test(String(url || "").trim());
+    }
+
     function startsWithFence(line) {
       return String(line || "").trimStart().startsWith("```");
     }
@@ -368,6 +372,15 @@
       const expr = String(expression || "").trim();
       if (!expr) return;
       out.push({ object: "block", type: "equation", equation: { expression: expr } });
+    }
+
+    function parseImageLine(line) {
+      const trimmed = String(line || "").trim();
+      const m = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$/);
+      if (!m) return null;
+      const url = String(m[2] || "").trim();
+      if (!isHttpUrl(url)) return null;
+      return { url, alt: String(m[1] || "") };
     }
 
     let i = 0;
@@ -414,6 +427,17 @@
 
       if (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4) {
         pushEquationBlock(trimmed.slice(2, -2));
+        i += 1;
+        continue;
+      }
+
+      const image = parseImageLine(line);
+      if (image) {
+        out.push({
+          object: "block",
+          type: "image",
+          image: { type: "external", external: { url: image.url } }
+        });
         i += 1;
         continue;
       }
