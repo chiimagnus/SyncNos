@@ -99,7 +99,8 @@
     selectedIds: new Set(),
     previewCache: new Map(),
     previewRequestToken: 0,
-    notionSyncById: new Map()
+    notionSyncById: new Map(),
+    notionSyncInProgress: false
   };
 
   const STORAGE_KEYS = {

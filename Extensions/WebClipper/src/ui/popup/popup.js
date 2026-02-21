@@ -15,6 +15,57 @@
 
   const { els, state, send, flashOk } = core;
 
+  let syncPollTimer = 0;
+
+  function setSyncingUi(isSyncing) {
+    if (!els.btnSyncNotion) return;
+    state.notionSyncInProgress = !!isSyncing;
+    if (state.notionSyncInProgress) {
+      els.btnSyncNotion.disabled = true;
+      els.btnSyncNotion.textContent = "Syncing...";
+    } else {
+      els.btnSyncNotion.textContent = "Sync";
+    }
+  }
+
+  function applyPerConversationResults(perConversation) {
+    if (!state || !state.notionSyncById) return;
+    if (!Array.isArray(perConversation)) return;
+    const now = Date.now();
+    for (const r of perConversation) {
+      const conversationId = Number(r && r.conversationId);
+      if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+      const ok = !!(r && r.ok);
+      state.notionSyncById.set(conversationId, {
+        ok,
+        mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+        appended: Number(r && r.appended),
+        error: r && r.error ? String(r.error) : "",
+        at: Number(r && r.at) || now
+      });
+    }
+  }
+
+  async function refreshSyncJobStatus({ pollOnce } = {}) {
+    const res = await send("getNotionSyncJobStatus");
+    if (!res || !res.ok) return { ok: false };
+    const job = res.data && res.data.job ? res.data.job : null;
+    if (job && job.perConversation) applyPerConversationResults(job.perConversation);
+
+    const isRunning = job && job.status === "running";
+    setSyncingUi(!!isRunning);
+    if (!isRunning && syncPollTimer) {
+      clearInterval(syncPollTimer);
+      syncPollTimer = 0;
+    }
+    if (isRunning && !syncPollTimer && !pollOnce) {
+      syncPollTimer = setInterval(() => {
+        refreshSyncJobStatus({ pollOnce: true }).catch(() => {});
+      }, 1000);
+    }
+    return { ok: true, job };
+  }
+
   function initNotionSyncAction() {
     if (!els.btnSyncNotion) return;
     els.btnSyncNotion.addEventListener("click", async () => {
@@ -22,8 +73,7 @@
       if (!ids.length) return;
       const btn = els.btnSyncNotion;
       const prevText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Syncing...";
+      setSyncingUi(true);
       try {
         const res = await send("notionSyncConversations", { conversationIds: ids });
         if (!res || !res.ok) {
@@ -69,8 +119,11 @@
           alert(`Sync finished.\n\nOK: ${okCount}\nFailed: 0${extra}`);
         }
       } finally {
+        // If popup closes mid-sync, background will still update the job status.
+        state.notionSyncInProgress = false;
         btn.textContent = prevText;
         btn.disabled = false;
+        await refreshSyncJobStatus({ pollOnce: true });
         await list.refresh();
       }
     });
@@ -88,6 +141,7 @@
 	    initNotionSyncAction();
 
     await tabs.init();
+    await refreshSyncJobStatus();
     await list.refresh();
   }
 
