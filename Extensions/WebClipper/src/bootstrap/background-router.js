@@ -14,8 +14,11 @@
   const NOTION_MESSAGE_TYPES = Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
-    SYNC_CONVERSATIONS: "notionSyncConversations"
+    SYNC_CONVERSATIONS: "notionSyncConversations",
+    GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   });
+
+  const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
 
   function ok(data) {
     return { ok: true, data, error: null };
@@ -23,6 +26,42 @@
 
   function err(message, extra) {
     return { ok: false, data: null, error: { message, extra: extra || null } };
+  }
+
+  function storageGet(keys) {
+    return new Promise((resolve) => chrome.storage.local.get(keys, (res) => resolve(res || {})));
+  }
+
+  function storageSet(obj) {
+    return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
+  }
+
+  async function getNotionSyncJob() {
+    try {
+      const res = await storageGet([NOTION_SYNC_JOB_KEY]);
+      const job = res && res[NOTION_SYNC_JOB_KEY] ? res[NOTION_SYNC_JOB_KEY] : null;
+      return job && typeof job === "object" ? job : null;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  async function setNotionSyncJob(job) {
+    try {
+      await storageSet({ [NOTION_SYNC_JOB_KEY]: job || null });
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function isRunningJob(job) {
+    if (!job || typeof job !== "object") return false;
+    if (job.status !== "running") return false;
+    const updatedAt = Number(job.updatedAt) || 0;
+    if (!updatedAt) return true;
+    // Stale guard: treat as not running after 20 minutes without updates.
+    return (Date.now() - updatedAt) < 20 * 60 * 1000;
   }
 
   async function handleMessage(msg) {
@@ -40,7 +79,14 @@
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
         return ok({ disconnected: true });
       }
+      case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS: {
+        const job = await getNotionSyncJob();
+        return ok({ job });
+      }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
+        const existingJob = await getNotionSyncJob();
+        if (isRunningJob(existingJob)) return err("sync already in progress");
+
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
         if (!token || !token.accessToken) return err("notion not connected");
         const parent = await new Promise((resolve) => {
@@ -104,6 +150,17 @@
         }
 
         const results = [];
+        const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const jobStartedAt = Date.now();
+        await setNotionSyncJob({
+          id: jobId,
+          status: "running",
+          startedAt: jobStartedAt,
+          updatedAt: jobStartedAt,
+          conversationIds: ids,
+          perConversation: []
+        });
+
         for (const id of ids) {
           try {
             // eslint-disable-next-line no-await-in-loop
@@ -219,6 +276,28 @@
             results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
           }
 
+          // Best-effort job status update for popup re-open.
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await setNotionSyncJob({
+              id: jobId,
+              status: "running",
+              startedAt: jobStartedAt,
+              updatedAt: Date.now(),
+              conversationIds: ids,
+              perConversation: results.map((r) => ({
+                conversationId: r.conversationId,
+                ok: !!r.ok,
+                mode: r.mode || (r.ok ? "ok" : "fail"),
+                appended: Number(r.appended) || 0,
+                error: r.error || "",
+                at: Date.now()
+              }))
+            });
+          } catch (_e) {
+            // ignore
+          }
+
           // Basic pacing to reduce rate limiting when syncing in batch.
           // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 250));
@@ -227,7 +306,25 @@
         const okCount = results.filter((r) => r.ok).length;
         const failCount = results.length - okCount;
         const failures = results.filter((r) => !r.ok);
-        return ok({ results, okCount, failCount, failures });
+        await setNotionSyncJob({
+          id: jobId,
+          status: "done",
+          startedAt: jobStartedAt,
+          updatedAt: Date.now(),
+          finishedAt: Date.now(),
+          conversationIds: ids,
+          okCount,
+          failCount,
+          perConversation: results.map((r) => ({
+            conversationId: r.conversationId,
+            ok: !!r.ok,
+            mode: r.mode || (r.ok ? "ok" : "fail"),
+            appended: Number(r.appended) || 0,
+            error: r.error || "",
+            at: Date.now()
+          }))
+        });
+        return ok({ results, okCount, failCount, failures, jobId });
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};
