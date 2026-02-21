@@ -16,6 +16,8 @@
   const { els, state, send, flashOk } = core;
 
   let syncPollTimer = 0;
+  let listPollTimer = 0;
+  let listRefreshing = false;
 
   function setSyncingUi(isSyncing) {
     if (!els.btnSyncNotion) return;
@@ -44,6 +46,36 @@
         at: Number(r && r.at) || now
       });
     }
+
+    try {
+      list && typeof list.render === "function" && list.render();
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  function isChatsTabActive() {
+    try {
+      return !!(els.viewChats && els.viewChats.classList && els.viewChats.classList.contains("is-active"));
+    } catch (_e) {
+      return true;
+    }
+  }
+
+  function startLiveListRefresh() {
+    if (listPollTimer) return;
+    listPollTimer = setInterval(() => {
+      if (!document || document.visibilityState !== "visible") return;
+      if (!isChatsTabActive()) return;
+      if (listRefreshing) return;
+      listRefreshing = true;
+      Promise.resolve()
+        .then(() => list && typeof list.refresh === "function" ? list.refresh() : null)
+        .catch(() => {})
+        .finally(() => {
+          listRefreshing = false;
+        });
+    }, 2000);
   }
 
   async function refreshSyncJobStatus({ pollOnce } = {}) {
@@ -143,6 +175,14 @@
     await tabs.init();
     await refreshSyncJobStatus();
     await list.refresh();
+    startLiveListRefresh();
+
+    window.addEventListener("unload", () => {
+      if (syncPollTimer) clearInterval(syncPollTimer);
+      if (listPollTimer) clearInterval(listPollTimer);
+      syncPollTimer = 0;
+      listPollTimer = 0;
+    });
   }
 
   init().catch((e) => {
