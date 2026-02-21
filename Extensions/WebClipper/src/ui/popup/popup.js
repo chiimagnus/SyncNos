@@ -19,12 +19,18 @@
   let listPollTimer = 0;
   let listRefreshing = false;
 
-  function setSyncingUi(isSyncing) {
+  function setSyncingUi(isSyncing, { done, total } = {}) {
     if (!els.btnSyncNotion) return;
     state.notionSyncInProgress = !!isSyncing;
     if (state.notionSyncInProgress) {
       els.btnSyncNotion.disabled = true;
-      els.btnSyncNotion.textContent = "Syncing...";
+      const d = Number(done);
+      const t = Number(total);
+      if (Number.isFinite(d) && Number.isFinite(t) && t > 0) {
+        els.btnSyncNotion.textContent = `Syncing(${d}/${t})`;
+      } else {
+        els.btnSyncNotion.textContent = "Syncing...";
+      }
     } else {
       els.btnSyncNotion.textContent = "Sync";
     }
@@ -84,8 +90,14 @@
     const job = res.data && res.data.job ? res.data.job : null;
     if (job && job.perConversation) applyPerConversationResults(job.perConversation);
 
-    const isRunning = job && job.status === "running";
-    setSyncingUi(!!isRunning);
+    const isRunning = !!(job && job.status === "running");
+    if (job) {
+      const done = Array.isArray(job.perConversation) ? job.perConversation.length : 0;
+      const total = Array.isArray(job.conversationIds) ? job.conversationIds.length : 0;
+      setSyncingUi(isRunning, { done, total });
+    } else if (!state.notionSyncInProgress) {
+      setSyncingUi(false);
+    }
     if (!isRunning && syncPollTimer) {
       clearInterval(syncPollTimer);
       syncPollTimer = 0;
@@ -105,7 +117,8 @@
       if (!ids.length) return;
       const btn = els.btnSyncNotion;
       const prevText = btn.textContent;
-      setSyncingUi(true);
+      setSyncingUi(true, { done: 0, total: ids.length });
+      refreshSyncJobStatus().catch(() => {});
       try {
         const res = await send("notionSyncConversations", { conversationIds: ids });
         if (!res || !res.ok) {
