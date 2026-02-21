@@ -194,23 +194,28 @@
           ? state.notionSyncById.get(conversation.id)
           : null;
         if (syncInfo && typeof syncInfo === "object") {
-          const ageMs = Date.now() - (Number(syncInfo.at) || 0);
-          if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 10 * 60 * 1000) {
-            const pill = document.createElement("span");
-            const ok = !!syncInfo.ok;
-            pill.className = ok ? "pill syncOk" : "pill syncFail";
-            const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
-            const appended = Number(syncInfo.appended);
-            if (ok && mode === "appended" && Number.isFinite(appended) && appended > 0) {
-              pill.textContent = `+${appended}`;
-            } else if (ok && mode === "no_changes") {
-              pill.textContent = "no change";
-            } else {
-              pill.textContent = ok ? mode : "sync failed";
-            }
-            if (!ok && syncInfo.error) pill.title = String(syncInfo.error);
-            name.appendChild(pill);
+          const pill = document.createElement("span");
+          const ok = !!syncInfo.ok;
+          pill.className = ok ? "pill syncOk" : "pill syncFail";
+
+          const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
+          const appended = Number(syncInfo.appended);
+          const at = Number(syncInfo.at) || 0;
+
+          if (!ok) {
+            pill.textContent = "failed";
+            if (syncInfo.error) pill.title = String(syncInfo.error);
+          } else if (mode === "no_changes") {
+            pill.textContent = "no changed";
+            pill.title = "No changes";
+          } else {
+            pill.textContent = "finished";
+            const suffix = (mode === "appended" && Number.isFinite(appended) && appended > 0) ? ` (+${appended})` : "";
+            const time = at ? ` @ ${new Date(at).toLocaleString()}` : "";
+            pill.title = `${mode}${suffix}${time}`;
           }
+
+          name.appendChild(pill);
         }
       } catch (_e) {
         // ignore
