@@ -769,6 +769,18 @@ main {
   background: var(--warn-bg);
 }
 
+.pill.syncOk {
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #166534;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.pill.syncFail {
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .bottomDock {
   margin-top: 10px;
 }

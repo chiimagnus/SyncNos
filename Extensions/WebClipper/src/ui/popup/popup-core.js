@@ -98,7 +98,8 @@
     conversations: [],
     selectedIds: new Set(),
     previewCache: new Map(),
-    previewRequestToken: 0
+    previewRequestToken: 0,
+    notionSyncById: new Map()
   };
 
   const STORAGE_KEYS = {
