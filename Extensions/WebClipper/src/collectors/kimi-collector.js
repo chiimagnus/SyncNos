@@ -38,6 +38,17 @@
     const utils = NS.collectorUtils || {};
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
+
+    function mergeImageUrls(nodes) {
+      if (!extractImages) return [];
+      const set = new Set();
+      for (const n of nodes || []) {
+        const urls = extractImages(n);
+        for (const u of urls || []) set.add(u);
+      }
+      return Array.from(set);
+    }
+
     let seq = 0;
     for (const item of items) {
       const isUser = item.classList && item.classList.contains("chat-content-item-user");
@@ -46,9 +57,12 @@
       const role = isUser ? "user" : "assistant";
 
       let text = "";
+      let imageScopes = [item];
       if (isUser) {
-        const parts = Array.from(item.querySelectorAll(".user-content")).map((el) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
+        const partsEls = Array.from(item.querySelectorAll(".user-content"));
+        const parts = partsEls.map((el) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
         text = NS.normalize.normalizeText(parts.join("\n\n"));
+        imageScopes = partsEls.length ? partsEls : [item];
       } else {
         const candidates = [];
         item.querySelectorAll(".markdown-container, .editor-content").forEach((el) => {
@@ -63,9 +77,10 @@
         });
         const parts = candidates.map((el) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
         text = NS.normalize.normalizeText(parts.join("\n\n"));
+        imageScopes = candidates.length ? candidates : [item];
       }
 
-      const imageUrls = extractImages ? extractImages(item) : [];
+      const imageUrls = mergeImageUrls(imageScopes);
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
       const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;

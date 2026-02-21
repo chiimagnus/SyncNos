@@ -247,6 +247,16 @@
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
+    function mergeImageUrls(nodes) {
+      if (!extractImages) return [];
+      const set = new Set();
+      for (const n of nodes || []) {
+        const urls = extractImages(n);
+        for (const u of urls || []) set.add(u);
+      }
+      return Array.from(set);
+    }
+
     const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
     const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
     if (picked.lowConfidence || !wrappersInRoot.length || root === document.body || !hasUser || !hasAssistant) {
@@ -257,7 +267,19 @@
       const w = wrappers[i];
       const role = roleFromWrapper(w);
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
-      const imageUrls = extractImages ? extractImages(w) : [];
+      const imageScopes = (() => {
+        if (!w || !w.querySelector) return [w];
+        if (role === "assistant") {
+          const blocks = Array.from(w.querySelectorAll("div[data-block-id]"));
+          return blocks.length ? blocks : [w];
+        }
+        const leaf =
+          w.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
+          w.querySelector("[data-content-editable-leaf='true']") ||
+          w;
+        return [leaf];
+      })();
+      const imageUrls = mergeImageUrls(imageScopes);
       if (!contentText && !imageUrls.length) continue;
       const markdown = NS.notionAiMarkdown || {};
       const contentMarkdown = role === "user"

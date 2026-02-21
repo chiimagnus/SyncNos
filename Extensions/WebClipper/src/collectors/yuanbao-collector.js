@@ -56,7 +56,7 @@
         tEl = el.querySelector(".agent-chat__speech-text") || el.querySelector(".hyc-component-reasoner__text") || el;
       }
       const text = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
-      const imageUrls = extractImages ? extractImages(el) : [];
+      const imageUrls = extractImages ? extractImages(tEl || el) : [];
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
       const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
