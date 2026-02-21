@@ -4,7 +4,7 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const DB_NAME = "webclipper";
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
 
   function extractNotionAiThreadIdFromUrl(url) {
     try {

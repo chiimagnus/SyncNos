@@ -11,11 +11,88 @@
     formatTime,
     getSourceMeta,
     hasWarningFlags,
-    isSameLocalDay
+    isSameLocalDay,
+    conversationToMarkdown
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
   };
+
+  const copyFeedbackTimers = new WeakMap();
+
+  async function copyTextToClipboard(text) {
+    const content = String(text || "");
+    if (!content) throw new Error("Nothing to copy");
+
+    try {
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(content);
+        return true;
+      }
+    } catch (_e) {
+      // fall back
+    }
+
+    // Fallback: execCommand('copy') via a hidden textarea.
+    const ta = document.createElement("textarea");
+    ta.value = content;
+    ta.setAttribute("readonly", "true");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    const prevFocus = document.activeElement;
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (_e) {
+      ok = false;
+    }
+    ta.remove();
+    try {
+      prevFocus && prevFocus.focus && prevFocus.focus();
+    } catch (_e) {
+      // ignore
+    }
+    if (!ok) throw new Error("Copy failed");
+    return true;
+  }
+
+  function showCopiedFeedback(buttonEl, { baseText, baseTitle } = {}) {
+    if (!buttonEl) return;
+    const prevTimer = copyFeedbackTimers.get(buttonEl);
+    if (prevTimer) clearTimeout(prevTimer);
+
+    const restoreText = baseText != null ? String(baseText) : String(buttonEl.textContent || "");
+    const restoreTitle = baseTitle != null ? String(baseTitle) : String(buttonEl.title || "");
+    buttonEl.classList.add("is-copied");
+    buttonEl.textContent = "✓";
+    buttonEl.title = "Copied";
+
+    const t = setTimeout(() => {
+      buttonEl.classList.remove("is-copied");
+      buttonEl.textContent = restoreText;
+      buttonEl.title = restoreTitle;
+      copyFeedbackTimers.delete(buttonEl);
+    }, 1100);
+    copyFeedbackTimers.set(buttonEl, t);
+  }
+
+  async function getMessagesForConversation(conversationId) {
+    if (!(state.previewCache instanceof Map)) state.previewCache = new Map();
+    const cached = state.previewCache.get(conversationId);
+    if (cached && Array.isArray(cached.messages)) return cached.messages;
+
+    const res = await send("getConversationDetail", { conversationId });
+    if (!res || !res.ok) {
+      throw new Error((res && res.error && res.error.message) || "Failed to load messages.");
+    }
+    const messages = (res && res.data && Array.isArray(res.data.messages)) ? res.data.messages : [];
+    state.previewCache.set(conversationId, { messages, fetchedAt: Date.now() });
+    return messages;
+  }
 
   function dispatchPreviewEvent(type, detail) {
     if (!els.list) return;
@@ -66,7 +143,7 @@
     if (els.chatBottomBar) els.chatBottomBar.classList.toggle("hasSelection", hasSelection);
 
     if (els.btnExport) els.btnExport.disabled = !hasSelection;
-    if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection;
+    if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection || !!state.notionSyncInProgress;
     if (els.btnDelete) els.btnDelete.disabled = !hasSelection;
 
     if (!hasSelection) {
@@ -111,12 +188,76 @@
         pill.textContent = "warning";
         name.appendChild(pill);
       }
+
+      try {
+        const syncInfo = state && state.notionSyncById && typeof state.notionSyncById.get === "function"
+          ? state.notionSyncById.get(conversation.id)
+          : null;
+        if (syncInfo && typeof syncInfo === "object") {
+          const pill = document.createElement("span");
+          const ok = !!syncInfo.ok;
+          pill.className = ok ? "pill syncOk" : "pill syncFail";
+
+          const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
+          const appended = Number(syncInfo.appended);
+          const at = Number(syncInfo.at) || 0;
+
+          if (!ok) {
+            pill.textContent = "failed";
+            if (syncInfo.error) pill.title = String(syncInfo.error);
+          } else if (mode === "no_changes") {
+            pill.textContent = "no changed";
+            pill.title = "No changes";
+          } else {
+            pill.textContent = "finished";
+            const suffix = (mode === "appended" && Number.isFinite(appended) && appended > 0) ? ` (+${appended})` : "";
+            const time = at ? ` @ ${new Date(at).toLocaleString()}` : "";
+            pill.title = `${mode}${suffix}${time}`;
+          }
+
+          name.appendChild(pill);
+        }
+      } catch (_e) {
+        // ignore
+      }
       meta.appendChild(name);
 
       const sub = document.createElement("div");
       sub.className = "sub";
       const sourceRaw = conversation.sourceName || conversation.source || "";
       const { key: sourceKey, label: sourceLabel } = getSourceMeta(sourceRaw);
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "sourceCopy";
+      copyBtn.setAttribute("aria-label", "Copy full markdown");
+      copyBtn.title = "Copy full markdown";
+      copyBtn.textContent = "⧉";
+      copyBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const baseText = copyBtn.textContent;
+        const baseTitle = copyBtn.title;
+        let copied = false;
+        copyBtn.disabled = true;
+        copyBtn.textContent = "…";
+        try {
+          const messages = await getMessagesForConversation(conversation.id);
+          const md = conversationToMarkdown({ conversation, messages });
+          await copyTextToClipboard(md);
+          copied = true;
+          showCopiedFeedback(copyBtn, { baseText, baseTitle });
+        } catch (err) {
+          alert((err && err.message) || "Copy failed.");
+        } finally {
+          copyBtn.disabled = false;
+          if (!copied) {
+            copyBtn.textContent = baseText;
+            copyBtn.title = baseTitle;
+          }
+        }
+      });
+      sub.appendChild(copyBtn);
 
       const openBtn = document.createElement("button");
       openBtn.type = "button";

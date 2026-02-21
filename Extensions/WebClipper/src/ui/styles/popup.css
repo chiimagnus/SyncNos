@@ -676,6 +676,41 @@ main {
   vertical-align: middle;
 }
 
+.sourceCopy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.sourceCopy:hover {
+  border-color: rgba(217, 89, 38, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+}
+
+.sourceCopy.is-copied {
+  border-color: var(--wc-ok-border);
+  background: var(--wc-ok-bg);
+  color: var(--wc-ok);
+}
+
+.sourceCopy:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .sourceOpen:hover {
   border-color: rgba(217, 89, 38, 0.35);
   background: rgba(255, 255, 255, 0.95);
@@ -767,6 +802,18 @@ main {
   border-color: var(--border-strong);
   color: var(--text);
   background: var(--warn-bg);
+}
+
+.pill.syncOk {
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #166534;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.pill.syncFail {
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .bottomDock {
