@@ -11,11 +11,67 @@
     formatTime,
     getSourceMeta,
     hasWarningFlags,
-    isSameLocalDay
+    isSameLocalDay,
+    flashOk,
+    conversationToMarkdown
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
   };
+
+  async function copyTextToClipboard(text) {
+    const content = String(text || "");
+    if (!content) throw new Error("Nothing to copy");
+
+    try {
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(content);
+        return true;
+      }
+    } catch (_e) {
+      // fall back
+    }
+
+    // Fallback: execCommand('copy') via a hidden textarea.
+    const ta = document.createElement("textarea");
+    ta.value = content;
+    ta.setAttribute("readonly", "true");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    const prevFocus = document.activeElement;
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (_e) {
+      ok = false;
+    }
+    ta.remove();
+    try {
+      prevFocus && prevFocus.focus && prevFocus.focus();
+    } catch (_e) {
+      // ignore
+    }
+    if (!ok) throw new Error("Copy failed");
+    return true;
+  }
+
+  async function getMessagesForConversation(conversationId) {
+    if (!(state.previewCache instanceof Map)) state.previewCache = new Map();
+    const cached = state.previewCache.get(conversationId);
+    if (cached && Array.isArray(cached.messages)) return cached.messages;
+
+    const res = await send("getConversationDetail", { conversationId });
+    if (!res || !res.ok) {
+      throw new Error((res && res.error && res.error.message) || "Failed to load messages.");
+    }
+    const messages = (res && res.data && Array.isArray(res.data.messages)) ? res.data.messages : [];
+    state.previewCache.set(conversationId, { messages, fetchedAt: Date.now() });
+    return messages;
+  }
 
   function dispatchPreviewEvent(type, detail) {
     if (!els.list) return;
@@ -144,6 +200,32 @@
       sub.className = "sub";
       const sourceRaw = conversation.sourceName || conversation.source || "";
       const { key: sourceKey, label: sourceLabel } = getSourceMeta(sourceRaw);
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "sourceCopy";
+      copyBtn.setAttribute("aria-label", "Copy full markdown");
+      copyBtn.title = "Copy full markdown";
+      copyBtn.textContent = "⧉";
+      copyBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const prevText = copyBtn.textContent;
+        copyBtn.disabled = true;
+        copyBtn.textContent = "…";
+        try {
+          const messages = await getMessagesForConversation(conversation.id);
+          const md = conversationToMarkdown({ conversation, messages });
+          await copyTextToClipboard(md);
+          flashOk(copyBtn);
+        } catch (err) {
+          alert((err && err.message) || "Copy failed.");
+        } finally {
+          copyBtn.textContent = prevText;
+          copyBtn.disabled = false;
+        }
+      });
+      sub.appendChild(copyBtn);
 
       const openBtn = document.createElement("button");
       openBtn.type = "button";

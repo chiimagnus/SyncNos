@@ -676,6 +676,35 @@ main {
   vertical-align: middle;
 }
 
+.sourceCopy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.sourceCopy:hover {
+  border-color: rgba(217, 89, 38, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+}
+
+.sourceCopy:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .sourceOpen:hover {
   border-color: rgba(217, 89, 38, 0.35);
   background: rgba(255, 255, 255, 0.95);
