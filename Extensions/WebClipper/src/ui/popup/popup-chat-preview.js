@@ -98,9 +98,45 @@
         continue;
       }
       if (token.type === "image") {
-        // Avoid loading remote images inside the popup preview.
+        const src = getAttr(token, "src");
+        const safeSrc = sanitizeHref(src);
         const alt = token.content || getAttr(token, "alt") || "";
-        if (alt) appendText(ensureParent(), alt);
+        if (!safeSrc) {
+          if (alt) appendText(ensureParent(), alt);
+          continue;
+        }
+
+        const wrap = document.createElement("div");
+        wrap.className = "chatPreviewImage";
+
+        const link = document.createElement("a");
+        link.setAttribute("href", safeSrc);
+        link.setAttribute("target", "_blank");
+        link.setAttribute("rel", "noopener noreferrer");
+
+        const img = document.createElement("img");
+        img.className = "chatPreviewImageImg";
+        img.src = safeSrc;
+        img.alt = alt;
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+
+        link.appendChild(img);
+        wrap.appendChild(link);
+
+        const urlLine = document.createElement("div");
+        urlLine.className = "chatPreviewImageUrl";
+        const urlLink = document.createElement("a");
+        urlLink.setAttribute("href", safeSrc);
+        urlLink.setAttribute("target", "_blank");
+        urlLink.setAttribute("rel", "noopener noreferrer");
+        urlLink.textContent = safeSrc;
+        urlLink.title = safeSrc;
+        urlLine.appendChild(urlLink);
+        wrap.appendChild(urlLine);
+
+        ensureParent().appendChild(wrap);
         continue;
       }
 
