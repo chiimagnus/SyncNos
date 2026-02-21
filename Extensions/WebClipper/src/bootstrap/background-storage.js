@@ -233,6 +233,81 @@
     return true;
   }
 
+  async function getSyncMappingByConversation(conversationId) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations", "sync_mappings"], "readonly");
+    const convo = await reqToPromise(stores.conversations.get(conversationId));
+    if (!convo) {
+      await txDone(t);
+      return null;
+    }
+    const source = convo.source || "";
+    const conversationKey = convo.conversationKey || "";
+    if (!source || !conversationKey) {
+      await txDone(t);
+      return { conversation: convo, mapping: null };
+    }
+    const idx = stores.sync_mappings.index("by_source_conversationKey");
+    const mapping = await reqToPromise(idx.get([source, conversationKey]));
+    await txDone(t);
+    return { conversation: convo, mapping: mapping || null };
+  }
+
+  async function setSyncCursor(conversationId, { lastSyncedMessageKey, lastSyncedSequence, lastSyncedAt }) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations", "sync_mappings"], "readwrite");
+    const convo = await reqToPromise(stores.conversations.get(conversationId));
+    if (!convo) throw new Error("conversation not found");
+
+    const source = convo.source || "";
+    const conversationKey = convo.conversationKey || "";
+    if (!source || !conversationKey) throw new Error("missing source or conversationKey");
+
+    const idx = stores.sync_mappings.index("by_source_conversationKey");
+    const existing = await reqToPromise(idx.get([source, conversationKey]));
+    const now = Date.now();
+
+    const mapping = withOptionalId(existing && existing.id, {
+      source,
+      conversationKey,
+      notionPageId: (existing && existing.notionPageId) ? String(existing.notionPageId || "") : (convo.notionPageId || ""),
+      lastSyncedMessageKey: lastSyncedMessageKey ? String(lastSyncedMessageKey) : "",
+      lastSyncedSequence: Number.isFinite(lastSyncedSequence) ? Number(lastSyncedSequence) : null,
+      lastSyncedAt: Number.isFinite(lastSyncedAt) ? Number(lastSyncedAt) : now,
+      updatedAt: now
+    });
+
+    if (existing) await reqToPromise(stores.sync_mappings.put(mapping));
+    else await reqToPromise(stores.sync_mappings.add(mapping));
+
+    await txDone(t);
+    return true;
+  }
+
+  async function clearSyncCursor(conversationId) {
+    const db = await openDb();
+    const { t, stores } = tx(db, ["conversations", "sync_mappings"], "readwrite");
+    const convo = await reqToPromise(stores.conversations.get(conversationId));
+    if (!convo) throw new Error("conversation not found");
+
+    const source = convo.source || "";
+    const conversationKey = convo.conversationKey || "";
+    if (!source || !conversationKey) throw new Error("missing source or conversationKey");
+
+    const idx = stores.sync_mappings.index("by_source_conversationKey");
+    const existing = await reqToPromise(idx.get([source, conversationKey]));
+    if (existing && existing.id) {
+      existing.lastSyncedMessageKey = "";
+      existing.lastSyncedSequence = null;
+      existing.lastSyncedAt = null;
+      existing.updatedAt = Date.now();
+      await reqToPromise(stores.sync_mappings.put(existing));
+    }
+
+    await txDone(t);
+    return true;
+  }
+
   NS.backgroundStorage = {
     upsertConversation,
     syncConversationMessages,
@@ -240,8 +315,10 @@
     getConversationById,
     getMessagesByConversationId,
     deleteConversationsByIds,
-    setConversationNotionPageId
+    setConversationNotionPageId,
+    getSyncMappingByConversation,
+    setSyncCursor,
+    clearSyncCursor
   };
   if (typeof module !== "undefined" && module.exports) module.exports = NS.backgroundStorage;
 })();
-
