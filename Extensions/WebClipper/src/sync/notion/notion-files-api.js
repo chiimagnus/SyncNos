@@ -35,6 +35,28 @@
     }
   }
 
+  function describeFileImportResult(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) return `[${value.length} items]`;
+    if (typeof value === "object") {
+      try {
+        const keys = Object.keys(value);
+        if (keys.length <= 6) return `{${keys.join(",")}}`;
+      } catch (_e) {
+        // ignore
+      }
+      try {
+        const s = JSON.stringify(value);
+        return s && s.length > 220 ? `${s.slice(0, 220)}…` : (s || "");
+      } catch (_e) {
+        return "{object}";
+      }
+    }
+    return String(value);
+  }
+
   async function createExternalURLUpload({ accessToken, url, filename, contentType }) {
     if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
     const target = String(url || "").trim();
@@ -79,7 +101,10 @@
       const upload = await retrieveUpload({ accessToken, id: uploadId });
       const status = upload && upload.status ? String(upload.status) : "";
       if (status === "uploaded") return upload;
-      if (status === "failed") throw new Error("file upload failed");
+      if (status === "failed") {
+        const extra = describeFileImportResult(upload && upload.file_import_result);
+        throw new Error(extra ? `file upload failed: ${extra}` : "file upload failed");
+      }
       if (status === "expired") throw new Error("file upload expired");
       if (status !== "pending") throw new Error(`file upload unknown status: ${status || "unknown"}`);
       if (i < attempts) {
@@ -100,4 +125,3 @@
   NS.notionFilesApi = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

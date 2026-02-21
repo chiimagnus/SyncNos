@@ -73,5 +73,23 @@ describe("notion-files-api", () => {
     expect(post.body.mode).toBe("external_url");
     expect(post.body.external_url).toBe("https://example.com/a.png");
   });
-});
 
+  it("surfaces file_import_result when upload fails", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        if (req.method === "GET" && req.path.startsWith("/v1/file_uploads/")) {
+          return { id: "u1", status: "failed", file_import_result: { message: "403" } };
+        }
+        throw new Error(`unexpected: ${req.method} ${req.path}`);
+      }
+    };
+
+    const files = loadNotionFilesApi();
+    await expect(files.waitUntilUploaded({ accessToken: "t", id: "u1", pollIntervalMs: 1, maxAttempts: 1 }))
+      .rejects
+      .toThrow(/file upload failed/i);
+  });
+});
