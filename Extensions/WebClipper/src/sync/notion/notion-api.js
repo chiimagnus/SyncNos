@@ -3,14 +3,14 @@
 
   const NOTION_VERSION = "2022-06-28";
 
-  async function notionFetch({ accessToken, method, path, body }) {
+  async function notionFetch({ accessToken, method, path, body, notionVersion }) {
     if (!accessToken) throw new Error("missing notion access token");
     const url = `https://api.notion.com${path}`;
     const res = await fetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Notion-Version": NOTION_VERSION,
+        "Notion-Version": notionVersion || NOTION_VERSION,
         "Content-Type": "application/json",
         Accept: "application/json"
       },
@@ -51,4 +51,3 @@
   NS.notionApi = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
