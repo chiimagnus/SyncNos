@@ -523,12 +523,23 @@
   }
 
   async function listChildren(accessToken, blockId) {
-    const res = await NS.notionApi.notionFetch({
-      accessToken,
-      method: "GET",
-      path: `/v1/blocks/${blockId}/children?page_size=100`
-    });
-    return Array.isArray(res.results) ? res.results : [];
+    const out = [];
+    let cursor = null;
+    for (;;) {
+      const qs = cursor ? `?page_size=100&start_cursor=${encodeURIComponent(String(cursor))}` : "?page_size=100";
+      // eslint-disable-next-line no-await-in-loop
+      const res = await NS.notionApi.notionFetch({
+        accessToken,
+        method: "GET",
+        path: `/v1/blocks/${blockId}/children${qs}`
+      });
+      const results = Array.isArray(res && res.results) ? res.results : [];
+      out.push(...results);
+      if (!res || !res.has_more) break;
+      cursor = res.next_cursor || null;
+      if (!cursor) break;
+    }
+    return out;
   }
 
   async function archiveBlock(accessToken, blockId) {
@@ -590,6 +601,23 @@
     return NS.notionApi.notionFetch({ accessToken, method: "GET", path: `/v1/pages/${pageId}` });
   }
 
+  function isPageArchivedOrTrashed(page) {
+    try {
+      if (!page || typeof page !== "object") return true;
+      if (page.archived === true) return true;
+      if (page.in_trash === true) return true;
+      return false;
+    } catch (_e) {
+      return true;
+    }
+  }
+
+  function isPageUsableForDatabase(page, databaseId) {
+    if (!pageBelongsToDatabase(page, databaseId)) return false;
+    if (isPageArchivedOrTrashed(page)) return false;
+    return true;
+  }
+
   function pageBelongsToDatabase(page, databaseId) {
     try {
       const parent = page && page.parent ? page.parent : null;
@@ -609,6 +637,8 @@
     createPageInDatabase,
     updatePageProperties,
     getPage,
+    isPageArchivedOrTrashed,
+    isPageUsableForDatabase,
     pageBelongsToDatabase,
     aiLabelForSource
   };
