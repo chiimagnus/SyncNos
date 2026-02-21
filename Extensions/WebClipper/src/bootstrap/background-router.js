@@ -248,17 +248,16 @@
             }
 
             // Page exists and is usable.
-            // eslint-disable-next-line no-await-in-loop
-            await NS.notionSyncService.updatePageProperties(token.accessToken, {
-              pageId,
-              title: convo.title,
-              url: convo.url,
-              ai: convo.source
-            });
-
             const inc = computeNewMessages(messages, cursor);
             if (inc.rebuild) {
               if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
+              // eslint-disable-next-line no-await-in-loop
+              await NS.notionSyncService.updatePageProperties(token.accessToken, {
+                pageId,
+                title: convo.title,
+                url: convo.url,
+                ai: convo.source
+              });
               // Force clear & rebuild (cursor missing or not found).
               // eslint-disable-next-line no-await-in-loop
               await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
@@ -274,6 +273,13 @@
               }
               results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
             } else if (inc.newMessages && inc.newMessages.length) {
+              // eslint-disable-next-line no-await-in-loop
+              await NS.notionSyncService.updatePageProperties(token.accessToken, {
+                pageId,
+                title: convo.title,
+                url: convo.url,
+                ai: convo.source
+              });
               const blocks = NS.notionSyncService.messagesToBlocks(inc.newMessages, { source: convo.source });
               if (blocks.length) {
                 // eslint-disable-next-line no-await-in-loop
