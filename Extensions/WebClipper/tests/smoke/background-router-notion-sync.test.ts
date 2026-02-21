@@ -172,4 +172,49 @@ describe("background-router notion sync", () => {
     expect(calls.some((c) => c.op === "clear")).toBe(true);
     expect(calls.some((c) => c.op === "append")).toBe(true);
   });
+
+  it("exposes sync job status for popup recovery", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionDbManager = { ensureDatabase: async () => ({ databaseId: "db1" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      getSyncMappingByConversation: async () => ({
+        conversation: { id: 1, title: "Hello", url: "https://x", source: "chatgpt" },
+        mapping: null
+      }),
+      getMessagesByConversationId: async () => [{ messageKey: "m1", role: "user", contentText: "hi", sequence: 1 }],
+      setConversationNotionPageId: async () => true,
+      setSyncCursor: async () => true
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionSyncService = {
+      getPage: async () => {
+        throw new Error("404");
+      },
+      createPageInDatabase: async () => ({ id: "p_new" }),
+      updatePageProperties: async () => ({ ok: true }),
+      clearPageChildren: async () => ({ ok: true }),
+      appendChildren: async () => ({ ok: true }),
+      messagesToBlocks: (messages: any[]) => [{ kind: "blocks", count: messages.length }],
+      isPageUsableForDatabase: () => false,
+      pageBelongsToDatabase: () => false
+    };
+
+    const router = loadBackgroundRouter();
+    const syncRes = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
+    expect(syncRes.ok).toBe(true);
+
+    const jobRes = await router.__handleMessageForTests({ type: "getNotionSyncJobStatus" });
+    expect(jobRes.ok).toBe(true);
+    expect(jobRes.data.job).toBeTruthy();
+    expect(jobRes.data.job.status).toBe("done");
+    expect(Array.isArray(jobRes.data.job.perConversation)).toBe(true);
+  });
 });
