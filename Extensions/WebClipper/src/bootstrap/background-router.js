@@ -283,5 +283,7 @@
   }
 
   NS.backgroundRouter = { start };
+  // Test hook (Node/Vitest). In extension runtime this is unused.
+  NS.backgroundRouter.__handleMessageForTests = handleMessage;
   if (typeof module !== "undefined" && module.exports) module.exports = NS.backgroundRouter;
 })();
