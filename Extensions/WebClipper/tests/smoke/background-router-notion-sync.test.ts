@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
+  const store: Record<string, unknown> = {};
   return {
     storage: {
       local: {
@@ -8,9 +9,14 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
           const out: Record<string, unknown> = {};
           for (const k of keys) {
             if (k === "notion_parent_page_id") out[k] = parentPageId;
+            else if (Object.prototype.hasOwnProperty.call(store, k)) out[k] = store[k];
             else out[k] = null;
           }
           cb(out);
+        },
+        set(payload: Record<string, unknown>, cb: () => void) {
+          for (const [k, v] of Object.entries(payload || {})) store[k] = v;
+          cb();
         }
       }
     }
@@ -167,4 +173,3 @@ describe("background-router notion sync", () => {
     expect(calls.some((c) => c.op === "append")).toBe(true);
   });
 });
-
