@@ -9,6 +9,7 @@
     kimi: { name: "Kimi", color: "blue" },
     doubao: { name: "豆包", color: "orange" },
     yuanbao: { name: "元宝", color: "red" },
+    poe: { name: "Poe", color: "pink" },
     notionai: { name: "NotionAI", color: "brown" }
   });
 
@@ -32,4 +33,3 @@
   NS.notionAi = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
