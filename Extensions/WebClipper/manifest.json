@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SyncNos-WebClipper",
   "version": "0.15.1",
-  "description": "Clip AI chats (ChatGPT, Claude, Gemini, DeepSeek, Kimi, Doubao, Yuanbao, NotionAI) into local storage, export, and sync to Notion.",
+  "description": "Clip AI chats (ChatGPT, Claude, Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, NotionAI) into local storage, export, and sync to Notion.",
   "action": {
     "default_title": "SyncNos-WebClipper",
     "default_popup": "src/ui/popup/popup.html"
@@ -24,6 +24,7 @@
     "https://*.kimi.com/*",
     "https://www.doubao.com/*",
     "https://yuanbao.tencent.com/*",
+    "https://poe.com/*",
     "https://*.notion.so/*",
     "https://*.notionusercontent.com/*",
     "https://img.notionusercontent.com/*",
@@ -46,6 +47,7 @@
         "https://*.kimi.com/*",
         "https://www.doubao.com/*",
         "https://yuanbao.tencent.com/*",
+        "https://poe.com/*",
         "https://*.notion.so/*"
       ],
       "css": ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/inpage.css"],
@@ -66,6 +68,7 @@
         "src/collectors/kimi-collector.js",
         "src/collectors/doubao-collector.js",
         "src/collectors/yuanbao-collector.js",
+        "src/collectors/poe-collector.js",
         "src/collectors/notionai/notionai-markdown.js",
         "src/collectors/notionai/notionai-collector.js",
         "src/integrations/notionai-model-picker.js",
@@ -93,6 +96,7 @@
         "https://*.kimi.com/*",
         "https://www.doubao.com/*",
         "https://yuanbao.tencent.com/*",
+        "https://poe.com/*",
         "https://*.notion.so/*"
       ]
     }

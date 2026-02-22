@@ -217,6 +217,7 @@ concatFiles({
     "src/collectors/kimi-collector.js",
     "src/collectors/doubao-collector.js",
     "src/collectors/yuanbao-collector.js",
+    "src/collectors/poe-collector.js",
     "src/collectors/notionai/notionai-markdown.js",
     "src/collectors/notionai/notionai-collector.js",
     "src/ui/inpage/inpage-tip.js",

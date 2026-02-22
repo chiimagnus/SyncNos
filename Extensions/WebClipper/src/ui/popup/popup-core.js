@@ -133,6 +133,7 @@
       kimi: { key: "kimi", label: "Kimi" },
       doubao: { key: "doubao", label: "Doubao" },
       yuanbao: { key: "yuanbao", label: "Yuanbao" },
+      poe: { key: "poe", label: "Poe" },
       zai: { key: "zai", label: "z.ai" }
     };
     return map[normalized] || { key: "unknown", label: text };
