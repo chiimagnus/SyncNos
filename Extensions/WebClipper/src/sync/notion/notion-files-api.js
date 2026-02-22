@@ -81,13 +81,10 @@
     if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
     const name = sanitizeFilename(filename || "");
     const ct = String(contentType || "").trim() || "application/octet-stream";
-    const len = Number(contentLength);
-    if (!Number.isFinite(len) || len <= 0) throw new Error("invalid contentLength");
     const body = {
-      mode: "file",
+      mode: "single_part",
       filename: name,
-      content_type: ct,
-      content_length: len
+      content_type: ct
     };
     return NS.notionApi.notionFetch({
       accessToken,
@@ -98,35 +95,30 @@
     });
   }
 
-  async function uploadBytesToUploadUrl({ uploadUrl, bytes, contentType }) {
-    const target = String(uploadUrl || "").trim();
-    if (!isHttpUrl(target)) throw new Error("invalid uploadUrl");
-    const ct = String(contentType || "").trim() || "application/octet-stream";
-    if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer)) throw new Error("invalid bytes");
-    const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    const res = await fetch(target, {
-      method: "PUT",
-      headers: { "Content-Type": ct },
-      body
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`upload_url PUT failed HTTP ${res.status} ${text || ""}`.trim());
-    }
-    return { ok: true };
-  }
-
-  async function completeUpload({ accessToken, id }) {
-    if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
+  async function sendFileUpload({ accessToken, id, bytes, filename, contentType }) {
     const uploadId = String(id || "").trim();
     if (!uploadId) throw new Error("missing upload id");
-    return NS.notionApi.notionFetch({
-      accessToken,
+    if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer)) throw new Error("invalid bytes");
+    if (typeof FormData === "undefined" || typeof Blob === "undefined") throw new Error("FormData/Blob missing");
+    const name = sanitizeFilename(filename || "image.jpg");
+    const ct = String(contentType || "").trim() || "application/octet-stream";
+    const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const form = new FormData();
+    const blob = new Blob([data], { type: ct });
+    form.append("file", blob, name);
+
+    const res = await fetch(`https://api.notion.com/v1/file_uploads/${encodeURIComponent(uploadId)}/send`, {
       method: "POST",
-      path: `/v1/file_uploads/${encodeURIComponent(uploadId)}/complete`,
-      body: {},
-      notionVersion: FILE_UPLOAD_VERSION
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Notion-Version": FILE_UPLOAD_VERSION,
+        Accept: "application/json"
+      },
+      body: form
     });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) throw new Error(`notion api failed: POST /v1/file_uploads/${uploadId}/send HTTP ${res.status} ${text}`);
+    return text ? JSON.parse(text) : {};
   }
 
   async function retrieveUpload({ accessToken, id }) {
@@ -171,8 +163,7 @@
     FILE_UPLOAD_VERSION,
     createExternalURLUpload,
     createFileUpload,
-    uploadBytesToUploadUrl,
-    completeUpload,
+    sendFileUpload,
     retrieveUpload,
     waitUntilUploaded
   };

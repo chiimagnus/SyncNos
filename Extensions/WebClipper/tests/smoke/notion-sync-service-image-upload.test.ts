@@ -28,12 +28,10 @@ describe("notion-sync-service image uploads", () => {
       createFileUpload: async () => {
         throw new Error("should not be called");
       },
-      uploadBytesToUploadUrl: async () => {
+      sendFileUpload: async () => {
         throw new Error("should not be called");
       },
-      completeUpload: async () => {
-        throw new Error("should not be called");
-      }
+      // `sendFileUpload` not used in this test.
     };
 
     const service = loadNotionSyncService();
@@ -72,15 +70,11 @@ describe("notion-sync-service image uploads", () => {
       },
       createFileUpload: async ({ filename, contentType, contentLength }: any) => {
         calls.push({ op: "createFileUpload", filename, contentType, contentLength });
-        return { id: "u2", upload_url: "https://uploads.example.com/u2" };
+        return { id: "u2" };
       },
-      uploadBytesToUploadUrl: async ({ uploadUrl, bytes, contentType }: any) => {
-        calls.push({ op: "uploadBytesToUploadUrl", uploadUrl, byteLength: bytes.byteLength, contentType });
-        return { ok: true };
-      },
-      completeUpload: async ({ id }: any) => {
-        calls.push({ op: "completeUpload", id });
-        return { ok: true };
+      sendFileUpload: async ({ id, bytes, filename, contentType }: any) => {
+        calls.push({ op: "sendFileUpload", id, byteLength: bytes.byteLength, filename, contentType });
+        return { id };
       },
       waitUntilUploaded: async ({ id }: any) => {
         calls.push({ op: "waitUntilUploaded", id });
@@ -101,8 +95,7 @@ describe("notion-sync-service image uploads", () => {
     expect(calls.map((c) => c.op)).toEqual([
       "createExternalURLUpload",
       "createFileUpload",
-      "uploadBytesToUploadUrl",
-      "completeUpload",
+      "sendFileUpload",
       "waitUntilUploaded"
     ]);
   });
@@ -127,12 +120,8 @@ describe("notion-sync-service image uploads", () => {
         calls.push({ op: "createFileUpload" });
         throw new Error("nope");
       },
-      uploadBytesToUploadUrl: async () => {
-        calls.push({ op: "uploadBytesToUploadUrl" });
-        throw new Error("nope");
-      },
-      completeUpload: async () => {
-        calls.push({ op: "completeUpload" });
+      sendFileUpload: async () => {
+        calls.push({ op: "sendFileUpload" });
         throw new Error("nope");
       },
       waitUntilUploaded: async () => {
@@ -154,4 +143,3 @@ describe("notion-sync-service image uploads", () => {
     expect(calls.map((c) => c.op)).toEqual(["createExternalURLUpload"]);
   });
 });
-

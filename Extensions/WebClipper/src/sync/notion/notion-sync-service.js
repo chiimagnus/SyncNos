@@ -736,8 +736,7 @@
       typeof files.createExternalURLUpload !== "function" ||
       typeof files.waitUntilUploaded !== "function" ||
       typeof files.createFileUpload !== "function" ||
-      typeof files.uploadBytesToUploadUrl !== "function" ||
-      typeof files.completeUpload !== "function"
+      typeof files.sendFileUpload !== "function"
     ) {
       return list;
     }
@@ -789,17 +788,13 @@
             const up = await files.createFileUpload({
               accessToken,
               filename,
-              contentType: ct,
-              contentLength: dl.bytes.byteLength
+              contentType: ct
             });
-            const uploadUrl = up && up.upload_url ? String(up.upload_url).trim() : "";
             const fileId = up && up.id ? String(up.id).trim() : "";
-            if (!uploadUrl || !fileId) throw new Error("missing upload_url");
+            if (!fileId) throw new Error("missing file upload id");
 
             // eslint-disable-next-line no-await-in-loop
-            await files.uploadBytesToUploadUrl({ uploadUrl, bytes: dl.bytes, contentType: ct });
-            // eslint-disable-next-line no-await-in-loop
-            await files.completeUpload({ accessToken, id: fileId });
+            await files.sendFileUpload({ accessToken, id: fileId, bytes: dl.bytes, filename, contentType: ct });
             // eslint-disable-next-line no-await-in-loop
             const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
             uploadId = ready && ready.id ? String(ready.id).trim() : fileId;
