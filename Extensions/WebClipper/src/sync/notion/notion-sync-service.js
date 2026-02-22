@@ -667,14 +667,75 @@
     return list.some((b) => b && b.type === "image" && b.image && b.image.type === "external" && b.image.external && b.image.external.url);
   }
 
+  function sanitizeUrlForLog(url) {
+    try {
+      const u = new URL(String(url || ""));
+      const keys = [];
+      for (const [k] of u.searchParams.entries()) keys.push(k);
+      const uniqueKeys = Array.from(new Set(keys));
+      const q = uniqueKeys.length ? `?keys=${uniqueKeys.slice(0, 12).join(",")}` : "";
+      return `${u.origin}${u.pathname}${q}`;
+    } catch (_e) {
+      return String(url || "").slice(0, 120);
+    }
+  }
+
+  function guessContentTypeFromUrl(url) {
+    const s = String(url || "").toLowerCase();
+    if (s.includes(".png")) return "image/png";
+    if (s.includes(".jpg") || s.includes(".jpeg")) return "image/jpeg";
+    if (s.includes(".webp")) return "image/webp";
+    if (s.includes(".gif")) return "image/gif";
+    if (s.includes(".svg")) return "image/svg+xml";
+    return "";
+  }
+
+  function guessFilenameFromUrl(url) {
+    try {
+      const u = new URL(String(url || ""));
+      const last = String(u.pathname || "").split("/").filter(Boolean).pop() || "";
+      if (last && last.includes(".")) return last.slice(0, 120);
+    } catch (_e) {
+      // ignore
+    }
+    return "image.jpg";
+  }
+
+  async function downloadBytes(url) {
+    if (typeof fetch !== "function") throw new Error("fetch missing");
+    const target = String(url || "").trim();
+    const res = await fetch(target, {
+      method: "GET",
+      redirect: "follow",
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "image/*,*/*;q=0.8" }
+    });
+    if (!res.ok) throw new Error(`image download failed HTTP ${res.status}`);
+    const ct = res.headers && res.headers.get ? String(res.headers.get("content-type") || "") : "";
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    return { bytes, contentType: ct.split(";")[0].trim(), contentLength: bytes.byteLength };
+  }
+
   async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
     const list = Array.isArray(blocks) ? blocks : [];
     if (!list.length) return [];
     const files = NS.notionFilesApi;
-    if (!files || typeof files.createExternalURLUpload !== "function" || typeof files.waitUntilUploaded !== "function") return list;
+    if (
+      !files ||
+      typeof files.createExternalURLUpload !== "function" ||
+      typeof files.waitUntilUploaded !== "function" ||
+      typeof files.createFileUpload !== "function" ||
+      typeof files.uploadBytesToUploadUrl !== "function" ||
+      typeof files.completeUpload !== "function"
+    ) {
+      return list;
+    }
 
     const cache = new Map();
     const out = [];
+    const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
     for (const b of list) {
       if (!b || b.type !== "image" || !b.image || b.image.type !== "external") {
@@ -698,8 +759,51 @@
           const ready = await files.waitUntilUploaded({ accessToken, id });
           uploadId = ready && ready.id ? String(ready.id).trim() : id;
           if (uploadId) cache.set(url, uploadId);
-        } catch (_e) {
-          uploadId = "";
+        } catch (e) {
+          const brief = sanitizeUrlForLog(url);
+          const msg = e && e.message ? String(e.message) : String(e);
+          try {
+            console.warn("[NotionImageUpload] external_url failed:", brief, msg);
+          } catch (_e2) {
+            // ignore
+          }
+
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const dl = await downloadBytes(url);
+            if (!dl || !(dl.bytes instanceof Uint8Array) || !dl.bytes.byteLength) throw new Error("download empty");
+            if (dl.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`image too large: ${dl.bytes.byteLength}`);
+            const ct = dl.contentType || guessContentTypeFromUrl(url) || "application/octet-stream";
+            const filename = guessFilenameFromUrl(url);
+
+            // eslint-disable-next-line no-await-in-loop
+            const up = await files.createFileUpload({
+              accessToken,
+              filename,
+              contentType: ct,
+              contentLength: dl.bytes.byteLength
+            });
+            const uploadUrl = up && up.upload_url ? String(up.upload_url).trim() : "";
+            const fileId = up && up.id ? String(up.id).trim() : "";
+            if (!uploadUrl || !fileId) throw new Error("missing upload_url");
+
+            // eslint-disable-next-line no-await-in-loop
+            await files.uploadBytesToUploadUrl({ uploadUrl, bytes: dl.bytes, contentType: ct });
+            // eslint-disable-next-line no-await-in-loop
+            await files.completeUpload({ accessToken, id: fileId });
+            // eslint-disable-next-line no-await-in-loop
+            const ready = await files.waitUntilUploaded({ accessToken, id: fileId });
+            uploadId = ready && ready.id ? String(ready.id).trim() : fileId;
+            if (uploadId) cache.set(url, uploadId);
+          } catch (e2) {
+            const msg2 = e2 && e2.message ? String(e2.message) : String(e2);
+            try {
+              console.warn("[NotionImageUpload] byte upload failed:", brief, msg2);
+            } catch (_e3) {
+              // ignore
+            }
+            uploadId = "";
+          }
         }
       }
 
