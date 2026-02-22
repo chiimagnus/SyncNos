@@ -260,4 +260,122 @@ describe("notionai-collector", () => {
     expect(userMsg.contentMarkdown).toContain("![](https://www.notion.so/image/attachment%3A");
     expect(userMsg.contentMarkdown).toContain("table=thread");
   });
+
+  it("does not capture left sidebar / page blocks outside chat turns", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+    const html = `
+      <div id="sidebar">
+        <div data-block-id="sidebar_block_1"><div data-content-editable-leaf="true">Sidebar content</div></div>
+      </div>
+      <div id="page">
+        <div data-block-id="page_block_1"><div data-content-editable-leaf="true">Main page content</div></div>
+      </div>
+      <div class="autolayout-col autolayout-fill-width" id="tuple_1">
+        <div class="autolayout-col">
+          <div data-agent-chat-user-step-id="u1">
+            <div data-content-editable-leaf="true">User says hi</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          <div class="autolayout-col autolayout-fill-width">
+            <div data-content-editable-root="true">
+              <div data-block-id="a1"><div data-content-editable-leaf="true">Assistant replies ok</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, {
+      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
+    });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadContract();
+    loadRegistry();
+    loadNotionAiMarkdown();
+    const collector = loadNotionAiCollector();
+
+    const snap = collector.capture();
+    expect(snap).toBeTruthy();
+    const texts = snap.messages.map((m: any) => m && m.contentText).join("\n");
+    expect(texts).toContain("User says hi");
+    expect(texts).toContain("Assistant replies ok");
+    expect(texts).not.toContain("Sidebar content");
+    expect(texts).not.toContain("Main page content");
+  });
+
+  it("pairs assistant replies as the next sibling container after each user turn", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+    const html = `
+      <div id="outside">
+        <div data-block-id="page_block_1"><div data-content-editable-leaf="true">Page block (should not capture)</div></div>
+      </div>
+      <div class="autolayout-col autolayout-fill-width" id="turns_root">
+        <div class="autolayout-col">
+          <div data-agent-chat-user-step-id="u1"><div data-content-editable-leaf="true">U1</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column;">
+          <div data-content-editable-root="true">
+            <div data-block-id="a1"><div data-content-editable-leaf="true">A1</div></div>
+          </div>
+        </div>
+        <div class="autolayout-col">
+          <div data-agent-chat-user-step-id="u2"><div data-content-editable-leaf="true">U2</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column;">
+          <div data-content-editable-root="true">
+            <div data-block-id="a2"><div data-content-editable-leaf="true">A2</div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, {
+      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
+    });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadContract();
+    loadRegistry();
+    loadNotionAiMarkdown();
+    const collector = loadNotionAiCollector();
+
+    const snap = collector.capture();
+    expect(snap).toBeTruthy();
+    const pairs = snap.messages.map((m: any) => `${m.role}:${m.contentText}`).join("|");
+    expect(pairs).toContain("user:U1");
+    expect(pairs).toContain("assistant:A1");
+    expect(pairs).toContain("user:U2");
+    expect(pairs).toContain("assistant:A2");
+    expect(pairs).not.toContain("Page block (should not capture)");
+  });
 });
