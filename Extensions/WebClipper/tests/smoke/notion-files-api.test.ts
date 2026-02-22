@@ -74,7 +74,7 @@ describe("notion-files-api", () => {
     expect(post.body.external_url).toBe("https://example.com/a.png");
   });
 
-  it("supports byte upload flow (mode:file + PUT upload_url + complete)", async () => {
+  it("supports single_part file upload (create + send + poll)", async () => {
     const reqs: any[] = [];
     const fetchCalls: any[] = [];
 
@@ -90,10 +90,9 @@ describe("notion-files-api", () => {
     globalThis.WebClipper.notionApi = {
       notionFetch: async (req: any) => {
         reqs.push(req);
-        if (req.method === "POST" && req.path === "/v1/file_uploads" && req.body && req.body.mode === "file") {
-          return { id: "u2", status: "pending", upload_url: "https://uploads.example.com/u2" };
+        if (req.method === "POST" && req.path === "/v1/file_uploads" && req.body && req.body.mode === "single_part") {
+          return { id: "u2", status: "pending" };
         }
-        if (req.method === "POST" && req.path === "/v1/file_uploads/u2/complete") return { ok: true };
         if (req.method === "GET" && req.path === "/v1/file_uploads/u2") return { id: "u2", status: "uploaded" };
         throw new Error(`unexpected: ${req.method} ${req.path}`);
       }
@@ -107,24 +106,27 @@ describe("notion-files-api", () => {
       contentLength: 3
     });
     expect(created.id).toBe("u2");
-    expect(created.upload_url).toBe("https://uploads.example.com/u2");
 
-    await files.uploadBytesToUploadUrl({
-      uploadUrl: created.upload_url,
+    await files.sendFileUpload({
+      accessToken: "t",
+      id: created.id,
       bytes: new Uint8Array([1, 2, 3]),
+      filename: "a.png",
       contentType: "image/png"
     });
-    expect(fetchCalls[0].url).toBe("https://uploads.example.com/u2");
-    expect(fetchCalls[0].init.method).toBe("PUT");
+    expect(fetchCalls[0].url).toBe("https://api.notion.com/v1/file_uploads/u2/send");
+    expect(fetchCalls[0].init.method).toBe("POST");
+    expect(fetchCalls[0].init.headers.Authorization).toBe("Bearer t");
+    expect(fetchCalls[0].init.headers["Notion-Version"]).toBe("2025-09-03");
+    expect(typeof fetchCalls[0].init.body?.append).toBe("function");
 
-    await files.completeUpload({ accessToken: "t", id: "u2" });
     await files.waitUntilUploaded({ accessToken: "t", id: "u2", pollIntervalMs: 1, maxAttempts: 1 });
 
     const post = reqs.find((r) => r.method === "POST" && r.path === "/v1/file_uploads");
     expect(post.notionVersion).toBe("2025-09-03");
-    expect(post.body.mode).toBe("file");
+    expect(post.body.mode).toBe("single_part");
     expect(post.body.content_type).toBe("image/png");
-    expect(post.body.content_length).toBe(3);
+    expect(post.body.content_length).toBe(undefined);
   });
 
   it("surfaces file_import_result when upload fails", async () => {
