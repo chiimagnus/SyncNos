@@ -231,7 +231,20 @@
               // eslint-disable-next-line no-await-in-loop
               await storage.setConversationNotionPageId(id, pageId);
 
-              const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              let blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              try {
+                if (
+                  blocks &&
+                  blocks.length &&
+                  typeof NS.notionSyncService.upgradeImageBlocksToFileUploads === "function" &&
+                  (typeof NS.notionSyncService.hasExternalImageBlocks !== "function" || NS.notionSyncService.hasExternalImageBlocks(blocks))
+                ) {
+                  // eslint-disable-next-line no-await-in-loop
+                  blocks = await NS.notionSyncService.upgradeImageBlocksToFileUploads(token.accessToken, blocks);
+                }
+              } catch (_e) {
+                // ignore (fallback: external images)
+              }
               if (blocks.length) {
                 // eslint-disable-next-line no-await-in-loop
                 await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
@@ -261,7 +274,20 @@
               // Force clear & rebuild (cursor missing or not found).
               // eslint-disable-next-line no-await-in-loop
               await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
-              const blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              let blocks = NS.notionSyncService.messagesToBlocks(messages, { source: convo.source });
+              try {
+                if (
+                  blocks &&
+                  blocks.length &&
+                  typeof NS.notionSyncService.upgradeImageBlocksToFileUploads === "function" &&
+                  (typeof NS.notionSyncService.hasExternalImageBlocks !== "function" || NS.notionSyncService.hasExternalImageBlocks(blocks))
+                ) {
+                  // eslint-disable-next-line no-await-in-loop
+                  blocks = await NS.notionSyncService.upgradeImageBlocksToFileUploads(token.accessToken, blocks);
+                }
+              } catch (_e) {
+                // ignore (fallback: external images)
+              }
               if (blocks.length) {
                 // eslint-disable-next-line no-await-in-loop
                 await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
@@ -280,7 +306,20 @@
                 url: convo.url,
                 ai: convo.source
               });
-              const blocks = NS.notionSyncService.messagesToBlocks(inc.newMessages, { source: convo.source });
+              let blocks = NS.notionSyncService.messagesToBlocks(inc.newMessages, { source: convo.source });
+              try {
+                if (
+                  blocks &&
+                  blocks.length &&
+                  typeof NS.notionSyncService.upgradeImageBlocksToFileUploads === "function" &&
+                  (typeof NS.notionSyncService.hasExternalImageBlocks !== "function" || NS.notionSyncService.hasExternalImageBlocks(blocks))
+                ) {
+                  // eslint-disable-next-line no-await-in-loop
+                  blocks = await NS.notionSyncService.upgradeImageBlocksToFileUploads(token.accessToken, blocks);
+                }
+              } catch (_e) {
+                // ignore (fallback: external images)
+              }
               if (blocks.length) {
                 // eslint-disable-next-line no-await-in-loop
                 await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);

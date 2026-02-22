@@ -59,16 +59,23 @@
     if (!containers.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const c of containers) {
       const user = c.querySelector("[data-testid='user-message']");
       if (user) {
         const text = NS.normalize.normalizeText(user.innerText || user.textContent || "");
-        if (text) {
+        const imageUrls = extractImages ? extractImages(user) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });
@@ -79,11 +86,15 @@
       const ai = c.querySelector(".font-claude-response") || c.querySelector("[data-testid='assistant-message']") || null;
       if (ai) {
         const text = extractOnlyFormalResponse(ai);
-        if (text) {
+        const imageUrls = extractImages ? extractImages(ai) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });

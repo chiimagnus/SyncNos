@@ -44,6 +44,9 @@
     });
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     for (let i = 0; i < nodes.length; i += 1) {
       const { el, role } = nodes[i];
       let tEl = el;
@@ -53,11 +56,15 @@
         tEl = el.querySelector(".agent-chat__speech-text") || el.querySelector(".hyc-component-reasoner__text") || el;
       }
       const text = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
-      if (!text) continue;
+      const imageUrls = extractImages ? extractImages(tEl || el) : [];
+      if (!text && !imageUrls.length) continue;
+      const contentText = text || "";
+      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
       out.push({
-        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText: text, sequence: i }),
+        messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i }),
         role,
-        contentText: text,
+        contentText,
+        contentMarkdown,
         sequence: i,
         updatedAt: Date.now()
       });

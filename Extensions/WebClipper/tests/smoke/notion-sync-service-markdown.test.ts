@@ -80,6 +80,32 @@ describe("notion-sync-service markdown", () => {
     expect(bold?.text?.content).toBe("b");
   });
 
+  it("converts image markdown to notion image blocks", () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+
+    const md = [
+      "Hello",
+      "",
+      "![](https://example.com/a.png)",
+      "",
+      "World"
+    ].join("\n");
+    const blocks = notionSyncService.markdownToNotionBlocks(md);
+    const img = blocks.find((b: any) => b && b.type === "image");
+    expect(img?.image?.type).toBe("external");
+    expect(img?.image?.external?.url).toBe("https://example.com/a.png");
+  });
+
   it("messagesToBlocks uses markdown when present (notionai)", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
