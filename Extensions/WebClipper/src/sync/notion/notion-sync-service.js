@@ -707,7 +707,7 @@
     const res = await fetch(target, {
       method: "GET",
       redirect: "follow",
-      credentials: "include",
+      credentials: "omit",
       cache: "no-store",
       headers: { Accept: "image/*,*/*;q=0.8" }
     });
