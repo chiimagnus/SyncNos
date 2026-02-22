@@ -76,18 +76,50 @@
     parent.appendChild(document.createTextNode(String(text || "")));
   }
 
+  function isWhitespaceText(text) {
+    return !String(text || "").replace(/\s+/g, "");
+  }
+
+  function isImageGalleryInline(tokens) {
+    const list = Array.isArray(tokens) ? tokens : [];
+    let imageCount = 0;
+    for (const t of list) {
+      if (!t) continue;
+      if (t.type === "image") {
+        imageCount += 1;
+        continue;
+      }
+      if (t.type === "softbreak" || t.type === "hardbreak") continue;
+      if (t.type === "text" && isWhitespaceText(t.content || "")) continue;
+      // Anything else means it's a normal paragraph (text + image etc.)
+      return false;
+    }
+    return imageCount > 0;
+  }
+
   function renderInlineTokens(parent, tokens) {
     const stack = [parent];
     const ensureParent = () => stack[stack.length - 1] || parent;
+
+    const gallery = isImageGalleryInline(tokens);
+    if (gallery) {
+      try {
+        ensureParent().classList && ensureParent().classList.add("chatPreviewImageRow");
+      } catch (_e) {
+        // ignore
+      }
+    }
 
     for (const token of tokens || []) {
       if (!token) continue;
 
       if (token.type === "text") {
+        if (gallery && isWhitespaceText(token.content || "")) continue;
         appendText(ensureParent(), token.content || "");
         continue;
       }
       if (token.type === "softbreak" || token.type === "hardbreak") {
+        if (gallery) continue;
         ensureParent().appendChild(document.createElement("br"));
         continue;
       }
@@ -106,7 +138,7 @@
           continue;
         }
 
-        const wrap = document.createElement("div");
+        const wrap = document.createElement("span");
         wrap.className = "chatPreviewImage";
 
         const link = document.createElement("a");

@@ -87,8 +87,22 @@
       lines.push(`![](${url})`);
     }
     if (!lines.length) return base;
-    if (!base) return lines.join("\n\n");
-    return `${base}\n\n${lines.join("\n\n")}`;
+    // Keep images contiguous (no blank line between) so popup preview can render a horizontal "gallery"
+    // while Notion sync can still parse each `![](...)` line into blocks.
+    if (!base) return lines.join("\n");
+
+    const parts = base.split("\n");
+    let lastNonEmpty = "";
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      const t = String(parts[i] || "").trim();
+      if (t) {
+        lastNonEmpty = t;
+        break;
+      }
+    }
+    const endsWithImageLine = /^!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$/.test(lastNonEmpty);
+    const sep = endsWithImageLine ? "\n" : "\n\n";
+    return `${base}${sep}${lines.join("\n")}`;
   }
 
   NS.collectorUtils = {
