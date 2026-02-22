@@ -88,6 +88,66 @@ jobs:
       - name: Build Chrome zip
         run: node Extensions/WebClipper/scripts/build.mjs --target=chrome --zip --zip-name="SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip"
 
+      - name: Debug CWS OAuth (no secrets)
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const extensionId = process.env.CWS_EXTENSION_ID || "";
+          const clientId = process.env.CWS_CLIENT_ID || "";
+          const clientSecret = process.env.CWS_CLIENT_SECRET || "";
+          const refreshToken = process.env.CWS_REFRESH_TOKEN || "";
+
+          function yesNo(v) { return v ? "yes" : "no"; }
+          console.log(`[cws] has CWS_EXTENSION_ID: ${yesNo(extensionId)}`);
+          console.log(`[cws] has CWS_CLIENT_ID: ${yesNo(clientId)}`);
+          console.log(`[cws] has CWS_CLIENT_SECRET: ${yesNo(clientSecret)}`);
+          console.log(`[cws] has CWS_REFRESH_TOKEN: ${yesNo(refreshToken)}`);
+
+          if (!extensionId || !clientId || !clientSecret || !refreshToken) {
+            throw new Error("Missing one or more required CWS secrets.");
+          }
+
+          const tokenBody = new URLSearchParams();
+          tokenBody.set("client_id", clientId);
+          tokenBody.set("client_secret", clientSecret);
+          tokenBody.set("refresh_token", refreshToken);
+          tokenBody.set("grant_type", "refresh_token");
+
+          const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: tokenBody.toString()
+          });
+          const tokenText = await tokenRes.text();
+          if (!tokenRes.ok) {
+            throw new Error(`OAuth token exchange failed: HTTP ${tokenRes.status} ${tokenText.slice(0, 500)}`);
+          }
+          const tokenJson = JSON.parse(tokenText);
+          const accessToken = String(tokenJson.access_token || "");
+          if (!accessToken) throw new Error("OAuth token exchange succeeded but access_token missing");
+          // Prevent accidental logging of the access token.
+          console.log(`::add-mask::${accessToken}`);
+
+          console.log(`[cws] token scope: ${tokenJson.scope || "(missing)"}`);
+          console.log(`[cws] token expires_in: ${tokenJson.expires_in || "(missing)"}`);
+
+          const itemUrl = `https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(extensionId)}`;
+          const itemRes = await fetch(itemUrl, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          const itemText = await itemRes.text();
+          if (!itemRes.ok) {
+            throw new Error(`CWS item check failed: HTTP ${itemRes.status} ${itemText.slice(0, 800)}`);
+          }
+          console.log("[cws] item check ok");
+          NODE
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+
       # Required secrets:
       # - CWS_EXTENSION_ID
       # - CWS_CLIENT_ID
