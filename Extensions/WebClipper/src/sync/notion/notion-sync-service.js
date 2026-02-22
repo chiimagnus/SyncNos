@@ -704,10 +704,19 @@
   async function downloadBytes(url) {
     if (typeof fetch !== "function") throw new Error("fetch missing");
     const target = String(url || "").trim();
+    let credentials = "include";
+    try {
+      const u = new URL(target);
+      // Attachment URLs may require Notion auth cookies on `notion.so`.
+      // The redirected CDN (`notionusercontent.com`) should work without credentials.
+      if (/(\.|^)notionusercontent\.com$/i.test(u.hostname)) credentials = "omit";
+    } catch (_e) {
+      // ignore
+    }
     const res = await fetch(target, {
       method: "GET",
       redirect: "follow",
-      credentials: "omit",
+      credentials,
       cache: "no-store",
       headers: { Accept: "image/*,*/*;q=0.8" }
     });
