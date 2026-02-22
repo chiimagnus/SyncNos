@@ -1,0 +1,105 @@
+name: WebClipper Publish to Chrome Web Store
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name (e.g. v0.14.5). Required for manual runs."
+        required: true
+        type: string
+      publish:
+        description: "Whether to publish after upload (true/false)."
+        required: false
+        type: boolean
+        default: true
+      publish_target:
+        description: "Publish target: default (public) or trustedTesters."
+        required: false
+        type: choice
+        default: default
+        options:
+          - default
+          - trustedTesters
+
+permissions:
+  contents: read
+
+jobs:
+  publish_cws:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve publish options
+        id: publish
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            publish="$(jq -r '.inputs.publish // "true"' "$GITHUB_EVENT_PATH")"
+            target="$(jq -r '.inputs.publish_target // "default"' "$GITHUB_EVENT_PATH")"
+          else
+            publish="true"
+            target="default"
+          fi
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+          echo "target=${target}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Extensions/WebClipper/package-lock.json
+
+      - name: Install WebClipper deps
+        run: npm ci --prefix Extensions/WebClipper
+
+      - name: Verify manifest version matches tag
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const tagName = process.env.TAG_NAME;
+          const tagVersion = String(tagName || "").replace(/^v/, "");
+          const manifest = JSON.parse(fs.readFileSync("Extensions/WebClipper/manifest.json", "utf8"));
+          if (!manifest.version) throw new Error("manifest.json missing version");
+          if (manifest.version !== tagVersion) {
+            throw new Error(`manifest version mismatch: manifest=${manifest.version} tag=${tagVersion}`);
+          }
+          console.log(`[ok] manifest version: ${manifest.version}`);
+          NODE
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+
+      - name: Build Chrome zip
+        run: node Extensions/WebClipper/scripts/build.mjs --target=chrome --zip --zip-name="SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip"
+
+      # Required secrets:
+      # - CWS_EXTENSION_ID
+      # - CWS_CLIENT_ID
+      # - CWS_CLIENT_SECRET
+      # - CWS_REFRESH_TOKEN
+      - name: Upload to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: Extensions/WebClipper/SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip
+          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+          client-id: ${{ secrets.CWS_CLIENT_ID }}
+          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
+          publish: ${{ steps.publish.outputs.publish }}
+          publish-target: ${{ steps.publish.outputs.target }}
