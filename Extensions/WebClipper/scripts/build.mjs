@@ -184,9 +184,6 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
 if (existsSync(repoLicense)) {
   cpSync(repoLicense, join(out, "LICENSE"));
 }
-cpSync(join(root, "icons/icon-16.png"), join(out, "icon-16.png"));
-cpSync(join(root, "icons/icon-48.png"), join(out, "icon-48.png"));
-cpSync(join(root, "icons/icon-128.png"), join(out, "icon-128.png"));
 // Popup HTML references icon assets under `icons/*` (source layout).
 // Keep an `icons/` folder in dist so those relative URLs keep working across browsers.
 cpSync(join(root, "icons"), join(out, "icons"), { recursive: true });
@@ -228,9 +225,7 @@ concatFiles({
     "src/bootstrap/content.js"
   ]
 });
-// Dist layout is flat (icons copied to root), but runtime code still references source paths.
-// Keep the runtime code stable by rewriting icon URLs to the dist layout.
-writeText(contentBundle, readText(contentBundle).replaceAll("icons/icon-128.png", "icon-128.png"));
+// Dist layout keeps runtime entrypoints at the root, while preserving the source `icons/*` folder layout.
 await minifyJsFile(contentBundle);
 
 // Bundle background SW (including previously importScripts-loaded modules).
@@ -316,18 +311,12 @@ if (Array.isArray(manifest.content_scripts) && manifest.content_scripts[0]) {
     js: ["content.js"]
   };
 }
-if (Array.isArray(manifest.web_accessible_resources)) {
-  manifest.web_accessible_resources = manifest.web_accessible_resources.map((item) => ({
-    ...item,
-    resources: (item.resources || []).map((resource) => resource === "icons/icon-128.png" ? "icon-128.png" : resource)
-  }));
-}
 if (manifest.icons && typeof manifest.icons === "object") {
   manifest.icons = {
     ...manifest.icons,
-    "16": "icon-16.png",
-    "48": "icon-48.png",
-    "128": "icon-128.png"
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   };
 }
 manifest = applyTargetManifestPatches(manifest, {
