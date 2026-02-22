@@ -38,6 +38,7 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 
 - Supported browsers: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**
 - Download (Releases): https://github.com/chiimagnus/SyncNos/releases
+- Chrome Web Store: https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
 - Firefox (AMO): https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
 
 ### What It Does
