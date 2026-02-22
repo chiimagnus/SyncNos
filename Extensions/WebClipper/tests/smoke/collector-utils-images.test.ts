@@ -56,7 +56,6 @@ describe("collector-utils images", () => {
       "https://example.com/b.png",
       "data:image/png;base64,abc"
     ]);
-    expect(md).toBe("Hello\n\n![](https://example.com/a.png)\n\n![](https://example.com/b.png)");
+    expect(md).toBe("Hello\n\n![](https://example.com/a.png)\n![](https://example.com/b.png)");
   });
 });
-

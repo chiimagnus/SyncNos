@@ -1106,15 +1106,35 @@ main {
 
 .chatPreviewImage {
   margin: 0 0 8px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chatPreviewImageRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.chatPreviewImageRow::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .chatPreviewImageImg {
   display: block;
-  max-width: 100%;
-  height: auto;
+  height: 72px;
+  width: auto;
+  max-width: 160px;
   border-radius: 10px;
   border: 1px solid rgba(217, 89, 38, 0.2);
   background: rgba(255, 241, 234, 0.4);
+  object-fit: cover;
 }
 
 .chatPreviewImageUrl {
@@ -1124,6 +1144,7 @@ main {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 160px;
 }
 
 .chatPreviewImageUrl a {
