@@ -74,6 +74,59 @@ describe("notion-files-api", () => {
     expect(post.body.external_url).toBe("https://example.com/a.png");
   });
 
+  it("supports byte upload flow (mode:file + PUT upload_url + complete)", async () => {
+    const reqs: any[] = [];
+    const fetchCalls: any[] = [];
+
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: string, init: any) => {
+      fetchCalls.push({ url, init });
+      return { ok: true, status: 200, text: async () => "" };
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        reqs.push(req);
+        if (req.method === "POST" && req.path === "/v1/file_uploads" && req.body && req.body.mode === "file") {
+          return { id: "u2", status: "pending", upload_url: "https://uploads.example.com/u2" };
+        }
+        if (req.method === "POST" && req.path === "/v1/file_uploads/u2/complete") return { ok: true };
+        if (req.method === "GET" && req.path === "/v1/file_uploads/u2") return { id: "u2", status: "uploaded" };
+        throw new Error(`unexpected: ${req.method} ${req.path}`);
+      }
+    };
+
+    const files = loadNotionFilesApi();
+    const created = await files.createFileUpload({
+      accessToken: "t",
+      filename: "a.png",
+      contentType: "image/png",
+      contentLength: 3
+    });
+    expect(created.id).toBe("u2");
+    expect(created.upload_url).toBe("https://uploads.example.com/u2");
+
+    await files.uploadBytesToUploadUrl({
+      uploadUrl: created.upload_url,
+      bytes: new Uint8Array([1, 2, 3]),
+      contentType: "image/png"
+    });
+    expect(fetchCalls[0].url).toBe("https://uploads.example.com/u2");
+    expect(fetchCalls[0].init.method).toBe("PUT");
+
+    await files.completeUpload({ accessToken: "t", id: "u2" });
+    await files.waitUntilUploaded({ accessToken: "t", id: "u2", pollIntervalMs: 1, maxAttempts: 1 });
+
+    const post = reqs.find((r) => r.method === "POST" && r.path === "/v1/file_uploads");
+    expect(post.notionVersion).toBe("2025-09-03");
+    expect(post.body.mode).toBe("file");
+    expect(post.body.content_type).toBe("image/png");
+    expect(post.body.content_length).toBe(3);
+  });
+
   it("surfaces file_import_result when upload fails", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
