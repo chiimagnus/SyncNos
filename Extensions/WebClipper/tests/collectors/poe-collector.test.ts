@@ -110,6 +110,80 @@ describe("poe-collector", () => {
     expect(snap.messages[1].contentText).not.toContain("重试");
   });
 
+  it("captures messages across date tupleGroupContainer buckets", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div class="ChatMessagesView_chatMessagesView__ROOT">
+        <div class="ChatMessagesView_tupleGroupContainer__LSCLm">
+          <p class="MessageDate_container__HJE_V">昨天</p>
+          <div class="ChatMessagesView_messageTuple__Jh5lQ">
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-1">
+              <div class="ChatMessage_messageWrapper__4Ugd6 ChatMessage_rightSideMessageWrapper__r0roB">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>y-user</p></div>
+                </div>
+              </div>
+            </div>
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-2">
+              <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+              <div class="ChatMessage_messageWrapper__4Ugd6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>y-assistant</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ChatMessagesView_tupleGroupContainer__LSCLm">
+          <p class="MessageDate_container__HJE_V">今天</p>
+          <div class="ChatMessagesView_messageTuple__Jh5lQ">
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-3">
+              <div class="ChatMessage_messageWrapper__4Ugd6 ChatMessage_rightSideMessageWrapper__r0roB">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>t-user</p></div>
+                </div>
+              </div>
+            </div>
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-4">
+              <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+              <div class="ChatMessage_messageWrapper__4Ugd6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>t-assistant</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeCollector();
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.messages.map((m: any) => m.messageKey)).toEqual(["message-1", "message-2", "message-3", "message-4"]);
+    expect(snap.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
+    expect(snap.messages.map((m: any) => m.contentText)).toEqual(["y-user", "y-assistant", "t-user", "t-assistant"]);
+  });
+
   it("appends image markdown but does not capture bot avatar images", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { JSDOM } = require("jsdom");
@@ -162,4 +236,3 @@ describe("poe-collector", () => {
     expect(md).not.toContain("avatar.jpeg");
   });
 });
-

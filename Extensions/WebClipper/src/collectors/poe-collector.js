@@ -33,8 +33,18 @@
   }
 
   function getConversationRoot() {
+    // Poe groups messages by date buckets:
+    // tupleGroupContainer -> (MessageDate label) + (one or more messageTuple)
+    // If we pick only the first messageTuple's parent, we may only capture one date bucket.
+    const group = document.querySelector("div[class*='ChatMessagesView_tupleGroupContainer__']");
+    if (group && group.parentElement) return group.parentElement;
+
     const tuple = document.querySelector("div[class*='ChatMessagesView_messageTuple__']");
-    if (tuple && tuple.parentElement) return tuple.parentElement;
+    if (tuple) {
+      const tupleGroup = tuple.closest ? tuple.closest("div[class*='ChatMessagesView_tupleGroupContainer__']") : null;
+      if (tupleGroup && tupleGroup.parentElement) return tupleGroup.parentElement;
+      if (tuple.parentElement) return tuple.parentElement;
+    }
 
     const msg = document.querySelector("div[class*='ChatMessage_chatMessage__'][id^='message-']");
     if (msg && msg.parentElement) return msg.parentElement;
