@@ -243,6 +243,54 @@
 
     const messages = [];
     const warningFlags = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
+
+    function mergeImageUrls(nodes) {
+      if (!extractImages) return [];
+      const set = new Set();
+      for (const n of nodes || []) {
+        const urls = extractImages(n);
+        for (const u of urls || []) set.add(u);
+      }
+      return Array.from(set);
+    }
+
+    function isThreadAttachmentImageUrl(url) {
+      const u = String(url || "").trim();
+      if (!u) return false;
+      // NotionAI user uploaded images often appear as:
+      // https://www.notion.so/image/attachment%3A...png?table=thread&id=...&...
+      if (!/^https?:\/\/[^/]*notion\.so\//i.test(u)) return false;
+      if (!/\/image\/attachment%3a/i.test(u)) return false;
+      if (!/[?&]table=thread(?:[&#]|$)/i.test(u)) return false;
+      if (!/[?&]id=[0-9a-f-]{16,}/i.test(u)) return false;
+      return true;
+    }
+
+    function findUserAttachmentContainer(userWrapper) {
+      let el = userWrapper;
+      for (let depth = 0; depth < 12 && el; depth += 1) {
+        try {
+          if (el.querySelectorAll) {
+            const userSteps = el.querySelectorAll("[data-agent-chat-user-step-id]");
+            if (userSteps.length === 1 && userSteps[0] === userWrapper) {
+              const imgs = Array.from(el.querySelectorAll("img"));
+              const hasAttachmentLike = imgs.some((img) => {
+                const src = img && img.src ? String(img.src) : "";
+                return /\/image\/attachment%3a/i.test(src) && /[?&]table=thread/i.test(src);
+              });
+              if (hasAttachmentLike) return el;
+            }
+          }
+        } catch (_e) {
+          // ignore
+        }
+        el = el.parentElement;
+      }
+      return userWrapper;
+    }
 
     const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
     const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
@@ -254,22 +302,39 @@
       const w = wrappers[i];
       const role = roleFromWrapper(w);
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
-      if (!contentText) continue;
+      const imageUrls = (() => {
+        if (!w || !w.querySelector) return [];
+        if (role === "assistant") {
+          const blocks = Array.from(w.querySelectorAll("div[data-block-id]"));
+          return mergeImageUrls(blocks.length ? blocks : [w]);
+        }
+
+        const leaf =
+          w.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
+          w.querySelector("[data-content-editable-leaf='true']") ||
+          w;
+
+        const attachmentContainer = findUserAttachmentContainer(w);
+        const merged = mergeImageUrls([leaf, attachmentContainer]);
+        return merged.filter(isThreadAttachmentImageUrl);
+      })();
+      if (!contentText && !imageUrls.length) continue;
       const markdown = NS.notionAiMarkdown || {};
       const contentMarkdown = role === "user"
         ? ((typeof markdown.extractUserMarkdown === "function" ? markdown.extractUserMarkdown(w) : "") || contentText)
         : ((typeof markdown.extractAssistantMarkdown === "function" ? markdown.extractAssistantMarkdown(w) : "") || contentText);
+      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown || contentText || "", imageUrls) : (contentMarkdown || contentText || "");
       const userStepId = role === "user" ? w.getAttribute("data-agent-chat-user-step-id") : "";
       const firstBlockId = role === "assistant" ? (w.querySelector("div[data-block-id]") || {}).getAttribute?.("data-block-id") : "";
       const stableId = userStepId || firstBlockId || "";
       const messageKey = stableId
         ? `${role}_${stableId}`
-        : NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });
+        : NS.normalize.makeFallbackMessageKey({ role, contentText: contentText || "", sequence: i });
       messages.push({
         messageKey,
         role,
-        contentText,
-        contentMarkdown,
+        contentText: contentText || "",
+        contentMarkdown: nextMarkdown,
         sequence: i,
         updatedAt: Date.now()
       });

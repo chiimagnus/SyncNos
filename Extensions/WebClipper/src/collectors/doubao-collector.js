@@ -38,17 +38,24 @@
     if (!containers.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const c of containers) {
       const sendMessage = c.querySelector("[data-testid='send_message']");
       if (sendMessage) {
         const tEl = sendMessage.querySelector("[data-testid='message_text_content']") || sendMessage;
         const text = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
-        if (text) {
+        const imageUrls = extractImages ? extractImages(sendMessage) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });
@@ -61,11 +68,15 @@
         const all = Array.from(recv.querySelectorAll("[data-testid='message_text_content']"));
         const textEl = all.find((el) => !el.closest("[data-testid='think_block_collapse']")) || recv;
         const text = NS.normalize.normalizeText(textEl.innerText || textEl.textContent || "");
-        if (text) {
+        const imageUrls = extractImages ? extractImages(recv) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });

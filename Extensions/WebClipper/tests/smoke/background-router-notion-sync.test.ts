@@ -217,4 +217,63 @@ describe("background-router notion sync", () => {
     expect(jobRes.data.job.status).toBe("done");
     expect(Array.isArray(jobRes.data.job.perConversation)).toBe(true);
   });
+
+  it("upgrades external image blocks to file_upload before append", async () => {
+    const calls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionDbManager = { ensureDatabase: async () => ({ databaseId: "db1" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      getSyncMappingByConversation: async () => ({
+        conversation: { id: 1, title: "Hello", url: "https://x", source: "chatgpt" },
+        mapping: null
+      }),
+      getMessagesByConversationId: async () => [{ messageKey: "m1", role: "user", contentText: "hi", contentMarkdown: "![](https://example.com/a.png)", sequence: 1 }],
+      setConversationNotionPageId: async () => true,
+      setSyncCursor: async () => true
+    };
+
+    let appendedBlocks: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionSyncService = {
+      getPage: async () => {
+        throw new Error("404");
+      },
+      createPageInDatabase: async () => ({ id: "p_new" }),
+      updatePageProperties: async () => ({ ok: true }),
+      clearPageChildren: async () => ({ ok: true }),
+      appendChildren: async (_t: string, _pageId: string, blocks: any[]) => {
+        appendedBlocks = blocks;
+        calls.push({ op: "append", pageId: _pageId });
+        return { ok: true };
+      },
+      messagesToBlocks: () => [{
+        object: "block",
+        type: "image",
+        image: { type: "external", external: { url: "https://example.com/a.png" } }
+      }],
+      hasExternalImageBlocks: () => true,
+      upgradeImageBlocksToFileUploads: async () => [{
+        object: "block",
+        type: "image",
+        image: { type: "file_upload", file_upload: { id: "u1" } }
+      }],
+      isPageUsableForDatabase: () => false,
+      pageBelongsToDatabase: () => false
+    };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(calls.some((c) => c.op === "append" && c.pageId === "p_new")).toBe(true);
+    expect(appendedBlocks[0]?.image?.type).toBe("file_upload");
+    expect(appendedBlocks[0]?.image?.file_upload?.id).toBe("u1");
+  });
 });

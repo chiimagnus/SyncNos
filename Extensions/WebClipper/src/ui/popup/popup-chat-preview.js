@@ -76,18 +76,50 @@
     parent.appendChild(document.createTextNode(String(text || "")));
   }
 
+  function isWhitespaceText(text) {
+    return !String(text || "").replace(/\s+/g, "");
+  }
+
+  function isImageGalleryInline(tokens) {
+    const list = Array.isArray(tokens) ? tokens : [];
+    let imageCount = 0;
+    for (const t of list) {
+      if (!t) continue;
+      if (t.type === "image") {
+        imageCount += 1;
+        continue;
+      }
+      if (t.type === "softbreak" || t.type === "hardbreak") continue;
+      if (t.type === "text" && isWhitespaceText(t.content || "")) continue;
+      // Anything else means it's a normal paragraph (text + image etc.)
+      return false;
+    }
+    return imageCount > 0;
+  }
+
   function renderInlineTokens(parent, tokens) {
     const stack = [parent];
     const ensureParent = () => stack[stack.length - 1] || parent;
+
+    const gallery = isImageGalleryInline(tokens);
+    if (gallery) {
+      try {
+        ensureParent().classList && ensureParent().classList.add("chatPreviewImageRow");
+      } catch (_e) {
+        // ignore
+      }
+    }
 
     for (const token of tokens || []) {
       if (!token) continue;
 
       if (token.type === "text") {
+        if (gallery && isWhitespaceText(token.content || "")) continue;
         appendText(ensureParent(), token.content || "");
         continue;
       }
       if (token.type === "softbreak" || token.type === "hardbreak") {
+        if (gallery) continue;
         ensureParent().appendChild(document.createElement("br"));
         continue;
       }
@@ -98,9 +130,45 @@
         continue;
       }
       if (token.type === "image") {
-        // Avoid loading remote images inside the popup preview.
+        const src = getAttr(token, "src");
+        const safeSrc = sanitizeHref(src);
         const alt = token.content || getAttr(token, "alt") || "";
-        if (alt) appendText(ensureParent(), alt);
+        if (!safeSrc) {
+          if (alt) appendText(ensureParent(), alt);
+          continue;
+        }
+
+        const wrap = document.createElement("span");
+        wrap.className = "chatPreviewImage";
+
+        const link = document.createElement("a");
+        link.setAttribute("href", safeSrc);
+        link.setAttribute("target", "_blank");
+        link.setAttribute("rel", "noopener noreferrer");
+
+        const img = document.createElement("img");
+        img.className = "chatPreviewImageImg";
+        img.src = safeSrc;
+        img.alt = alt;
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+
+        link.appendChild(img);
+        wrap.appendChild(link);
+
+        const urlLine = document.createElement("div");
+        urlLine.className = "chatPreviewImageUrl";
+        const urlLink = document.createElement("a");
+        urlLink.setAttribute("href", safeSrc);
+        urlLink.setAttribute("target", "_blank");
+        urlLink.setAttribute("rel", "noopener noreferrer");
+        urlLink.textContent = safeSrc;
+        urlLink.title = safeSrc;
+        urlLine.appendChild(urlLink);
+        wrap.appendChild(urlLine);
+
+        ensureParent().appendChild(wrap);
         continue;
       }
 

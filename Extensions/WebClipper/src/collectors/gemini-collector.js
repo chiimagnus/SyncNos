@@ -38,16 +38,23 @@
     if (!blocks.length) return [];
 
     const out = [];
+    const utils = NS.collectorUtils || {};
+    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
+    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
     for (const b of blocks) {
       const user = b.querySelector("user-query .query-text") || b.querySelector("[data-test-id='user-message']") || null;
       if (user) {
         const text = NS.normalize.normalizeText(user.innerText || user.textContent || "");
-        if (text) {
+        const imageUrls = extractImages ? extractImages(user) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "user", contentText, sequence: seq }),
             role: "user",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });
@@ -58,11 +65,15 @@
       const model = b.querySelector("model-response .model-response-text") || b.querySelector("model-response") || null;
       if (model) {
         const text = NS.normalize.normalizeText(model.innerText || model.textContent || "");
-        if (text) {
+        const imageUrls = extractImages ? extractImages(model) : [];
+        if (text || imageUrls.length) {
+          const contentText = text || "";
+          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
           out.push({
-            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText: text, sequence: seq }),
+            messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
-            contentText: text,
+            contentText,
+            contentMarkdown,
             sequence: seq,
             updatedAt: Date.now()
           });
