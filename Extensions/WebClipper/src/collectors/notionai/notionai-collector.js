@@ -129,34 +129,195 @@
     return { root: best, allRoots: roots, lowConfidence: roots.length !== 1 || userCount < 1 };
   }
 
+  function hasAssistantBlocksOutsideUserStep(el, userStep) {
+    if (!el || !el.querySelectorAll) return false;
+    const blocks = Array.from(el.querySelectorAll("div[data-block-id]"));
+    return blocks.some((b) => b && (!userStep || !userStep.contains(b)));
+  }
+
+  function isUserTurnContainer(el) {
+    if (!el || !el.querySelector) return false;
+    return !!el.querySelector("[data-agent-chat-user-step-id]");
+  }
+
+  function isAssistantTurnContainer(el) {
+    if (!el || !el.querySelector) return false;
+    if (el.querySelector("[data-agent-chat-user-step-id]")) return false;
+    return !!el.querySelector("div[data-block-id]");
+  }
+
+  function directChildContaining(root, target) {
+    if (!root || !root.children || !target) return null;
+    const kids = Array.from(root.children || []);
+    for (const k of kids) {
+      if (k && k.contains && k.contains(target)) return k;
+    }
+    return null;
+  }
+
+  function findTurnsListRoot(seedUserStep, boundaryRoot, totalUserStepsInBoundary) {
+    if (!seedUserStep) return null;
+    const total = typeof totalUserStepsInBoundary === "number" ? totalUserStepsInBoundary : 0;
+    let el = seedUserStep;
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (let depth = 0; depth < 40 && el && el.parentElement; depth += 1) {
+      el = el.parentElement;
+      if (!el || !el.children) continue;
+
+      if (boundaryRoot && el === boundaryRoot.parentElement) break;
+
+      const children = Array.from(el.children || []);
+      if (children.length < 2) continue;
+
+      const userChildCount = children.filter(isUserTurnContainer).length;
+      const assistantChildCount = children.filter(isAssistantTurnContainer).length;
+      if (!userChildCount || !assistantChildCount) continue;
+
+      // If we already see multiple turns, avoid choosing a container that only has a single user child
+      // (often indicates a broader layout container that also contains sidebar/page content).
+      if (total >= 2 && userChildCount < 2) continue;
+
+      const paired = Math.min(userChildCount, assistantChildCount);
+      const balance = 1 - Math.abs(userChildCount - assistantChildCount) / Math.max(1, userChildCount + assistantChildCount);
+      const density = (userChildCount + assistantChildCount) / Math.max(1, children.length);
+
+      const score = paired * 100000 + Math.round(balance * 10000) + Math.round(density * 1000) - depth * 10 - children.length;
+      if (score > bestScore) {
+        best = el;
+        bestScore = score;
+      }
+
+      if (boundaryRoot && el === boundaryRoot) break;
+    }
+
+    return best;
+  }
+
+  function findNextAssistantContainerFromUserItem(userItem, listRoot) {
+    if (!userItem) return null;
+    let sib = userItem.nextElementSibling;
+    while (sib && (!listRoot || listRoot.contains(sib))) {
+      if (isUserTurnContainer(sib)) return null;
+      if (isAssistantTurnContainer(sib)) return sib;
+      sib = sib.nextElementSibling;
+    }
+    return null;
+  }
+
+  function findTupleAndAssistantByChildren(userStep) {
+    if (!userStep) return { tuple: null, assistantWrapper: null };
+    let el = userStep;
+
+    for (let depth = 0; depth < 40 && el && el.parentElement; depth += 1) {
+      el = el.parentElement;
+      if (!el || !el.children) continue;
+
+      const userSteps = el.querySelectorAll ? el.querySelectorAll("[data-agent-chat-user-step-id]") : [];
+      if (!userSteps || userSteps.length !== 1 || userSteps[0] !== userStep) continue;
+
+      const children = Array.from(el.children || []);
+      if (children.length < 2) continue;
+
+      const userChild = children.find((c) => c && c.contains && c.contains(userStep));
+      if (!userChild) continue;
+
+      const assistantChild = children.find((c) => {
+        if (!c || c === userChild || !c.querySelector) return false;
+        if (c.querySelector("[data-agent-chat-user-step-id]")) return false;
+        return hasAssistantBlocksOutsideUserStep(c, null);
+      });
+
+      if (assistantChild) return { tuple: el, assistantWrapper: assistantChild };
+    }
+
+    return { tuple: null, assistantWrapper: null };
+  }
+
+  function findMessageTupleFromUserStep(userStep, scope) {
+    if (!userStep || !userStep.parentElement) return null;
+    const s = scope || document;
+    let bestFallback = null;
+    let el = userStep;
+
+    for (let depth = 0; depth < 30 && el && el.parentElement; depth += 1) {
+      el = el.parentElement;
+      if (!el || !el.querySelectorAll) continue;
+      if (s !== document && !s.contains(el)) break;
+
+      const steps = el.querySelectorAll("[data-agent-chat-user-step-id]");
+      if (steps.length !== 1 || steps[0] !== userStep) continue;
+
+      if (el.classList && el.classList.contains("autolayout-col") && el.classList.contains("autolayout-fill-width")) {
+        bestFallback = el;
+      }
+
+      const assistantBlocks = Array.from(el.querySelectorAll("div[data-block-id]")).filter((b) => b && !userStep.contains(b));
+      if (assistantBlocks.length) return el;
+    }
+
+    return bestFallback;
+  }
+
+  function findAssistantWrapperFromTuple(tupleEl, userStep) {
+    if (!tupleEl || !tupleEl.querySelectorAll) return null;
+    const blocks = Array.from(tupleEl.querySelectorAll("div[data-block-id]")).filter((b) => b && (!userStep || !userStep.contains(b)));
+    if (!blocks.length) return null;
+
+    const firstBlock = blocks[0];
+    let w =
+      firstBlock.closest("div[data-content-editable-root='true']") ||
+      firstBlock.closest(".autolayout-col.autolayout-fill-width") ||
+      firstBlock.closest("div");
+
+    while (w && w !== tupleEl && userStep && w.contains(userStep)) w = w.parentElement;
+    if (!w || (userStep && w.contains(userStep)) || !tupleEl.contains(w)) {
+      w = firstBlock.parentElement;
+      while (w && w !== tupleEl && userStep && w.contains(userStep)) w = w.parentElement;
+    }
+
+    if (!w || !tupleEl.contains(w) || (userStep && w.contains(userStep))) return null;
+    return w;
+  }
+
   function getTurnWrappers(root) {
     const uniqueNodes = new Set();
     const scope = root || document;
+    const userSteps = Array.from(scope.querySelectorAll("[data-agent-chat-user-step-id]"));
+    if (!userSteps.length) return [];
 
-    // user wrapper
-    scope.querySelectorAll("[data-agent-chat-user-step-id]").forEach((el) => uniqueNodes.add(el));
-
-    // assistant wrapper: find a container for blocks, but exclude big containers that also include user steps.
-    scope.querySelectorAll("div[data-block-id]").forEach((block) => {
-      const w = block.closest(".autolayout-col.autolayout-fill-width") || block.closest("div");
-      if (!w) return;
-      if (w.querySelector("[data-agent-chat-user-step-id]")) return;
-      // Ensure it's within our scope (closest may escape shadow-like boundaries).
-      if (scope !== document && !scope.contains(w)) return;
-      uniqueNodes.add(w);
-    });
-
-    const sorted = Array.from(uniqueNodes);
-    sorted.sort((a, b) => {
-      if (a === b) return 0;
-      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-    });
+    const listRoot = findTurnsListRoot(userSteps[0], scope === document ? null : scope, userSteps.length);
+    if (listRoot) {
+      const inListSteps = Array.from(listRoot.querySelectorAll("[data-agent-chat-user-step-id]"));
+      for (const step of inListSteps) {
+        const userItem = directChildContaining(listRoot, step);
+        const assistantItem = userItem ? findNextAssistantContainerFromUserItem(userItem, listRoot) : null;
+        uniqueNodes.add(step);
+        if (assistantItem) uniqueNodes.add(assistantItem);
+      }
+    } else {
+    for (const userStep of userSteps) {
+      // Important: tuple/assistant may render outside the chosen scroll container.
+      // Still anchor on user steps within `scope` to avoid capturing sidebar/page blocks.
+      const byChildren = findTupleAndAssistantByChildren(userStep);
+      const tuple = byChildren.tuple || findMessageTupleFromUserStep(userStep, document) || null;
+      const assistantWrapper = byChildren.assistantWrapper || (tuple ? findAssistantWrapperFromTuple(tuple, userStep) : null);
+      uniqueNodes.add(userStep);
+      if (assistantWrapper) uniqueNodes.add(assistantWrapper);
+    }
+    }
 
     const finalNodes = [];
-    for (const node of sorted) {
+    for (const node of Array.from(uniqueNodes)) {
       const isChild = finalNodes.some((parent) => parent.contains(node));
       if (!isChild) finalNodes.push(node);
     }
+
+    finalNodes.sort((a, b) => {
+      if (a === b) return 0;
+      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
     return finalNodes;
   }
 
