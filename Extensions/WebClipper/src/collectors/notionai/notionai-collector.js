@@ -257,6 +257,41 @@
       return Array.from(set);
     }
 
+    function isThreadAttachmentImageUrl(url) {
+      const u = String(url || "").trim();
+      if (!u) return false;
+      // NotionAI user uploaded images often appear as:
+      // https://www.notion.so/image/attachment%3A...png?table=thread&id=...&...
+      if (!/^https?:\/\/[^/]*notion\.so\//i.test(u)) return false;
+      if (!/\/image\/attachment%3a/i.test(u)) return false;
+      if (!/[?&]table=thread(?:[&#]|$)/i.test(u)) return false;
+      if (!/[?&]id=[0-9a-f-]{16,}/i.test(u)) return false;
+      return true;
+    }
+
+    function findUserAttachmentContainer(userWrapper) {
+      let el = userWrapper;
+      for (let depth = 0; depth < 12 && el; depth += 1) {
+        try {
+          if (el.querySelectorAll) {
+            const userSteps = el.querySelectorAll("[data-agent-chat-user-step-id]");
+            if (userSteps.length === 1 && userSteps[0] === userWrapper) {
+              const imgs = Array.from(el.querySelectorAll("img"));
+              const hasAttachmentLike = imgs.some((img) => {
+                const src = img && img.src ? String(img.src) : "";
+                return /\/image\/attachment%3a/i.test(src) && /[?&]table=thread/i.test(src);
+              });
+              if (hasAttachmentLike) return el;
+            }
+          }
+        } catch (_e) {
+          // ignore
+        }
+        el = el.parentElement;
+      }
+      return userWrapper;
+    }
+
     const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
     const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
     if (picked.lowConfidence || !wrappersInRoot.length || root === document.body || !hasUser || !hasAssistant) {
@@ -267,19 +302,22 @@
       const w = wrappers[i];
       const role = roleFromWrapper(w);
       const contentText = role === "user" ? extractUserText(w) : extractAssistantText(w);
-      const imageScopes = (() => {
-        if (!w || !w.querySelector) return [w];
+      const imageUrls = (() => {
+        if (!w || !w.querySelector) return [];
         if (role === "assistant") {
           const blocks = Array.from(w.querySelectorAll("div[data-block-id]"));
-          return blocks.length ? blocks : [w];
+          return mergeImageUrls(blocks.length ? blocks : [w]);
         }
+
         const leaf =
           w.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
           w.querySelector("[data-content-editable-leaf='true']") ||
           w;
-        return [leaf];
+
+        const attachmentContainer = findUserAttachmentContainer(w);
+        const merged = mergeImageUrls([leaf, attachmentContainer]);
+        return merged.filter(isThreadAttachmentImageUrl);
       })();
-      const imageUrls = mergeImageUrls(imageScopes);
       if (!contentText && !imageUrls.length) continue;
       const markdown = NS.notionAiMarkdown || {};
       const contentMarkdown = role === "user"

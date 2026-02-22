@@ -45,6 +45,15 @@ function loadNotionAiMarkdown() {
   return require("../../src/collectors/notionai/notionai-markdown.js");
 }
 
+function loadCollectorUtils() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/collectors/collector-utils.js");
+}
+
 describe("notionai-collector", () => {
   it("exposes inpageMatches for early UI eligibility", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -198,5 +207,57 @@ describe("notionai-collector", () => {
 
     expect(keys[0]).toBe(`notionai_t_${threadId}`);
     expect(keys[1]).toBe(`notionai_t_${threadId}`);
+  });
+
+  it("captures user uploaded images (thread attachments) outside text leaf", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+    const html = `
+      <div class="autolayout-col autolayout-fill-width">
+        <div style="overflow-x: scroll;">
+          <div class="autolayout-row autolayout-fill-width autolayout-center-right">
+            <img alt="img" src="/image/attachment%3Ae00be16f-a57a-4995-afac-66d32b83cdb1%3Abd2f9308-fe5b-4edc-8e1e-d12366019f0e.png?table=thread&id=30ebe9d6-386a-80d3-b8fa-00a9ae0cf204&spaceId=6b7be9d6-386a-81db-8d3d-0003c6c8e636&width=1200&cache=v2" />
+          </div>
+        </div>
+        <div class="autolayout-col">
+          <div data-agent-chat-user-step-id="30ebe9d6-386a-800c-b8ed-00aa46077426">
+            <div data-content-editable-leaf="true">你好</div>
+          </div>
+        </div>
+      </div>
+      <div class="autolayout-col autolayout-fill-width">
+        <div data-block-id="b1"><div data-content-editable-leaf="true">ok</div></div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, {
+      url: `https://www.notion.so/chiimagnus/Page-0123456789abcdef0123456789abcdef?t=${threadId}`
+    });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadContract();
+    loadRegistry();
+    loadNotionAiMarkdown();
+    const collector = loadNotionAiCollector();
+
+    const snap = collector.capture();
+    expect(snap).toBeTruthy();
+    const userMsg = snap.messages.find((m: any) => m && m.role === "user");
+    expect(userMsg).toBeTruthy();
+    expect(userMsg.contentMarkdown).toContain("![](https://www.notion.so/image/attachment%3A");
+    expect(userMsg.contentMarkdown).toContain("table=thread");
   });
 });
