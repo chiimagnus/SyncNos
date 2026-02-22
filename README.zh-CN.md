@@ -38,6 +38,7 @@
 
 - 支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**
 - 下载（Releases）：https://github.com/chiimagnus/SyncNos/releases
+- Chrome Web Store：https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
 - Firefox（AMO）：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
 
 ### 作用
