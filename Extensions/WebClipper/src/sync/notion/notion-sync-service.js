@@ -720,7 +720,10 @@
       cache: "no-store",
       headers: { Accept: "image/*,*/*;q=0.8" }
     });
-    if (!res.ok) throw new Error(`image download failed HTTP ${res.status}`);
+    if (!res.ok) {
+      const finalUrl = res && res.url ? String(res.url) : target;
+      throw new Error(`image download failed HTTP ${res.status} ${sanitizeUrlForLog(finalUrl)}`);
+    }
     const ct = res.headers && res.headers.get ? String(res.headers.get("content-type") || "") : "";
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
