@@ -86,7 +86,7 @@ Font.system(size: Font.TextStyle.caption.basePointSize * fontScale, design: .mon
 | ⌘- | 缩小字体（Decrease Text Size） |
 | ⌘0 | 重置字体（Reset Text Size） |
 
-快捷键实现位于 `Views/Commands/ViewCommands.swift`，调用 `FontScaleManager` 的 `increaseSize()`、`decreaseSize()`、`reset()` 方法。
+快捷键实现位于 `Views/Settings/Commands/ViewCommands.swift`，调用 `FontScaleManager` 的 `increaseSize()`、`decreaseSize()`、`reset()` 方法。
 
 ---
 
@@ -95,7 +95,7 @@ Font.system(size: Font.TextStyle.caption.basePointSize * fontScale, design: .mon
 | 文件 | 描述 |
 |------|------|
 | `Services/Core/FontScaleManager.swift` | 核心实现 |
-| `Views/Commands/ViewCommands.swift` | 菜单命令 |
+| `Views/Settings/Commands/ViewCommands.swift` | 菜单命令 |
 | `Views/Settings/General/TextSizeSettingsView.swift` | 设置界面 |
 
 ---
