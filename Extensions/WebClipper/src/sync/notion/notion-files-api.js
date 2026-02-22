@@ -77,6 +77,50 @@
     });
   }
 
+  async function createFileUpload({ accessToken, filename, contentType, contentLength }) {
+    if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
+    const name = sanitizeFilename(filename || "");
+    const ct = String(contentType || "").trim() || "application/octet-stream";
+    const body = {
+      mode: "single_part",
+      filename: name,
+      content_type: ct
+    };
+    return NS.notionApi.notionFetch({
+      accessToken,
+      method: "POST",
+      path: "/v1/file_uploads",
+      body,
+      notionVersion: FILE_UPLOAD_VERSION
+    });
+  }
+
+  async function sendFileUpload({ accessToken, id, bytes, filename, contentType }) {
+    const uploadId = String(id || "").trim();
+    if (!uploadId) throw new Error("missing upload id");
+    if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer)) throw new Error("invalid bytes");
+    if (typeof FormData === "undefined" || typeof Blob === "undefined") throw new Error("FormData/Blob missing");
+    const name = sanitizeFilename(filename || "image.jpg");
+    const ct = String(contentType || "").trim() || "application/octet-stream";
+    const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const form = new FormData();
+    const blob = new Blob([data], { type: ct });
+    form.append("file", blob, name);
+
+    const res = await fetch(`https://api.notion.com/v1/file_uploads/${encodeURIComponent(uploadId)}/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Notion-Version": FILE_UPLOAD_VERSION,
+        Accept: "application/json"
+      },
+      body: form
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) throw new Error(`notion api failed: POST /v1/file_uploads/${uploadId}/send HTTP ${res.status} ${text}`);
+    return text ? JSON.parse(text) : {};
+  }
+
   async function retrieveUpload({ accessToken, id }) {
     if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
     const uploadId = String(id || "").trim();
@@ -118,6 +162,8 @@
   const api = {
     FILE_UPLOAD_VERSION,
     createExternalURLUpload,
+    createFileUpload,
+    sendFileUpload,
     retrieveUpload,
     waitUntilUploaded
   };
