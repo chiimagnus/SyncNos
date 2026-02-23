@@ -409,6 +409,99 @@ describe("poe-collector", () => {
     expect(snap.messages.map((m: any) => m.contentText)).toEqual(["y-user", "y-assistant", "t-user", "t-assistant"]);
   });
 
+  it("auto-loads older poe history on manual prepare before capture", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    function tupleHtml(startId: number) {
+      const userId = startId;
+      const aiId = startId + 1;
+      return `
+        <div class="ChatMessagesView_tupleGroupContainer__LSCLm">
+          <div class="ChatMessagesView_messageTuple__Jh5lQ">
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-${userId}">
+              <div class="ChatMessage_messageWrapper__4Ugd6 ChatMessage_rightSideMessageWrapper__r0roB">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>u-${userId}</p></div>
+                </div>
+              </div>
+            </div>
+            <div class="ChatMessage_chatMessage__xkgHx" id="message-${aiId}">
+              <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+              <div class="ChatMessage_messageWrapper__4Ugd6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH"><p>a-${aiId}</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    const html = `
+      <div id="scroll-root" style="height: 300px; overflow-y: auto;">
+        <div id="list-root">
+          ${tupleHtml(5)}
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    const scrollRoot = dom.window.document.getElementById("scroll-root");
+    const listRoot = dom.window.document.getElementById("list-root");
+    expect(scrollRoot).toBeTruthy();
+    expect(listRoot).toBeTruthy();
+
+    let loadRound = 0;
+    let scrollTopValue = 240;
+    Object.defineProperty(scrollRoot, "clientHeight", { configurable: true, get: () => 300 });
+    Object.defineProperty(scrollRoot, "scrollHeight", { configurable: true, get: () => 1200 + loadRound * 300 });
+    Object.defineProperty(scrollRoot, "scrollTop", {
+      configurable: true,
+      get: () => scrollTopValue,
+      set: (value) => {
+        scrollTopValue = Number(value) || 0;
+        if (scrollTopValue <= 0 && loadRound < 2 && listRoot) {
+          loadRound += 1;
+          const prepend = loadRound === 1 ? tupleHtml(3) : tupleHtml(1);
+          listRoot.innerHTML = `${prepend}${listRoot.innerHTML}`;
+          scrollTopValue = loadRound < 2 ? 120 : 0;
+        }
+      }
+    });
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeMarkdown();
+    const collector = loadPoeCollector();
+
+    await collector.prepareManualCapture({ maxRounds: 10, settleMs: 0, waitForLoadMs: 60, pollMs: 5 });
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.messages.map((m: any) => m.messageKey)).toEqual([
+      "message-1",
+      "message-2",
+      "message-3",
+      "message-4",
+      "message-5",
+      "message-6"
+    ]);
+  });
+
   it("appends image markdown but does not capture bot avatar images", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { JSDOM } = require("jsdom");
