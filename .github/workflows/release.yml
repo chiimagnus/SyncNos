@@ -21,7 +21,11 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           body: |
-            **Download:** https://apps.apple.com/app/syncnos/id6755133888
+            **Links**
+            - Website: https://chiimagnus.notion.io/syncnos
+            - macOS App: https://apps.apple.com/app/syncnos/id6755133888
+            - Chrome Extension: https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
+            - Firefox Extension: https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
           generate_release_notes: true
           append_body: true
           draft: false
