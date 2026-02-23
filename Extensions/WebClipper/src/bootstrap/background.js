@@ -17,6 +17,7 @@
       "../sync/notion/notion-ai.js",
       "../sync/notion/notion-db-manager.js",
       "../sync/notion/notion-sync-service.js",
+      "../sync/notion/notion-sync-job-store.js",
       "../sync/obsidian/obsidian-url-service.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
