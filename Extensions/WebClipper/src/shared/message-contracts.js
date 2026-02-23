@@ -22,10 +22,15 @@
     OPEN_URL: "openObsidianUrl"
   });
 
+  const UI_MESSAGE_TYPES = Object.freeze({
+    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+  });
+
   const api = {
     CORE_MESSAGE_TYPES,
     NOTION_MESSAGE_TYPES,
-    OBSIDIAN_MESSAGE_TYPES
+    OBSIDIAN_MESSAGE_TYPES,
+    UI_MESSAGE_TYPES
   };
 
   NS.messageContracts = api;

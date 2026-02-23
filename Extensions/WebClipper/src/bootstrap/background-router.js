@@ -23,6 +23,10 @@
     OPEN_URL: "openObsidianUrl"
   });
 
+  const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
+    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+  });
+
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   function ok(data) {
@@ -51,6 +55,18 @@
     if (!storage) return err("storage module missing");
 
       switch (msg.type) {
+      case UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP: {
+        if (!chrome || !chrome.action || typeof chrome.action.openPopup !== "function") {
+          return err("open popup is not supported in this browser", { code: "OPEN_POPUP_UNSUPPORTED" });
+        }
+        try {
+          await chrome.action.openPopup();
+          return ok({ opened: true });
+        } catch (e) {
+          const message = e && e.message ? e.message : String(e || "open popup failed");
+          return err(message, { code: "OPEN_POPUP_FAILED" });
+        }
+      }
       case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {
         const obsidianService = NS.obsidianUrlService;
         if (!obsidianService || typeof obsidianService.isObsidianUrl !== "function" || typeof obsidianService.openObsidianUrl !== "function") {
