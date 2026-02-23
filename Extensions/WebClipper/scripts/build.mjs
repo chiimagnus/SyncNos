@@ -48,7 +48,10 @@ function run(cmd, args, cwd) {
 const root = new URL("..", import.meta.url).pathname;
 const cli = parseArgs(process.argv.slice(2));
 const target = String(cli.target || "chrome");
-const distDirName = cli.outDir || (target === "firefox" ? "dist-firefox" : "dist");
+const distDirName = cli.outDir
+  || (target === "firefox"
+    ? "dist-firefox"
+    : (target === "edge" ? "dist-edge" : "dist"));
 const dist = join(root, distDirName);
 
 // Fail fast before packaging: detect missing references in source files.
@@ -320,7 +323,10 @@ manifest = applyTargetManifestPatches(manifest, {
 writeText(join(out, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
 if (cli.zip) {
-  const zipName = cli.zipName || (target === "firefox" ? "SyncNos-WebClipper-firefox.xpi" : "SyncNos-WebClipper.zip");
+  const zipName = cli.zipName
+    || (target === "firefox"
+      ? "SyncNos-WebClipper-firefox.xpi"
+      : (target === "edge" ? "SyncNos-WebClipper-edge.zip" : "SyncNos-WebClipper.zip"));
   const zipOut = join(root, zipName);
   rmSync(zipOut, { force: true });
 

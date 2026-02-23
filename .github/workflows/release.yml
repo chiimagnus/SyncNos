@@ -26,6 +26,7 @@ jobs:
             - macOS App: https://apps.apple.com/app/syncnos/id6755133888
             - Chrome Extension: https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
             - Firefox Extension: https://addons.mozilla.org/firefox/addon/syncnos-webclipper/
+            - Edge Extension: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/syncnos-webclipper-edge-${{ github.ref_name }}.zip
           generate_release_notes: true
           append_body: true
           draft: false
