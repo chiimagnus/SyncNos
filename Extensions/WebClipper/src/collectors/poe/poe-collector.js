@@ -67,6 +67,10 @@
     return false;
   }
 
+  function poeMarkdown() {
+    return NS.poeMarkdown || {};
+  }
+
   function sortByDomOrder(nodes) {
     const sorted = Array.from(nodes || []);
     sorted.sort((a, b) => {
@@ -153,6 +157,7 @@
     if (!wrappers.length) return [];
 
     const utils = NS.collectorUtils || {};
+    const markdown = poeMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
@@ -164,21 +169,28 @@
 
       const node = contentNodeFromWrapper(w);
       const raw = node && (node.innerText || node.textContent) ? (node.innerText || node.textContent) : "";
-      const contentText = NS.normalize && typeof NS.normalize.normalizeText === "function"
+      const fallbackText = NS.normalize && typeof NS.normalize.normalizeText === "function"
         ? NS.normalize.normalizeText(raw)
         : String(raw || "").trim();
 
-      const imageUrls = extractImages ? extractImages(imageScopeFromWrapper(w)) : [];
-      if (!contentText && !imageUrls.length) continue;
+      const contentText = typeof markdown.extractMessageText === "function"
+        ? String(markdown.extractMessageText(w, role) || "")
+        : fallbackText;
 
-      const baseMarkdown = contentText || "";
-      const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
+      const imageUrls = extractImages ? extractImages(imageScopeFromWrapper(w)) : [];
+      let contentMarkdown = typeof markdown.extractMessageMarkdown === "function"
+        ? String(markdown.extractMessageMarkdown(w, role) || "")
+        : (contentText || "");
+      if (!contentMarkdown) contentMarkdown = contentText || "";
+
+      if (!contentText && !imageUrls.length) continue;
+      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown, imageUrls) : contentMarkdown;
 
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
         role,
         contentText: contentText || "",
-        contentMarkdown,
+        contentMarkdown: nextMarkdown,
         sequence: seq,
         updatedAt: Date.now()
       });
@@ -212,5 +224,19 @@
     NS.collectorsRegistry.register({ id: "poe", matches, collector: api });
   }
 
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof module !== "undefined" && module.exports) {
+    const markdown = poeMarkdown();
+    module.exports = {
+      ...api,
+      __test: {
+        removeThinkingNodes: markdown.removeThinkingNodes,
+        removeNonContentNodes: markdown.removeNonContentNodes,
+        normalizeMarkdown: markdown.normalizeMarkdown,
+        htmlToMarkdown: markdown.htmlToMarkdown,
+        extractTextFromSanitizedClone: markdown.extractTextFromSanitizedClone,
+        extractMessageMarkdown: markdown.extractMessageMarkdown,
+        extractMessageText: markdown.extractMessageText
+      }
+    };
+  }
 })();
