@@ -10,10 +10,11 @@
 	  const notionAi = NS.popupNotionAi;
 	  const database = NS.popupDatabase;
   const about = NS.popupAbout;
+  const docsApi = NS.popupConversationDocs;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown, copyTextToClipboard } = core;
+  const { els, state, send, flashOk, sanitizeFilenamePart, copyTextToClipboard } = core;
   const contracts = NS.messageContracts || {};
   const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
     SYNC_CONVERSATIONS: "notionSyncConversations",
@@ -114,29 +115,11 @@
   }
 
   async function buildObsidianPayload(selectedIds) {
-    const idSet = new Set(
-      Array.isArray(selectedIds)
-        ? selectedIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
-        : []
-    );
-    const selected = Array.isArray(state.conversations)
-      ? state.conversations.filter((c) => c && idSet.has(Number(c.id)))
-      : [];
-    if (!selected.length) throw new Error("No conversations selected.");
-
-    const docs = [];
-    for (const conversation of selected) {
-      // eslint-disable-next-line no-await-in-loop
-      const detail = await send("getConversationDetail", { conversationId: conversation.id });
-      if (!detail || !detail.ok) {
-        throw new Error((detail && detail.error && detail.error.message) || `Failed to load conversation#${conversation.id}`);
-      }
-      const messages = (detail && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
-      docs.push({
-        conversation,
-        markdown: conversationToMarkdown({ conversation, messages })
-      });
+    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") {
+      throw new Error("Conversation docs module not available.");
     }
+    const docs = await docsApi.buildConversationDocs({ selectedIds });
+    if (!docs.length) throw new Error("No conversations selected.");
 
     const stamp = isoStampForName();
     if (docs.length === 1) {
