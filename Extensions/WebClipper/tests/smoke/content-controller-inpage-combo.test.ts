@@ -98,6 +98,23 @@ afterEach(() => {
 });
 
 describe("content-controller inpage combo", () => {
+  it("does not show fallback tip when popup open succeeds", async () => {
+    const harness = createHarness({
+      sendImpl: async (type: string) => {
+        if (type === "openExtensionPopup") return { ok: true, data: { opened: true } };
+        return { ok: true, data: {} };
+      }
+    });
+
+    await harness.runTick();
+    const cfg = harness.getButtonConfig();
+    expect(typeof cfg?.onDoubleClick).toBe("function");
+
+    await cfg.onDoubleClick();
+
+    expect(harness.tipCalls.some((c) => String(c.text).includes("toolbar icon"))).toBe(false);
+  });
+
   it("shows fallback tip when popup open fails", async () => {
     const harness = createHarness({
       sendImpl: async (type: string) => {
