@@ -35,6 +35,7 @@ describe("notion-sync-service", () => {
     expect(lastReq.method).toBe("POST");
     expect(lastReq.path).toBe("/v1/pages");
     expect(lastReq.body.properties.AI.multi_select[0].name).toBe("ChatGPT");
+    expect(lastReq.body.properties.Date?.date?.start).toBeTruthy();
   });
 
   it("sets AI multi_select on update", async () => {
@@ -62,6 +63,7 @@ describe("notion-sync-service", () => {
     expect(lastReq.method).toBe("PATCH");
     expect(lastReq.path).toBe("/v1/pages/p1");
     expect(lastReq.body.properties.AI.multi_select[0].name).toBe("Claude");
+    expect(lastReq.body.properties.Date).toBeUndefined();
   });
 
   it("detects page database parent", () => {
