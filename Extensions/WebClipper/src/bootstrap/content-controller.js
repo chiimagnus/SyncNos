@@ -79,7 +79,11 @@
         try {
           const collector = getCollector() || getInpageCollector();
           if (!collector || typeof collector.capture !== "function") return;
-          const snapshot = collector.capture({ manual: true });
+          if (typeof collector.prepareManualCapture === "function") {
+            inpageTip && inpageTip.showSaveTip && inpageTip.showSaveTip("Loading full history...");
+            await collector.prepareManualCapture();
+          }
+          const snapshot = await Promise.resolve(collector.capture({ manual: true }));
           if (!snapshot) {
             inpageTip && inpageTip.showSaveTip && inpageTip.showSaveTip("No visible conversation found");
             return;
@@ -112,7 +116,7 @@
               onClick: clickSave
             });
             if (!collector || typeof collector.capture !== "function") return;
-            const snapshot = collector.capture();
+            const snapshot = await Promise.resolve(collector.capture());
             if (!snapshot) return;
             const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
             if (!inc || !inc.changed) return;
