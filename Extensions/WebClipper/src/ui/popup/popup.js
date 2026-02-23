@@ -11,11 +11,12 @@
   const database = NS.popupDatabase;
   const about = NS.popupAbout;
   const docsApi = NS.popupConversationDocs;
+  const obsidianApi = NS.popupObsidian;
   const syncStateApi = NS.popupNotionSyncState;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, state, send, flashOk, sanitizeFilenamePart, copyTextToClipboard } = core;
+  const { els, state, send, flashOk, copyTextToClipboard } = core;
   const contracts = NS.messageContracts || {};
   const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
     SYNC_CONVERSATIONS: "notionSyncConversations",
@@ -106,46 +107,15 @@
     }, 2000);
   }
 
-  function isoStampForName() {
-    return new Date().toISOString().replace(/[:.]/g, "-");
-  }
-
-  function sanitizeObsidianNoteName(input, fallback) {
-    const raw = sanitizeFilenamePart(input || "", fallback || "SyncNos Clip");
-    const cleaned = String(raw || fallback || "SyncNos Clip")
-      .replace(/\.+$/, "")
-      .trim();
-    return cleaned || (fallback || "SyncNos Clip");
-  }
-
-  function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
-    const params = new URLSearchParams();
-    params.set("name", String(noteName || "SyncNos Clip"));
-    params.set("silent", "true");
-    if (useClipboard) params.set("clipboard", "1");
-    else params.set("content", String(markdown || ""));
-    return `obsidian://new?${params.toString()}`;
-  }
-
-  async function buildObsidianPayload(selectedIds) {
+  async function buildObsidianPayloads(selectedIds) {
     if (!docsApi || typeof docsApi.buildConversationDocs !== "function") {
       throw new Error("Conversation docs module not available.");
     }
-    const docs = await docsApi.buildConversationDocs({ selectedIds });
-    if (!docs.length) throw new Error("No conversations selected.");
-
-    const stamp = isoStampForName();
-    if (docs.length === 1) {
-      const doc = docs[0];
-      const noteName = sanitizeObsidianNoteName(doc && doc.conversation && doc.conversation.title, `SyncNos-${stamp}`);
-      return { noteName, markdown: doc.markdown || "" };
+    if (!obsidianApi || typeof obsidianApi.createObsidianPayloads !== "function") {
+      throw new Error("Obsidian module not available.");
     }
-
-    const merged = docs.map((d) => String(d.markdown || "")).join("\n\n---\n\n");
-    return {
-      noteName: sanitizeObsidianNoteName(`SyncNos Chats ${stamp}`, `SyncNos-Chats-${stamp}`),
-      markdown: merged
-    };
+    const docs = await docsApi.buildConversationDocs({ selectedIds });
+    return obsidianApi.createObsidianPayloads(docs);
   }
 
   async function refreshSyncJobStatus({ pollOnce } = {}) {
@@ -236,22 +206,37 @@
       btn.textContent = "Adding...";
 
       try {
-        const payload = await buildObsidianPayload(ids);
-        let useClipboard = false;
-        try {
-          await copyTextToClipboard(payload.markdown);
-          useClipboard = true;
-        } catch (_e) {
-          // fallback to URI `content` mode
-          useClipboard = false;
+        if (!obsidianApi || typeof obsidianApi.buildObsidianNewUrl !== "function") {
+          throw new Error("Obsidian module not available.");
         }
+        const payloads = await buildObsidianPayloads(ids);
+        if (!payloads.length) throw new Error("No conversations selected.");
 
-        const url = buildObsidianNewUrl({
-          noteName: payload.noteName,
-          markdown: payload.markdown,
-          useClipboard
-        });
-        const res = await send(obsidianTypes.OPEN_URL, { url });
+        let res = null;
+        if (payloads.length === 1) {
+          const payload = payloads[0];
+          let useClipboard = false;
+          try {
+            await copyTextToClipboard(payload.markdown);
+            useClipboard = true;
+          } catch (_e) {
+            // fallback to URI `content` mode
+            useClipboard = false;
+          }
+          const url = obsidianApi.buildObsidianNewUrl({
+            noteName: payload.noteName,
+            markdown: payload.markdown,
+            useClipboard
+          });
+          res = await send(obsidianTypes.OPEN_URL, { url });
+        } else {
+          const urls = payloads.map((payload) => obsidianApi.buildObsidianNewUrl({
+            noteName: payload.noteName,
+            markdown: payload.markdown,
+            useClipboard: false
+          }));
+          res = await send(obsidianTypes.OPEN_URL, { urls });
+        }
         if (!res || !res.ok) {
           throw new Error((res && res.error && res.error.message) || "Open Obsidian failed.");
         }

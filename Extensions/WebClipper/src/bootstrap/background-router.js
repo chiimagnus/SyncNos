@@ -33,6 +33,17 @@
     return { ok: false, data: null, error: { message, extra: extra || null } };
   }
 
+  function normalizeObsidianUrls(msg) {
+    if (!msg || typeof msg !== "object") return [];
+    if (Array.isArray(msg.urls)) {
+      return msg.urls
+        .map((url) => String(url || "").trim())
+        .filter((url) => !!url);
+    }
+    const single = String(msg.url || "").trim();
+    return single ? [single] : [];
+  }
+
   async function handleMessage(msg) {
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
@@ -45,10 +56,17 @@
         if (!obsidianService || typeof obsidianService.isObsidianUrl !== "function" || typeof obsidianService.openObsidianUrl !== "function") {
           return err("obsidian url service missing");
         }
-        const targetUrl = String(msg.url || "").trim();
-        if (!obsidianService.isObsidianUrl(targetUrl)) return err("invalid obsidian url");
-        await obsidianService.openObsidianUrl(targetUrl);
-        return ok({ opened: true });
+        const urls = normalizeObsidianUrls(msg);
+        if (!urls.length) return err("invalid obsidian url");
+        for (const targetUrl of urls) {
+          if (!obsidianService.isObsidianUrl(targetUrl)) return err("invalid obsidian url");
+        }
+        for (const targetUrl of urls) {
+          // open in sequence to preserve creation order
+          // eslint-disable-next-line no-await-in-loop
+          await obsidianService.openObsidianUrl(targetUrl);
+        }
+        return ok({ opened: true, count: urls.length });
       }
       case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));

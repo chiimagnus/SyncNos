@@ -113,6 +113,33 @@ describe("background-router obsidian open url", () => {
     expect(String(createCalls[0]?.url || "")).toContain("obsidian://new");
   });
 
+  it("opens multiple obsidian urls in order when urls[] is provided", async () => {
+    const updateCalls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {
+      backgroundStorage: {}
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = createChromeMock({
+      onUpdate: (payload) => updateCalls.push(payload)
+    });
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({
+      type: "openObsidianUrl",
+      urls: [
+        "obsidian://new?name=SyncNos-1",
+        "obsidian://new?name=SyncNos-2"
+      ]
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.data?.count).toBe(2);
+    expect(updateCalls.length).toBe(2);
+    expect(String(updateCalls[0]?.url || "")).toContain("SyncNos-1");
+    expect(String(updateCalls[1]?.url || "")).toContain("SyncNos-2");
+  });
+
   it("rejects non-obsidian url", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {
@@ -125,6 +152,24 @@ describe("background-router obsidian open url", () => {
     const res = await router.__handleMessageForTests({
       type: "openObsidianUrl",
       url: "https://example.com"
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toContain("invalid obsidian url");
+  });
+
+  it("rejects invalid url inside urls[] payload", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {
+      backgroundStorage: {}
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = createChromeMock();
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({
+      type: "openObsidianUrl",
+      urls: ["obsidian://new?name=ok", "https://example.com"]
     });
 
     expect(res.ok).toBe(false);
