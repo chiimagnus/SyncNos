@@ -20,11 +20,11 @@ function loadCollectorUtils() {
 
 function loadPoeCollector() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/poe-collector.js");
+  const modulePath = require.resolve("../../src/collectors/poe/poe-collector.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/poe-collector.js");
+  return require("../../src/collectors/poe/poe-collector.js");
 }
 
 describe("poe-collector", () => {
