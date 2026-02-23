@@ -2,17 +2,15 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore;
   const list = NS.popupList;
+  const docsApi = NS.popupConversationDocs;
   if (!core || !list) return;
 
   const {
     els,
-    state,
-    send,
     flashOk,
     sanitizeFilenamePart,
     createZipBlob,
-    downloadBlob,
-    conversationToMarkdown
+    downloadBlob
   } = core;
 
   function isExportMenuOpen() {
@@ -30,17 +28,14 @@
   }
 
   async function exportJson() {
+    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") throw new Error("Conversation docs module not available.");
     const ids = list.getSelectedIds();
     if (!ids.length) return;
-    const selected = state.conversations.filter((conversation) => state.selectedIds.has(conversation.id));
-    const items = [];
-    for (const conversation of selected) {
-      const detail = await send("getConversationDetail", { conversationId: conversation.id });
-      items.push({
-        conversation,
-        messages: (detail && detail.ok && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : []
-      });
-    }
+    const docs = await docsApi.buildConversationDocs({ selectedIds: ids, throwOnEmpty: false });
+    const items = docs.map((doc) => ({
+      conversation: doc.conversation,
+      messages: doc.messages
+    }));
 
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -57,15 +52,10 @@
   }
 
   async function exportMd({ mergeSingle }) {
+    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") throw new Error("Conversation docs module not available.");
     const ids = list.getSelectedIds();
     if (!ids.length) return;
-    const selected = state.conversations.filter((conversation) => state.selectedIds.has(conversation.id));
-    const docs = [];
-    for (const conversation of selected) {
-      const detail = await send("getConversationDetail", { conversationId: conversation.id });
-      const messages = (detail && detail.ok && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
-      docs.push({ conversation, markdown: conversationToMarkdown({ conversation, messages }) });
-    }
+    const docs = await docsApi.buildConversationDocs({ selectedIds: ids, throwOnEmpty: false });
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const files = [];
