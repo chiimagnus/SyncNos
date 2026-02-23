@@ -9,13 +9,19 @@
     // eslint-disable-next-line no-undef
     importScripts(
       "../storage/schema.js",
+      "../shared/message-contracts.js",
       "../sync/notion/oauth-config.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",
       "../sync/notion/notion-files-api.js",
       "../sync/notion/notion-ai.js",
       "../sync/notion/notion-db-manager.js",
+      "../sync/notion/notion-markdown-blocks.js",
+      "../sync/notion/notion-image-upload-upgrader.js",
       "../sync/notion/notion-sync-service.js",
+      "../sync/notion/notion-sync-job-store.js",
+      "../sync/notion/notion-sync-orchestrator.js",
+      "../sync/obsidian/obsidian-url-service.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
       "./background-router.js"

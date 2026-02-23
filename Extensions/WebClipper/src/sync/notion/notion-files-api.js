@@ -161,6 +161,8 @@
 
   const api = {
     FILE_UPLOAD_VERSION,
+    sanitizeFilename,
+    guessFilenameFromUrl,
     createExternalURLUpload,
     createFileUpload,
     sendFileUpload,
