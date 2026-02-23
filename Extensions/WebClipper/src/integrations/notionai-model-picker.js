@@ -33,6 +33,10 @@
     return document.querySelector('div[role="button"][data-testid="unified-chat-model-button"]');
   }
 
+  function getSendButton() {
+    return document.querySelector('div[role="button"][data-testid="agent-send-message-button"]');
+  }
+
   function isVisible(el) {
     if (!el || !el.getBoundingClientRect) return false;
     const r = el.getBoundingClientRect();
@@ -70,6 +74,75 @@
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function findComposerRoot(startEl) {
+    // Anchors on the composer controls (send/model) and finds the nearest
+    // ancestor that also contains the editable textbox.
+    let host = startEl;
+    for (let depth = 0; depth < 25 && host; depth += 1) {
+      if (host.querySelector) {
+        const hasInput = !!host.querySelector('div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]');
+        const hasSend = !!host.querySelector('div[role="button"][data-testid="agent-send-message-button"]');
+        const hasModel = !!host.querySelector('div[role="button"][data-testid="unified-chat-model-button"]');
+        if (hasInput && (hasSend || hasModel)) return host;
+      }
+      host = host.parentElement;
+    }
+    return null;
+  }
+
+  function getComposerInput() {
+    const send = getSendButton();
+    const model = getModelButton();
+    const root = findComposerRoot(send || model);
+    if (!root || !root.querySelectorAll) return null;
+    const inputs = Array.from(
+      root.querySelectorAll('div[role="textbox"][data-content-editable-leaf="true"][contenteditable="true"]')
+    );
+    for (const input of inputs) {
+      if (isVisible(input)) return input;
+    }
+    return null;
+  }
+
+  function setCaretToEnd(el) {
+    if (!el) return false;
+    try {
+      const sel = globalThis.getSelection && getSelection();
+      if (!sel || typeof sel.removeAllRanges !== "function") return false;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function restoreFocusToComposer() {
+    const input = getComposerInput();
+    if (!input) return false;
+
+    // Notion editor sometimes ignores plain `focus()`; click tends to work better.
+    const ok = fireClick(input);
+    try {
+      input.focus && input.focus();
+    } catch (_e) {
+      // ignore
+    }
+    // Keep cursor at the end, so user can continue typing immediately.
+    setCaretToEnd(input);
+    return ok;
+  }
+
+  function restoreFocusToComposerWithRetry() {
+    const delays = [0, 80, 180, 320];
+    for (const d of delays) {
+      setTimeout(() => restoreFocusToComposer(), d);
+    }
   }
 
   function findModelMenu() {
@@ -128,6 +201,8 @@
     const btn = getModelButton();
     if (!btn || !isVisible(btn)) return false;
 
+    const activeBefore = document.activeElement;
+
     const expanded = String(btn.getAttribute("aria-expanded") || "").toLowerCase() === "true";
     if (!expanded) {
       fireClick(btn);
@@ -148,7 +223,20 @@
     const target = items[idx0];
     if (!target) return false;
 
-    return fireClick(target);
+    const ok = fireClick(target);
+    if (ok) {
+      // After clicking a menu item, Notion may leave focus in the model menu/button.
+      // Put focus back to the composer input to reduce extra clicks.
+      const send = getSendButton();
+      const root = findComposerRoot(send || btn);
+      const shouldRestore =
+        !activeBefore ||
+        activeBefore === document.body ||
+        activeBefore === document.documentElement ||
+        (root && root.contains(activeBefore));
+      if (shouldRestore) restoreFocusToComposerWithRetry();
+    }
+    return ok;
   }
 
   async function maybeApply() {
@@ -180,4 +268,3 @@
 
   NS.notionAiModelPicker = { maybeApply, STORAGE_KEY, DEFAULT_INDEX_1_BASED };
 })();
-
