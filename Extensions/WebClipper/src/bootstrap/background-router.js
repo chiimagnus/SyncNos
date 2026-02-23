@@ -51,9 +51,6 @@
   async function handleMessage(msg) {
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
-    const storage = NS.backgroundStorage;
-    if (!storage) return err("storage module missing");
-
       switch (msg.type) {
       case UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP: {
         if (!chrome || !chrome.action || typeof chrome.action.openPopup !== "function") {
@@ -120,6 +117,8 @@
         }
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const payload = msg.payload || {};
         if (!payload.source) return err("missing conversation source");
         if (!payload.conversationKey) return err("missing conversationKey");
@@ -127,22 +126,30 @@
         return ok(convo);
       }
       case MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const res = await storage.syncConversationMessages(conversationId, msg.messages);
         return ok(res);
       }
       case MESSAGE_TYPES.GET_CONVERSATIONS: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const items = await storage.getConversations();
         return ok(items);
       }
       case MESSAGE_TYPES.GET_CONVERSATION_DETAIL: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const messages = await storage.getMessagesByConversationId(conversationId);
         return ok({ conversationId, messages });
       }
       case MESSAGE_TYPES.DELETE_CONVERSATIONS: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
         const res = await storage.deleteConversationsByIds(ids);
         return ok(res);

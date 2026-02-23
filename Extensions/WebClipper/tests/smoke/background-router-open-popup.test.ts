@@ -38,6 +38,26 @@ describe("background-router open extension popup", () => {
     expect(calls).toEqual(["open"]);
   });
 
+  it("opens popup even when backgroundStorage is unavailable", async () => {
+    const calls: string[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      action: {
+        openPopup: async () => {
+          calls.push("open");
+        }
+      }
+    };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "openExtensionPopup" });
+
+    expect(res.ok).toBe(true);
+    expect(calls).toEqual(["open"]);
+  });
+
   it("returns unsupported error when action.openPopup is unavailable", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = { backgroundStorage: {} };
