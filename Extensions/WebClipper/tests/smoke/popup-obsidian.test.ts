@@ -64,10 +64,10 @@ describe("popup-obsidian", () => {
 
     expect(clipboardUrl).toContain("obsidian://new?");
     expect(clipboardUrl).toContain("clipboard=1");
-    expect(clipboardUrl).toContain("name=Clip%20Name");
+    expect(clipboardUrl).toContain("file=SyncNos-AIChats%2FClip%20Name");
     expect(clipboardUrl).not.toContain("+");
     expect(contentUrl).toContain("content=");
-    expect(contentUrl).toContain("name=Clip%20Name");
+    expect(contentUrl).toContain("file=SyncNos-AIChats%2FClip%20Name");
     expect(contentUrl).toContain("content=%23%20hello%20world");
     expect(contentUrl).not.toContain("+");
     expect(contentUrl).not.toContain("clipboard=1");
