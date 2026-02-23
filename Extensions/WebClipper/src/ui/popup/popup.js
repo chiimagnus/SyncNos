@@ -13,7 +13,7 @@
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, state, send, flashOk } = core;
+  const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown } = core;
 
   let syncPollTimer = 0;
   let listPollTimer = 0;
@@ -82,6 +82,107 @@
           listRefreshing = false;
         });
     }, 2000);
+  }
+
+  function isoStampForName() {
+    return new Date().toISOString().replace(/[:.]/g, "-");
+  }
+
+  function sanitizeObsidianNoteName(input, fallback) {
+    const raw = sanitizeFilenamePart(input || "", fallback || "SyncNos Clip");
+    const cleaned = String(raw || fallback || "SyncNos Clip")
+      .replace(/\.+$/, "")
+      .trim();
+    return cleaned || (fallback || "SyncNos Clip");
+  }
+
+  async function copyTextToClipboard(text) {
+    const content = String(text || "");
+    if (!content) throw new Error("Nothing to copy.");
+
+    try {
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(content);
+        return true;
+      }
+    } catch (_e) {
+      // fall through to execCommand fallback
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = content;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+
+    const prevFocus = document.activeElement;
+    textarea.focus();
+    textarea.select();
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (_e) {
+      copied = false;
+    }
+    textarea.remove();
+    try {
+      prevFocus && prevFocus.focus && prevFocus.focus();
+    } catch (_e) {
+      // ignore
+    }
+    if (!copied) throw new Error("Copy failed.");
+    return true;
+  }
+
+  function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
+    const params = new URLSearchParams();
+    params.set("name", String(noteName || "SyncNos Clip"));
+    params.set("silent", "true");
+    if (useClipboard) params.set("clipboard", "1");
+    else params.set("content", String(markdown || ""));
+    return `obsidian://new?${params.toString()}`;
+  }
+
+  async function buildObsidianPayload(selectedIds) {
+    const idSet = new Set(
+      Array.isArray(selectedIds)
+        ? selectedIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+        : []
+    );
+    const selected = Array.isArray(state.conversations)
+      ? state.conversations.filter((c) => c && idSet.has(Number(c.id)))
+      : [];
+    if (!selected.length) throw new Error("No conversations selected.");
+
+    const docs = [];
+    for (const conversation of selected) {
+      // eslint-disable-next-line no-await-in-loop
+      const detail = await send("getConversationDetail", { conversationId: conversation.id });
+      if (!detail || !detail.ok) {
+        throw new Error((detail && detail.error && detail.error.message) || `Failed to load conversation#${conversation.id}`);
+      }
+      const messages = (detail && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
+      docs.push({
+        conversation,
+        markdown: conversationToMarkdown({ conversation, messages })
+      });
+    }
+
+    const stamp = isoStampForName();
+    if (docs.length === 1) {
+      const doc = docs[0];
+      const noteName = sanitizeObsidianNoteName(doc && doc.conversation && doc.conversation.title, `SyncNos-${stamp}`);
+      return { noteName, markdown: doc.markdown || "" };
+    }
+
+    const merged = docs.map((d) => String(d.markdown || "")).join("\n\n---\n\n");
+    return {
+      noteName: sanitizeObsidianNoteName(`SyncNos Chats ${stamp}`, `SyncNos-Chats-${stamp}`),
+      markdown: merged
+    };
   }
 
   async function refreshSyncJobStatus({ pollOnce } = {}) {
@@ -174,6 +275,54 @@
     });
   }
 
+  function initObsidianAction() {
+    if (!els.btnAddObsidian) return;
+    els.btnAddObsidian.addEventListener("click", async () => {
+      const ids = list.getSelectedIds();
+      if (!ids.length) return;
+      if (state.obsidianAddInProgress) return;
+
+      const btn = els.btnAddObsidian;
+      const prevText = btn.textContent || "Obsidian";
+      state.obsidianAddInProgress = true;
+      btn.disabled = true;
+      btn.textContent = "Adding...";
+
+      try {
+        const payload = await buildObsidianPayload(ids);
+        let useClipboard = false;
+        try {
+          await copyTextToClipboard(payload.markdown);
+          useClipboard = true;
+        } catch (_e) {
+          // fallback to URI `content` mode
+          useClipboard = false;
+        }
+
+        const url = buildObsidianNewUrl({
+          noteName: payload.noteName,
+          markdown: payload.markdown,
+          useClipboard
+        });
+        const res = await send("openObsidianUrl", { url });
+        if (!res || !res.ok) {
+          throw new Error((res && res.error && res.error.message) || "Open Obsidian failed.");
+        }
+        flashOk(btn);
+      } catch (e) {
+        alert((e && e.message) || "Add to Obsidian failed.");
+      } finally {
+        state.obsidianAddInProgress = false;
+        btn.textContent = prevText;
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
+  }
+
   async function init() {
     list.init();
     chatPreview.init();
@@ -183,6 +332,7 @@
 	    notionAi.init();
 	    database.init();
 	    about.init();
+	    initObsidianAction();
 	    initNotionSyncAction();
 
     await tabs.init();
