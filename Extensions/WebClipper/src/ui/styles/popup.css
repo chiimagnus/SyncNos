@@ -491,6 +491,10 @@ body {
   border-color: var(--border-strong);
 }
 
+#btnAddObsidian {
+  border-color: rgba(97, 67, 255, 0.35);
+}
+
 .input {
   flex: 1;
   min-width: 0;
