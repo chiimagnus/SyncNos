@@ -51,6 +51,9 @@ const target = String(cli.target || "chrome");
 const distDirName = cli.outDir || (target === "firefox" ? "dist-firefox" : "dist");
 const dist = join(root, distDirName);
 
+// Fail fast before packaging: detect missing references in source files.
+run("node", ["scripts/check.mjs"], root);
+
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 function parseArgs(argv) {
   const args = { root: null, manifest: null, syntax: true };
@@ -56,6 +56,33 @@ function uniqStrings(arr) {
   return out;
 }
 
+function toPosixPath(p) {
+  return String(p || "").split("\\").join("/");
+}
+
+function listJsFilesRecursively(startDir, rootDir) {
+  if (!existsSync(startDir)) return [];
+
+  const out = [];
+  const stack = [startDir];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(abs);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith(".js")) continue;
+      out.push(toPosixPath(relative(rootDir, abs)));
+    }
+  }
+  return out.sort();
+}
+
 function extractPopupScriptSrcs(popupHtml) {
   const out = [];
   const re = /<script\s+[^>]*src="([^"]+)"[^>]*>\s*<\/script>/g;
@@ -82,6 +109,25 @@ function extractImportScriptsPaths(backgroundSource) {
     if (p) out.push(p);
   }
   return out;
+}
+
+function collectContentScriptJs(manifest) {
+  const contentScripts = Array.isArray(manifest?.content_scripts) ? manifest.content_scripts : [];
+  const out = [];
+  for (const cs of contentScripts) {
+    const js = Array.isArray(cs?.js) ? cs.js : [];
+    for (const p of js) out.push(p);
+  }
+  return uniqStrings(out);
+}
+
+function collectBackgroundEntryJs(manifest) {
+  const out = [];
+  const sw = manifest?.background?.service_worker;
+  if (typeof sw === "string" && sw.trim()) out.push(sw.trim());
+  const scripts = Array.isArray(manifest?.background?.scripts) ? manifest.background.scripts : [];
+  for (const s of scripts) out.push(s);
+  return uniqStrings(out);
 }
 
 const cli = parseArgs(process.argv.slice(2));
@@ -111,33 +157,38 @@ for (const size of [16, 48, 128]) {
 }
 
 if (cli.syntax) {
-  const contentScriptJs = (() => {
-    const cs = Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
-    const first = cs[0] || null;
-    const js = first && Array.isArray(first.js) ? first.js : [];
-    return js.filter((p) => typeof p === "string" && p.trim()).map((p) => p.trim());
-  })();
+  const contentScriptJs = collectContentScriptJs(manifest);
+  const backgroundEntryJs = collectBackgroundEntryJs(manifest);
 
   const popupScriptJs = (() => {
-    const popupHtmlPath = join(root, "src", "ui", "popup", "popup.html");
+    const popupRelPath = (manifest.action && typeof manifest.action.default_popup === "string")
+      ? manifest.action.default_popup
+      : "src/ui/popup/popup.html";
+    const popupHtmlPath = join(root, popupRelPath);
     if (!existsSync(popupHtmlPath)) return [];
     const html = readFileSync(popupHtmlPath, "utf-8");
-    const popupDir = join(root, "src", "ui", "popup");
+    const popupDir = dirname(popupHtmlPath);
     const srcs = extractPopupScriptSrcs(html);
-    return srcs.map((src) => relative(root, join(popupDir, src)));
+    return srcs.map((src) => toPosixPath(relative(root, join(popupDir, src))));
   })();
 
   const backgroundDeps = (() => {
-    const bgPath = join(root, "src", "bootstrap", "background.js");
-    if (!existsSync(bgPath)) return [];
-    const txt = readFileSync(bgPath, "utf-8");
-    const bootstrapDir = join(root, "src", "bootstrap");
-    const deps = extractImportScriptsPaths(txt);
-    return deps.map((p) => relative(root, join(bootstrapDir, p)));
+    const out = [];
+    for (const relFile of backgroundEntryJs) {
+      const bgPath = join(root, relFile);
+      if (!existsSync(bgPath)) continue;
+      const txt = readFileSync(bgPath, "utf-8");
+      const bgDir = dirname(bgPath);
+      const deps = extractImportScriptsPaths(txt);
+      for (const p of deps) {
+        out.push(toPosixPath(relative(root, join(bgDir, p))));
+      }
+    }
+    return uniqStrings(out);
   })();
 
   // Syntax check all js sources (fast, no bundling required).
-  const jsFiles = uniqStrings(["src/bootstrap/background.js", "src/bootstrap/content.js"]
+  const jsFiles = uniqStrings(backgroundEntryJs
     .concat(backgroundDeps)
     .concat(contentScriptJs)
     .concat(popupScriptJs));
@@ -146,6 +197,18 @@ if (cli.syntax) {
     const p = join(root, f);
     if (!existsSync(p)) fail(`missing: ${f}`);
     run("node", ["-c", p], root);
+  }
+
+  const sourceJsFiles = listJsFilesRecursively(join(root, "src"), root)
+    .filter((f) => !f.endsWith(".test.js") && !f.endsWith(".spec.js"));
+  const referenced = new Set(jsFiles);
+  const unreferenced = sourceJsFiles.filter((f) => !referenced.has(f));
+  if (unreferenced.length > 0) {
+    fail([
+      "unreferenced source js files:",
+      ...unreferenced.map((f) => `- ${f}`),
+      "add them to manifest.content_scripts[].js, popup.html <script src>, or background importScripts()."
+    ].join("\n"));
   }
 }
 
