@@ -29,6 +29,30 @@
     return NS.collectorUtils.inEditMode(root);
   }
 
+  function normalizeTitle(value) {
+    const text = value == null ? "" : String(value);
+    if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
+      return NS.normalize.normalizeText(text);
+    }
+    return text.replace(/\s+/g, " ").trim();
+  }
+
+  function extractConversationTitle() {
+    const selectors = [
+      "[data-test-id='conversation-title']",
+      ".conversation-title-container .conversation-title-column [class*='gds-title']",
+      ".conversation-title-container .conversation-title-column"
+    ];
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (!el) continue;
+      const title = normalizeTitle(el.textContent || el.innerText || "");
+      if (title) return title;
+    }
+    const pageTitle = normalizeTitle(document.title || "");
+    return pageTitle || "Gemini";
+  }
+
   function collectMessages() {
     const root = getConversationRoot();
     if (!root) return [];
@@ -93,7 +117,7 @@
         sourceType: "chat",
         source: "gemini",
         conversationKey: findConversationKey(),
-        title: document.title || "Gemini",
+        title: extractConversationTitle(),
         url: location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
