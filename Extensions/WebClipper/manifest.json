@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SyncNos-WebClipper",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "description": "Clip AI chats (ChatGPT, Claude, Gemini, DeepSeek, Kimi, Doubao, Yuanbao, Poe, NotionAI) into local storage, export, and sync to Notion.",
   "action": {
     "default_title": "SyncNos-WebClipper",
