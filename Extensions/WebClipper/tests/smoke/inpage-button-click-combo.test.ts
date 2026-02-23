@@ -102,6 +102,9 @@ describe("inpage-button click combos", () => {
 
     vi.advanceTimersByTime(401);
     expect(calls).toEqual(["save", "combo:5:5"]);
+    expect(btn?.classList.contains("is-easter-5")).toBe(true);
+    vi.advanceTimersByTime(761);
+    expect(btn?.classList.contains("is-easter-5")).toBe(false);
   });
 
   it("maps 7+ clicks to level 7 combo", () => {
@@ -121,6 +124,7 @@ describe("inpage-button click combos", () => {
 
     vi.advanceTimersByTime(401);
     expect(calls).toEqual(["save", "combo:7:8"]);
+    expect(btn?.classList.contains("is-easter-7")).toBe(true);
   });
 
   it("cleans pending combo timer when button is removed", () => {
