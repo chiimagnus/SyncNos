@@ -7,6 +7,11 @@
     const inpageButton = NS.inpageButton;
     const inpageTip = NS.inpageTip;
 
+    function showInpageTip(text, kind) {
+      if (!inpageTip || typeof inpageTip.showSaveTip !== "function") return;
+      inpageTip.showSaveTip(text, { kind });
+    }
+
     function send(type, payload) {
       if (!runtime || typeof runtime.send !== "function") {
         return Promise.reject(new Error("runtime client unavailable"));
@@ -80,18 +85,18 @@
           const collector = getCollector() || getInpageCollector();
           if (!collector || typeof collector.capture !== "function") return;
           if (typeof collector.prepareManualCapture === "function") {
-            inpageTip && inpageTip.showSaveTip && inpageTip.showSaveTip("Loading full history...");
+            showInpageTip("Loading full history...", "loading");
             await collector.prepareManualCapture();
           }
           const snapshot = await Promise.resolve(collector.capture({ manual: true }));
           if (!snapshot) {
-            inpageTip && inpageTip.showSaveTip && inpageTip.showSaveTip("No visible conversation found");
+            showInpageTip("No visible conversation found", "error");
             return;
           }
           await saveSnapshot(snapshot);
           inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
         } catch (_e) {
-          inpageTip && inpageTip.showSaveTip && inpageTip.showSaveTip("Save failed");
+          showInpageTip("Save failed", "error");
         }
       };
 
