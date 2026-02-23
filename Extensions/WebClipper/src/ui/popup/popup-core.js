@@ -177,6 +177,14 @@
     return api.createZipBlob(files);
   }
 
+  async function copyTextToClipboard(text) {
+    const api = (globalThis.WebClipper && globalThis.WebClipper.popupClipboard) || null;
+    if (!api || typeof api.copyTextToClipboard !== "function") {
+      throw new Error("Clipboard module not available");
+    }
+    return api.copyTextToClipboard(text);
+  }
+
   function conversationToMarkdown({ conversation, messages }) {
     if (conversation && conversation.sourceType === "article") {
       const api = (globalThis.WebClipper && globalThis.WebClipper.articleMarkdown) || null;
@@ -266,6 +274,7 @@
     sanitizeFilenamePart,
     downloadBlob,
     createZipBlob,
+    copyTextToClipboard,
     conversationToMarkdown,
     openUrl,
     sanitizeHttpUrl,

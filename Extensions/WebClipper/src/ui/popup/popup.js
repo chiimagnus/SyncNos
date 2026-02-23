@@ -13,7 +13,7 @@
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown } = core;
+  const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown, copyTextToClipboard } = core;
   const contracts = NS.messageContracts || {};
   const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
     SYNC_CONVERSATIONS: "notionSyncConversations",
@@ -102,47 +102,6 @@
       .replace(/\.+$/, "")
       .trim();
     return cleaned || (fallback || "SyncNos Clip");
-  }
-
-  async function copyTextToClipboard(text) {
-    const content = String(text || "");
-    if (!content) throw new Error("Nothing to copy.");
-
-    try {
-      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-        await navigator.clipboard.writeText(content);
-        return true;
-      }
-    } catch (_e) {
-      // fall through to execCommand fallback
-    }
-
-    const textarea = document.createElement("textarea");
-    textarea.value = content;
-    textarea.setAttribute("readonly", "true");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    textarea.style.top = "0";
-    document.body.appendChild(textarea);
-
-    const prevFocus = document.activeElement;
-    textarea.focus();
-    textarea.select();
-
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch (_e) {
-      copied = false;
-    }
-    textarea.remove();
-    try {
-      prevFocus && prevFocus.focus && prevFocus.focus();
-    } catch (_e) {
-      // ignore
-    }
-    if (!copied) throw new Error("Copy failed.");
-    return true;
   }
 
   function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
