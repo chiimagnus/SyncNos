@@ -1,6 +1,7 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore || {};
+  const DEFAULT_OBSIDIAN_FOLDER = "SyncNos-AIChats";
 
   function defaultSanitizeFilenamePart(input, fallback) {
     const text = String(input || "")
@@ -32,8 +33,9 @@
   }
 
   function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
+    const filePath = `${DEFAULT_OBSIDIAN_FOLDER}/${sanitizeObsidianNoteName(noteName, "SyncNos Clip")}`;
     const pairs = [
-      ["name", String(noteName || "SyncNos Clip")],
+      ["file", filePath],
       ["silent", "true"]
     ];
     if (useClipboard) pairs.push(["clipboard", "1"]);
@@ -74,6 +76,7 @@
   }
 
   const api = {
+    DEFAULT_OBSIDIAN_FOLDER,
     isoStampForName,
     sanitizeObsidianNoteName,
     buildObsidianNewUrl,
