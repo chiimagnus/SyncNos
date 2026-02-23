@@ -271,6 +271,7 @@ concatFiles({
     "src/ui/popup/popup-delete.js",
     "src/ui/popup/popup-notion.js",
     "src/ui/popup/popup-database.js",
+    "src/ui/popup/popup-notionai.js",
     "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
   ]
@@ -281,6 +282,7 @@ await minifyJsFile(popupBundle);
 const popupHtmlSrc = readText(join(root, "src/ui/popup/popup.html"));
 const popupHtml = popupHtmlSrc
   .replace(/<title>SyncNos<\/title>\s*(?:<link\s+rel="stylesheet"[^>]*>\s*)+/g, '<title>SyncNos</title>\n    <link rel="stylesheet" href="./popup.css" />\n')
+  .replace(/src="\.\.\/\.\.\/\.\.\/icons\//g, 'src="./icons/')
   .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
@@ -297,6 +299,7 @@ const popupHtml = popupHtmlSrc
   .replace(/<script\s+src="\.\/popup-delete\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-notion\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-database\.js"><\/script>\s*/g, "")
+  .replace(/<script\s+src="\.\/popup-notionai\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup-about\.js"><\/script>\s*/g, "")
   .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
 writeText(join(out, "popup.html"), popupHtml);

@@ -3,6 +3,8 @@ Poe 的聊天消息会按日期分组：
 - 第一层：ChatMessagesView_tupleGroupContainer__*（包含日期标题 + 若干条消息）
 - 日期标题：MessageDate_container__*（如“昨天”“今天”）
 - 在每个日期组里，会出现多个用户/AI 对话消息（ChatMessage_chatMessage__*）
+  - 同一个日期组下可能有多个 messageTuple
+  - 同一个 messageTuple 下也可能包含多条消息（不保证只有一对 user/assistant）
 
 注意：collector 解析时不能只取第一个 messageTuple 的父节点作为 root，否则只能抓到一个日期组。
 -->
