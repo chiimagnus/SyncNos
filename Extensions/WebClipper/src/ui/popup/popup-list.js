@@ -18,6 +18,7 @@
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
   };
+  const syncStateApi = NS.popupNotionSyncState;
 
   const copyFeedbackTimers = new WeakMap();
 
@@ -156,17 +157,20 @@
           ? state.notionSyncById.get(conversation.id)
           : null;
         if (syncInfo && typeof syncInfo === "object") {
+          const normalized = (syncStateApi && typeof syncStateApi.normalizeSyncRecord === "function")
+            ? syncStateApi.normalizeSyncRecord({ ...syncInfo, conversationId: conversation.id })
+            : syncInfo;
           const pill = document.createElement("span");
-          const ok = !!syncInfo.ok;
+          const ok = !!normalized.ok;
           pill.className = ok ? "pill syncOk" : "pill syncFail";
 
-          const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
-          const appended = Number(syncInfo.appended);
-          const at = Number(syncInfo.at) || 0;
+          const mode = normalized.mode ? String(normalized.mode) : (ok ? "ok" : "fail");
+          const appended = Number(normalized.appended);
+          const at = Number(normalized.at) || 0;
 
           if (!ok) {
             pill.textContent = "failed";
-            if (syncInfo.error) pill.title = String(syncInfo.error);
+            if (normalized.error) pill.title = String(normalized.error);
           } else if (mode === "no_changes") {
             pill.textContent = "no changed";
             pill.title = "No changes";
