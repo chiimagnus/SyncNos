@@ -18,6 +18,15 @@ function loadCollectorUtils() {
   return require("../../src/collectors/collector-utils.js");
 }
 
+function loadPoeMarkdown() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/collectors/poe/poe-markdown.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/collectors/poe/poe-markdown.js");
+}
+
 function loadPoeCollector() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/collectors/poe/poe-collector.js");
@@ -73,12 +82,89 @@ describe("poe-collector", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
+    loadPoeMarkdown();
     loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("你好");
+  });
+
+  it("filters thinking process and captures markdown for assistant message", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div class="ChatMessagesView_messageTuple__X">
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-11">
+          <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+          <div class="ChatMessage_messageWrapper__4Ugd6">
+            <div class="Message_messageBubbleWrapper__sEq8z">
+              <div class="Message_leftSideMessageBubble__VPdk6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH">
+                    <div class="Markdown_markdownContainer__Tz3HQ">
+                      <div class="Prose_prose__7AjXb">
+                        <p>Thinking...</p>
+                        <blockquote node="[object Object]">
+                          <p>this should be ignored</p>
+                        </blockquote>
+                        <p><strong>Bold</strong> and <em>italic</em> with <a href="https://example.com">link</a>.</p>
+                        <ul>
+                          <li>Item A</li>
+                          <li>Item B</li>
+                        </ul>
+                        <pre><code class="language-js">console.log(1);\nconsole.log(2);</code></pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeMarkdown();
+    loadPoeCollector();
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+
+    const msg = snap.messages[0];
+    expect(msg.contentText).toContain("Bold and italic with link.");
+    expect(msg.contentText).not.toContain("Thinking");
+    expect(msg.contentText).not.toContain("this should be ignored");
+
+    const md = msg.contentMarkdown || "";
+    expect(md).toContain("**Bold**");
+    expect(md).toContain("*italic*");
+    expect(md).toContain("[link](https://example.com)");
+    expect(md).toContain("- Item A");
+    expect(md).toContain("- Item B");
+    expect(md).toContain("```js");
+    expect(md).toContain("console.log(1);");
+    expect(md).toContain("```");
+    expect(md).not.toContain("Thinking...");
+    expect(md).not.toContain("this should be ignored");
   });
 
   it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
@@ -142,6 +228,7 @@ describe("poe-collector", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
+    loadPoeMarkdown();
     loadPoeCollector();
 
     // @ts-expect-error test global
@@ -227,6 +314,7 @@ describe("poe-collector", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
+    loadPoeMarkdown();
     loadPoeCollector();
 
     // @ts-expect-error test global
@@ -277,6 +365,7 @@ describe("poe-collector", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
+    loadPoeMarkdown();
     loadPoeCollector();
 
     // @ts-expect-error test global
