@@ -215,13 +215,13 @@
     const opts = options && typeof options === "object" ? options : {};
     const el = ensureBubble();
     if (!el) return;
+    resetTimers();
     setTextAndKind(el, text, opts.kind);
     positionBubble(el);
     replayEnterAnimation(el);
 
     state.visibleUntil = Date.now() + VISIBLE_MS;
     startFollowLoop(el);
-    resetTimers();
     state.hideTimer = setTimeout(() => {
       removeBubble();
     }, VISIBLE_MS);
