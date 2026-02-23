@@ -206,7 +206,7 @@
 
     if (els.btnNotionConnect) {
       els.btnNotionConnect.addEventListener("click", async () => {
-        const status = await send("getNotionAuthStatus");
+        const status = await send(notionTypes.GET_AUTH_STATUS);
         if (status && status.ok && status.data && status.data.connected) {
           await send(notionTypes.DISCONNECT);
           await refreshNotionStatus();
