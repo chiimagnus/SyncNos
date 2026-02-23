@@ -32,6 +32,13 @@ function loadBackgroundRouter() {
   require("../../src/sync/notion/notion-sync-job-store.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const orchestratorModulePath = require.resolve("../../src/sync/notion/notion-sync-orchestrator.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[orchestratorModulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/sync/notion/notion-sync-orchestrator.js");
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/bootstrap/background-router.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];

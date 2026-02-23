@@ -59,296 +59,31 @@
         return ok({ disconnected: true });
       }
       case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS: {
-        const notionJobStore = NS.notionSyncJobStore;
-        if (!notionJobStore || typeof notionJobStore.abortRunningJobIfFromOtherInstance !== "function") {
-          return err("notion sync job store missing");
+        const notionSyncOrchestrator = NS.notionSyncOrchestrator;
+        if (!notionSyncOrchestrator || typeof notionSyncOrchestrator.getSyncJobStatus !== "function") {
+          return err("notion sync orchestrator missing");
         }
-        const job = await notionJobStore.abortRunningJobIfFromOtherInstance(BACKGROUND_INSTANCE_ID);
-        return ok({ job });
+        try {
+          const data = await notionSyncOrchestrator.getSyncJobStatus({ instanceId: BACKGROUND_INSTANCE_ID });
+          return ok(data);
+        } catch (e) {
+          return err(e && e.message ? e.message : String(e));
+        }
       }
       case NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
-        const notionJobStore = NS.notionSyncJobStore;
-        if (
-          !notionJobStore ||
-          typeof notionJobStore.abortRunningJobIfFromOtherInstance !== "function" ||
-          typeof notionJobStore.isRunningJob !== "function" ||
-          typeof notionJobStore.setJob !== "function"
-        ) {
-          return err("notion sync job store missing");
+        const notionSyncOrchestrator = NS.notionSyncOrchestrator;
+        if (!notionSyncOrchestrator || typeof notionSyncOrchestrator.syncConversations !== "function") {
+          return err("notion sync orchestrator missing");
         }
-        const existingJob = await notionJobStore.abortRunningJobIfFromOtherInstance(BACKGROUND_INSTANCE_ID);
-        if (notionJobStore.isRunningJob(existingJob)) return err("sync already in progress");
-
-        const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
-        if (!token || !token.accessToken) return err("notion not connected");
-        const parent = await new Promise((resolve) => {
-          chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
-        });
-        if (!parent) return err("missing parentPageId");
-        const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
-        if (!ids.length) return err("no conversationIds");
-        if (!NS.notionSyncService) return err("notion sync service missing");
-
-        if (!NS.notionDbManager || !NS.notionDbManager.ensureDatabase) return err("notion db manager missing");
-        const db = await NS.notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId: parent });
-        const dbId = db && db.databaseId ? db.databaseId : "";
-        if (!dbId) return err("missing databaseId");
-
-        function toConvoLabel(convo) {
-          if (!convo) return "(missing conversation)";
-          const t = convo.title || "";
-          return t ? `"${t}"` : `conversation#${convo.id || "?"}`;
+        try {
+          const data = await notionSyncOrchestrator.syncConversations({
+            conversationIds: msg.conversationIds,
+            instanceId: BACKGROUND_INSTANCE_ID
+          });
+          return ok(data);
+        } catch (e) {
+          return err(e && e.message ? e.message : String(e));
         }
-
-        function extractCursor(mapping) {
-          const m = mapping && typeof mapping === "object" ? mapping : {};
-          const lastSyncedMessageKey = (m.lastSyncedMessageKey && String(m.lastSyncedMessageKey).trim()) ? String(m.lastSyncedMessageKey).trim() : "";
-          const lastSyncedSequence = Number(m.lastSyncedSequence);
-          const seq = Number.isFinite(lastSyncedSequence) ? lastSyncedSequence : null;
-          return { lastSyncedMessageKey, lastSyncedSequence: seq };
-        }
-
-        function computeNewMessages(messages, cursor) {
-          const list = Array.isArray(messages) ? messages : [];
-          if (!list.length) return { ok: true, mode: "empty", newMessages: [], rebuild: false };
-          const key = cursor && cursor.lastSyncedMessageKey ? String(cursor.lastSyncedMessageKey) : "";
-          const seq = cursor && Number.isFinite(cursor.lastSyncedSequence) ? Number(cursor.lastSyncedSequence) : null;
-
-          if (key) {
-            const idx = list.findIndex((m) => m && String(m.messageKey || "") === key);
-            if (idx < 0) return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
-            return { ok: true, mode: "append", newMessages: list.slice(idx + 1), rebuild: false };
-          }
-
-          if (seq != null) {
-            const next = list.filter((m) => m && Number(m.sequence) > seq);
-            return { ok: true, mode: "append", newMessages: next, rebuild: false };
-          }
-
-          return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
-        }
-
-        function lastMessageCursor(messages) {
-          const list = Array.isArray(messages) ? messages : [];
-          if (!list.length) return { lastSyncedMessageKey: "", lastSyncedSequence: null, lastSyncedAt: Date.now() };
-          const last = list[list.length - 1];
-          const key = last && last.messageKey ? String(last.messageKey) : "";
-          const seq = Number(last && last.sequence);
-          return {
-            lastSyncedMessageKey: key,
-            lastSyncedSequence: Number.isFinite(seq) ? seq : null,
-            lastSyncedAt: Date.now()
-          };
-        }
-
-        function canUpgradeImageBlocks(blocks) {
-          if (!blocks || !blocks.length) return false;
-          if (typeof NS.notionSyncService.upgradeImageBlocksToFileUploads !== "function") return false;
-          if (typeof NS.notionSyncService.hasExternalImageBlocks === "function") {
-            return NS.notionSyncService.hasExternalImageBlocks(blocks);
-          }
-          return true;
-        }
-
-        async function buildBlocksForSync(source, messagesList) {
-          let blocks = NS.notionSyncService.messagesToBlocks(messagesList, { source });
-          if (!canUpgradeImageBlocks(blocks)) return blocks;
-          try {
-            blocks = await NS.notionSyncService.upgradeImageBlocksToFileUploads(token.accessToken, blocks);
-          } catch (_e) {
-            // ignore (fallback: external images)
-          }
-          return blocks;
-        }
-
-        const results = [];
-        const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-        const jobStartedAt = Date.now();
-        await notionJobStore.setJob({
-          id: jobId,
-          instanceId: BACKGROUND_INSTANCE_ID,
-          status: "running",
-          startedAt: jobStartedAt,
-          updatedAt: jobStartedAt,
-          conversationIds: ids,
-          perConversation: []
-        });
-
-        for (const id of ids) {
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            const mapped = await (storage.getSyncMappingByConversation ? storage.getSyncMappingByConversation(id) : Promise.resolve(null));
-            const convo = mapped && mapped.conversation ? mapped.conversation : null;
-            const mapping = mapped && mapped.mapping ? mapped.mapping : null;
-            if (!convo) {
-              results.push({ conversationId: id, ok: false, error: "conversation not found" });
-              continue;
-            }
-
-            // eslint-disable-next-line no-await-in-loop
-            const messages = await storage.getMessagesByConversationId(id);
-            const cursor = extractCursor(mapping);
-
-            let pageId = "";
-            if (mapping && mapping.notionPageId) pageId = String(mapping.notionPageId || "");
-            if (!pageId && convo.notionPageId) pageId = String(convo.notionPageId || "");
-
-            let page = null;
-            let pageUsable = false;
-            if (pageId) {
-              try {
-                // eslint-disable-next-line no-await-in-loop
-                page = await NS.notionSyncService.getPage(token.accessToken, pageId);
-                pageUsable = NS.notionSyncService.isPageUsableForDatabase
-                  ? NS.notionSyncService.isPageUsableForDatabase(page, dbId)
-                  : NS.notionSyncService.pageBelongsToDatabase(page, dbId);
-              } catch (_e) {
-                pageUsable = false;
-              }
-              if (!pageUsable) pageId = "";
-            }
-
-            if (!pageId) {
-              // Create new page (first sync or page missing/deleted/trashed).
-              // eslint-disable-next-line no-await-in-loop
-              const created = await NS.notionSyncService.createPageInDatabase(token.accessToken, {
-                databaseId: dbId,
-                title: convo.title,
-                url: convo.url,
-                ai: convo.source
-              });
-              pageId = created && created.id ? created.id : "";
-              if (!pageId) throw new Error("create page failed");
-              // eslint-disable-next-line no-await-in-loop
-              await storage.setConversationNotionPageId(id, pageId);
-
-              // eslint-disable-next-line no-await-in-loop
-              const blocks = await buildBlocksForSync(convo.source, messages);
-              if (blocks.length) {
-                // eslint-disable-next-line no-await-in-loop
-                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
-              }
-              const nextCursor = lastMessageCursor(messages);
-              if (storage.setSyncCursor) {
-                // eslint-disable-next-line no-await-in-loop
-                await storage.setSyncCursor(id, nextCursor);
-              }
-              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "created", appended: messages.length });
-              // eslint-disable-next-line no-await-in-loop
-              await new Promise((r) => setTimeout(r, 250));
-              continue;
-            }
-
-            // Page exists and is usable.
-            const inc = computeNewMessages(messages, cursor);
-            if (inc.rebuild) {
-              if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
-              // eslint-disable-next-line no-await-in-loop
-              await NS.notionSyncService.updatePageProperties(token.accessToken, {
-                pageId,
-                title: convo.title,
-                url: convo.url,
-                ai: convo.source
-              });
-              // Force clear & rebuild (cursor missing or not found).
-              // eslint-disable-next-line no-await-in-loop
-              await NS.notionSyncService.clearPageChildren(token.accessToken, pageId);
-              // eslint-disable-next-line no-await-in-loop
-              const blocks = await buildBlocksForSync(convo.source, messages);
-              if (blocks.length) {
-                // eslint-disable-next-line no-await-in-loop
-                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
-              }
-              const nextCursor = lastMessageCursor(messages);
-              if (storage.setSyncCursor) {
-                // eslint-disable-next-line no-await-in-loop
-                await storage.setSyncCursor(id, nextCursor);
-              }
-              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "rebuilt", appended: messages.length });
-            } else if (inc.newMessages && inc.newMessages.length) {
-              // eslint-disable-next-line no-await-in-loop
-              await NS.notionSyncService.updatePageProperties(token.accessToken, {
-                pageId,
-                title: convo.title,
-                url: convo.url,
-                ai: convo.source
-              });
-              // eslint-disable-next-line no-await-in-loop
-              const blocks = await buildBlocksForSync(convo.source, inc.newMessages);
-              if (blocks.length) {
-                // eslint-disable-next-line no-await-in-loop
-                await NS.notionSyncService.appendChildren(token.accessToken, pageId, blocks);
-              }
-              const nextCursor = lastMessageCursor(messages);
-              if (storage.setSyncCursor) {
-                // eslint-disable-next-line no-await-in-loop
-                await storage.setSyncCursor(id, nextCursor);
-              }
-              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "appended", appended: inc.newMessages.length });
-            } else {
-              // No new messages.
-              const nextCursor = lastMessageCursor(messages);
-              if (storage.setSyncCursor) {
-                // eslint-disable-next-line no-await-in-loop
-                await storage.setSyncCursor(id, nextCursor);
-              }
-              results.push({ conversationId: id, ok: true, notionPageId: pageId, mode: "no_changes", appended: 0 });
-            }
-          } catch (e) {
-            results.push({ conversationId: id, ok: false, error: e && e.message ? e.message : String(e) });
-          }
-
-          // Best-effort job status update for popup re-open.
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            await notionJobStore.setJob({
-              id: jobId,
-              instanceId: BACKGROUND_INSTANCE_ID,
-              status: "running",
-              startedAt: jobStartedAt,
-              updatedAt: Date.now(),
-              conversationIds: ids,
-              perConversation: results.map((r) => ({
-                conversationId: r.conversationId,
-                ok: !!r.ok,
-                mode: r.mode || (r.ok ? "ok" : "fail"),
-                appended: Number(r.appended) || 0,
-                error: r.error || "",
-                at: Date.now()
-              }))
-            });
-          } catch (_e) {
-            // ignore
-          }
-
-          // Basic pacing to reduce rate limiting when syncing in batch.
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, 250));
-        }
-
-        const okCount = results.filter((r) => r.ok).length;
-        const failCount = results.length - okCount;
-        const failures = results.filter((r) => !r.ok);
-        await notionJobStore.setJob({
-          id: jobId,
-          instanceId: BACKGROUND_INSTANCE_ID,
-          status: "done",
-          startedAt: jobStartedAt,
-          updatedAt: Date.now(),
-          finishedAt: Date.now(),
-          conversationIds: ids,
-          okCount,
-          failCount,
-          perConversation: results.map((r) => ({
-            conversationId: r.conversationId,
-            ok: !!r.ok,
-            mode: r.mode || (r.ok ? "ok" : "fail"),
-            appended: Number(r.appended) || 0,
-            error: r.error || "",
-            at: Date.now()
-          }))
-        });
-        return ok({ results, okCount, failCount, failures, jobId });
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
         const payload = msg.payload || {};
