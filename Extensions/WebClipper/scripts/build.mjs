@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 function parseArgs(argv) {
   const args = {
@@ -109,6 +109,34 @@ function stripBackgroundImportScripts(backgroundSource) {
   return `${backgroundSource.slice(0, tryIdx)}\n${backgroundSource.slice(blockEndIdx)}`;
 }
 
+function extractImportScriptsPaths(backgroundSource) {
+  const idx = backgroundSource.indexOf("importScripts(");
+  if (idx < 0) return [];
+  const start = idx + "importScripts(".length;
+  const end = backgroundSource.indexOf(");", start);
+  if (end < 0) return [];
+  const inside = backgroundSource.slice(start, end);
+  const out = [];
+  const re = /["']([^"']+)["']/g;
+  let m = null;
+  while ((m = re.exec(inside))) {
+    const p = String(m[1] || "").trim();
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+function extractPopupScriptSrcs(popupHtml) {
+  const out = [];
+  const re = /<script\s+[^>]*src="([^"]+)"[^>]*>\s*<\/script>/g;
+  let m = null;
+  while ((m = re.exec(popupHtml))) {
+    const src = String(m[1] || "").trim();
+    if (src) out.push(src);
+  }
+  return out;
+}
+
 async function minifyJsFile(file) {
   const { minify } = await import("terser");
 
@@ -180,6 +208,34 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   return next;
 }
 
+const manifestSrc = JSON.parse(readText(join(root, "manifest.json")));
+const contentScriptSourceFiles = (() => {
+  // Single source of truth: `manifest.json` content_scripts js list.
+  // This avoids "forgot to add file into build list" regressions.
+  const cs = Array.isArray(manifestSrc.content_scripts) ? manifestSrc.content_scripts : [];
+  const first = cs[0] || null;
+  const js = first && Array.isArray(first.js) ? first.js : [];
+  return js.filter((p) => typeof p === "string" && p.trim()).map((p) => p.trim());
+})();
+
+const popupHtmlSrcPath = join(root, "src", "ui", "popup", "popup.html");
+const popupHtmlSrc = readText(popupHtmlSrcPath);
+const popupScriptFiles = (() => {
+  const popupDir = join(root, "src", "ui", "popup");
+  const srcs = extractPopupScriptSrcs(popupHtmlSrc);
+  return srcs.map((src) => relative(root, join(popupDir, src)));
+})();
+
+const backgroundSrcPath = join(root, "src", "bootstrap", "background.js");
+const backgroundSrcText = readText(backgroundSrcPath);
+const backgroundBundleParts = (() => {
+  const bootstrapDir = join(root, "src", "bootstrap");
+  const deps = extractImportScriptsPaths(backgroundSrcText);
+  const parts = deps.map((p) => readText(join(bootstrapDir, p)));
+  parts.push(stripBackgroundImportScripts(backgroundSrcText));
+  return parts;
+})();
+
 // Copy only minimal runtime assets into dist root.
 if (existsSync(repoLicense)) {
   cpSync(repoLicense, join(out, "LICENSE"));
@@ -200,54 +256,16 @@ concatCssFiles({
 const contentBundle = join(out, "content.js");
 concatFiles({
   outFile: contentBundle,
-  files: [
-    "src/shared/normalize.js",
-    "src/shared/runtime-client.js",
-    "src/storage/incremental-updater.js",
-    "src/collectors/collector-contract.js",
-    "src/collectors/registry.js",
-    "src/collectors/runtime-observer.js",
-    "src/collectors/collector-utils.js",
-    "src/collectors/chatgpt-collector.js",
-    "src/collectors/claude-collector.js",
-    "src/collectors/gemini-collector.js",
-    "src/collectors/deepseek-collector.js",
-    "src/collectors/zai/zai-markdown.js",
-    "src/collectors/zai/zai-collector.js",
-    "src/collectors/kimi-collector.js",
-    "src/collectors/doubao-collector.js",
-    "src/collectors/yuanbao-collector.js",
-    "src/collectors/poe-collector.js",
-    "src/collectors/notionai/notionai-markdown.js",
-    "src/collectors/notionai/notionai-collector.js",
-    "src/integrations/notionai-model-picker.js",
-    "src/ui/inpage/inpage-tip.js",
-    "src/ui/inpage/inpage-button.js",
-    "src/bootstrap/content-controller.js",
-    "src/bootstrap/content.js"
-  ]
+  files: contentScriptSourceFiles
 });
 // Dist layout keeps runtime entrypoints at the root, while preserving the source `icons/*` folder layout.
 await minifyJsFile(contentBundle);
 
 // Bundle background SW (including previously importScripts-loaded modules).
 const backgroundBundle = join(out, "background.js");
-const backgroundText = stripBackgroundImportScripts(readText(join(root, "src/bootstrap/background.js")));
 concatParts({
   outFile: backgroundBundle,
-  parts: [
-    readText(join(root, "src/storage/schema.js")),
-    readText(join(root, "src/sync/notion/oauth-config.js")),
-    readText(join(root, "src/sync/notion/token-store.js")),
-    readText(join(root, "src/sync/notion/notion-api.js")),
-    readText(join(root, "src/sync/notion/notion-ai.js")),
-    readText(join(root, "src/sync/notion/notion-db-manager.js")),
-    readText(join(root, "src/sync/notion/notion-sync-service.js")),
-    readText(join(root, "src/bootstrap/background-storage.js")),
-    readText(join(root, "src/bootstrap/background-notion-oauth.js")),
-    readText(join(root, "src/bootstrap/background-router.js")),
-    backgroundText
-  ]
+  parts: backgroundBundleParts
 });
 await minifyJsFile(backgroundBundle);
 
@@ -255,58 +273,25 @@ await minifyJsFile(backgroundBundle);
 const popupBundle = join(out, "popup.js");
 concatFiles({
   outFile: popupBundle,
-  files: [
-    "src/shared/runtime-client.js",
-    "src/export/article-markdown.js",
-    "src/export/zip-utils.js",
-    "node_modules/markdown-it/dist/markdown-it.js",
-    "src/storage/schema.js",
-    "src/storage/backup-utils.js",
-    "src/sync/notion/oauth-config.js",
-    "src/sync/notion/notion-api.js",
-    "src/ui/popup/popup-core.js",
-    "src/ui/popup/popup-tabs.js",
-    "src/ui/popup/popup-list.js",
-    "src/ui/popup/popup-chat-preview.js",
-    "src/ui/popup/popup-export.js",
-    "src/ui/popup/popup-delete.js",
-    "src/ui/popup/popup-notion.js",
-    "src/ui/popup/popup-database.js",
-    "src/ui/popup/popup-notionai.js",
-    "src/ui/popup/popup-about.js",
-    "src/ui/popup/popup.js"
-  ]
+  files: popupScriptFiles
 });
 await minifyJsFile(popupBundle);
 
 // Rewrite popup.html to load the bundled script only.
-const popupHtmlSrc = readText(join(root, "src/ui/popup/popup.html"));
-const popupHtml = popupHtmlSrc
-  .replace(/<title>SyncNos<\/title>\s*(?:<link\s+rel="stylesheet"[^>]*>\s*)+/g, '<title>SyncNos</title>\n    <link rel="stylesheet" href="./popup.css" />\n')
-  .replace(/src="\.\.\/\.\.\/\.\.\/icons\//g, 'src="./icons/')
-  .replace(/<script\s+src="\.\.\/\.\.\/shared\/runtime-client\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/export\/article-markdown\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/export\/zip-utils\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/\.\.\/node_modules\/markdown-it\/dist\/markdown-it\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/storage\/schema\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/storage\/backup-utils\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/oauth-config\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\.\/\.\.\/sync\/notion\/notion-api\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-core\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-tabs\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-list\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-chat-preview\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-export\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-delete\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-notion\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-database\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-notionai\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup-about\.js"><\/script>\s*/g, "")
-  .replace(/<script\s+src="\.\/popup\.js"><\/script>\s*/g, '<script src="./popup.js"></script>\n');
+let popupHtml = popupHtmlSrc
+  .replace(
+    /<title>SyncNos<\/title>\s*(?:<link\s+rel="stylesheet"[^>]*>\s*)+/g,
+    '<title>SyncNos</title>\n    <link rel="stylesheet" href="./popup.css" />\n'
+  )
+  .replace(/src="\.\.\/\.\.\/\.\.\/icons\//g, 'src="./icons/');
+
+// Remove all script tags from source HTML and re-inject the bundled script only.
+popupHtml = popupHtml.replace(/<script\s+[^>]*src="[^"]+"[^>]*>\s*<\/script>\s*/g, "");
+popupHtml = popupHtml.replace(/<\/body>/i, '    <script src="./popup.js"></script>\n  </body>');
 writeText(join(out, "popup.html"), popupHtml);
 
 // Rewrite manifest.json for bundled entrypoints.
-let manifest = JSON.parse(readText(join(root, "manifest.json")));
+let manifest = { ...manifestSrc };
 manifest.background = { service_worker: "background.js" };
 manifest.action = { ...(manifest.action || {}), default_popup: "popup.html" };
 if (Array.isArray(manifest.content_scripts) && manifest.content_scripts[0]) {

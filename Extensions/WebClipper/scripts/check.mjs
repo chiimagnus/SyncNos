@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 function parseArgs(argv) {
   const args = { root: null, manifest: null, syntax: true };
@@ -43,6 +43,47 @@ function run(cmd, args, cwd) {
   if (res.status !== 0) fail(`${cmd} ${args.join(" ")} failed`);
 }
 
+function uniqStrings(arr) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of arr || []) {
+    if (typeof raw !== "string") continue;
+    const s = raw.trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+function extractPopupScriptSrcs(popupHtml) {
+  const out = [];
+  const re = /<script\s+[^>]*src="([^"]+)"[^>]*>\s*<\/script>/g;
+  let m = null;
+  while ((m = re.exec(popupHtml))) {
+    const src = String(m[1] || "").trim();
+    if (src) out.push(src);
+  }
+  return out;
+}
+
+function extractImportScriptsPaths(backgroundSource) {
+  const idx = backgroundSource.indexOf("importScripts(");
+  if (idx < 0) return [];
+  const start = idx + "importScripts(".length;
+  const end = backgroundSource.indexOf(");", start);
+  if (end < 0) return [];
+  const inside = backgroundSource.slice(start, end);
+  const out = [];
+  const re = /["']([^"']+)["']/g;
+  let m = null;
+  while ((m = re.exec(inside))) {
+    const p = String(m[1] || "").trim();
+    if (p) out.push(p);
+  }
+  return out;
+}
+
 const cli = parseArgs(process.argv.slice(2));
 const root = cli.root ? join(new URL("..", import.meta.url).pathname, cli.root) : new URL("..", import.meta.url).pathname;
 
@@ -70,50 +111,36 @@ for (const size of [16, 48, 128]) {
 }
 
 if (cli.syntax) {
+  const contentScriptJs = (() => {
+    const cs = Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
+    const first = cs[0] || null;
+    const js = first && Array.isArray(first.js) ? first.js : [];
+    return js.filter((p) => typeof p === "string" && p.trim()).map((p) => p.trim());
+  })();
+
+  const popupScriptJs = (() => {
+    const popupHtmlPath = join(root, "src", "ui", "popup", "popup.html");
+    if (!existsSync(popupHtmlPath)) return [];
+    const html = readFileSync(popupHtmlPath, "utf-8");
+    const popupDir = join(root, "src", "ui", "popup");
+    const srcs = extractPopupScriptSrcs(html);
+    return srcs.map((src) => relative(root, join(popupDir, src)));
+  })();
+
+  const backgroundDeps = (() => {
+    const bgPath = join(root, "src", "bootstrap", "background.js");
+    if (!existsSync(bgPath)) return [];
+    const txt = readFileSync(bgPath, "utf-8");
+    const bootstrapDir = join(root, "src", "bootstrap");
+    const deps = extractImportScriptsPaths(txt);
+    return deps.map((p) => relative(root, join(bootstrapDir, p)));
+  })();
+
   // Syntax check all js sources (fast, no bundling required).
-  const jsFiles = [
-    "src/bootstrap/background.js",
-    "src/bootstrap/content.js",
-    "src/collectors/collector-contract.js",
-    "src/collectors/registry.js",
-    "src/collectors/runtime-observer.js",
-    "src/collectors/collector-utils.js",
-    "src/storage/incremental-updater.js",
-    "src/storage/schema.js",
-    "src/storage/backup-utils.js",
-    "src/shared/normalize.js",
-    "src/collectors/chatgpt-collector.js",
-    "src/collectors/claude-collector.js",
-    "src/collectors/gemini-collector.js",
-    "src/collectors/deepseek-collector.js",
-    "src/collectors/zai/zai-collector.js",
-    "src/collectors/kimi-collector.js",
-    "src/collectors/doubao-collector.js",
-    "src/collectors/yuanbao-collector.js",
-    "src/collectors/poe-collector.js",
-    "src/collectors/notionai/notionai-collector.js",
-    "src/integrations/notionai-model-picker.js",
-    "src/sync/notion/oauth-config.js",
-    "src/sync/notion/token-store.js",
-    "src/sync/notion/notion-api.js",
-    "src/sync/notion/notion-ai.js",
-    "src/sync/notion/notion-db-manager.js",
-    "src/sync/notion/notion-sync-service.js",
-    "src/export/article-markdown.js",
-    "src/export/zip-utils.js",
-    "node_modules/markdown-it/dist/markdown-it.js",
-    "src/ui/popup/popup-core.js",
-    "src/ui/popup/popup-tabs.js",
-    "src/ui/popup/popup-list.js",
-    "src/ui/popup/popup-chat-preview.js",
-    "src/ui/popup/popup-export.js",
-    "src/ui/popup/popup-delete.js",
-    "src/ui/popup/popup-notion.js",
-    "src/ui/popup/popup-database.js",
-    "src/ui/popup/popup-notionai.js",
-    "src/ui/popup/popup-about.js",
-    "src/ui/popup/popup.js"
-  ];
+  const jsFiles = uniqStrings(["src/bootstrap/background.js", "src/bootstrap/content.js"]
+    .concat(backgroundDeps)
+    .concat(contentScriptJs)
+    .concat(popupScriptJs));
 
   for (const f of jsFiles) {
     const p = join(root, f);
