@@ -92,6 +92,7 @@ if (cli.syntax) {
     "src/collectors/yuanbao-collector.js",
     "src/collectors/poe-collector.js",
     "src/collectors/notionai/notionai-collector.js",
+    "src/integrations/notionai-model-picker.js",
     "src/sync/notion/oauth-config.js",
     "src/sync/notion/token-store.js",
     "src/sync/notion/notion-api.js",
