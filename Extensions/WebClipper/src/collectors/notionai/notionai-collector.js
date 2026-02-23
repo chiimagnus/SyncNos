@@ -369,7 +369,7 @@
   }
 
   function getChatTitleFromHistoryButton() {
-    // Observed DOM (see `.github/docs/notionAIDOM.md`):
+    // Observed DOM (see `Extensions/WebClipper/src/collectors/notionai/notionai.md`):
     // <div role="button" aria-label="history"> <div>Title...</div> ... </div>
     const btn = document.querySelector('div[role="button"][aria-label="history"]');
     if (!btn) return "";

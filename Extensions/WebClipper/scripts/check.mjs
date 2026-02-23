@@ -109,6 +109,7 @@ if (cli.syntax) {
     "src/ui/popup/popup-delete.js",
     "src/ui/popup/popup-notion.js",
     "src/ui/popup/popup-database.js",
+    "src/ui/popup/popup-notionai.js",
     "src/ui/popup/popup-about.js",
     "src/ui/popup/popup.js"
   ];
