@@ -25,11 +25,20 @@
   }
 
   function findTitle() {
-    const bot = document.querySelector("a[class*='BotHeader_title__'] p")
-      || document.querySelector("div[class*='BotHeader_textContainer__'] p")
-      || document.querySelector("h1");
-    const t = bot && bot.textContent ? bot.textContent.trim() : "";
-    return t || document.title || "Poe";
+    const selectors = [
+      "div[class*='BaseNavbar_chatTitleItem__'] p[class*='ChatHeader_titleText__']",
+      "div[class*='ChatHeader_titleRow__'] p[class*='ChatHeader_titleText__']",
+      "p[class*='ChatHeader_titleText__']",
+      "a[class*='BotHeader_title__'] p",
+      "div[class*='BotHeader_textContainer__'] p",
+      "h1"
+    ];
+    for (const selector of selectors) {
+      const node = document.querySelector(selector);
+      const text = node && node.textContent ? node.textContent.trim() : "";
+      if (text) return text;
+    }
+    return document.title || "Poe";
   }
 
   function getConversationRoot() {

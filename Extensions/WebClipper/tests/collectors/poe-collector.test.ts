@@ -28,6 +28,59 @@ function loadPoeCollector() {
 }
 
 describe("poe-collector", () => {
+  it("prefers chat header title text for conversation title", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div class="BaseNavbar_chatTitleItem__GtrXf">
+        <div class="ChatHeader_titleRow__M_J3L">
+          <p class="ChatHeader_titleText__zXG0d">你好</p>
+        </div>
+      </div>
+
+      <div class="ChatMessagesView_messageTuple__X">
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-1">
+          <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD">
+            <div class="BotHeader_textContainer__kVf_I"><p>Assistant</p></div>
+          </div>
+          <div class="ChatMessage_messageWrapper__4Ugd6">
+            <div class="Message_messageBubbleWrapper__sEq8z">
+              <div class="Message_leftSideMessageBubble__VPdk6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH">
+                    <p>reply</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeCollector();
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.conversation.title).toBe("你好");
+  });
+
   it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { JSDOM } = require("jsdom");
