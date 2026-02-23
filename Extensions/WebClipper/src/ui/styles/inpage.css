@@ -56,7 +56,9 @@
   padding: 10px 12px;
   border: 1px solid var(--bubble-border);
   border-radius: 14px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bubble-bg) 92%, #ffffff 8%), var(--bubble-bg));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
+    var(--bubble-bg);
   color: var(--bubble-text);
   font: 12px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: 0.01em;
