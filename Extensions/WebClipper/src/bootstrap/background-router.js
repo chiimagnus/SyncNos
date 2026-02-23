@@ -42,53 +42,6 @@
     return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
   }
 
-  function isObsidianUrl(url) {
-    const text = String(url || "").trim();
-    return /^obsidian:\/\//i.test(text);
-  }
-
-  function openObsidianUrl(url) {
-    return new Promise((resolve, reject) => {
-      const tabs = chrome && chrome.tabs ? chrome.tabs : null;
-      if (!tabs) {
-        reject(new Error("tabs api unavailable"));
-        return;
-      }
-
-      function doneWithRuntimeResult(fallbackMessage) {
-        const runtimeError = chrome.runtime && chrome.runtime.lastError ? chrome.runtime.lastError : null;
-        if (runtimeError) {
-          reject(new Error(runtimeError.message || fallbackMessage || "open obsidian url failed"));
-          return;
-        }
-        resolve(true);
-      }
-
-      if (typeof tabs.update === "function") {
-        tabs.update({ url }, () => {
-          const updateError = chrome.runtime && chrome.runtime.lastError ? chrome.runtime.lastError : null;
-          if (!updateError) {
-            resolve(true);
-            return;
-          }
-          if (typeof tabs.create === "function") {
-            tabs.create({ url, active: true }, () => doneWithRuntimeResult("open obsidian url failed"));
-            return;
-          }
-          reject(new Error(updateError.message || "open obsidian url failed"));
-        });
-        return;
-      }
-
-      if (typeof tabs.create === "function") {
-        tabs.create({ url, active: true }, () => doneWithRuntimeResult("open obsidian url failed"));
-        return;
-      }
-
-      reject(new Error("tabs api unavailable"));
-    });
-  }
-
   async function getNotionSyncJob() {
     try {
       const res = await storageGet([NOTION_SYNC_JOB_KEY]);
@@ -143,11 +96,15 @@
     const storage = NS.backgroundStorage;
     if (!storage) return err("storage module missing");
 
-    switch (msg.type) {
+      switch (msg.type) {
       case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {
+        const obsidianService = NS.obsidianUrlService;
+        if (!obsidianService || typeof obsidianService.isObsidianUrl !== "function" || typeof obsidianService.openObsidianUrl !== "function") {
+          return err("obsidian url service missing");
+        }
         const targetUrl = String(msg.url || "").trim();
-        if (!isObsidianUrl(targetUrl)) return err("invalid obsidian url");
-        await openObsidianUrl(targetUrl);
+        if (!obsidianService.isObsidianUrl(targetUrl)) return err("invalid obsidian url");
+        await obsidianService.openObsidianUrl(targetUrl);
         return ok({ opened: true });
       }
       case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
