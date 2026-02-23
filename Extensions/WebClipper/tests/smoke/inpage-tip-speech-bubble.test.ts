@@ -17,6 +17,8 @@ function setupDom() {
   global.Node = dom.window.Node;
   // @ts-expect-error test global
   globalThis.WebClipper = {};
+  Object.defineProperty(dom.window, "innerWidth", { value: 1000, configurable: true, writable: true });
+  Object.defineProperty(dom.window, "innerHeight", { value: 800, configurable: true, writable: true });
 
   return dom;
 }
@@ -70,6 +72,27 @@ describe("inpage-tip speech bubble", () => {
     expect(bubble?.textContent).toContain("Save failed");
   });
 
+  it.each([
+    { name: "left edge", rect: { left: 2, right: 42, top: 360, bottom: 400, width: 40, height: 40 }, expected: "right" },
+    {
+      name: "right edge",
+      rect: { left: 958, right: 998, top: 360, bottom: 400, width: 40, height: 40 },
+      expected: "left"
+    },
+    { name: "top edge", rect: { left: 470, right: 510, top: 2, bottom: 42, width: 40, height: 40 }, expected: "bottom" },
+    {
+      name: "bottom edge",
+      rect: { left: 470, right: 510, top: 758, bottom: 798, width: 40, height: 40 },
+      expected: "top"
+    }
+  ])("uses inward placement for $name", ({ rect, expected }) => {
+    appendIconRect(rect);
+    const api = loadInpageTip();
+
+    api.showSaveTip("tip", { kind: "loading" });
+    expect(document.getElementById("webclipper-inpage-bubble")?.dataset.placement).toBe(expected);
+  });
+
   it("reuses singleton bubble and replaces text on rapid updates", () => {
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
@@ -93,5 +116,18 @@ describe("inpage-tip speech bubble", () => {
 
     vi.advanceTimersByTime(1801);
     expect(document.getElementById("webclipper-inpage-bubble")).toBeNull();
+  });
+
+  it("clears enter class after animation window", () => {
+    vi.useFakeTimers();
+    appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
+    const api = loadInpageTip();
+
+    api.showSaveTip("Loading full history...", { kind: "loading" });
+    const bubble = document.getElementById("webclipper-inpage-bubble");
+    expect(bubble?.classList.contains("is-enter")).toBe(true);
+
+    vi.advanceTimersByTime(341);
+    expect(bubble?.classList.contains("is-enter")).toBe(false);
   });
 });
