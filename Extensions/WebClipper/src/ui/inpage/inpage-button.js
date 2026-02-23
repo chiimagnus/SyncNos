@@ -9,6 +9,16 @@
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
   const INPAGE_OK_FLASH_COOLDOWN_MS = 2500;
   const COMBO_WINDOW_MS = 400;
+  const EASTER_CLASSES = Object.freeze({
+    3: "is-easter-3",
+    5: "is-easter-5",
+    7: "is-easter-7"
+  });
+  const EASTER_DURATION_MS = Object.freeze({
+    3: 520,
+    5: 760,
+    7: 1100
+  });
 
   let runtime = null;
 
@@ -212,6 +222,29 @@
     let startTop = 0;
     let comboCount = 0;
     let comboTimer = null;
+    let easterTimer = null;
+
+    function clearEasterAnimation() {
+      if (easterTimer) {
+        clearTimeout(easterTimer);
+        easterTimer = null;
+      }
+      Object.values(EASTER_CLASSES).forEach((name) => btn.classList.remove(name));
+    }
+
+    function replayEasterAnimation(level) {
+      const cls = EASTER_CLASSES[level];
+      if (!cls) return;
+      clearEasterAnimation();
+      // Force reflow so same-class animation can replay on rapid combo repeats.
+      void btn.offsetWidth;
+      btn.classList.add(cls);
+      const duration = EASTER_DURATION_MS[level] || 800;
+      easterTimer = setTimeout(() => {
+        btn.classList.remove(cls);
+        easterTimer = null;
+      }, duration);
+    }
 
     function settleCombo() {
       const finalCount = comboCount;
@@ -225,6 +258,7 @@
 
       const level = resolveComboLevel(finalCount);
       if (!level) return;
+      replayEasterAnimation(level);
       onCombo && onCombo({ level, count: finalCount, windowMs: COMBO_WINDOW_MS });
     }
 
@@ -343,6 +377,7 @@
 
     btn.__webclipperCleanup = () => {
       resetComboState();
+      clearEasterAnimation();
       window.removeEventListener("resize", onResize);
     };
   }
