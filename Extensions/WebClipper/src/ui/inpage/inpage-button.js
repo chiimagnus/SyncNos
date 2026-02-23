@@ -251,6 +251,11 @@
       comboCount = 0;
       comboTimer = null;
 
+      if (finalCount === 1) {
+        onClick && onClick();
+        return;
+      }
+
       if (finalCount === 2) {
         onDoubleClick && onDoubleClick({ count: finalCount, windowMs: COMBO_WINDOW_MS });
         return;
@@ -263,9 +268,6 @@
     }
 
     function registerClick() {
-      if (comboCount === 0) {
-        onClick && onClick();
-      }
       comboCount += 1;
       if (comboTimer) {
         clearTimeout(comboTimer);
