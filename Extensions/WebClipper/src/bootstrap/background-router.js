@@ -2,8 +2,9 @@
 
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const contracts = NS.messageContracts || {};
 
-  const MESSAGE_TYPES = Object.freeze({
+  const MESSAGE_TYPES = contracts.CORE_MESSAGE_TYPES || Object.freeze({
     UPSERT_CONVERSATION: "upsertConversation",
     SYNC_CONVERSATION_MESSAGES: "syncConversationMessages",
     GET_CONVERSATIONS: "getConversations",
@@ -11,14 +12,14 @@
     DELETE_CONVERSATIONS: "deleteConversations",
   });
 
-  const NOTION_MESSAGE_TYPES = Object.freeze({
+  const NOTION_MESSAGE_TYPES = contracts.NOTION_MESSAGE_TYPES || Object.freeze({
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect",
     SYNC_CONVERSATIONS: "notionSyncConversations",
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   });
 
-  const OBSIDIAN_MESSAGE_TYPES = Object.freeze({
+  const OBSIDIAN_MESSAGE_TYPES = contracts.OBSIDIAN_MESSAGE_TYPES || Object.freeze({
     OPEN_URL: "openObsidianUrl"
   });
 
