@@ -2,13 +2,15 @@
   "name": "webclipper",
   "private": true,
   "version": "0.14.6",
-  "description": "WebClipper Chrome extension (ChatGPT + NotionAI) MVP",
+  "description": "WebClipper browser extension (Chromium/Edge + Firefox)",
   "type": "commonjs",
   "scripts": {
     "check": "node scripts/check.mjs",
+    "check:dist:edge": "node scripts/check.mjs --root=dist-edge --no-syntax",
     "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox --no-syntax",
     "test": "vitest run",
     "build": "node scripts/build.mjs",
+    "build:edge": "node scripts/build.mjs --target=edge --out=dist-edge --zip --zip-name=SyncNos-WebClipper-edge.zip",
     "build:firefox": "node scripts/build.mjs --target=firefox --zip",
     "package:amo-source": "node scripts/package-amo-source.mjs"
   },
