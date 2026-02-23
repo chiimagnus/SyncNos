@@ -6,11 +6,12 @@
   const chatPreview = NS.popupChatPreview;
 	  const popupExport = NS.popupExport;
 	  const popupDelete = NS.popupDelete;
-	  const notion = NS.popupNotion;
-	  const notionAi = NS.popupNotionAi;
-	  const database = NS.popupDatabase;
+  const notion = NS.popupNotion;
+  const notionAi = NS.popupNotionAi;
+  const database = NS.popupDatabase;
   const about = NS.popupAbout;
   const docsApi = NS.popupConversationDocs;
+  const syncStateApi = NS.popupNotionSyncState;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
@@ -46,27 +47,39 @@
   }
 
   function applyPerConversationResults(perConversation) {
-    if (!state || !state.notionSyncById) return;
-    if (!Array.isArray(perConversation)) return;
-    const now = Date.now();
-    for (const r of perConversation) {
-      const conversationId = Number(r && r.conversationId);
-      if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-      const ok = !!(r && r.ok);
-      state.notionSyncById.set(conversationId, {
-        ok,
-        mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
-        appended: Number(r && r.appended),
-        error: r && r.error ? String(r.error) : "",
-        at: Number(r && r.at) || now
-      });
+    if (!syncStateApi || typeof syncStateApi.applySyncResults !== "function") {
+      if (!Array.isArray(perConversation) || !(state && state.notionSyncById instanceof Map)) return;
+      const now = Date.now();
+      for (const r of perConversation) {
+        const conversationId = Number(r && r.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+        const ok = !!(r && r.ok);
+        state.notionSyncById.set(conversationId, {
+          ok,
+          mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+          appended: Number(r && r.appended),
+          error: r && r.error ? String(r.error) : "",
+          at: Number(r && r.at) || now
+        });
+      }
+      try {
+        list && typeof list.render === "function" && list.render();
+      } catch (_e) {
+        // ignore
+      }
+      return;
     }
-
-    try {
-      list && typeof list.render === "function" && list.render();
-    } catch (_e) {
-      // ignore
-    }
+    syncStateApi.applySyncResults({
+      rows: perConversation,
+      state,
+      onChanged: () => {
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
   }
 
   function isChatsTabActive() {
@@ -182,23 +195,7 @@
         const failures = Array.isArray(data.failures) ? data.failures : [];
         const results = Array.isArray(data.results) ? data.results : [];
 
-        try {
-          const now = Date.now();
-          for (const r of results) {
-            const conversationId = Number(r && r.conversationId);
-            if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-            const ok = !!(r && r.ok);
-            state && state.notionSyncById && state.notionSyncById.set(conversationId, {
-              ok,
-              mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
-              appended: Number(r && r.appended),
-              error: r && r.error ? String(r.error) : "",
-              at: now
-            });
-          }
-        } catch (_e) {
-          // ignore
-        }
+        applyPerConversationResults(results);
 
         if (failCount) {
           const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
