@@ -6,14 +6,24 @@
   const chatPreview = NS.popupChatPreview;
 	  const popupExport = NS.popupExport;
 	  const popupDelete = NS.popupDelete;
-	  const notion = NS.popupNotion;
-	  const notionAi = NS.popupNotionAi;
-	  const database = NS.popupDatabase;
-	  const about = NS.popupAbout;
+  const notion = NS.popupNotion;
+  const notionAi = NS.popupNotionAi;
+  const database = NS.popupDatabase;
+  const about = NS.popupAbout;
+  const docsApi = NS.popupConversationDocs;
+  const syncStateApi = NS.popupNotionSyncState;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
-  const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown } = core;
+  const { els, state, send, flashOk, sanitizeFilenamePart, copyTextToClipboard } = core;
+  const contracts = NS.messageContracts || {};
+  const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
+    SYNC_CONVERSATIONS: "notionSyncConversations",
+    GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
+  };
+  const obsidianTypes = contracts.OBSIDIAN_MESSAGE_TYPES || {
+    OPEN_URL: "openObsidianUrl"
+  };
 
   let syncPollTimer = 0;
   let listPollTimer = 0;
@@ -37,27 +47,39 @@
   }
 
   function applyPerConversationResults(perConversation) {
-    if (!state || !state.notionSyncById) return;
-    if (!Array.isArray(perConversation)) return;
-    const now = Date.now();
-    for (const r of perConversation) {
-      const conversationId = Number(r && r.conversationId);
-      if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-      const ok = !!(r && r.ok);
-      state.notionSyncById.set(conversationId, {
-        ok,
-        mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
-        appended: Number(r && r.appended),
-        error: r && r.error ? String(r.error) : "",
-        at: Number(r && r.at) || now
-      });
+    if (!syncStateApi || typeof syncStateApi.applySyncResults !== "function") {
+      if (!Array.isArray(perConversation) || !(state && state.notionSyncById instanceof Map)) return;
+      const now = Date.now();
+      for (const r of perConversation) {
+        const conversationId = Number(r && r.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+        const ok = !!(r && r.ok);
+        state.notionSyncById.set(conversationId, {
+          ok,
+          mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+          appended: Number(r && r.appended),
+          error: r && r.error ? String(r.error) : "",
+          at: Number(r && r.at) || now
+        });
+      }
+      try {
+        list && typeof list.render === "function" && list.render();
+      } catch (_e) {
+        // ignore
+      }
+      return;
     }
-
-    try {
-      list && typeof list.render === "function" && list.render();
-    } catch (_e) {
-      // ignore
-    }
+    syncStateApi.applySyncResults({
+      rows: perConversation,
+      state,
+      onChanged: () => {
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
   }
 
   function isChatsTabActive() {
@@ -96,47 +118,6 @@
     return cleaned || (fallback || "SyncNos Clip");
   }
 
-  async function copyTextToClipboard(text) {
-    const content = String(text || "");
-    if (!content) throw new Error("Nothing to copy.");
-
-    try {
-      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-        await navigator.clipboard.writeText(content);
-        return true;
-      }
-    } catch (_e) {
-      // fall through to execCommand fallback
-    }
-
-    const textarea = document.createElement("textarea");
-    textarea.value = content;
-    textarea.setAttribute("readonly", "true");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    textarea.style.top = "0";
-    document.body.appendChild(textarea);
-
-    const prevFocus = document.activeElement;
-    textarea.focus();
-    textarea.select();
-
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch (_e) {
-      copied = false;
-    }
-    textarea.remove();
-    try {
-      prevFocus && prevFocus.focus && prevFocus.focus();
-    } catch (_e) {
-      // ignore
-    }
-    if (!copied) throw new Error("Copy failed.");
-    return true;
-  }
-
   function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
     const params = new URLSearchParams();
     params.set("name", String(noteName || "SyncNos Clip"));
@@ -147,29 +128,11 @@
   }
 
   async function buildObsidianPayload(selectedIds) {
-    const idSet = new Set(
-      Array.isArray(selectedIds)
-        ? selectedIds.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
-        : []
-    );
-    const selected = Array.isArray(state.conversations)
-      ? state.conversations.filter((c) => c && idSet.has(Number(c.id)))
-      : [];
-    if (!selected.length) throw new Error("No conversations selected.");
-
-    const docs = [];
-    for (const conversation of selected) {
-      // eslint-disable-next-line no-await-in-loop
-      const detail = await send("getConversationDetail", { conversationId: conversation.id });
-      if (!detail || !detail.ok) {
-        throw new Error((detail && detail.error && detail.error.message) || `Failed to load conversation#${conversation.id}`);
-      }
-      const messages = (detail && detail.data && Array.isArray(detail.data.messages)) ? detail.data.messages : [];
-      docs.push({
-        conversation,
-        markdown: conversationToMarkdown({ conversation, messages })
-      });
+    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") {
+      throw new Error("Conversation docs module not available.");
     }
+    const docs = await docsApi.buildConversationDocs({ selectedIds });
+    if (!docs.length) throw new Error("No conversations selected.");
 
     const stamp = isoStampForName();
     if (docs.length === 1) {
@@ -186,7 +149,7 @@
   }
 
   async function refreshSyncJobStatus({ pollOnce } = {}) {
-    const res = await send("getNotionSyncJobStatus");
+    const res = await send(notionTypes.GET_SYNC_JOB_STATUS);
     if (!res || !res.ok) return { ok: false };
     const job = res.data && res.data.job ? res.data.job : null;
     if (job && job.perConversation) applyPerConversationResults(job.perConversation);
@@ -221,7 +184,7 @@
       setSyncingUi(true, { done: 0, total: ids.length });
       refreshSyncJobStatus().catch(() => {});
       try {
-        const res = await send("notionSyncConversations", { conversationIds: ids });
+        const res = await send(notionTypes.SYNC_CONVERSATIONS, { conversationIds: ids });
         if (!res || !res.ok) {
           alert((res && res.error && res.error.message) || "Sync failed.");
           return;
@@ -232,23 +195,7 @@
         const failures = Array.isArray(data.failures) ? data.failures : [];
         const results = Array.isArray(data.results) ? data.results : [];
 
-        try {
-          const now = Date.now();
-          for (const r of results) {
-            const conversationId = Number(r && r.conversationId);
-            if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-            const ok = !!(r && r.ok);
-            state && state.notionSyncById && state.notionSyncById.set(conversationId, {
-              ok,
-              mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
-              appended: Number(r && r.appended),
-              error: r && r.error ? String(r.error) : "",
-              at: now
-            });
-          }
-        } catch (_e) {
-          // ignore
-        }
+        applyPerConversationResults(results);
 
         if (failCount) {
           const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
@@ -304,7 +251,7 @@
           markdown: payload.markdown,
           useClipboard
         });
-        const res = await send("openObsidianUrl", { url });
+        const res = await send(obsidianTypes.OPEN_URL, { url });
         if (!res || !res.ok) {
           throw new Error((res && res.error && res.error.message) || "Open Obsidian failed.");
         }

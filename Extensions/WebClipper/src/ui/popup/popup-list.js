@@ -12,53 +12,15 @@
     getSourceMeta,
     hasWarningFlags,
     isSameLocalDay,
+    copyTextToClipboard,
     conversationToMarkdown
   } = core;
   const previewEvents = PREVIEW_EVENTS || {
     click: "popup:conversation-click"
   };
+  const syncStateApi = NS.popupNotionSyncState;
 
   const copyFeedbackTimers = new WeakMap();
-
-  async function copyTextToClipboard(text) {
-    const content = String(text || "");
-    if (!content) throw new Error("Nothing to copy");
-
-    try {
-      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-        await navigator.clipboard.writeText(content);
-        return true;
-      }
-    } catch (_e) {
-      // fall back
-    }
-
-    // Fallback: execCommand('copy') via a hidden textarea.
-    const ta = document.createElement("textarea");
-    ta.value = content;
-    ta.setAttribute("readonly", "true");
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    ta.style.top = "0";
-    document.body.appendChild(ta);
-    const prevFocus = document.activeElement;
-    ta.focus();
-    ta.select();
-    let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch (_e) {
-      ok = false;
-    }
-    ta.remove();
-    try {
-      prevFocus && prevFocus.focus && prevFocus.focus();
-    } catch (_e) {
-      // ignore
-    }
-    if (!ok) throw new Error("Copy failed");
-    return true;
-  }
 
   function showCopiedFeedback(buttonEl, { baseText, baseTitle } = {}) {
     if (!buttonEl) return;
@@ -195,17 +157,20 @@
           ? state.notionSyncById.get(conversation.id)
           : null;
         if (syncInfo && typeof syncInfo === "object") {
+          const normalized = (syncStateApi && typeof syncStateApi.normalizeSyncRecord === "function")
+            ? syncStateApi.normalizeSyncRecord({ ...syncInfo, conversationId: conversation.id })
+            : syncInfo;
           const pill = document.createElement("span");
-          const ok = !!syncInfo.ok;
+          const ok = !!normalized.ok;
           pill.className = ok ? "pill syncOk" : "pill syncFail";
 
-          const mode = syncInfo.mode ? String(syncInfo.mode) : (ok ? "ok" : "fail");
-          const appended = Number(syncInfo.appended);
-          const at = Number(syncInfo.at) || 0;
+          const mode = normalized.mode ? String(normalized.mode) : (ok ? "ok" : "fail");
+          const appended = Number(normalized.appended);
+          const at = Number(normalized.at) || 0;
 
           if (!ok) {
             pill.textContent = "failed";
-            if (syncInfo.error) pill.title = String(syncInfo.error);
+            if (normalized.error) pill.title = String(normalized.error);
           } else if (mode === "no_changes") {
             pill.textContent = "no changed";
             pill.title = "No changes";
