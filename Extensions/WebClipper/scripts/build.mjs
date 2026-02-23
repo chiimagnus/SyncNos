@@ -220,6 +220,7 @@ concatFiles({
     "src/collectors/poe-collector.js",
     "src/collectors/notionai/notionai-markdown.js",
     "src/collectors/notionai/notionai-collector.js",
+    "src/integrations/notionai-model-picker.js",
     "src/ui/inpage/inpage-tip.js",
     "src/ui/inpage/inpage-button.js",
     "src/bootstrap/content-controller.js",
