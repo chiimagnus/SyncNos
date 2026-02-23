@@ -55,6 +55,8 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 
 - Captures AI chats from supported sites into local browser storage
 - Exports selected conversations as JSON/Markdown
+- Adds selected conversations to Obsidian via `obsidian://new` (single selection prefers clipboard mode; multi-selection opens URLs in order)
+- Obsidian notes default to `SyncNos-AIChats/<conversation-title>`; duplicate note names append numeric suffixes
 - Database Backup: export/import local IndexedDB + non-sensitive `chrome.storage.local` settings (import merges by `source + conversationKey`; Notion token is not included)
 - Manually syncs selected conversations to Notion (OAuth)
 - Writes to a Notion database named `SyncNos-AI Chats`; re-sync clears and rebuilds page content to avoid duplicates
@@ -63,7 +65,7 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 
 ### Supported Sites
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / NotionAI / z.ai
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI / z.ai
 
 ### Install From Releases
 

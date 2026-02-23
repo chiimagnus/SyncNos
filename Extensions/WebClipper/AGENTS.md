@@ -1,6 +1,6 @@
 # SyncNos WebClipper（浏览器扩展）Agent 指南
 
-[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
+[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、添加到 Obsidian、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
 
 ## 作用范围
 
@@ -15,7 +15,7 @@
 
 ## 关键约束
 
-- 修改应聚焦在：采集 -> 本地持久化 -> 导出/备份/导入 -> 手动 Notion 同步。
+- 修改应聚焦在：采集 -> 本地持久化 -> 导出/Obsidian/备份/导入 -> 手动 Notion 同步。
 - 权限保持最小且明确；避免添加 `*://*/*` 或无关的 Chrome API。
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
@@ -50,6 +50,23 @@
 - **Popup 只负责触发与展示**：长任务放后台 Service Worker 执行，popup 通过 message 获取进度/结果。
 - **节流与速率限制**：对 Notion 写入必须做 pacing/批量；批量同步要能部分失败不影响其它项。
 - **权限变更需要理由**：新增 `permissions/host_permissions` 前先给出“为何需要、替代方案为何不行、风险与范围控制”。
+
+### 模块入口索引（2026-02 重构后）
+
+- **消息协议（前后端共享）**：`src/shared/message-contracts.js`
+  - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
+- **后台路由（统一入口）**：`src/bootstrap/background-router.js`
+  - 路由 `openObsidianUrl`、Notion 同步任务状态、会话 CRUD 等消息。
+- **Notion 同步模块**：`src/sync/notion/`
+  - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
+- **Obsidian 模块**：`src/ui/popup/popup-obsidian.js` + `src/sync/obsidian/obsidian-url-service.js`
+  - popup 负责 payload 和 URL 生成，background 负责 URL 校验与顺序打开。
+
+### Obsidian 约束
+
+- 默认目录：`SyncNos-AIChats/`，笔记名优先使用会话标题并做非法字符清洗与重名后缀。
+- 单选会话：优先复制 Markdown 到剪贴板并走 `clipboard=1`；复制失败时回退到 `content` 参数。
+- 多选会话：生成多个 `obsidian://new` URL，后台按顺序逐个打开，避免创建顺序错乱。
 
 ### 测试与回归
 

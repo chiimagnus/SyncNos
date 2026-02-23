@@ -17,7 +17,7 @@ SyncNos/
 │       ├── DataSources-From/    # 数据源适配器
 │       └── DataSources-To/      # 同步目标适配器
 ├── Extensions/                  # 浏览器扩展
-│   └── WebClipper/              # Chrome Extension (MV3)
+│   └── WebClipper/              # Browser Extension (MV3)
 ├── .github/docs/                 # 开发指南文档
 └── Resource/                    # 资源文件
 ```

@@ -54,6 +54,8 @@
 
 - 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
 - 导出所选对话为 JSON/Markdown
+- 通过 `obsidian://new` 将所选对话写入 Obsidian（单选优先走剪贴板模式；多选按顺序打开多个 URL）
+- Obsidian 默认写入 `SyncNos-AIChats/<会话标题>`；同名笔记会自动追加数字后缀
 - 数据库备份：导出/导入本地 IndexedDB + 非敏感 `chrome.storage.local` 设置（导入按 `source + conversationKey` 合并；不包含 Notion token）
 - 手动同步所选对话到 Notion（OAuth）
 - 同步写入 Notion 数据库 `SyncNos-AI Chats`；重复同步会清空目标页面子块并重建内容以避免重复追加
@@ -62,7 +64,7 @@
 
 ### 支持站点
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / NotionAI / z.ai
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI / z.ai
 
 ### 从 Releases 安装
 
