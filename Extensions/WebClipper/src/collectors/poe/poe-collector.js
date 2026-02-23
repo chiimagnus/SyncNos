@@ -83,6 +83,10 @@
     return sorted;
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  }
+
   function isUserWrapper(wrapper) {
     if (!wrapper || !wrapper.querySelector) return false;
     return !!(
@@ -138,6 +142,155 @@
       if (!isChild) finalNodes.push(node);
     }
     return finalNodes;
+  }
+
+  function wrapperSignature(wrapper) {
+    if (!wrapper) return "";
+    const id = wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
+    if (id) return id;
+    const node = contentNodeFromWrapper(wrapper);
+    const raw = node && node.textContent ? String(node.textContent) : "";
+    return raw.replace(/\s+/g, " ").trim().slice(0, 80);
+  }
+
+  function messageLoadSignature(root) {
+    const wrappers = getMessageWrappers(root);
+    const total = wrappers.length;
+    if (!total) return "0";
+    const first = wrappers[0];
+    const second = total > 1 ? wrappers[1] : null;
+    const last = wrappers[total - 1];
+    return [
+      total,
+      wrapperSignature(first),
+      wrapperSignature(second),
+      wrapperSignature(last)
+    ].join("|");
+  }
+
+  function isScrollableElement(el) {
+    if (!el) return false;
+    const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
+    const canScroll = Number(el.scrollHeight || 0) > Number(el.clientHeight || 0) + 20;
+    if (el === scrollingRoot || el === document.documentElement || el === document.body) {
+      return canScroll;
+    }
+
+    let overflowY = "";
+    try {
+      const win = (el.ownerDocument && el.ownerDocument.defaultView) || window;
+      overflowY = String((win && win.getComputedStyle ? win.getComputedStyle(el).overflowY : "") || "");
+    } catch (_e) {
+      overflowY = "";
+    }
+    const styleScrollable = /(auto|scroll|overlay)/i.test(overflowY);
+    return canScroll && (styleScrollable || !overflowY);
+  }
+
+  function isScrollCandidate(el) {
+    if (!el) return false;
+    return Number(el.scrollHeight || 0) > Number(el.clientHeight || 0) + 20;
+  }
+
+  function findScrollContainer(root) {
+    const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
+    const seed = (root && root.querySelector)
+      ? (root.querySelector("div[class*='ChatMessagesView_messageTuple__']")
+        || root.querySelector("div[class*='ChatMessage_chatMessage__'][id^='message-']")
+        || root)
+      : root;
+
+    let el = seed;
+    for (let depth = 0; depth < 24 && el; depth += 1) {
+      if (isScrollableElement(el)) return el;
+      el = el.parentElement;
+    }
+
+    el = seed;
+    for (let depth = 0; depth < 24 && el; depth += 1) {
+      if (isScrollCandidate(el)) return el;
+      el = el.parentElement;
+    }
+
+    if (isScrollableElement(scrollingRoot)) return scrollingRoot;
+    return scrollingRoot;
+  }
+
+  function getContainerScrollTop(container) {
+    if (!container) return 0;
+    const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
+    if (container === scrollingRoot || container === document.documentElement || container === document.body) {
+      const y1 = Number(window.pageYOffset || 0);
+      const y2 = document.documentElement ? Number(document.documentElement.scrollTop || 0) : 0;
+      const y3 = document.body ? Number(document.body.scrollTop || 0) : 0;
+      return Math.max(y1, y2, y3);
+    }
+    return Number(container.scrollTop || 0);
+  }
+
+  function scrollContainerToTop(container) {
+    if (!container) return;
+    const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
+    if (container === scrollingRoot || container === document.documentElement || container === document.body) {
+      if (scrollingRoot) scrollingRoot.scrollTop = 0;
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+      return;
+    }
+    container.scrollTop = 0;
+  }
+
+  async function waitForMessageChange(root, previousSig, { waitForLoadMs, pollMs }) {
+    const timeoutMs = Math.max(0, Number(waitForLoadMs) || 0);
+    const intervalMs = Math.max(10, Number(pollMs) || 80);
+    const start = Date.now();
+
+    while ((Date.now() - start) <= timeoutMs) {
+      await sleep(intervalMs);
+      const nextSig = messageLoadSignature(root);
+      if (nextSig !== previousSig) return { changed: true, sig: nextSig };
+    }
+
+    return { changed: false, sig: messageLoadSignature(root) };
+  }
+
+  async function prepareManualCapture(options) {
+    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return false;
+
+    const root = getConversationRoot();
+    if (!root) return false;
+
+    const scrollContainer = findScrollContainer(root);
+    if (!scrollContainer) return false;
+
+    const maxRounds = Math.max(1, Number(options && options.maxRounds) || 24);
+    const settleMs = Math.max(0, Number(options && options.settleMs) || 120);
+    const waitForLoadMs = Math.max(80, Number(options && options.waitForLoadMs) || 900);
+    const pollMs = Math.max(10, Number(options && options.pollMs) || 80);
+
+    let sig = messageLoadSignature(root);
+    let stableAtTopRounds = 0;
+
+    for (let round = 0; round < maxRounds; round += 1) {
+      scrollContainerToTop(scrollContainer);
+      if (settleMs) await sleep(settleMs);
+
+      const waited = await waitForMessageChange(root, sig, { waitForLoadMs, pollMs });
+      sig = waited.sig;
+
+      const atTop = getContainerScrollTop(scrollContainer) <= 2;
+      if (waited.changed) {
+        stableAtTopRounds = 0;
+        continue;
+      }
+
+      if (atTop) stableAtTopRounds += 1;
+      else stableAtTopRounds = 0;
+
+      if (stableAtTopRounds >= 2) break;
+    }
+
+    return true;
   }
 
   function messageKeyFromWrapper(wrapper, role, contentText, sequence) {
@@ -217,7 +370,7 @@
     };
   }
 
-  const api = { capture, getRoot: getConversationRoot };
+  const api = { capture, getRoot: getConversationRoot, prepareManualCapture };
   NS.collectors = NS.collectors || {};
   NS.collectors.poe = api;
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
