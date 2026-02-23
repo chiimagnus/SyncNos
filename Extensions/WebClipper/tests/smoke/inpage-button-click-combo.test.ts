@@ -107,6 +107,27 @@ describe("inpage-button click combos", () => {
     expect(btn?.classList.contains("is-easter-5")).toBe(false);
   });
 
+  it("triggers level 3 combo for exact triple click without double callback", () => {
+    const api = loadInpageButton();
+    const calls: string[] = [];
+
+    api.ensureInpageButton({
+      collectorId: "gemini",
+      onClick: () => calls.push("save"),
+      onDoubleClick: () => calls.push("double"),
+      onCombo: ({ level, count }: { level: number; count: number }) => calls.push(`combo:${level}:${count}`)
+    });
+
+    const btn = document.getElementById("webclipper-inpage-btn");
+    for (let i = 0; i < 3; i += 1) {
+      btn?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    }
+
+    vi.advanceTimersByTime(401);
+    expect(calls).toEqual(["save", "combo:3:3"]);
+    expect(btn?.classList.contains("is-easter-3")).toBe(true);
+  });
+
   it("maps 7+ clicks to level 7 combo", () => {
     const api = loadInpageButton();
     const calls: string[] = [];
