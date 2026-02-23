@@ -7,6 +7,7 @@
 - 目标目录：`Extensions/WebClipper/`
 - 平台：
   - Chrome / Chromium（开发时通过“加载已解压的扩展程序”）
+  - Edge（Chromium，支持加载 Chrome 产物 / Edge 产物）
   - Chrome Web Store：https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
   - Firefox（已上架 AMO：https://addons.mozilla.org/firefox/addon/syncnos-webclipper/；开发可用临时扩展）
 - 支持的网站（content scripts）：ChatGPT、Claude、Gemini、DeepSeek、Kimi、豆包、元宝、Poe、NotionAI、z.ai
@@ -63,6 +64,7 @@
 - 安装依赖：`npm --prefix Extensions/WebClipper install`
 - 本地开发（Chrome）：在 `chrome://extensions` 加载 `Extensions/WebClipper/`
 - 构建 Chrome dist：`npm --prefix Extensions/WebClipper run build`
+- 构建 Edge 包：`npm --prefix Extensions/WebClipper run build:edge`
 - 构建 Firefox `.xpi`：`npm --prefix Extensions/WebClipper run build:firefox`
 
 ## 命令
@@ -70,7 +72,9 @@
 - 静态检查（manifest/icons + JS 语法）：`npm --prefix Extensions/WebClipper run check`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
 - 构建打包（Chrome dist）：`npm --prefix Extensions/WebClipper run build`
+- 构建打包（Edge zip）：`npm --prefix Extensions/WebClipper run build:edge`
 - 构建打包（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run build:firefox`
+- 校验 Edge 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:edge`
 - 校验 Firefox 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
 
@@ -108,3 +112,9 @@
 - 打开 `chrome://extensions`
 - 启用开发者模式
 - 加载已解压扩展：`Extensions/WebClipper/`
+
+## Edge 开发
+
+- 打开 `edge://extensions`
+- 启用开发人员模式
+- 加载已解压扩展：`Extensions/WebClipper/dist-edge/`（或 `Extensions/WebClipper/dist/`）

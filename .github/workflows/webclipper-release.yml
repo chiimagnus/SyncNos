@@ -44,6 +44,9 @@ jobs:
       - name: Build WebClipper package
         run: npm --prefix Extensions/WebClipper run build
 
+      - name: Build WebClipper Edge package
+        run: npm --prefix Extensions/WebClipper run build:edge
+
       - name: Build WebClipper Firefox XPI
         run: npm --prefix Extensions/WebClipper run build:firefox
 
@@ -55,10 +58,7 @@ jobs:
             cd Extensions/WebClipper/dist
             zip -r "${GITHUB_WORKSPACE}/release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" .
           )
-          (
-            cd Extensions/WebClipper/dist
-            zip -r "${GITHUB_WORKSPACE}/release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" .
-          )
+          cp Extensions/WebClipper/SyncNos-WebClipper-edge.zip "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
           cp Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
       - name: Upload assets to GitHub Release
