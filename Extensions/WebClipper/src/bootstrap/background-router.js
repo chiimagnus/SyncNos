@@ -18,6 +18,10 @@
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   });
 
+  const OBSIDIAN_MESSAGE_TYPES = Object.freeze({
+    OPEN_URL: "openObsidianUrl"
+  });
+
   const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
@@ -35,6 +39,53 @@
 
   function storageSet(obj) {
     return new Promise((resolve) => chrome.storage.local.set(obj, () => resolve(true)));
+  }
+
+  function isObsidianUrl(url) {
+    const text = String(url || "").trim();
+    return /^obsidian:\/\//i.test(text);
+  }
+
+  function openObsidianUrl(url) {
+    return new Promise((resolve, reject) => {
+      const tabs = chrome && chrome.tabs ? chrome.tabs : null;
+      if (!tabs) {
+        reject(new Error("tabs api unavailable"));
+        return;
+      }
+
+      function doneWithRuntimeResult(fallbackMessage) {
+        const runtimeError = chrome.runtime && chrome.runtime.lastError ? chrome.runtime.lastError : null;
+        if (runtimeError) {
+          reject(new Error(runtimeError.message || fallbackMessage || "open obsidian url failed"));
+          return;
+        }
+        resolve(true);
+      }
+
+      if (typeof tabs.update === "function") {
+        tabs.update({ url }, () => {
+          const updateError = chrome.runtime && chrome.runtime.lastError ? chrome.runtime.lastError : null;
+          if (!updateError) {
+            resolve(true);
+            return;
+          }
+          if (typeof tabs.create === "function") {
+            tabs.create({ url, active: true }, () => doneWithRuntimeResult("open obsidian url failed"));
+            return;
+          }
+          reject(new Error(updateError.message || "open obsidian url failed"));
+        });
+        return;
+      }
+
+      if (typeof tabs.create === "function") {
+        tabs.create({ url, active: true }, () => doneWithRuntimeResult("open obsidian url failed"));
+        return;
+      }
+
+      reject(new Error("tabs api unavailable"));
+    });
   }
 
   async function getNotionSyncJob() {
@@ -92,6 +143,12 @@
     if (!storage) return err("storage module missing");
 
     switch (msg.type) {
+      case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {
+        const targetUrl = String(msg.url || "").trim();
+        if (!isObsidianUrl(targetUrl)) return err("invalid obsidian url");
+        await openObsidianUrl(targetUrl);
+        return ok({ opened: true });
+      }
       case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));
         return ok({ connected: !!(token && token.accessToken), token: token || null });

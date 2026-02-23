@@ -143,6 +143,7 @@
     if (els.chatBottomBar) els.chatBottomBar.classList.toggle("hasSelection", hasSelection);
 
     if (els.btnExport) els.btnExport.disabled = !hasSelection;
+    if (els.btnAddObsidian) els.btnAddObsidian.disabled = !hasSelection || !!state.obsidianAddInProgress;
     if (els.btnSyncNotion) els.btnSyncNotion.disabled = !hasSelection || !!state.notionSyncInProgress;
     if (els.btnDelete) els.btnDelete.disabled = !hasSelection;
 

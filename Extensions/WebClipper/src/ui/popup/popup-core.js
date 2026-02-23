@@ -74,6 +74,7 @@
     menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
     menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
     menuExportJsons: document.getElementById("menuExportJsons"),
+    btnAddObsidian: document.getElementById("btnAddObsidian"),
     btnSyncNotion: document.getElementById("btnSyncNotion"),
     btnNotionConnect: document.getElementById("btnNotionConnect"),
     notionStatusTitle: document.getElementById("notionStatusTitle"),
@@ -100,7 +101,8 @@
     previewCache: new Map(),
     previewRequestToken: 0,
     notionSyncById: new Map(),
-    notionSyncInProgress: false
+    notionSyncInProgress: false,
+    obsidianAddInProgress: false
   };
 
   const STORAGE_KEYS = {
