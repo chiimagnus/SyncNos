@@ -16,18 +16,25 @@
     visibleUntil: 0
   };
 
+  function getDoc() {
+    return typeof globalThis.document !== "undefined" ? globalThis.document : null;
+  }
+
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
   }
 
   function getViewport() {
-    const w = Math.max(0, window.innerWidth || 0);
-    const h = Math.max(0, window.innerHeight || 0);
+    const win = typeof globalThis.window !== "undefined" ? globalThis.window : null;
+    const w = Math.max(0, (win && win.innerWidth) || 0);
+    const h = Math.max(0, (win && win.innerHeight) || 0);
     return { width: w, height: h };
   }
 
   function getAnchorRect() {
-    const btn = document.getElementById(INPAGE_BTN_ID);
+    const doc = getDoc();
+    if (!doc) return null;
+    const btn = doc.getElementById(INPAGE_BTN_ID);
     if (btn && typeof btn.getBoundingClientRect === "function") {
       return btn.getBoundingClientRect();
     }
@@ -93,7 +100,9 @@
   }
 
   function ensureBubble() {
-    const existing = document.getElementById(BUBBLE_ID);
+    const doc = getDoc();
+    if (!doc || !doc.documentElement) return null;
+    const existing = doc.getElementById(BUBBLE_ID);
     if (existing) return existing;
 
     const bubble = document.createElement("div");
@@ -111,7 +120,7 @@
     arrow.setAttribute("aria-hidden", "true");
     bubble.appendChild(arrow);
 
-    document.documentElement.appendChild(bubble);
+    doc.documentElement.appendChild(bubble);
     return bubble;
   }
 
@@ -182,7 +191,9 @@
   function removeBubble() {
     resetTimers();
     stopFollowLoop();
-    const el = document.getElementById(BUBBLE_ID);
+    const doc = getDoc();
+    if (!doc) return;
+    const el = doc.getElementById(BUBBLE_ID);
     if (el && el.parentNode) el.parentNode.removeChild(el);
   }
 
@@ -203,6 +214,7 @@
   function showSaveTip(text, options) {
     const opts = options && typeof options === "object" ? options : {};
     const el = ensureBubble();
+    if (!el) return;
     setTextAndKind(el, text, opts.kind);
     positionBubble(el);
     replayEnterAnimation(el);
