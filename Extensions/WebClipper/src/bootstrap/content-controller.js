@@ -2,6 +2,20 @@
 
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const contracts = NS.messageContracts || {};
+  const CORE_MESSAGE_TYPES = contracts.CORE_MESSAGE_TYPES || Object.freeze({
+    UPSERT_CONVERSATION: "upsertConversation",
+    SYNC_CONVERSATION_MESSAGES: "syncConversationMessages"
+  });
+  const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
+    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+  });
+
+  const EASTER_EGG_LINES = Object.freeze({
+    3: ["Combo x3! Nice rhythm.", "Three taps. Paw approved."],
+    5: ["Combo x5! Beast mode on.", "Five-hit streak. Zoomies unlocked."],
+    7: ["Combo x7! Legendary paws.", "Seven-hit streak. Animal boss mood."]
+  });
 
   function createController({ runtime }) {
     const inpageButton = NS.inpageButton;
@@ -17,6 +31,13 @@
         return Promise.reject(new Error("runtime client unavailable"));
       }
       return runtime.send(type, payload);
+    }
+
+    function pickLineByLevel(level) {
+      const lines = EASTER_EGG_LINES[level];
+      if (!Array.isArray(lines) || !lines.length) return "";
+      const idx = Math.floor(Math.random() * lines.length);
+      return lines[idx] || lines[0];
     }
 
     function getCollector() {
@@ -48,12 +69,12 @@
 
     async function saveSnapshot(snapshot) {
       if (!snapshot || !snapshot.conversation) return;
-      const convoRes = await send("upsertConversation", { payload: snapshot.conversation });
+      const convoRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, { payload: snapshot.conversation });
       if (!convoRes || !convoRes.ok) {
         throw new Error((convoRes && convoRes.error && convoRes.error.message) || "upsertConversation failed");
       }
       const convo = convoRes.data;
-      const msgRes = await send("syncConversationMessages", {
+      const msgRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
         conversationId: convo.id,
         messages: snapshot.messages || []
       });
@@ -100,6 +121,25 @@
         }
       };
 
+      const openPopupPanel = async () => {
+        try {
+          const res = await send(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP);
+          if (!res || !res.ok) {
+            showInpageTip("Click toolbar icon to open panel", "error");
+          }
+        } catch (_e) {
+          showInpageTip("Click toolbar icon to open panel", "error");
+        }
+      };
+
+      const showComboLine = (payload) => {
+        const level = payload && Number(payload.level);
+        if (!Number.isFinite(level)) return;
+        const line = pickLineByLevel(level);
+        if (!line) return;
+        showInpageTip(line);
+      };
+
       observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
         debounceMs: 600,
         getRoot: () => {
@@ -118,7 +158,9 @@
             inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
             inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
               collectorId: inpageCollector && inpageCollector.id,
-              onClick: clickSave
+              onClick: clickSave,
+              onDoubleClick: openPopupPanel,
+              onCombo: showComboLine
             });
             if (!collector || typeof collector.capture !== "function") return;
             const snapshot = await Promise.resolve(collector.capture());

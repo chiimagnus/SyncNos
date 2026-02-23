@@ -8,6 +8,17 @@
   const EDGE_GAP = 8;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
   const INPAGE_OK_FLASH_COOLDOWN_MS = 2500;
+  const COMBO_WINDOW_MS = 400;
+  const EASTER_CLASSES = Object.freeze({
+    3: "is-easter-3",
+    5: "is-easter-5",
+    7: "is-easter-7"
+  });
+  const EASTER_DURATION_MS = Object.freeze({
+    3: 520,
+    5: 760,
+    7: 1100
+  });
 
   let runtime = null;
 
@@ -140,7 +151,27 @@
     }, 1400);
   }
 
-  function ensureInpageButton({ collectorId, onClick }) {
+  function resolveComboLevel(count) {
+    if (count >= 7) return 7;
+    if (count >= 5) return 5;
+    if (count >= 3) return 3;
+    return 0;
+  }
+
+  function destroyButton(el) {
+    if (!el) return;
+    const cleanup = el.__webclipperCleanup;
+    if (typeof cleanup === "function") {
+      try {
+        cleanup();
+      } catch (_e) {
+        // ignore
+      }
+    }
+    el.remove();
+  }
+
+  function ensureInpageButton({ collectorId, onClick, onDoubleClick, onCombo }) {
     if (!collectorId) return;
 
     const existing = document.getElementById(INPAGE_BTN_ID);
@@ -149,7 +180,7 @@
         ensureInpageOkDecor(existing);
         return;
       }
-      existing.remove();
+      destroyButton(existing);
     }
     const btn = document.createElement("button");
     btn.id = INPAGE_BTN_ID;
@@ -189,6 +220,67 @@
     let startY = 0;
     let startLeft = 0;
     let startTop = 0;
+    let comboCount = 0;
+    let comboTimer = null;
+    let easterTimer = null;
+
+    function clearEasterAnimation() {
+      if (easterTimer) {
+        clearTimeout(easterTimer);
+        easterTimer = null;
+      }
+      Object.values(EASTER_CLASSES).forEach((name) => btn.classList.remove(name));
+    }
+
+    function replayEasterAnimation(level) {
+      const cls = EASTER_CLASSES[level];
+      if (!cls) return;
+      clearEasterAnimation();
+      // Force reflow so same-class animation can replay on rapid combo repeats.
+      void btn.offsetWidth;
+      btn.classList.add(cls);
+      const duration = EASTER_DURATION_MS[level] || 800;
+      easterTimer = setTimeout(() => {
+        btn.classList.remove(cls);
+        easterTimer = null;
+      }, duration);
+    }
+
+    function settleCombo() {
+      const finalCount = comboCount;
+      comboCount = 0;
+      comboTimer = null;
+
+      if (finalCount === 1) {
+        onClick && onClick();
+        return;
+      }
+
+      if (finalCount === 2) {
+        onDoubleClick && onDoubleClick({ count: finalCount, windowMs: COMBO_WINDOW_MS });
+        return;
+      }
+
+      const level = resolveComboLevel(finalCount);
+      if (!level) return;
+      replayEasterAnimation(level);
+      onCombo && onCombo({ level, count: finalCount, windowMs: COMBO_WINDOW_MS });
+    }
+
+    function registerClick() {
+      comboCount += 1;
+      if (comboTimer) {
+        clearTimeout(comboTimer);
+      }
+      comboTimer = setTimeout(settleCombo, COMBO_WINDOW_MS);
+    }
+
+    function resetComboState() {
+      comboCount = 0;
+      if (!comboTimer) return;
+      clearTimeout(comboTimer);
+      comboTimer = null;
+    }
 
     btn.addEventListener("pointerdown", (e) => {
       dragging = true;
@@ -247,7 +339,7 @@
       }
       e.preventDefault();
       e.stopPropagation();
-      onClick && onClick();
+      registerClick();
     });
 
     document.documentElement.appendChild(btn);
@@ -272,7 +364,7 @@
       snappedState = snapToClosestEdge(btn, rect.left, rect.top);
     }
 
-    window.addEventListener("resize", () => {
+    const onResize = () => {
       if (!btn.isConnected) return;
       const nextState = applySnappedPosition(btn, snappedState);
       if (!nextState) return;
@@ -282,14 +374,21 @@
       } catch (_e) {
         // ignore
       }
-    });
+    };
+    window.addEventListener("resize", onResize);
+
+    btn.__webclipperCleanup = () => {
+      resetComboState();
+      clearEasterAnimation();
+      window.removeEventListener("resize", onResize);
+    };
   }
 
   function cleanupButtons(activeCollectorId) {
     const active = activeCollectorId || "";
     if (!active) {
       const el = document.getElementById(INPAGE_BTN_ID);
-      if (el) el.remove();
+      if (el) destroyButton(el);
     }
     // Cleanup legacy Notion button id from older versions.
     const legacyNotionBtn = document.getElementById("webclipper-notionai-btn");

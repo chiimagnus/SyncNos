@@ -23,6 +23,10 @@
     OPEN_URL: "openObsidianUrl"
   });
 
+  const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
+    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+  });
+
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   function ok(data) {
@@ -47,10 +51,19 @@
   async function handleMessage(msg) {
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
-    const storage = NS.backgroundStorage;
-    if (!storage) return err("storage module missing");
-
       switch (msg.type) {
+      case UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP: {
+        if (!chrome || !chrome.action || typeof chrome.action.openPopup !== "function") {
+          return err("open popup is not supported in this browser", { code: "OPEN_POPUP_UNSUPPORTED" });
+        }
+        try {
+          await chrome.action.openPopup();
+          return ok({ opened: true });
+        } catch (e) {
+          const message = e && e.message ? e.message : String(e || "open popup failed");
+          return err(message, { code: "OPEN_POPUP_FAILED" });
+        }
+      }
       case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {
         const obsidianService = NS.obsidianUrlService;
         if (!obsidianService || typeof obsidianService.isObsidianUrl !== "function" || typeof obsidianService.openObsidianUrl !== "function") {
@@ -104,6 +117,8 @@
         }
       }
       case MESSAGE_TYPES.UPSERT_CONVERSATION: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const payload = msg.payload || {};
         if (!payload.source) return err("missing conversation source");
         if (!payload.conversationKey) return err("missing conversationKey");
@@ -111,22 +126,30 @@
         return ok(convo);
       }
       case MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const res = await storage.syncConversationMessages(conversationId, msg.messages);
         return ok(res);
       }
       case MESSAGE_TYPES.GET_CONVERSATIONS: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const items = await storage.getConversations();
         return ok(items);
       }
       case MESSAGE_TYPES.GET_CONVERSATION_DETAIL: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const messages = await storage.getMessagesByConversationId(conversationId);
         return ok({ conversationId, messages });
       }
       case MESSAGE_TYPES.DELETE_CONVERSATIONS: {
+        const storage = NS.backgroundStorage;
+        if (!storage) return err("storage module missing");
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
         const res = await storage.deleteConversationsByIds(ids);
         return ok(res);

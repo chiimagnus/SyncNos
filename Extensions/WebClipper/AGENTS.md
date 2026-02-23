@@ -20,6 +20,7 @@
 - 除 `chrome.storage.local` 外，不要记录或持久化任何密钥（Notion OAuth client secret 由用户提供）。
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
+- inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -55,7 +56,7 @@
 ### 模块入口索引（2026-02 重构后）
 
 - **消息协议（前后端共享）**：`src/shared/message-contracts.js`
-  - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
+  - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **后台路由（统一入口）**：`src/bootstrap/background-router.js`
   - 路由 `openObsidianUrl`、Notion 同步任务状态、会话 CRUD 等消息。
 - **Notion 同步模块**：`src/sync/notion/`
