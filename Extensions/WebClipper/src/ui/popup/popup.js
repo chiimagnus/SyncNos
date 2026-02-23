@@ -9,11 +9,19 @@
 	  const notion = NS.popupNotion;
 	  const notionAi = NS.popupNotionAi;
 	  const database = NS.popupDatabase;
-	  const about = NS.popupAbout;
+  const about = NS.popupAbout;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
   const { els, state, send, flashOk, sanitizeFilenamePart, conversationToMarkdown } = core;
+  const contracts = NS.messageContracts || {};
+  const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
+    SYNC_CONVERSATIONS: "notionSyncConversations",
+    GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
+  };
+  const obsidianTypes = contracts.OBSIDIAN_MESSAGE_TYPES || {
+    OPEN_URL: "openObsidianUrl"
+  };
 
   let syncPollTimer = 0;
   let listPollTimer = 0;
@@ -186,7 +194,7 @@
   }
 
   async function refreshSyncJobStatus({ pollOnce } = {}) {
-    const res = await send("getNotionSyncJobStatus");
+    const res = await send(notionTypes.GET_SYNC_JOB_STATUS);
     if (!res || !res.ok) return { ok: false };
     const job = res.data && res.data.job ? res.data.job : null;
     if (job && job.perConversation) applyPerConversationResults(job.perConversation);
@@ -221,7 +229,7 @@
       setSyncingUi(true, { done: 0, total: ids.length });
       refreshSyncJobStatus().catch(() => {});
       try {
-        const res = await send("notionSyncConversations", { conversationIds: ids });
+        const res = await send(notionTypes.SYNC_CONVERSATIONS, { conversationIds: ids });
         if (!res || !res.ok) {
           alert((res && res.error && res.error.message) || "Sync failed.");
           return;
@@ -304,7 +312,7 @@
           markdown: payload.markdown,
           useClipboard
         });
-        const res = await send("openObsidianUrl", { url });
+        const res = await send(obsidianTypes.OPEN_URL, { url });
         if (!res || !res.ok) {
           throw new Error((res && res.error && res.error.message) || "Open Obsidian failed.");
         }

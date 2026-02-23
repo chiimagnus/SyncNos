@@ -9,6 +9,7 @@
     // eslint-disable-next-line no-undef
     importScripts(
       "../storage/schema.js",
+      "../shared/message-contracts.js",
       "../sync/notion/oauth-config.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",

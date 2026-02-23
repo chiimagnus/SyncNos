@@ -6,6 +6,11 @@
   if (!core) return;
 
   const { els, send, storageGet, storageSet, flashOk, disableImageDrag, openHttpUrl } = core;
+  const contracts = NS.messageContracts || {};
+  const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
+    GET_AUTH_STATUS: "getNotionAuthStatus",
+    DISCONNECT: "notionDisconnect"
+  };
 
   async function getNotionOAuthMeta() {
     const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
@@ -21,7 +26,7 @@
   }
 
   async function getNotionAccessToken() {
-    const status = await send("getNotionAuthStatus");
+    const status = await send(notionTypes.GET_AUTH_STATUS);
     if (!status || !status.ok || !status.data || !status.data.connected) return "";
     return status.data.token && status.data.token.accessToken ? status.data.token.accessToken : "";
   }
@@ -133,7 +138,7 @@
   }
 
   async function refreshNotionStatus() {
-    const res = await send("getNotionAuthStatus");
+    const res = await send(notionTypes.GET_AUTH_STATUS);
     const meta = await getNotionOAuthMeta();
     if (!res || !res.ok || !res.data) {
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
@@ -203,7 +208,7 @@
       els.btnNotionConnect.addEventListener("click", async () => {
         const status = await send("getNotionAuthStatus");
         if (status && status.ok && status.data && status.data.connected) {
-          await send("notionDisconnect");
+          await send(notionTypes.DISCONNECT);
           await refreshNotionStatus();
           return;
         }
