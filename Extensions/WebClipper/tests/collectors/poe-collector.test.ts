@@ -167,6 +167,90 @@ describe("poe-collector", () => {
     expect(md).not.toContain("this should be ignored");
   });
 
+  it("captures latest poe markdown structure and keeps normal blockquote content", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div class="ChatMessagesView_messageTuple__X">
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-12">
+          <div class="LeftSideMessageHeader_leftSideMessageHeader__5CfdD"></div>
+          <div class="ChatMessage_messageWrapper__4Ugd6">
+            <div class="Message_messageBubbleWrapper__sEq8z">
+              <div class="Message_leftSideMessageBubble__VPdk6">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH">
+                    <div class="Markdown_markdownContainer__Tz3HQ">
+                      <div class="Prose_prose__7AjXb Prose_presets_prose__H9VRM Prose_presets_theme-hi-contrast__LQyM9">
+                        <p>当然可以！以下是用Markdown格式编写的文本示例：</p>
+                        <h1>标题1</h1>
+                        <h2>标题2</h2>
+                        <p>这是一个段落，里面有一些<strong>加粗的文本</strong>和<em>斜体的文本</em>。</p>
+                        <ul>
+                          <li>这是一个无序列表
+                            <ul>
+                              <li>子项1</li>
+                              <li>子项2</li>
+                            </ul>
+                          </li>
+                        </ul>
+                        <ol>
+                          <li>这是一个有序列表</li>
+                          <li>项目2</li>
+                        </ol>
+                        <p><a href="https://www.example.com" target="_blank">这是一个链接</a></p>
+                        <blockquote node="[object Object]">
+                          <p>这是一个引用。</p>
+                        </blockquote>
+                        <p>您可以根据需要修改或添加内容！</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeMarkdown();
+    loadPoeCollector();
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+
+    const md = snap.messages[0].contentMarkdown || "";
+    expect(md).toContain("# 标题1");
+    expect(md).toContain("## 标题2");
+    expect(md).toContain("**加粗的文本**");
+    expect(md).toContain("*斜体的文本*");
+    expect(md).toContain("- 这是一个无序列表");
+    expect(md).toContain("- 子项1");
+    expect(md).toContain("- 子项2");
+    expect(md).toContain("1. 这是一个有序列表");
+    expect(md).toContain("1. 项目2");
+    expect(md).toContain("[这是一个链接](https://www.example.com)");
+    expect(md).toContain("> 这是一个引用。");
+    expect(md).toContain("您可以根据需要修改或添加内容！");
+  });
+
   it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { JSDOM } = require("jsdom");
