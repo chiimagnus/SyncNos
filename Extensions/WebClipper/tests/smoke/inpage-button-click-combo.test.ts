@@ -46,7 +46,7 @@ describe("inpage-button click combos", () => {
     delete globalThis.WebClipper;
   });
 
-  it("keeps single click as immediate save action", () => {
+  it("fires single-click save only after combo window settles", () => {
     const api = loadInpageButton();
     const calls: string[] = [];
 
@@ -58,8 +58,10 @@ describe("inpage-button click combos", () => {
     const btn = document.getElementById("webclipper-inpage-btn");
     btn?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 
-    expect(calls).toEqual(["save"]);
-    vi.advanceTimersByTime(401);
+    expect(calls).toEqual([]);
+    vi.advanceTimersByTime(399);
+    expect(calls).toEqual([]);
+    vi.advanceTimersByTime(2);
     expect(calls).toEqual(["save"]);
   });
 
@@ -77,11 +79,11 @@ describe("inpage-button click combos", () => {
     btn?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     btn?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 
-    expect(calls).toEqual(["save"]);
+    expect(calls).toEqual([]);
     vi.advanceTimersByTime(399);
-    expect(calls).toEqual(["save"]);
+    expect(calls).toEqual([]);
     vi.advanceTimersByTime(2);
-    expect(calls).toEqual(["save", "double"]);
+    expect(calls).toEqual(["double"]);
   });
 
   it("uses highest combo level and suppresses double when count >= 3", () => {
@@ -101,7 +103,7 @@ describe("inpage-button click combos", () => {
     }
 
     vi.advanceTimersByTime(401);
-    expect(calls).toEqual(["save", "combo:5:5"]);
+    expect(calls).toEqual(["combo:5:5"]);
     expect(btn?.classList.contains("is-easter-5")).toBe(true);
     vi.advanceTimersByTime(761);
     expect(btn?.classList.contains("is-easter-5")).toBe(false);
@@ -124,7 +126,7 @@ describe("inpage-button click combos", () => {
     }
 
     vi.advanceTimersByTime(401);
-    expect(calls).toEqual(["save", "combo:3:3"]);
+    expect(calls).toEqual(["combo:3:3"]);
     expect(btn?.classList.contains("is-easter-3")).toBe(true);
   });
 
@@ -144,7 +146,7 @@ describe("inpage-button click combos", () => {
     }
 
     vi.advanceTimersByTime(401);
-    expect(calls).toEqual(["save", "combo:7:8"]);
+    expect(calls).toEqual(["combo:7:8"]);
     expect(btn?.classList.contains("is-easter-7")).toBe(true);
   });
 
@@ -164,6 +166,6 @@ describe("inpage-button click combos", () => {
     api.cleanupButtons("");
 
     vi.advanceTimersByTime(401);
-    expect(calls).toEqual(["save"]);
+    expect(calls).toEqual([]);
   });
 });
