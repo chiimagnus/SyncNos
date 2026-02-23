@@ -114,8 +114,11 @@
 
   function imageScopeFromWrapper(wrapper) {
     if (!wrapper || !wrapper.querySelector) return wrapper;
-    const bubble = wrapper.querySelector("div[class*='Message_messageBubbleWrapper__']") || wrapper;
-    return bubble.querySelector("div[class*='Message_messageTextContainer__']") || bubble;
+    const bubble = wrapper.querySelector("div[class*='Message_leftSideMessageBubble__'], div[class*='Message_rightSideMessageBubble__']");
+    if (bubble) return bubble;
+    const bubbleWrapper = wrapper.querySelector("div[class*='Message_messageBubbleWrapper__']");
+    if (bubbleWrapper) return bubbleWrapper;
+    return wrapper.querySelector("div[class*='Message_messageTextContainer__']") || wrapper;
   }
 
   function getMessageWrappers(root) {

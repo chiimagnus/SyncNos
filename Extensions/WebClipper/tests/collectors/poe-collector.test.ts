@@ -554,4 +554,58 @@ describe("poe-collector", () => {
     expect(md).toContain("![](https://img.test/attach.png)");
     expect(md).not.toContain("avatar.jpeg");
   });
+
+  it("captures attachment images outside message text container", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const html = `
+      <div class="ChatMessagesView_messageTuple__X">
+        <div class="ChatMessage_chatMessage__xkgHx" id="message-20">
+          <div class="ChatMessage_messageWrapper__4Ugd6 ChatMessage_rightSideMessageWrapper__r0roB">
+            <div class="Message_messageBubbleWrapper__sEq8z">
+              <div class="Message_rightSideMessageBubble__ioa_i">
+                <div class="Message_messageTextContainer__w64Sc">
+                  <div class="Message_selectableText__SQ8WH">
+                    <p><strong>@GLM-5</strong> 这是什么？</p>
+                  </div>
+                </div>
+                <div class="Attachments_attachments__x_H2Q">
+                  <img
+                    class="FileInfo_interactiveImage__AHKat Attachments_attachment___L7ZA"
+                    src="https://pfst.cf2.poecdn.net/base/image/example-image.png?w=1280&h=800"
+                    alt="截图.png"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, { url: "https://poe.com/chat/4ogjbuwydndzro1w6g" });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadPoeMarkdown();
+    loadPoeCollector();
+
+    // @ts-expect-error test global
+    const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
+    expect(snap).toBeTruthy();
+    expect(snap.messages.length).toBe(1);
+    expect(snap.messages[0].contentText).toContain("@GLM-5 这是什么？");
+    expect(snap.messages[0].contentMarkdown || "").toContain("![](https://pfst.cf2.poecdn.net/base/image/example-image.png?w=1280&h=800)");
+  });
 });
