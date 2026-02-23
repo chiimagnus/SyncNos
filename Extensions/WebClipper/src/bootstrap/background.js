@@ -17,6 +17,7 @@
       "../sync/notion/notion-ai.js",
       "../sync/notion/notion-db-manager.js",
       "../sync/notion/notion-markdown-blocks.js",
+      "../sync/notion/notion-image-upload-upgrader.js",
       "../sync/notion/notion-sync-service.js",
       "../sync/notion/notion-sync-job-store.js",
       "../sync/notion/notion-sync-orchestrator.js",
