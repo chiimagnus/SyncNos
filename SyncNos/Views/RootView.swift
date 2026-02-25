@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import MenuBarDockKit
 
 /// 根视图：管理 Onboarding、PayWall 和 MainListView 的切换
 /// 确保 PayWall 在 MainListView 初始化之前显示，避免数据源的副作用（如文件夹授权弹窗）

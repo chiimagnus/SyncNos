@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AppKit
+import MenuBarDockKit
 
 /// 管理应用图标显示模式的 ViewModel
 @MainActor
@@ -96,4 +97,3 @@ final class AppIconDisplayViewModel: ObservableObject {
         DIContainer.shared.loggerService.info("Applied activation policy: \(newPolicy.rawValue) for mode: \(mode)")
     }
 }
-

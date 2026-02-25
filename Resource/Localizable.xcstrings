@@ -11012,6 +11012,7 @@
     },
     "In the Dock" : {
       "comment" : "App icon display mode: dock only",
+      "extractionState" : "stale",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -11107,6 +11108,7 @@
     },
     "In the Menu Bar" : {
       "comment" : "App icon display mode: menu bar only",
+      "extractionState" : "stale",
       "localizations" : {
         "da" : {
           "stringUnit" : {
@@ -11202,6 +11204,7 @@
     },
     "In the Menu Bar and Dock" : {
       "comment" : "App icon display mode: both menu bar and dock",
+      "extractionState" : "stale",
       "localizations" : {
         "da" : {
           "stringUnit" : {

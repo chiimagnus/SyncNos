@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import MenuBarDockKit
 
 /// 键盘导航目标：当前焦点在 List 还是 Detail
 enum KeyboardNavigationTarget {
