@@ -4,6 +4,28 @@
   const DB_TITLE = "SyncNos-AI Chats";
   const DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
 
+  function removeStorageKeys(keys) {
+    return new Promise((resolve) => {
+      if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== "function") {
+        return resolve(false);
+      }
+      chrome.storage.local.remove(Array.isArray(keys) ? keys : [], () => resolve(true));
+    });
+  }
+
+  function clearCachedDatabaseId() {
+    return removeStorageKeys([DB_STORAGE_KEY]);
+  }
+
+  function isNotionDatabaseNotFoundError(error) {
+    const msg = error && error.message ? String(error.message) : String(error || "");
+    if (!msg) return false;
+    if (!msg.includes("HTTP 404")) return false;
+    const lower = msg.toLowerCase();
+    if (!lower.includes("object_not_found")) return false;
+    return lower.includes("database");
+  }
+
   function buildAiOptions() {
     const api = NS.notionAi;
     if (api && typeof api.buildAiOptions === "function") return api.buildAiOptions();
@@ -63,16 +85,23 @@
     }
   }
 
-  async function ensureDatabase({ accessToken, parentPageId }) {
-    const cached = await new Promise((resolve) => {
-      chrome.storage.local.get([DB_STORAGE_KEY], (res) => resolve((res && res[DB_STORAGE_KEY]) || ""));
-    });
+  async function ensureDatabase({ accessToken, parentPageId, forceRefresh }) {
+    const shouldUseCache = !forceRefresh;
+    if (!shouldUseCache) await clearCachedDatabaseId();
+
+    const cached = shouldUseCache
+      ? await new Promise((resolve) => {
+        chrome.storage.local.get([DB_STORAGE_KEY], (res) => resolve((res && res[DB_STORAGE_KEY]) || ""));
+      })
+      : "";
+
     if (cached) {
       try {
         const db = await getDatabase(accessToken, cached);
         await ensureDatabaseSchema({ accessToken, databaseId: cached });
         return { databaseId: cached, title: DB_TITLE, reused: true, database: db };
       } catch (_e) {
+        await clearCachedDatabaseId();
         // Fall through: cached id invalid or no access.
       }
     }
@@ -100,7 +129,10 @@
     ensureDatabase,
     ensureDatabaseSchema,
     buildAiOptions,
-    DB_TITLE
+    clearCachedDatabaseId,
+    isNotionDatabaseNotFoundError,
+    DB_TITLE,
+    DB_STORAGE_KEY
   };
   NS.notionDbManager = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

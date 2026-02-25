@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
-  const store: Record<string, unknown> = {};
+function mockChromeStorage({ parentPageId = "parent_page", initial = {} as Record<string, unknown> } = {}) {
+  const store: Record<string, unknown> = {
+    notion_parent_page_id: parentPageId,
+    ...initial
+  };
+  const removed: string[] = [];
   return {
     storage: {
       local: {
         get(keys: string[], cb: (res: Record<string, unknown>) => void) {
           const out: Record<string, unknown> = {};
           for (const k of keys) {
-            if (k === "notion_parent_page_id") out[k] = parentPageId;
-            else if (Object.prototype.hasOwnProperty.call(store, k)) out[k] = store[k];
+            if (Object.prototype.hasOwnProperty.call(store, k)) out[k] = store[k];
             else out[k] = null;
           }
           cb(out);
@@ -17,9 +20,19 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
         set(payload: Record<string, unknown>, cb: () => void) {
           for (const [k, v] of Object.entries(payload || {})) store[k] = v;
           cb();
+        },
+        remove(keys: string[], cb: () => void) {
+          for (const k of keys || []) {
+            removed.push(String(k));
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete store[k];
+          }
+          cb();
         }
       }
-    }
+    },
+    __store: store,
+    __removed: removed
   };
 }
 
@@ -47,6 +60,37 @@ function loadBackgroundRouter() {
 }
 
 describe("background-router notion sync", () => {
+  it("disconnect clears token and notion sync target cache", async () => {
+    let clearTokenCalls = 0;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const chromeMock = mockChromeStorage({
+      initial: {
+        notion_db_id_syncnos_ai_chats: "db_old"
+      }
+    });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = {
+      clearToken: async () => {
+        clearTokenCalls += 1;
+      }
+    };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "notionDisconnect" });
+
+    expect(res.ok).toBe(true);
+    expect(res.data.disconnected).toBe(true);
+    expect(clearTokenCalls).toBe(1);
+    expect(chromeMock.__removed.includes("notion_parent_page_id")).toBe(true);
+    expect(chromeMock.__removed.includes("notion_db_id_syncnos_ai_chats")).toBe(true);
+    expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    expect(chromeMock.__store.notion_db_id_syncnos_ai_chats).toBeUndefined();
+  });
+
   it("recreates page when existing page is missing", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
@@ -289,5 +333,75 @@ describe("background-router notion sync", () => {
     expect(calls.some((c) => c.op === "append" && c.pageId === "p_new")).toBe(true);
     expect(appendedBlocks[0]?.image?.type).toBe("file_upload");
     expect(appendedBlocks[0]?.image?.file_upload?.id).toBe("u1");
+  });
+
+  it("rebuilds database cache and retries create page on database object_not_found", async () => {
+    const calls: any[] = [];
+    let ensureDbCalls = 0;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionDbManager = {
+      ensureDatabase: async () => {
+        ensureDbCalls += 1;
+        return { databaseId: ensureDbCalls === 1 ? "db_old" : "db_new" };
+      },
+      clearCachedDatabaseId: async () => {
+        calls.push({ op: "clearDbCache" });
+      }
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      getSyncMappingByConversation: async () => ({
+        conversation: { id: 1, title: "Hello", url: "https://x", source: "chatgpt" },
+        mapping: null
+      }),
+      getMessagesByConversationId: async () => [{ messageKey: "m1", role: "user", contentText: "hi", sequence: 1 }],
+      setConversationNotionPageId: async (_id: number, pageId: string) => calls.push({ op: "setPageId", pageId }),
+      setSyncCursor: async () => calls.push({ op: "setCursor" })
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionSyncService = {
+      getPage: async () => {
+        throw new Error("404");
+      },
+      createPageInDatabase: async (_token: string, payload: any) => {
+        calls.push({ op: "createPage", databaseId: payload.databaseId });
+        if (payload.databaseId === "db_old") {
+          throw new Error(
+            "notion api failed: POST /v1/pages HTTP 404 " +
+            '{"object":"error","status":404,"code":"object_not_found","message":"Could not find database with ID: db_old"}'
+          );
+        }
+        return { id: "p_new" };
+      },
+      updatePageProperties: async () => ({ ok: true }),
+      clearPageChildren: async () => ({ ok: true }),
+      appendChildren: async (_t: string, pageId: string, _blocks: any[]) => {
+        calls.push({ op: "append", pageId });
+        return { ok: true };
+      },
+      messagesToBlocks: (messages: any[]) => [{ kind: "blocks", count: messages.length }],
+      isPageUsableForDatabase: () => false,
+      pageBelongsToDatabase: () => false
+    };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
+
+    expect(res.ok).toBe(true);
+    expect(res.data.okCount).toBe(1);
+    expect(res.data.results[0].mode).toBe("created");
+    expect(ensureDbCalls).toBe(2);
+    expect(calls.some((c) => c.op === "clearDbCache")).toBe(true);
+    expect(calls.some((c) => c.op === "createPage" && c.databaseId === "db_old")).toBe(true);
+    expect(calls.some((c) => c.op === "createPage" && c.databaseId === "db_new")).toBe(true);
+    expect(calls.some((c) => c.op === "setPageId" && c.pageId === "p_new")).toBe(true);
   });
 });

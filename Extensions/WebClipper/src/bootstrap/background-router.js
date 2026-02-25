@@ -28,6 +28,10 @@
   });
 
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const NOTION_STORAGE_KEYS_ON_DISCONNECT = Object.freeze([
+    "notion_parent_page_id",
+    "notion_db_id_syncnos_ai_chats"
+  ]);
 
   function ok(data) {
     return { ok: true, data, error: null };
@@ -46,6 +50,13 @@
     }
     const single = String(msg.url || "").trim();
     return single ? [single] : [];
+  }
+
+  async function removeStorageKeys(keys) {
+    if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== "function") return false;
+    return new Promise((resolve) => {
+      chrome.storage.local.remove(Array.isArray(keys) ? keys : [], () => resolve(true));
+    });
   }
 
   async function handleMessage(msg) {
@@ -87,6 +98,7 @@
       }
       case NOTION_MESSAGE_TYPES.DISCONNECT: {
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
+        await removeStorageKeys(NOTION_STORAGE_KEYS_ON_DISCONNECT);
         return ok({ disconnected: true });
       }
       case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS: {

@@ -2,6 +2,7 @@
 
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const PARENT_PAGE_STORAGE_KEY = "notion_parent_page_id";
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
@@ -83,8 +84,71 @@
 
   async function getNotionParentPageId() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(["notion_parent_page_id"], (res) => resolve((res && res.notion_parent_page_id) || ""));
+      chrome.storage.local.get([PARENT_PAGE_STORAGE_KEY], (res) => resolve((res && res[PARENT_PAGE_STORAGE_KEY]) || ""));
     });
+  }
+
+  function isDatabaseNotFoundError(error, notionDbManager) {
+    if (notionDbManager && typeof notionDbManager.isNotionDatabaseNotFoundError === "function") {
+      return notionDbManager.isNotionDatabaseNotFoundError(error);
+    }
+    const msg = error && error.message ? String(error.message) : String(error || "");
+    if (!msg) return false;
+    if (!msg.includes("HTTP 404")) return false;
+    const lower = msg.toLowerCase();
+    if (!lower.includes("object_not_found")) return false;
+    return lower.includes("database");
+  }
+
+  async function recoverDatabaseId({ notionDbManager, accessToken, parentPageId }) {
+    if (!notionDbManager || typeof notionDbManager.ensureDatabase !== "function") return "";
+    if (typeof notionDbManager.clearCachedDatabaseId === "function") {
+      await notionDbManager.clearCachedDatabaseId();
+    }
+    const recovered = await notionDbManager.ensureDatabase({
+      accessToken,
+      parentPageId,
+      forceRefresh: true
+    });
+    return recovered && recovered.databaseId ? String(recovered.databaseId) : "";
+  }
+
+  async function createPageWithDatabaseRecovery({
+    notionSyncService,
+    notionDbManager,
+    accessToken,
+    parentPageId,
+    databaseId,
+    title,
+    url,
+    ai
+  }) {
+    try {
+      const created = await notionSyncService.createPageInDatabase(accessToken, {
+        databaseId,
+        title,
+        url,
+        ai
+      });
+      return { created, databaseId };
+    } catch (error) {
+      if (!isDatabaseNotFoundError(error, notionDbManager)) throw error;
+
+      const recoveredDbId = await recoverDatabaseId({
+        notionDbManager,
+        accessToken,
+        parentPageId
+      });
+      if (!recoveredDbId) throw error;
+
+      const created = await notionSyncService.createPageInDatabase(accessToken, {
+        databaseId: recoveredDbId,
+        title,
+        url,
+        ai
+      });
+      return { created, databaseId: recoveredDbId };
+    }
   }
 
   function getDependencies() {
@@ -134,7 +198,7 @@
     if (!notionDbManager || !notionDbManager.ensureDatabase) throw new Error("notion db manager missing");
 
     const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId });
-    const dbId = db && db.databaseId ? db.databaseId : "";
+    let dbId = db && db.databaseId ? db.databaseId : "";
     if (!dbId) throw new Error("missing databaseId");
 
     const results = [];
@@ -185,12 +249,18 @@
 
         if (!pageId) {
           // eslint-disable-next-line no-await-in-loop
-          const created = await notionSyncService.createPageInDatabase(token.accessToken, {
+          const createRes = await createPageWithDatabaseRecovery({
+            notionSyncService,
+            notionDbManager,
+            accessToken: token.accessToken,
+            parentPageId,
             databaseId: dbId,
             title: convo.title,
             url: convo.url,
             ai: convo.source
           });
+          dbId = createRes.databaseId || dbId;
+          const created = createRes.created;
           pageId = created && created.id ? created.id : "";
           if (!pageId) throw new Error("create page failed");
 
