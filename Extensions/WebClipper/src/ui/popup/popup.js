@@ -19,6 +19,7 @@
   const { els, state, send, flashOk, copyTextToClipboard } = core;
   const contracts = NS.messageContracts || {};
   const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
+    GET_AUTH_STATUS: "getNotionAuthStatus",
     SYNC_CONVERSATIONS: "notionSyncConversations",
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   };
@@ -149,6 +150,8 @@
     els.btnSyncNotion.addEventListener("click", async () => {
       const ids = list.getSelectedIds();
       if (!ids.length) return;
+      const configReady = await ensureNotionSyncConfigured();
+      if (!configReady) return;
       const btn = els.btnSyncNotion;
       const prevText = btn.textContent;
       setSyncingUi(true, { done: 0, total: ids.length });
@@ -156,7 +159,14 @@
       try {
         const res = await send(notionTypes.SYNC_CONVERSATIONS, { conversationIds: ids });
         if (!res || !res.ok) {
-          alert((res && res.error && res.error.message) || "Sync failed.");
+          const msg = (res && res.error && res.error.message) || "Sync failed.";
+          if (shouldGuideToNotionSettings(msg)) {
+            await guideToNotionSettings({
+              message: "Notion is not fully configured. Please connect Notion and select a sync page in Settings."
+            });
+            return;
+          }
+          alert(msg);
           return;
         }
         const data = res.data || {};
@@ -190,6 +200,37 @@
         await list.refresh();
       }
     });
+  }
+
+  function shouldGuideToNotionSettings(message) {
+    const msg = String(message || "").toLowerCase();
+    if (!msg) return false;
+    return msg.includes("missing parentpageid") || msg.includes("notion not connected");
+  }
+
+  async function guideToNotionSettings({ message }) {
+    if (tabs && typeof tabs.setActiveTab === "function") tabs.setActiveTab("settings");
+    if (notion && typeof notion.refreshNotionStatus === "function") {
+      try {
+        await notion.refreshNotionStatus();
+      } catch (_e) {
+        // ignore
+      }
+    }
+    alert(message || "Please configure Notion in Settings first.");
+  }
+
+  async function ensureNotionSyncConfigured() {
+    const auth = await send(notionTypes.GET_AUTH_STATUS);
+    const connected = !!(auth && auth.ok && auth.data && auth.data.connected);
+    const stored = await core.storageGet(["notion_parent_page_id"]);
+    const parentPageId = stored && stored.notion_parent_page_id ? String(stored.notion_parent_page_id).trim() : "";
+    if (connected && parentPageId) return true;
+
+    await guideToNotionSettings({
+      message: "Please connect Notion and select a sync page in Settings before syncing."
+    });
+    return false;
   }
 
   function initObsidianAction() {
