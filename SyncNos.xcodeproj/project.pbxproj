@@ -104,6 +104,7 @@
 			);
 			name = SyncNos;
 			packageProductDependencies = (
+				F5F7301841414EF3DD892DA3 /* MenuBarDockKit */,
 			);
 			productName = SyncNos;
 			productReference = D8CE88DA2E713DB50025AD6E /* SyncNos.app */;
@@ -147,6 +148,9 @@
 			);
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "../SharedPackages/MenuBarDockKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D81167BD2E70A140000D0173 /* Products */;
 			projectDirPath = "";
@@ -420,6 +424,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "../SharedPackages/MenuBarDockKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../SharedPackages/MenuBarDockKit";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F5F7301841414EF3DD892DA3 /* MenuBarDockKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MenuBarDockKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D81167B42E70A13F000D0173 /* Project object */;
 }

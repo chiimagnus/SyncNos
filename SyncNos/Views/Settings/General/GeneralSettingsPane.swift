@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import MenuBarDockKit
 
 struct GeneralSettingsPane: View {
     @ObservedObject var loginItemVM: LoginItemViewModel
