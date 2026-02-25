@@ -7,6 +7,7 @@ struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var iapPresentationMode: IAPPresentationMode? = nil
     @State private var mainWindow: NSWindow? = nil
+    @State private var mainWindowDockVisibilityController = MainWindowDockVisibilityController()
     @StateObject private var mainWindowStayOnTopController = MainWindowStayOnTopController()
     @ObservedObject private var fontScaleManager = FontScaleManager.shared
     
@@ -75,6 +76,7 @@ struct RootView: View {
         }
         .onDisappear {
             mainWindowStayOnTopController.reset()
+            mainWindowDockVisibilityController.reset()
         }
         .onChange(of: hasCompletedOnboarding) { _, newValue in
             // 完成引导后立即检查 PayWall 状态
@@ -96,6 +98,7 @@ struct RootView: View {
         .background(
             WindowReader(window: $mainWindow) { newWindow in
                 mainWindowStayOnTopController.attachWindow(newWindow)
+                mainWindowDockVisibilityController.attachWindow(newWindow)
             }
         )
         .frame(minWidth: minimumWindowSize.width, minHeight: minimumWindowSize.height)
