@@ -42,6 +42,70 @@ describe("notion-files-api", () => {
     expect(calls[1].headers["Notion-Version"]).toBe("2099-01-01");
   });
 
+  it("searchPages paginates and returns usable parent pages only", async () => {
+    const bodies: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: string, init: any) => {
+      const body = JSON.parse(String(init && init.body ? init.body : "{}"));
+      bodies.push(body);
+      if (bodies.length === 1) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            results: [{ object: "page", id: "entry1", parent: { type: "database_id", database_id: "db1" } }],
+            has_more: true,
+            next_cursor: "cursor_2"
+          })
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          results: [
+            { object: "page", id: "entry2", parent: { type: "database_id", database_id: "db2" } },
+            { object: "page", id: "p2", parent: { type: "page_id", page_id: "root1" }, properties: {} }
+          ],
+          has_more: false
+        })
+      };
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const notionApi = loadNotionApi();
+    const res = await notionApi.searchPages({ accessToken: "t", query: "", pageSize: 50 });
+
+    expect(Array.isArray(res.results)).toBe(true);
+    expect(res.results.length).toBe(1);
+    expect(res.results[0].id).toBe("p2");
+    expect(Object.prototype.hasOwnProperty.call(bodies[0], "query")).toBe(false);
+    expect(bodies[0].filter?.value).toBe("page");
+    expect(bodies[1].start_cursor).toBe("cursor_2");
+  });
+
+  it("searchPages keeps non-empty query", async () => {
+    const bodies: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: string, init: any) => {
+      bodies.push(JSON.parse(String(init && init.body ? init.body : "{}")));
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ results: [{ object: "page", id: "p1", properties: {} }], has_more: false })
+      };
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const notionApi = loadNotionApi();
+    await notionApi.searchPages({ accessToken: "t", query: "syncnos", pageSize: 10 });
+
+    expect(bodies[0].query).toBe("syncnos");
+    expect(bodies[0].page_size).toBe(10);
+  });
+
   it("creates external_url upload and polls until uploaded", async () => {
     const reqs: any[] = [];
     // @ts-expect-error test global

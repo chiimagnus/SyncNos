@@ -31,24 +31,39 @@
     return status.data.token && status.data.token.accessToken ? status.data.token.accessToken : "";
   }
 
+  function setParentPagePlaceholder(text) {
+    if (!els.notionPages) return;
+    const option = document.createElement("option");
+    option.value = "";
+    option.disabled = true;
+    option.selected = true;
+    option.textContent = String(text || "No pages available.");
+    els.notionPages.replaceChildren(option);
+  }
+
   async function loadParentPages() {
     const accessToken = await getNotionAccessToken();
     if (!accessToken) {
+      setParentPagePlaceholder("Connect Notion to load pages.");
       alert("Notion not connected.");
       return;
     }
     const api = globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
     if (!api) {
+      setParentPagePlaceholder("Notion API is unavailable. Reload extension.");
       alert("Notion API module not available.");
       return;
     }
     const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
     const pagesRaw = Array.isArray(result.results) ? result.results : [];
-    const withoutDatabaseEntries = pagesRaw.filter((p) => !(p && p.parent && p.parent.type === "database_id"));
-    const rootPages = withoutDatabaseEntries.filter((p) => p && p.parent && p.parent.type === "workspace");
-    const pages = rootPages.length ? rootPages : withoutDatabaseEntries;
+    const pages = pagesRaw.filter((p) => !(p && (p.archived === true || p.in_trash === true)));
 
     if (!els.notionPages) return;
+    if (!pages.length) {
+      setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
+      return;
+    }
+
     els.notionPages.replaceChildren();
     for (const page of pages) {
       const opt = document.createElement("option");
@@ -147,7 +162,7 @@
       setNotionConnectBusy(false);
       stopNotionConnectPolling();
       notionParentPagesLoaded = false;
-      if (els.notionPages) els.notionPages.replaceChildren();
+      setParentPagePlaceholder("Connect Notion to load pages.");
       return;
     }
     if (res.data.connected) {
@@ -163,6 +178,7 @@
         notionParentPagesLoaded = true;
         loadParentPages().catch((e) => {
           notionParentPagesLoaded = false;
+          setParentPagePlaceholder("Failed to load pages. Click refresh.");
           const msg = e && e.message ? e.message : String(e || "Failed to load Notion pages.");
           if (!refreshNotionStatus.__lastLoadPagesError || refreshNotionStatus.__lastLoadPagesError !== msg) {
             refreshNotionStatus.__lastLoadPagesError = msg;
@@ -186,6 +202,7 @@
       setNotionParentControlsEnabled(false);
       setNotionConnectBusy(false);
       notionParentPagesLoaded = false;
+      setParentPagePlaceholder("Connect Notion to load pages.");
     }
   }
 
@@ -194,7 +211,10 @@
       els.btnNotionLoadPages.addEventListener("click", () => {
         loadParentPages()
           .then(() => flashOk(els.btnNotionLoadPages))
-          .catch((e) => alert(e && e.message ? e.message : String(e)));
+          .catch((e) => {
+            setParentPagePlaceholder("Failed to load pages. Click refresh.");
+            alert(e && e.message ? e.message : String(e));
+          });
       });
     }
 

@@ -37,14 +37,43 @@
     return page && page.url ? page.url : "Untitled";
   }
 
-  async function searchPages({ accessToken, query, pageSize }) {
+  function buildSearchBody({ query, pageSize, startCursor }) {
     const body = {
-      query: query || "",
       filter: { property: "object", value: "page" },
-      sort: { direction: "descending", timestamp: "last_edited_time" },
-      page_size: pageSize || 20
+      page_size: pageSize || 50
     };
-    return notionFetch({ accessToken, method: "POST", path: "/v1/search", body });
+    const q = String(query || "").trim();
+    if (q) body.query = q;
+    if (startCursor) body.start_cursor = String(startCursor);
+    return body;
+  }
+
+  async function searchPages({ accessToken, query, pageSize }) {
+    const size = Number.isFinite(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : 50;
+    let cursor = null;
+    let guard = 0;
+
+    while (guard < 20) {
+      guard += 1;
+      const body = buildSearchBody({ query, pageSize: size, startCursor: cursor });
+      const res = await notionFetch({ accessToken, method: "POST", path: "/v1/search", body });
+      const results = Array.isArray(res && res.results) ? res.results : [];
+      const usableParentPages = results.filter((item) => {
+        if (!item || item.object !== "page") return false;
+        const parent = item.parent || null;
+        if (!parent) return true;
+        if (parent.database_id) return false;
+        if (parent.type === "database_id") return false;
+        return true;
+      });
+      if (usableParentPages.length) {
+        return { ...(res || {}), results: usableParentPages };
+      }
+      if (!res || !res.has_more || !res.next_cursor) break;
+      cursor = res.next_cursor;
+    }
+
+    return { results: [], has_more: false, next_cursor: null };
   }
 
   const api = { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
