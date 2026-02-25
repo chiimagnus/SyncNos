@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import MenuBarDockKit
 
 // MARK: - Global Search Panel
 

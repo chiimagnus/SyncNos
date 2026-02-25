@@ -1,4 +1,5 @@
 import SwiftUI
+import MenuBarDockKit
 
 @MainActor
 @objc final class AppDelegate: NSObject, NSApplicationDelegate {
