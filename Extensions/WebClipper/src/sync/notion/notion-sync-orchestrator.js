@@ -17,6 +17,19 @@
     return { lastSyncedMessageKey, lastSyncedSequence: seq };
   }
 
+  function isObjectNotFoundError(error) {
+    const message = error && error.message ? String(error.message) : String(error || "");
+    if (!message) return false;
+    return message.includes("object_not_found");
+  }
+
+  function isMissingDatabaseError(error) {
+    const message = error && error.message ? String(error.message) : String(error || "");
+    if (!message) return false;
+    if (!isObjectNotFoundError(error)) return false;
+    return message.toLowerCase().includes("database");
+  }
+
   function computeNewMessages(messages, cursor) {
     const list = Array.isArray(messages) ? messages : [];
     if (!list.length) return { ok: true, mode: "empty", newMessages: [], rebuild: false };
@@ -87,6 +100,25 @@
     });
   }
 
+  function storageRemove(keys) {
+    return new Promise((resolve) => {
+      if (!Array.isArray(keys) || !keys.length) return resolve(false);
+      if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== "function") return resolve(false);
+      chrome.storage.local.remove(keys, () => resolve(true));
+    });
+  }
+
+  async function clearCachedDatabaseId(notionDbManager) {
+    if (notionDbManager && typeof notionDbManager.clearCachedDatabaseId === "function") {
+      await notionDbManager.clearCachedDatabaseId();
+      return true;
+    }
+    const key = notionDbManager && notionDbManager.DB_STORAGE_KEY
+      ? String(notionDbManager.DB_STORAGE_KEY)
+      : "notion_db_id_syncnos_ai_chats";
+    return storageRemove([key]);
+  }
+
   function getDependencies() {
     return {
       notionJobStore: NS.notionSyncJobStore,
@@ -134,8 +166,9 @@
     if (!notionDbManager || !notionDbManager.ensureDatabase) throw new Error("notion db manager missing");
 
     const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId });
-    const dbId = db && db.databaseId ? db.databaseId : "";
+    let dbId = db && db.databaseId ? db.databaseId : "";
     if (!dbId) throw new Error("missing databaseId");
+    let recoveredMissingDatabase = false;
 
     const results = [];
     const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -184,13 +217,34 @@
         }
 
         if (!pageId) {
-          // eslint-disable-next-line no-await-in-loop
-          const created = await notionSyncService.createPageInDatabase(token.accessToken, {
-            databaseId: dbId,
-            title: convo.title,
-            url: convo.url,
-            ai: convo.source
-          });
+          let created = null;
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            created = await notionSyncService.createPageInDatabase(token.accessToken, {
+              databaseId: dbId,
+              title: convo.title,
+              url: convo.url,
+              ai: convo.source
+            });
+          } catch (createErr) {
+            const shouldRecoverDb = !recoveredMissingDatabase && isMissingDatabaseError(createErr);
+            if (!shouldRecoverDb) throw createErr;
+            recoveredMissingDatabase = true;
+            // Recover once by clearing stale DB cache and rebuilding under current parent page.
+            // eslint-disable-next-line no-await-in-loop
+            await clearCachedDatabaseId(notionDbManager);
+            // eslint-disable-next-line no-await-in-loop
+            const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId });
+            dbId = rebuiltDb && rebuiltDb.databaseId ? String(rebuiltDb.databaseId) : "";
+            if (!dbId) throw createErr;
+            // eslint-disable-next-line no-await-in-loop
+            created = await notionSyncService.createPageInDatabase(token.accessToken, {
+              databaseId: dbId,
+              title: convo.title,
+              url: convo.url,
+              ai: convo.source
+            });
+          }
           pageId = created && created.id ? created.id : "";
           if (!pageId) throw new Error("create page failed");
 
