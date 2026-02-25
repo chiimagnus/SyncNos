@@ -56,14 +56,11 @@
     }
     const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
     const pagesRaw = Array.isArray(result.results) ? result.results : [];
-    const withoutDatabaseEntries = pagesRaw.filter((p) => !(p && p.parent && p.parent.type === "database_id"));
-    const rootPages = withoutDatabaseEntries.filter((p) => p && p.parent && p.parent.type === "workspace");
-    const pages = rootPages.length ? rootPages : withoutDatabaseEntries;
+    const pages = pagesRaw.filter((p) => !(p && (p.archived === true || p.in_trash === true)));
 
     if (!els.notionPages) return;
     if (!pages.length) {
       setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
-      await storageSet({ notion_parent_page_id: "" });
       return;
     }
 
