@@ -42,7 +42,9 @@
       alert("Notion API module not available.");
       return;
     }
-    const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
+    const result = (typeof api.searchAllPages === "function")
+      ? await api.searchAllPages({ accessToken, query: "", pageSize: 100 })
+      : await api.searchPages({ accessToken, query: "", pageSize: 100 });
     const pagesRaw = Array.isArray(result.results) ? result.results : [];
     const withoutDatabaseEntries = pagesRaw.filter((p) => !(p && p.parent && p.parent.type === "database_id"));
     const rootPages = withoutDatabaseEntries.filter((p) => p && p.parent && p.parent.type === "workspace");
