@@ -42,57 +42,62 @@
   }
 
   async function loadParentPages() {
-    const accessToken = await getNotionAccessToken();
-    if (!accessToken) {
-      setParentPagePlaceholder("Connect Notion to load pages.");
-      alert("Notion not connected.");
-      return;
-    }
-    const api = globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
-    if (!api) {
-      setParentPagePlaceholder("Notion API is unavailable. Reload extension.");
-      alert("Notion API module not available.");
-      return;
-    }
-    const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
-    const pagesRaw = Array.isArray(result.results) ? result.results : [];
-    const pages = pagesRaw.filter((p) => !(p && (p.archived === true || p.in_trash === true)));
-
-    if (!els.notionPages) return;
-    if (!pages.length) {
-      setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
-      return;
-    }
-
-    els.notionPages.replaceChildren();
-    for (const page of pages) {
-      const opt = document.createElement("option");
-      opt.value = page.id;
-      opt.textContent = api.getPageTitle(page);
-      els.notionPages.appendChild(opt);
-    }
-
-    const saved = await storageGet(["notion_parent_page_id"]);
-    const savedId = (saved && saved.notion_parent_page_id) ? String(saved.notion_parent_page_id).trim() : "";
-    const hasSavedOption = (() => {
-      if (!savedId) return false;
-      try {
-        return Array.from(els.notionPages.options || []).some((o) => o && String(o.value) === savedId);
-      } catch (_e) {
-        return false;
+    setParentPagesLoading(true);
+    try {
+      const accessToken = await getNotionAccessToken();
+      if (!accessToken) {
+        setParentPagePlaceholder("Connect Notion to load pages.");
+        alert("Notion not connected.");
+        return;
       }
-    })();
+      const api = globalThis.WebClipper && globalThis.WebClipper.notionApi ? globalThis.WebClipper.notionApi : null;
+      if (!api) {
+        setParentPagePlaceholder("Notion API is unavailable. Reload extension.");
+        alert("Notion API module not available.");
+        return;
+      }
+      const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
+      const pagesRaw = Array.isArray(result.results) ? result.results : [];
+      const pages = pagesRaw.filter((p) => !(p && (p.archived === true || p.in_trash === true)));
 
-    if (hasSavedOption) {
-      els.notionPages.value = savedId;
-    }
+      if (!els.notionPages) return;
+      if (!pages.length) {
+        setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
+        return;
+      }
 
-    // Important: `notionSyncConversations` reads `notion_parent_page_id` from storage.
-    // If the user never changes the dropdown (still on the first option), the value would
-    // never be persisted, causing sync to fail with "missing parentPageId".
-    const currentSelected = String(els.notionPages.value || "").trim();
-    if (currentSelected && (!savedId || !hasSavedOption || savedId !== currentSelected)) {
-      await storageSet({ notion_parent_page_id: currentSelected });
+      els.notionPages.replaceChildren();
+      for (const page of pages) {
+        const opt = document.createElement("option");
+        opt.value = page.id;
+        opt.textContent = api.getPageTitle(page);
+        els.notionPages.appendChild(opt);
+      }
+
+      const saved = await storageGet(["notion_parent_page_id"]);
+      const savedId = (saved && saved.notion_parent_page_id) ? String(saved.notion_parent_page_id).trim() : "";
+      const hasSavedOption = (() => {
+        if (!savedId) return false;
+        try {
+          return Array.from(els.notionPages.options || []).some((o) => o && String(o.value) === savedId);
+        } catch (_e) {
+          return false;
+        }
+      })();
+
+      if (hasSavedOption) {
+        els.notionPages.value = savedId;
+      }
+
+      // Important: `notionSyncConversations` reads `notion_parent_page_id` from storage.
+      // If the user never changes the dropdown (still on the first option), the value would
+      // never be persisted, causing sync to fail with "missing parentPageId".
+      const currentSelected = String(els.notionPages.value || "").trim();
+      if (currentSelected && (!savedId || !hasSavedOption || savedId !== currentSelected)) {
+        await storageSet({ notion_parent_page_id: currentSelected });
+      }
+    } finally {
+      setParentPagesLoading(false);
     }
   }
 
@@ -122,6 +127,8 @@
 
   let notionConnectPollTimer = null;
   let notionParentPagesLoaded = false;
+  let notionParentControlsEnabled = false;
+  let notionParentPagesLoading = false;
 
   function setNotionConnectBusy(busy) {
     if (!els.btnNotionConnect) return;
@@ -146,10 +153,23 @@
     notionConnectPollTimer = null;
   }
 
+  function applyNotionParentControlsState() {
+    const enabled = notionParentControlsEnabled && !notionParentPagesLoading;
+    if (els.btnNotionLoadPages) {
+      els.btnNotionLoadPages.disabled = !enabled;
+      els.btnNotionLoadPages.classList.toggle("is-loading", notionParentPagesLoading);
+    }
+    if (els.notionPages) els.notionPages.disabled = !enabled;
+  }
+
   function setNotionParentControlsEnabled(enabled) {
-    const on = !!enabled;
-    if (els.btnNotionLoadPages) els.btnNotionLoadPages.disabled = !on;
-    if (els.notionPages) els.notionPages.disabled = !on;
+    notionParentControlsEnabled = !!enabled;
+    applyNotionParentControlsState();
+  }
+
+  function setParentPagesLoading(loading) {
+    notionParentPagesLoading = !!loading;
+    applyNotionParentControlsState();
   }
 
   async function refreshNotionStatus() {
@@ -158,6 +178,7 @@
     if (!res || !res.ok || !res.data) {
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
       if (els.btnNotionConnect) els.btnNotionConnect.textContent = "Connect";
+      setParentPagesLoading(false);
       setNotionParentControlsEnabled(false);
       setNotionConnectBusy(false);
       stopNotionConnectPolling();
@@ -199,6 +220,7 @@
         if (els.notionStatusTitle) els.notionStatusTitle.textContent = "Not connected";
       }
       if (els.btnNotionConnect) els.btnNotionConnect.textContent = "Connect";
+      setParentPagesLoading(false);
       setNotionParentControlsEnabled(false);
       setNotionConnectBusy(false);
       notionParentPagesLoaded = false;

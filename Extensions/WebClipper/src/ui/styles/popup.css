@@ -388,6 +388,15 @@ body {
   line-height: 1;
 }
 
+.btn.icon .iconSpin {
+  display: inline-block;
+  line-height: 1;
+}
+
+#btnNotionLoadPages.is-loading .iconSpin {
+  animation: notion-spin 900ms linear infinite;
+}
+
 .btn[disabled] {
   opacity: 0.65;
   cursor: default;
@@ -1199,12 +1208,22 @@ main {
   }
 }
 
+@keyframes notion-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toolbar,
   .btn,
   .row,
   .input,
-  .tabIndicator {
+  .tabIndicator,
+  .iconSpin {
     animation: none !important;
     transition: none !important;
   }
