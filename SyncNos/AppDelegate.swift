@@ -88,6 +88,19 @@ import SwiftUI
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
         return false
     }
+
+    // MARK: - Window Lifecycle
+    /// 当最后一个窗口关闭时：
+    /// - `.menuBarOnly`：隐藏 Dock（应用仍可通过菜单栏图标继续使用）
+    /// - 其它模式：保持 Dock 显示
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                DockPresenceService.hideDockIfAllowedWhenNoVisibleWindows()
+            }
+        }
+        return false
+    }
     
     // Ensure clicking the Dock icon re-opens the main window even if other windows are visible.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
