@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
   const store: Record<string, unknown> = { ...initial };
+  const removed: string[][] = [];
   return {
     storage: {
       local: {
@@ -13,9 +14,16 @@ function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
         set(payload: Record<string, unknown>, cb: () => void) {
           for (const [k, v] of Object.entries(payload || {})) store[k] = v;
           cb();
+        },
+        remove(keys: string[], cb: () => void) {
+          const arr = Array.isArray(keys) ? keys : [];
+          removed.push(arr.slice());
+          for (const k of arr) delete store[k];
+          cb();
         }
       }
-    }
+    },
+    __removed: removed
   };
 }
 
@@ -97,5 +105,40 @@ describe("notion-db-manager", () => {
 
     const patched = calls.some((c) => c.method === "PATCH" && c.path === "/v1/databases/db1");
     expect(patched).toBe(true);
+  });
+
+  it("clears stale cached database id and recreates database on object_not_found", async () => {
+    const calls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "GET" && req.path === "/v1/databases/db_old") {
+          throw new Error("notion api failed: GET /v1/databases/db_old HTTP 404 {\"code\":\"object_not_found\"}");
+        }
+        if (req.method === "POST" && req.path === "/v1/search") return { results: [] };
+        if (req.method === "POST" && req.path === "/v1/databases") return { id: "db_new" };
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+    const chromeMock = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: "db_old" } });
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: "t", parentPageId: "p" });
+    expect(res.databaseId).toBe("db_new");
+    expect(chromeMock.__removed.some((keys) => keys.includes("notion_db_id_syncnos_ai_chats"))).toBe(true);
+    expect(calls.some((c) => c.method === "GET" && c.path === "/v1/databases/db_old")).toBe(true);
   });
 });
