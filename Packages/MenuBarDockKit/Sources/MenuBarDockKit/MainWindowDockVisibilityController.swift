@@ -4,16 +4,18 @@ import Foundation
 /// 主窗口 Dock 可见性控制器（仅作用于主窗口）。
 ///
 /// 目标：当用户选择「仅菜单栏」模式时，打开主窗口期间临时显示 Dock，关闭主窗口后恢复隐藏。
-final class MainWindowDockVisibilityController {
+public final class MainWindowDockVisibilityController {
     private weak var window: NSWindow?
     private var didBecomeMainObserver: Any?
     private var windowWillCloseObserver: Any?
+
+    public init() {}
 
     deinit {
         detachWindow()
     }
 
-    func attachWindow(_ newWindow: NSWindow?) {
+    public func attachWindow(_ newWindow: NSWindow?) {
         assertMainThread()
         if window === newWindow { return }
 
@@ -45,7 +47,7 @@ final class MainWindowDockVisibilityController {
         }
     }
 
-    func reset() {
+    public func reset() {
         assertMainThread()
         detachWindow()
     }
@@ -66,3 +68,4 @@ final class MainWindowDockVisibilityController {
         precondition(Thread.isMainThread, "MainWindowDockVisibilityController 必须在主线程使用")
     }
 }
+
