@@ -149,7 +149,7 @@
 			mainGroup = D81167B32E70A13F000D0173;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "../SharedPackages/MenuBarDockKit" */,
+				4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "Packages/MenuBarDockKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D81167BD2E70A140000D0173 /* Products */;
@@ -426,9 +426,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "../SharedPackages/MenuBarDockKit" */ = {
+		4497FCB2EE380B1004F77F3D /* XCLocalSwiftPackageReference "Packages/MenuBarDockKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../SharedPackages/MenuBarDockKit";
+			relativePath = Packages/MenuBarDockKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
