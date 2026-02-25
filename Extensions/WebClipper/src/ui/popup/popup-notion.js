@@ -11,6 +11,7 @@
     GET_AUTH_STATUS: "getNotionAuthStatus",
     DISCONNECT: "notionDisconnect"
   };
+  const PARENT_PAGES_CACHE_KEY = "notion_parent_pages_cache_v1";
 
   async function getNotionOAuthMeta() {
     const res = await storageGet(["notion_oauth_last_error", "notion_oauth_pending_state"]);
@@ -41,6 +42,85 @@
     els.notionPages.replaceChildren(option);
   }
 
+  function normalizeParentPageSummaries(rawPages) {
+    const list = Array.isArray(rawPages) ? rawPages : [];
+    const out = [];
+    const seen = new Set();
+    for (const item of list) {
+      const id = item && item.id ? String(item.id).trim() : "";
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const title = item && item.title ? String(item.title).trim() : "";
+      out.push({ id, title: title || "Untitled" });
+    }
+    return out;
+  }
+
+  async function applyParentPageSummaries(rawPages) {
+    if (!els.notionPages) return false;
+    const pages = normalizeParentPageSummaries(rawPages);
+    if (!pages.length) {
+      setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
+      return false;
+    }
+
+    els.notionPages.replaceChildren();
+    for (const page of pages) {
+      const opt = document.createElement("option");
+      opt.value = page.id;
+      opt.textContent = page.title;
+      els.notionPages.appendChild(opt);
+    }
+
+    const saved = await storageGet(["notion_parent_page_id"]);
+    const savedId = (saved && saved.notion_parent_page_id) ? String(saved.notion_parent_page_id).trim() : "";
+    const hasSavedOption = (() => {
+      if (!savedId) return false;
+      try {
+        return Array.from(els.notionPages.options || []).some((o) => o && String(o.value) === savedId);
+      } catch (_e) {
+        return false;
+      }
+    })();
+
+    if (hasSavedOption) {
+      els.notionPages.value = savedId;
+    }
+
+    // Important: `notionSyncConversations` reads `notion_parent_page_id` from storage.
+    // If the user never changes the dropdown (still on the first option), the value would
+    // never be persisted, causing sync to fail with "missing parentPageId".
+    const currentSelected = String(els.notionPages.value || "").trim();
+    if (currentSelected && (!savedId || !hasSavedOption || savedId !== currentSelected)) {
+      await storageSet({ notion_parent_page_id: currentSelected });
+    }
+    return true;
+  }
+
+  async function getCachedParentPageSummaries(workspaceId) {
+    const res = await storageGet([PARENT_PAGES_CACHE_KEY]);
+    const cache = res && res[PARENT_PAGES_CACHE_KEY] && typeof res[PARENT_PAGES_CACHE_KEY] === "object"
+      ? res[PARENT_PAGES_CACHE_KEY]
+      : null;
+    if (!cache) return [];
+
+    const expectedWorkspaceId = String(workspaceId || "").trim();
+    const cachedWorkspaceId = String(cache.workspaceId || "").trim();
+    if (expectedWorkspaceId && cachedWorkspaceId && expectedWorkspaceId !== cachedWorkspaceId) return [];
+
+    return normalizeParentPageSummaries(cache.pages);
+  }
+
+  async function setCachedParentPageSummaries(workspaceId, rawPages) {
+    const pages = normalizeParentPageSummaries(rawPages);
+    await storageSet({
+      [PARENT_PAGES_CACHE_KEY]: {
+        workspaceId: String(workspaceId || "").trim(),
+        pages
+      }
+    });
+  }
+
   async function loadParentPages() {
     setParentPagesLoading(true);
     try {
@@ -59,42 +139,10 @@
       const result = await api.searchPages({ accessToken, query: "", pageSize: 50 });
       const pagesRaw = Array.isArray(result.results) ? result.results : [];
       const pages = pagesRaw.filter((p) => !(p && (p.archived === true || p.in_trash === true)));
-
-      if (!els.notionPages) return;
-      if (!pages.length) {
-        setParentPagePlaceholder("No accessible parent pages. Share one with SyncNos.");
-        return;
-      }
-
-      els.notionPages.replaceChildren();
-      for (const page of pages) {
-        const opt = document.createElement("option");
-        opt.value = page.id;
-        opt.textContent = api.getPageTitle(page);
-        els.notionPages.appendChild(opt);
-      }
-
-      const saved = await storageGet(["notion_parent_page_id"]);
-      const savedId = (saved && saved.notion_parent_page_id) ? String(saved.notion_parent_page_id).trim() : "";
-      const hasSavedOption = (() => {
-        if (!savedId) return false;
-        try {
-          return Array.from(els.notionPages.options || []).some((o) => o && String(o.value) === savedId);
-        } catch (_e) {
-          return false;
-        }
-      })();
-
-      if (hasSavedOption) {
-        els.notionPages.value = savedId;
-      }
-
-      // Important: `notionSyncConversations` reads `notion_parent_page_id` from storage.
-      // If the user never changes the dropdown (still on the first option), the value would
-      // never be persisted, causing sync to fail with "missing parentPageId".
-      const currentSelected = String(els.notionPages.value || "").trim();
-      if (currentSelected && (!savedId || !hasSavedOption || savedId !== currentSelected)) {
-        await storageSet({ notion_parent_page_id: currentSelected });
+      const summaries = pages.map((page) => ({ id: page && page.id, title: api.getPageTitle(page) }));
+      const applied = await applyParentPageSummaries(summaries);
+      if (applied) {
+        await setCachedParentPageSummaries(notionWorkspaceId, summaries);
       }
     } finally {
       setParentPagesLoading(false);
@@ -129,6 +177,7 @@
   let notionParentPagesLoaded = false;
   let notionParentControlsEnabled = false;
   let notionParentPagesLoading = false;
+  let notionWorkspaceId = "";
 
   function setNotionConnectBusy(busy) {
     if (!els.btnNotionConnect) return;
@@ -183,10 +232,12 @@
       setNotionConnectBusy(false);
       stopNotionConnectPolling();
       notionParentPagesLoaded = false;
+      notionWorkspaceId = "";
       setParentPagePlaceholder("Connect Notion to load pages.");
       return;
     }
     if (res.data.connected) {
+      notionWorkspaceId = (res.data.token && res.data.token.workspaceId) ? String(res.data.token.workspaceId).trim() : "";
       const workspaceName = (res.data.token && res.data.token.workspaceName) ? String(res.data.token.workspaceName).trim() : "";
       const showWorkspace = workspaceName && workspaceName.toLowerCase() !== "connected";
       if (els.notionStatusTitle) els.notionStatusTitle.textContent = showWorkspace ? `Connected ✅ (${workspaceName})` : "Connected ✅";
@@ -197,15 +248,22 @@
 
       if (!notionParentPagesLoaded) {
         notionParentPagesLoaded = true;
-        loadParentPages().catch((e) => {
-          notionParentPagesLoaded = false;
-          setParentPagePlaceholder("Failed to load pages. Click refresh.");
-          const msg = e && e.message ? e.message : String(e || "Failed to load Notion pages.");
-          if (!refreshNotionStatus.__lastLoadPagesError || refreshNotionStatus.__lastLoadPagesError !== msg) {
-            refreshNotionStatus.__lastLoadPagesError = msg;
-            alert(`Failed to load Notion pages: ${msg}`);
-          }
-        });
+        getCachedParentPageSummaries(notionWorkspaceId)
+          .then((cached) => {
+            if (cached.length) {
+              return applyParentPageSummaries(cached);
+            }
+            return loadParentPages();
+          })
+          .catch((e) => {
+            notionParentPagesLoaded = false;
+            setParentPagePlaceholder("Failed to load pages. Click refresh.");
+            const msg = e && e.message ? e.message : String(e || "Failed to load Notion pages.");
+            if (!refreshNotionStatus.__lastLoadPagesError || refreshNotionStatus.__lastLoadPagesError !== msg) {
+              refreshNotionStatus.__lastLoadPagesError = msg;
+              alert(`Failed to load Notion pages: ${msg}`);
+            }
+          });
       }
     } else {
       if (meta && meta.lastError) {
@@ -224,6 +282,7 @@
       setNotionParentControlsEnabled(false);
       setNotionConnectBusy(false);
       notionParentPagesLoaded = false;
+      notionWorkspaceId = "";
       setParentPagePlaceholder("Connect Notion to load pages.");
     }
   }
