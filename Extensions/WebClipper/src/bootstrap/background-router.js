@@ -28,6 +28,12 @@
   });
 
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const NOTION_DISCONNECT_STORAGE_KEYS = Object.freeze([
+    "notion_parent_page_id",
+    "notion_db_id_syncnos_ai_chats",
+    "notion_oauth_pending_state",
+    "notion_oauth_last_error"
+  ]);
 
   function ok(data) {
     return { ok: true, data, error: null };
@@ -46,6 +52,22 @@
     }
     const single = String(msg.url || "").trim();
     return single ? [single] : [];
+  }
+
+  function storageRemove(keys) {
+    return new Promise((resolve) => {
+      if (!Array.isArray(keys) || !keys.length) return resolve(false);
+      if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.remove !== "function") return resolve(false);
+      chrome.storage.local.remove(keys, () => resolve(true));
+    });
+  }
+
+  function notionDisconnectStorageKeys() {
+    const out = NOTION_DISCONNECT_STORAGE_KEYS.slice();
+    const notionJobStore = NS.notionSyncJobStore;
+    const syncJobKey = notionJobStore && notionJobStore.NOTION_SYNC_JOB_KEY ? String(notionJobStore.NOTION_SYNC_JOB_KEY).trim() : "";
+    if (syncJobKey) out.push(syncJobKey);
+    return Array.from(new Set(out));
   }
 
   async function handleMessage(msg) {
@@ -87,7 +109,9 @@
       }
       case NOTION_MESSAGE_TYPES.DISCONNECT: {
         await (NS.notionTokenStore && NS.notionTokenStore.clearToken ? NS.notionTokenStore.clearToken() : Promise.resolve());
-        return ok({ disconnected: true });
+        const clearedKeys = notionDisconnectStorageKeys();
+        await storageRemove(clearedKeys);
+        return ok({ disconnected: true, clearedKeys });
       }
       case NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS: {
         const notionSyncOrchestrator = NS.notionSyncOrchestrator;
