@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
-  const store: Record<string, unknown> = {};
+  const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
+  const removed: string[][] = [];
   return {
     storage: {
       local: {
         get(keys: string[], cb: (res: Record<string, unknown>) => void) {
           const out: Record<string, unknown> = {};
           for (const k of keys) {
-            if (k === "notion_parent_page_id") out[k] = parentPageId;
-            else if (Object.prototype.hasOwnProperty.call(store, k)) out[k] = store[k];
+            if (Object.prototype.hasOwnProperty.call(store, k)) out[k] = store[k];
             else out[k] = null;
           }
           cb(out);
@@ -17,9 +17,16 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
         set(payload: Record<string, unknown>, cb: () => void) {
           for (const [k, v] of Object.entries(payload || {})) store[k] = v;
           cb();
+        },
+        remove(keys: string[], cb: () => void) {
+          const arr = Array.isArray(keys) ? keys : [];
+          removed.push(arr.slice());
+          for (const k of arr) delete store[k];
+          cb();
         }
       }
-    }
+    },
+    __removed: removed
   };
 }
 
@@ -47,6 +54,35 @@ function loadBackgroundRouter() {
 }
 
 describe("background-router notion sync", () => {
+  it("disconnect clears notion token and cached notion routing keys", async () => {
+    let tokenCleared = 0;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = {
+      clearToken: async () => {
+        tokenCleared += 1;
+      }
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionSyncJobStore = { NOTION_SYNC_JOB_KEY: "notion_sync_job_v1" };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "notionDisconnect" });
+
+    expect(res.ok).toBe(true);
+    expect(tokenCleared).toBe(1);
+    const removedFlatten = chromeMock.__removed.flat();
+    expect(removedFlatten).toContain("notion_parent_page_id");
+    expect(removedFlatten).toContain("notion_db_id_syncnos_ai_chats");
+    expect(removedFlatten).toContain("notion_oauth_pending_state");
+    expect(removedFlatten).toContain("notion_oauth_last_error");
+    expect(removedFlatten).toContain("notion_sync_job_v1");
+  });
+
   it("recreates page when existing page is missing", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
@@ -289,5 +325,65 @@ describe("background-router notion sync", () => {
     expect(calls.some((c) => c.op === "append" && c.pageId === "p_new")).toBe(true);
     expect(appendedBlocks[0]?.image?.type).toBe("file_upload");
     expect(appendedBlocks[0]?.image?.file_upload?.id).toBe("u1");
+  });
+
+  it("recovers once by clearing cached database id when create page returns database object_not_found", async () => {
+    const createCalls: string[] = [];
+    const ensureCalls: string[] = [];
+    let clearCacheCalls = 0;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionDbManager = {
+      ensureDatabase: async () => {
+        if (!ensureCalls.length) {
+          ensureCalls.push("db_stale");
+          return { databaseId: "db_stale" };
+        }
+        ensureCalls.push("db_new");
+        return { databaseId: "db_new" };
+      },
+      clearCachedDatabaseId: async () => {
+        clearCacheCalls += 1;
+      }
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      getSyncMappingByConversation: async () => ({
+        conversation: { id: 1, title: "Hello", url: "https://x", source: "chatgpt" },
+        mapping: null
+      }),
+      getMessagesByConversationId: async () => [{ messageKey: "m1", role: "user", contentText: "hi", sequence: 1 }],
+      setConversationNotionPageId: async () => true,
+      setSyncCursor: async () => true
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionSyncService = {
+      createPageInDatabase: async (_t: string, payload: any) => {
+        createCalls.push(payload.databaseId);
+        if (payload.databaseId === "db_stale") {
+          throw new Error("notion api failed: POST /v1/pages HTTP 404 {\"code\":\"object_not_found\",\"message\":\"Could not find database with ID: db_stale\"}");
+        }
+        return { id: "p_new" };
+      },
+      appendChildren: async () => ({ ok: true }),
+      messagesToBlocks: () => [{ kind: "blocks", count: 1 }],
+      isPageUsableForDatabase: () => false,
+      pageBelongsToDatabase: () => false
+    };
+
+    const router = loadBackgroundRouter();
+    const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
+    expect(res.ok).toBe(true);
+    expect(res.data.results[0].mode).toBe("created");
+    expect(createCalls).toEqual(["db_stale", "db_new"]);
+    expect(ensureCalls).toEqual(["db_stale", "db_new"]);
+    expect(clearCacheCalls).toBe(1);
   });
 });

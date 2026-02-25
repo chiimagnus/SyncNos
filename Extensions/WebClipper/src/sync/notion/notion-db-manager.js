@@ -4,6 +4,20 @@
   const DB_TITLE = "SyncNos-AI Chats";
   const DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
 
+  function getCachedDatabaseId() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get([DB_STORAGE_KEY], (res) => resolve((res && res[DB_STORAGE_KEY]) || ""));
+    });
+  }
+
+  function setCachedDatabaseId(databaseId) {
+    return new Promise((resolve) => chrome.storage.local.set({ [DB_STORAGE_KEY]: databaseId || "" }, () => resolve(true)));
+  }
+
+  function clearCachedDatabaseId() {
+    return new Promise((resolve) => chrome.storage.local.remove([DB_STORAGE_KEY], () => resolve(true)));
+  }
+
   function buildAiOptions() {
     const api = NS.notionAi;
     if (api && typeof api.buildAiOptions === "function") return api.buildAiOptions();
@@ -64,9 +78,7 @@
   }
 
   async function ensureDatabase({ accessToken, parentPageId }) {
-    const cached = await new Promise((resolve) => {
-      chrome.storage.local.get([DB_STORAGE_KEY], (res) => resolve((res && res[DB_STORAGE_KEY]) || ""));
-    });
+    const cached = await getCachedDatabaseId();
     if (cached) {
       try {
         const db = await getDatabase(accessToken, cached);
@@ -74,6 +86,7 @@
         return { databaseId: cached, title: DB_TITLE, reused: true, database: db };
       } catch (_e) {
         // Fall through: cached id invalid or no access.
+        await clearCachedDatabaseId();
       }
     }
 
@@ -85,22 +98,24 @@
       return t === DB_TITLE;
     });
     if (exact && exact.id) {
-      await new Promise((resolve) => chrome.storage.local.set({ [DB_STORAGE_KEY]: exact.id }, () => resolve(true)));
+      await setCachedDatabaseId(exact.id);
       await ensureDatabaseSchema({ accessToken, databaseId: exact.id });
       return { databaseId: exact.id, title: DB_TITLE, reused: true, database: exact };
     }
 
     const created = await createDatabase(accessToken, { parentPageId, title: DB_TITLE });
     if (!created || !created.id) throw new Error("create database failed");
-    await new Promise((resolve) => chrome.storage.local.set({ [DB_STORAGE_KEY]: created.id }, () => resolve(true)));
+    await setCachedDatabaseId(created.id);
     return { databaseId: created.id, title: DB_TITLE, reused: false, database: created };
   }
 
   const api = {
     ensureDatabase,
     ensureDatabaseSchema,
+    clearCachedDatabaseId,
     buildAiOptions,
-    DB_TITLE
+    DB_TITLE,
+    DB_STORAGE_KEY
   };
   NS.notionDbManager = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
