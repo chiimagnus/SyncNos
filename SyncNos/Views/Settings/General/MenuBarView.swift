@@ -35,7 +35,7 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 8) {
             // MARK: - Window Management
             HoverMenuButton(action: {
-                NSApp.activate(ignoringOtherApps: true) // 强制将应用带到前台
+                DockPresenceService.prepareForPresentingMainWindow()
                 openWindow(id: "main") // 打开或聚焦主窗口
             }) {
                 Text("Open SyncNos")
