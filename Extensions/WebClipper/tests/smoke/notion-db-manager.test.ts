@@ -163,6 +163,45 @@ describe("notion-db-manager", () => {
     expect(patched).toBe(true);
   });
 
+  it("returns false when cached database has AI property with wrong type", async () => {
+    const calls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "GET" && req.path === "/v1/databases/db1") {
+          return {
+            id: "db1",
+            properties: {
+              Name: { type: "title" },
+              Date: { type: "date" },
+              URL: { type: "url" },
+              AI: { type: "select" }
+            }
+          };
+        }
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: "db1" } });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+
+    const ok = await notionDbManager.ensureDatabaseSchema({ accessToken: "t", databaseId: "db1" });
+    expect(ok).toBe(false);
+    expect(calls.some((c) => c.method === "PATCH")).toBe(false);
+  });
+
   it("clears stale cached database id and recreates database on object_not_found", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
