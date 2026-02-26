@@ -22,6 +22,7 @@
       "../sync/notion/notion-sync-job-store.js",
       "../sync/notion/notion-sync-orchestrator.js",
       "../sync/obsidian/obsidian-url-service.js",
+      "../collectors/article-fetcher.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
       "./background-router.js"

@@ -13,6 +13,7 @@
   const docsApi = NS.popupConversationDocs;
   const obsidianApi = NS.popupObsidian;
   const syncStateApi = NS.popupNotionSyncState;
+  const articleApi = NS.popupArticle;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !about) return;
 
@@ -266,6 +267,7 @@
 	    about.init();
 	    initObsidianAction();
 	    initNotionSyncAction();
+	    articleApi && typeof articleApi.init === "function" && articleApi.init();
 
     await tabs.init();
     await refreshSyncJobStatus();

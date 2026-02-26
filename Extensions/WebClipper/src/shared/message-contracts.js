@@ -18,6 +18,10 @@
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   });
 
+  const ARTICLE_MESSAGE_TYPES = Object.freeze({
+    FETCH_ARTICLE: "fetchArticle"
+  });
+
   const OBSIDIAN_MESSAGE_TYPES = Object.freeze({
     OPEN_URL: "openObsidianUrl"
   });
@@ -29,6 +33,7 @@
   const api = {
     CORE_MESSAGE_TYPES,
     NOTION_MESSAGE_TYPES,
+    ARTICLE_MESSAGE_TYPES,
     OBSIDIAN_MESSAGE_TYPES,
     UI_MESSAGE_TYPES
   };

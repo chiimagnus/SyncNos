@@ -19,6 +19,10 @@
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   });
 
+  const ARTICLE_MESSAGE_TYPES = contracts.ARTICLE_MESSAGE_TYPES || Object.freeze({
+    FETCH_ARTICLE: "fetchArticle"
+  });
+
   const OBSIDIAN_MESSAGE_TYPES = contracts.OBSIDIAN_MESSAGE_TYPES || Object.freeze({
     OPEN_URL: "openObsidianUrl"
   });
@@ -84,6 +88,18 @@
         } catch (e) {
           const message = e && e.message ? e.message : String(e || "open popup failed");
           return err(message, { code: "OPEN_POPUP_FAILED" });
+        }
+      }
+      case ARTICLE_MESSAGE_TYPES.FETCH_ARTICLE: {
+        const fetcher = NS.articleFetcher;
+        if (!fetcher || typeof fetcher.fetchArticleFromActiveTab !== "function") {
+          return err("article fetcher not available");
+        }
+        try {
+          const data = await fetcher.fetchArticleFromActiveTab();
+          return ok(data);
+        } catch (e) {
+          return err(e && e.message ? e.message : String(e));
         }
       }
       case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {

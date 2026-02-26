@@ -92,7 +92,8 @@
 	    btnAboutSource: document.getElementById("btnAboutSource"),
 	    btnAboutChangelog: document.getElementById("btnAboutChangelog"),
 	    btnAboutMail: document.getElementById("btnAboutMail"),
-	    btnAboutGitHub: document.getElementById("btnAboutGitHub")
+	    btnAboutGitHub: document.getElementById("btnAboutGitHub"),
+	    btnClipArticle: document.getElementById("btnClipArticle")
 	  };
 
   const state = {
@@ -136,7 +137,8 @@
       doubao: { key: "doubao", label: "Doubao" },
       yuanbao: { key: "yuanbao", label: "Yuanbao" },
       poe: { key: "poe", label: "Poe" },
-      zai: { key: "zai", label: "z.ai" }
+      zai: { key: "zai", label: "z.ai" },
+      article: { key: "article", label: "Article" }
     };
     return map[normalized] || { key: "unknown", label: text };
   }
