@@ -823,6 +823,14 @@ input[type="checkbox"] {
   background: rgba(239, 68, 68, 0.12);
 }
 
+#sourceFilterSelect.input {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 750;
+  max-width: 150px;
+}
+
 .bottomDock {
   margin-top: 10px;
 }
@@ -870,6 +878,10 @@ input[type="checkbox"] {
     max-width 220ms ease 0ms,
     opacity 160ms ease 90ms,
     transform 220ms ease 90ms;
+}
+
+.bottomBar.hasSelection #sourceFilterSelect {
+  display: none;
 }
 
 .bottomBar .stats {

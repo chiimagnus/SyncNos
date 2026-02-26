@@ -1,3 +1,5 @@
+/* global chrome */
+
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore;
@@ -26,10 +28,82 @@
   const obsidianTypes = contracts.OBSIDIAN_MESSAGE_TYPES || {
     OPEN_URL: "openObsidianUrl"
   };
+  const uiEventTypes = contracts.UI_EVENT_TYPES || {
+    CONVERSATIONS_CHANGED: "conversationsChanged"
+  };
+  const uiPortNames = contracts.UI_PORT_NAMES || {
+    POPUP_EVENTS: "popup:events"
+  };
 
   let syncPollTimer = 0;
-  let listPollTimer = 0;
-  let listRefreshing = false;
+  let conversationsEventsPort = null;
+  let conversationsRefreshTimer = 0;
+  let conversationsRefreshInFlight = false;
+  let conversationsRefreshPending = false;
+
+  function scheduleConversationsRefresh(delayMs) {
+    if (conversationsRefreshTimer) return;
+    conversationsRefreshTimer = setTimeout(() => {
+      conversationsRefreshTimer = 0;
+      if (conversationsRefreshInFlight) {
+        conversationsRefreshPending = true;
+        return;
+      }
+      conversationsRefreshInFlight = true;
+      Promise.resolve()
+        .then(() => list && typeof list.refresh === "function" ? list.refresh() : null)
+        .catch(() => {})
+        .finally(() => {
+          conversationsRefreshInFlight = false;
+          if (conversationsRefreshPending) {
+            conversationsRefreshPending = false;
+            scheduleConversationsRefresh(60);
+          }
+        });
+    }, Number.isFinite(delayMs) ? delayMs : 180);
+  }
+
+  function requestConversationsRefresh(delayMs) {
+    if (conversationsRefreshInFlight) {
+      conversationsRefreshPending = true;
+      return;
+    }
+    scheduleConversationsRefresh(delayMs);
+  }
+
+  function initConversationsEventsSubscription() {
+    try {
+      if (!chrome || !chrome.runtime || typeof chrome.runtime.connect !== "function") return false;
+      conversationsEventsPort = chrome.runtime.connect({ name: uiPortNames.POPUP_EVENTS });
+    } catch (_e) {
+      conversationsEventsPort = null;
+      return false;
+    }
+    if (!conversationsEventsPort) return false;
+
+    try {
+      conversationsEventsPort.onMessage.addListener((msg) => {
+        if (!msg || typeof msg.type !== "string") return;
+        if (msg.type !== uiEventTypes.CONVERSATIONS_CHANGED) return;
+        requestConversationsRefresh(160);
+      });
+    } catch (_e) {
+      // ignore
+    }
+
+    try {
+      conversationsEventsPort.onDisconnect.addListener(() => {
+        conversationsEventsPort = null;
+        if (conversationsRefreshTimer) clearTimeout(conversationsRefreshTimer);
+        conversationsRefreshTimer = 0;
+        conversationsRefreshPending = false;
+      });
+    } catch (_e) {
+      // ignore
+    }
+
+    return true;
+  }
 
   function setSyncingUi(isSyncing, { done, total } = {}) {
     if (!els.btnSyncNotion) return;
@@ -82,30 +156,6 @@
         }
       }
     });
-  }
-
-  function isChatsTabActive() {
-    try {
-      return !!(els.viewChats && els.viewChats.classList && els.viewChats.classList.contains("is-active"));
-    } catch (_e) {
-      return true;
-    }
-  }
-
-  function startLiveListRefresh() {
-    if (listPollTimer) return;
-    listPollTimer = setInterval(() => {
-      if (!document || document.visibilityState !== "visible") return;
-      if (!isChatsTabActive()) return;
-      if (listRefreshing) return;
-      listRefreshing = true;
-      Promise.resolve()
-        .then(() => list && typeof list.refresh === "function" ? list.refresh() : null)
-        .catch(() => {})
-        .finally(() => {
-          listRefreshing = false;
-        });
-    }, 2000);
   }
 
   async function buildObsidianPayloads(selectedIds) {
@@ -274,13 +324,18 @@
     await tabs.init();
     await refreshSyncJobStatus();
     await list.refresh();
-    startLiveListRefresh();
+    initConversationsEventsSubscription();
 
     window.addEventListener("unload", () => {
       if (syncPollTimer) clearInterval(syncPollTimer);
-      if (listPollTimer) clearInterval(listPollTimer);
+      try {
+        conversationsEventsPort && conversationsEventsPort.disconnect && conversationsEventsPort.disconnect();
+      } catch (_e) {
+        // ignore
+      }
+      if (conversationsRefreshTimer) clearTimeout(conversationsRefreshTimer);
       syncPollTimer = 0;
-      listPollTimer = 0;
+      conversationsRefreshTimer = 0;
     });
   }
 

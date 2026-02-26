@@ -7,6 +7,8 @@
     els,
     state,
     send,
+    storageGet,
+    storageSet,
     PREVIEW_EVENTS,
     formatTime,
     getSourceMeta,
@@ -21,6 +23,81 @@
   const syncStateApi = NS.popupNotionSyncState;
 
   const copyFeedbackTimers = new WeakMap();
+
+  const FILTER_KEY = (core && core.STORAGE_KEYS && core.STORAGE_KEYS.popupSourceFilterKey)
+    ? core.STORAGE_KEYS.popupSourceFilterKey
+    : "popup_source_filter_key";
+  let filterLoaded = false;
+
+  function normalizeSourceKey(conversation) {
+    const sourceRaw = conversation && (conversation.sourceName || conversation.source) ? (conversation.sourceName || conversation.source) : "";
+    const meta = getSourceMeta(sourceRaw);
+    return meta && meta.key ? String(meta.key) : "unknown";
+  }
+
+  function applySourceFilter(conversations, { sourceKey } = {}) {
+    const list = Array.isArray(conversations) ? conversations : [];
+    const key = (sourceKey != null ? String(sourceKey) : "").trim().toLowerCase();
+    if (!key || key === "all") return list;
+    return list.filter((c) => normalizeSourceKey(c) === key);
+  }
+
+  function getFilterLabelForKey(key) {
+    const k = String(key || "all").toLowerCase();
+    if (k === "all") return "All";
+    try {
+      const meta = getSourceMeta(k);
+      if (meta && meta.label) return String(meta.label);
+    } catch (_e) {
+      // ignore
+    }
+    return k;
+  }
+
+  function getAvailableSourceOptions(conversations) {
+    const items = Array.isArray(conversations) ? conversations : [];
+    const map = new Map();
+    for (const c of items) {
+      const k = normalizeSourceKey(c);
+      if (!k) continue;
+      const label = getFilterLabelForKey(k);
+      map.set(k, { key: k, label });
+    }
+    const opts = Array.from(map.values());
+    opts.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+    return [{ key: "all", label: "All" }, ...opts];
+  }
+
+  function renderFilterOptions() {
+    if (!els.sourceFilterSelect) return;
+    els.sourceFilterSelect.replaceChildren();
+    const options = getAvailableSourceOptions(state.allConversations);
+    const current = String(state.sourceFilterKey || "all").toLowerCase();
+    for (const opt of options) {
+      const option = document.createElement("option");
+      option.value = String(opt.key);
+      option.textContent = opt.label;
+      if (String(opt.key).toLowerCase() === current) option.selected = true;
+      els.sourceFilterSelect.appendChild(option);
+    }
+  }
+
+  async function setSourceFilterKey(key) {
+    const next = (key != null ? String(key) : "all").trim().toLowerCase() || "all";
+    state.sourceFilterKey = next;
+    state.selectedIds.clear();
+    syncActionButtons();
+    syncSelectAllCheckbox();
+    try {
+      if (typeof storageSet === "function") await storageSet({ [FILTER_KEY]: next });
+    } catch (_e) {
+      // ignore
+    }
+    state.conversations = applySourceFilter(state.allConversations, { sourceKey: state.sourceFilterKey });
+    renderFilterOptions();
+    if (els.sourceFilterSelect) els.sourceFilterSelect.value = state.sourceFilterKey;
+    render();
+  }
 
   function showCopiedFeedback(buttonEl, { baseText, baseTitle } = {}) {
     if (!buttonEl) return;
@@ -290,9 +367,41 @@
     syncActionButtons();
   }
 
+  async function ensureFilterLoaded() {
+    if (filterLoaded) return true;
+    filterLoaded = true;
+    if (typeof storageGet !== "function") return false;
+    try {
+      const res = await storageGet([FILTER_KEY]);
+      const raw = res && res[FILTER_KEY] != null ? res[FILTER_KEY] : "all";
+      state.sourceFilterKey = String(raw || "all").trim().toLowerCase() || "all";
+    } catch (_e) {
+      state.sourceFilterKey = "all";
+    }
+    return true;
+  }
+
   async function refresh() {
+    await ensureFilterLoaded();
     const res = await send("getConversations");
-    state.conversations = (res && res.ok && Array.isArray(res.data)) ? res.data : [];
+    state.allConversations = (res && res.ok && Array.isArray(res.data)) ? res.data : [];
+    state.conversations = applySourceFilter(state.allConversations, { sourceKey: state.sourceFilterKey });
+    renderFilterOptions();
+    if (els.sourceFilterSelect) {
+      const exists = Array.from(els.sourceFilterSelect.options || []).some((o) => String(o && o.value).toLowerCase() === String(state.sourceFilterKey).toLowerCase());
+      if (exists) {
+        els.sourceFilterSelect.value = state.sourceFilterKey;
+      } else {
+        state.sourceFilterKey = "all";
+        els.sourceFilterSelect.value = "all";
+        try {
+          if (typeof storageSet === "function") await storageSet({ [FILTER_KEY]: "all" });
+        } catch (_e) {
+          // ignore
+        }
+        state.conversations = applySourceFilter(state.allConversations, { sourceKey: state.sourceFilterKey });
+      }
+    }
     const ids = new Set(state.conversations.map((conversation) => conversation.id));
     state.selectedIds = new Set(Array.from(state.selectedIds).filter((id) => ids.has(id)));
     render();
@@ -312,6 +421,13 @@
       }
       render();
     });
+    if (els.sourceFilterSelect) {
+      els.sourceFilterSelect.addEventListener("change", async () => {
+        await ensureFilterLoaded();
+        const next = els.sourceFilterSelect ? els.sourceFilterSelect.value : "all";
+        await setSourceFilterKey(next);
+      });
+    }
     syncActionButtons();
   }
 
@@ -319,6 +435,11 @@
     init,
     render,
     refresh,
-    getSelectedIds
+    getSelectedIds,
+    __test: {
+      applySourceFilter
+    }
   };
+
+  if (typeof module !== "undefined" && module.exports) module.exports = NS.popupList;
 })();

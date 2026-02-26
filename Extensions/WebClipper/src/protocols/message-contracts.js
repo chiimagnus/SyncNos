@@ -30,12 +30,22 @@
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
 
+  const UI_EVENT_TYPES = Object.freeze({
+    CONVERSATIONS_CHANGED: "conversationsChanged"
+  });
+
+  const UI_PORT_NAMES = Object.freeze({
+    POPUP_EVENTS: "popup:events"
+  });
+
   const api = {
     CORE_MESSAGE_TYPES,
     NOTION_MESSAGE_TYPES,
     OBSIDIAN_MESSAGE_TYPES,
     ARTICLE_MESSAGE_TYPES,
-    UI_MESSAGE_TYPES
+    UI_MESSAGE_TYPES,
+    UI_EVENT_TYPES,
+    UI_PORT_NAMES
   };
 
   NS.messageContracts = api;
