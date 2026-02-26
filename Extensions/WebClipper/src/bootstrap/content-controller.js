@@ -208,6 +208,7 @@
             const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
             if (!inc || !inc.changed) return;
             await saveSnapshot(inc.snapshot);
+            showInpageTip("Saved", "ok");
           } catch (_e) {
             if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
               stop();
