@@ -2,7 +2,6 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore || {};
   const DEFAULT_OBSIDIAN_FOLDER = "SyncNos-AIChats";
-  const kinds = NS.conversationKinds || null;
 
   function defaultSanitizeFilenamePart(input, fallback) {
     const text = String(input || "")
@@ -34,6 +33,7 @@
   }
 
   function folderForConversation(conversation) {
+    const kinds = (globalThis.WebClipper && globalThis.WebClipper.conversationKinds) || null;
     if (kinds && typeof kinds.pick === "function") {
       try {
         const kind = kinds.pick(conversation);
