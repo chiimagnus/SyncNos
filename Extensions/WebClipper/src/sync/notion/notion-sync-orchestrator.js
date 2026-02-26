@@ -113,9 +113,11 @@
       await notionDbManager.clearCachedDatabaseId(storageKey);
       return true;
     }
-    const key = notionDbManager && notionDbManager.DB_STORAGE_KEY
-      ? String(notionDbManager.DB_STORAGE_KEY)
-      : (String(storageKey || "").trim() || "notion_db_id_syncnos_ai_chats");
+    const explicit = String(storageKey || "").trim();
+    const fallback = notionDbManager && notionDbManager.DEFAULT_DB_STORAGE_KEY
+      ? String(notionDbManager.DEFAULT_DB_STORAGE_KEY).trim()
+      : "notion_db_id_syncnos_ai_chats";
+    const key = explicit || fallback;
     return storageRemove([key]);
   }
 
