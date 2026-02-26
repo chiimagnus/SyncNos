@@ -148,12 +148,10 @@
                 showInpageTip("Saving...", "loading");
               }
               const snapshot = await Promise.resolve(collector.capture({ manual: true }));
-              if (!snapshot) {
-                showInpageTip("No visible conversation found", "error");
-                return null;
-              }
-              await saveSnapshot(snapshot);
-              return { ok: true };
+              if (!snapshot) throw new Error("No visible conversation found");
+              const saved = await saveSnapshot(snapshot);
+              if (!saved) throw new Error("No visible conversation found");
+              return saved;
             }
           });
         } catch (_e) {
@@ -207,7 +205,8 @@
             if (!snapshot) return;
             const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
             if (!inc || !inc.changed) return;
-            await saveSnapshot(inc.snapshot);
+            const saved = await saveSnapshot(inc.snapshot);
+            if (saved) showInpageTip("Saved", "ok");
           } catch (_e) {
             if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
               stop();
