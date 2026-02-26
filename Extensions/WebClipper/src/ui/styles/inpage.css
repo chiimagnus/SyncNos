@@ -1,13 +1,13 @@
 .webclipper-inpage-btn {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 0;
+  bottom: 0;
   z-index: 2147483647;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  border: 1px solid transparent;
+  padding: 0;
+  border: 0;
   border-radius: 11px;
   background: transparent;
   color: inherit;
@@ -118,7 +118,7 @@
   --bubble-bg: rgba(24, 24, 26, 0.92);
   --bubble-border: rgba(255, 255, 255, 0.18);
   --bubble-text: #ffffff;
-  --bubble-arrow-size: 8px;
+  --bubble-arrow-size: 7px;
   --bubble-shift-x: 0px;
   --bubble-shift-y: 0px;
 
@@ -126,15 +126,15 @@
   left: 0;
   top: 0;
   z-index: 2147483647;
-  max-width: min(300px, calc(100vw - 24px));
-  padding: 10px 12px;
+  max-width: min(300px, 100vw);
+  padding: 7px 11px;
   border: 1px solid var(--bubble-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
     var(--bubble-bg);
   color: var(--bubble-text);
-  font: 12px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: 0.01em;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   pointer-events: none;
