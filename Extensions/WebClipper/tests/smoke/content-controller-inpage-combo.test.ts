@@ -14,6 +14,7 @@ function loadContentController() {
 function createHarness(options?: {
   sendImpl?: (type: string, payload?: any) => Promise<any>;
   captureImpl?: (args?: any) => any;
+  incrementalImpl?: (snapshot: any) => any;
 }) {
   let tickRef: TickFn = null;
   let buttonConfig: any = null;
@@ -61,7 +62,10 @@ function createHarness(options?: {
       }
     },
     incrementalUpdater: {
-      computeIncremental: () => ({ changed: false })
+      computeIncremental: (snapshot: any) => {
+        if (typeof options?.incrementalImpl === "function") return options.incrementalImpl(snapshot);
+        return { changed: false };
+      }
     }
   };
 
@@ -167,5 +171,46 @@ describe("content-controller inpage combo", () => {
     expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
     expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
+  });
+
+  it("shows error tip when manual capture finds no visible conversation", async () => {
+    const harness = createHarness({
+      captureImpl: (args) => {
+        if (!args || !args.manual) return null;
+        return null;
+      }
+    });
+
+    await harness.runTick();
+    const cfg = harness.getButtonConfig();
+    expect(typeof cfg?.onClick).toBe("function");
+
+    await cfg.onClick();
+
+    expect(harness.tipCalls.some((c) => String(c.text).includes("No visible conversation"))).toBe(true);
+    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(false);
+  });
+
+  it("shows tip when auto incremental save succeeds", async () => {
+    const snapshot = {
+      conversation: { source: "gemini", conversationKey: "auto-1" },
+      messages: [{ messageKey: "m1", sequence: 1, role: "user", contentText: "hello" }]
+    };
+
+    const harness = createHarness({
+      captureImpl: () => snapshot,
+      incrementalImpl: (snap) => ({ changed: true, snapshot: snap }),
+      sendImpl: async (type: string) => {
+        if (type === "upsertConversation") return { ok: true, data: { id: 22 } };
+        if (type === "syncConversationMessages") return { ok: true, data: { inserted: 1 } };
+        return { ok: true, data: {} };
+      }
+    });
+
+    await harness.runTick();
+
+    expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
+    expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
+    expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(true);
   });
 });
