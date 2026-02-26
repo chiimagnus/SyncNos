@@ -5,8 +5,8 @@
   const BUBBLE_ID = "webclipper-inpage-bubble";
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const VISIBLE_MS = 1800;
-  const VIEWPORT_PAD = 8;
-  const ANCHOR_GAP = 10;
+  const VIEWPORT_PAD = 0;
+  const ANCHOR_GAP = 8;
   const ANIM_CLASS = "is-enter";
 
   const state = {
@@ -39,9 +39,9 @@
       return btn.getBoundingClientRect();
     }
     const viewport = getViewport();
-    const size = 40;
-    const left = Math.max(VIEWPORT_PAD, viewport.width - size - 16);
-    const top = Math.max(VIEWPORT_PAD, viewport.height - size - 16);
+    const size = 28;
+    const left = Math.max(VIEWPORT_PAD, viewport.width - size);
+    const top = Math.max(VIEWPORT_PAD, viewport.height - size);
     return {
       left,
       top,
