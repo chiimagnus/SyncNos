@@ -55,7 +55,7 @@
 
 ### 模块入口索引（2026-02 重构后）
 
-- **消息协议（前后端共享）**：`src/shared/message-contracts.js`
+- **消息协议（前后端共享）**：`src/protocols/message-contracts.js`
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **后台路由（统一入口）**：`src/bootstrap/background-router.js`
   - 路由 `openObsidianUrl`、Notion 同步任务状态、会话 CRUD 等消息。
