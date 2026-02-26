@@ -39,29 +39,29 @@ Repo root: `/Users/chii_magnus/Github_OpenSource/SyncNos`
 
 - Task: `Task 4: popup 建立 Port 订阅并 debounce 刷新`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/ui/popup/popup.js:41`
 - Summary: `scheduleConversationsRefresh` 在 refresh 进行中收到新事件时，可能“丢刷新”导致列表错过最新变更。
 - Risk: 高并发/连续保存时，popup 可能停留在旧列表直到下次事件（或用户手动操作/重开）。
 - Expected fix: 增加 pending 标记（例如 `conversationsRefreshPending`），若事件发生在 refresh 进行中，则在当前 refresh 结束后再补一次 refresh（合并多次事件）。
 - Validation: `npm --prefix Extensions/WebClipper test`
-- Resolution evidence: `<to be filled>`
+- Resolution evidence: `fix: audit1 - avoid dropping popup refresh events` (commit `5e179df5`), `npm --prefix Extensions/WebClipper test` PASS
 
 ## Finding F-02
 
 - Task: `Task 4: popup 建立 Port 订阅并 debounce 刷新`
 - Severity: `Low`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/ui/popup/popup.js:1`
 - Summary: `popup.js` 使用 `chrome.runtime.connect` 但未声明 `/* global chrome */`，与项目其它 popup 文件的风格不一致。
 - Risk: 若后续增加静态检查/规则，可能产生不必要的告警；同时降低一致性与可读性。
 - Expected fix: 在文件头部增加 `/* global chrome */`。
 - Validation: `npm --prefix Extensions/WebClipper test`（以及如有 `npm --prefix Extensions/WebClipper run check` 更佳）
-- Resolution evidence: `<to be filled>`
+- Resolution evidence: `fix: audit1 - avoid dropping popup refresh events` (commit `5e179df5`), `npm --prefix Extensions/WebClipper test` PASS
 
 ## Fix log
 
-- (pending)
+- `5e179df5` 修复 popup refresh 合并逻辑，避免 refresh 进行中丢事件；并补齐 `/* global chrome */` 声明。
 
 ## Validation log
 
@@ -69,5 +69,4 @@ Repo root: `/Users/chii_magnus/Github_OpenSource/SyncNos`
 
 ## Final status and residual risks
 
-- 当前实现满足“广播+订阅替代轮询”的主目标；但需先修复 F-01 以避免连续事件下的刷新丢失。
-
+- 当前实现满足“广播+订阅替代轮询”的主目标；已修复连续事件下的刷新丢失风险。
