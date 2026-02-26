@@ -30,7 +30,9 @@
     "https://img.notionusercontent.com/*",
     "https://api.notion.com/*",
     "https://syncnos-notion-oauth.chiimagnus.workers.dev/*",
-    "https://chiimagnus.github.io/*"
+    "https://chiimagnus.github.io/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "content_scripts": [
     {
