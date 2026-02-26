@@ -29,7 +29,7 @@
 1. 新建独立宿主 App：`SyncNos WebClipper`（iOS + macOS），只承载扩展与引导页。
 2. macOS 复用现有 `SyncNos` 作为宿主（新增 macOS 扩展 target），iOS 仍新建壳 App。
 
-建议：先走选项 1（最快打通 iOS+macOS 上架链路），之后再评估是否把 macOS 扩展合并进现有 `SyncNos.xcodeproj`。
+已选：选项 2（macOS 复用现有 `SyncNos`；iOS 新建壳 App 承载扩展）。
 
 ### Decision B: Notion OAuth redirectUri 是否继续用 GitHub Pages
 
@@ -37,7 +37,21 @@
 
 风险：需要在该域名上运行 content script 来上报 `code/state`，并且 host permissions 需允许该域名。
 
-建议：保持不变（最小改动），但把“回调页上报”作为主流程，`webNavigation` 监听作为兼容分支/可选保留。
+已选：保持不变（继续使用 GitHub Pages 回调页）。
+
+建议：把“回调页上报”作为主流程，`webNavigation` 监听作为兼容分支/可选保留。
+
+可替代方案（如果不想继续用 GitHub Pages）：
+- 方案 B1：自有域名静态页（推荐）
+  - 例：`https://syncnos.app/oauth/notion/callback`
+  - 页面内容与 GitHub Pages 回调页等价：解析 `code/state/error` 并 `runtime.sendMessage` 给扩展
+  - 优点：可控、品牌一致、可在审核材料中解释更清晰
+- 方案 B2：Cloudflare Workers / Vercel / Netlify 托管回调页
+  - 例：直接复用现有 Workers 域名下的一个回调路径（不与 token-exchange API 混淆）
+  - 优点：上线快；可与现有 OAuth 代理部署一起维护
+- 方案 B3：Universal Links（让 iOS App 接管回调）
+  - 例：redirect 到 `https://syncnos.app/notion/callback`，由 iOS App 通过 Associated Domains 接管
+  - 缺点：需要额外的 App <-> Extension 数据传递设计（App Group/Native bridge），否则扩展拿不到 code；实现复杂度明显更高
 
 ---
 
@@ -141,29 +155,35 @@
 
 ## P2：生成并跑通 iOS + macOS Safari Web Extension 工程
 
-### Task 6: 用 Safari packager 生成 iOS+macOS 宿主 App + Extension 工程
+### Task 6: iOS 壳 App + iOS Extension 工程生成（packager）
 
 **Files:**
-- Create: `Extensions/WebClipper/xcode/` 下的新工程目录（由工具生成）
+- Create: `Extensions/WebClipper/xcode/` 下的 iOS 工程目录（由工具生成）
 
 **Step 1: 实施**
 - Run:
   - `npm --prefix Extensions/WebClipper run build:safari`
-  - `xcrun safari-web-extension-packager --project-location Extensions/WebClipper/xcode --app-name "SyncNos Web Clipper" --bundle-identifier com.chiimagnus.syncnos.webclipper --swift --copy-resources --no-open Extensions/WebClipper/dist-safari`
-- 产物预期：生成一个包含 iOS App/iOS Extension/macOS App/macOS Extension 的 Xcode 工程（结构类似 `obsidian-clipper-main/xcode`）。
+  - `xcrun safari-web-extension-packager --project-location Extensions/WebClipper/xcode --app-name "SyncNos Web Clipper" --bundle-identifier com.chiimagnus.syncnos.webclipper.ios --swift --copy-resources --ios-only --no-open Extensions/WebClipper/dist-safari`
+- 产物预期：生成包含 iOS App + iOS Extension 的 Xcode 工程（结构可参考 `obsidian-clipper-main/xcode` 的 iOS 部分）。
 
 **Step 2: 验证**
 - Run: `xcodebuild -list -project "<生成的 .xcodeproj 路径>"`
-- Expected: 能看到 iOS/macOS 的 scheme/targets。
+- Expected: 能看到 iOS 的 scheme/targets。
 
-### Task 7: Xcode 运行调试打通（macOS Safari）
+### Task 7: macOS 在现有 `SyncNos.xcodeproj` 新增 Safari Web Extension target 并嵌入
 
 **Files:**
-- Modify: 生成工程中的 macOS App/Extension 配置（Signing、Bundle ID、资源引用）
+- Modify: `SyncNos.xcodeproj`（新增 target 的工程改动）
+- Modify: `SyncNos/`（宿主 App 侧的引导 UI/按钮若需要）
+- (Potential) Modify: `SyncNos/SyncNos.entitlements`（如需要新增能力）
 
 **Step 1: 实施**
-- Xcode 里选择 macOS App scheme Run，启动后按引导在 Safari Settings 启用扩展。
-- 用 Safari 打开支持站点，确认 content script/popup/background 都在跑。
+- 在 Xcode 中打开 `SyncNos.xcodeproj`：
+  - `File > New > Target... > Safari Web Extension`
+  - 选择嵌入到现有 `SyncNos`（macOS App）
+  - 扩展资源指向 `Extensions/WebClipper/dist-safari`（Debug 可引用，Release 固化）
+- Run `SyncNos`，按引导在 Safari Settings 启用扩展。
+- 用 Safari 打开支持站点，确认 content script/popup/background 都在跑（Safari 的 Develop 菜单可协助调试）。
 
 **Step 2: 验证**
 - Manual：完成一次“采集 -> popup 列表可见 -> 删除可用”。
@@ -231,4 +251,3 @@
 - 每完成一个 Task，建议至少跑一次：
   - `npm --prefix Extensions/WebClipper run test`
   - `npm --prefix Extensions/WebClipper run build:safari`
-
