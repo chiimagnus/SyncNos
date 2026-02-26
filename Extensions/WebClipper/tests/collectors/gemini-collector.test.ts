@@ -20,11 +20,11 @@ function loadCollectorUtils() {
 
 function loadGeminiCollector() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/gemini-collector.js");
+  const modulePath = require.resolve("../../src/collectors/gemini/gemini-collector.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/gemini-collector.js");
+  return require("../../src/collectors/gemini/gemini-collector.js");
 }
 
 function setupGeminiDom(html: string, url: string) {
