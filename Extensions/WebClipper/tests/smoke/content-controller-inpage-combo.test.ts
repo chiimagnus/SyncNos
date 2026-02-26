@@ -213,4 +213,46 @@ describe("content-controller inpage combo", () => {
     expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
     expect(harness.tipCalls.some((c) => String(c.text) === "Saved")).toBe(true);
   });
+
+  it("ignores repeated manual clicks while a save is still in progress", async () => {
+    let resolveUpsert: ((value: any) => void) | null = null;
+    const upsertPending = new Promise((resolve) => {
+      resolveUpsert = resolve;
+    });
+
+    const harness = createHarness({
+      captureImpl: (args) => {
+        if (!args || !args.manual) return null;
+        return {
+          conversation: { source: "gemini", conversationKey: "lock-1" },
+          messages: [{ messageKey: "m1", sequence: 1, role: "user", contentText: "hi" }]
+        };
+      },
+      sendImpl: async (type: string) => {
+        if (type === "upsertConversation") {
+          await upsertPending;
+          return { ok: true, data: { id: 31 } };
+        }
+        if (type === "syncConversationMessages") return { ok: true, data: { inserted: 1 } };
+        return { ok: true, data: {} };
+      }
+    });
+
+    await harness.runTick();
+    const cfg = harness.getButtonConfig();
+    expect(typeof cfg?.onClick).toBe("function");
+
+    const firstClick = cfg.onClick();
+    const secondClick = cfg.onClick();
+    await Promise.resolve();
+
+    expect(harness.sendCalls.filter((c) => c.type === "upsertConversation")).toHaveLength(1);
+    expect(harness.tipCalls.some((c) => String(c.text) === "Saving..." && c.opts?.kind === "loading")).toBe(true);
+
+    resolveUpsert && resolveUpsert({});
+    await firstClick;
+    await secondClick;
+
+    expect(harness.sendCalls.filter((c) => c.type === "syncConversationMessages")).toHaveLength(1);
+  });
 });
