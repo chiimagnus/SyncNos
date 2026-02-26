@@ -32,13 +32,25 @@
   });
 
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  const NOTION_DISCONNECT_STORAGE_KEYS = Object.freeze([
+  const NOTION_DISCONNECT_BASE_STORAGE_KEYS = Object.freeze([
     "notion_parent_page_id",
-    "notion_db_id_syncnos_ai_chats",
-    "notion_db_id_syncnos_web_articles",
     "notion_oauth_pending_state",
     "notion_oauth_last_error"
   ]);
+
+  function getNotionDbStorageKeys() {
+    const kinds = NS.conversationKinds;
+    if (kinds && typeof kinds.getNotionStorageKeys === "function") {
+      try {
+        const keys = kinds.getNotionStorageKeys();
+        if (Array.isArray(keys) && keys.length) return keys.map((k) => String(k || "").trim()).filter(Boolean);
+      } catch (_e) {
+        // ignore
+      }
+    }
+    // Fallback (load-order safety).
+    return ["notion_db_id_syncnos_ai_chats", "notion_db_id_syncnos_web_articles"];
+  }
 
   function ok(data) {
     return { ok: true, data, error: null };
@@ -68,7 +80,8 @@
   }
 
   function notionDisconnectStorageKeys() {
-    const out = NOTION_DISCONNECT_STORAGE_KEYS.slice();
+    const out = NOTION_DISCONNECT_BASE_STORAGE_KEYS.slice();
+    out.push(...getNotionDbStorageKeys());
     const notionJobStore = NS.notionSyncJobStore;
     const syncJobKey = notionJobStore && notionJobStore.NOTION_SYNC_JOB_KEY ? String(notionJobStore.NOTION_SYNC_JOB_KEY).trim() : "";
     if (syncJobKey) out.push(syncJobKey);
