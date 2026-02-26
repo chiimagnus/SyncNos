@@ -1,3 +1,5 @@
+/* global chrome */
+
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore;
@@ -37,20 +39,36 @@
   let conversationsEventsPort = null;
   let conversationsRefreshTimer = 0;
   let conversationsRefreshInFlight = false;
+  let conversationsRefreshPending = false;
 
   function scheduleConversationsRefresh(delayMs) {
     if (conversationsRefreshTimer) return;
     conversationsRefreshTimer = setTimeout(() => {
       conversationsRefreshTimer = 0;
-      if (conversationsRefreshInFlight) return;
+      if (conversationsRefreshInFlight) {
+        conversationsRefreshPending = true;
+        return;
+      }
       conversationsRefreshInFlight = true;
       Promise.resolve()
         .then(() => list && typeof list.refresh === "function" ? list.refresh() : null)
         .catch(() => {})
         .finally(() => {
           conversationsRefreshInFlight = false;
+          if (conversationsRefreshPending) {
+            conversationsRefreshPending = false;
+            scheduleConversationsRefresh(60);
+          }
         });
     }, Number.isFinite(delayMs) ? delayMs : 180);
+  }
+
+  function requestConversationsRefresh(delayMs) {
+    if (conversationsRefreshInFlight) {
+      conversationsRefreshPending = true;
+      return;
+    }
+    scheduleConversationsRefresh(delayMs);
   }
 
   function initConversationsEventsSubscription() {
@@ -67,7 +85,7 @@
       conversationsEventsPort.onMessage.addListener((msg) => {
         if (!msg || typeof msg.type !== "string") return;
         if (msg.type !== uiEventTypes.CONVERSATIONS_CHANGED) return;
-        scheduleConversationsRefresh(160);
+        requestConversationsRefresh(160);
       });
     } catch (_e) {
       // ignore
@@ -78,6 +96,7 @@
         conversationsEventsPort = null;
         if (conversationsRefreshTimer) clearTimeout(conversationsRefreshTimer);
         conversationsRefreshTimer = 0;
+        conversationsRefreshPending = false;
       });
     } catch (_e) {
       // ignore
