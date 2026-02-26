@@ -59,10 +59,12 @@
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **后台路由（统一入口）**：`src/bootstrap/background-router.js`
   - 路由 `openObsidianUrl`、Notion 同步任务状态、会话 CRUD 等消息。
-- **Notion 同步模块**：`src/sync/notion/`
+- **Notion 同步模块**：`src/export/notion/`
   - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
-- **Obsidian 模块**：`src/ui/popup/popup-obsidian.js` + `src/sync/obsidian/obsidian-url-service.js`
+- **Obsidian 模块**：`src/ui/popup/popup-obsidian.js` + `src/export/obsidian/obsidian-url-service.js`
   - popup 负责 payload 和 URL 生成，background 负责 URL 校验与顺序打开。
+- **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
+  - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 
 ### Obsidian 约束
 
