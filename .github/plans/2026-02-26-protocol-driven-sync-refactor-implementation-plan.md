@@ -5,7 +5,7 @@
 **Goal（目标）:**
 - 以“协议驱动开发”的方式重构同步与导出路由：把 Web Article 与 AI Chats 的分流规则集中到一个可注册/可验证的协议层。
 - Notion：`sourceType=article` 同步到独立 Database；`sourceType=chat` 维持现状。
-- Obsidian：为文章与聊天做分流（至少分文件夹），并补齐你说的“Obsidian 版本”差异（以协议/配置形式支持不同 URI 生成策略）。
+- Obsidian：为文章与聊天做分流（按不同 folder 输出）。
 
 **Non-goals（非目标）:**
 - 不做 Notion 侧历史页面迁移（旧版本已同步到 AI Chats DB 的文章页面会保留；新版本在文章库里新建/更新自己的映射）。
@@ -15,10 +15,10 @@
 **Approach（方案）:**
 - 引入“Conversation Kind”协议（类似 `collector-contract.js`）：定义 `chat`/`article` 两种 kind，并集中管理：
   - Notion database 的 title/storage key/schema
-  - Obsidian export 的 folder/URI strategy
+  - Obsidian export 的 folder
 - 所有“按类型分流”的逻辑改为：`kind = kindRegistry.pick(conversation)`，下游只依赖 `kind` 的配置，不再散落 `if (sourceType === "article") ...`。
 - Notion 同步重构为“kind 驱动”：DB manager 变成通用 `ensureDatabase(dbSpec)`；orchestrator 在每个 conversation 上按 kind 获取 dbId 并同步。
-- Obsidian 导出重构为“kind + uriStrategy 驱动”：同一份 doc 输出到不同 folder，URI 生成通过 strategy 协议适配（你提到的“版本”）。
+- Obsidian 导出重构为“kind 驱动”：同一份 doc 输出到不同 folder。
 
 **Acceptance（验收）:**
 - Notion：
@@ -29,20 +29,10 @@
 - Obsidian：
   - chat 默认写入文件夹 `SyncNos-AIChats/`
   - article 默认写入文件夹 `SyncNos-WebArticles/`（命名可调整，但需固定且可测）
-  - 若启用另一种 Obsidian URI “版本/策略”，仍能生成可用 url（至少测试覆盖 URL shape/参数编码）
 - 验证命令：
   - Run: `npm --prefix Extensions/WebClipper run check`
   - Run: `npm --prefix Extensions/WebClipper run test`
   - Expected: 全部通过
-
----
-
-## 不确定项（需要你确认，避免我猜）
-- Obsidian “版本”具体指什么？
-  - A: 文章/聊天分不同 folder（功能版本）
-  - B: 不同 URI 规范（例如 core Obsidian URI vs Advanced URI 插件参数差异）
-  - C: 不同 vault/路径组织（按 sourceType、按日期、按来源）
-- Notion 文章库的标题是否固定为 `SyncNos-Web Articles`？（如果你有更喜欢的命名，告诉我一次性定死）
 
 ---
 
@@ -154,21 +144,18 @@
 
 ---
 
-## P2（高优先级）：Obsidian “版本”与文章/聊天分流
+## P2（高优先级）：Obsidian 文章/聊天分流
 
-### Task 6: Obsidian 导出改为 kind 驱动 folder + URI strategy 协议
+### Task 6: Obsidian 导出改为 kind 驱动 folder
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/ui/popup/popup-obsidian.js`
 - Modify: `Extensions/WebClipper/tests/smoke/popup-obsidian.test.ts`
-- (可选) Create: `Extensions/WebClipper/src/sync/obsidian/obsidian-uri-strategies.js`
 
 **Step 1: 实现功能**
 - 将 `DEFAULT_OBSIDIAN_FOLDER` 改为由 kind 决定：
   - chat: `SyncNos-AIChats`
   - article: `SyncNos-WebArticles`
-- 引入 URI strategy 协议（先实现一个默认策略，保留现有行为），并留出第二策略的扩展点（对应你说的“Obsidian 版本”）：
-  - `buildNewUrl({ filePath, markdown, useClipboard }) -> string`
 - 更新测试：文章会输出 `file=SyncNos-WebArticles/...`。
 
 **Step 2: 验证**
@@ -177,7 +164,7 @@
 
 ---
 
-## P3（可选）：协议化收口与清理
+## P3（必须）：协议化收口与清理
 
 ### Task 7: 清理散落的 sourceType 判断（把分流逻辑全部收口到 kind）
 
@@ -190,4 +177,3 @@
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run test`
 - Expected: PASS
-
