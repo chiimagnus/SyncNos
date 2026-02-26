@@ -5,7 +5,7 @@
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
-  const EDGE_GAP = 8;
+  const EDGE_GAP = 0;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
   const COMBO_WINDOW_MS = 400;
   const EASTER_CLASSES = Object.freeze({
