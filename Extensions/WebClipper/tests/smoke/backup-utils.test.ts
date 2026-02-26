@@ -9,6 +9,7 @@ describe("backup-utils", () => {
       notion_oauth_client_id: "abc",
       notion_parent_page_id: "p1",
       notion_db_id_syncnos_ai_chats: "db1",
+      notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
       notion_oauth_token_v1: { accessToken: "secret" }
     });
@@ -16,6 +17,7 @@ describe("backup-utils", () => {
       notion_oauth_client_id: "abc",
       notion_parent_page_id: "p1",
       notion_db_id_syncnos_ai_chats: "db1",
+      notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings"
     });
   });
@@ -65,4 +67,3 @@ describe("backup-utils", () => {
     expect(merged2.sequence).toBe(2);
   });
 });
-
