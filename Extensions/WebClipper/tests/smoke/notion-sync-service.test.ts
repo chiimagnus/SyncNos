@@ -38,6 +38,71 @@ describe("notion-sync-service", () => {
     expect(lastReq.body.properties.Date?.date?.start).toBeTruthy();
   });
 
+  it("respects explicit properties (article should not inject AI)", async () => {
+    let lastReq: any = null;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        lastReq = req;
+        return { id: "p1" };
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+
+    await notionSyncService.createPageInDatabase("t", {
+      databaseId: "db",
+      properties: {
+        Name: { title: [{ type: "text", text: { content: "Article" } }] },
+        URL: { url: "https://x" },
+        Date: { date: { start: "2026-02-26T00:00:00.000Z" } },
+        Author: { rich_text: [{ type: "text", text: { content: "A" } }] }
+      }
+    });
+    expect(lastReq.body.properties.AI).toBeUndefined();
+    expect(lastReq.body.properties.Author).toBeTruthy();
+  });
+
+  it("uses capturedAt when generating Date on create", async () => {
+    let lastReq: any = null;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        lastReq = req;
+        return { id: "p1" };
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+
+    await notionSyncService.createPageInDatabase("t", {
+      databaseId: "db",
+      title: "Hello",
+      url: "https://x",
+      ai: "chatgpt",
+      capturedAt: Date.parse("2026-02-23T12:34:56.000Z")
+    });
+    expect(lastReq.body.properties.Date?.date?.start).toBe("2026-02-23T12:34:56.000Z");
+  });
+
   it("sets AI multi_select on update", async () => {
     let lastReq: any = null;
     // @ts-expect-error test global

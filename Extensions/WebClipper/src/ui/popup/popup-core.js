@@ -189,7 +189,11 @@
   }
 
   function conversationToMarkdown({ conversation, messages }) {
-    if (conversation && conversation.sourceType === "article") {
+    const kinds = (globalThis.WebClipper && globalThis.WebClipper.conversationKinds) || null;
+    const kind = (kinds && typeof kinds.pick === "function") ? kinds.pick(conversation) : null;
+    const kindId = kind && kind.id ? String(kind.id) : "";
+
+    if (kindId === "article") {
       const api = (globalThis.WebClipper && globalThis.WebClipper.articleMarkdown) || null;
       if (api && typeof api.formatArticleMarkdown === "function") {
         return api.formatArticleMarkdown({ conversation, messages });

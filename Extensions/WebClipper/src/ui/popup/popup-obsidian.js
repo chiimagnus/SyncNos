@@ -32,8 +32,23 @@
     return cleaned || (fallback || "SyncNos Clip");
   }
 
-  function buildObsidianNewUrl({ noteName, markdown, useClipboard }) {
-    const filePath = `${DEFAULT_OBSIDIAN_FOLDER}/${sanitizeObsidianNoteName(noteName, "SyncNos Clip")}`;
+  function folderForConversation(conversation) {
+    const kinds = (globalThis.WebClipper && globalThis.WebClipper.conversationKinds) || null;
+    if (kinds && typeof kinds.pick === "function") {
+      try {
+        const kind = kinds.pick(conversation);
+        const folder = kind && kind.obsidian && kind.obsidian.folder ? String(kind.obsidian.folder).trim() : "";
+        if (folder) return folder;
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return DEFAULT_OBSIDIAN_FOLDER;
+  }
+
+  function buildObsidianNewUrl({ noteName, markdown, useClipboard, folder }) {
+    const targetFolder = String(folder || "").trim() || DEFAULT_OBSIDIAN_FOLDER;
+    const filePath = `${targetFolder}/${sanitizeObsidianNoteName(noteName, "SyncNos Clip")}`;
     const pairs = [
       ["file", filePath],
       ["silent", "true"]
@@ -70,13 +85,15 @@
         : sanitizeObsidianNoteName(`${baseName}-${count}`, `${fallback}-${count}`, { sanitizeFilenamePart });
       return {
         noteName,
-        markdown: String((doc && doc.markdown) || "")
+        markdown: String((doc && doc.markdown) || ""),
+        folder: folderForConversation(doc && doc.conversation ? doc.conversation : null)
       };
     });
   }
 
   const api = {
     DEFAULT_OBSIDIAN_FOLDER,
+    folderForConversation,
     isoStampForName,
     sanitizeObsidianNoteName,
     buildObsidianNewUrl,

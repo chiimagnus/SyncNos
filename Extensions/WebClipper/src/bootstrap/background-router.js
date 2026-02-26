@@ -35,6 +35,7 @@
   const NOTION_DISCONNECT_STORAGE_KEYS = Object.freeze([
     "notion_parent_page_id",
     "notion_db_id_syncnos_ai_chats",
+    "notion_db_id_syncnos_web_articles",
     "notion_oauth_pending_state",
     "notion_oauth_last_error"
   ]);

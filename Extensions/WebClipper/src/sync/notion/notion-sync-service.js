@@ -206,28 +206,37 @@
     }
   }
 
-  function buildPageProperties({ title, url, ai, includeDate }) {
+  function buildPageProperties({ title, url, ai, includeDate, capturedAt }) {
     const props = {
       Name: { title: [{ type: "text", text: { content: title || "Untitled" } }] },
       URL: { url: url || "" }
     };
-    if (includeDate) props.Date = { date: { start: new Date().toISOString() } };
+    if (includeDate) {
+      const at = Number(capturedAt);
+      const stamp = Number.isFinite(at) && at > 0 ? at : Date.now();
+      props.Date = { date: { start: new Date(stamp).toISOString() } };
+    }
     const aiName = aiLabelForSource(ai);
     if (aiName) props.AI = { multi_select: [{ name: aiName }] };
     return props;
   }
 
-  async function createPageInDatabase(accessToken, { databaseId, title, url, ai }) {
+  function resolveProperties({ properties, title, url, ai, includeDate, capturedAt }) {
+    if (properties && typeof properties === "object") return properties;
+    return buildPageProperties({ title, url, ai, includeDate, capturedAt });
+  }
+
+  async function createPageInDatabase(accessToken, { databaseId, title, url, ai, properties, capturedAt }) {
     const body = {
       parent: { database_id: databaseId },
-      properties: buildPageProperties({ title, url, ai, includeDate: true })
+      properties: resolveProperties({ properties, title, url, ai, includeDate: true, capturedAt })
     };
     return NS.notionApi.notionFetch({ accessToken, method: "POST", path: "/v1/pages", body });
   }
 
-  async function updatePageProperties(accessToken, { pageId, title, url, ai }) {
+  async function updatePageProperties(accessToken, { pageId, title, url, ai, properties }) {
     const body = {
-      properties: buildPageProperties({ title, url, ai, includeDate: false })
+      properties: resolveProperties({ properties, title, url, ai, includeDate: false })
     };
     return NS.notionApi.notionFetch({ accessToken, method: "PATCH", path: `/v1/pages/${pageId}`, body });
   }

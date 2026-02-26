@@ -23,7 +23,8 @@ function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
         }
       }
     },
-    __removed: removed
+    __removed: removed,
+    __store: store
   };
 }
 
@@ -72,6 +73,61 @@ describe("notion-db-manager", () => {
     expect(create.body.properties?.AI?.multi_select).toBeTruthy();
   });
 
+  it("creates SyncNos-Web Articles database when missing (dbSpec-driven + separate cache key)", async () => {
+    const calls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "POST" && req.path === "/v1/search") return { results: [] };
+        if (req.method === "POST" && req.path === "/v1/databases") return { id: "db_articles" };
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+
+    const dbSpec = {
+      title: "SyncNos-Web Articles",
+      storageKey: "notion_db_id_syncnos_web_articles",
+      properties: {
+        Name: { title: {} },
+        Date: { date: {} },
+        URL: { url: {} },
+        Author: { rich_text: {} },
+        Published: { rich_text: {} },
+        Description: { rich_text: {} }
+      },
+      ensureSchemaPatch: {
+        Author: { rich_text: {} },
+        Published: { rich_text: {} },
+        Description: { rich_text: {} }
+      }
+    };
+
+    const res = await notionDbManager.ensureDatabase({ accessToken: "t", parentPageId: "p", dbSpec });
+    expect(res.databaseId).toBe("db_articles");
+    expect(res.title).toBe("SyncNos-Web Articles");
+    expect(chromeMock.__store.notion_db_id_syncnos_web_articles).toBe("db_articles");
+
+    const create = calls.find((c) => c.method === "POST" && c.path === "/v1/databases");
+    expect(create.body.title?.[0]?.text?.content).toBe("SyncNos-Web Articles");
+    expect(create.body.properties?.Author?.rich_text).toBeTruthy();
+    expect(create.body.properties?.AI).toBeFalsy();
+  });
+
   it("best-effort adds AI property when reusing cached database without AI", async () => {
     const calls: any[] = [];
     // @ts-expect-error test global
@@ -105,6 +161,45 @@ describe("notion-db-manager", () => {
 
     const patched = calls.some((c) => c.method === "PATCH" && c.path === "/v1/databases/db1");
     expect(patched).toBe(true);
+  });
+
+  it("returns false when cached database has AI property with wrong type", async () => {
+    const calls: any[] = [];
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    loadNotionAi();
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "GET" && req.path === "/v1/databases/db1") {
+          return {
+            id: "db1",
+            properties: {
+              Name: { type: "title" },
+              Date: { type: "date" },
+              URL: { type: "url" },
+              AI: { type: "select" }
+            }
+          };
+        }
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: "db1" } });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+
+    const ok = await notionDbManager.ensureDatabaseSchema({ accessToken: "t", databaseId: "db1" });
+    expect(ok).toBe(false);
+    expect(calls.some((c) => c.method === "PATCH")).toBe(false);
   });
 
   it("clears stale cached database id and recreates database on object_not_found", async () => {
