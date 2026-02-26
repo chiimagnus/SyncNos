@@ -96,6 +96,14 @@
     const db = await getDatabase(accessToken, databaseId);
     const props = db && db.properties ? db.properties : {};
     const patch = spec.ensureSchemaPatch && typeof spec.ensureSchemaPatch === "object" ? spec.ensureSchemaPatch : {};
+
+    // If the DB has an `AI` property but it's not a multi_select, we can't patch it in-place.
+    // Signal failure so callers can surface a clear error or rebuild strategy.
+    if (patch.AI) {
+      const ai = props && props.AI ? props.AI : null;
+      if (ai && ai.type && ai.type !== "multi_select") return false;
+    }
+
     const missing = {};
     for (const [k, v] of Object.entries(patch)) {
       if (!props || !props[k]) missing[k] = v;
