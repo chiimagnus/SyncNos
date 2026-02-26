@@ -55,10 +55,16 @@
 - 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
 - 导出所选对话为 JSON/Markdown
 - 通过 `obsidian://new` 将所选对话写入 Obsidian（单选优先走剪贴板模式；多选按顺序打开多个 URL）
-- Obsidian 默认写入 `SyncNos-AIChats/<会话标题>`；同名笔记会自动追加数字后缀
+- Obsidian 按 kind 分目录写入：
+  - 聊天：`SyncNos-AIChats/<会话标题>`
+  - 网页文章：`SyncNos-WebArticles/<文章标题>`
+  - 同名笔记会自动追加数字后缀
 - 数据库备份：导出/导入本地 IndexedDB + 非敏感 `chrome.storage.local` 设置（导入按 `source + conversationKey` 合并；不包含 Notion token）
 - 手动同步所选对话到 Notion（OAuth）
-- 同步写入 Notion 数据库 `SyncNos-AI Chats`；重复同步会清空目标页面子块并重建内容以避免重复追加
+- Notion 同步按 kind 分库写入：
+  - 聊天：数据库 `SyncNos-AI Chats`
+  - 网页文章：数据库 `SyncNos-Web Articles`
+  - cursor 匹配时只追加新增消息；cursor 缺失（或文章重复 fetch 有更新）时会清空页面子块并重建内容。
 - 当消息包含 `contentMarkdown` 时，同步会优先将 Markdown 渲染为 Notion blocks（标题/列表/引用/代码块等）；否则回退为纯文本。
 - Notion AI：可选“自动点选偏好的大模型”（仅在 Notion AI 当前为 **自动/Auto** 时生效，可在扩展 Settings 中配置）
 
