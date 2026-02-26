@@ -24,6 +24,7 @@
       "../sync/obsidian/obsidian-url-service.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
+      "./article-fetch-service.js",
       "./background-router.js"
     );
   } catch (_e) {
