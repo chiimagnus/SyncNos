@@ -49,7 +49,6 @@ function createHarness(options?: {
         buttonConfig = cfg;
       },
       cleanupButtons: () => {},
-      flashInpageOk: vi.fn()
     },
     collectorsRegistry: {
       pickActive: () => ({ id: "gemini", collector }),
@@ -87,7 +86,6 @@ function createHarness(options?: {
       if (tickRef) await tickRef();
     },
     getButtonConfig: () => buttonConfig,
-    flashInpageOk: globalThis.WebClipper.inpageButton.flashInpageOk
   };
 }
 
@@ -168,6 +166,6 @@ describe("content-controller inpage combo", () => {
 
     expect(harness.sendCalls.some((c) => c.type === "upsertConversation")).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === "syncConversationMessages")).toBe(true);
-    expect(harness.flashInpageOk).toHaveBeenCalled();
+    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
   });
 });
