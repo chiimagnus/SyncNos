@@ -31,6 +31,14 @@
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
 
+  const UI_EVENT_TYPES = contracts.UI_EVENT_TYPES || Object.freeze({
+    CONVERSATIONS_CHANGED: "conversationsChanged"
+  });
+
+  const UI_PORT_NAMES = contracts.UI_PORT_NAMES || Object.freeze({
+    POPUP_EVENTS: "popup:events"
+  });
+
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const NOTION_DISCONNECT_BASE_STORAGE_KEYS = Object.freeze([
     "notion_parent_page_id",
@@ -218,6 +226,22 @@
     if (notionJobStore && typeof notionJobStore.abortRunningJobIfFromOtherInstance === "function") {
       notionJobStore.abortRunningJobIfFromOtherInstance(BACKGROUND_INSTANCE_ID).catch(() => {});
     }
+
+    // Port subscription:
+    // When popup opens, it connects via `chrome.runtime.connect`. That Port keeps MV3 service worker alive
+    // during the popup lifetime, and automatically disconnects when the popup closes.
+    try {
+      const hub = NS.backgroundEventsHub;
+      if (chrome && chrome.runtime && typeof chrome.runtime.onConnect?.addListener === "function") {
+        chrome.runtime.onConnect.addListener((port) => {
+          if (!port || port.name !== UI_PORT_NAMES.POPUP_EVENTS) return;
+          if (hub && typeof hub.registerPort === "function") hub.registerPort(port);
+        });
+      }
+    } catch (_e) {
+      // ignore
+    }
+
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       Promise.resolve()
         .then(() => handleMessage(msg))
