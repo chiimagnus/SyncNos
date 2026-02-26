@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 function loadNotionAi() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-ai.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-ai.js");
+  return require("../../src/export/notion/notion-ai.js");
 }
 
 describe("notion-sync-service", () => {
@@ -25,11 +25,11 @@ describe("notion-sync-service", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     await notionSyncService.createPageInDatabase("t", { databaseId: "db", title: "Hello", url: "https://x", ai: "chatgpt" });
     expect(lastReq.method).toBe("POST");
@@ -53,11 +53,11 @@ describe("notion-sync-service", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     await notionSyncService.createPageInDatabase("t", {
       databaseId: "db",
@@ -87,11 +87,11 @@ describe("notion-sync-service", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     await notionSyncService.createPageInDatabase("t", {
       databaseId: "db",
@@ -118,11 +118,11 @@ describe("notion-sync-service", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     await notionSyncService.updatePageProperties("t", { pageId: "p1", title: "Hello", url: "https://x", ai: "claude" });
     expect(lastReq.method).toBe("PATCH");
@@ -133,11 +133,11 @@ describe("notion-sync-service", () => {
 
   it("detects page database parent", () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const page = { parent: { type: "database_id", database_id: "db1" } };
     expect(notionSyncService.pageBelongsToDatabase(page, "db1")).toBe(true);
@@ -146,11 +146,11 @@ describe("notion-sync-service", () => {
 
   it("detects archived/trashed pages", () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     expect(notionSyncService.isPageArchivedOrTrashed({ archived: true })).toBe(true);
     expect(notionSyncService.isPageArchivedOrTrashed({ in_trash: true })).toBe(true);
@@ -177,11 +177,11 @@ describe("notion-sync-service", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     await notionSyncService.clearPageChildren("t", "p1");
     const getCalls = calls.filter((c) => c.method === "GET");

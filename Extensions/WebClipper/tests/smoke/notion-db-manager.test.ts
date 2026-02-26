@@ -30,11 +30,11 @@ function mockChromeStorage({ initial = {} as Record<string, unknown> } = {}) {
 
 function loadNotionAi() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-ai.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-ai.js");
+  return require("../../src/export/notion/notion-ai.js");
 }
 
 describe("notion-db-manager", () => {
@@ -57,11 +57,11 @@ describe("notion-db-manager", () => {
     globalThis.chrome = mockChromeStorage();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-db-manager.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+    const notionDbManager = require("../../src/export/notion/notion-db-manager.js");
 
     const res = await notionDbManager.ensureDatabase({ accessToken: "t", parentPageId: "p" });
     expect(res.databaseId).toBe("db_created");
@@ -93,11 +93,11 @@ describe("notion-db-manager", () => {
     globalThis.chrome = chromeMock;
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-db-manager.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+    const notionDbManager = require("../../src/export/notion/notion-db-manager.js");
 
     const dbSpec = {
       title: "SyncNos-Web Articles",
@@ -149,11 +149,11 @@ describe("notion-db-manager", () => {
     globalThis.chrome = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: "db1" } });
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-db-manager.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+    const notionDbManager = require("../../src/export/notion/notion-db-manager.js");
 
     const res = await notionDbManager.ensureDatabase({ accessToken: "t", parentPageId: "p" });
     expect(res.reused).toBe(true);
@@ -191,11 +191,11 @@ describe("notion-db-manager", () => {
     globalThis.chrome = mockChromeStorage({ initial: { notion_db_id_syncnos_ai_chats: "db1" } });
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-db-manager.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+    const notionDbManager = require("../../src/export/notion/notion-db-manager.js");
 
     const ok = await notionDbManager.ensureDatabaseSchema({ accessToken: "t", databaseId: "db1" });
     expect(ok).toBe(false);
@@ -225,11 +225,11 @@ describe("notion-db-manager", () => {
     globalThis.chrome = chromeMock;
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-db-manager.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-db-manager.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionDbManager = require("../../src/sync/notion/notion-db-manager.js");
+    const notionDbManager = require("../../src/export/notion/notion-db-manager.js");
 
     const res = await notionDbManager.ensureDatabase({ accessToken: "t", parentPageId: "p" });
     expect(res.databaseId).toBe("db_new");

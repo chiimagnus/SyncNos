@@ -43,11 +43,11 @@ function loadKinds() {
 
 function loadOrchestrator() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-sync-orchestrator.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-sync-orchestrator.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-sync-orchestrator.js");
+  return require("../../src/export/notion/notion-sync-orchestrator.js");
 }
 
 describe("notion-sync-orchestrator kind routing", () => {

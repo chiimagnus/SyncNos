@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 function loadNotionAi() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-ai.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-ai.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-ai.js");
+  return require("../../src/export/notion/notion-ai.js");
 }
 
 describe("notion-sync-service markdown", () => {
@@ -17,11 +17,11 @@ describe("notion-sync-service markdown", () => {
     loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const rich = notionSyncService.inlineMarkdownToRichText("Hello **bold** and `code` plus [link](https://example.com).");
     expect(Array.isArray(rich)).toBe(true);
@@ -40,11 +40,11 @@ describe("notion-sync-service markdown", () => {
     loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const md = [
       "### Title",
@@ -87,11 +87,11 @@ describe("notion-sync-service markdown", () => {
     loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const md = [
       "Hello",
@@ -113,11 +113,11 @@ describe("notion-sync-service markdown", () => {
     loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const messages = [
       { role: "assistant", contentText: "plain", contentMarkdown: "- item **b**" }
@@ -133,11 +133,11 @@ describe("notion-sync-service markdown", () => {
     loadNotionAi();
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete require.cache[modulePath];
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/sync/notion/notion-sync-service.js");
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
 
     const messages = [
       { role: "assistant", contentText: "plain", contentMarkdown: "```js\nconsole.log(1)\n```" }

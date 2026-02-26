@@ -50,8 +50,8 @@
 ### Task 1: 引入 Conversation Kind 协议与 Registry（含运行时加载顺序）
 
 **Files:**
-- Create: `Extensions/WebClipper/src/shared/conversation-kind-contract.js`
-- Create: `Extensions/WebClipper/src/shared/conversation-kinds.js`
+- Create: `Extensions/WebClipper/src/protocols/conversation-kind-contract.js`
+- Create: `Extensions/WebClipper/src/protocols/conversation-kinds.js`
 - Modify: `Extensions/WebClipper/src/bootstrap/background.js`
 - Modify: `Extensions/WebClipper/src/ui/popup/popup.html`
 - Create: `Extensions/WebClipper/tests/smoke/conversation-kinds.test.ts`
@@ -218,7 +218,7 @@
 **Step 1: 实现功能**
 - 所有“文章/聊天差异”必须先 `kindRegistry.pick(conversation)` 再决定策略，避免继续扩散 `if (sourceType === "article") ...`。
 - 将“允许直接使用 sourceType 的位置”限制为：
-  - `src/shared/conversation-kinds.js`（matches）
+  - `src/protocols/conversation-kinds.js`（matches）
   - `src/bootstrap/article-fetch-service.js`（写入 sourceType）
   - `src/storage/*`（数据模型与合并）
 

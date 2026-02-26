@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 function loadNotionSyncService() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-sync-service.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-sync-service.js");
+  return require("../../src/export/notion/notion-sync-service.js");
 }
 
 describe("notion-sync-service image uploads", () => {
