@@ -66,7 +66,10 @@
 
 ### Obsidian 约束
 
-- 默认目录：`SyncNos-AIChats/`，笔记名优先使用会话标题并做非法字符清洗与重名后缀。
+- 默认目录按 kind 分流：
+  - chat：`SyncNos-AIChats/`
+  - article：`SyncNos-WebArticles/`
+  笔记名优先使用标题并做非法字符清洗与重名后缀。
 - 单选会话：优先复制 Markdown 到剪贴板并走 `clipboard=1`；复制失败时回退到 `content` 参数。
 - 多选会话：生成多个 `obsidian://new` URL，后台按顺序逐个打开，避免创建顺序错乱。
 

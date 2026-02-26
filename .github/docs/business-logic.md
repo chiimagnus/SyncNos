@@ -5,7 +5,7 @@
 SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Notion”的工具组合，包含：
 
 - **SyncNos（macOS App）**：从 Apple Books、GoodLinks、WeRead（微信读书）、Dedao（得到）与聊天截图 OCR 中提取高亮/笔记/消息，整理后同步到 Notion。
-- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话并增量保存到本地，支持导出（JSON/Markdown）、本地数据库备份导出/导入（合并导入），以及手动同步到 Notion（OAuth）。
+- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话与网页文章（手动 fetch 当前页），增量保存到本地；支持导出（JSON/Markdown）、本地数据库备份导出/导入（合并导入），以及手动同步到 Notion（OAuth）。
 
 - 给谁用：希望把阅读与对话中的“可复用信息”系统化沉淀到 Notion 的用户
 - 核心体验：
@@ -64,7 +64,10 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 输入：Parent Page；条目与其内容片段
 - 输出：
   - App：通常“按来源一个数据库”，每个条目对应一个页面，在页面内写入高亮/笔记 blocks
-  - WebClipper：创建/复用数据库 `SyncNos-AI Chats`，按“1 会话 -> 1 页面”写入消息内容
+  - WebClipper：按 kind 分库创建/复用数据库并写入页面内容：
+    - chat：`SyncNos-AI Chats`
+    - article：`SyncNos-Web Articles`
+    - 统一按“1 会话 -> 1 页面”写入内容 blocks
 - 关键边界与失败方式：Notion API 限流或网络异常会导致同步失败；需要提供可重试与失败原因
 
 ### 2.6 增量同步与自动同步（App）
@@ -119,12 +122,15 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 ### 3.3 WebClipper：对话采集 → 导出/Obsidian/备份/同步 Notion
 
 1. 用户在支持站点进行对话，扩展自动增量采集并本地入库
+   - 或用户在设置页点击 “Fetch Current Page”，将当前网页文章抓取为 `sourceType=article` 的会话并入库
 2. 用户在扩展弹窗中选择会话，执行：
    - 导出（JSON/Markdown），或
-   - 添加到 Obsidian（生成 `obsidian://new`，默认落入 `SyncNos-AIChats` 目录），或
+   - 添加到 Obsidian（生成 `obsidian://new`，按 kind 分目录落入 `SyncNos-AIChats` / `SyncNos-WebArticles`），或
    - 数据库备份导出/导入（合并导入），或
-   - 连接 Notion 并选择 Parent Page，同步到 `SyncNos-AI Chats`
-3. 重复同步时，为避免重复追加，会覆盖目标页面的子块内容并重建消息内容
+   - 连接 Notion 并选择 Parent Page，同步到对应 kind 的数据库（`SyncNos-AI Chats` / `SyncNos-Web Articles`）
+3. 重复同步策略：
+   - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
+   - article：当文章被重新 fetch 且内容更新时，也会覆盖式重建子块（避免停留在 no_changes）
 
 ## 4) 业务流程图（Mermaid）
 
@@ -146,9 +152,9 @@ flowchart TD
     W3 -->|导出| W4["导出 JSON/Markdown"]
     W3 -->|添加到 Obsidian| W8["生成 `obsidian://new` URL（单选可走剪贴板）"]
     W3 -->|备份| W5["备份导出/导入（合并）"]
-    W3 -->|同步 Notion| W6["创建/复用 `SyncNos-AI Chats`"]
-    W8 --> W9["Obsidian 创建/打开笔记（默认目录 `SyncNos-AIChats`）"]
-    W6 --> W7["写入会话页（覆盖式重建子块）"]
+    W3 -->|同步 Notion| W6["按 kind 创建/复用数据库（Chats/Web Articles）"]
+    W8 --> W9["Obsidian 创建/打开笔记（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）"]
+    W6 --> W7["写入/更新会话页（增量追加或覆盖式重建子块）"]
     W4 --> I
     W9 --> I
     W5 --> I
@@ -161,7 +167,9 @@ flowchart TD
 - macOS 沙盒约束：Apple Books/GoodLinks 需要用户显式授权目录；授权不正确时无法读取数据
 - 会话类数据源约束：WeRead/Dedao 依赖 Cookie；过期/失效会导致拉取失败，需要用户重新登录
 - 增量与去重前提：依赖来源提供稳定标识；否则可能退化为覆盖式重建或出现重复追加风险
-- WebClipper 重复同步策略：为避免重复追加，会覆盖目标页面的子块内容并重建消息内容
+- WebClipper 重复同步策略（按 kind）：
+  - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
+  - article：当文章被重新 fetch 且内容更新时覆盖式重建子块
 - WebClipper Obsidian 约束：通过 `obsidian://` URL scheme 触发目标应用；若系统未正确处理该协议，扩展应返回可理解的失败提示
 - WebClipper 备份约束：备份导入为合并模式；备份文件不应包含 Notion token 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
@@ -170,7 +178,7 @@ flowchart TD
 
 ### 6.1 Notion 侧产物
 
-- 按来源创建/复用数据库（App 常见标题前缀为 `SyncNos-...`；WebClipper 常见标题为 `SyncNos-AI Chats`）
+- 按来源创建/复用数据库（App 常见标题前缀为 `SyncNos-...`；WebClipper 常见标题为 `SyncNos-AI Chats` / `SyncNos-Web Articles`）
 - 页面/条目结构：
   - App：通常“一个条目一个页面”，在页面内写入高亮/笔记 blocks，并维护“最后同步时间/数量”等属性
   - WebClipper：通常“一个会话一个页面”，写入按时间顺序组织的消息内容
@@ -178,7 +186,7 @@ flowchart TD
 ### 6.2 本地侧产物
 
 - App：用于加速展示与增量同步的缓存数据、已同步映射与时间戳；敏感凭据优先使用系统安全存储（如 Keychain）
-- WebClipper：浏览器本地数据库（IndexedDB）的会话与消息、非敏感设置、导出的 JSON/Markdown 与备份文件，以及写入 Obsidian 的笔记内容（默认目录 `SyncNos-AIChats`）
+- WebClipper：浏览器本地数据库（IndexedDB）的会话与消息、非敏感设置、导出的 JSON/Markdown 与备份文件，以及写入 Obsidian 的笔记内容（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）
 
 ## 7) 术语表（Glossary）
 

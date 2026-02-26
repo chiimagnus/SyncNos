@@ -31,6 +31,21 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
 }
 
 function loadBackgroundRouter() {
+  // Ensure global protocol modules are loaded before orchestrator (mirrors MV3 load order).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const kindContractPath = require.resolve("../../src/shared/conversation-kind-contract.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[kindContractPath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/shared/conversation-kind-contract.js");
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const kindsPath = require.resolve("../../src/shared/conversation-kinds.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[kindsPath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/shared/conversation-kinds.js");
+
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const jobStoreModulePath = require.resolve("../../src/sync/notion/notion-sync-job-store.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -78,6 +93,7 @@ describe("background-router notion sync", () => {
     const removedFlatten = chromeMock.__removed.flat();
     expect(removedFlatten).toContain("notion_parent_page_id");
     expect(removedFlatten).toContain("notion_db_id_syncnos_ai_chats");
+    expect(removedFlatten).toContain("notion_db_id_syncnos_web_articles");
     expect(removedFlatten).toContain("notion_oauth_pending_state");
     expect(removedFlatten).toContain("notion_oauth_last_error");
     expect(removedFlatten).toContain("notion_sync_job_v1");

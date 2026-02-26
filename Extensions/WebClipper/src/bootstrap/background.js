@@ -10,6 +10,8 @@
     importScripts(
       "../storage/schema.js",
       "../shared/message-contracts.js",
+      "../shared/conversation-kind-contract.js",
+      "../shared/conversation-kinds.js",
       "../sync/notion/oauth-config.js",
       "../sync/notion/token-store.js",
       "../sync/notion/notion-api.js",

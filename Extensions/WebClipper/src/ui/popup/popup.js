@@ -227,14 +227,16 @@
           const url = obsidianApi.buildObsidianNewUrl({
             noteName: payload.noteName,
             markdown: payload.markdown,
-            useClipboard
+            useClipboard,
+            folder: payload.folder
           });
           res = await send(obsidianTypes.OPEN_URL, { url });
         } else {
           const urls = payloads.map((payload) => obsidianApi.buildObsidianNewUrl({
             noteName: payload.noteName,
             markdown: payload.markdown,
-            useClipboard: false
+            useClipboard: false,
+            folder: payload.folder
           }));
           res = await send(obsidianTypes.OPEN_URL, { urls });
         }
