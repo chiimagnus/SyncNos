@@ -93,6 +93,7 @@ describe("background-router notion sync", () => {
     const removedFlatten = chromeMock.__removed.flat();
     expect(removedFlatten).toContain("notion_parent_page_id");
     expect(removedFlatten).toContain("notion_db_id_syncnos_ai_chats");
+    expect(removedFlatten).toContain("notion_db_id_syncnos_web_articles");
     expect(removedFlatten).toContain("notion_oauth_pending_state");
     expect(removedFlatten).toContain("notion_oauth_last_error");
     expect(removedFlatten).toContain("notion_sync_job_v1");

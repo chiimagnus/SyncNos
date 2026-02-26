@@ -7,6 +7,7 @@
     "notion_oauth_client_id",
     "notion_parent_page_id",
     "notion_db_id_syncnos_ai_chats",
+    "notion_db_id_syncnos_web_articles",
     "popup_active_tab"
   ]);
 
