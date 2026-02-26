@@ -31,6 +31,14 @@
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
 
+  const UI_EVENT_TYPES = contracts.UI_EVENT_TYPES || Object.freeze({
+    CONVERSATIONS_CHANGED: "conversationsChanged"
+  });
+
+  const UI_PORT_NAMES = contracts.UI_PORT_NAMES || Object.freeze({
+    POPUP_EVENTS: "popup:events"
+  });
+
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const NOTION_DISCONNECT_BASE_STORAGE_KEYS = Object.freeze([
     "notion_parent_page_id",
@@ -128,6 +136,15 @@
         }
         try {
           const data = await articleService.fetchActiveTabArticle({ tabId: msg.tabId });
+          try {
+            const hub = NS.backgroundEventsHub;
+            const conversationId = Number(data && data.conversationId);
+            if (hub && typeof hub.broadcast === "function" && Number.isFinite(conversationId) && conversationId > 0) {
+              hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "articleFetch", conversationId });
+            }
+          } catch (_e) {
+            // ignore
+          }
           return ok(data);
         } catch (e) {
           return err(e && e.message ? e.message : String(e || "article fetch failed"));
@@ -185,6 +202,14 @@
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const res = await storage.syncConversationMessages(conversationId, msg.messages);
+        try {
+          const hub = NS.backgroundEventsHub;
+          if (hub && typeof hub.broadcast === "function") {
+            hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "upsert", conversationId });
+          }
+        } catch (_e) {
+          // ignore
+        }
         return ok(res);
       }
       case MESSAGE_TYPES.GET_CONVERSATIONS: {
@@ -206,6 +231,17 @@
         if (!storage) return err("storage module missing");
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
         const res = await storage.deleteConversationsByIds(ids);
+        try {
+          const hub = NS.backgroundEventsHub;
+          if (hub && typeof hub.broadcast === "function") {
+            const normalizedIds = Array.isArray(ids)
+              ? ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+              : [];
+            hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "delete", conversationIds: normalizedIds });
+          }
+        } catch (_e) {
+          // ignore
+        }
         return ok(res);
       }
       default:
@@ -218,6 +254,22 @@
     if (notionJobStore && typeof notionJobStore.abortRunningJobIfFromOtherInstance === "function") {
       notionJobStore.abortRunningJobIfFromOtherInstance(BACKGROUND_INSTANCE_ID).catch(() => {});
     }
+
+    // Port subscription:
+    // When popup opens, it connects via `chrome.runtime.connect`. That Port keeps MV3 service worker alive
+    // during the popup lifetime, and automatically disconnects when the popup closes.
+    try {
+      const hub = NS.backgroundEventsHub;
+      if (chrome && chrome.runtime && typeof chrome.runtime.onConnect?.addListener === "function") {
+        chrome.runtime.onConnect.addListener((port) => {
+          if (!port || port.name !== UI_PORT_NAMES.POPUP_EVENTS) return;
+          if (hub && typeof hub.registerPort === "function") hub.registerPort(port);
+        });
+      }
+    } catch (_e) {
+      // ignore
+    }
+
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       Promise.resolve()
         .then(() => handleMessage(msg))

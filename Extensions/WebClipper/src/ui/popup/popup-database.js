@@ -3,6 +3,7 @@
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
   const core = NS.popupCore;
+  const list = NS.popupList;
   const schema = NS.storageSchema;
   const backupUtils = NS.backupUtils;
   if (!core || !schema || !backupUtils) return;
@@ -410,6 +411,11 @@
         setImportButtonLabel(view.text);
       });
       resetImportUiDelayed("Imported ✓", 1600);
+      try {
+        list && typeof list.refresh === "function" && list.refresh();
+      } catch (_e) {
+        // ignore
+      }
     } catch (_e) {
       setStatus("Error");
       resetImportUiDelayed("Import failed", 2000);
