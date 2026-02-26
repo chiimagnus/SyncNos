@@ -7,6 +7,9 @@
     UPSERT_CONVERSATION: "upsertConversation",
     SYNC_CONVERSATION_MESSAGES: "syncConversationMessages"
   });
+  const ARTICLE_MESSAGE_TYPES = contracts.ARTICLE_MESSAGE_TYPES || Object.freeze({
+    FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
+  });
   const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
@@ -24,6 +27,24 @@
     function showInpageTip(text, kind) {
       if (!inpageTip || typeof inpageTip.showSaveTip !== "function") return;
       inpageTip.showSaveTip(text, { kind });
+    }
+
+    function errorMessage(err, fallback) {
+      const msg = err && typeof err === "object" && "message" in err ? err.message : err;
+      const text = String(msg || fallback || "Save failed").trim();
+      return text || String(fallback || "Save failed");
+    }
+
+    async function runManualSaveFlow({ startText, run }) {
+      showInpageTip(startText || "Saving...", "loading");
+      try {
+        const value = await run();
+        showInpageTip("Saved", "ok");
+        return value;
+      } catch (e) {
+        showInpageTip(errorMessage(e, "Save failed"), "error");
+        throw e;
+      }
     }
 
     function send(type, payload) {
@@ -104,20 +125,39 @@
         if (stopped) return;
         try {
           const collector = getCollector() || getInpageCollector();
-          if (!collector || typeof collector.capture !== "function") return;
-          if (typeof collector.prepareManualCapture === "function") {
-            showInpageTip("Loading full history...", "loading");
-            await collector.prepareManualCapture();
-          }
-          const snapshot = await Promise.resolve(collector.capture({ manual: true }));
-          if (!snapshot) {
-            showInpageTip("No visible conversation found", "error");
+          if (collector && collector.id === "web") {
+            await runManualSaveFlow({
+              startText: "Saving...",
+              run: async () => {
+                const res = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
+                if (!res || !res.ok) {
+                  const msg = (res && res.error && res.error.message) ? String(res.error.message) : "Fetch failed";
+                  throw new Error(msg);
+                }
+                return res;
+              }
+            });
             return;
           }
-          await saveSnapshot(snapshot);
-          inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
+          if (!collector || typeof collector.capture !== "function") return;
+          await runManualSaveFlow({
+            startText: typeof collector.prepareManualCapture === "function" ? "Loading full history..." : "Saving...",
+            run: async () => {
+              if (typeof collector.prepareManualCapture === "function") {
+                await collector.prepareManualCapture();
+                showInpageTip("Saving...", "loading");
+              }
+              const snapshot = await Promise.resolve(collector.capture({ manual: true }));
+              if (!snapshot) {
+                showInpageTip("No visible conversation found", "error");
+                return null;
+              }
+              await saveSnapshot(snapshot);
+              return { ok: true };
+            }
+          });
         } catch (_e) {
-          showInpageTip("Save failed", "error");
+          // Error tip already shown in runManualSaveFlow().
         }
       };
 
@@ -168,7 +208,6 @@
             const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
             if (!inc || !inc.changed) return;
             await saveSnapshot(inc.snapshot);
-            inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
           } catch (_e) {
             if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
               stop();

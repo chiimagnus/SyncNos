@@ -7,7 +7,6 @@
   const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
   const EDGE_GAP = 8;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
-  const INPAGE_OK_FLASH_COOLDOWN_MS = 2500;
   const COMBO_WINDOW_MS = 400;
   const EASTER_CLASSES = Object.freeze({
     3: "is-easter-3",
@@ -101,56 +100,6 @@
     return applySnappedPosition(el, { edge: closest.edge, offset });
   }
 
-  const inpageOkState = {
-    lastAt: 0,
-    timer: null
-  };
-
-  function ensureInpageOkDecor(btn) {
-    if (!btn || !btn.appendChild) return;
-    let check = btn.querySelector(".webclipper-inpage-btn__check");
-    if (!check) {
-      check = document.createElement("span");
-      check.className = "webclipper-inpage-btn__check";
-      check.setAttribute("aria-hidden", "true");
-      check.textContent = "✓";
-      btn.appendChild(check);
-    }
-
-    // Defensive: Notion's global styles (or cached older extension CSS) can leak into our badge.
-    // Force the "popup-style" white badge here so it stays visually consistent.
-    try {
-      check.style.background = "#ffffff";
-      check.style.border = "1px solid rgba(31, 157, 85, 0.38)";
-      check.style.color = "#1f9d55";
-    } catch (_e) {
-      // ignore
-    }
-  }
-
-  function flashInpageOk() {
-    const btn = document.getElementById(INPAGE_BTN_ID);
-    if (!btn) return;
-    ensureInpageOkDecor(btn);
-    const now = Date.now();
-    if (now - inpageOkState.lastAt < INPAGE_OK_FLASH_COOLDOWN_MS) return;
-    inpageOkState.lastAt = now;
-
-    if (inpageOkState.timer) {
-      clearTimeout(inpageOkState.timer);
-      inpageOkState.timer = null;
-    }
-
-    btn.classList.remove("is-flash-ok");
-    // Force reflow so re-adding the class re-triggers the animation reliably.
-    void btn.offsetWidth;
-    btn.classList.add("is-flash-ok");
-    inpageOkState.timer = setTimeout(() => {
-      btn.classList.remove("is-flash-ok");
-      inpageOkState.timer = null;
-    }, 1400);
-  }
-
   function resolveComboLevel(count) {
     if (count >= 7) return 7;
     if (count >= 5) return 5;
@@ -177,7 +126,6 @@
     const existing = document.getElementById(INPAGE_BTN_ID);
     if (existing) {
       if (existing.dataset.sourceId === collectorId) {
-        ensureInpageOkDecor(existing);
         return;
       }
       destroyButton(existing);
@@ -208,8 +156,6 @@
     } else {
       btn.textContent = INPAGE_BUTTON_LABEL;
     }
-
-    ensureInpageOkDecor(btn);
 
     const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
@@ -398,8 +344,7 @@
   NS.inpageButton = {
     initRuntime,
     ensureInpageButton,
-    cleanupButtons,
-    flashInpageOk
+    cleanupButtons
   };
   if (typeof module !== "undefined" && module.exports) module.exports = NS.inpageButton;
 })();
