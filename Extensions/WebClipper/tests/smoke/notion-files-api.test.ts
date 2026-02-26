@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 
 function loadNotionApi() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-api.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-api.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-api.js");
+  return require("../../src/export/notion/notion-api.js");
 }
 
 function loadNotionFilesApi() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/sync/notion/notion-files-api.js");
+  const modulePath = require.resolve("../../src/export/notion/notion-files-api.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/sync/notion/notion-files-api.js");
+  return require("../../src/export/notion/notion-files-api.js");
 }
 
 describe("notion-files-api", () => {

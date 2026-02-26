@@ -33,32 +33,32 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
 function loadBackgroundRouter() {
   // Ensure global protocol modules are loaded before orchestrator (mirrors MV3 load order).
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const kindContractPath = require.resolve("../../src/shared/conversation-kind-contract.js");
+  const kindContractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[kindContractPath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/shared/conversation-kind-contract.js");
+  require("../../src/protocols/conversation-kind-contract.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const kindsPath = require.resolve("../../src/shared/conversation-kinds.js");
+  const kindsPath = require.resolve("../../src/protocols/conversation-kinds.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[kindsPath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/shared/conversation-kinds.js");
+  require("../../src/protocols/conversation-kinds.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const jobStoreModulePath = require.resolve("../../src/sync/notion/notion-sync-job-store.js");
+  const jobStoreModulePath = require.resolve("../../src/export/notion/notion-sync-job-store.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[jobStoreModulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/sync/notion/notion-sync-job-store.js");
+  require("../../src/export/notion/notion-sync-job-store.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const orchestratorModulePath = require.resolve("../../src/sync/notion/notion-sync-orchestrator.js");
+  const orchestratorModulePath = require.resolve("../../src/export/notion/notion-sync-orchestrator.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[orchestratorModulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/sync/notion/notion-sync-orchestrator.js");
+  require("../../src/export/notion/notion-sync-orchestrator.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/bootstrap/background-router.js");

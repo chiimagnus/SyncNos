@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest";
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const backupUtils = require("../../src/storage/backup-utils.js");
+function loadBackupUtils() {
+  // Ensure protocol registry is loaded (mirrors popup runtime load order).
+  // @ts-expect-error test global
+  globalThis.WebClipper = {};
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const contractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[contractPath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/protocols/conversation-kind-contract.js");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const kindsPath = require.resolve("../../src/protocols/conversation-kinds.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[kindsPath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/protocols/conversation-kinds.js");
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/storage/backup-utils.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/storage/backup-utils.js");
+}
 
 describe("backup-utils", () => {
   it("filterStorageForBackup keeps allowlist only", () => {
+    const backupUtils = loadBackupUtils();
     const filtered = backupUtils.filterStorageForBackup({
       notion_oauth_client_id: "abc",
       notion_parent_page_id: "p1",
@@ -23,11 +46,13 @@ describe("backup-utils", () => {
   });
 
   it("validateBackupDocument rejects unsupported version", () => {
+    const backupUtils = loadBackupUtils();
     const res = backupUtils.validateBackupDocument({ schemaVersion: 999, stores: {} });
     expect(res.ok).toBe(false);
   });
 
   it("validateBackupDocument rejects duplicate conversation keys", () => {
+    const backupUtils = loadBackupUtils();
     const doc = {
       schemaVersion: 1,
       stores: {
@@ -44,6 +69,7 @@ describe("backup-utils", () => {
   });
 
   it("mergeConversationRecord does not overwrite non-empty local title/url", () => {
+    const backupUtils = loadBackupUtils();
     const existing = { id: 10, sourceType: "chat", source: "chatgpt", conversationKey: "c1", title: "Local", url: "https://a", lastCapturedAt: 5 };
     const incoming = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "c1", title: "Backup", url: "https://b", lastCapturedAt: 9 };
     const merged = backupUtils.mergeConversationRecord(existing, incoming);
@@ -53,6 +79,7 @@ describe("backup-utils", () => {
   });
 
   it("mergeMessageRecord prefers newer updatedAt and fills missing markdown", () => {
+    const backupUtils = loadBackupUtils();
     const existing = { id: 1, conversationId: 9, messageKey: "m1", contentMarkdown: "", contentText: "hi", updatedAt: 10, sequence: 1, role: "user" };
     const incoming = { conversationId: 9, messageKey: "m1", contentMarkdown: "## md", contentText: "hi", updatedAt: 9, sequence: 1, role: "user" };
     const merged1 = backupUtils.mergeMessageRecord(existing, incoming);

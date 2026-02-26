@@ -63,7 +63,7 @@ describe("collectors images (smoke)", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
-    loadCollector("../../src/collectors/chatgpt-collector.js");
+    loadCollector("../../src/collectors/chatgpt/chatgpt-collector.js");
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.chatgpt.capture({ manual: true });
@@ -108,7 +108,7 @@ describe("collectors images (smoke)", () => {
     globalThis.WebClipper = {};
     loadNormalize();
     loadCollectorUtils();
-    loadCollector("../../src/collectors/claude-collector.js");
+    loadCollector("../../src/collectors/claude/claude-collector.js");
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.claude.capture();

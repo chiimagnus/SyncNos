@@ -5,7 +5,7 @@
 
   const ARTICLE_SOURCE = "web";
   const ARTICLE_SOURCE_TYPE = "article";
-  const READABILITY_FILE = "vendor/readability.js";
+  const READABILITY_FILE = "src/collectors/web/readability.js";
 
   function toError(message) {
     return new Error(String(message || "unknown error"));

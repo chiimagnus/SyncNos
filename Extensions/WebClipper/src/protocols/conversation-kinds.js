@@ -56,6 +56,21 @@
     return defs.slice();
   }
 
+  function getNotionStorageKeys() {
+    const out = [];
+    for (const d of defs) {
+      try {
+        const key = d && d.notion && d.notion.dbSpec && d.notion.dbSpec.storageKey
+          ? String(d.notion.dbSpec.storageKey).trim()
+          : "";
+        if (key) out.push(key);
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return Array.from(new Set(out));
+  }
+
   const CHAT_KIND_ID = "chat";
   const ARTICLE_KIND_ID = "article";
 
@@ -161,10 +176,10 @@
     register,
     pick,
     list,
+    getNotionStorageKeys,
     CHAT_KIND_ID,
     ARTICLE_KIND_ID
   };
   NS.conversationKinds = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

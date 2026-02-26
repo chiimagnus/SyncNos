@@ -202,6 +202,13 @@ if (cli.syntax) {
   const sourceJsFiles = listJsFilesRecursively(join(root, "src"), root)
     .filter((f) => !f.endsWith(".test.js") && !f.endsWith(".spec.js"));
   const referenced = new Set(jsFiles);
+
+  // Some sources are intentionally loaded dynamically via chrome.scripting.executeScript({ files: [...] }).
+  // Keep this list tight: every entry should have a clear injection call-site.
+  const dynamicallyInjected = new Set([
+    "src/collectors/web/readability.js"
+  ]);
+  for (const f of dynamicallyInjected) referenced.add(f);
   const unreferenced = sourceJsFiles.filter((f) => !referenced.has(f));
   if (unreferenced.length > 0) {
     fail([
