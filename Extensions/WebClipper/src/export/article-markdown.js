@@ -14,7 +14,7 @@
     lines.push("");
     lines.push("## Content");
     lines.push("");
-    lines.push(String((m0 && m0.contentText) || ""));
+    lines.push(String((m0 && (m0.contentMarkdown || m0.contentText)) || ""));
     lines.push("");
     return lines.join("\n");
   }
@@ -23,4 +23,3 @@
   NS.articleMarkdown = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

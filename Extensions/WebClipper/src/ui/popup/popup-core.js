@@ -80,6 +80,8 @@
     notionStatusTitle: document.getElementById("notionStatusTitle"),
     btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
     notionPages: document.getElementById("notionPages"),
+    btnFetchCurrentArticle: document.getElementById("btnFetchCurrentArticle"),
+    articleFetchStatus: document.getElementById("articleFetchStatus"),
     databaseBackupStatus: document.getElementById("databaseBackupStatus"),
 	    btnDatabaseExport: document.getElementById("btnDatabaseExport"),
 	    databaseImportFile: document.getElementById("databaseImportFile"),
@@ -136,7 +138,8 @@
       doubao: { key: "doubao", label: "Doubao" },
       yuanbao: { key: "yuanbao", label: "Yuanbao" },
       poe: { key: "poe", label: "Poe" },
-      zai: { key: "zai", label: "z.ai" }
+      zai: { key: "zai", label: "z.ai" },
+      web: { key: "web", label: "Web" }
     };
     return map[normalized] || { key: "unknown", label: text };
   }

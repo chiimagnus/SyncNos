@@ -249,6 +249,9 @@ if (existsSync(repoLicense)) {
 // Popup HTML references icon assets under `icons/*` (source layout).
 // Keep an `icons/` folder in dist so those relative URLs keep working across browsers.
 cpSync(join(root, "icons"), join(out, "icons"), { recursive: true });
+if (existsSync(join(root, "vendor"))) {
+  cpSync(join(root, "vendor"), join(out, "vendor"), { recursive: true });
+}
 concatCssFiles({
   outFile: join(out, "popup.css"),
   files: ["src/ui/styles/tokens.css", "src/ui/styles/flash-ok.css", "src/ui/styles/popup.css"]

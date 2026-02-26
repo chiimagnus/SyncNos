@@ -662,6 +662,18 @@ main {
   word-break: break-word;
 }
 
+#articleFetchStatus.is-loading {
+  color: var(--muted);
+}
+
+#articleFetchStatus.is-ok {
+  color: var(--wc-ok);
+}
+
+#articleFetchStatus.is-error {
+  color: var(--danger);
+}
+
 .sourceOpen {
   display: inline-flex;
   align-items: center;

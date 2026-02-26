@@ -69,10 +69,10 @@
 	      </section>
 
 	      <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
-	        <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
-	          <div class="settingsRow settingsRow--header" id="notionBar">
-	            <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
-	            <div class="notionHeaderText" aria-label="Notion OAuth status">
+        <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
+          <div class="settingsRow settingsRow--header" id="notionBar">
+            <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
+            <div class="notionHeaderText" aria-label="Notion OAuth status">
               <span class="notionHeaderTitle">Notion OAuth</span>
               <span class="notionHeaderSep" aria-hidden="true">|</span>
               <span id="notionStatusTitle" class="notionHeaderStatus">Not connected</span>
@@ -91,6 +91,28 @@
             </div>
 	          </div>
 	        </section>
+
+          <section class="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
+            <div class="settingsRow settingsRow--header" aria-label="Article fetch header">
+              <div class="notionHeaderText">
+                <span class="notionHeaderTitle">Article Fetch</span>
+              </div>
+              <div class="spacer"></div>
+            </div>
+
+            <div class="settingsDivider" role="presentation"></div>
+
+            <div class="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+              <div class="settingsControl settingsControl--grow">
+                <button id="btnFetchCurrentArticle" class="btn" type="button">Fetch Current Page</button>
+              </div>
+            </div>
+
+            <div class="settingsRow settingsRow--compact" aria-label="Article fetch status">
+              <div class="settingsLabel settingsLabel--inline">Status</div>
+              <div id="articleFetchStatus" class="sub">Idle</div>
+            </div>
+          </section>
 
 	        <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
 	          <div class="settingsRow settingsRow--header" aria-label="Database backup header">
@@ -196,6 +218,7 @@
     <script src="./popup-conversation-docs.js"></script>
     <script src="./popup-obsidian.js"></script>
     <script src="./popup-notion-sync-state.js"></script>
+    <script src="./popup-article-fetch.js"></script>
     <script src="./popup-tabs.js"></script>
     <script src="./popup-list.js"></script>
     <script src="./popup-chat-preview.js"></script>
