@@ -173,6 +173,24 @@ describe("content-controller inpage combo", () => {
     expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
   });
 
+  it("shows error tip when manual capture finds no visible conversation", async () => {
+    const harness = createHarness({
+      captureImpl: (args) => {
+        if (!args || !args.manual) return null;
+        return null;
+      }
+    });
+
+    await harness.runTick();
+    const cfg = harness.getButtonConfig();
+    expect(typeof cfg?.onClick).toBe("function");
+
+    await cfg.onClick();
+
+    expect(harness.tipCalls.some((c) => String(c.text).includes("No visible conversation"))).toBe(true);
+    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(false);
+  });
+
   it("shows tip when auto incremental save succeeds", async () => {
     const snapshot = {
       conversation: { source: "gemini", conversationKey: "auto-1" },
