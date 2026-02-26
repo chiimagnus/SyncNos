@@ -23,6 +23,10 @@
     OPEN_URL: "openObsidianUrl"
   });
 
+  const ARTICLE_MESSAGE_TYPES = contracts.ARTICLE_MESSAGE_TYPES || Object.freeze({
+    FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
+  });
+
   const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
@@ -102,6 +106,18 @@
           await obsidianService.openObsidianUrl(targetUrl);
         }
         return ok({ opened: true, count: urls.length });
+      }
+      case ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB: {
+        const articleService = NS.articleFetchService;
+        if (!articleService || typeof articleService.fetchActiveTabArticle !== "function") {
+          return err("article fetch service missing");
+        }
+        try {
+          const data = await articleService.fetchActiveTabArticle({ tabId: msg.tabId });
+          return ok(data);
+        } catch (e) {
+          return err(e && e.message ? e.message : String(e || "article fetch failed"));
+        }
       }
       case NOTION_MESSAGE_TYPES.GET_AUTH_STATUS: {
         const token = await (NS.notionTokenStore && NS.notionTokenStore.getToken ? NS.notionTokenStore.getToken() : Promise.resolve(null));

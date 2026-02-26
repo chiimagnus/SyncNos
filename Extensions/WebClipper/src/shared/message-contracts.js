@@ -22,6 +22,10 @@
     OPEN_URL: "openObsidianUrl"
   });
 
+  const ARTICLE_MESSAGE_TYPES = Object.freeze({
+    FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
+  });
+
   const UI_MESSAGE_TYPES = Object.freeze({
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
@@ -30,6 +34,7 @@
     CORE_MESSAGE_TYPES,
     NOTION_MESSAGE_TYPES,
     OBSIDIAN_MESSAGE_TYPES,
+    ARTICLE_MESSAGE_TYPES,
     UI_MESSAGE_TYPES
   };
 
