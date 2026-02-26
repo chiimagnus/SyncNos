@@ -51,50 +51,50 @@
 
 - Task: `Task 2: 重构 Notion DB Manager 为“dbSpec 驱动”`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/sync/notion/notion-db-manager.js:92`
 - Summary: `ensureDatabaseSchema()` 只检查 “属性是否存在”，不检查 “属性类型是否正确”（例如 AI 已存在但不是 multi_select），可能导致数据库 schema 不符合预期而后续 sync 报错。
 - Risk: `已有 Notion DB 被手动改坏字段类型时，新的 best-effort 修复不生效，导致同步失败或写入异常。`
 - Expected fix: `对关键属性（chat 的 AI）增加类型校验；类型不匹配时尝试 patch（或至少返回 false 触发上层处理）。`
 - Validation: `npm --prefix Extensions/WebClipper run test -- tests/smoke/notion-db-manager.test.ts`
-- Resolution evidence: `TBD`
+- Resolution evidence: `Commit 8e2d8973; added type check (AI must be multi_select) + test coverage.`
 
 ## Finding F-02
 
 - Task: `Task 6: Obsidian 导出改为 kind 驱动 folder（需要同时改 popup.js 调用点）`
 - Severity: `Low`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/ui/popup/popup-obsidian.js:5`
 - Summary: `popup-obsidian.js` 在模块初始化时缓存了 `const kinds = NS.conversationKinds || null`；若未来调整 popup 脚本加载顺序，可能导致 folder 路由回退到默认值而不易察觉。
 - Risk: `运行时依赖 load order 的隐式耦合增加；未来扩展更多 kind 时更容易踩坑。`
 - Expected fix: `在 `folderForConversation()` 内按调用时读取 `globalThis.WebClipper.conversationKinds`，避免模块级缓存。`
 - Validation: `npm --prefix Extensions/WebClipper run test -- tests/smoke/popup-obsidian.test.ts`
-- Resolution evidence: `TBD`
+- Resolution evidence: `Commit ca3fcfc7; removed module-level caching and kept tests green.`
 
 ## Finding F-03
 
 - Task: `Task 4: Notion Sync Orchestrator 按 kind 路由 dbId + kind 驱动同步策略（破坏性重构）`
 - Severity: `Low`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/sync/notion/notion-sync-orchestrator.js:116`
 - Summary: `clearCachedDatabaseId()` 的 fallback 分支仍引用 `notionDbManager.DB_STORAGE_KEY`（已不再导出），虽然不会影响现有路径，但属于死代码/漂移点。
 - Risk: `后续维护者误以为该字段仍存在；未来重构时造成错误假设。`
 - Expected fix: `改为读取 `DEFAULT_DB_STORAGE_KEY`（若存在）或仅使用传入的 `storageKey` + hardcoded fallback。`
 - Validation: `npm --prefix Extensions/WebClipper run test -- tests/smoke/notion-sync-orchestrator-kind-routing.test.ts`
-- Resolution evidence: `TBD`
+- Resolution evidence: `Commit 3dcd9b6d; replaced stale fallback with storageKey + DEFAULT_DB_STORAGE_KEY.`
 
 ## Fix Log
 
-- (Pending) Fix findings in severity order: F-01 -> F-02 -> F-03
+- F-01 Resolved: `webclipper: validate AI property type in notion db schema check` (8e2d8973)
+- F-02 Resolved: `webclipper: avoid caching conversationKinds in popup obsidian` (ca3fcfc7)
+- F-03 Resolved: `webclipper: remove stale DB_STORAGE_KEY fallback in notion orchestrator` (3dcd9b6d)
 
 ## Validation Log
 
-- (Pending) After fixes:
-  - `npm --prefix Extensions/WebClipper run test`
-  - `npm --prefix Extensions/WebClipper run check`
+- `npm --prefix Extensions/WebClipper run test` (PASS)
+- `npm --prefix Extensions/WebClipper run check` (PASS: `[check] ok`)
 
 ## Final Status And Residual Risks
 
-- Status: `Audit completed; fixes pending.`
-- Residual risks: `None recorded yet (pending fix phase).`
-
+- Status: `Audit completed; all findings resolved.`
+- Residual risks: `None.`
