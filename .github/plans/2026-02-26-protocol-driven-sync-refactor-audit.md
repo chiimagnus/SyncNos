@@ -18,8 +18,8 @@
 ## Task-To-File Map
 
 - Task 1:
-  - `Extensions/WebClipper/src/shared/conversation-kind-contract.js`
-  - `Extensions/WebClipper/src/shared/conversation-kinds.js`
+  - `Extensions/WebClipper/src/protocols/conversation-kind-contract.js`
+  - `Extensions/WebClipper/src/protocols/conversation-kinds.js`
   - `Extensions/WebClipper/src/bootstrap/background.js`
   - `Extensions/WebClipper/src/ui/popup/popup.html`
   - `Extensions/WebClipper/tests/smoke/conversation-kinds.test.ts`

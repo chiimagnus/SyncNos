@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const zipUtils = require("../../src/export/zip-utils.js");
+const zipUtils = require("../../src/export/local/zip-utils.js");
 
 describe("zip-utils", () => {
   it("creates a valid zip blob for multiple files", async () => {

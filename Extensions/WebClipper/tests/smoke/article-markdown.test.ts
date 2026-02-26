@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 function loadArticleMarkdown() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/article-markdown.js");
+  const modulePath = require.resolve("../../src/export/local/article-markdown.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/article-markdown.js");
+  return require("../../src/export/local/article-markdown.js");
 }
 
 afterEach(() => {
