@@ -108,6 +108,7 @@
     function createAutoCaptureController() {
       let stopped = false;
       let observer = null;
+      let manualSaveInFlight = false;
 
       function stop() {
         if (stopped) return;
@@ -123,6 +124,11 @@
       // Manual button: trigger an immediate capture and save once.
       const clickSave = async () => {
         if (stopped) return;
+        if (manualSaveInFlight) {
+          showInpageTip("Saving...", "loading");
+          return;
+        }
+        manualSaveInFlight = true;
         try {
           const collector = getCollector() || getInpageCollector();
           if (collector && collector.id === "web") {
@@ -156,6 +162,8 @@
           });
         } catch (_e) {
           // Error tip already shown in runManualSaveFlow().
+        } finally {
+          manualSaveInFlight = false;
         }
       };
 
