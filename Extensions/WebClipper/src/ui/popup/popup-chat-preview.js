@@ -487,8 +487,9 @@
       positionPopover();
     });
 
-    if (els.chatsMain) {
-      els.chatsMain.addEventListener("scroll", () => {
+    const scrollEl = els.viewChatsScroll || els.chatsMain;
+    if (scrollEl) {
+      scrollEl.addEventListener("scroll", () => {
         if (!els.chatPreviewPopover || els.chatPreviewPopover.hidden) return;
         if (!preview.activeAnchorEl || !document.contains(preview.activeAnchorEl)) {
           hideNow();
