@@ -74,22 +74,28 @@
 - Run: `npm --prefix Extensions/WebClipper run build:safari`
 - Expected: 生成 `Extensions/WebClipper/dist-safari/manifest.json`、`popup.html`、`background.js`、`content.js`、`icons/*` 等可加载文件。
 
-### Task 2: 权限收敛（移除默认全站注入）
+### Task 2: 全站权限与全站注入（Obsidian 风格）
 
 **Files:**
 - Modify: `Extensions/WebClipper/manifest.json`
 - Modify: `Extensions/WebClipper/scripts/build.mjs`（Safari 目标 patch）
 
 **Step 1: 实现**
-- 针对 Safari 目标：
-  - 移除 `host_permissions` 中的 `http://*/*`、`https://*/*`
-  - 移除 `content_scripts` 里对 `*://*/*` 的默认注入块
-  - 保留明确支持站点 + Notion API + OAuth 域名（尤其保留 `chiimagnus.github.io` 以便回调上报）
-- 将“任意网页抓取”改为“用户显式触发 + activeTab/注入”能力（实现细节见 Task 5）。
+- 按 Obsidian Web Clipper 的套路走（“任意网页剪藏”为核心能力）：
+  - Safari 目标保留全站 host 权限：`<all_urls>` + `http://*/*` + `https://*/*`
+  - Safari 目标保留全站 content script 注入（`matches: ["http://*/*","https://*/*"]` 或 `*://*/*`）
+  - 保留 Notion API + OAuth 域名（尤其保留 `chiimagnus.github.io` 以便回调上报）
+- 约束（避免“全站注入”导致审核/性能问题）：
+  - 全站 content script 必须保持“轻量且不主动采集”：不做后台自动抓取，不扫 DOM，不上报页面内容；仅在用户触发（点击按钮/菜单）时才抽取正文并写入本地库
+  - UI 上明确提示“扩展在任意网页可用，但只有在你点击剪藏时才会读取内容”
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run build:safari`
-- Expected: `dist-safari/manifest.json` 中不再出现 `*://*/*` 默认注入；Safari 目标的 host 权限是可解释的最小集合。
+- Expected: `dist-safari/manifest.json` 中包含 `<all_urls>`/`*://*/*`，并且内容脚本匹配全站；同时产品文案/隐私说明能解释“为何需要全站”以及“只在用户触发时读取内容”。
+
+补充（iOS/macOS 用户侧开关验证）：
+- macOS Safari：用户能在 Safari Settings > Extensions 给扩展启用 “All Websites”（或等效全站访问）
+- iOS Safari：用户能在 Settings > Safari > Extensions 给扩展启用 “All Websites”（或等效全站访问）
 
 ### Task 3: OAuth 回调从“监听式”改为“回调页主动上报”（Safari 主路径）
 
