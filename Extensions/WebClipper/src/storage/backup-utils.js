@@ -3,13 +3,27 @@
 
   const BACKUP_SCHEMA_VERSION = 1;
 
-  const STORAGE_ALLOWLIST = Object.freeze([
+  const STORAGE_ALLOWLIST_BASE = Object.freeze([
     "notion_oauth_client_id",
     "notion_parent_page_id",
-    "notion_db_id_syncnos_ai_chats",
-    "notion_db_id_syncnos_web_articles",
     "popup_active_tab"
   ]);
+
+  function getNotionDbStorageKeys() {
+    const kinds = NS.conversationKinds;
+    if (kinds && typeof kinds.getNotionStorageKeys === "function") {
+      try {
+        const keys = kinds.getNotionStorageKeys();
+        if (Array.isArray(keys) && keys.length) return keys.map((k) => String(k || "").trim()).filter(Boolean);
+      } catch (_e) {
+        // ignore
+      }
+    }
+    // Fallback (load-order safety).
+    return ["notion_db_id_syncnos_ai_chats", "notion_db_id_syncnos_web_articles"];
+  }
+
+  const STORAGE_ALLOWLIST = Object.freeze(Array.from(new Set([...STORAGE_ALLOWLIST_BASE, ...getNotionDbStorageKeys()])));
 
   function isNonEmptyString(v) {
     return typeof v === "string" && v.trim().length > 0;
