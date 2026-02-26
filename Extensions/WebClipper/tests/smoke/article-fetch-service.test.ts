@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 function loadArticleFetchService() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/article-fetch-service.js");
+  const modulePath = require.resolve("../../src/collectors/web/article-fetch-service.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/article-fetch-service.js");
+  return require("../../src/collectors/web/article-fetch-service.js");
 }
 
 afterEach(() => {

@@ -53,11 +53,11 @@ function createChromeMock(options: ChromeMockOptions = {}) {
 
 function loadBackgroundRouter() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const serviceModulePath = require.resolve("../../src/sync/obsidian/obsidian-url-service.js");
+  const serviceModulePath = require.resolve("../../src/export/obsidian/obsidian-url-service.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[serviceModulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/sync/obsidian/obsidian-url-service.js");
+  require("../../src/export/obsidian/obsidian-url-service.js");
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/bootstrap/background-router.js");
