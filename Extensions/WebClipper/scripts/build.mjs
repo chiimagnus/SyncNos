@@ -216,12 +216,22 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
 
 const manifestSrc = JSON.parse(readText(join(root, "manifest.json")));
 const contentScriptSourceFiles = (() => {
-  // Single source of truth: `manifest.json` content_scripts js list.
+  // Single source of truth: `manifest.json` content_scripts js list(s).
   // This avoids "forgot to add file into build list" regressions.
   const cs = Array.isArray(manifestSrc.content_scripts) ? manifestSrc.content_scripts : [];
-  const first = cs[0] || null;
-  const js = first && Array.isArray(first.js) ? first.js : [];
-  return js.filter((p) => typeof p === "string" && p.trim()).map((p) => p.trim());
+  const files = [];
+  const seen = new Set();
+  for (const entry of cs) {
+    const js = entry && Array.isArray(entry.js) ? entry.js : [];
+    for (const raw of js) {
+      if (typeof raw !== "string") continue;
+      const p = raw.trim();
+      if (!p || seen.has(p)) continue;
+      seen.add(p);
+      files.push(p);
+    }
+  }
+  return files;
 })();
 
 const popupHtmlSrcPath = join(root, "src", "ui", "popup", "popup.html");
@@ -304,11 +314,11 @@ let manifest = { ...manifestSrc };
 manifest.background = { service_worker: "background.js" };
 manifest.action = { ...(manifest.action || {}), default_popup: "popup.html" };
 if (Array.isArray(manifest.content_scripts) && manifest.content_scripts[0]) {
-  manifest.content_scripts[0] = {
-    ...manifest.content_scripts[0],
+  manifest.content_scripts = manifest.content_scripts.map((entry) => ({
+    ...entry,
     css: ["inpage.css"],
     js: ["content.js"]
-  };
+  }));
 }
 if (manifest.icons && typeof manifest.icons === "object") {
   manifest.icons = {
