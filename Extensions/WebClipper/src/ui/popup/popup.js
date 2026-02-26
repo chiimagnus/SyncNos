@@ -34,8 +34,6 @@
   };
 
   let syncPollTimer = 0;
-  let listPollTimer = 0;
-  let listRefreshing = false;
   let conversationsEventsPort = null;
   let conversationsRefreshTimer = 0;
   let conversationsRefreshInFlight = false;
@@ -139,30 +137,6 @@
         }
       }
     });
-  }
-
-  function isChatsTabActive() {
-    try {
-      return !!(els.viewChats && els.viewChats.classList && els.viewChats.classList.contains("is-active"));
-    } catch (_e) {
-      return true;
-    }
-  }
-
-  function startLiveListRefresh() {
-    if (listPollTimer) return;
-    listPollTimer = setInterval(() => {
-      if (!document || document.visibilityState !== "visible") return;
-      if (!isChatsTabActive()) return;
-      if (listRefreshing) return;
-      listRefreshing = true;
-      Promise.resolve()
-        .then(() => list && typeof list.refresh === "function" ? list.refresh() : null)
-        .catch(() => {})
-        .finally(() => {
-          listRefreshing = false;
-        });
-    }, 2000);
   }
 
   async function buildObsidianPayloads(selectedIds) {
@@ -332,11 +306,9 @@
     await refreshSyncJobStatus();
     await list.refresh();
     initConversationsEventsSubscription();
-    startLiveListRefresh();
 
     window.addEventListener("unload", () => {
       if (syncPollTimer) clearInterval(syncPollTimer);
-      if (listPollTimer) clearInterval(listPollTimer);
       try {
         conversationsEventsPort && conversationsEventsPort.disconnect && conversationsEventsPort.disconnect();
       } catch (_e) {
@@ -344,7 +316,6 @@
       }
       if (conversationsRefreshTimer) clearTimeout(conversationsRefreshTimer);
       syncPollTimer = 0;
-      listPollTimer = 0;
       conversationsRefreshTimer = 0;
     });
   }
