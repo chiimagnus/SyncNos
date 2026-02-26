@@ -108,14 +108,14 @@
     });
   }
 
-  async function clearCachedDatabaseId(notionDbManager) {
+  async function clearCachedDatabaseId(notionDbManager, storageKey) {
     if (notionDbManager && typeof notionDbManager.clearCachedDatabaseId === "function") {
-      await notionDbManager.clearCachedDatabaseId();
+      await notionDbManager.clearCachedDatabaseId(storageKey);
       return true;
     }
     const key = notionDbManager && notionDbManager.DB_STORAGE_KEY
       ? String(notionDbManager.DB_STORAGE_KEY)
-      : "notion_db_id_syncnos_ai_chats";
+      : (String(storageKey || "").trim() || "notion_db_id_syncnos_ai_chats");
     return storageRemove([key]);
   }
 
@@ -125,7 +125,8 @@
       notionTokenStore: NS.notionTokenStore,
       notionDbManager: NS.notionDbManager,
       notionSyncService: NS.notionSyncService,
-      storage: NS.backgroundStorage
+      storage: NS.backgroundStorage,
+      conversationKinds: NS.conversationKinds
     };
   }
 
@@ -139,7 +140,7 @@
   }
 
   async function syncConversations({ conversationIds, instanceId }) {
-    const { notionJobStore, notionTokenStore, notionDbManager, notionSyncService, storage } = getDependencies();
+    const { notionJobStore, notionTokenStore, notionDbManager, notionSyncService, storage, conversationKinds } = getDependencies();
     if (
       !notionJobStore ||
       typeof notionJobStore.abortRunningJobIfFromOtherInstance !== "function" ||
@@ -164,11 +165,22 @@
     if (!storage) throw new Error("storage module missing");
     if (!notionSyncService) throw new Error("notion sync service missing");
     if (!notionDbManager || !notionDbManager.ensureDatabase) throw new Error("notion db manager missing");
+    if (!conversationKinds || typeof conversationKinds.pick !== "function") throw new Error("conversation kinds missing");
 
-    const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId });
-    let dbId = db && db.databaseId ? db.databaseId : "";
-    if (!dbId) throw new Error("missing databaseId");
-    let recoveredMissingDatabase = false;
+    const dbIdByKindId = new Map();
+    const recoveredMissingDbByStorageKey = new Set();
+
+    async function ensureDbForKind(kind) {
+      const existing = dbIdByKindId.get(kind.id);
+      if (existing) return String(existing);
+      const spec = kind && kind.notion && kind.notion.dbSpec ? kind.notion.dbSpec : null;
+      if (!spec) throw new Error(`missing dbSpec for kind ${kind && kind.id ? kind.id : "?"}`);
+      const db = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec: spec });
+      const dbId = db && db.databaseId ? String(db.databaseId) : "";
+      if (!dbId) throw new Error(`missing databaseId for kind ${kind.id}`);
+      dbIdByKindId.set(kind.id, dbId);
+      return dbId;
+    }
 
     const results = [];
     const jobId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -193,6 +205,18 @@
           results.push({ conversationId: id, ok: false, error: "conversation not found" });
           continue;
         }
+
+        const kindPicked = conversationKinds.pick(convo);
+        const kind = kindPicked || (typeof conversationKinds.list === "function"
+          ? (conversationKinds.list() || []).find((d) => d && d.id === "chat")
+          : null);
+        if (!kind) throw new Error(`no conversation kind for ${toConvoLabel(convo)}`);
+        const dbSpec = kind && kind.notion && kind.notion.dbSpec ? kind.notion.dbSpec : null;
+        const pageSpec = kind && kind.notion && kind.notion.pageSpec ? kind.notion.pageSpec : null;
+        if (!dbSpec || !dbSpec.storageKey) throw new Error(`missing notion dbSpec for kind ${kind.id}`);
+        if (!pageSpec) throw new Error(`missing notion pageSpec for kind ${kind.id}`);
+
+        let dbId = await ensureDbForKind(kind);
 
         // eslint-disable-next-line no-await-in-loop
         const messages = await storage.getMessagesByConversationId(id);
@@ -222,27 +246,26 @@
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
-              title: convo.title,
-              url: convo.url,
-              ai: convo.source
+              properties: pageSpec.buildCreateProperties(convo),
+              capturedAt: convo.lastCapturedAt
             });
           } catch (createErr) {
-            const shouldRecoverDb = !recoveredMissingDatabase && isMissingDatabaseError(createErr);
+            const shouldRecoverDb = !recoveredMissingDbByStorageKey.has(String(dbSpec.storageKey)) && isMissingDatabaseError(createErr);
             if (!shouldRecoverDb) throw createErr;
-            recoveredMissingDatabase = true;
+            recoveredMissingDbByStorageKey.add(String(dbSpec.storageKey));
             // Recover once by clearing stale DB cache and rebuilding under current parent page.
             // eslint-disable-next-line no-await-in-loop
-            await clearCachedDatabaseId(notionDbManager);
+            await clearCachedDatabaseId(notionDbManager, String(dbSpec.storageKey));
             // eslint-disable-next-line no-await-in-loop
-            const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId });
+            const rebuiltDb = await notionDbManager.ensureDatabase({ accessToken: token.accessToken, parentPageId, dbSpec });
             dbId = rebuiltDb && rebuiltDb.databaseId ? String(rebuiltDb.databaseId) : "";
             if (!dbId) throw createErr;
+            dbIdByKindId.set(kind.id, dbId);
             // eslint-disable-next-line no-await-in-loop
             created = await notionSyncService.createPageInDatabase(token.accessToken, {
               databaseId: dbId,
-              title: convo.title,
-              url: convo.url,
-              ai: convo.source
+              properties: pageSpec.buildCreateProperties(convo),
+              capturedAt: convo.lastCapturedAt
             });
           }
           pageId = created && created.id ? created.id : "";
@@ -273,14 +296,21 @@
         }
 
         const inc = computeNewMessages(messages, cursor);
-        if (inc.rebuild) {
+        let shouldRebuild = !!inc.rebuild;
+        if (!shouldRebuild && pageSpec && typeof pageSpec.shouldRebuild === "function") {
+          try {
+            shouldRebuild = !!pageSpec.shouldRebuild({ conversation: convo, messages, mapping });
+          } catch (_e) {
+            // ignore
+          }
+        }
+
+        if (shouldRebuild) {
           if (!messages.length) throw new Error(`missing cursor for ${toConvoLabel(convo)} and no local messages to rebuild`);
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
-            title: convo.title,
-            url: convo.url,
-            ai: convo.source
+            properties: pageSpec.buildUpdateProperties(convo)
           });
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.clearPageChildren(token.accessToken, pageId);
@@ -305,9 +335,7 @@
           // eslint-disable-next-line no-await-in-loop
           await notionSyncService.updatePageProperties(token.accessToken, {
             pageId,
-            title: convo.title,
-            url: convo.url,
-            ai: convo.source
+            properties: pageSpec.buildUpdateProperties(convo)
           });
           // eslint-disable-next-line no-await-in-loop
           const blocks = await buildBlocksForSync({
