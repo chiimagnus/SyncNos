@@ -197,6 +197,196 @@
           return `<html><body><p>${escapeHtml(normalizedText)}</p></body></html>`;
         }
 
+        function normalizeInlineText(value) {
+          return String(value || "").replace(/\s+/g, " ");
+        }
+
+        function sanitizeUrl(raw) {
+          const text = String(raw || "").trim();
+          if (!text) return "";
+          if (/^\/\//.test(text)) return `${location.protocol}${text}`;
+          try {
+            const resolved = new URL(text, location.href).toString();
+            return /^https?:\/\//i.test(resolved) ? resolved : "";
+          } catch (_e) {
+            return "";
+          }
+        }
+
+        function isBlockTag(tag) {
+          return [
+            "p", "div", "section", "article", "main", "header", "footer", "aside",
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            "ul", "ol", "li", "blockquote", "pre", "table", "figure", "hr"
+          ].includes(String(tag || "").toLowerCase());
+        }
+
+        function escapeMarkdownLabel(value) {
+          return String(value || "").replace(/\]/g, "\\]");
+        }
+
+        function renderInlineChildren(node) {
+          if (!node) return "";
+          const parts = [];
+          const children = Array.from(node.childNodes || []);
+          for (const child of children) {
+            parts.push(renderInlineNode(child));
+          }
+          return parts
+            .join("")
+            .replace(/[ \t]+\n/g, "\n")
+            .replace(/\n[ \t]+/g, "\n")
+            .replace(/[ \t]{2,}/g, " ");
+        }
+
+        function renderInlineNode(node) {
+          if (!node) return "";
+          if (node.nodeType === Node.TEXT_NODE) {
+            return normalizeInlineText(node.nodeValue || "");
+          }
+          if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+          const tag = String(node.tagName || "").toLowerCase();
+          if (!tag) return "";
+
+          if (tag === "br") return "\n";
+          if (tag === "img") {
+            const src = sanitizeUrl(node.getAttribute("src") || node.getAttribute("data-src") || "");
+            if (!src) return "";
+            const alt = escapeMarkdownLabel(normalize(node.getAttribute("alt") || ""));
+            return `![${alt}](${src})`;
+          }
+          if (tag === "a") {
+            const href = sanitizeUrl(node.getAttribute("href") || "");
+            const label = renderInlineChildren(node).trim() || href;
+            if (!href) return label;
+            return `[${escapeMarkdownLabel(label)}](${href})`;
+          }
+          if (tag === "code") {
+            const text = normalizeInlineText(node.textContent || "").trim();
+            if (!text) return "";
+            return `\`${text.replace(/`/g, "\\`")}\``;
+          }
+          if (tag === "strong" || tag === "b") {
+            const text = renderInlineChildren(node).trim();
+            return text ? `**${text}**` : "";
+          }
+          if (tag === "em" || tag === "i") {
+            const text = renderInlineChildren(node).trim();
+            return text ? `*${text}*` : "";
+          }
+          return renderInlineChildren(node);
+        }
+
+        function renderList(node, ordered) {
+          const items = Array.from(node.children || []).filter((child) => {
+            return child && String(child.tagName || "").toLowerCase() === "li";
+          });
+          if (!items.length) return "";
+
+          const startRaw = Number.parseInt(String(node.getAttribute("start") || "1"), 10);
+          const start = ordered && Number.isFinite(startRaw) && startRaw > 0 ? startRaw : 1;
+
+          const lines = [];
+          for (let i = 0; i < items.length; i += 1) {
+            const li = items[i];
+            const content = (renderChildrenAsBlocks(li) || renderInlineChildren(li) || "")
+              .trim()
+              .replace(/\n+/g, " ");
+            if (!content) continue;
+            const marker = ordered ? `${start + i}.` : "-";
+            lines.push(`${marker} ${content}`);
+          }
+          return lines.join("\n");
+        }
+
+        function renderChildrenAsBlocks(node) {
+          if (!node) return "";
+          const parts = [];
+          const children = Array.from(node.childNodes || []);
+          for (const child of children) {
+            const block = renderBlockNode(child);
+            if (block) parts.push(block);
+          }
+          return parts.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+        }
+
+        function renderBlockNode(node) {
+          if (!node) return "";
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = normalizeInlineText(node.nodeValue || "").trim();
+            return text || "";
+          }
+          if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+          const tag = String(node.tagName || "").toLowerCase();
+          if (!tag || ["script", "style", "noscript", "iframe", "svg", "canvas"].includes(tag)) return "";
+
+          if (/^h[1-6]$/.test(tag)) {
+            const level = Math.max(1, Math.min(6, Number(tag.slice(1))));
+            const text = renderInlineChildren(node).trim();
+            return text ? `${"#".repeat(level)} ${text}` : "";
+          }
+          if (tag === "p") {
+            return renderInlineChildren(node).trim();
+          }
+          if (tag === "ul") return renderList(node, false);
+          if (tag === "ol") return renderList(node, true);
+          if (tag === "blockquote") {
+            const inner = (renderChildrenAsBlocks(node) || renderInlineChildren(node)).trim();
+            if (!inner) return "";
+            return inner
+              .split("\n")
+              .map((line) => line ? `> ${line}` : ">")
+              .join("\n");
+          }
+          if (tag === "pre") {
+            const text = String(node.textContent || "").replace(/\n+$/, "");
+            if (!text.trim()) return "";
+            const fence = text.includes("```") ? "````" : "```";
+            return `${fence}\n${text}\n${fence}`;
+          }
+          if (tag === "hr") return "---";
+          if (tag === "img") return renderInlineNode(node);
+          if (tag === "figure") {
+            const images = Array.from(node.querySelectorAll("img"))
+              .map((img) => renderInlineNode(img))
+              .filter(Boolean);
+            const captionNode = node.querySelector("figcaption");
+            const caption = captionNode ? renderInlineChildren(captionNode).trim() : "";
+            const out = [];
+            if (images.length) out.push(images.join("\n\n"));
+            if (caption) out.push(`*${caption}*`);
+            if (out.length) return out.join("\n\n");
+          }
+
+          const childBlocks = renderChildrenAsBlocks(node);
+          if (childBlocks) return childBlocks;
+
+          if (!isBlockTag(tag)) {
+            return renderInlineChildren(node).trim();
+          }
+          return "";
+        }
+
+        function htmlToMarkdown(content, text) {
+          const normalizedContent = normalize(content);
+          if (!normalizedContent) return normalize(text);
+          try {
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(
+              `<div id="syncnos_article_md_root">${normalizedContent}</div>`,
+              "text/html"
+            );
+            const root = parsed.getElementById("syncnos_article_md_root");
+            if (!root) return normalize(text);
+            const markdown = renderChildrenAsBlocks(root).replace(/\n{3,}/g, "\n\n").trim();
+            return markdown || normalize(text);
+          } catch (_e) {
+            return normalize(text);
+          }
+        }
+
         function fallbackExtract() {
           const root = pickRoot();
           if (!root) return null;
@@ -216,6 +406,7 @@
             publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
             excerpt: text ? (text.length > 220 ? `${text.slice(0, 220)}...` : text) : "",
             contentHTML: buildHtml(content, text),
+            contentMarkdown: htmlToMarkdown(content, text),
             textContent: text,
             warningFlags: ["fallback_extractor"]
           };
@@ -284,6 +475,7 @@
                   publishedAt: readMeta(["meta[property='article:published_time']", "meta[name='publish_date']", "meta[name='pubdate']"]),
                   excerpt: normalize(article.excerpt || ""),
                   contentHTML: buildHtml(content, text),
+                  contentMarkdown: htmlToMarkdown(content, text),
                   textContent: text,
                   warningFlags: []
                 };
@@ -325,6 +517,7 @@
     const extracted = await extractArticleOnTab(targetTabId);
 
     const textContent = normalizeText(extracted.textContent || "");
+    const markdownContent = normalizeText(extracted.contentMarkdown || "");
     const title = normalizeText(extracted.title || "") || fallbackTitle(normalizedUrl, tab.title || "");
     const author = normalizeText(extracted.author || "");
     const publishedAt = normalizeText(extracted.publishedAt || "");
@@ -356,12 +549,13 @@
       lastCapturedAt: capturedAt
     });
 
-    const body = normalizeText(textContent);
+    const body = textContent;
+    const markdown = markdownContent || body;
     await storage.syncConversationMessages(Number(conversation.id), [{
       messageKey: "article_body",
       role: "assistant",
       contentText: body,
-      contentMarkdown: body,
+      contentMarkdown: markdown,
       sequence: 1,
       updatedAt: capturedAt
     }]);

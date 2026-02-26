@@ -43,6 +43,13 @@ describe("article-fetch-service", () => {
           publishedAt: "2026-02-20T10:00:00.000Z",
           excerpt: "Description",
           contentHTML: "<html><body><p>Hello world article text.</p></body></html>",
+          contentMarkdown: [
+            "## Heading",
+            "",
+            "![img](https://example.com/a.png)",
+            "",
+            "Hello world article text."
+          ].join("\n"),
           textContent: "Hello world article text.",
           warningFlags: []
         }
@@ -87,7 +94,8 @@ describe("article-fetch-service", () => {
       messageKey: "article_body",
       role: "assistant",
       sequence: 1,
-      contentText: "Hello world article text."
+      contentText: "Hello world article text.",
+      contentMarkdown: "## Heading\n\n![img](https://example.com/a.png)\n\nHello world article text."
     });
   });
 
