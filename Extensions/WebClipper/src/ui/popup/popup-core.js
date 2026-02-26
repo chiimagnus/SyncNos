@@ -79,6 +79,7 @@
       menuExportJsons: document.getElementById("menuExportJsons"),
       btnAddObsidian: document.getElementById("btnAddObsidian"),
       btnSyncNotion: document.getElementById("btnSyncNotion"),
+      sourceFilterSelect: document.getElementById("sourceFilterSelect"),
       btnNotionConnect: document.getElementById("btnNotionConnect"),
       notionStatusTitle: document.getElementById("notionStatusTitle"),
       btnNotionLoadPages: document.getElementById("btnNotionLoadPages"),
@@ -102,16 +103,19 @@
 
   const state = {
     conversations: [],
+    allConversations: [],
     selectedIds: new Set(),
     previewCache: new Map(),
     previewRequestToken: 0,
     notionSyncById: new Map(),
     notionSyncInProgress: false,
-    obsidianAddInProgress: false
+    obsidianAddInProgress: false,
+    sourceFilterKey: "all"
   };
 
   const STORAGE_KEYS = {
-    popupActiveTab: "popup_active_tab"
+    popupActiveTab: "popup_active_tab",
+    popupSourceFilterKey: "popup_source_filter_key"
   };
 
   const PREVIEW_EVENTS = {
