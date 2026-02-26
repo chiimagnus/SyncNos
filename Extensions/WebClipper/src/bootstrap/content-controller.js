@@ -39,7 +39,6 @@
       showInpageTip(startText || "Saving...", "loading");
       try {
         const value = await run();
-        inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
         showInpageTip("Saved", "ok");
         return value;
       } catch (e) {
@@ -209,7 +208,6 @@
             const inc = NS.incrementalUpdater && NS.incrementalUpdater.computeIncremental(snapshot);
             if (!inc || !inc.changed) return;
             await saveSnapshot(inc.snapshot);
-            inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
           } catch (_e) {
             if (runtime && typeof runtime.isInvalidContextError === "function" && runtime.isInvalidContextError(_e)) {
               stop();

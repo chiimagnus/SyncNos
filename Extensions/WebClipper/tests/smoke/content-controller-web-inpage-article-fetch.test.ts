@@ -44,7 +44,6 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
         buttonConfig = cfg;
       },
       cleanupButtons: () => {},
-      flashInpageOk: vi.fn()
     },
     collectorsRegistry: {
       pickActive: () => null,
@@ -84,7 +83,6 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       if (tickRef) await tickRef();
     },
     getButtonConfig: () => buttonConfig,
-    flashInpageOk: globalThis.WebClipper.inpageButton.flashInpageOk
   };
 }
 
@@ -113,7 +111,6 @@ describe("content-controller web inpage fetch", () => {
     await cfg.onClick();
 
     expect(harness.sendCalls.some((c) => c.type === "fetchActiveTabArticle")).toBe(true);
-    expect(harness.flashInpageOk).toHaveBeenCalled();
     expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
   });
 });
