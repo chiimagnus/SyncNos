@@ -7,6 +7,9 @@
     UPSERT_CONVERSATION: "upsertConversation",
     SYNC_CONVERSATION_MESSAGES: "syncConversationMessages"
   });
+  const ARTICLE_MESSAGE_TYPES = contracts.ARTICLE_MESSAGE_TYPES || Object.freeze({
+    FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
+  });
   const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
     OPEN_EXTENSION_POPUP: "openExtensionPopup"
   });
@@ -104,6 +107,18 @@
         if (stopped) return;
         try {
           const collector = getCollector() || getInpageCollector();
+          if (collector && collector.id === "web") {
+            showInpageTip("Fetching article...", "loading");
+            const res = await send(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB);
+            if (!res || !res.ok) {
+              const msg = (res && res.error && res.error.message) ? String(res.error.message) : "Fetch failed";
+              showInpageTip(msg, "error");
+              return;
+            }
+            inpageButton && inpageButton.flashInpageOk && inpageButton.flashInpageOk();
+            showInpageTip("Saved", "ok");
+            return;
+          }
           if (!collector || typeof collector.capture !== "function") return;
           if (typeof collector.prepareManualCapture === "function") {
             showInpageTip("Loading full history...", "loading");
