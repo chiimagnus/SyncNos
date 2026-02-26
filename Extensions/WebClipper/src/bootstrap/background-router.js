@@ -136,6 +136,15 @@
         }
         try {
           const data = await articleService.fetchActiveTabArticle({ tabId: msg.tabId });
+          try {
+            const hub = NS.backgroundEventsHub;
+            const conversationId = Number(data && data.conversationId);
+            if (hub && typeof hub.broadcast === "function" && Number.isFinite(conversationId) && conversationId > 0) {
+              hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "articleFetch", conversationId });
+            }
+          } catch (_e) {
+            // ignore
+          }
           return ok(data);
         } catch (e) {
           return err(e && e.message ? e.message : String(e || "article fetch failed"));
@@ -193,6 +202,14 @@
         const conversationId = Number(msg.conversationId);
         if (!Number.isFinite(conversationId) || conversationId <= 0) return err("invalid conversationId");
         const res = await storage.syncConversationMessages(conversationId, msg.messages);
+        try {
+          const hub = NS.backgroundEventsHub;
+          if (hub && typeof hub.broadcast === "function") {
+            hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "upsert", conversationId });
+          }
+        } catch (_e) {
+          // ignore
+        }
         return ok(res);
       }
       case MESSAGE_TYPES.GET_CONVERSATIONS: {
@@ -214,6 +231,17 @@
         if (!storage) return err("storage module missing");
         const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
         const res = await storage.deleteConversationsByIds(ids);
+        try {
+          const hub = NS.backgroundEventsHub;
+          if (hub && typeof hub.broadcast === "function") {
+            const normalizedIds = Array.isArray(ids)
+              ? ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+              : [];
+            hub.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, { reason: "delete", conversationIds: normalizedIds });
+          }
+        } catch (_e) {
+          // ignore
+        }
         return ok(res);
       }
       default:
