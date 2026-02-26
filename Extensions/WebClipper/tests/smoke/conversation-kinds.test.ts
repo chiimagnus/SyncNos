@@ -48,4 +48,11 @@ describe("conversation-kinds", () => {
     });
     expect(should).toBe(true);
   });
+
+  it("exposes notion storage keys from registry (used by infra like disconnect/backup)", () => {
+    const kinds = loadConversationKinds();
+    const keys = kinds.getNotionStorageKeys();
+    expect(keys).toContain("notion_db_id_syncnos_ai_chats");
+    expect(keys).toContain("notion_db_id_syncnos_web_articles");
+  });
 });
