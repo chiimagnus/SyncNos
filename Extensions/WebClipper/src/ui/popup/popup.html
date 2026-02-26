@@ -30,9 +30,11 @@
       </header>
 
       <section id="viewChats" class="view is-active" role="tabpanel" aria-labelledby="tabChats">
-        <main class="chatsMain">
-          <div id="list" class="list"></div>
-        </main>
+        <div class="viewScroll" aria-label="Chats content">
+          <main class="chatsMain">
+            <div id="list" class="list"></div>
+          </main>
+        </div>
         <aside
           id="chatPreviewPopover"
           class="chatPreviewPopover"
@@ -69,138 +71,142 @@
 	      </section>
 
 	      <section id="viewSettings" class="view" role="tabpanel" aria-labelledby="tabSettings">
-        <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
-          <div class="settingsRow settingsRow--header" id="notionBar">
-            <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
-            <div class="notionHeaderText" aria-label="Notion OAuth status">
-              <span class="notionHeaderTitle">Notion OAuth</span>
-              <span class="notionHeaderSep" aria-hidden="true">|</span>
-              <span id="notionStatusTitle" class="notionHeaderStatus">Not connected</span>
-            </div>
-            <div class="spacer"></div>
-            <button id="btnNotionConnect" class="btn">Connect</button>
-          </div>
-
-          <div class="settingsDivider" role="presentation"></div>
-
-          <div class="settingsRow settingsRow--compact" aria-label="Parent page selector">
-            <div class="settingsLabel settingsLabel--inline">Parent Page</div>
-            <div class="settingsControl settingsControl--grow">
-              <select id="notionPages" class="input"></select>
-              <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
-            </div>
-	          </div>
-	        </section>
-
-          <section class="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
-            <div class="settingsRow settingsRow--header" aria-label="Article fetch header">
-              <div class="notionHeaderText">
-                <span class="notionHeaderTitle">Article Fetch</span>
+        <div class="viewScroll" aria-label="Settings content">
+          <section class="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
+            <div class="settingsRow settingsRow--header" id="notionBar">
+              <img class="notionLogo" src="../../../icons/notion.svg" alt="" aria-hidden="true" />
+              <div class="notionHeaderText" aria-label="Notion OAuth status">
+                <span class="notionHeaderTitle">Notion OAuth</span>
+                <span class="notionHeaderSep" aria-hidden="true">|</span>
+                <span id="notionStatusTitle" class="notionHeaderStatus">Not connected</span>
               </div>
               <div class="spacer"></div>
+              <button id="btnNotionConnect" class="btn">Connect</button>
             </div>
 
             <div class="settingsDivider" role="presentation"></div>
 
-            <div class="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+            <div class="settingsRow settingsRow--compact" aria-label="Parent page selector">
+              <div class="settingsLabel settingsLabel--inline">Parent Page</div>
               <div class="settingsControl settingsControl--grow">
-                <button id="btnFetchCurrentArticle" class="btn" type="button">Fetch Current Page</button>
+                <select id="notionPages" class="input"></select>
+                <button id="btnNotionLoadPages" class="btn icon" type="button" title="Refresh">↻</button>
               </div>
-            </div>
-
-            <div class="settingsRow settingsRow--compact" aria-label="Article fetch status">
-              <div class="settingsLabel settingsLabel--inline">Status</div>
-              <div id="articleFetchStatus" class="sub">Idle</div>
-            </div>
-          </section>
-
-	        <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
-	          <div class="settingsRow settingsRow--header" aria-label="Database backup header">
-	            <div class="notionHeaderText">
-	              <span class="notionHeaderTitle">Database Backup</span>
 	            </div>
-	            <div class="spacer"></div>
-	          </div>
+	          </section>
 
-          <div class="settingsDivider" role="presentation"></div>
+            <section class="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
+              <div class="settingsRow settingsRow--header" aria-label="Article fetch header">
+                <div class="notionHeaderText">
+                  <span class="notionHeaderTitle">Article Fetch</span>
+                </div>
+                <div class="spacer"></div>
+              </div>
 
-          <div class="settingsRow settingsRow--compact" aria-label="Database import controls">
-            <div class="settingsControl settingsControl--grow">
-              <button id="btnDatabaseExport" class="btn" type="button">Export</button>
-              <button id="btnDatabaseImport" class="btn" type="button">Import</button>
-              <input id="databaseImportFile" class="fileInputHidden" type="file" accept=".json,application/json" />
-            </div>
+              <div class="settingsDivider" role="presentation"></div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+                <div class="settingsControl settingsControl--grow">
+                  <button id="btnFetchCurrentArticle" class="btn" type="button">Fetch Current Page</button>
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Article fetch status">
+                <div class="settingsLabel settingsLabel--inline">Status</div>
+                <div id="articleFetchStatus" class="sub">Idle</div>
+              </div>
+            </section>
+
+	          <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
+	            <div class="settingsRow settingsRow--header" aria-label="Database backup header">
+	              <div class="notionHeaderText">
+	                <span class="notionHeaderTitle">Database Backup</span>
+	              </div>
+	              <div class="spacer"></div>
+	            </div>
+
+              <div class="settingsDivider" role="presentation"></div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Database import controls">
+                <div class="settingsControl settingsControl--grow">
+                  <button id="btnDatabaseExport" class="btn" type="button">Export</button>
+                  <button id="btnDatabaseImport" class="btn" type="button">Import</button>
+                  <input id="databaseImportFile" class="fileInputHidden" type="file" accept=".json,application/json" />
+                </div>
+              </div>
+
+	            <div class="settingsRow settingsRow--compact" aria-label="Database import note">
+	              <div class="settingsLabel settingsLabel--inline">Note</div>
+	              <div class="sub">Import merges by (source + conversationKey). Notion token is not included.</div>
+	            </div>
+	          </section>
+
+	          <section class="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
+	            <div class="settingsRow settingsRow--header" aria-label="Notion AI header">
+	              <div class="notionHeaderText">
+	                <span class="notionHeaderTitle">Notion AI</span>
+	              </div>
+	              <div class="spacer"></div>
+	            </div>
+
+	            <div class="settingsDivider" role="presentation"></div>
+
+	            <div class="settingsRow settingsRow--compact" aria-label="Preferred model index">
+	              <div class="settingsLabel settingsLabel--inline">Model Index</div>
+	              <div class="settingsControl settingsControl--grow">
+	                <input
+	                  id="notionAiModelIndex"
+	                  class="input"
+	                  type="number"
+	                  inputmode="numeric"
+	                  min="1"
+	                  step="1"
+	                  placeholder="3"
+	                  aria-label="Notion AI preferred model index"
+	                />
+	                <button id="btnNotionAiModelSave" class="btn" type="button">Save</button>
+	                <button id="btnNotionAiModelReset" class="btn" type="button" title="Reset to default">Reset</button>
+	              </div>
+	            </div>
+
+	            <div class="settingsRow settingsRow--compact" aria-label="Notion AI model note">
+	              <div class="settingsLabel settingsLabel--inline">Note</div>
+	              <div class="sub">Applies only when Notion AI model is set to Auto. Menu order may change in Notion.</div>
+	            </div>
+	          </section>
           </div>
-
-	          <div class="settingsRow settingsRow--compact" aria-label="Database import note">
-	            <div class="settingsLabel settingsLabel--inline">Note</div>
-	            <div class="sub">Import merges by (source + conversationKey). Notion token is not included.</div>
-	          </div>
-	        </section>
-
-	        <section class="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
-	          <div class="settingsRow settingsRow--header" aria-label="Notion AI header">
-	            <div class="notionHeaderText">
-	              <span class="notionHeaderTitle">Notion AI</span>
-	            </div>
-	            <div class="spacer"></div>
-	          </div>
-
-	          <div class="settingsDivider" role="presentation"></div>
-
-	          <div class="settingsRow settingsRow--compact" aria-label="Preferred model index">
-	            <div class="settingsLabel settingsLabel--inline">Model Index</div>
-	            <div class="settingsControl settingsControl--grow">
-	              <input
-	                id="notionAiModelIndex"
-	                class="input"
-	                type="number"
-	                inputmode="numeric"
-	                min="1"
-	                step="1"
-	                placeholder="3"
-	                aria-label="Notion AI preferred model index"
-	              />
-	              <button id="btnNotionAiModelSave" class="btn" type="button">Save</button>
-	              <button id="btnNotionAiModelReset" class="btn" type="button" title="Reset to default">Reset</button>
-	            </div>
-	          </div>
-
-	          <div class="settingsRow settingsRow--compact" aria-label="Notion AI model note">
-	            <div class="settingsLabel settingsLabel--inline">Note</div>
-	            <div class="sub">Applies only when Notion AI model is set to Auto. Menu order may change in Notion.</div>
-	          </div>
-	        </section>
 	      </section>
 
       <section id="viewAbout" class="view" role="tabpanel" aria-labelledby="tabAbout">
-        <section class="toolbar aboutHero" aria-label="About SyncNos WebClipper">
-          <img class="aboutLogo" src="../../../icons/icon-48.png" alt="" />
-          <div class="aboutInfo">
-            <div class="aboutName">SyncNos WebClipper</div>
-            <div class="sub" id="aboutVersion">Version</div>
-          </div>
-          <div class="aboutLinks" aria-label="Links">
-            <button id="btnAboutMacApp" class="btn" type="button">Mac App</button>
-            <button id="btnAboutSource" class="btn" type="button">Source Code</button>
-            <button id="btnAboutChangelog" class="btn" type="button">Changelog</button>
-          </div>
-        </section>
+        <div class="viewScroll" aria-label="About content">
+          <section class="toolbar aboutHero" aria-label="About SyncNos WebClipper">
+            <img class="aboutLogo" src="../../../icons/icon-48.png" alt="" />
+            <div class="aboutInfo">
+              <div class="aboutName">SyncNos WebClipper</div>
+              <div class="sub" id="aboutVersion">Version</div>
+            </div>
+            <div class="aboutLinks" aria-label="Links">
+              <button id="btnAboutMacApp" class="btn" type="button">Mac App</button>
+              <button id="btnAboutSource" class="btn" type="button">Source Code</button>
+              <button id="btnAboutChangelog" class="btn" type="button">Changelog</button>
+            </div>
+          </section>
 
-        <section class="toolbar" aria-label="Author">
-          <img class="aboutAvatar" src="../../../icons/author-avatar.png" alt="Chii Magnus avatar" />
-          <div class="aboutAuthor">
-            <div class="aboutAuthorName">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
-            <div class="sub">Time Machine Creator~</div>
-          </div>
-          <div class="spacer"></div>
-          <button id="btnAboutMail" class="btn" type="button">Mail</button>
-          <button id="btnAboutGitHub" class="btn" type="button">GitHub</button>
-        </section>
+          <section class="toolbar" aria-label="Author">
+            <img class="aboutAvatar" src="../../../icons/author-avatar.png" alt="Chii Magnus avatar" />
+            <div class="aboutAuthor">
+              <div class="aboutAuthorName">𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</div>
+              <div class="sub">Time Machine Creator~</div>
+            </div>
+            <div class="spacer"></div>
+            <button id="btnAboutMail" class="btn" type="button">Mail</button>
+            <button id="btnAboutGitHub" class="btn" type="button">GitHub</button>
+          </section>
 
-        <section class="toolbar aboutDonate" aria-label="Donate QR code">
-          <img class="aboutDonateImage" src="../../../icons/buymeacoffee1.jpg" alt="Chii Magnus donate QR code" />
-        </section>
+          <section class="toolbar aboutDonate" aria-label="Donate QR code">
+            <img class="aboutDonateImage" src="../../../icons/buymeacoffee1.jpg" alt="Chii Magnus donate QR code" />
+          </section>
+        </div>
       </section>
     </div>
 
