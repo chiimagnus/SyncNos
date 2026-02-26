@@ -24,6 +24,7 @@
       "../export/notion/notion-sync-job-store.js",
       "../export/notion/notion-sync-orchestrator.js",
       "../export/obsidian/obsidian-url-service.js",
+      "./background-events-hub.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
       "../collectors/web/article-fetch-service.js",
