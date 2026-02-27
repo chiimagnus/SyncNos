@@ -76,7 +76,6 @@
       exportMenu: document.getElementById("exportMenu"),
       menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
       menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
-      menuExportJsons: document.getElementById("menuExportJsons"),
       btnAddObsidian: document.getElementById("btnAddObsidian"),
       btnSyncNotion: document.getElementById("btnSyncNotion"),
       sourceFilterSelect: document.getElementById("sourceFilterSelect"),

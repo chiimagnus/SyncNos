@@ -141,6 +141,113 @@
     );
   }
 
+  function isListType(type) {
+    return type === "bulleted_list" || type === "numbered_list" || type === "to_do_list";
+  }
+
+  function directChildBlocks(block) {
+    if (!block || !block.querySelectorAll) return [];
+    const all = Array.from(block.querySelectorAll("div[data-block-id]"));
+    return all.filter((child) => {
+      if (!child || child === block) return false;
+      const parentBlock = child.parentElement ? child.parentElement.closest("div[data-block-id]") : null;
+      return parentBlock === block;
+    });
+  }
+
+  function numberedListMarker(block) {
+    if (!block || !block.querySelector) return "1.";
+    const label = block.querySelector(".notion-list-item-box-left .pseudoBefore");
+    const fromText = String((label && label.textContent) || "").trim();
+    const textMatch = fromText.match(/^(\d+)[.)]?$/);
+    if (textMatch) return `${textMatch[1]}.`;
+
+    const style = elementStyleString(label);
+    const styleMatch = style.match(/--pseudoBefore--content:\s*["']?(\d+)\.?["']?/i);
+    if (styleMatch) return `${styleMatch[1]}.`;
+
+    return "1.";
+  }
+
+  function listItemMarker(block, type) {
+    if (type === "bulleted_list") return "-";
+    if (type === "numbered_list") return numberedListMarker(block);
+    if (type === "to_do_list") {
+      const checked = !!block.querySelector('[role="checkbox"][aria-checked="true"]');
+      return checked ? "- [x]" : "- [ ]";
+    }
+    return "-";
+  }
+
+  function renderListItem(block, depth) {
+    const type = getBlockTypeName(block);
+    const marker = listItemMarker(block, type);
+    const indent = "  ".repeat(Math.max(0, depth));
+    const continuationIndent = indent + " ".repeat(marker.length + 1);
+
+    const leaf = blockLeaf(block);
+    const text = leafToMarkdown(leaf);
+    const textLines = text ? text.split("\n") : [];
+
+    const lines = [];
+    if (textLines.length) {
+      lines.push(`${indent}${marker} ${textLines[0]}`);
+      for (const line of textLines.slice(1)) lines.push(`${continuationIndent}${line}`);
+    } else {
+      lines.push(`${indent}${marker}`);
+    }
+
+    const children = directChildBlocks(block);
+    for (const child of children) {
+      const childType = getBlockTypeName(child);
+      if (!isListType(childType)) continue;
+      const nested = renderListItem(child, depth + 1);
+      if (nested) lines.push(nested);
+    }
+
+    return lines.join("\n");
+  }
+
+  function codeLeafText(leaf) {
+    if (!leaf) return "";
+    const raw = normalizeMarkdownText(leaf.textContent || "");
+    return raw.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+  }
+
+  function codeFenceDelimiter(content) {
+    const runs = String(content || "").match(/`+/g) || [];
+    const longest = runs.reduce((max, s) => Math.max(max, s.length), 0);
+    return "`".repeat(Math.max(3, longest + 1));
+  }
+
+  function normalizeCodeLanguage(raw) {
+    const value = String(raw || "").trim().toLowerCase();
+    return value.replace(/[^a-z0-9_+.-]/g, "");
+  }
+
+  function detectCodeLanguage(block) {
+    if (!block || !block.querySelectorAll) return "";
+    const attrs = [
+      block.getAttribute("data-language"),
+      block.getAttribute("data-code-language")
+    ];
+    for (const a of attrs) {
+      const language = normalizeCodeLanguage(a);
+      if (language) return language;
+    }
+
+    const nodes = [block].concat(Array.from(block.querySelectorAll("[class],[data-language],[data-code-language]")).slice(0, 8));
+    for (const node of nodes) {
+      if (!node || !node.getAttribute) continue;
+      const dataLanguage = normalizeCodeLanguage(node.getAttribute("data-language") || node.getAttribute("data-code-language"));
+      if (dataLanguage) return dataLanguage;
+      const className = String(node.getAttribute("class") || "");
+      const m = className.match(/\blanguage-([a-z0-9_+.-]+)\b/i);
+      if (m && m[1]) return normalizeCodeLanguage(m[1]);
+    }
+    return "";
+  }
+
   function escapeMarkdownTableCell(value) {
     const text = String(value || "").replace(/\n+/g, " ").trim();
     // Escape pipes to avoid breaking table columns.
@@ -232,6 +339,17 @@
       return `$$\n${tex}\n$$`;
     }
 
+    if (isListType(type)) return renderListItem(block, 0);
+
+    if (type === "code") {
+      const leaf = blockLeaf(block);
+      const code = codeLeafText(leaf);
+      if (!code) return "";
+      const fence = codeFenceDelimiter(code);
+      const language = detectCodeLanguage(block);
+      return `${fence}${language}\n${code}\n${fence}`;
+    }
+
     const leaf = blockLeaf(block);
     const text = leafToMarkdown(leaf);
     if (!text) return "";
@@ -243,13 +361,6 @@
     if (type === "quote") {
       const lines = text.split("\n").map((l) => `> ${l}`.trimEnd());
       return lines.join("\n");
-    }
-
-    if (type === "bulleted_list") return `- ${text}`;
-    if (type === "numbered_list") return `1. ${text}`;
-    if (type === "to_do_list") {
-      const checked = !!block.querySelector('[role="checkbox"][aria-checked="true"]');
-      return `- [${checked ? "x" : " "}] ${text}`;
     }
 
     if (type === "callout") {
@@ -305,4 +416,3 @@
   NS.notionAiMarkdown = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
