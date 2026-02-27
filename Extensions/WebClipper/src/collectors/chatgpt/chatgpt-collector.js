@@ -45,6 +45,10 @@
     return element.querySelector(".markdown.prose") || element.querySelector(".markdown") || element;
   }
 
+  function chatgptMarkdown() {
+    return NS.chatgptMarkdown || {};
+  }
+
   function getTurnWrappers(root) {
     const scope = root || document;
     const uniqueNodes = new Set();
@@ -95,6 +99,7 @@
 
     const out = [];
     const utils = NS.collectorUtils || {};
+    const markdown = chatgptMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     for (let i = 0; i < wrappers.length; i += 1) {
@@ -102,7 +107,10 @@
       const role = roleFromWrapper(el);
       const node = role === "user" ? userContentNode(el) : assistantContentNode(el);
       const raw = node ? (node.innerText || node.textContent || "") : "";
-      const contentText = NS.normalize.normalizeText(raw);
+      const fallbackText = NS.normalize.normalizeText(raw);
+      const contentText = role === "assistant" && typeof markdown.extractAssistantText === "function"
+        ? (markdown.extractAssistantText(el) || fallbackText)
+        : fallbackText;
       const imageUrls = (() => {
         if (!extractImages) return [];
         const primary = extractImages(node || el);
@@ -111,7 +119,9 @@
         return Array.from(new Set(primary.concat(secondary)));
       })();
       if (!contentText && !imageUrls.length) continue;
-      const baseMarkdown = contentText || "";
+      const baseMarkdown = role === "assistant" && typeof markdown.extractAssistantMarkdown === "function"
+        ? (markdown.extractAssistantMarkdown(el) || contentText || "")
+        : (contentText || "");
       const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
       const messageId = el.getAttribute && (el.getAttribute("data-message-id") || el.id);
       const messageKey = messageId || NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i });

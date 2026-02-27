@@ -26,6 +26,10 @@
     return NS.collectorUtils.inEditMode(root);
   }
 
+  function kimiMarkdown() {
+    return NS.kimiMarkdown || {};
+  }
+
   function collectMessages() {
     const root = getConversationRoot();
     if (!root) return [];
@@ -36,6 +40,7 @@
 
     const out = [];
     const utils = NS.collectorUtils || {};
+    const markdown = kimiMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
@@ -75,15 +80,39 @@
           if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
           return 0;
         });
-        const parts = candidates.map((el) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
-        text = NS.normalize.normalizeText(parts.join("\n\n"));
-        imageScopes = candidates.length ? candidates : [item];
+        const uniq = [];
+        for (const candidate of candidates) {
+          if (uniq.some((p) => p.contains(candidate))) continue;
+          uniq.push(candidate);
+        }
+
+        const textParts = uniq.map((el) => {
+          const fallbackText = NS.normalize.normalizeText(el.innerText || el.textContent || "");
+          if (typeof markdown.extractAssistantText !== "function") return fallbackText;
+          return markdown.extractAssistantText(el) || fallbackText;
+        }).filter(Boolean);
+        text = NS.normalize.normalizeText(textParts.join("\n\n"));
+
+        const markdownParts = uniq.map((el) => {
+          const fallbackText = NS.normalize.normalizeText(el.innerText || el.textContent || "");
+          if (typeof markdown.extractAssistantMarkdown !== "function") return fallbackText;
+          return markdown.extractAssistantMarkdown(el) || fallbackText;
+        }).filter(Boolean);
+        const joinedMarkdown = markdownParts.join("\n\n");
+        item.__kimiContentMarkdown = typeof markdown.normalizeMarkdown === "function"
+          ? markdown.normalizeMarkdown(joinedMarkdown)
+          : joinedMarkdown;
+
+        imageScopes = uniq.length ? uniq : [item];
       }
 
       const imageUrls = mergeImageUrls(imageScopes);
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
-      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+      const baseMarkdown = !isUser
+        ? (item.__kimiContentMarkdown || contentText)
+        : contentText;
+      const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
       out.push({
         messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,

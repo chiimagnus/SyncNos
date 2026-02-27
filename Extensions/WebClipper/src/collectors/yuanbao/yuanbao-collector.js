@@ -26,6 +26,10 @@
     return NS.collectorUtils.inEditMode(root);
   }
 
+  function yuanbaoMarkdown() {
+    return NS.yuanbaoMarkdown || {};
+  }
+
   function collectMessages() {
     const root = getConversationRoot();
     if (!root) return [];
@@ -45,6 +49,7 @@
 
     const out = [];
     const utils = NS.collectorUtils || {};
+    const markdown = yuanbaoMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     for (let i = 0; i < nodes.length; i += 1) {
@@ -55,11 +60,17 @@
       } else {
         tEl = el.querySelector(".agent-chat__speech-text") || el.querySelector(".hyc-component-reasoner__text") || el;
       }
-      const text = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
+      const fallbackText = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
+      const text = role === "assistant" && typeof markdown.extractAssistantText === "function"
+        ? (markdown.extractAssistantText(tEl) || fallbackText)
+        : fallbackText;
       const imageUrls = extractImages ? extractImages(tEl || el) : [];
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
-      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+      const baseMarkdown = role === "assistant" && typeof markdown.extractAssistantMarkdown === "function"
+        ? (markdown.extractAssistantMarkdown(tEl) || contentText)
+        : contentText;
+      const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
       out.push({
         messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: i }),
         role,
