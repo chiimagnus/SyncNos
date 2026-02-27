@@ -4,7 +4,8 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
-  const INPAGE_BTN_STORAGE_KEY = "webclipper_btn_pos_inpage_v2";
+  const INPAGE_BTN_STORAGE_KEY_V2 = "webclipper_btn_pos_inpage_v2";
+  const INPAGE_BTN_STORAGE_KEY_V3 = "webclipper_btn_pos_inpage_v3";
   const EDGE_GAP = 0;
   const INPAGE_BUTTON_LABEL = "WebClipper: Save";
   const COMBO_WINDOW_MS = 400;
@@ -36,52 +37,84 @@
     return { width, height };
   }
 
+  function clamp01(v) {
+    return clamp(v, 0, 1);
+  }
+
+  function getSnappedRange(edge, size) {
+    const { width, height } = size;
+    if (edge === "left" || edge === "right") {
+      const min = EDGE_GAP;
+      const max = Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP);
+      const range = Math.max(0, max - min);
+      return { axis: "y", min, max, range };
+    }
+    const min = EDGE_GAP;
+    const max = Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP);
+    const range = Math.max(0, max - min);
+    return { axis: "x", min, max, range };
+  }
+
+  function resolveOffsetFromState(edge, size, state) {
+    const range = getSnappedRange(edge, size);
+    const ratio = state && Number.isFinite(state.ratio) ? clamp01(Number(state.ratio)) : null;
+    if (ratio != null) {
+      return { offset: range.min + ratio * range.range, ratio };
+    }
+    const fallbackOffset = state && Number.isFinite(state.offset) ? Number(state.offset) : EDGE_GAP;
+    const clampedOffset = clamp(fallbackOffset, range.min, range.max);
+    const nextRatio = range.range > 0 ? (clampedOffset - range.min) / range.range : 0;
+    return { offset: clampedOffset, ratio: clamp01(nextRatio) };
+  }
+
   function applySnappedPosition(el, state) {
     if (!state || !state.edge) return null;
-    const { width, height } = getButtonSize(el);
+    const size = getButtonSize(el);
+    const { width, height } = size;
     const maxLeft = Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP);
     const maxTop = Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP);
-    const offset = Number.isFinite(state.offset) ? state.offset : EDGE_GAP;
     const edge = state.edge;
+    const resolved = resolveOffsetFromState(edge, size, state);
 
     el.style.position = "fixed";
     if (edge === "left") {
-      const top = clamp(offset, EDGE_GAP, maxTop);
+      const top = clamp(resolved.offset, EDGE_GAP, maxTop);
       el.style.left = `${EDGE_GAP}px`;
       el.style.right = "auto";
       el.style.top = `${top}px`;
       el.style.bottom = "auto";
-      return { edge, offset: top };
+      return { edge, ratio: resolved.ratio };
     }
     if (edge === "right") {
-      const top = clamp(offset, EDGE_GAP, maxTop);
+      const top = clamp(resolved.offset, EDGE_GAP, maxTop);
       el.style.left = "auto";
       el.style.right = `${EDGE_GAP}px`;
       el.style.top = `${top}px`;
       el.style.bottom = "auto";
-      return { edge, offset: top };
+      return { edge, ratio: resolved.ratio };
     }
     if (edge === "top") {
-      const left = clamp(offset, EDGE_GAP, maxLeft);
+      const left = clamp(resolved.offset, EDGE_GAP, maxLeft);
       el.style.left = `${left}px`;
       el.style.right = "auto";
       el.style.top = `${EDGE_GAP}px`;
       el.style.bottom = "auto";
-      return { edge, offset: left };
+      return { edge, ratio: resolved.ratio };
     }
     if (edge === "bottom") {
-      const left = clamp(offset, EDGE_GAP, maxLeft);
+      const left = clamp(resolved.offset, EDGE_GAP, maxLeft);
       el.style.left = `${left}px`;
       el.style.right = "auto";
       el.style.top = "auto";
       el.style.bottom = `${EDGE_GAP}px`;
-      return { edge, offset: left };
+      return { edge, ratio: resolved.ratio };
     }
     return null;
   }
 
   function snapToClosestEdge(el, desiredLeft, desiredTop) {
-    const { width, height } = getButtonSize(el);
+    const size = getButtonSize(el);
+    const { width, height } = size;
     const maxLeft = Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP);
     const maxTop = Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP);
     const left = clamp(desiredLeft, EDGE_GAP, maxLeft);
@@ -96,8 +129,11 @@
     distances.sort((a, b) => a.distance - b.distance);
 
     const closest = distances[0];
-    const offset = closest.edge === "left" || closest.edge === "right" ? top : left;
-    return applySnappedPosition(el, { edge: closest.edge, offset });
+    const edge = closest.edge;
+    const offset = edge === "left" || edge === "right" ? top : left;
+    const range = getSnappedRange(edge, size);
+    const ratio = range.range > 0 ? (offset - range.min) / range.range : 0;
+    return applySnappedPosition(el, { edge, ratio: clamp01(ratio) });
   }
 
   function resolveComboLevel(count) {
@@ -157,7 +193,6 @@
       btn.textContent = INPAGE_BUTTON_LABEL;
     }
 
-    const storageKey = INPAGE_BTN_STORAGE_KEY;
     let snappedState = null;
 
     let dragging = false;
@@ -269,7 +304,7 @@
       const rect = btn.getBoundingClientRect();
       snappedState = snapToClosestEdge(btn, rect.left, rect.top);
       try {
-        if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
+        if (snappedState) localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
       } catch (_e) {
         // ignore
       }
@@ -291,11 +326,19 @@
     document.documentElement.appendChild(btn);
 
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed.edge === "string" && Number.isFinite(parsed.offset)) {
+      const savedV3 = localStorage.getItem(INPAGE_BTN_STORAGE_KEY_V3);
+      if (savedV3) {
+        const parsed = JSON.parse(savedV3);
+        if (parsed && typeof parsed.edge === "string" && (Number.isFinite(parsed.ratio) || Number.isFinite(parsed.offset))) {
           snappedState = applySnappedPosition(btn, parsed);
+        }
+      } else {
+        const savedV2 = localStorage.getItem(INPAGE_BTN_STORAGE_KEY_V2);
+        if (savedV2) {
+          const parsed = JSON.parse(savedV2);
+          if (parsed && typeof parsed.edge === "string" && (Number.isFinite(parsed.ratio) || Number.isFinite(parsed.offset))) {
+            snappedState = applySnappedPosition(btn, parsed);
+          }
         }
       }
 
@@ -304,7 +347,7 @@
         snappedState = snapToClosestEdge(btn, rect.left, rect.top);
       }
 
-      if (snappedState) localStorage.setItem(storageKey, JSON.stringify(snappedState));
+      if (snappedState) localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
     } catch (_e) {
       const rect = btn.getBoundingClientRect();
       snappedState = snapToClosestEdge(btn, rect.left, rect.top);
@@ -316,7 +359,7 @@
       if (!nextState) return;
       snappedState = nextState;
       try {
-        localStorage.setItem(storageKey, JSON.stringify(snappedState));
+        localStorage.setItem(INPAGE_BTN_STORAGE_KEY_V3, JSON.stringify(snappedState));
       } catch (_e) {
         // ignore
       }
