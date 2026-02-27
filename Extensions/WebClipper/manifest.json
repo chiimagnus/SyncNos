@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SyncNos-AI+Web Clipper",
-  "version": "0.17.4",
+  "version": "0.17.5",
   "description": "Clip AI chats to local storage, export to JSON or Markdown, and sync to Notion on demand.",
   "action": {
     "default_title": "SyncNos-WebClipper",
