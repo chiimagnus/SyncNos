@@ -27,30 +27,6 @@
     if (els.btnExport) els.btnExport.setAttribute("aria-expanded", "true");
   }
 
-  async function exportJson() {
-    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") throw new Error("Conversation docs module not available.");
-    const ids = list.getSelectedIds();
-    if (!ids.length) return;
-    const docs = await docsApi.buildConversationDocs({ selectedIds: ids, throwOnEmpty: false });
-    const items = docs.map((doc) => ({
-      conversation: doc.conversation,
-      messages: doc.messages
-    }));
-
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      count: items.length,
-      items
-    };
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const jsonFilename = `webclipper-export-${stamp}.json`;
-    const zipBlob = await createZipBlob([
-      { name: jsonFilename, data: JSON.stringify(payload, null, 2) }
-    ]);
-    downloadBlob({ blob: zipBlob, filename: `webclipper-export-${stamp}.zip`, saveAs: false });
-    flashOk(els.btnExport);
-  }
-
   async function exportMd({ mergeSingle }) {
     if (!docsApi || typeof docsApi.buildConversationDocs !== "function") throw new Error("Conversation docs module not available.");
     const ids = list.getSelectedIds();
@@ -91,12 +67,6 @@
     });
   }
 
-  function safeExportJsons() {
-    exportJson().catch((e) => {
-      alert((e && e.message) || "Export JSON failed.");
-    });
-  }
-
   function init() {
     if (els.btnExport) {
       els.btnExport.addEventListener("click", (e) => {
@@ -118,13 +88,6 @@
       els.menuExportMultiMarkdown.addEventListener("click", () => {
         closeExportMenu();
         safeExportMultiMarkdown();
-      });
-    }
-
-    if (els.menuExportJsons) {
-      els.menuExportJsons.addEventListener("click", () => {
-        closeExportMenu();
-        safeExportJsons();
       });
     }
 
