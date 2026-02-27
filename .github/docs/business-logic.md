@@ -1,6 +1,6 @@
 # SyncNos Business Logic
 
-## 1) 产品概述
+## 1 产品概述
 
 SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Notion”的工具组合，包含：
 
@@ -18,7 +18,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
   - Notion：数据库与页面/条目、页面属性（如最后同步时间/数量等）、内容 blocks
   - 本地：App 缓存与凭据；WebClipper 本地数据库与导出/备份文件
 
-## 2) 核心业务能力（Capabilities）
+## 2 核心业务能力（Capabilities）
 
 ### 2.1 Notion 授权与 Parent Page 选择
 
@@ -102,7 +102,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 输出：本地缓存与必要映射；敏感凭据保存于系统安全存储（如 Keychain）
 - 关键边界与失败方式：Keychain 不可用或读取失败时，相关来源应提示“需要重新登录/授权”
 
-## 3) 核心用户流程（User Journeys）
+## 3 核心用户流程（User Journeys）
 
 ### 3.1 首次配置并完成一次同步（App 主流程）
 
@@ -132,7 +132,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
    - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
    - article：当文章被重新 fetch 且内容更新时，也会覆盖式重建子块（避免停留在 no_changes）
 
-## 4) 业务流程图（Mermaid）
+## 4 业务流程图（Mermaid）
 
 ```mermaid
 flowchart TD
@@ -161,7 +161,7 @@ flowchart TD
     W7 --> I
 ```
 
-## 5) 业务规则与约束（Rules & Constraints）
+## 5 业务规则与约束（Rules & Constraints）
 
 - 同步前置条件：必须具备有效的 Notion 授权信息与 Parent Page
 - macOS 沙盒约束：Apple Books/GoodLinks 需要用户显式授权目录；授权不正确时无法读取数据
@@ -174,7 +174,7 @@ flowchart TD
 - WebClipper 备份约束：备份导入为合并模式；备份文件不应包含 Notion token 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
 
-## 6) 产物与可见结果（Outputs）
+## 6 产物与可见结果（Outputs）
 
 ### 6.1 Notion 侧产物
 
@@ -188,7 +188,7 @@ flowchart TD
 - App：用于加速展示与增量同步的缓存数据、已同步映射与时间戳；敏感凭据优先使用系统安全存储（如 Keychain）
 - WebClipper：浏览器本地数据库（IndexedDB）的会话与消息、非敏感设置、导出的 JSON/Markdown 与备份文件，以及写入 Obsidian 的笔记内容（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）
 
-## 7) 术语表（Glossary）
+## 7 术语表（Glossary）
 
 - Parent Page：Notion 中承载 SyncNos 产物的父页面（统一落点）
 - 条目（Item）：一个可同步对象（书/文章/对话），在 Notion 中通常对应一个页面或一个数据库条目
@@ -199,7 +199,7 @@ flowchart TD
 - 消息（Message）：会话中的最小内容单元，通常按 user/assistant 顺序组织
 - Obsidian URL：用于从浏览器触发 Obsidian 创建笔记的协议链接（如 `obsidian://new?...`）
 
-## 8) 入口索引（读码起点，<= 5）
+## 8 入口索引（读码起点，<= 5）
 
 - `SyncNos/Services/DataSources-To/Notion/`
 - `SyncNos/Services/DataSources-From/`
