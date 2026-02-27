@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 function parseArgs(argv) {
   const args = {
@@ -261,6 +261,12 @@ if (existsSync(repoLicense)) {
 cpSync(join(root, "icons"), join(out, "icons"), { recursive: true });
 if (existsSync(join(root, "vendor"))) {
   cpSync(join(root, "vendor"), join(out, "vendor"), { recursive: true });
+}
+for (const relPath of ["src/collectors/web/readability.js"]) {
+  const srcPath = join(root, relPath);
+  const outPath = join(out, relPath);
+  mkdirSync(dirname(outPath), { recursive: true });
+  cpSync(srcPath, outPath);
 }
 concatCssFiles({
   outFile: join(out, "popup.css"),
