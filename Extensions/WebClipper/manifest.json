@@ -72,6 +72,7 @@
         "src/collectors/zai/zai-markdown.js",
         "src/collectors/zai/zai-collector.js",
         "src/collectors/kimi/kimi-collector.js",
+        "src/collectors/doubao/doubao-markdown.js",
         "src/collectors/doubao/doubao-collector.js",
         "src/collectors/yuanbao/yuanbao-markdown.js",
         "src/collectors/yuanbao/yuanbao-collector.js",

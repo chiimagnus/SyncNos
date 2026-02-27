@@ -29,6 +29,10 @@
     return NS.collectorUtils.inEditMode(root);
   }
 
+  function doubaoMarkdown() {
+    return NS.doubaoMarkdown || {};
+  }
+
   function collectMessages() {
     const root = getConversationRoot();
     if (!root) return [];
@@ -39,6 +43,7 @@
 
     const out = [];
     const utils = NS.collectorUtils || {};
+    const markdown = doubaoMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
@@ -67,11 +72,17 @@
       if (recv) {
         const all = Array.from(recv.querySelectorAll("[data-testid='message_text_content']"));
         const textEl = all.find((el) => !el.closest("[data-testid='think_block_collapse']")) || recv;
-        const text = NS.normalize.normalizeText(textEl.innerText || textEl.textContent || "");
+        const fallbackText = NS.normalize.normalizeText(textEl.innerText || textEl.textContent || "");
+        const text = typeof markdown.extractAssistantText === "function"
+          ? (markdown.extractAssistantText(textEl) || fallbackText)
+          : fallbackText;
         const imageUrls = extractImages ? extractImages(recv) : [];
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const baseMarkdown = typeof markdown.extractAssistantMarkdown === "function"
+            ? (markdown.extractAssistantMarkdown(textEl) || contentText)
+            : contentText;
+          const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
           out.push({
             messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
