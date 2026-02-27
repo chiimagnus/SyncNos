@@ -62,6 +62,7 @@
         "src/collectors/registry.js",
         "src/collectors/runtime-observer.js",
         "src/collectors/collector-utils.js",
+        "src/collectors/chatgpt/chatgpt-markdown.js",
         "src/collectors/chatgpt/chatgpt-collector.js",
         "src/collectors/claude/claude-collector.js",
         "src/collectors/gemini/gemini-markdown.js",
