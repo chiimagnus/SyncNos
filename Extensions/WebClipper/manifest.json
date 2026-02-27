@@ -71,6 +71,7 @@
         "src/collectors/deepseek/deepseek-collector.js",
         "src/collectors/zai/zai-markdown.js",
         "src/collectors/zai/zai-collector.js",
+        "src/collectors/kimi/kimi-markdown.js",
         "src/collectors/kimi/kimi-collector.js",
         "src/collectors/doubao/doubao-markdown.js",
         "src/collectors/doubao/doubao-collector.js",
