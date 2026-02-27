@@ -67,6 +67,7 @@
         "src/collectors/claude/claude-collector.js",
         "src/collectors/gemini/gemini-markdown.js",
         "src/collectors/gemini/gemini-collector.js",
+        "src/collectors/deepseek/deepseek-markdown.js",
         "src/collectors/deepseek/deepseek-collector.js",
         "src/collectors/zai/zai-markdown.js",
         "src/collectors/zai/zai-collector.js",
