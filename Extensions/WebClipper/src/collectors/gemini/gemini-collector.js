@@ -21,6 +21,10 @@
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
+  function geminiMarkdown() {
+    return NS.geminiMarkdown || {};
+  }
+
   function getConversationRoot() {
     return document.querySelector("#chat-history") || document.querySelector("main") || document.body;
   }
@@ -51,6 +55,25 @@
     }
     const pageTitle = normalizeTitle(document.title || "");
     return pageTitle || "Gemini";
+  }
+
+  function extractAssistantMarkdown(node, fallbackText) {
+    const md = geminiMarkdown();
+    if (typeof md.extractAssistantMarkdown === "function") {
+      const markdown = md.extractAssistantMarkdown(node);
+      if (markdown) return markdown;
+    }
+    return fallbackText || "";
+  }
+
+  function extractAssistantText(node) {
+    const md = geminiMarkdown();
+    if (typeof md.extractAssistantText === "function") {
+      const text = md.extractAssistantText(node);
+      if (text) return text;
+    }
+    const raw = node ? (node.innerText || node.textContent || "") : "";
+    return NS.normalize.normalizeText(raw);
   }
 
   function collectMessages() {
@@ -86,13 +109,14 @@
         }
       }
 
-      const model = b.querySelector("model-response .model-response-text") || b.querySelector("model-response") || null;
+      const model = b.querySelector("model-response") || b.querySelector("model-response .model-response-text") || null;
       if (model) {
-        const text = NS.normalize.normalizeText(model.innerText || model.textContent || "");
+        const text = extractAssistantText(model);
         const imageUrls = extractImages ? extractImages(model) : [];
         if (text || imageUrls.length) {
           const contentText = text || "";
-          const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+          const baseMarkdown = extractAssistantMarkdown(model, contentText);
+          const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown || contentText, imageUrls) : (baseMarkdown || contentText);
           out.push({
             messageKey: NS.normalize.makeFallbackMessageKey({ role: "assistant", contentText, sequence: seq }),
             role: "assistant",
@@ -126,7 +150,15 @@
     };
   }
 
-  const api = { capture, getRoot: getConversationRoot };
+  const api = {
+    capture,
+    getRoot: getConversationRoot,
+    __test: {
+      collectMessages,
+      extractAssistantMarkdown,
+      extractAssistantText
+    }
+  };
   NS.collectors = NS.collectors || {};
   NS.collectors.gemini = api;
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
