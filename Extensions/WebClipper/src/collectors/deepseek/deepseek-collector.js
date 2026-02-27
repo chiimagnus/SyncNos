@@ -26,6 +26,10 @@
     return NS.collectorUtils.inEditMode(root);
   }
 
+  function deepseekMarkdown() {
+    return NS.deepseekMarkdown || {};
+  }
+
   function collectMessages() {
     const root = getConversationRoot();
     if (!root) return [];
@@ -36,6 +40,7 @@
 
     const out = [];
     const utils = NS.collectorUtils || {};
+    const markdown = deepseekMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
     let seq = 0;
@@ -54,12 +59,18 @@
         const directMarkdown = Array.from(ds.children || []).find((c) => c && c.classList && c.classList.contains("ds-markdown"));
         const contentEl = directMarkdown || ds.querySelector(".ds-markdown") || ds;
         contentNode = contentEl;
-        text = NS.normalize.normalizeText(contentEl.innerText || contentEl.textContent || "");
+        const fallbackText = NS.normalize.normalizeText(contentEl.innerText || contentEl.textContent || "");
+        text = typeof markdown.extractAssistantText === "function"
+          ? (markdown.extractAssistantText(contentEl) || fallbackText)
+          : fallbackText;
       }
       const imageUrls = extractImages ? extractImages(contentNode || el) : [];
       if (!text && !imageUrls.length) continue;
       const contentText = text || "";
-      const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+      const baseMarkdown = !isUser && typeof markdown.extractAssistantMarkdown === "function"
+        ? (markdown.extractAssistantMarkdown(contentNode) || contentText)
+        : contentText;
+      const contentMarkdown = appendImageMd ? appendImageMd(baseMarkdown, imageUrls) : baseMarkdown;
       out.push({
         messageKey: NS.normalize.makeFallbackMessageKey({ role, contentText, sequence: seq }),
         role,
