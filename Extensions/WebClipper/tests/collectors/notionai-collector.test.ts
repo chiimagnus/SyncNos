@@ -378,4 +378,65 @@ describe("notionai-collector", () => {
     expect(pairs).toContain("assistant:A2");
     expect(pairs).not.toContain("Page block (should not capture)");
   });
+
+  it("captures nested list and fenced code markdown from assistant blocks", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
+
+    const threadId = "30cbe9d6386a807c83e900a970ea41b2";
+    const html = `
+      <div class="autolayout-col autolayout-fill-width" id="turns_root">
+        <div class="autolayout-col">
+          <div data-agent-chat-user-step-id="u1"><div data-content-editable-leaf="true">U1</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column;">
+          <div data-content-editable-root="true">
+            <div data-block-id="a-list-1" class="notion-selectable notion-numbered_list-block">
+              <div class="notion-list-item-box-left"><span class="pseudoBefore" style="--pseudoBefore--content: &quot;1.&quot;;">1.</span></div>
+              <div data-content-editable-leaf="true">父级条目</div>
+              <div data-block-id="a-list-1-1" class="notion-selectable notion-bulleted_list-block">
+                <div data-content-editable-leaf="true">子级条目</div>
+              </div>
+            </div>
+            <div data-block-id="a-code-1" class="notion-selectable notion-code-block">
+              <div data-content-editable-leaf="true">const value = 1;
+console.log(value);</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dom = new JSDOM(`<body>${html}</body>`, {
+      url: `https://www.notion.so/chat?t=${threadId}&wfv=chat`
+    });
+    // @ts-expect-error test global
+    globalThis.window = dom.window;
+    // @ts-expect-error test global
+    globalThis.document = dom.window.document;
+    // @ts-expect-error test global
+    globalThis.Node = dom.window.Node;
+    // @ts-expect-error test global
+    globalThis.location = dom.window.location;
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadNormalize();
+    loadCollectorUtils();
+    loadContract();
+    loadRegistry();
+    loadNotionAiMarkdown();
+    const collector = loadNotionAiCollector();
+
+    const snap = collector.capture();
+    expect(snap).toBeTruthy();
+    const assistant = snap.messages.find((m: any) => m && m.role === "assistant");
+    expect(assistant).toBeTruthy();
+    const md = String(assistant.contentMarkdown || "");
+    expect(md).toContain("1. 父级条目");
+    expect(md).toContain("  - 子级条目");
+    expect(md).toContain("```");
+    expect(md).toContain("const value = 1;");
+    expect(md).toContain("console.log(value);");
+  });
 });
