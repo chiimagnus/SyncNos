@@ -2,11 +2,14 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const BACKUP_SCHEMA_VERSION = 1;
+  const BACKUP_ZIP_SCHEMA_VERSION = 2;
 
   const STORAGE_ALLOWLIST_BASE = Object.freeze([
     "notion_oauth_client_id",
     "notion_parent_page_id",
-    "popup_active_tab"
+    "popup_active_tab",
+    "popup_source_filter_key",
+    "notion_ai_preferred_model_index"
   ]);
 
   function getNotionDbStorageKeys() {
@@ -200,15 +203,125 @@
     return { ok: true, error: "" };
   }
 
+  function isSafeZipPath(path) {
+    const raw = String(path || "").trim();
+    if (!raw) return false;
+    if (raw.includes("\0")) return false;
+    if (raw.startsWith("/") || raw.startsWith("\\")) return false;
+    if (raw.includes("\\")) return false;
+    if (/(^|\/)\.\.(\/|$)/.test(raw)) return false;
+    return true;
+  }
+
+  function validateBackupManifest(doc) {
+    if (!doc || typeof doc !== "object") return { ok: false, error: "Manifest is not an object" };
+    if (Number(doc.backupSchemaVersion) !== BACKUP_ZIP_SCHEMA_VERSION) {
+      return { ok: false, error: "Unsupported backupSchemaVersion" };
+    }
+    if (!isNonEmptyString(doc.exportedAt)) return { ok: false, error: "Missing exportedAt" };
+    if (!doc.db || typeof doc.db !== "object") return { ok: false, error: "Missing db" };
+    if (!isNonEmptyString(doc.db.name)) return { ok: false, error: "Missing db.name" };
+    if (!Number.isFinite(Number(doc.db.version))) return { ok: false, error: "Missing db.version" };
+
+    if (!doc.counts || typeof doc.counts !== "object") return { ok: false, error: "Missing counts" };
+    for (const k of ["conversations", "messages", "sync_mappings"]) {
+      if (!Number.isFinite(Number(doc.counts[k])) || Number(doc.counts[k]) < 0) {
+        return { ok: false, error: `Invalid counts.${k}` };
+      }
+    }
+
+    const config = doc.config;
+    if (!config || typeof config !== "object") return { ok: false, error: "Missing config" };
+    const storageLocalPath = config.storageLocalPath;
+    if (!isNonEmptyString(storageLocalPath) || !isSafeZipPath(storageLocalPath)) {
+      return { ok: false, error: "Invalid config.storageLocalPath" };
+    }
+    if (!String(storageLocalPath).endsWith(".json")) return { ok: false, error: "Invalid config.storageLocalPath extension" };
+
+    const index = doc.index;
+    if (!index || typeof index !== "object") return { ok: false, error: "Missing index" };
+    const conversationsCsvPath = index.conversationsCsvPath;
+    if (!isNonEmptyString(conversationsCsvPath) || !isSafeZipPath(conversationsCsvPath)) {
+      return { ok: false, error: "Invalid index.conversationsCsvPath" };
+    }
+    if (!String(conversationsCsvPath).endsWith(".csv")) return { ok: false, error: "Invalid index.conversationsCsvPath extension" };
+
+    if (!Array.isArray(doc.sources)) return { ok: false, error: "Missing sources" };
+    const seenFiles = new Set();
+    for (const group of doc.sources) {
+      if (!group || typeof group !== "object") return { ok: false, error: "Invalid sources item" };
+      if (!isNonEmptyString(group.source)) return { ok: false, error: "Invalid sources[].source" };
+      const files = Array.isArray(group.files) ? group.files : null;
+      if (!files) return { ok: false, error: "Invalid sources[].files" };
+      const expectedCount = Number(group.conversationCount);
+      if (!Number.isFinite(expectedCount) || expectedCount < 0) return { ok: false, error: "Invalid sources[].conversationCount" };
+      if (expectedCount !== files.length) return { ok: false, error: "sources[].conversationCount mismatch" };
+      for (const filePath of files) {
+        const p = String(filePath || "").trim();
+        if (!p || !isSafeZipPath(p)) return { ok: false, error: "Invalid sources file path" };
+        if (!p.startsWith("sources/")) return { ok: false, error: "Invalid sources file prefix" };
+        if (!p.endsWith(".json")) return { ok: false, error: "Invalid sources file extension" };
+        if (seenFiles.has(p)) return { ok: false, error: "Duplicate sources file path" };
+        seenFiles.add(p);
+      }
+    }
+
+    return { ok: true, error: "" };
+  }
+
+  function validateConversationBundle(doc) {
+    if (!doc || typeof doc !== "object") return { ok: false, error: "Bundle is not an object" };
+    if (Number(doc.schemaVersion) !== 1) return { ok: false, error: "Unsupported bundle schemaVersion" };
+    if (!doc.conversation || typeof doc.conversation !== "object") return { ok: false, error: "Missing conversation" };
+    const conversation = doc.conversation;
+    const source = conversation.source ? String(conversation.source) : "";
+    const conversationKey = conversation.conversationKey ? String(conversation.conversationKey) : "";
+    if (!isNonEmptyString(source) || !isNonEmptyString(conversationKey)) {
+      return { ok: false, error: "Missing conversation.source or conversation.conversationKey" };
+    }
+
+    const messages = Array.isArray(doc.messages) ? doc.messages : null;
+    if (!messages) return { ok: false, error: "Missing messages" };
+    for (const m of messages) {
+      if (!m || typeof m !== "object") return { ok: false, error: "Invalid message item" };
+      if (!isNonEmptyString(m.messageKey)) return { ok: false, error: "Message missing messageKey" };
+    }
+
+    if (doc.syncMapping != null) {
+      if (!doc.syncMapping || typeof doc.syncMapping !== "object") return { ok: false, error: "Invalid syncMapping" };
+      const mappingSource = doc.syncMapping.source ? String(doc.syncMapping.source) : "";
+      const mappingKey = doc.syncMapping.conversationKey ? String(doc.syncMapping.conversationKey) : "";
+      if (!isNonEmptyString(mappingSource) || !isNonEmptyString(mappingKey)) {
+        return { ok: false, error: "syncMapping missing source or conversationKey" };
+      }
+      if (mappingSource !== source || mappingKey !== conversationKey) {
+        return { ok: false, error: "syncMapping does not match conversation" };
+      }
+    }
+
+    return { ok: true, error: "" };
+  }
+
+  function validateStorageLocalDocument(doc) {
+    if (!doc || typeof doc !== "object") return { ok: false, error: "Storage backup is not an object" };
+    if (Number(doc.schemaVersion) !== 1) return { ok: false, error: "Unsupported storage schemaVersion" };
+    if (doc.storageLocal != null && typeof doc.storageLocal !== "object") return { ok: false, error: "Invalid storageLocal" };
+    return { ok: true, error: "" };
+  }
+
   const api = {
     BACKUP_SCHEMA_VERSION,
+    BACKUP_ZIP_SCHEMA_VERSION,
     STORAGE_ALLOWLIST,
     uniqueConversationKey,
     mergeConversationRecord,
     mergeMessageRecord,
     mergeSyncMappingRecord,
     filterStorageForBackup,
-    validateBackupDocument
+    validateBackupDocument,
+    validateBackupManifest,
+    validateConversationBundle,
+    validateStorageLocalDocument
   };
   NS.backupUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
