@@ -17,6 +17,7 @@
   - Zip v2（推荐）：读取 `manifest.json` 校验版本并按清单读取每对话文件；将对话文件中的 `conversation/messages/syncMapping` 还原为“可合并导入”的输入，再复用现有 upsert 规则导入到 IndexedDB，并应用 allowlist 配置。
   - Legacy JSON v1（兼容）：保留现有 `importDatabaseBackupMerge(doc)` 行为与 `validateBackupDocument(doc)` 校验。
 - Zip 读写：当前已有 zip 写入（stored，无压缩），需要新增 zip 读取（至少支持本项目生成的 stored zip）。
+  - 兼容性要求：Import 必须支持“用户解压后重新压缩”的 zip（通常会变为 deflate），因此 unzip 需要至少支持 method=0(stored) 与 method=8(deflate)。
 
 **Acceptance（验收）:**
 - UI：Database Backup 的 Import 文件选择支持 `*.zip`（推荐）与 `*.json`（legacy）；文案明确“不包含 Notion token”。
@@ -119,7 +120,9 @@ webclipper-db-backup-<ISO>.zip
 - 在 `zip-utils.js` 增加 `extractZipEntries(blobOrArrayBuffer)`：
   - 支持读取 End of Central Directory（EOCD）
   - 支持 Central Directory 遍历，解析文件名/offset/size/CRC
-  - 仅支持 compression method=0（stored），其它 method 明确报错
+  - 支持 compression method：
+    - `0`（stored）：直接读取 entry data
+    - `8`（deflate）：解压得到原始 bytes（优先用 Web API `DecompressionStream`，若不可用则使用内置/引入的纯 JS inflate 实现）
   - 忽略目录条目（`name` 以 `/` 结尾）
   - 若出现重复 entry name：直接报错（避免覆盖/歧义）
   - 返回 `{ name -> Uint8Array }` 或 `{ name, bytes }[]`
@@ -240,4 +243,4 @@ webclipper-db-backup-<ISO>.zip
 ## 不确定项（执行前如需再确认）
 
 - `conversationKey` 作为文件名暂不做长度限制（先观察真实数据形态）；如后续发现极端长文件名，再加截断策略并通过 `manifest.json` 保持可逆映射。
-- Import 是否需要兼容“用户解压后再重新压缩”的 zip（通常会变成 deflate）。本计划默认仅支持 SyncNos 自己导出的 stored zip；如需要更强兼容性，可在 `zip-utils` 增加 deflate 解压（优先评估 `DecompressionStream` 的跨浏览器可用性）。
+- （已确认）Import 需要兼容“用户解压后再重新压缩”的 zip（常见为 deflate）。
