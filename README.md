@@ -15,7 +15,7 @@ English | [中文](README.zh-CN.md)
 This project has two parts:
 
 1. **macOS app**: sync highlights and notes to Notion from Apple Books, GoodLinks, WeRead, Dedao, and chat history (including OCR). Supported: **macOS 14.0+**.
-2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (JSON/Markdown), backup/restore the local database (export/import), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**.
+2. **WebClipper extension**: capture AI chats from supported sites into local browser storage, export (Markdown), backup/restore the local database (export/import), and manually sync to Notion (OAuth). Supported: **Chromium-based browsers (Chrome/Edge/Arc/etc.)** and **Firefox (AMO listed)**.
 
 ## How It Works
 
@@ -54,7 +54,7 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 ### What It Does
 
 - Captures AI chats from supported sites into local browser storage
-- Exports selected conversations as JSON/Markdown
+- Exports selected conversations as Markdown (single merged export or multi-file zip export)
 - Adds selected conversations to Obsidian via `obsidian://new` (single selection prefers clipboard mode; multi-selection opens URLs in order)
 - Obsidian export routes by kind:
   - Chats: `SyncNos-AIChats/<conversation-title>`
