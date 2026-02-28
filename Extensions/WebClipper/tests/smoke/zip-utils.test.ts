@@ -128,13 +128,13 @@ describe("zip-utils", () => {
 
   it("extractZipEntries can read deflated (method=8) entries", async () => {
     const zipUtils = loadZipUtils();
+    const big = "a".repeat(150_000);
     const bytes = makeDeflatedZipEntry({
       name: "sources/chatgpt/c1.json",
-      data: new TextEncoder().encode(JSON.stringify({ ok: true }))
+      data: new TextEncoder().encode(JSON.stringify({ ok: true, big }))
     });
     const blob = new Blob([bytes], { type: "application/zip" });
     const entries: Map<string, Uint8Array> = await zipUtils.extractZipEntries(blob);
-    expect(new TextDecoder().decode(entries.get("sources/chatgpt/c1.json"))).toBe(JSON.stringify({ ok: true }));
+    expect(new TextDecoder().decode(entries.get("sources/chatgpt/c1.json"))).toBe(JSON.stringify({ ok: true, big }));
   });
 });
-
