@@ -14,7 +14,7 @@
 此项目分为两部分：
 
 1. **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion。支持：**macOS 14.0+**。
-2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（JSON/Markdown）、数据库备份/恢复（导出/导入），以及手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**。
+2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（Markdown）、数据库备份/恢复（导出/导入），以及手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**。
 
 ## 工作流程
 
@@ -53,7 +53,7 @@
 ### 作用
 
 - 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
-- 导出所选对话为 JSON/Markdown
+- 导出所选对话为 Markdown（支持单文件合并导出或多文件 zip 导出）
 - 通过 `obsidian://new` 将所选对话写入 Obsidian（单选优先走剪贴板模式；多选按顺序打开多个 URL）
 - Obsidian 按 kind 分目录写入：
   - 聊天：`SyncNos-AIChats/<会话标题>`

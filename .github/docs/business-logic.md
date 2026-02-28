@@ -5,7 +5,7 @@
 SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Notion”的工具组合，包含：
 
 - **SyncNos（macOS App）**：从 Apple Books、GoodLinks、WeRead（微信读书）、Dedao（得到）与聊天截图 OCR 中提取高亮/笔记/消息，整理后同步到 Notion。
-- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话与网页文章（手动 fetch 当前页），增量保存到本地；支持导出（JSON/Markdown）、本地数据库备份导出/导入（合并导入），以及手动同步到 Notion（OAuth）。
+- **WebClipper（浏览器扩展）**：在浏览器中采集 AI 对话与网页文章（手动 fetch 当前页），增量保存到本地；支持导出（Markdown）、本地数据库备份导出/导入（合并导入），以及手动同步到 Notion（OAuth）。
 
 - 给谁用：希望把阅读与对话中的“可复用信息”系统化沉淀到 Notion 的用户
 - 核心体验：
@@ -68,6 +68,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
     - chat：`SyncNos-AI Chats`
     - article：`SyncNos-Web Articles`
     - 统一按“1 会话 -> 1 页面”写入内容 blocks
+    - 当 `contentMarkdown` 可用时优先渲染为结构化 blocks（标题/列表/引用/代码块等），否则回退为纯文本段落
 - 关键边界与失败方式：Notion API 限流或网络异常会导致同步失败；需要提供可重试与失败原因
 
 ### 2.6 增量同步与自动同步（App）
@@ -91,7 +92,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 用户价值：即使不连接 Notion，也能把对话以可迁移的形式带走，或快速沉淀到 Obsidian，并可在不同设备/浏览器之间恢复
 - 触发方式：用户在扩展弹窗中选择导出、添加到 Obsidian，或备份导出/导入
 - 输入：选中的会话；备份文件（导入）
-- 输出：导出文件（JSON/Markdown）、Obsidian 新建笔记请求（`obsidian://new`）、备份文件（JSON）、合并导入后的本地数据
+- 输出：导出文件（Markdown）、Obsidian 新建笔记请求（`obsidian://new`）、备份文件（JSON）、合并导入后的本地数据
 - 关键边界与失败方式：备份导入为合并模式（不清空现有数据）；备份不应包含 Notion token；当系统无法调用 Obsidian URL scheme 时应明确提示失败
 
 ### 2.9 隐私与本地存储
@@ -124,7 +125,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 1. 用户在支持站点进行对话，扩展自动增量采集并本地入库
    - 或用户在设置页点击 “Fetch Current Page”，将当前网页文章抓取为 `sourceType=article` 的会话并入库
 2. 用户在扩展弹窗中选择会话，执行：
-   - 导出（JSON/Markdown），或
+   - 导出（Markdown），或
    - 添加到 Obsidian（生成 `obsidian://new`，按 kind 分目录落入 `SyncNos-AIChats` / `SyncNos-WebArticles`），或
    - 数据库备份导出/导入（合并导入），或
    - 连接 Notion 并选择 Parent Page，同步到对应 kind 的数据库（`SyncNos-AI Chats` / `SyncNos-Web Articles`）
@@ -149,7 +150,7 @@ flowchart TD
     B -->|WebClipper| W1["打开支持站点对话页"]
     W1 --> W2["自动增量采集并本地入库"]
     W2 --> W3{用户动作}
-    W3 -->|导出| W4["导出 JSON/Markdown"]
+    W3 -->|导出| W4["导出 Markdown"]
     W3 -->|添加到 Obsidian| W8["生成 `obsidian://new` URL（单选可走剪贴板）"]
     W3 -->|备份| W5["备份导出/导入（合并）"]
     W3 -->|同步 Notion| W6["按 kind 创建/复用数据库（Chats/Web Articles）"]
@@ -173,6 +174,7 @@ flowchart TD
 - WebClipper Obsidian 约束：通过 `obsidian://` URL scheme 触发目标应用；若系统未正确处理该协议，扩展应返回可理解的失败提示
 - WebClipper 备份约束：备份导入为合并模式；备份文件不应包含 Notion token 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
+- WebClipper Markdown 渲染约束：`contentMarkdown` 可用时按 Markdown 结构写入 Notion blocks；不可用时回退纯文本，避免同步中断
 
 ## 6 产物与可见结果（Outputs）
 
@@ -186,7 +188,7 @@ flowchart TD
 ### 6.2 本地侧产物
 
 - App：用于加速展示与增量同步的缓存数据、已同步映射与时间戳；敏感凭据优先使用系统安全存储（如 Keychain）
-- WebClipper：浏览器本地数据库（IndexedDB）的会话与消息、非敏感设置、导出的 JSON/Markdown 与备份文件，以及写入 Obsidian 的笔记内容（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）
+- WebClipper：浏览器本地数据库（IndexedDB）的会话与消息、非敏感设置、导出的 Markdown 与备份文件，以及写入 Obsidian 的笔记内容（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）
 
 ## 7 术语表（Glossary）
 
