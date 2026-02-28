@@ -6,9 +6,10 @@
   const list = NS.popupList;
   const schema = NS.storageSchema;
   const backupUtils = NS.backupUtils;
+  const zipUtils = NS.zipUtils;
   if (!core || !schema || !backupUtils) return;
 
-  const { els, storageGet, storageSet, downloadBlob, flashOk, disableImageDrag } = core;
+  const { els, storageGet, storageSet, downloadBlob, flashOk, disableImageDrag, createZipBlob } = core;
 
   const uiState = {
     busy: false,
@@ -89,11 +90,60 @@
     setExportButtonLabel(text);
   }
 
-  async function exportDatabaseBackup() {
+  function sanitizeZipPathPart(input, fallback) {
+    const text = String(input || "").trim();
+    if (!text) return fallback;
+    const cleaned = text
+      .replace(/[\\/:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned || cleaned === "." || cleaned === "..") return fallback;
+    return cleaned;
+  }
+
+  function csvCell(raw) {
+    const text = raw == null ? "" : String(raw);
+    if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, "\"\"")}"`;
+    return text;
+  }
+
+  function stripLocalConversation(conversation) {
+    const c = conversation && typeof conversation === "object" ? { ...conversation } : {};
+    delete c.id;
+    return c;
+  }
+
+  function stripLocalMessage(message) {
+    const m = message && typeof message === "object" ? { ...message } : {};
+    delete m.id;
+    delete m.conversationId;
+    return m;
+  }
+
+  function stripLocalMapping(mapping) {
+    const m = mapping && typeof mapping === "object" ? { ...mapping } : {};
+    delete m.id;
+    return m;
+  }
+
+  function compareMessages(a, b) {
+    const aSeq = Number(a && a.sequence);
+    const bSeq = Number(b && b.sequence);
+    if (Number.isFinite(aSeq) && Number.isFinite(bSeq) && aSeq !== bSeq) return aSeq - bSeq;
+    const aAt = Number(a && a.updatedAt) || 0;
+    const bAt = Number(b && b.updatedAt) || 0;
+    if (aAt !== bAt) return aAt - bAt;
+    const aKey = a && a.messageKey ? String(a.messageKey) : "";
+    const bKey = b && b.messageKey ? String(b.messageKey) : "";
+    return aKey.localeCompare(bKey);
+  }
+
+  async function exportDatabaseBackupZipV2() {
     setBusy(true);
     setStatus("Exporting…");
     setExportButtonLabel("Exporting…");
     try {
+      if (!createZipBlob || !zipUtils) throw new Error("ZIP module not available");
       const db = await schema.openDb();
       const { t, stores } = tx(db, ["conversations", "messages", "sync_mappings"], "readonly");
       const conversations = await reqToPromise(stores.conversations.getAll());
@@ -104,21 +154,153 @@
       const rawStorage = await storageGet(backupUtils.STORAGE_ALLOWLIST);
       const storageLocal = backupUtils.filterStorageForBackup(rawStorage);
 
-      const payload = {
-        schemaVersion: backupUtils.BACKUP_SCHEMA_VERSION,
-        exportedAt: new Date().toISOString(),
-        db: { name: schema.DB_NAME, version: schema.DB_VERSION },
-        stores: {
-          conversations: conversations || [],
-          messages: messages || [],
-          sync_mappings: syncMappings || []
-        },
+      const exportedAt = new Date().toISOString();
+
+      const allConversations = Array.isArray(conversations) ? conversations : [];
+      const allMessages = Array.isArray(messages) ? messages : [];
+      const allMappings = Array.isArray(syncMappings) ? syncMappings : [];
+
+      const messagesByConversationId = new Map();
+      for (const m of allMessages) {
+        const cid = Number(m && m.conversationId);
+        if (!Number.isFinite(cid) || cid <= 0) continue;
+        const list = messagesByConversationId.get(cid) || [];
+        list.push(m);
+        messagesByConversationId.set(cid, list);
+      }
+
+      const mappingByUniqueKey = new Map();
+      for (const m of allMappings) {
+        if (!m || typeof m !== "object") continue;
+        const uk = backupUtils.uniqueConversationKey(m);
+        if (!uk) continue;
+        const existing = mappingByUniqueKey.get(uk) || null;
+        if (!existing) {
+          mappingByUniqueKey.set(uk, m);
+          continue;
+        }
+        const aUpdated = Number(existing.updatedAt) || 0;
+        const bUpdated = Number(m.updatedAt) || 0;
+        if (bUpdated > aUpdated) mappingByUniqueKey.set(uk, m);
+      }
+
+      const sources = new Map();
+      for (const c of allConversations) {
+        if (!c || typeof c !== "object") continue;
+        const source = c.source ? String(c.source) : "";
+        if (!source) continue;
+        const list = sources.get(source) || [];
+        list.push(c);
+        sources.set(source, list);
+      }
+
+      const files = [];
+      const manifestSources = [];
+
+      const indexHeader = [
+        "source",
+        "conversationKey",
+        "title",
+        "url",
+        "lastCapturedAt",
+        "messageCount",
+        "notionPageId",
+        "hasNotionPageId",
+        "filePath"
+      ];
+      const indexLines = [indexHeader.map(csvCell).join(",")];
+
+      const usedPathsBySource = new Map();
+
+      for (const [source, convos] of sources.entries()) {
+        const safeSource = sanitizeZipPathPart(source.toLowerCase(), "unknown");
+        const used = usedPathsBySource.get(safeSource) || new Set();
+        usedPathsBySource.set(safeSource, used);
+
+        const groupFiles = [];
+        for (const c of convos) {
+          const conversationKey = c && c.conversationKey ? String(c.conversationKey) : "";
+          if (!conversationKey) continue;
+
+          const safeKeyBase = sanitizeZipPathPart(conversationKey, "conversation");
+          let safeKey = safeKeyBase;
+          let suffix = 2;
+          let entryPath = `sources/${safeSource}/${safeKey}.json`;
+          while (used.has(entryPath)) {
+            safeKey = `${safeKeyBase}-${suffix}`;
+            entryPath = `sources/${safeSource}/${safeKey}.json`;
+            suffix += 1;
+          }
+          used.add(entryPath);
+
+          const cid = Number(c && c.id);
+          const rawMsgs = Number.isFinite(cid) && cid > 0 ? (messagesByConversationId.get(cid) || []) : [];
+          const msgs = rawMsgs.slice().sort(compareMessages).map(stripLocalMessage);
+
+          const uk = backupUtils.uniqueConversationKey(c);
+          const mapping = uk ? (mappingByUniqueKey.get(uk) || null) : null;
+          const safeConversation = stripLocalConversation(c);
+          const safeMapping = mapping ? stripLocalMapping(mapping) : null;
+
+          const bundle = {
+            schemaVersion: 1,
+            conversation: safeConversation,
+            messages: msgs,
+            syncMapping: safeMapping
+          };
+
+          files.push({ name: entryPath, data: JSON.stringify(bundle, null, 2), lastModifiedAt: exportedAt });
+          groupFiles.push(entryPath);
+
+          const notionPageId = (safeMapping && safeMapping.notionPageId) ? String(safeMapping.notionPageId)
+            : (safeConversation.notionPageId ? String(safeConversation.notionPageId) : "");
+          const hasNotionPageId = notionPageId ? "true" : "false";
+
+          indexLines.push([
+            csvCell(source),
+            csvCell(conversationKey),
+            csvCell(safeConversation.title || ""),
+            csvCell(safeConversation.url || ""),
+            csvCell(safeConversation.lastCapturedAt || ""),
+            csvCell(msgs.length),
+            csvCell(notionPageId),
+            csvCell(hasNotionPageId),
+            csvCell(entryPath)
+          ].join(","));
+        }
+
+        manifestSources.push({
+          source,
+          conversationCount: groupFiles.length,
+          files: groupFiles
+        });
+      }
+
+      const storageDoc = {
+        schemaVersion: 1,
         storageLocal
       };
+      files.push({ name: "config/storage-local.json", data: JSON.stringify(storageDoc, null, 2), lastModifiedAt: exportedAt });
+      files.push({ name: "index/conversations.csv", data: indexLines.join("\n"), lastModifiedAt: exportedAt });
+
+      const manifest = {
+        backupSchemaVersion: backupUtils.BACKUP_ZIP_SCHEMA_VERSION,
+        exportedAt,
+        db: { name: schema.DB_NAME, version: schema.DB_VERSION },
+        counts: {
+          conversations: allConversations.length,
+          messages: allMessages.length,
+          sync_mappings: allMappings.length
+        },
+        config: { storageLocalPath: "config/storage-local.json" },
+        index: { conversationsCsvPath: "index/conversations.csv" },
+        sources: manifestSources
+      };
+      files.unshift({ name: "manifest.json", data: JSON.stringify(manifest, null, 2), lastModifiedAt: exportedAt });
 
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const filename = `webclipper-db-backup-${stamp}.json`;
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const filename = `webclipper-db-backup-${stamp}.zip`;
+      const blob = await createZipBlob(files);
       downloadBlob({ blob, filename, saveAs: true });
       flashOk(els.btnDatabaseExport);
       setStatus("Exported");
@@ -381,7 +563,7 @@
 
   async function safeExport() {
     try {
-      await exportDatabaseBackup();
+      await exportDatabaseBackupZipV2();
     } catch (e) {
       resetExportUiDelayed("Export failed", 1600);
     }
