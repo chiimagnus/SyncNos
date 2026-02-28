@@ -51,7 +51,7 @@
 
 | API | 当前用途 | Safari 风险 | 改造方案 |
 |---|---|---|---|
-| `chrome.downloads` | 导出 JSON/Markdown/ZIP、备份导出 | 不支持/行为不一致 | 抽象 `saveFile()`：优先使用 Safari 可用下载策略；失败时回退为“复制到剪贴板 + 用户保存”或“交由宿主 App 保存”。 |
+| `chrome.downloads` | 导出 Markdown/ZIP、备份 Zip v2 导出（导入兼容 legacy JSON） | 不支持/行为不一致 | 抽象 `saveFile()`：优先使用 Safari 可用下载策略；失败时回退为“复制到剪贴板 + 用户保存”或“交由宿主 App 保存”。 |
 | `chrome.webNavigation.onCommitted` | Notion OAuth 回调拦截 | 触发时机/过滤行为不稳定 | 改为回调页主动 `runtime.sendMessage` 传 `code/state`；后台只做 `state` 校验与换 token。 |
 | `chrome.scripting.executeScript` | on-demand 文章抓取注入 Readability | 注入能力与授权路径需验证 | 优先“常驻 content script + message 抽取”，减少运行时注入依赖。 |
 | `chrome.*` 直连 | 全局 API 使用分散 | 平台分支扩散 | 增加 `browserApi` 适配层，隔离平台差异。 |
@@ -128,7 +128,7 @@
 
 1. 自动采集：各已支持站点稳定写入会话与消息。
 2. popup UI：列表、删除、预览、筛选功能正常。
-3. 导出/备份：JSON/Markdown/ZIP、备份导出/导入全链路可用（含失败提示）。
+3. 导出/备份：Markdown/ZIP 导出、备份 Zip v2 导出/导入（兼容 legacy JSON 导入）全链路可用（含失败提示）。
 4. OAuth：连接、回调、断连、重连、异常重试可用。
 5. Notion 同步：可成功创建/更新页面，失败可见且可重试。
 6. 文章抓取：授权、抽取、保存流程可用。

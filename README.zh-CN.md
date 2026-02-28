@@ -59,7 +59,11 @@
   - 聊天：`SyncNos-AIChats/<会话标题>`
   - 网页文章：`SyncNos-WebArticles/<文章标题>`
   - 同名笔记会自动追加数字后缀
-- 数据库备份：导出/导入本地 IndexedDB + 非敏感 `chrome.storage.local` 设置（导入按 `source + conversationKey` 合并；不包含 Notion token）
+- 数据库备份：
+  - 导出：仅支持 `*.zip`（`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`）
+  - 导入：支持 `*.zip`（推荐）与 legacy `*.json`
+  - 合并规则：按 `(source + conversationKey)` 合并导入，避免同 key 重复项
+  - 安全：备份不包含 Notion token / secret
 - 手动同步所选对话到 Notion（OAuth）
 - Notion 同步按 kind 分库写入：
   - 聊天：数据库 `SyncNos-AI Chats`
