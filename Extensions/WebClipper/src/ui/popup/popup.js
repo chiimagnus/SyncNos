@@ -12,12 +12,13 @@
   const notionAi = NS.popupNotionAi;
   const database = NS.popupDatabase;
   const articleFetch = NS.popupArticleFetch;
+  const inpageVisibility = NS.popupInpageVisibility;
   const about = NS.popupAbout;
   const docsApi = NS.popupConversationDocs;
   const obsidianApi = NS.popupObsidian;
   const syncStateApi = NS.popupNotionSyncState;
 
-	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !articleFetch || !about) return;
+	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !articleFetch || !inpageVisibility || !about) return;
 
   const { els, state, send, flashOk, copyTextToClipboard } = core;
   const contracts = NS.messageContracts || {};
@@ -317,6 +318,7 @@
 	    notionAi.init();
 	    database.init();
       articleFetch.init();
+      inpageVisibility.init();
 	    about.init();
 	    initObsidianAction();
 	    initNotionSyncAction();

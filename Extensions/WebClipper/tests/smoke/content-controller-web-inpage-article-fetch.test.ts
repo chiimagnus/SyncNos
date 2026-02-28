@@ -92,6 +92,8 @@ afterEach(() => {
   delete globalThis.WebClipper;
   // @ts-expect-error cleanup
   delete globalThis.location;
+  // @ts-expect-error cleanup
+  delete globalThis.chrome;
 });
 
 describe("content-controller web inpage fetch", () => {

@@ -21,6 +21,11 @@
 - 优先本地优先体验：自动采集只保存本地；Notion 同步由用户触发，且可能覆盖目标页面内容。
 - inpage 错误/加载提示使用锚定 icon 的单例气泡：新消息覆盖旧消息并重播动画，默认展示时长 `1.8s`。
 - inpage icon 交互约束：`400ms` 窗口结算后，`count===1` 才执行保存；“恰好双击”才尝试打开 popup；`3/5/7` 连击触发彩蛋动画与台词；若 `openPopup` 不可用则提示用户点击工具栏图标。
+- inpage 显示范围开关：`inpage_supported_only`（`chrome.storage.local`）。
+  - 默认值 `false`：所有 `http(s)` 页面显示 inpage 按钮。
+  - 值为 `true`：仅在已支持 AI 站点 + Notion 页面显示 inpage 按钮（普通网页隐藏）。
+  - 切换后应立即生效（当前页面无需刷新）。
+  - 该开关只影响 inpage 按钮显示，不影响 popup 中 `Fetch Current Page` 能力。
 
 ## 工程开发规范（建议）
 以下规范用于保持 WebClipper 可维护、可扩展、可调试，并减少“看起来点了但其实没生效”的隐性故障。
@@ -65,6 +70,8 @@
   - popup 负责 payload 和 URL 生成，background 负责 URL 校验与顺序打开。
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
+- **Inpage 显示范围设置**：`src/ui/popup/popup-inpage-visibility.js` + `src/bootstrap/content-controller.js`
+  - popup 负责写入 `inpage_supported_only`；content 负责读取并实时过滤 `web` collector 的 inpage 展示资格。
 
 ### Obsidian 约束
 

@@ -65,6 +65,10 @@
   - 合并规则：按 `(source + conversationKey)` 合并导入，避免同 key 重复项
   - 安全：备份不包含 Notion token / secret
 - 手动同步所选对话到 Notion（OAuth）
+- Inpage 按钮显示范围可在扩展 Settings 中配置：
+  - 默认：所有 `http(s)` 页面显示
+  - 开启“仅在支持站点显示 Inpage 按钮”后：仅在已支持 AI 站点 + Notion 页面显示
+  - 该开关不影响 Settings 中的 `Fetch Current Page`
 - Notion 同步按 kind 分库写入：
   - 聊天：数据库 `SyncNos-AI Chats`
   - 网页文章：数据库 `SyncNos-Web Articles`
