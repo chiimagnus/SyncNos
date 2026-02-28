@@ -5,20 +5,24 @@
 **Goal（目标）:** 将 WebClipper 的 Database Backup 从单文件 `*.json` 升级为 `*.zip`：按 `conversation.source` 分目录、每个对话一个 JSON 文件；同时提供 `index.csv` 便于人类/AI 快速阅读；Import 以“合并导入（按 key 去重）”为准则完成一键恢复。
 
 **Non-goals（非目标）:**
-- 不再兼容旧版单文件 `*.json` 备份（Export/Import 都不支持）。
+- 不再提供旧版单文件 `*.json` 的 Export（仅 Export `*.zip`）。
+- 旧版单文件 `*.json` 仅作为 **legacy Import** 保留（用于导入历史备份），不再作为推荐路径演进。
 - 不做“内容级去重”（例如按内容 hash 去重）；仅按现有 key 规则合并（`source+conversationKey`、`conversationId+messageKey`）。
 - 不导出任何敏感凭据（Notion token / client secret 等）。
 
 **Approach（方案）:**
 - 定义 Zip v2 目录结构与 schema：`manifest.json` 作为 Import 的权威入口，`sources/{source}/...` 存放对话文件，`config/storage-local.json` 存放 allowlist 配置，`index/conversations.csv` 作为可读索引（Import 不依赖 CSV）。
 - Export：从 IndexedDB 读取三大 store（`conversations/messages/sync_mappings`）+ allowlist 的 `chrome.storage.local`，按 `conversation.source` 分组生成每对话 JSON；同时生成 `manifest.json` 与 `index.csv`，最后打包 zip 下载。
-- Import：仅接受 zip；读取 `manifest.json` 校验版本并按清单读取每对话文件；将对话文件中的 `conversation/messages/syncMapping` 还原为“可合并导入”的输入，再复用现有 upsert 规则导入到 IndexedDB，并应用 allowlist 配置。
+- Import：同时支持：
+  - Zip v2（推荐）：读取 `manifest.json` 校验版本并按清单读取每对话文件；将对话文件中的 `conversation/messages/syncMapping` 还原为“可合并导入”的输入，再复用现有 upsert 规则导入到 IndexedDB，并应用 allowlist 配置。
+  - Legacy JSON v1（兼容）：保留现有 `importDatabaseBackupMerge(doc)` 行为与 `validateBackupDocument(doc)` 校验。
 - Zip 读写：当前已有 zip 写入（stored，无压缩），需要新增 zip 读取（至少支持本项目生成的 stored zip）。
 
 **Acceptance（验收）:**
-- UI：Database Backup 的 Import 文件选择只接受 `*.zip`；文案明确“不包含 Notion token”。
+- UI：Database Backup 的 Import 文件选择支持 `*.zip`（推荐）与 `*.json`（legacy）；文案明确“不包含 Notion token”。
 - Export：产物 zip 目录结构符合本文；`sources/` 下按 source 分文件夹，且每个对话一个 JSON。
 - Import：导入后数据可用；重复导入同一 zip 不会产生“同 key 的重复记录”；并且 `storage-local` allowlist 配置被恢复。
+- Legacy Import：旧 `*.json` 备份仍可导入，且维持原先的 merge 语义与去重口径。
 - 安全：zip 不包含 `notion_oauth_token_v1`、`notion_oauth_client_secret` 等敏感字段。
 - 可读性：`index/conversations.csv` 至少包含 `notionPageId` 与 `hasNotionPageId` 两列，且 `filePath` 可直接定位到对话 JSON。
 - 回归：`npm --prefix Extensions/WebClipper run test` 通过；`npm --prefix Extensions/WebClipper run check` 通过。
@@ -91,8 +95,8 @@ webclipper-db-backup-<ISO>.zip
 
 **Step 1: 实现功能**
 - 保留并继续使用：`mergeConversationRecord/mergeMessageRecord/mergeSyncMappingRecord/filterStorageForBackup/uniqueConversationKey`。
-- 及时删除不再需要的旧实现：移除旧 `validateBackupDocument`（单文件 JSON v1）与其相关测试断言（本迭代不再支持 `*.json` 备份）。
-- 新增：
+- 保留 legacy JSON v1 校验：继续保留 `validateBackupDocument(doc)`（用于历史 `*.json` Import）。
+- 新增（Zip v2）：
   - `BACKUP_ZIP_SCHEMA_VERSION = 2`
   - `validateBackupManifest(doc)`（校验 `backupSchemaVersion`、必需字段、路径合法性）
   - `validateConversationBundle(doc)`（校验 per-conversation 文件的关键字段）
@@ -165,20 +169,24 @@ webclipper-db-backup-<ISO>.zip
 - Modify: `Extensions/WebClipper/src/export/local/zip-utils.js`（如 Task 2 的 API 需要补充文本解码 helper）
 
 **Step 1: 实现功能**
-- 更新 file input accept：只允许 `*.zip`
+- 更新 file input accept：允许 `*.zip` 与 `*.json`
 - 替换 `importFromFile(file)`：
-  - 使用 `extractZipEntries(file)` 得到 entries
-  - 读取并解析 `manifest.json`，调用 `backupUtils.validateBackupManifest`
-  - 读取并应用 `config/storage-local.json`（仍为 merge-only：`storageSet(filteredSettings)`；并复用 `backupUtils.filterStorageForBackup` 再过滤一遍）
-  - 遍历 `manifest.sources[].files`：
-    - 解析每个对话 JSON（`validateConversationBundle`）
-    - 不依赖文件名推断 key：以文件内容中的 `conversation.source/conversation.conversationKey` 为准
-    - 对每个对话执行“合并 upsert”流程：
-      - Upsert conversation by `(source, conversationKey)`（复用既有代码路径）
-      - Upsert messages by `(localConversationId, messageKey)`
-      - Upsert sync mapping by `(source, conversationKey)`，并按现有规则填充 `convo.notionPageId`（仅当本地缺失）
-- 错误处理：manifest 缺失/版本不支持/zip 不可读/非 stored zip 等，UI 状态提示明确。
-- 及时删除不再需要的旧实现：移除旧的“单文件 JSON”读取/解析/导入路径（例如 `file.text()` + `JSON.parse` + 旧 doc 结构假设），避免后续误维护。
+  - 根据文件类型分支：
+    - `*.zip`（或 magic header `PK`）：走 Zip v2 导入
+      - 使用 `extractZipEntries(file)` 得到 entries
+      - 读取并解析 `manifest.json`，调用 `backupUtils.validateBackupManifest`
+      - 读取并应用 `config/storage-local.json`（merge-only：`storageSet(filteredSettings)`；并复用 `backupUtils.filterStorageForBackup` 再过滤一遍）
+      - 遍历 `manifest.sources[].files`：
+        - 解析每个对话 JSON（`validateConversationBundle`）
+        - 不依赖文件名推断 key：以文件内容中的 `conversation.source/conversation.conversationKey` 为准
+        - 对每个对话执行“合并 upsert”流程：
+          - Upsert conversation by `(source, conversationKey)`
+          - Upsert messages by `(localConversationId, messageKey)`
+          - Upsert sync mapping by `(source, conversationKey)`（并按现有规则填充 `convo.notionPageId`）
+    - `*.json`：走 legacy JSON v1 导入（保留现有实现）
+      - `file.text()` + `JSON.parse()` 得到 doc
+      - `backupUtils.validateBackupDocument(doc)` + `importDatabaseBackupMerge(doc, onProgress)`
+  - 错误处理：manifest 缺失/版本不支持/zip 不可读/非 stored zip/legacy json 校验失败等，UI 状态提示明确。
 
 **Step 2: 验证（手动）**
 - 在一个“干净 profile”或删除扩展存储后导入 zip
@@ -191,11 +199,11 @@ webclipper-db-backup-<ISO>.zip
 - Modify: `Extensions/WebClipper/src/ui/popup/popup-database.js`（如需）
 
 **Step 1: 实现功能**
-- 将 `databaseImportFile` 的 `accept` 改为 `.zip,application/zip`
+- 将 `databaseImportFile` 的 `accept` 改为 `.zip,application/zip,.json,application/json`
 - 更新 Note 文案：
   - 强调 “Import merges by (source + conversationKey)”
   - 强调 “Notion token is not included”
-  - 说明 “Backup file is a .zip”
+  - 说明 “Backup file is a .zip (recommended) / .json (legacy)”
 
 **Step 2: 验证**
 - 目视检查 popup：文件选择器只显示 zip；Note 更新正确。
