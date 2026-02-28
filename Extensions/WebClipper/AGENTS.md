@@ -1,6 +1,6 @@
 # SyncNos WebClipper（浏览器扩展）Agent 指南
 
-[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（JSON/Markdown）、添加到 Obsidian、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
+[SyncNos WebClipper](https://github.com/chiimagnus/SyncNos) 是本仓库中的一个独立浏览器扩展（基于 WebExtensions / MV3）。它会从支持的网站抓取 AI 聊天对话并保存到浏览器本地数据库，支持导出（Markdown）、添加到 Obsidian、本地数据库备份/恢复（导出/导入，合并导入），以及手动同步到 Notion。
 
 ## 作用范围
 

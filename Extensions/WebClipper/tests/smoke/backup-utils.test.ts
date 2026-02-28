@@ -34,6 +34,8 @@ describe("backup-utils", () => {
       notion_db_id_syncnos_ai_chats: "db1",
       notion_db_id_syncnos_web_articles: "db2",
       popup_active_tab: "settings",
+      popup_source_filter_key: "all",
+      notion_ai_preferred_model_index: 3,
       notion_oauth_token_v1: { accessToken: "secret" }
     });
     expect(filtered).toEqual({
@@ -41,7 +43,9 @@ describe("backup-utils", () => {
       notion_parent_page_id: "p1",
       notion_db_id_syncnos_ai_chats: "db1",
       notion_db_id_syncnos_web_articles: "db2",
-      popup_active_tab: "settings"
+      popup_active_tab: "settings",
+      popup_source_filter_key: "all",
+      notion_ai_preferred_model_index: 3
     });
   });
 
@@ -66,6 +70,55 @@ describe("backup-utils", () => {
     };
     const res = backupUtils.validateBackupDocument(doc);
     expect(res.ok).toBe(false);
+  });
+
+  it("validateBackupManifest accepts a minimal zip v2 manifest", () => {
+    const backupUtils = loadBackupUtils();
+    const res = backupUtils.validateBackupManifest({
+      backupSchemaVersion: 2,
+      exportedAt: new Date().toISOString(),
+      db: { name: "webclipper", version: 3 },
+      counts: { conversations: 1, messages: 2, sync_mappings: 0 },
+      config: { storageLocalPath: "config/storage-local.json" },
+      index: { conversationsCsvPath: "index/conversations.csv" },
+      sources: [
+        { source: "chatgpt", conversationCount: 1, files: ["sources/chatgpt/c1.json"] }
+      ]
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("validateBackupManifest rejects unsafe paths", () => {
+    const backupUtils = loadBackupUtils();
+    const res = backupUtils.validateBackupManifest({
+      backupSchemaVersion: 2,
+      exportedAt: new Date().toISOString(),
+      db: { name: "webclipper", version: 3 },
+      counts: { conversations: 1, messages: 0, sync_mappings: 0 },
+      config: { storageLocalPath: "../config/storage-local.json" },
+      index: { conversationsCsvPath: "index/conversations.csv" },
+      sources: []
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("validateConversationBundle requires messageKey and mapping match", () => {
+    const backupUtils = loadBackupUtils();
+    const res1 = backupUtils.validateConversationBundle({
+      schemaVersion: 1,
+      conversation: { source: "chatgpt", conversationKey: "c1" },
+      messages: [{ role: "user" }],
+      syncMapping: null
+    });
+    expect(res1.ok).toBe(false);
+
+    const res2 = backupUtils.validateConversationBundle({
+      schemaVersion: 1,
+      conversation: { source: "chatgpt", conversationKey: "c1" },
+      messages: [{ messageKey: "m1", role: "user", contentText: "hi" }],
+      syncMapping: { source: "chatgpt", conversationKey: "c2" }
+    });
+    expect(res2.ok).toBe(false);
   });
 
   it("mergeConversationRecord does not overwrite non-empty local title/url", () => {
