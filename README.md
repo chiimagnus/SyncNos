@@ -60,7 +60,11 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
   - Chats: `SyncNos-AIChats/<conversation-title>`
   - Web articles: `SyncNos-WebArticles/<article-title>`
   - Duplicate note names append numeric suffixes
-- Database Backup: export/import local IndexedDB + non-sensitive `chrome.storage.local` settings (import merges by `source + conversationKey`; Notion token is not included)
+- Database Backup:
+  - Export: `*.zip` only (`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`)
+  - Import: `*.zip` (recommended) and legacy `*.json`
+  - Merge semantics: import merges by `(source + conversationKey)` and avoids duplicate key items
+  - Security: backup excludes Notion token/secret
 - Manually syncs selected conversations to Notion (OAuth)
 - Notion sync routes by kind:
   - Chats: database `SyncNos-AI Chats`

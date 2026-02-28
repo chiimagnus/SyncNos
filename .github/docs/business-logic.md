@@ -92,7 +92,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 用户价值：即使不连接 Notion，也能把对话以可迁移的形式带走，或快速沉淀到 Obsidian，并可在不同设备/浏览器之间恢复
 - 触发方式：用户在扩展弹窗中选择导出、添加到 Obsidian，或备份导出/导入
 - 输入：选中的会话；备份文件（导入）
-- 输出：导出文件（Markdown）、Obsidian 新建笔记请求（`obsidian://new`）、备份文件（JSON）、合并导入后的本地数据
+- 输出：导出文件（Markdown）、Obsidian 新建笔记请求（`obsidian://new`）、备份文件（Zip v2，含 manifest/index/sources/config）、合并导入后的本地数据（支持 Zip v2 与 legacy JSON）
 - 关键边界与失败方式：备份导入为合并模式（不清空现有数据）；备份不应包含 Notion token；当系统无法调用 Obsidian URL scheme 时应明确提示失败
 
 ### 2.9 隐私与本地存储
@@ -172,7 +172,7 @@ flowchart TD
   - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
   - article：当文章被重新 fetch 且内容更新时覆盖式重建子块
 - WebClipper Obsidian 约束：通过 `obsidian://` URL scheme 触发目标应用；若系统未正确处理该协议，扩展应返回可理解的失败提示
-- WebClipper 备份约束：备份导入为合并模式；备份文件不应包含 Notion token 等敏感凭据
+- WebClipper 备份约束：备份导出仅 Zip v2；导入为合并模式（Zip v2 + legacy JSON）；备份文件不应包含 Notion token 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
 - WebClipper Markdown 渲染约束：`contentMarkdown` 可用时按 Markdown 结构写入 Notion blocks；不可用时回退纯文本，避免同步中断
 
