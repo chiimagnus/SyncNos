@@ -41,17 +41,17 @@
 
 - Task: `Task 2: 增强 zip-utils：增加 unzip 读取能力（stored + deflate）`
 - Severity: `High`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/src/export/local/zip-utils.js:1`
 - Summary: `inflateRawTiny` uses a heuristic output buffer and only grows between blocks; it can throw "data error" mid-block when the output is larger than the initial estimate (likely on large backups when `DecompressionStream` is unavailable).`
 - Risk: `Zip import fails on valid deflated archives (method=8), breaking the “unzip then re-zip” compatibility requirement on browsers without DecompressionStream.`
 - Expected fix: `Thread the expected uncompressed size into the deflate fallback and preallocate output to that exact size (or support safe mid-block growth).`
 - Validation: `npm --prefix Extensions/WebClipper run test`
-- Resolution evidence: `(pending)`
+- Resolution evidence: `Commit a0603e81 wires expected uncompressed size into the fallback; full WebClipper tests pass.`
 
 ## Fix log
 
-- (pending)
+- `a0603e81` WebClipper zip import: fix deflate fallback sizing
 
 ## Validation log
 
@@ -60,5 +60,5 @@
 
 ## Final status and residual risks
 
-- (pending)
-
+- All findings resolved.
+- Residual risk: `conversationKey` file name length is intentionally not limited yet (per plan “不确定项”); extremely long keys may still be awkward to extract on some filesystems.
