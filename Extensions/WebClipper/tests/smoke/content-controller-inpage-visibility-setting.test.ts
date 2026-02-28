@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type TickFn = (() => Promise<void>) | null;
+type StorageListener = ((changes: Record<string, any>, areaName: string) => void) | null;
 
 function loadContentController() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -11,14 +12,34 @@ function loadContentController() {
   return require("../../src/bootstrap/content-controller.js");
 }
 
-function createHarness(options?: { sendImpl?: (type: string, payload?: any) => Promise<any> }) {
+function createHarness(options?: { initialSetting?: boolean }) {
   let tickRef: TickFn = null;
   let buttonConfig: any = null;
-  const tipCalls: any[] = [];
-  const sendCalls: Array<{ type: string; payload?: any }> = [];
+  let storageListener: StorageListener = null;
 
-  // @ts-expect-error test global (needed by getInpageCollector)
+  // @ts-expect-error test global
   globalThis.location = { href: "https://example.com/post", hostname: "example.com", pathname: "/post" };
+
+  // @ts-expect-error test global
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get: (_keys: any, cb: (value: Record<string, any>) => void) => {
+          if (typeof options?.initialSetting === "boolean") {
+            cb({ inpage_supported_only: options.initialSetting });
+            return;
+          }
+          cb({});
+        }
+      },
+      onChanged: {
+        addListener: (fn: StorageListener) => {
+          storageListener = fn;
+        },
+        removeListener: (_fn: StorageListener) => {}
+      }
+    }
+  };
 
   // @ts-expect-error test global
   globalThis.WebClipper = {
@@ -27,17 +48,12 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
         UPSERT_CONVERSATION: "upsertConversation",
         SYNC_CONVERSATION_MESSAGES: "syncConversationMessages"
       },
-      ARTICLE_MESSAGE_TYPES: {
-        FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
-      },
       UI_MESSAGE_TYPES: {
         OPEN_EXTENSION_POPUP: "openExtensionPopup"
       }
     },
     inpageTip: {
-      showSaveTip: (text: string, opts: any) => {
-        tipCalls.push({ text, opts });
-      }
+      showSaveTip: () => {}
     },
     inpageButton: {
       ensureInpageButton: (cfg: any) => {
@@ -63,26 +79,27 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
   };
 
   const runtime = {
-    send: async (type: string, payload?: any) => {
-      sendCalls.push({ type, payload });
-      if (typeof options?.sendImpl === "function") return options.sendImpl(type, payload);
-      return { ok: true, data: {} };
-    },
+    send: async () => ({ ok: true, data: {} }),
     onInvalidated: () => () => {},
     isInvalidContextError: () => false
   };
 
   const api = loadContentController();
-  const controller = api.createController({ runtime });
-  controller.start();
+  const wrapper = api.createController({ runtime });
+  const controller = wrapper.start();
 
   return {
-    tipCalls,
-    sendCalls,
+    controller,
     runTick: async () => {
+      await Promise.resolve();
+      await Promise.resolve();
       if (tickRef) await tickRef();
     },
     getButtonConfig: () => buttonConfig,
+    emitSettingChanged: (nextValue: boolean) => {
+      if (!storageListener) return;
+      storageListener({ inpage_supported_only: { oldValue: !nextValue, newValue: nextValue } }, "local");
+    }
   };
 }
 
@@ -96,23 +113,32 @@ afterEach(() => {
   delete globalThis.chrome;
 });
 
-describe("content-controller web inpage fetch", () => {
-  it("routes single-click save to background article fetch for web collector", async () => {
-    const harness = createHarness({
-      sendImpl: async (type: string) => {
-        if (type === "fetchActiveTabArticle") return { ok: true, data: { conversationId: 11 } };
-        return { ok: true, data: {} };
-      }
-    });
-
+describe("content-controller inpage visibility setting", () => {
+  it("defaults to showing web inpage button when setting is missing", async () => {
+    const harness = createHarness();
     await harness.runTick();
     const cfg = harness.getButtonConfig();
     expect(cfg?.collectorId).toBe("web");
-    expect(typeof cfg?.onClick).toBe("function");
+  });
 
-    await cfg.onClick();
+  it("hides web inpage button when inpage_supported_only is true", async () => {
+    const harness = createHarness({ initialSetting: true });
+    await harness.runTick();
+    const cfg = harness.getButtonConfig();
+    expect(cfg?.collectorId).toBeUndefined();
+  });
 
-    expect(harness.sendCalls.some((c) => c.type === "fetchActiveTabArticle")).toBe(true);
-    expect(harness.tipCalls.some((c) => c.opts?.kind === "ok")).toBe(true);
+  it("applies storage onChanged updates immediately on next tick", async () => {
+    const harness = createHarness({ initialSetting: false });
+    await harness.runTick();
+    expect(harness.getButtonConfig()?.collectorId).toBe("web");
+
+    harness.emitSettingChanged(true);
+    await harness.runTick();
+    expect(harness.getButtonConfig()?.collectorId).toBeUndefined();
+
+    harness.emitSettingChanged(false);
+    await harness.runTick();
+    expect(harness.getButtonConfig()?.collectorId).toBe("web");
   });
 });
