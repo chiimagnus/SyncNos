@@ -128,12 +128,14 @@ describe("content-controller inpage visibility setting", () => {
     expect(cfg?.collectorId).toBeUndefined();
   });
 
-  it("applies storage onChanged updates immediately on next tick", async () => {
+  it("applies storage onChanged updates immediately", async () => {
     const harness = createHarness({ initialSetting: false });
     await harness.runTick();
     expect(harness.getButtonConfig()?.collectorId).toBe("web");
 
     harness.emitSettingChanged(true);
+    expect(harness.getButtonConfig()?.collectorId).toBeUndefined();
+
     await harness.runTick();
     expect(harness.getButtonConfig()?.collectorId).toBeUndefined();
 

@@ -229,6 +229,19 @@
         showInpageTip(line);
       };
 
+      function refreshInpageButton() {
+        const collector = getCollector();
+        const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
+        inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
+        inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
+          collectorId: inpageCollector ? inpageCollector.id : undefined,
+          onClick: clickSave,
+          onDoubleClick: openPopupPanel,
+          onCombo: showComboLine
+        });
+        return collector;
+      }
+
       observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
         debounceMs: 600,
         getRoot: () => {
@@ -242,15 +255,7 @@
             const modelPicker = NS.notionAiModelPicker;
             modelPicker && typeof modelPicker.maybeApply === "function" && modelPicker.maybeApply();
 
-            const collector = getCollector();
-            const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
-            inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
-            inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
-              collectorId: inpageCollector ? inpageCollector.id : undefined,
-              onClick: clickSave,
-              onDoubleClick: openPopupPanel,
-              onCombo: showComboLine
-            });
+            const collector = refreshInpageButton();
             if (!collector || typeof collector.capture !== "function") return;
             const snapshot = await Promise.resolve(collector.capture());
             if (!snapshot) return;
@@ -277,6 +282,7 @@
             inpageSupportedOnly = normalizeInpageSupportedOnly(
               changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY] && changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY].newValue
             );
+            refreshInpageButton();
           };
           chrome.storage.onChanged.addListener(onStorageChanged);
         }
