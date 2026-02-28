@@ -95,7 +95,7 @@
     return false;
   }
 
-  async function decompressDeflateRaw(bytes) {
+  async function decompressDeflateRaw(bytes, expectedSize) {
     const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
     if (typeof DecompressionStream !== "undefined") {
       const tryFormats = ["deflate-raw", "deflate"];
@@ -110,7 +110,7 @@
         }
       }
     }
-    return inflateRawTiny(input);
+    return inflateRawTiny(input, expectedSize);
   }
 
   // Minimal DEFLATE (raw) fallback implementation.
@@ -308,9 +308,10 @@
     }
   }
 
-  function inflateRawTiny(sourceBytes) {
+  function inflateRawTiny(sourceBytes, expectedSize) {
     const src = sourceBytes instanceof Uint8Array ? sourceBytes : new Uint8Array(sourceBytes || []);
-    const estimated = Math.max(1024, src.length * 3);
+    const hint = Number(expectedSize);
+    const estimated = Number.isFinite(hint) && hint >= 0 ? Math.max(1, hint) : Math.max(1024, src.length * 3);
     let dest = new Uint8Array(estimated);
     let d = new TinyData(src, dest);
 
@@ -437,7 +438,7 @@
       if (method === 0) {
         contentBytes = new Uint8Array(compressed);
       } else {
-        contentBytes = await decompressDeflateRaw(compressed);
+        contentBytes = await decompressDeflateRaw(compressed, size);
       }
       if (Number.isFinite(size) && size >= 0 && contentBytes.length !== size) {
         throw new Error("zip entry size mismatch");
