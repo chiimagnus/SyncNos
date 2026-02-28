@@ -20,6 +20,7 @@
 - Export：产物 zip 目录结构符合本文；`sources/` 下按 source 分文件夹，且每个对话一个 JSON。
 - Import：导入后数据可用；重复导入同一 zip 不会产生“同 key 的重复记录”；并且 `storage-local` allowlist 配置被恢复。
 - 安全：zip 不包含 `notion_oauth_token_v1`、`notion_oauth_client_secret` 等敏感字段。
+- 可读性：`index/conversations.csv` 至少包含 `notionPageId` 与 `hasNotionPageId` 两列，且 `filePath` 可直接定位到对话 JSON。
 - 回归：`npm --prefix Extensions/WebClipper run test` 通过；`npm --prefix Extensions/WebClipper run check` 通过。
 
 ---
@@ -90,7 +91,8 @@ webclipper-db-backup-<ISO>.zip
 
 **Step 1: 实现功能**
 - 保留并继续使用：`mergeConversationRecord/mergeMessageRecord/mergeSyncMappingRecord/filterStorageForBackup/uniqueConversationKey`。
-- 移除或废弃旧 `validateBackupDocument`（单文件 JSON v1），新增：
+- 及时删除不再需要的旧实现：移除旧 `validateBackupDocument`（单文件 JSON v1）与其相关测试断言（本迭代不再支持 `*.json` 备份）。
+- 新增：
   - `BACKUP_ZIP_SCHEMA_VERSION = 2`
   - `validateBackupManifest(doc)`（校验 `backupSchemaVersion`、必需字段、路径合法性）
   - `validateConversationBundle(doc)`（校验 per-conversation 文件的关键字段）
@@ -114,6 +116,8 @@ webclipper-db-backup-<ISO>.zip
   - 支持读取 End of Central Directory（EOCD）
   - 支持 Central Directory 遍历，解析文件名/offset/size/CRC
   - 仅支持 compression method=0（stored），其它 method 明确报错
+  - 忽略目录条目（`name` 以 `/` 结尾）
+  - 若出现重复 entry name：直接报错（避免覆盖/歧义）
   - 返回 `{ name -> Uint8Array }` 或 `{ name, bytes }[]`
 - 保留现有 `createZipBlob(files)` 不变（向后兼容 markdown export）。
 
@@ -130,8 +134,13 @@ webclipper-db-backup-<ISO>.zip
 **Step 1: 实现功能**
 - 替换 `exportDatabaseBackup()`：
   - 读取三大 store + `chrome.storage.local` allowlist（使用 `backupUtils.STORAGE_ALLOWLIST`）
-  - 将 `conversations` 按 `source` 分组；对每个会话取其 messages + mapping，生成一个对话 JSON：
+  - 性能：避免为每个 conversation 扫全量 messages/mappings（O(n^2)）。建议先构建：
+    - `messagesByConversationId: Map<number, ChatMessage[]>`
+    - `mappingByUniqueKey: Map<string, SyncMapping>`（key=`${source}||${conversationKey}`）
+  - 将 `conversations` 按 `source` 分组；对每个会话取其 messages + mapping，生成一个对话 JSON（每对话 1 文件）：
     - 文件路径：`sources/<source>/<safeConversationKey>.json`
+    - 文件内容做“可移植化”：移除/不写入本地自增 id 字段（`conversation.id`、`message.id`、`message.conversationId`、`syncMapping.id`），避免用户误以为 id 可跨设备复用
+    - `messages` 建议按 `sequence` 升序排序（若无 `sequence` 则按 `updatedAt` 升序作为 fallback），提升可读性与可 diff 性
   - 生成 `config/storage-local.json`
   - 生成 `index/conversations.csv`（注意 CSV 转义：逗号/引号/换行）
   - 生成 `manifest.json`（包含 `sources[].files` 清单）
@@ -139,6 +148,8 @@ webclipper-db-backup-<ISO>.zip
 - 导出文件名/路径安全：
   - `source`/`conversationKey` 必须 sanitize（复用 `sanitizeFilenamePart` 逻辑或在本文件内实现等价 sanitize）
   - 防止 `../` 等路径逃逸（zip-utils 已做 normalize，但导出侧仍应生成干净路径）
+  - 处理“sanitize 后文件名碰撞”：若两个不同 `conversationKey` 生成了同名 `safeConversationKey`，必须自动加后缀去冲突（例如 `-2/-3`），并以 `manifest.json` 的 `files[]` 为准
+  - `index.csv` 中的 `filePath` 必须与 `manifest.json` 一致；`notionPageId` 建议取“有效值”：优先 `syncMapping.notionPageId`，否则回退 `conversation.notionPageId`，并同时输出 `hasNotionPageId`
 
 **Step 2: 验证（手动）**
 - 在 Chrome/Edge 加载本地扩展，进入 popup -> Settings -> Database Backup -> Export
@@ -158,14 +169,16 @@ webclipper-db-backup-<ISO>.zip
 - 替换 `importFromFile(file)`：
   - 使用 `extractZipEntries(file)` 得到 entries
   - 读取并解析 `manifest.json`，调用 `backupUtils.validateBackupManifest`
-  - 读取并应用 `config/storage-local.json`（仍为 merge-only：`storageSet(filteredSettings)`）
+  - 读取并应用 `config/storage-local.json`（仍为 merge-only：`storageSet(filteredSettings)`；并复用 `backupUtils.filterStorageForBackup` 再过滤一遍）
   - 遍历 `manifest.sources[].files`：
     - 解析每个对话 JSON（`validateConversationBundle`）
+    - 不依赖文件名推断 key：以文件内容中的 `conversation.source/conversation.conversationKey` 为准
     - 对每个对话执行“合并 upsert”流程：
       - Upsert conversation by `(source, conversationKey)`（复用既有代码路径）
       - Upsert messages by `(localConversationId, messageKey)`
       - Upsert sync mapping by `(source, conversationKey)`，并按现有规则填充 `convo.notionPageId`（仅当本地缺失）
 - 错误处理：manifest 缺失/版本不支持/zip 不可读/非 stored zip 等，UI 状态提示明确。
+- 及时删除不再需要的旧实现：移除旧的“单文件 JSON”读取/解析/导入路径（例如 `file.text()` + `JSON.parse` + 旧 doc 结构假设），避免后续误维护。
 
 **Step 2: 验证（手动）**
 - 在一个“干净 profile”或删除扩展存储后导入 zip
@@ -201,7 +214,7 @@ webclipper-db-backup-<ISO>.zip
 - 覆盖至少三类场景：
   - 数据转换：manifest + bundle 校验通过
   - 状态变化：allowlist 过滤不会带出 token/secret
-  - 边界条件：缺失字段/未知版本/非法路径（如 `../`）被拒绝
+  - 边界条件：缺失字段/未知版本/非法路径（如 `../`）被拒绝；sanitize 碰撞时 `manifest.files` 仍可唯一定位
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run test`
@@ -219,3 +232,4 @@ webclipper-db-backup-<ISO>.zip
 ## 不确定项（执行前如需再确认）
 
 - `conversationKey` 作为文件名暂不做长度限制（先观察真实数据形态）；如后续发现极端长文件名，再加截断策略并通过 `manifest.json` 保持可逆映射。
+- Import 是否需要兼容“用户解压后再重新压缩”的 zip（通常会变成 deflate）。本计划默认仅支持 SyncNos 自己导出的 stored zip；如需要更强兼容性，可在 `zip-utils` 增加 deflate 解压（优先评估 `DecompressionStream` 的跨浏览器可用性）。
