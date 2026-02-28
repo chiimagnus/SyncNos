@@ -92,6 +92,7 @@
 	    notionAiModelIndex: document.getElementById("notionAiModelIndex"),
 	    btnNotionAiModelSave: document.getElementById("btnNotionAiModelSave"),
 	    btnNotionAiModelReset: document.getElementById("btnNotionAiModelReset"),
+      inpageSupportedOnlyToggle: document.getElementById("inpageSupportedOnlyToggle"),
 	    aboutVersion: document.getElementById("aboutVersion"),
 	    btnAboutMacApp: document.getElementById("btnAboutMacApp"),
 	    btnAboutSource: document.getElementById("btnAboutSource"),

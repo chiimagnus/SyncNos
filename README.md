@@ -66,6 +66,10 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
   - Merge semantics: import merges by `(source + conversationKey)` and avoids duplicate key items
   - Security: backup excludes Notion token/secret
 - Manually syncs selected conversations to Notion (OAuth)
+- Inpage button visibility is configurable in popup Settings:
+  - Default: shown on all `http(s)` pages
+  - When `Only show Inpage button on supported sites` is enabled: shown only on supported AI sites + Notion pages
+  - This setting does not disable `Fetch Current Page` in popup Settings
 - Notion sync routes by kind:
   - Chats: database `SyncNos-AI Chats`
   - Web articles: database `SyncNos-Web Articles`

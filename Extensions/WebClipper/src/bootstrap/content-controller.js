@@ -1,4 +1,4 @@
-/* global console */
+/* global console, chrome */
 
 (function () {
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
@@ -19,10 +19,12 @@
     5: ["Combo x5! Beast mode on.", "Five-hit streak. Zoomies unlocked."],
     7: ["Combo x7! Legendary paws.", "Seven-hit streak. Animal boss mood."]
   });
+  const INPAGE_SUPPORTED_ONLY_STORAGE_KEY = "inpage_supported_only";
 
   function createController({ runtime }) {
     const inpageButton = NS.inpageButton;
     const inpageTip = NS.inpageTip;
+    let inpageSupportedOnly = false;
 
     function showInpageTip(text, kind) {
       if (!inpageTip || typeof inpageTip.showSaveTip !== "function") return;
@@ -61,6 +63,30 @@
       return lines[idx] || lines[0];
     }
 
+    function normalizeInpageSupportedOnly(value) {
+      return value === true;
+    }
+
+    function shouldAllowInpageCollector(collectorId) {
+      if (collectorId !== "web") return true;
+      return !inpageSupportedOnly;
+    }
+
+    function readInpageSupportedOnlySetting() {
+      return new Promise((resolve) => {
+        try {
+          if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.get !== "function") {
+            return resolve(false);
+          }
+          chrome.storage.local.get([INPAGE_SUPPORTED_ONLY_STORAGE_KEY], (res) => {
+            resolve(normalizeInpageSupportedOnly(res && res[INPAGE_SUPPORTED_ONLY_STORAGE_KEY]));
+          });
+        } catch (_e) {
+          resolve(false);
+        }
+      });
+    }
+
     function getCollector() {
       const reg = NS.collectorsRegistry;
       if (!reg || typeof reg.pickActive !== "function") return null;
@@ -80,7 +106,7 @@
         const fn = typeof d.inpageMatches === "function" ? d.inpageMatches : d.matches;
         if (typeof fn !== "function") continue;
         try {
-          if (fn(loc)) return { id: d.id, ...(d.collector || {}) };
+          if (fn(loc) && shouldAllowInpageCollector(d.id)) return { id: d.id, ...(d.collector || {}) };
         } catch (_e) {
           // ignore
         }
@@ -109,10 +135,25 @@
       let stopped = false;
       let observer = null;
       let manualSaveInFlight = false;
+      let onStorageChanged = null;
+
+      function toInpageEligibleCollector(collector) {
+        if (!collector) return null;
+        if (!shouldAllowInpageCollector(collector.id)) return null;
+        return collector;
+      }
 
       function stop() {
         if (stopped) return;
         stopped = true;
+        try {
+          if (onStorageChanged && chrome && chrome.storage && chrome.storage.onChanged
+            && typeof chrome.storage.onChanged.removeListener === "function") {
+            chrome.storage.onChanged.removeListener(onStorageChanged);
+          }
+        } catch (_e) {
+          // ignore
+        }
         inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons("");
         observer && observer.stop && observer.stop();
       }
@@ -131,7 +172,9 @@
         manualSaveInFlight = true;
         try {
           const collector = getCollector() || getInpageCollector();
-          if (collector && collector.id === "web") {
+          const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
+          if (!inpageCollector) return;
+          if (inpageCollector.id === "web") {
             await runManualSaveFlow({
               startText: "Saving...",
               run: async () => {
@@ -145,15 +188,15 @@
             });
             return;
           }
-          if (!collector || typeof collector.capture !== "function") return;
+          if (typeof inpageCollector.capture !== "function") return;
           await runManualSaveFlow({
-            startText: typeof collector.prepareManualCapture === "function" ? "Loading full history..." : "Saving...",
+            startText: typeof inpageCollector.prepareManualCapture === "function" ? "Loading full history..." : "Saving...",
             run: async () => {
-              if (typeof collector.prepareManualCapture === "function") {
-                await collector.prepareManualCapture();
+              if (typeof inpageCollector.prepareManualCapture === "function") {
+                await inpageCollector.prepareManualCapture();
                 showInpageTip("Saving...", "loading");
               }
-              const snapshot = await Promise.resolve(collector.capture({ manual: true }));
+              const snapshot = await Promise.resolve(inpageCollector.capture({ manual: true }));
               if (!snapshot) throw new Error("No visible conversation found");
               const saved = await saveSnapshot(snapshot);
               if (!saved) throw new Error("No visible conversation found");
@@ -186,6 +229,19 @@
         showInpageTip(line);
       };
 
+      function refreshInpageButton() {
+        const collector = getCollector();
+        const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
+        inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
+        inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
+          collectorId: inpageCollector ? inpageCollector.id : undefined,
+          onClick: clickSave,
+          onDoubleClick: openPopupPanel,
+          onCombo: showComboLine
+        });
+        return collector;
+      }
+
       observer = NS.runtimeObserver && NS.runtimeObserver.createObserver({
         debounceMs: 600,
         getRoot: () => {
@@ -199,15 +255,7 @@
             const modelPicker = NS.notionAiModelPicker;
             modelPicker && typeof modelPicker.maybeApply === "function" && modelPicker.maybeApply();
 
-            const collector = getCollector();
-            const inpageCollector = collector || getInpageCollector();
-            inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
-            inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
-              collectorId: inpageCollector && inpageCollector.id,
-              onClick: clickSave,
-              onDoubleClick: openPopupPanel,
-              onCombo: showComboLine
-            });
+            const collector = refreshInpageButton();
             if (!collector || typeof collector.capture !== "function") return;
             const snapshot = await Promise.resolve(collector.capture());
             if (!snapshot) return;
@@ -226,10 +274,36 @@
         }
       });
 
+      try {
+        if (chrome && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function") {
+          onStorageChanged = (changes, areaName) => {
+            if (areaName !== "local") return;
+            if (!changes || !Object.prototype.hasOwnProperty.call(changes, INPAGE_SUPPORTED_ONLY_STORAGE_KEY)) return;
+            inpageSupportedOnly = normalizeInpageSupportedOnly(
+              changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY] && changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY].newValue
+            );
+            refreshInpageButton();
+          };
+          chrome.storage.onChanged.addListener(onStorageChanged);
+        }
+      } catch (_e) {
+        // ignore
+      }
+
       return {
         start() {
           if (stopped) return;
-          observer && observer.start && observer.start();
+          readInpageSupportedOnlySetting()
+            .then((value) => {
+              inpageSupportedOnly = value;
+            })
+            .catch(() => {
+              inpageSupportedOnly = false;
+            })
+            .finally(() => {
+              if (stopped) return;
+              observer && observer.start && observer.start();
+            });
         },
         stop
       };
