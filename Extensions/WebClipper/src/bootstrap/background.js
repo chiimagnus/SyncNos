@@ -27,6 +27,7 @@
       "../export/obsidian/obsidian-local-rest-client.js",
       "../export/obsidian/obsidian-note-path.js",
       "../export/obsidian/obsidian-sync-metadata.js",
+      "../export/obsidian/obsidian-markdown-writer.js",
       "../export/obsidian/obsidian-sync-orchestrator.js",
       "./background-events-hub.js",
       "./background-storage.js",

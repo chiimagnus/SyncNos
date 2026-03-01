@@ -55,6 +55,7 @@ describe("obsidian-sync-orchestrator", () => {
     loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
     loadModule("../../src/export/obsidian/obsidian-note-path.js");
     loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
+    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
     const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
 
     // @ts-expect-error test global
@@ -67,14 +68,24 @@ describe("obsidian-sync-orchestrator", () => {
       }
     };
 
+    let call = 0;
     // @ts-expect-error test global
-    globalThis.fetch = async () => {
-      return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
+    globalThis.fetch = async (_url: any, init: any) => {
+      call += 1;
+      const method = String(init?.method || "GET").toUpperCase();
+      if (method === "GET") {
+        return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
+      }
+      if (method === "PUT") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
     await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("full_rebuild");
+    expect(syncRes.results[0].ok).toBe(true);
   });
 
   it("decides incremental append when remote has cursor and there are new messages", async () => {
@@ -85,6 +96,7 @@ describe("obsidian-sync-orchestrator", () => {
     loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
     loadModule("../../src/export/obsidian/obsidian-note-path.js");
     loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
+    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
     const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
 
     // @ts-expect-error test global
@@ -100,20 +112,30 @@ describe("obsidian-sync-orchestrator", () => {
       }
     };
 
+    const calls: any[] = [];
     // @ts-expect-error test global
-    globalThis.fetch = async () => {
-      return new Response(JSON.stringify({
-        frontmatter: {
-          syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
-        },
-        content: "x"
-      }), { status: 200, headers: { "content-type": "application/json" } });
+    globalThis.fetch = async (_url: any, init: any) => {
+      calls.push({ url: _url, init });
+      const method = String(init?.method || "GET").toUpperCase();
+      if (method === "GET") {
+        return new Response(JSON.stringify({
+          frontmatter: {
+            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
+          },
+          content: "x"
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (method === "PATCH") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
     await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("incremental_append");
     expect(syncRes.results[0].appended).toBe(1);
+    expect(syncRes.results[0].ok).toBe(true);
 
     const status = await orch.getSyncStatus({ instanceId: "x" });
     expect(status.job?.status).toBe("finished");

@@ -75,11 +75,13 @@
     }
 
     const convo = await storage.getConversationById(conversationId);
-    if (!convo) return buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: "conversation not found", at: Date.now() });
+    if (!convo) {
+      return { isFinal: true, row: buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: "conversation not found", at: Date.now() }) };
+    }
 
     const messages = await storage.getMessagesByConversationId(conversationId);
     if (!Array.isArray(messages) || !messages.length) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "empty", appended: 0, error: "No messages to sync.", at: Date.now() });
+      return { isFinal: true, row: buildPerConversationResult({ conversationId, ok: false, mode: "empty", appended: 0, error: "No messages to sync.", at: Date.now() }) };
     }
 
     const notePathMod = NS.obsidianNotePath;
@@ -87,20 +89,22 @@
     const filePath = notePathMod.buildStableNotePath(convo);
 
     const clientRes = await buildClient();
-    if (!clientRes.ok) return buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: clientRes.error && clientRes.error.message ? clientRes.error.message : "client error", at: Date.now() });
+    if (!clientRes.ok) {
+      return { isFinal: true, row: buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: clientRes.error && clientRes.error.message ? clientRes.error.message : "client error", at: Date.now() }) };
+    }
     const client = clientRes.client;
 
     if (forceFull) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "full_rebuild_forced", appended: messages.length, error: "writer not implemented", at: Date.now() });
+      return { isFinal: false, conversationId, convo, filePath, messages, mode: "full_rebuild_forced" };
     }
 
     // @ts-ignore
     const remote = await client.getVaultFile(filePath, { accept: client.NOTE_JSON_ACCEPT || "application/vnd.olrapi.note+json" });
     if (!remote.ok) {
       if (remote.status === 404) {
-        return buildPerConversationResult({ conversationId, ok: false, mode: "full_rebuild", appended: messages.length, error: "writer not implemented", at: Date.now() });
+        return { isFinal: false, conversationId, convo, filePath, messages, mode: "full_rebuild" };
       }
-      return buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: remote.error && remote.error.message ? remote.error.message : "remote error", at: Date.now() });
+      return { isFinal: true, row: buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: remote.error && remote.error.message ? remote.error.message : "remote error", at: Date.now() }) };
     }
 
     const note = remote.data && typeof remote.data === "object" ? remote.data : null;
@@ -110,29 +114,31 @@
     if (!metaMod || typeof metaMod.readSyncnosObject !== "function") throw new Error("obsidian sync metadata module missing");
     const parsed = metaMod.readSyncnosObject(frontmatter);
     if (!parsed.ok) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "full_rebuild", appended: messages.length, error: "writer not implemented", at: Date.now() });
+      return { isFinal: false, conversationId, convo, filePath, messages, mode: "full_rebuild" };
     }
     if (parsed.data.source !== safeString(convo.source) || parsed.data.conversationKey !== safeString(convo.conversationKey)) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "full_rebuild", appended: messages.length, error: "writer not implemented", at: Date.now() });
+      return { isFinal: false, conversationId, convo, filePath, messages, mode: "full_rebuild" };
     }
 
     const delta = computeDelta(messages, parsed.data);
     if (!delta.ok) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "full_rebuild", appended: messages.length, error: "writer not implemented", at: Date.now() });
+      return { isFinal: false, conversationId, convo, filePath, messages, mode: "full_rebuild" };
     }
     if (!delta.newMessages.length) {
-      return buildPerConversationResult({ conversationId, ok: false, mode: "no_changes", appended: 0, error: "writer not implemented", at: Date.now() });
+      return { isFinal: true, row: buildPerConversationResult({ conversationId, ok: true, mode: "no_changes", appended: 0, error: "", at: Date.now() }) };
     }
 
     const nextCursor = pickLocalCursor(messages);
-    return buildPerConversationResult({
+    return {
+      isFinal: false,
       conversationId,
-      ok: false,
+      convo,
+      filePath,
+      messages,
       mode: "incremental_append",
-      appended: delta.newMessages.length,
-      error: `writer not implemented (next: ${nextCursor.lastSyncedSequence || ""})`,
-      at: Date.now()
-    });
+      newMessages: delta.newMessages,
+      nextCursor
+    };
   }
 
   async function testConnection({ instanceId } = {}) {
@@ -180,7 +186,61 @@
     for (const conversationId of ids) {
       let row = null;
       try {
-        row = await decideSyncModeForConversation({ conversationId, forceFull: forceFullIds.has(conversationId) });
+        const decision = await decideSyncModeForConversation({ conversationId, forceFull: forceFullIds.has(conversationId) });
+        if (decision && decision.isFinal) {
+          row = decision.row;
+        } else if (decision && decision.mode && decision.conversationId) {
+          const writer = NS.obsidianMarkdownWriter;
+          const metaMod = NS.obsidianSyncMetadata;
+          const clientRes = await buildClient();
+          const client = clientRes.ok ? clientRes.client : null;
+
+          if (!clientRes.ok || !client) {
+            row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: clientRes.error && clientRes.error.message ? clientRes.error.message : "client error", at: Date.now() });
+          } else if (decision.mode === "full_rebuild" || decision.mode === "full_rebuild_forced") {
+            if (!writer || typeof writer.buildFullNoteMarkdown !== "function") throw new Error("obsidian markdown writer missing");
+            if (!metaMod || typeof metaMod.buildSyncnosObject !== "function") throw new Error("obsidian sync metadata module missing");
+            const syncnosObject = metaMod.buildSyncnosObject({ conversation: decision.convo, cursor: pickLocalCursor(decision.messages) });
+            const markdown = writer.buildFullNoteMarkdown({ conversation: decision.convo, messages: decision.messages, syncnosObject });
+            // @ts-ignore
+            const putRes = await client.putVaultFile(decision.filePath, markdown);
+            if (!putRes || !putRes.ok) {
+              row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: putRes && putRes.error && putRes.error.message ? putRes.error.message : "put failed", at: Date.now() });
+            } else {
+              row = buildPerConversationResult({ conversationId, ok: true, mode: decision.mode, appended: decision.messages.length, error: "", at: Date.now() });
+            }
+          } else if (decision.mode === "incremental_append") {
+            if (!writer || typeof writer.buildIncrementalAppendMarkdown !== "function") throw new Error("obsidian markdown writer missing");
+            if (!metaMod || typeof metaMod.buildSyncnosObject !== "function") throw new Error("obsidian sync metadata module missing");
+            const chunk = writer.buildIncrementalAppendMarkdown({ newMessages: decision.newMessages });
+            // @ts-ignore
+            const patchRes = await writer.appendUnderMessagesHeading({ client, filePath: decision.filePath, markdown: chunk });
+            const isIdempotentDup = !patchRes.ok
+              && patchRes.error
+              && patchRes.error.code === "bad_request"
+              && patchRes.error.body
+              && typeof patchRes.error.body === "object"
+              && String(patchRes.error.body.message || "").includes("content-already-preexists-in-target");
+            if (!patchRes.ok && !isIdempotentDup) {
+              row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: patchRes.error && patchRes.error.message ? patchRes.error.message : "patch failed", at: Date.now() });
+            } else {
+              const syncnosObject = metaMod.buildSyncnosObject({ conversation: decision.convo, cursor: decision.nextCursor });
+              // @ts-ignore
+              const fmRes = await writer.replaceSyncnosFrontmatter({ client, filePath: decision.filePath, syncnosObject });
+              if (!fmRes || !fmRes.ok) {
+                row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: fmRes && fmRes.error && fmRes.error.message ? fmRes.error.message : "frontmatter patch failed", at: Date.now() });
+              } else {
+                row = buildPerConversationResult({ conversationId, ok: true, mode: "incremental_append", appended: decision.newMessages.length, error: "", at: Date.now() });
+              }
+            }
+          } else {
+            row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: "unknown mode", at: Date.now() });
+          }
+        } else if (decision && decision.row) {
+          row = decision.row;
+        } else {
+          row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: "invalid decision", at: Date.now() });
+        }
       } catch (e) {
         row = buildPerConversationResult({
           conversationId,
