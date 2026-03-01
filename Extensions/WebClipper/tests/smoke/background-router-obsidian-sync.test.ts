@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 
 function loadBackgroundRouter() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const storeModulePath = require.resolve("../../src/export/obsidian/obsidian-settings-store.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[storeModulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("../../src/export/obsidian/obsidian-settings-store.js");
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/bootstrap/background-router.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete require.cache[modulePath];
@@ -12,26 +19,15 @@ function loadBackgroundRouter() {
 describe("background-router obsidian sync routes", () => {
   it("delegates settings get/save and orchestrator actions", async () => {
     const calls: any = {
-      getSettings: 0,
-      saveSettings: null,
       testConnection: 0,
       getSyncStatus: 0,
       syncConversations: null
     };
 
+    const store: Record<string, unknown> = {};
     // @ts-expect-error test global
     globalThis.WebClipper = {
       backgroundStorage: {},
-      obsidianSettingsStore: {
-        async getSettings() {
-          calls.getSettings += 1;
-          return { enabled: true, apiBaseUrl: "http://127.0.0.1:27123", authHeaderName: "Authorization" };
-        },
-        async saveSettings(payload: any) {
-          calls.saveSettings = payload;
-          return { saved: true, ...payload };
-        }
-      },
       obsidianSyncOrchestrator: {
         async testConnection({ instanceId }: any) {
           calls.testConnection += 1;
@@ -48,12 +44,32 @@ describe("background-router obsidian sync routes", () => {
       }
     };
 
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get(keys: any, cb: (res: Record<string, unknown>) => void) {
+            const list = Array.isArray(keys) ? keys : (typeof keys === "string" ? [keys] : Object.keys(keys || {}));
+            const out: Record<string, unknown> = {};
+            for (const k of list) out[k] = Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
+            cb(out);
+          },
+          set(payload: Record<string, unknown>, cb: () => void) {
+            for (const [k, v] of Object.entries(payload || {})) store[k] = v;
+            cb && cb();
+          }
+        }
+      }
+    };
+
     const router = loadBackgroundRouter();
 
     const getRes = await router.__handleMessageForTests({ type: "obsidianGetSettings" });
     expect(getRes.ok).toBe(true);
-    expect(getRes.data?.enabled).toBe(true);
-    expect(calls.getSettings).toBe(1);
+    expect(getRes.data?.enabled).toBe(false);
+    expect(getRes.data?.apiBaseUrl).toContain("http://127.0.0.1:27123");
+    expect(getRes.data?.apiKeyPresent).toBe(false);
 
     const saveRes = await router.__handleMessageForTests({
       type: "obsidianSaveSettings",
@@ -63,8 +79,9 @@ describe("background-router obsidian sync routes", () => {
       authHeaderName: "Authorization"
     });
     expect(saveRes.ok).toBe(true);
-    expect(calls.saveSettings?.enabled).toBe(false);
-    expect(calls.saveSettings?.apiKey).toBe("k");
+    expect(saveRes.data?.enabled).toBe(false);
+    expect(saveRes.data?.apiKeyPresent).toBe(true);
+    expect(saveRes.data?.apiKeyMasked).toBe("********");
 
     const testRes = await router.__handleMessageForTests({ type: "obsidianTestConnection" });
     expect(testRes.ok).toBe(true);
@@ -88,4 +105,3 @@ describe("background-router obsidian sync routes", () => {
     expect(typeof calls.syncConversations?.instanceId).toBe("string");
   });
 });
-
