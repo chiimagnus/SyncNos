@@ -185,6 +185,50 @@
               </div>
             </section>
 
+            <section class="toolbar settingsPanel" id="obsidianPathsCard" aria-label="Obsidian Paths">
+              <div class="settingsRow settingsRow--header" aria-label="Obsidian paths header">
+                <div class="notionHeaderText">
+                  <span class="notionHeaderTitle">Obsidian Paths</span>
+                </div>
+                <div class="spacer"></div>
+              </div>
+
+              <div class="settingsDivider" role="presentation"></div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian AI chats folder">
+                <div class="settingsLabel settingsLabel--inline">AI Chats Folder</div>
+                <div class="settingsControl settingsControl--grow">
+                  <input
+                    id="obsidianChatFolder"
+                    class="input"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="SyncNos-AIChats"
+                    aria-label="Obsidian AI chats folder"
+                  />
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian web clipper folder">
+                <div class="settingsLabel settingsLabel--inline">Web Clipper Folder</div>
+                <div class="settingsControl settingsControl--grow">
+                  <input
+                    id="obsidianArticleFolder"
+                    class="input"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="SyncNos-WebArticles"
+                    aria-label="Obsidian web clipper folder"
+                  />
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian paths note">
+                <div class="settingsLabel settingsLabel--inline">Note</div>
+                <div class="sub">Vault-relative folder paths. Nested folders supported. Empty uses defaults.</div>
+              </div>
+            </section>
+
 	          <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
 	            <div class="settingsRow settingsRow--header" aria-label="Database backup header">
 	              <div class="notionHeaderText">
