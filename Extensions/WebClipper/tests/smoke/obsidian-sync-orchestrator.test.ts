@@ -140,4 +140,105 @@ describe("obsidian-sync-orchestrator", () => {
     const status = await orch.getSyncStatus({ instanceId: "x" });
     expect(status.job?.status).toBe("finished");
   });
+
+  it("falls back to full rebuild when cursor updatedAt mismatches local history", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    setupChromeStorage();
+    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
+    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
+    loadModule("../../src/export/obsidian/obsidian-note-path.js");
+    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
+    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
+    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      async getConversationById() {
+        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
+      },
+      async getMessagesByConversationId() {
+        return [
+          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
+        ];
+      }
+    };
+
+    // GET returns cursor with mismatched updatedAt -> should rebuild (PUT)
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || "GET").toUpperCase();
+      if (method === "GET") {
+        return new Response(JSON.stringify({
+          frontmatter: {
+            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 999 }
+          },
+          content: "x"
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (method === "PUT") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+    };
+
+    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(syncRes.results[0].mode).toBe("full_rebuild");
+  });
+
+  it("falls back to full rebuild when PATCH fails with PatchFailed (non-dedup)", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    setupChromeStorage();
+    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
+    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
+    loadModule("../../src/export/obsidian/obsidian-note-path.js");
+    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
+    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
+    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      async getConversationById() {
+        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
+      },
+      async getMessagesByConversationId() {
+        return [
+          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
+        ];
+      }
+    };
+
+    let patchCount = 0;
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: any, init: any) => {
+      const method = String(init?.method || "GET").toUpperCase();
+      if (method === "GET") {
+        return new Response(JSON.stringify({
+          frontmatter: {
+            syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 1 }
+          },
+          content: "x"
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (method === "PATCH") {
+        patchCount += 1;
+        return new Response(JSON.stringify({ errorCode: 40080, message: "PatchFailed: something else" }), { status: 400, headers: { "content-type": "application/json" } });
+      }
+      if (method === "PUT") {
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
+    };
+
+    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(patchCount).toBe(1);
+    expect(syncRes.results[0].ok).toBe(true);
+    expect(syncRes.results[0].mode).toBe("full_rebuild_fallback");
+  });
 });
