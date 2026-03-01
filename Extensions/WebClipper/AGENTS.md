@@ -80,12 +80,14 @@
 - 默认目录按 kind 分流：
   - chat：`SyncNos-AIChats/`
   - article：`SyncNos-WebArticles/`
-  文件路径由 `source + conversationKey` 生成稳定 hash（避免标题改名导致找不到旧文件）。
+- 目录可配置：popup `Settings -> Obsidian Paths` 可分别设置 Chat 与 Web article 的 vault-relative 文件夹。
+- 文件路径由 `source + conversationKey` 生成稳定 hash（避免标题改名导致找不到旧文件；文件名不依赖标题）。
 - 同步策略（平台主导）：
   - Obsidian 端不存在文件：全量重建（PUT）
   - Obsidian 端存在文件且 frontmatter 兼容：增量追加（PATCH 追加到 heading `SyncNos::Messages`），并 PATCH frontmatter 更新游标
   - 若检测到冲突或 PATCH 失败：自动回退全量重建（PUT）
 - 本期仅支持 Obsidian Local REST API 的 HTTP insecure 模式（默认 `http://127.0.0.1:27123`）；不支持 `https://127.0.0.1:27124` 自签名证书模式。
+  - popup 配置项默认自动保存（`blur` 保存；`Enter` 可立即保存）。
 
 ### 测试与回归
 
