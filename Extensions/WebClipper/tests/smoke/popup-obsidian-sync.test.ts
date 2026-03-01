@@ -14,6 +14,8 @@ describe("popup-obsidian-sync", () => {
     const els: any = {
       obsidianApiBaseUrl: { value: "http://127.0.0.1:27123" },
       obsidianAuthHeaderName: { value: "Authorization" },
+      obsidianChatFolder: { value: "SyncNos-AIChats" },
+      obsidianArticleFolder: { value: "SyncNos-WebArticles" },
       obsidianApiKey: { value: "   " }
     };
     // @ts-expect-error test global
@@ -25,12 +27,16 @@ describe("popup-obsidian-sync", () => {
     const payload = api.__test.readUiPayload();
     expect(payload.apiBaseUrl).toContain("http://127.0.0.1:27123");
     expect(payload.apiKey).toBe(null);
+    expect(payload.chatFolder).toBe("SyncNos-AIChats");
+    expect(payload.articleFolder).toBe("SyncNos-WebArticles");
   });
 
   it("applies settings to UI with plaintext api key", () => {
     const els: any = {
       obsidianApiBaseUrl: { value: "" },
       obsidianAuthHeaderName: { value: "" },
+      obsidianChatFolder: { value: "" },
+      obsidianArticleFolder: { value: "" },
       obsidianApiKey: { value: "x", placeholder: "" }
     };
     // @ts-expect-error test global
@@ -42,11 +48,15 @@ describe("popup-obsidian-sync", () => {
     api.__test.applySettingsToUi({
       apiBaseUrl: "http://127.0.0.1:27123",
       authHeaderName: "Authorization",
+      chatFolder: "My/Chats",
+      articleFolder: "My/Articles",
       apiKey: "secret-key",
       apiKeyPresent: true
     });
     expect(els.obsidianApiBaseUrl.value).toContain("http://127.0.0.1:27123");
     expect(els.obsidianApiKey.value).toBe("secret-key");
     expect(els.obsidianApiKey.placeholder).toBe("");
+    expect(els.obsidianChatFolder.value).toBe("My/Chats");
+    expect(els.obsidianArticleFolder.value).toBe("My/Articles");
   });
 });

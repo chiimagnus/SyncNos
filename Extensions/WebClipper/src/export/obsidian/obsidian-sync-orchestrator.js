@@ -98,7 +98,14 @@
 
     const notePathMod = NS.obsidianNotePath;
     if (!notePathMod || typeof notePathMod.buildStableNotePath !== "function") throw new Error("obsidian note path module missing");
-    const filePath = notePathMod.buildStableNotePath(convo);
+
+    const store = NS.obsidianSettingsStore;
+    const pathConfig = store && typeof store.getPathConfig === "function" ? await store.getPathConfig() : null;
+    const folderByKindId = pathConfig
+      ? { chat: safeString(pathConfig.chatFolder), article: safeString(pathConfig.articleFolder) }
+      : null;
+
+    const filePath = notePathMod.buildStableNotePath(convo, { folderByKindId });
 
     const clientRes = await buildClient();
     if (!clientRes.ok) {

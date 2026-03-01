@@ -118,7 +118,9 @@
           enabled: msg.enabled,
           apiBaseUrl: msg.apiBaseUrl,
           apiKey: msg.apiKey,
-          authHeaderName: msg.authHeaderName
+          authHeaderName: msg.authHeaderName,
+          chatFolder: msg.chatFolder,
+          articleFolder: msg.articleFolder
         });
         return ok(data);
       }
