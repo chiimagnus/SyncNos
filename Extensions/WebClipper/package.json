@@ -36,6 +36,7 @@
   "dependencies": {
     "markdown-it": "^14.1.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-router-dom": "7.13.1"
   }
 }
