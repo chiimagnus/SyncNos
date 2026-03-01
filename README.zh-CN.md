@@ -54,11 +54,13 @@
 
 - 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
 - 导出所选对话为 Markdown（支持单文件合并导出或多文件 zip 导出）
-- 通过 `obsidian://new` 将所选对话写入 Obsidian（单选优先走剪贴板模式；多选按顺序打开多个 URL）
-- Obsidian 按 kind 分目录写入：
-  - 聊天：`SyncNos-AIChats/<会话标题>`
-  - 网页文章：`SyncNos-WebArticles/<文章标题>`
-  - 同名笔记会自动追加数字后缀
+- 通过 `Obsidian Local REST API` 将所选对话同步到 Obsidian（通过 `http://127.0.0.1:27123` 写入/更新 vault 文件）
+- Obsidian 笔记路径：
+  - 默认按 kind 分目录：
+    - 聊天：`SyncNos-AIChats/`
+    - 网页文章：`SyncNos-WebArticles/`
+  - 目录可在扩展 Settings 中配置
+  - 文件名由 `(source + conversationKey)` 生成稳定 hash（不依赖标题），便于增量更新
 - 数据库备份：
   - 导出：仅支持 `*.zip`（`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`）
   - 导入：支持 `*.zip`（推荐）与 legacy `*.json`
