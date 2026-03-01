@@ -3,6 +3,23 @@
 
   const NOTION_VERSION = "2022-06-28";
 
+  function parseRetryAfterMs(res) {
+    try {
+      const raw = res && res.headers && typeof res.headers.get === "function"
+        ? String(res.headers.get("Retry-After") || "").trim()
+        : "";
+      if (!raw) return 0;
+      const sec = Number(raw);
+      if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000);
+      const dateMs = Date.parse(raw);
+      if (!Number.isFinite(dateMs)) return 0;
+      const delta = dateMs - Date.now();
+      return delta > 0 ? delta : 0;
+    } catch (_e) {
+      return 0;
+    }
+  }
+
   async function notionFetch({ accessToken, method, path, body, notionVersion }) {
     if (!accessToken) throw new Error("missing notion access token");
     const url = `https://api.notion.com${path}`;
@@ -17,7 +34,19 @@
       body: body ? JSON.stringify(body) : undefined
     });
     const text = await res.text();
-    if (!res.ok) throw new Error(`notion api failed: ${method} ${path} HTTP ${res.status} ${text}`);
+    if (!res.ok) {
+      const err = new Error(`notion api failed: ${method} ${path} HTTP ${res.status} ${text}`);
+      err.status = res.status;
+      const retryAfterMs = parseRetryAfterMs(res);
+      if (retryAfterMs > 0) err.retryAfterMs = retryAfterMs;
+      try {
+        const parsed = text ? JSON.parse(text) : null;
+        if (parsed && parsed.code) err.code = String(parsed.code);
+      } catch (_e) {
+        // ignore
+      }
+      throw err;
+    }
     return text ? JSON.parse(text) : {};
   }
 
