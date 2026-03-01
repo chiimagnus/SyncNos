@@ -33,7 +33,7 @@ function setupChromeStorage() {
 }
 
 describe("obsidian-sync-orchestrator", () => {
-  it("reports disabled when setting is off", async () => {
+  it("reports missing_api_key when api key is not configured", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
@@ -43,8 +43,7 @@ describe("obsidian-sync-orchestrator", () => {
 
     const res = await orch.testConnection({ instanceId: "x" });
     expect(res.ok).toBe(false);
-    expect(res.enabled).toBe(false);
-    expect(res.error?.code).toBe("disabled");
+    expect(res.error?.code).toBe("missing_api_key");
   });
 
   it("decides full rebuild when remote note is missing (404)", async () => {
@@ -82,7 +81,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("full_rebuild");
     expect(syncRes.results[0].ok).toBe(true);
@@ -131,7 +130,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].mode).toBe("incremental_append");
     expect(syncRes.results[0].appended).toBe(1);
@@ -183,7 +182,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(syncRes.results[0].ok).toBe(true);
     expect(syncRes.results[0].mode).toBe("full_rebuild");
@@ -235,7 +234,7 @@ describe("obsidian-sync-orchestrator", () => {
       return new Response(JSON.stringify({ errorCode: 40000, message: "unexpected" }), { status: 400, headers: { "content-type": "application/json" } });
     };
 
-    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    await store.saveSettings({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
     const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
     expect(patchCount).toBe(1);
     expect(syncRes.results[0].ok).toBe(true);

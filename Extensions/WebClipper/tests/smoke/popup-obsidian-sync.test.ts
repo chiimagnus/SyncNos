@@ -12,7 +12,6 @@ function loadModule() {
 describe("popup-obsidian-sync", () => {
   it("reads UI payload and keeps apiKey when input is empty", () => {
     const els: any = {
-      obsidianSyncEnabled: { checked: true },
       obsidianApiBaseUrl: { value: "http://127.0.0.1:27123" },
       obsidianAuthHeaderName: { value: "Authorization" },
       obsidianApiKey: { value: "   " }
@@ -24,14 +23,12 @@ describe("popup-obsidian-sync", () => {
     };
     const api = loadModule();
     const payload = api.__test.readUiPayload();
-    expect(payload.enabled).toBe(true);
     expect(payload.apiBaseUrl).toContain("http://127.0.0.1:27123");
     expect(payload.apiKey).toBe(null);
   });
 
-  it("applies settings to UI with masked api key placeholder", () => {
+  it("applies settings to UI with plaintext api key", () => {
     const els: any = {
-      obsidianSyncEnabled: { checked: false },
       obsidianApiBaseUrl: { value: "" },
       obsidianAuthHeaderName: { value: "" },
       obsidianApiKey: { value: "x", placeholder: "" }
@@ -43,15 +40,13 @@ describe("popup-obsidian-sync", () => {
     };
     const api = loadModule();
     api.__test.applySettingsToUi({
-      enabled: true,
       apiBaseUrl: "http://127.0.0.1:27123",
       authHeaderName: "Authorization",
-      apiKeyMasked: "********"
+      apiKey: "secret-key",
+      apiKeyPresent: true
     });
-    expect(els.obsidianSyncEnabled.checked).toBe(true);
     expect(els.obsidianApiBaseUrl.value).toContain("http://127.0.0.1:27123");
-    expect(els.obsidianApiKey.value).toBe("");
-    expect(els.obsidianApiKey.placeholder).toBe("********");
+    expect(els.obsidianApiKey.value).toBe("secret-key");
+    expect(els.obsidianApiKey.placeholder).toBe("");
   });
 });
-

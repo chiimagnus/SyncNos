@@ -71,7 +71,7 @@
     const store = NS.obsidianSettingsStore;
     if (!store || typeof store.getConnectionConfig !== "function") throw new Error("obsidian settings store missing");
     const conn = await store.getConnectionConfig();
-    if (!conn.enabled) return { ok: false, error: { code: "disabled", message: "Obsidian sync is disabled." } };
+    if (!conn || !conn.apiKey) return { ok: false, error: { code: "missing_api_key", message: "Obsidian API Key is required." } };
 
     const clientMod = NS.obsidianLocalRestClient;
     if (!clientMod || typeof clientMod.createClient !== "function") throw new Error("obsidian local rest client missing");
@@ -158,22 +158,22 @@
     if (!store || typeof store.getConnectionConfig !== "function") throw new Error("obsidian settings store missing");
 
     const conn = await store.getConnectionConfig();
-    if (!conn.enabled) return { ok: false, enabled: false, error: { code: "disabled", message: "Obsidian sync is disabled." }, instanceId: safeString(instanceId) };
+    if (!conn || !conn.apiKey) return { ok: false, error: { code: "missing_api_key", message: "Obsidian API Key is required." }, instanceId: safeString(instanceId) };
 
     const clientMod = NS.obsidianLocalRestClient;
     if (!clientMod || typeof clientMod.createClient !== "function") throw new Error("obsidian local rest client missing");
 
     const client = clientMod.createClient(conn);
     if (!client || client.ok === false) {
-      return { ok: false, enabled: true, error: client && client.error ? client.error : { code: "invalid_client", message: "invalid client" }, instanceId: safeString(instanceId) };
+      return { ok: false, error: client && client.error ? client.error : { code: "invalid_client", message: "invalid client" }, instanceId: safeString(instanceId) };
     }
 
     // Root endpoint allows reachability test and may report auth status.
     // @ts-ignore
     const res = await client.getServerStatus();
-    if (!res || !res.ok) return { ok: false, enabled: true, error: res && res.error ? res.error : { code: "network_error", message: "connection failed" }, instanceId: safeString(instanceId) };
+    if (!res || !res.ok) return { ok: false, error: res && res.error ? res.error : { code: "network_error", message: "connection failed" }, instanceId: safeString(instanceId) };
 
-    return { ok: true, enabled: true, data: res.data || null, instanceId: safeString(instanceId) };
+    return { ok: true, data: res.data || null, instanceId: safeString(instanceId) };
   }
 
   function getSyncStatus({ instanceId } = {}) {
