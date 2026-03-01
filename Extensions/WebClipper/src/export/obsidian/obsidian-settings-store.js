@@ -4,14 +4,12 @@
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const STORAGE_KEYS = Object.freeze({
-    enabled: "obsidian_sync_enabled",
     apiBaseUrl: "obsidian_api_base_url",
     apiKey: "obsidian_api_key",
     authHeaderName: "obsidian_api_auth_header_name",
   });
 
   const DEFAULTS = Object.freeze({
-    enabled: false,
     apiBaseUrl: "http://127.0.0.1:27123",
     authHeaderName: "Authorization",
   });
@@ -46,35 +44,31 @@
   }
 
   async function getSettings() {
-    const res = await storageGet([STORAGE_KEYS.enabled, STORAGE_KEYS.apiBaseUrl, STORAGE_KEYS.apiKey, STORAGE_KEYS.authHeaderName]);
-    const enabled = res[STORAGE_KEYS.enabled];
+    const res = await storageGet([STORAGE_KEYS.apiBaseUrl, STORAGE_KEYS.apiKey, STORAGE_KEYS.authHeaderName]);
     const apiBaseUrl = normalizeBaseUrl(res[STORAGE_KEYS.apiBaseUrl]);
     const apiKey = safeString(res[STORAGE_KEYS.apiKey]);
     const authHeaderName = normalizeAuthHeaderName(res[STORAGE_KEYS.authHeaderName]);
 
     return {
-      enabled: enabled == null ? DEFAULTS.enabled : Boolean(enabled),
       apiBaseUrl,
       authHeaderName,
       apiKeyPresent: !!apiKey,
       // Do not expose the plaintext key back to the popup.
-      apiKeyMasked: apiKey ? "********" : ""
+      apiKeyMasked: apiKey ? "********************************" : ""
     };
   }
 
   async function getConnectionConfig() {
-    const res = await storageGet([STORAGE_KEYS.enabled, STORAGE_KEYS.apiBaseUrl, STORAGE_KEYS.apiKey, STORAGE_KEYS.authHeaderName]);
+    const res = await storageGet([STORAGE_KEYS.apiBaseUrl, STORAGE_KEYS.apiKey, STORAGE_KEYS.authHeaderName]);
     return {
-      enabled: res[STORAGE_KEYS.enabled] == null ? DEFAULTS.enabled : Boolean(res[STORAGE_KEYS.enabled]),
       apiBaseUrl: normalizeBaseUrl(res[STORAGE_KEYS.apiBaseUrl]),
       apiKey: safeString(res[STORAGE_KEYS.apiKey]),
       authHeaderName: normalizeAuthHeaderName(res[STORAGE_KEYS.authHeaderName])
     };
   }
 
-  async function saveSettings({ enabled, apiBaseUrl, apiKey, authHeaderName } = {}) {
+  async function saveSettings({ apiBaseUrl, apiKey, authHeaderName } = {}) {
     const payload = {};
-    if (enabled != null) payload[STORAGE_KEYS.enabled] = Boolean(enabled);
     if (apiBaseUrl != null) payload[STORAGE_KEYS.apiBaseUrl] = normalizeBaseUrl(apiBaseUrl);
     if (authHeaderName != null) payload[STORAGE_KEYS.authHeaderName] = normalizeAuthHeaderName(authHeaderName);
     // If apiKey is omitted (undefined/null), keep existing.

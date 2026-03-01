@@ -67,21 +67,18 @@ describe("background-router obsidian sync routes", () => {
 
     const getRes = await router.__handleMessageForTests({ type: "obsidianGetSettings" });
     expect(getRes.ok).toBe(true);
-    expect(getRes.data?.enabled).toBe(false);
     expect(getRes.data?.apiBaseUrl).toContain("http://127.0.0.1:27123");
     expect(getRes.data?.apiKeyPresent).toBe(false);
 
     const saveRes = await router.__handleMessageForTests({
       type: "obsidianSaveSettings",
-      enabled: false,
       apiBaseUrl: "http://127.0.0.1:27123",
       apiKey: "k",
       authHeaderName: "Authorization"
     });
     expect(saveRes.ok).toBe(true);
-    expect(saveRes.data?.enabled).toBe(false);
     expect(saveRes.data?.apiKeyPresent).toBe(true);
-    expect(saveRes.data?.apiKeyMasked).toBe("********");
+    expect(saveRes.data?.apiKeyMasked).toBe("********************************");
 
     const testRes = await router.__handleMessageForTests({ type: "obsidianTestConnection" });
     expect(testRes.ok).toBe(true);
