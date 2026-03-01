@@ -18,7 +18,7 @@
 - 构建与开发
   - `npm --prefix Extensions/WebClipper run dev` 可启动开发模式并可加载扩展
   - `npm --prefix Extensions/WebClipper run build` 可产出 Chrome/Edge 可加载产物
-  - `npm --prefix Extensions/WebClipper run build -- --browser firefox`（或等价命令）可产出 Firefox 可加载产物
+  - `npm --prefix Extensions/WebClipper run build:firefox`（或等价命令）可产出 Firefox 可加载产物（具体命令由 Task 02/03 Spike 固化）
 - 扩展内 Web App
   - popup 内按钮可打开 `app.html`，并能切换 `/`、`/sync`、`/settings`、`/debug` 路由（HashRouter）
 - 核心能力不回归（最小冒烟）
@@ -55,7 +55,7 @@
 
 **Step 1: 实现**
 - 迁移期默认继续使用 `npm`（沿用现有 `package-lock.json`），不要引入 `pnpm-lock.yaml`。
-- 在 `package.json` 里新增/预留 WXT 相关 scripts（先占位，后续 Task 填实）。
+- 在 `package.json` 里新增/预留 WXT 相关 scripts（先占位，后续 Task 填实；Firefox 构建脚本统一命名为 `build:firefox`）。
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper install`
@@ -110,6 +110,7 @@
 **Step 1: 实现**
 - 安装 WXT 与 React 模块（按 Task 02 的实际模板选择依赖）。
 - 新增 scripts（以 WXT 为准）：`dev`、`build`（含 firefox）、`test`（继续 Vitest）。
+- 确保 TypeScript 能编译（`tsconfig.json`/类型依赖等以 WXT 模板为准）；TS 严格选项可先分阶段开启，但至少要保证 `npm run build` 能稳定通过。
 
 **Step 2: 验证**
 - Run: `npm --prefix Extensions/WebClipper run dev`
@@ -186,8 +187,8 @@
 
 **Step 1: 实现**
 - 目标：在 WXT 入口里“最大程度复用旧代码”，优先选择以下最小侵入方案之一（由 Task 02/03 的 WXT 约定决定）：
-  1) 在 background/content entrypoint 中 `importScripts(...)` 加载旧 `src/**` 文件（需要确保这些文件会被拷贝到产物中且相对路径可用）
-  2) 或把旧的入口 IIFE 复制到 `src/legacy/` 并改成可被 WXT 产物引用的静态资源
+  1) **优先**：把旧入口封装成可 ESM `import` 的模块（迁移到 `src/legacy/`，只做“导出/初始化”所需的最小改动），然后由 WXT entrypoint 直接 `import` 并调用
+  2) **备选**：若 Spike 证明 background 是 classic worker 且允许 `importScripts`，再考虑把 legacy 作为静态资源拷贝到产物中并 `importScripts(...)`（否则不要走这条路，避免 module worker 不兼容）
 - 只要能让旧的 message router 与 storage 初始化起来即可（先不追求全覆盖）。
 
 **Step 2: 验证**
@@ -447,4 +448,3 @@
 - WXT unlisted page（app）的入口文件约定与打包路径（由 Task 02/03 固化）
 - WXT Firefox 构建产物能否满足 AMO 审核的“source package 可复现”要求（由 Task 09/22 验证）
 - legacy 适配方式选型（importScripts 静态文件 vs legacy 复制到新目录）：以“最少改动 + 能尽快在 WXT 下跑通”为准（由 Task 08 Spike 决策）
-
