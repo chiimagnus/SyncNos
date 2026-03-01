@@ -22,7 +22,7 @@
     error: "Error (see console)"
   });
 
-  const OBSIDIAN_SETUP_GUIDE_URL = "https://github.com/chiimagnus/SyncNos/blob/feat/.github/docs/webclipper-obsidian-local-rest-api-sync.md";
+  const OBSIDIAN_SETUP_GUIDE_URL = "https://github.com/chiimagnus/SyncNos/blob/feat/.github/guide/obsidian/setup-guide.md";
 
   let suppressEvents = true;
   let busy = false;
