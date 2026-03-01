@@ -1,272 +1,196 @@
-# WebClipper 脚手架迁移方案
-## 目标
+# WebClipper 脚手架迁移方案（更新版：完全重构，但按增量落地）
 
-把 WebClipper 从「IIFE + `globalThis.WebClipper` 手工装配 + 自研 concat 构建」迁移到 **WXT 框架**，实现：
+> 目标共识：接入脚手架意味着**最终形态必然是一次“全量重构后的新工程结构”**；但为了降低 AI coding 与迁移失败风险，我们采用 **Strangler Fig（藤蔓式）渐进重构**：每一阶段都能跑、能构建、能回归核心能力，逐段替换旧实现，而不是一口气推倒重来。
 
-- 扩展内 SPA（`chrome-extension://<id>/app.html`），加页面 = 加路由
-- popup 瘦身为快捷入口，复杂功能跳 `app.html#/xxx`
-- 多浏览器构建（Chrome / Firefox / Edge）开箱即用
-- 业务逻辑（采集/存储/同步）平移，不重写
+## 0. Goal / Non-goals
+
+### Goal（要达成什么）
+
+- 把 WebClipper 从「IIFE + `globalThis.WebClipper` 手工装配 + 自研 concat 构建」迁移到 **WXT（Vite）脚手架**
+- 构建一个扩展内 Web App：`chrome-extension://<id>/app.html`（SPA + Router）
+  - 新增页面/新 Tab = 新增路由与业务模块
+  - popup 变成快捷入口：常用动作 + 打开完整界面
+- 多浏览器交付链清晰：Chrome / Edge / Firefox（本地 dev、构建、打包、商店交付）
+- 业务能力不回归：采集 → 本地持久化 → 导出/Obsidian → Notion OAuth + Notion Sync → 备份/导入
+
+### Non-goals（明确不做）
+
+- 不做功能“再设计”（例如改默认开关、改交互约束、改去重规则）
+- 不在迁移期引入新的数据源/新同步目标（除非为了验证架构必须）
 
 ---
 
-## 技术选型
+## 1. 当前约束（必须遵守）
 
-| 层 | 选型 | 理由 |
+- 权限保持最小且明确；新增 permissions/host_permissions 前要有理由与验收（见 `Extensions/WebClipper/AGENTS.md`）
+- 不持久化除 `chrome.storage.local` 外的任何密钥（OAuth token、API key 等不落 IndexedDB）
+- inpage 交互约束不变（单例 tip、400ms combo 结算、双击打开 popup 不可用时提示等）
+- 迁移期间：每个 Phase 结束都必须能构建 + 最小手测冒烟
+
+---
+
+## 2. 技术选型（最终形态）
+
+| 层 | 选型 | 说明 |
 | --- | --- | --- |
-| **脚手架** | WXT | 自动生成 manifest、content script 打包为 IIFE、Firefox MV2 fallback 内置、dev 时自动 reload 扩展。底层就是 Vite。 |
-| **UI 框架** | React 18+ (或 Preact) | 生态最大、Router 成熟、和未来 web app 共享组件最方便。Preact 可 alias 替换，体积更小。 |
-| **语言** | TypeScript (strict) | 模块边界靠类型守住，不靠人 |
-| **路由** | React Router v7+ | app.html 内 SPA 路由，hash mode（扩展页不走 HTTP） |
-| **状态管理** | Zustand | 轻量、TS 友好、不绑 React 组件树（background 里也能用 store 逻辑） |
-| **样式** | Tailwind CSS 4 | 原子类 + purge，扩展包体积可控。content script UI 用 Shadow DOM 隔离 |
-| **测试** | Vitest + @webext-core/fake-browser | WXT 生态自带 fake browser API，单测不用真扩展环境 |
+| 脚手架 | WXT | 接管 manifest/多入口构建/多浏览器打包/dev reload；底层 Vite |
+| UI 框架 | React（或 Preact alias） | “扩展内 Web App”可维护性优先；Router/生态成熟 |
+| 语言 | TypeScript（strict） | 用类型约束模块边界，降低长期扩展成本 |
+| 路由 | HashRouter | `chrome-extension://` 无 server fallback，Hash 最稳 |
+| 状态 | Zustand（仅 UI 层） | 轻量；注意：background/content 不强行用 Zustand |
+| 样式 | Tailwind（app/popup）+ Shadow DOM（inpage） | app/popup 快速迭代；inpage 隔离站点样式污染 |
+| 测试 | Vitest（保留并扩展） | 继续用现有 `vitest`，迁移时补关键单测 |
 
 ---
 
-## WXT 项目结构
+## 3. 目录结构（按“业务分域”组织，而不是纯技术分层）
+
+> 原则：未来你要加一个新页面（新 Tab）/新能力，应该主要在一个“业务域”内改动，而不是到处跨目录 import。
 
 ```
 Extensions/WebClipper/
-├── entrypoints/
-│   ├── background.ts              # Service Worker 入口
-│   ├── popup/                     # 弹窗（轻量快捷操作）
-│   │   ├── index.html
-│   │   ├── main.tsx
-│   │   └── App.tsx
-│   ├── app.html                   # ⭐ 扩展内 SPA（unlisted page）
-│   ├── app/                       # app.html 的 React 入口
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   └── routes/
-│   │       ├── Conversations.tsx
-│   │       ├── SyncJobs.tsx
-│   │       ├── Settings.tsx
-│   │       └── Debug.tsx
-│   └── content.ts                 # Content Script 入口
-├── lib/                           # ⭐ 平移过来的业务逻辑
-│   ├── protocols/
-│   │   └── message-contracts.ts   # ← 从 src/protocols/ 迁移
-│   ├── storage/
-│   │   ├── schema.ts              # ← IndexedDB schema + migration
-│   │   ├── background-storage.ts
-│   │   └── incremental-updater.ts
-│   ├── collectors/
-│   │   ├── registry.ts
-│   │   └── runtime-observer.ts
-│   ├── messaging/
-│   │   └── bridge.ts              # WXT messaging wrapper
-│   └── stores/                    # Zustand stores
-│       ├── sync-store.ts
-│       └── ui-store.ts
-├── components/                    # popup 和 app 共享的 React 组件
-│   ├── ChatList.tsx
-│   ├── SyncStatus.tsx
-│   └── ...
-├── assets/
-│   └── icons/
-├── public/
-├── wxt.config.ts                  # WXT 配置（替代 manifest.json）
-├── tailwind.config.ts
+├── entrypoints/                       # WXT 入口（薄胶水）
+│   ├── background.ts
+│   ├── content.ts
+│   ├── popup/                         # popup（轻量入口）
+│   └── app/                           # app（扩展内 Web App）
+├── src/
+│   ├── platform/                      # 浏览器平台适配（runtime、storage、permissions、logging）
+│   ├── domains/                       # 业务域（核心）
+│   │   ├── conversations/             # 会话：采集快照、去重、列表/详情读模型
+│   │   ├── sync/                      # 同步：job 状态、节流/重试、结果聚合
+│   │   ├── backup/                    # 备份/导入：zip v2、legacy JSON 合并规则
+│   │   └── settings/                  # 设置：敏感字段策略（不回显/只显示状态/提供清除）
+│   ├── integrations/                  # 外部系统集成（按目标分）
+│   │   ├── notion/
+│   │   ├── obsidian/
+│   │   └── web-article/
+│   ├── collectors/                    # 平台采集器（按站点/平台分文件夹）
+│   ├── ui/
+│   │   ├── app/                       # app 页面与路由
+│   │   ├── popup/                     # popup 组件
+│   │   └── inpage/                    # content/inpage UI（Shadow DOM）
+│   └── shared/                        # 无业务语义的纯工具（少量）
+├── public/                            # 静态资源（icons、fonts）
+├── tests/                             # Vitest（复用/迁移原有 tests）
+├── wxt.config.ts
 ├── tsconfig.json
 └── package.json
 ```
 
----
+迁移期额外约定：
 
-## 关键配置
-
-### wxt.config.ts
-
-```tsx
-import { defineConfig } from 'wxt';
-
-export default defineConfig({
-  modules: ['@wxt-dev/module-react'],
-  manifest: {
-    name: 'SyncNos WebClipper',
-    permissions: ['storage', 'activeTab', 'tabs'],
-    // 按需申请，不用 <all_urls>
-    optional_host_permissions: ['https://*/*', 'http://*/*'],
-  },
-  // 多浏览器
-  browser: 'chrome', // dev 默认，build 时 --browser firefox
-});
-```
-
-### app.html（unlisted page = 扩展内 SPA）
-
-```html
-<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SyncNos</title>
-    <!-- WXT unlisted page 不会出现在 manifest 的 chrome_url_overrides 里 -->
-    <!-- 用户通过 chrome.runtime.getURL('app.html') 打开 -->
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./app/main.tsx"></script>
-  </body>
-</html>
-```
-
-### app/main.tsx
-
-```tsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { HashRouter, Routes, Route } from 'react-router-dom';
-import { Conversations } from './routes/Conversations';
-import { SyncJobs } from './routes/SyncJobs';
-import { Settings } from './routes/Settings';
-import { Debug } from './routes/Debug';
-import { AppShell } from '../components/AppShell';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <HashRouter>
-    <AppShell>
-      <Routes>
-        <Route path="/" element={<Conversations />} />
-        <Route path="/sync" element={<SyncJobs />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/debug" element={<Debug />} />
-      </Routes>
-    </AppShell>
-  </HashRouter>
-);
-```
-
-### popup → 跳转 app.html
-
-```tsx
-// popup/App.tsx 里的「打开完整界面」按钮
-const openApp = (path = '/') => {
-  const url = browser.runtime.getURL(`/app.html#${path}`);
-  browser.tabs.create({ url });
-  window.close(); // 关闭 popup
-};
-```
-
-### background.ts（平移现有路由逻辑）
-
-```tsx
-// entrypoints/background.ts
-import { setupMessageRouter } from '@/lib/messaging/bridge';
-import { initStorage } from '@/lib/storage/background-storage';
-import { registerCollectors } from '@/lib/collectors/registry';
-
-export default defineBackground(() => {
-  // 初始化存储层（IndexedDB schema + migration）
-  initStorage();
-  // 注册消息路由（从 background-router.js 迁移）
-  setupMessageRouter();
-  // 注册采集器
-  registerCollectors();
-});
-```
+- 旧实现移动到 `src/legacy/`（只读 + 最小补丁），由新代码通过“适配层”调用；每完成一个域的替换，就删除对应 legacy。
 
 ---
 
-## 迁移步骤（按顺序执行）
+## 4. 权限与 Host 权限策略（先写清楚，避免迁移回归）
 
-### Phase 0：搭骨架（~1h）
+### 4.1 当前扩展依赖的权限（迁移后必须保留）
 
-- [ ]  `npx wxt@latest init WebClipper-v2 --template react`
-- [ ]  安装依赖：`pnpm add react-router-dom zustand`
-- [ ]  安装 dev 依赖：`pnpm add -D tailwindcss @tailwindcss/vite`
-- [ ]  配置 `wxt.config.ts`（见上）
-- [ ]  创建 `app.html` + `entrypoints/app/main.tsx`（unlisted SPA 入口）
-- [ ]  跑通 `pnpm dev`，确认 popup 和 app.html 都能打开
+> 以现状为准（见 `Extensions/WebClipper/manifest.json`）：`storage`, `downloads`, `tabs`, `webNavigation`, `activeTab`, `scripting`
 
-### Phase 1：平移业务逻辑到 lib/（~2-3h）
+迁移计划要求：
 
-- [ ]  把 `src/protocols/message-contracts.js` → `lib/protocols/message-contracts.ts`（加类型）
-- [ ]  把 `src/storage/schema.js` → `lib/storage/schema.ts`
-- [ ]  把 `src/bootstrap/background-storage.js` → `lib/storage/background-storage.ts`
-- [ ]  把 `src/bootstrap/background-router.js` → `lib/messaging/bridge.ts`
-- [ ]  把 `src/collectors/registry.js` + `runtime-observer.js` → `lib/collectors/`
-- [ ]  把 `src/storage/incremental-updater.js` → `lib/storage/incremental-updater.ts`
-- [ ]  **不改逻辑**，只加 TS 类型 + ESM import/export
+- Phase 0 就把这些权限在 `wxt.config.ts` 中完整声明出来（否则后续功能验证无意义）
+- 不在迁移期“顺便精简权限”；精简作为迁移完成后的独立任务（有数据支撑与验收）
 
-### Phase 2：重写 popup UI（~2h）
+### 4.2 host_permissions（关于 `http(s)://*/*`）
 
-- [ ]  `entrypoints/popup/App.tsx`：React 组件化
-- [ ]  保留核心功能：当前页采集状态、快速保存、打开 app.html 按钮
-- [ ]  通过 `browser.runtime.sendMessage` 和 background 通信（复用 message-contracts）
+现状已包含 `http://*/*` 与 `https://*/*`，且 inpage 默认在所有页面可见（`inpage_supported_only=false`）。因此：
 
-### Phase 3：搭 app.html SPA 路由页面（~3-4h）
-
-- [ ]  `AppShell`：侧边栏导航 + 顶栏
-- [ ]  `/`（Conversations）：对话列表，从 IndexedDB 读取
-- [ ]  `/sync`（SyncJobs）：同步任务状态、进度、重试
-- [ ]  `/settings`：配置项（Notion token、Parent Page 等）
-- [ ]  `/debug`：日志查看、IndexedDB 浏览
-
-### Phase 4：迁移 content script（~1-2h）
-
-- [ ]  `entrypoints/content.ts`：WXT 自动打包为 IIFE
-- [ ]  迁移 `inpage-button.js` → 用 `createShadowRootUi` 隔离样式
-- [ ]  迁移 `content-controller.js` 逻辑
-
-### Phase 5：多浏览器构建验证（~1h）
-
-- [ ]  `pnpm build` → Chrome 产物
-- [ ]  `pnpm build --browser firefox` → Firefox 产物（WXT 自动处理 MV2 fallback）
-- [ ]  删除旧 `scripts/build.mjs`、`check.mjs`
-- [ ]  更新 `AGENTS.md` 反映新项目结构
+- **迁移期不改默认行为** ⇒ host 权限继续需要覆盖全网页
+- 后续若要“默认最小 host 权限 + 运行时申请 optional host 权限”，必须：
+  - 明确行为变更（默认不再全站可见/或首次开启时弹权限）
+  - 补 UI 引导与降级路径
+  - 重做 content 注入策略（按需注入 vs 静态 content_scripts）
 
 ---
 
-## 架构决策记录
+## 5. 迁移策略（每一步可运行、可回滚）
 
-### 为什么 WXT 而不是裸 Vite？
+> 关键：不是“先把所有 JS 转 TS”，而是“先把交付形态稳定下来，再把业务域逐个 strangling 掉 legacy”。
 
-裸 Vite 需要你自己处理：manifest 生成、content script IIFE 打包、Firefox MV2 background.scripts fallback、开发时扩展自动 reload。这些全是 `build.mjs` 目前在做的事。WXT 内置解决了所有这些，底层就是 Vite。
+### Phase 0：Spike 验证（0.5–1 天，必须先做）
 
-### 为什么 WXT 而不是 Plasmo？
+- [ ] WXT 多入口：background/content/popup/app 能正常 dev 与 build
+- [ ] 验证 WXT 对 “unlisted page（app）” 的入口约定与产物路径（不要靠猜）
+- [ ] 验证 Firefox 交付链：构建、临时加载、基础功能可跑（至少 popup + background 路由 + storage）
 
-Plasmo 更「opinionated」，自动注入 content script UI 的方式和你现有的手动控制（registry + observer 模式）冲突较大。WXT 更接近原生 Vite，给你更多控制权，迁移摩擦更小。
+验收：
 
-### 为什么 unlisted page 而不是 newtab / options？
+- `dev` 下能从 popup 打开 `app`，HashRouter 路由可切换
+- `build` 产物可在 Chrome 加载
+- Firefox 临时扩展能加载并能打开 popup（不要求全功能，但要跑通核心通信链路）
 
-`app.html` 作为 unlisted page 不会覆盖用户的新标签页，不会出现在 manifest 的 `chrome_url_overrides` 里。用户通过 popup 按钮或 `chrome.runtime.getURL()` 主动打开。未来如果要覆盖 newtab，只需加一个 `entrypoints/newtab.html` 指向同一套 React 组件即可。
+### Phase 1：建立“平台层”与消息协议（1–2 天）
 
-### 为什么 HashRouter？
+- [ ] `src/platform/runtime`：统一 `sendMessage/connectPort`，屏蔽 `chrome`/`browser` 差异
+- [ ] `src/platform/storage`：统一 `storage.local` 访问（包含敏感字段策略的 helper）
+- [ ] `src/domains/*` 的接口先定义出来（只定义类型与边界，不搬代码）
+- [ ] `message-contracts` 转 TS，并成为唯一消息 type 来源（禁止散落字符串）
 
-扩展页面走 `chrome-extension://` 协议，不经过 HTTP 服务器，没有 server-side fallback。`HashRouter` 是唯一可靠的选择。
+验收：
 
-### 为什么 Zustand 而不是 Redux / Jotai / Context？
+- background 能注册 router，popup/app 能发送最小消息并得到响应
 
-- 比 Redux 轻得多，没有 boilerplate
-- Store 逻辑可以脱离 React 组件树（background 里也能用）
-- TS 类型推断天然友好
-- 你一个人维护，简单就是正义
+### Phase 2：先把“扩展内 Web App（app）”跑起来（1–2 天）
+
+- [ ] app 路由骨架：`/`（Conversations）、`/sync`、`/settings`、`/debug`（先空壳）
+- [ ] popup 增加一个“打开完整界面”按钮：`browser.runtime.getURL('app.html#...')`
+- [ ] settings 页先只做“状态展示 + 清除”，不回显 token/apiKey
+
+验收：
+
+- app 可作为“未来扩展主界面”稳定打开与导航
+
+### Phase 3：按业务域逐个替换 legacy（2–5 天，迭代）
+
+按顺序建议：
+
+1) conversations（读多写少）
+2) sync jobs（Notion/Obsidian 状态）
+3) export/backup（文件/zip）
+4) collectors/inpage（最容易回归，最后做）
+
+每个域的要求：
+
+- [ ] 给域内核心逻辑补 3 类单测：数据转换 / 状态变化 / 边界条件
+- [ ] 完成后删掉对应 legacy 子模块（避免双实现长期共存）
+
+### Phase 4：迁移 inpage（最后做，单独验收）
+
+- [ ] Shadow DOM 隔离样式
+- [ ] 严格回归交互约束（400ms combo、单例 tip、双击打开等）
+
+### Phase 5：替换构建链与发布链（收尾）
+
+- [ ] 清理旧 `scripts/build.mjs`、`scripts/check.mjs`（在 WXT 完整覆盖后再删）
+- [ ] 保留/重建 “Firefox AMO source package” 的可复现流程（迁移现有 `package-amo-source` 能力）
+- [ ] 更新 `Extensions/WebClipper/AGENTS.md` 与 README（仅在新结构稳定后）
 
 ---
 
-## 给 Codex 的执行指令
+## 6. 关键配置草案（先写清“必须项”，细节在 Phase 0 Spike 后定稿）
 
-复制以下内容直接发给 Codex：
+### wxt.config.ts（迁移期必须包含完整权限）
+
+> 迁移期先“对齐现状权限”，不要先做权限瘦身。
+
+- permissions：`storage`, `downloads`, `tabs`, `webNavigation`, `activeTab`, `scripting`
+- host_permissions：保留现状（含 `http(s)://*/*`）直到明确要改默认行为
+
+---
+
+## 7. 给 Codex 的执行指令（更新版，强调渐进与可回滚）
 
 ```
-用 WXT 重构 Extensions/WebClipper。具体要求：
+目标：在 Extensions/WebClipper 内 in-place 迁移到 WXT（不要新建 WebClipper-v2 目录），采用渐进式重构。
 
-1. 在 Extensions/ 下用 `npx wxt@latest init WebClipper-v2 --template react` 初始化
-2. 安装 @wxt-dev/module-react, react-router-dom, zustand, tailwindcss, @tailwindcss/vite
-3. 配置 wxt.config.ts：React 模块、manifest name "SyncNos WebClipper"、permissions: storage + activeTab + tabs、optional_host_permissions: https://*/* + http://*/*
-4. 创建 entrypoints/app.html 作为 unlisted page（扩展内 SPA）
-5. 创建 entrypoints/app/main.tsx：HashRouter + 4 个路由（/, /sync, /settings, /debug）
-6. popup 保持轻量，加一个按钮通过 browser.runtime.getURL('/app.html') 打开完整界面
-7. 把现有 src/ 下的业务逻辑平移到 lib/（加 TS 类型，不改逻辑）：
-   - protocols/message-contracts → lib/protocols/
-   - storage/schema + background-storage + incremental-updater → lib/storage/
-   - bootstrap/background-router → lib/messaging/bridge.ts
-   - collectors/registry + runtime-observer → lib/collectors/
-8. background.ts 调用 lib/ 的初始化函数
-9. content.ts 迁移 content-controller + inpage-button，用 createShadowRootUi
-10. 确保 pnpm dev 和 pnpm build 都能跑通，pnpm build --browser firefox 也能跑通
-11. 不要修改 lib/ 下的业务逻辑，只做 JS→TS 转换和 ESM 化
+硬性要求：
+1) 每个 Phase 结束都能 npm dev / npm run build / npm test 通过（优先复用现有 npm + package-lock，不强制切 pnpm）
+2) wxt.config.ts 迁移期必须先对齐现状 permissions/host_permissions（不要提前“精简权限”）
+3) 先做 Phase 0 Spike：验证 app（unlisted page）入口约定 + Firefox 构建与临时加载可跑
+4) 目录结构按“业务分域”组织（domains/integrations/ui/platform），旧实现移到 src/legacy 并逐段删除
+5) settings 页面敏感字段不回显，只展示状态与提供清除
 ```
