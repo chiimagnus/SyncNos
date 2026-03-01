@@ -56,6 +56,7 @@ xcodebuild -scheme SyncNos build # 构建
 |------|------|
 | 添加新数据源 | `SyncNos/Services/DataSources-From/添加新数据源完整指南.md` |
 | 添加新同步目标 | `SyncNos/Services/DataSources-To/添加新同步目标完整指南.md` |
+| WebClipper：Obsidian Local REST API 同步 | `.github/docs/webclipper-obsidian-local-rest-api-sync.md` |
 
 ## 测试
 
