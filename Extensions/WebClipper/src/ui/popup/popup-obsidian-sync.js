@@ -22,6 +22,8 @@
     error: "Error (see console)"
   });
 
+  const OBSIDIAN_SETUP_GUIDE_URL = "https://github.com/chiimagnus/SyncNos/blob/feat/.github/docs/webclipper-obsidian-local-rest-api-sync.md";
+
   let suppressEvents = true;
   let busy = false;
 
@@ -250,6 +252,13 @@
             alert((e && e.message) || "Test failed.");
           })
           .finally(() => setBusy(false));
+      });
+    }
+
+    if (els.obsidianSetupGuideLink) {
+      els.obsidianSetupGuideLink.addEventListener("click", (e) => {
+        try { e && e.preventDefault && e.preventDefault(); } catch (_e2) {}
+        chrome.tabs.create({ url: OBSIDIAN_SETUP_GUIDE_URL });
       });
     }
   }

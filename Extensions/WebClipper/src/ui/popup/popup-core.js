@@ -88,6 +88,7 @@
       obsidianApiBaseUrl: document.getElementById("obsidianApiBaseUrl"),
       obsidianApiKey: document.getElementById("obsidianApiKey"),
       obsidianAuthHeaderName: document.getElementById("obsidianAuthHeaderName"),
+      obsidianSetupGuideLink: document.getElementById("obsidianSetupGuideLink"),
       obsidianChatFolder: document.getElementById("obsidianChatFolder"),
       obsidianArticleFolder: document.getElementById("obsidianArticleFolder"),
       btnObsidianSettingsSave: document.getElementById("btnObsidianSettingsSave"),
