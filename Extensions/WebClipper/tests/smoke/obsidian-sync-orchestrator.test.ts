@@ -47,22 +47,75 @@ describe("obsidian-sync-orchestrator", () => {
     expect(res.error?.code).toBe("disabled");
   });
 
-  it("runs sync job and exposes job status", async () => {
+  it("decides full rebuild when remote note is missing (404)", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
     const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
     loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
+    loadModule("../../src/export/obsidian/obsidian-note-path.js");
+    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
     const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
 
-    await store.saveSettings({ enabled: true });
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      async getConversationById() {
+        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
+      },
+      async getMessagesByConversationId() {
+        return [{ messageKey: "m1", sequence: 1, contentMarkdown: "hi", updatedAt: Date.now() }];
+      }
+    };
 
-    const syncRes = await orch.syncConversations({ conversationIds: [1, 2], instanceId: "x" });
-    expect(syncRes.results.length).toBe(2);
+    // @ts-expect-error test global
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({ errorCode: 40400, message: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
+    };
+
+    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(syncRes.results[0].mode).toBe("full_rebuild");
+  });
+
+  it("decides incremental append when remote has cursor and there are new messages", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    setupChromeStorage();
+    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
+    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
+    loadModule("../../src/export/obsidian/obsidian-note-path.js");
+    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
+    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+
+    // @ts-expect-error test global
+    globalThis.WebClipper.backgroundStorage = {
+      async getConversationById() {
+        return { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "k1", title: "t" };
+      },
+      async getMessagesByConversationId() {
+        return [
+          { messageKey: "m1", sequence: 1, contentMarkdown: "a", updatedAt: 1 },
+          { messageKey: "m2", sequence: 2, contentMarkdown: "b", updatedAt: 2 }
+        ];
+      }
+    };
+
+    // @ts-expect-error test global
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({
+        frontmatter: {
+          syncnos: { source: "chatgpt", conversationKey: "k1", schemaVersion: 1, lastSyncedSequence: 1, lastSyncedMessageKey: "m1" }
+        },
+        content: "x"
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    await store.saveSettings({ enabled: true, apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k" });
+    const syncRes = await orch.syncConversations({ conversationIds: [1], instanceId: "x" });
+    expect(syncRes.results[0].mode).toBe("incremental_append");
+    expect(syncRes.results[0].appended).toBe(1);
 
     const status = await orch.getSyncStatus({ instanceId: "x" });
     expect(status.job?.status).toBe("finished");
-    expect(Array.isArray(status.job?.perConversation)).toBe(true);
   });
 });
-
