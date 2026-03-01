@@ -34,7 +34,10 @@
         conversationKey,
         schemaVersion,
         lastSyncedSequence: safeNumberOrNull(obj.lastSyncedSequence),
-        lastSyncedMessageKey: safeString(obj.lastSyncedMessageKey) || ""
+        lastSyncedMessageKey: safeString(obj.lastSyncedMessageKey) || "",
+        // Optional fields for conflict detection / debugging.
+        lastSyncedMessageUpdatedAt: safeNumberOrNull(obj.lastSyncedMessageUpdatedAt),
+        lastSyncedAt: safeNumberOrNull(obj.lastSyncedAt)
       }
     };
   }
@@ -54,7 +57,9 @@
       conversationKey,
       schemaVersion: SCHEMA_VERSION,
       lastSyncedSequence,
-      lastSyncedMessageKey
+      lastSyncedMessageKey,
+      lastSyncedMessageUpdatedAt: safeNumberOrNull(cur.lastSyncedMessageUpdatedAt),
+      lastSyncedAt: safeNumberOrNull(cur.lastSyncedAt)
     };
   }
 
@@ -66,4 +71,3 @@
 
   if (typeof module !== "undefined" && module.exports) module.exports = NS.obsidianSyncMetadata;
 })();
-

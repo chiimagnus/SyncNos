@@ -36,7 +36,9 @@
     const last = list[list.length - 1] || {};
     return {
       lastSyncedSequence: Number.isFinite(Number(last.sequence)) ? Number(last.sequence) : null,
-      lastSyncedMessageKey: safeString(last.messageKey)
+      lastSyncedMessageKey: safeString(last.messageKey),
+      lastSyncedMessageUpdatedAt: Number.isFinite(Number(last.updatedAt)) ? Number(last.updatedAt) : null,
+      lastSyncedAt: Date.now()
     };
   }
 
@@ -44,12 +46,22 @@
     const list = Array.isArray(messages) ? messages : [];
     if (!list.length) return { ok: true, newMessages: [], reason: "empty" };
 
-    const seq = cursor && Number.isFinite(Number(cursor.lastSyncedSequence)) ? Number(cursor.lastSyncedSequence) : null;
+    const seq = cursor && cursor.lastSyncedSequence != null && Number.isFinite(Number(cursor.lastSyncedSequence))
+      ? Number(cursor.lastSyncedSequence)
+      : null;
     const key = cursor && cursor.lastSyncedMessageKey ? safeString(cursor.lastSyncedMessageKey) : "";
     if (seq == null || !key) return { ok: false, reason: "missing_cursor" };
 
     const anchor = list.find((m) => safeString(m && m.messageKey) === key && Number(m && m.sequence) === seq);
     if (!anchor) return { ok: false, reason: "cursor_mismatch" };
+
+    const expectedUpdatedAt = cursor && cursor.lastSyncedMessageUpdatedAt != null && Number.isFinite(Number(cursor.lastSyncedMessageUpdatedAt))
+      ? Number(cursor.lastSyncedMessageUpdatedAt)
+      : null;
+    const actualUpdatedAt = anchor && Number.isFinite(Number(anchor.updatedAt)) ? Number(anchor.updatedAt) : null;
+    if (expectedUpdatedAt != null && actualUpdatedAt != null && expectedUpdatedAt !== actualUpdatedAt) {
+      return { ok: false, reason: "cursor_updatedAt_mismatch" };
+    }
 
     const newMessages = list.filter((m) => Number(m && m.sequence) > seq);
     return { ok: true, newMessages, reason: newMessages.length ? "has_changes" : "no_changes" };
@@ -221,8 +233,24 @@
               && patchRes.error.body
               && typeof patchRes.error.body === "object"
               && String(patchRes.error.body.message || "").includes("content-already-preexists-in-target");
-            if (!patchRes.ok && !isIdempotentDup) {
+            const patchFailedCode = patchRes && patchRes.error && patchRes.error.body && typeof patchRes.error.body === "object"
+              ? Number(patchRes.error.body.errorCode)
+              : null;
+            const isPatchFailed = !patchRes.ok && (patchFailedCode === 40080 || String(patchRes.error && patchRes.error.body && patchRes.error.body.message || "").includes("PatchFailed"));
+
+            if (!patchRes.ok && !isIdempotentDup && !isPatchFailed) {
               row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: patchRes.error && patchRes.error.message ? patchRes.error.message : "patch failed", at: Date.now() });
+            } else if (!patchRes.ok && isPatchFailed && !isIdempotentDup) {
+              // Fallback to full rebuild.
+              const syncnosObject = metaMod.buildSyncnosObject({ conversation: decision.convo, cursor: pickLocalCursor(decision.messages) });
+              const markdown = writer.buildFullNoteMarkdown({ conversation: decision.convo, messages: decision.messages, syncnosObject });
+              // @ts-ignore
+              const putRes = await client.putVaultFile(decision.filePath, markdown);
+              if (!putRes || !putRes.ok) {
+                row = buildPerConversationResult({ conversationId, ok: false, mode: "failed", appended: 0, error: putRes && putRes.error && putRes.error.message ? putRes.error.message : "put failed", at: Date.now() });
+              } else {
+                row = buildPerConversationResult({ conversationId, ok: true, mode: "full_rebuild_fallback", appended: decision.messages.length, error: "", at: Date.now() });
+              }
             } else {
               const syncnosObject = metaMod.buildSyncnosObject({ conversation: decision.convo, cursor: decision.nextCursor });
               // @ts-ignore

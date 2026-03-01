@@ -24,7 +24,7 @@ describe("obsidian-sync-metadata", () => {
     const mod = loadMetadata();
     const syncnos = mod.buildSyncnosObject({
       conversation: { source: "x", conversationKey: "y" },
-      cursor: { lastSyncedSequence: 12, lastSyncedMessageKey: "m1" }
+      cursor: { lastSyncedSequence: 12, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 9, lastSyncedAt: 10 }
     });
 
     const parsed = mod.readSyncnosObject({ syncnos });
@@ -33,6 +33,7 @@ describe("obsidian-sync-metadata", () => {
     expect(parsed.data?.conversationKey).toBe("y");
     expect(parsed.data?.lastSyncedSequence).toBe(12);
     expect(parsed.data?.lastSyncedMessageKey).toBe("m1");
+    expect(parsed.data?.lastSyncedMessageUpdatedAt).toBe(9);
+    expect(parsed.data?.lastSyncedAt).toBe(10);
   });
 });
-
