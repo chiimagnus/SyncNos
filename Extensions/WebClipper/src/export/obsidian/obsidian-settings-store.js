@@ -52,6 +52,8 @@
     return {
       apiBaseUrl,
       authHeaderName,
+      // User requested plaintext display in the popup.
+      apiKey,
       apiKeyPresent: !!apiKey,
       // Do not expose the plaintext key back to the popup.
       apiKeyMasked: apiKey ? "********************************" : ""

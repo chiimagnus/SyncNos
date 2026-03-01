@@ -27,7 +27,7 @@ describe("popup-obsidian-sync", () => {
     expect(payload.apiKey).toBe(null);
   });
 
-  it("applies settings to UI with masked api key placeholder", () => {
+  it("applies settings to UI with plaintext api key", () => {
     const els: any = {
       obsidianApiBaseUrl: { value: "" },
       obsidianAuthHeaderName: { value: "" },
@@ -42,11 +42,11 @@ describe("popup-obsidian-sync", () => {
     api.__test.applySettingsToUi({
       apiBaseUrl: "http://127.0.0.1:27123",
       authHeaderName: "Authorization",
+      apiKey: "secret-key",
       apiKeyPresent: true
     });
     expect(els.obsidianApiBaseUrl.value).toContain("http://127.0.0.1:27123");
-    expect(typeof els.obsidianApiKey.value).toBe("string");
-    expect(els.obsidianApiKey.value.length).toBeGreaterThan(10);
+    expect(els.obsidianApiKey.value).toBe("secret-key");
     expect(els.obsidianApiKey.placeholder).toBe("");
   });
 });
