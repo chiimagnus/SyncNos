@@ -1,3 +1,5 @@
+import { startLegacyContent } from '../src/legacy/content-entry.js';
+
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
   // Note: host_permissions still includes `http(s)://*/*` for on-demand scripting injects.
@@ -17,7 +19,7 @@ export default defineContentScript({
     'https://poe.com/*',
     'https://*.notion.so/*',
   ],
-  main() {
-    console.log('WebClipper content (WXT)');
+  async main() {
+    await startLegacyContent();
   },
 });
