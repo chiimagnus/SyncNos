@@ -62,6 +62,16 @@
     };
   }
 
+  async function getConnectionConfig() {
+    const res = await storageGet([STORAGE_KEYS.enabled, STORAGE_KEYS.apiBaseUrl, STORAGE_KEYS.apiKey, STORAGE_KEYS.authHeaderName]);
+    return {
+      enabled: res[STORAGE_KEYS.enabled] == null ? DEFAULTS.enabled : Boolean(res[STORAGE_KEYS.enabled]),
+      apiBaseUrl: normalizeBaseUrl(res[STORAGE_KEYS.apiBaseUrl]),
+      apiKey: safeString(res[STORAGE_KEYS.apiKey]),
+      authHeaderName: normalizeAuthHeaderName(res[STORAGE_KEYS.authHeaderName])
+    };
+  }
+
   async function saveSettings({ enabled, apiBaseUrl, apiKey, authHeaderName } = {}) {
     const payload = {};
     if (enabled != null) payload[STORAGE_KEYS.enabled] = Boolean(enabled);
@@ -78,9 +88,9 @@
     STORAGE_KEYS,
     DEFAULTS,
     getSettings,
+    getConnectionConfig,
     saveSettings
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = NS.obsidianSettingsStore;
 })();
-
