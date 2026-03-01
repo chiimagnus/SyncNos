@@ -1,9 +1,23 @@
 export default defineContentScript({
-  // P1: temporary match-all for scaffolding verification.
-  // P1-05 will align this to the current manifest's supported sites/strategy.
-  matches: ['http://*/*', 'https://*/*'],
+  // P1-05: align with current `manifest.json` content_scripts matches.
+  // Note: host_permissions still includes `http(s)://*/*` for on-demand scripting injects.
+  matches: [
+    'https://chat.openai.com/*',
+    'https://chatgpt.com/*',
+    'https://www.chatgpt.com/*',
+    'https://claude.ai/*',
+    'https://gemini.google.com/*',
+    'https://chat.deepseek.com/*',
+    'https://chat.z.ai/*',
+    'https://kimi.moonshot.cn/*',
+    'https://kimi.com/*',
+    'https://*.kimi.com/*',
+    'https://www.doubao.com/*',
+    'https://yuanbao.tencent.com/*',
+    'https://poe.com/*',
+    'https://*.notion.so/*',
+  ],
   main() {
     console.log('WebClipper content (WXT)');
   },
 });
-
