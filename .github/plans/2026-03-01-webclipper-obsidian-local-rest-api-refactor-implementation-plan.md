@@ -17,13 +17,13 @@
 - 每次同步先 `GET /vault/<path>` 检查远端：`404 -> PUT 全量`，`200 -> 读取 note+json 决策增量`。
 - 增量写入优先使用 `PATCH /vault/<path>`（按 heading 追加）以获得去重能力；写入游标使用 `PATCH frontmatter`，两步均可重试且幂等。
 - 若检测到历史消息被改写/删除、frontmatter 缺失或不兼容，自动回退 `PUT` 全量重建，保证可恢复性。
-- TLS 现实约束：浏览器扩展无法跳过自签名证书校验；开发期建议优先启用插件的 `HTTP (Insecure Mode, :27123)`，或按插件文档导出证书 `GET /obsidian-local-rest-api.crt` 并在系统/浏览器中信任后再使用 `HTTPS (Secure Mode, :27124)`。
+- 本期仅支持插件 `HTTP (Insecure Mode, :27123)`（`http://127.0.0.1:27123`）。`https://127.0.0.1:27124` 自签名证书信任与 HTTPS 支持暂不纳入范围（避免引入证书安装/信任流程与跨浏览器差异）。
 
 **Acceptance（验收）:**
 - 选中会话后执行 Obsidian 同步，首次写入成功创建文件；再次同步仅追加新增消息。
 - 在 Obsidian 手动删除对应文件后，再次同步可自动全量重建文件。
 - 在 Obsidian 保留文件但移除同步 frontmatter 后，再次同步可自动回退全量写入并补齐 frontmatter。
-- API Key 鉴权失败、服务不可达、自签名证书错误都能在 UI 给出明确错误。
+- API Key 鉴权失败、服务不可达等都能在 UI 给出明确错误（本期不实现 HTTPS 证书错误的专门引导）。
 - 重复触发同一批增量不会重复写入（去重生效）。
 - 自动化验证通过：`npm --prefix Extensions/WebClipper run test` 与 `npm --prefix Extensions/WebClipper run check`。
 
@@ -31,22 +31,20 @@
 
 ## P1（最高优先级）：重构协议与基础设施
 
-### Task 1: 重构消息协议，新增 Obsidian 同步指令
+### Task 1: 重构消息协议，新增 Obsidian 同步指令（移除 URI 模式）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/protocols/message-contracts.js`
 - Modify: `Extensions/WebClipper/src/bootstrap/background-router.js`
-- Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-open.test.ts`
 - Create: `Extensions/WebClipper/tests/smoke/background-router-obsidian-sync.test.ts`
 
 **Step 1: 实现功能**
 - 新增 Obsidian 消息类型：`SYNC_CONVERSATIONS`、`GET_SYNC_STATUS`、`TEST_CONNECTION`、`SAVE_SETTINGS`、`GET_SETTINGS`。
-- 保留 `OPEN_URL` 仅作为向后兼容（后续可下线）。
+- 删除 `OPEN_URL` 路由与相关 UI 逻辑（不再支持 `obsidian://` URI 导出）。
 
 **Step 2: 验证**
-Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/background-router-obsidian-open.test.ts`  
 Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/background-router-obsidian-sync.test.ts`  
-Expected: 新旧 Obsidian 路由测试都通过。
+Expected: Obsidian 同步路由测试通过。
 
 **Step 3:（可选）原子提交**
 Run: `git commit -m "refactor: task1 - add obsidian sync message contracts"`
@@ -60,7 +58,7 @@ Run: `git commit -m "refactor: task1 - add obsidian sync message contracts"`
 - Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-sync.test.ts`
 
 **Step 1: 实现功能**
-- 统一存储键：`obsidian_sync_enabled`、`obsidian_api_base_url`、`obsidian_api_key`、`obsidian_api_auth_header_name`、`obsidian_allow_insecure_http`。
+- 统一存储键：`obsidian_sync_enabled`、`obsidian_api_base_url`、`obsidian_api_key`、`obsidian_api_auth_header_name`。
 - 所有写入由 background 执行，popup 不直接触达密钥。
 
 **Step 2: 验证**
@@ -78,12 +76,11 @@ Run: `git commit -m "feat: task2 - add obsidian settings store for local rest ap
 
 **Step 1: 实现功能**
 - 封装 `GET/PUT/POST/PATCH /vault/<path>` 与 `GET /`（无需鉴权但返回 `authenticated`）健康检查。
-- 支持 `GET /obsidian-local-rest-api.crt`（证书导出，供用户手动信任 HTTPS）。
 - 路径编码：对每个 path segment 做 `encodeURIComponent`，保留 `/` 为真实分隔符（不要把 `/` 编码成 `%2F`）。
 - 统一注入 `Authorization: Bearer <apiKey>`（header 名默认 `Authorization`，但允许用户在插件端改名时可配置）。
 - 支持 `Accept: application/vnd.olrapi.note+json`（读取 frontmatter/tags/stat/content）与 `text/markdown`（纯文本）。
-- 统一错误结构：`network_error`、`auth_error`、`not_found`、`tls_error`、`bad_request`。
-  - `tls_error` 需明确提示“自签名证书未信任”与解决方式（切到 HTTP insecure 或信任证书）。
+- 统一错误结构：`network_error`、`auth_error`、`not_found`、`bad_request`。
+- 若用户配置了 `https://` Base URL：直接返回清晰错误（本期不支持），提示改用 `http://127.0.0.1:27123`。
 
 **Step 2: 验证**
 Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/obsidian-local-rest-client.test.ts`  
@@ -248,7 +245,7 @@ Run: `git commit -m "refactor: task9 - switch popup obsidian action to sync work
 
 **Step 1: 实现功能**
 - 设置项：API Base URL、API Key、启用开关、连接测试按钮。
-- Base URL 默认建议：`http://127.0.0.1:27123`（插件 HTTP Insecure Mode），或 `https://127.0.0.1:27124`（HTTPS Secure Mode，需信任证书）。
+- Base URL 默认：`http://127.0.0.1:27123`（插件 HTTP Insecure Mode）。
 - 密钥输入框仅显示掩码；保存时走 background 消息。
 
 **Step 2: 验证**
@@ -286,33 +283,14 @@ Expected: UI 与交互相关 smoke 测试全部通过。
 
 ## P4：兼容迁移、文档与最终验收
 
-### Task 12: 向后兼容旧 URI 通道并提供迁移开关
-
-**Files:**
-- Modify: `Extensions/WebClipper/src/ui/popup/popup.js`
-- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-url-service.js`
-- Modify: `Extensions/WebClipper/src/protocols/message-contracts.js`
-- Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-open.test.ts`
-
-**Step 1: 实现功能**
-- 默认走 Local REST API；连接不可用时允许手动切换到 URI 模式。
-- URI 模式标记为兼容能力，避免中断老用户。
-
-**Step 2: 验证**
-Run: `npm --prefix Extensions/WebClipper run test -- tests/smoke/background-router-obsidian-open.test.ts`  
-Expected: 兼容链路保持可用。
-
-**Step 3:（可选）原子提交**
-Run: `git commit -m "chore: task12 - keep uri fallback for backward compatibility"`
-
-### Task 13: 文档与开发说明更新
+### Task 12: 文档与开发说明更新
 
 **Files:**
 - Modify: `Extensions/WebClipper/AGENTS.md`
 - Create: `.github/docs/webclipper-obsidian-local-rest-api-sync.md`
 
 **Step 1: 实现功能**
-- 补充本地 API 配置步骤、证书处理、安全建议、故障排查。
+- 补充本地 API 配置步骤、安全建议、故障排查（本期仅覆盖 HTTP :27123）。
 - 安全建议至少覆盖：绑定 `127.0.0.1`（避免 `0.0.0.0` 暴露到局域网）、谨慎启用 HTTP insecure、API Key 视为敏感信息与轮换方式。
 - 明确“远端存在驱动”策略与 frontmatter 字段约定。
 
@@ -321,9 +299,9 @@ Run: `rg -n "Obsidian|Local REST API|frontmatter|full_rebuild|incremental" Exten
 Expected: 文档术语一致，路径准确。
 
 **Step 3:（可选）原子提交**
-Run: `git commit -m "docs: task13 - document obsidian local rest api sync architecture"`
+Run: `git commit -m "docs: task12 - document obsidian local rest api sync architecture"`
 
-### Task 14: 端到端冒烟与打包校验
+### Task 13: 端到端冒烟与打包校验
 
 **Files:**
 - Modify: `Extensions/WebClipper/tests/smoke/`（按需要补充 e2e smoke）
@@ -338,7 +316,7 @@ Run: `npm --prefix Extensions/WebClipper run build`
 Expected: 测试、检查、构建全部通过。
 
 **Step 3:（可选）原子提交**
-Run: `git commit -m "test: task14 - add obsidian local rest api end-to-end smoke coverage"`
+Run: `git commit -m "test: task13 - add obsidian local rest api end-to-end smoke coverage"`
 
 ---
 
@@ -347,7 +325,7 @@ Run: `git commit -m "test: task14 - add obsidian local rest api end-to-end smoke
 - 空会话（0 条消息）: 同步应拒绝并提示原因，不创建空白垃圾文件。
 - 重复消息 key: 增量计算必须去重，避免重复 append。
 - 历史消息编辑: 自动回退全量重建，防止远端内容分叉。
-- API 不可用/证书异常: 不应卡死任务，单条失败可继续其它条目；证书异常要给出可执行的修复路径（切 HTTP insecure 或信任 `GET /obsidian-local-rest-api.crt`）。
+- API 不可用: 不应卡死任务，单条失败可继续其它条目；需给出可执行的修复路径（例如确认插件启用、Base URL 正确、API Key 正确）。
 - PATCH 去重反馈: `40080 PatchFailed` 且 message 为 `content-already-preexists-in-target` 时应视为幂等成功（不算失败）。
 - 用户手动改标题: 不影响文件定位（路径由 conversationKey 决定）。
 
@@ -359,6 +337,6 @@ Run: `git commit -m "test: task14 - add obsidian local rest api end-to-end smoke
 
 ## 不确定项（执行前确认）
 
-- 是否在第一期直接移除 URI 模式，还是保留兼容开关一个小版本周期。
-- frontmatter 字段命名是否固定为 `syncnos.*`，或需要与现有 SyncNos 主应用字段保持一致。
-- 是否允许 HTTP（27123）作为开发临时模式；生产建议仅 HTTPS（27124）。
+- 已确认：直接移除 URI 模式。
+- 已确认：本期仅支持 HTTP（27123）。
+- 待最终确认：frontmatter 字段命名采用 `syncnos` 命名空间对象（推荐），还是改为扁平键（例如 `syncnos_*`）。
