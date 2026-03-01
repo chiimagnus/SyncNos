@@ -23,8 +23,6 @@
     error: "Error (see console)"
   });
 
-  const API_KEY_MASK = "********************************";
-
   let suppressEvents = true;
   let busy = false;
 
@@ -33,7 +31,6 @@
   let savePending = false;
   let dirty = false;
 
-  let apiKeyPresentCached = false;
   let lastSaved = { apiBaseUrl: null, authHeaderName: null };
 
   function safeString(v) {
@@ -60,7 +57,7 @@
     const shouldIncludeKey = includeApiKey === true;
     const apiKeyRaw = els.obsidianApiKey ? String(els.obsidianApiKey.value || "") : "";
     const apiKeyTrimmed = safeString(apiKeyRaw);
-    const apiKey = shouldIncludeKey && apiKeyTrimmed && apiKeyTrimmed !== API_KEY_MASK ? apiKeyRaw : null;
+    const apiKey = shouldIncludeKey && apiKeyTrimmed ? apiKeyRaw : null;
 
     return { apiBaseUrl, authHeaderName, apiKey };
   }
@@ -72,17 +69,8 @@
       if (els.obsidianApiBaseUrl) els.obsidianApiBaseUrl.value = s.apiBaseUrl ? String(s.apiBaseUrl) : "";
       if (els.obsidianAuthHeaderName) els.obsidianAuthHeaderName.value = s.authHeaderName ? String(s.authHeaderName) : "";
       if (els.obsidianApiKey) {
-        // Never show plaintext key. Provide a placeholder when key exists.
-        const hasKey = !!s.apiKeyPresent;
-        apiKeyPresentCached = hasKey;
-        els.obsidianApiKey.value = hasKey ? API_KEY_MASK : "";
+        els.obsidianApiKey.value = s.apiKey ? String(s.apiKey) : "";
         els.obsidianApiKey.placeholder = "";
-        if (hasKey) {
-          if (!els.obsidianApiKey.dataset) els.obsidianApiKey.dataset = {};
-          els.obsidianApiKey.dataset.masked = "1";
-        } else {
-          if (els.obsidianApiKey.dataset) delete els.obsidianApiKey.dataset.masked;
-        }
       }
     } finally {
       suppressEvents = false;
@@ -209,19 +197,9 @@
 
     if (els.obsidianApiKey) {
       // Only save API key when the user commits the value (Enter/blur).
-      els.obsidianApiKey.addEventListener("focus", () => {
-        if (els.obsidianApiKey && els.obsidianApiKey.dataset && els.obsidianApiKey.dataset.masked === "1") {
-          els.obsidianApiKey.value = "";
-          delete els.obsidianApiKey.dataset.masked;
-        }
-      });
       els.obsidianApiKey.addEventListener("blur", () => {
         const typed = els.obsidianApiKey ? safeString(els.obsidianApiKey.value) : "";
-        if (!typed && apiKeyPresentCached) {
-          els.obsidianApiKey.value = API_KEY_MASK;
-          els.obsidianApiKey.dataset.masked = "1";
-          return;
-        }
+        if (!typed) return;
         runSave({ includeApiKey: true, applyUi: true });
       });
       els.obsidianApiKey.addEventListener("keydown", (e) => {
