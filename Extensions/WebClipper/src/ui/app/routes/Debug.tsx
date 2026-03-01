@@ -1,7 +1,9 @@
+import { send } from '../../../platform/runtime/runtime';
+
 export default function Debug() {
   const ping = async () => {
     try {
-      const res = await browser.runtime.sendMessage({ type: '__WXT_PING__' });
+      const res = await send('__WXT_PING__');
       alert(JSON.stringify(res));
     } catch (e) {
       alert(String(e));
