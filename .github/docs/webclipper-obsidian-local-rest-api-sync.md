@@ -15,8 +15,17 @@
 ## Obsidian 端准备
 
 1. 安装并启用插件：`Obsidian Local REST API`
-2. 启用 Insecure HTTP（默认端口 `27123`）
-3. 配置 API Key
+
+![Install Obsidian Local REST API plugin](../../Extensions/WebClipper/src/ui/guide/assets/obsidian-install-plugin.png)
+
+2. 在插件设置中启用 `Insecure HTTP`（默认端口 `27123`）
+
+![Enable insecure HTTP mode](../../Extensions/WebClipper/src/ui/guide/assets/obsidian-enable-insecure-http.png)
+
+3. 复制 `API Key`（后续要粘贴到 WebClipper 设置里）
+
+![Copy API key](../../Extensions/WebClipper/src/ui/guide/assets/obsidian-copy-api-key.png)
+
 4. 确认监听地址为 `127.0.0.1`（不要绑定 `0.0.0.0` 暴露到局域网）
 
 ## WebClipper 配置
