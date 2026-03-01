@@ -17,7 +17,6 @@
   const STATUS = Object.freeze({
     idle: "Idle",
     loading: "Loading…",
-    dirty: "Unsaved changes…",
     saving: "Saving…",
     saved: "Saved",
     error: "Error (see console)"
@@ -29,7 +28,6 @@
   let saveTimer = 0;
   let saveInFlight = false;
   let savePending = false;
-  let dirty = false;
 
   let lastSaved = { apiBaseUrl: null, authHeaderName: null, chatFolder: null, articleFolder: null };
 
@@ -117,7 +115,6 @@
     if (!res || !res.ok) throw new Error((res && res.error && res.error.message) || "Failed to load Obsidian settings.");
     applySettingsToUi(res.data);
     lastSaved = snapshotFromSettings(res.data);
-    dirty = false;
     return res.data;
   }
 
@@ -127,14 +124,11 @@
     if (!res || !res.ok) throw new Error((res && res.error && res.error.message) || "Failed to save Obsidian settings.");
     if (applyUi !== false) applySettingsToUi(res.data);
     lastSaved = snapshotFromSettings(res.data);
-    dirty = false;
     return res.data;
   }
 
   function scheduleSave({ delayMs, includeApiKey, applyUi } = {}) {
     if (suppressEvents) return;
-    dirty = true;
-    setStatus(STATUS.dirty);
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = 0;
@@ -158,8 +152,8 @@
 
     // If nothing meaningful changed, don't spam storage writes.
     const current = snapshotFromUi();
-    if (!keyToSave && (!dirty || snapshotsEqual(current, lastSaved))) {
-      dirty = false;
+    const hasNonKeyChanges = !snapshotsEqual(current, lastSaved);
+    if (!keyToSave && !hasNonKeyChanges) {
       setStatus(STATUS.idle);
       return;
     }
@@ -197,24 +191,30 @@
   }
 
   function bindEvents() {
+    function onEnterSave(e) {
+      if (!e || e.key !== "Enter") return;
+      try { e.preventDefault(); } catch (_e2) {}
+      runSave({ applyUi: true });
+    }
+
     if (els.obsidianApiBaseUrl) {
-      els.obsidianApiBaseUrl.addEventListener("input", () => scheduleSave());
       els.obsidianApiBaseUrl.addEventListener("blur", () => runSave({ applyUi: true }));
+      els.obsidianApiBaseUrl.addEventListener("keydown", onEnterSave);
     }
 
     if (els.obsidianAuthHeaderName) {
-      els.obsidianAuthHeaderName.addEventListener("input", () => scheduleSave());
       els.obsidianAuthHeaderName.addEventListener("blur", () => runSave({ applyUi: true }));
+      els.obsidianAuthHeaderName.addEventListener("keydown", onEnterSave);
     }
 
     if (els.obsidianChatFolder) {
-      els.obsidianChatFolder.addEventListener("input", () => scheduleSave());
       els.obsidianChatFolder.addEventListener("blur", () => runSave({ applyUi: true }));
+      els.obsidianChatFolder.addEventListener("keydown", onEnterSave);
     }
 
     if (els.obsidianArticleFolder) {
-      els.obsidianArticleFolder.addEventListener("input", () => scheduleSave());
       els.obsidianArticleFolder.addEventListener("blur", () => runSave({ applyUi: true }));
+      els.obsidianArticleFolder.addEventListener("keydown", onEnterSave);
     }
 
     if (els.obsidianApiKey) {
