@@ -22,6 +22,10 @@
   };
   const syncStateApi = NS.popupNotionSyncState;
   const obsidianSyncStateApi = NS.popupObsidianSyncState;
+  const contracts = NS.messageContracts || {};
+  const obsidianTypes = contracts.OBSIDIAN_MESSAGE_TYPES || {
+    SYNC_CONVERSATIONS: "obsidianSyncConversations"
+  };
 
   const copyFeedbackTimers = new WeakMap();
 
@@ -309,7 +313,7 @@
             const prev = forceBtn.textContent;
             forceBtn.textContent = "…";
             try {
-              const res = await send("obsidianSyncConversations", { conversationIds: [conversation.id], forceFullConversationIds: [conversation.id] });
+              const res = await send(obsidianTypes.SYNC_CONVERSATIONS, { conversationIds: [conversation.id], forceFullConversationIds: [conversation.id] });
               if (!res || !res.ok) throw new Error((res && res.error && res.error.message) || "sync failed");
             } catch (_e) {
               alert("Force full sync failed.");
