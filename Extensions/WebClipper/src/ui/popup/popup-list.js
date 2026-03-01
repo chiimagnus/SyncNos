@@ -21,6 +21,7 @@
     click: "popup:conversation-click"
   };
   const syncStateApi = NS.popupNotionSyncState;
+  const obsidianSyncStateApi = NS.popupObsidianSyncState;
 
   const copyFeedbackTimers = new WeakMap();
 
@@ -259,6 +260,65 @@
           }
 
           name.appendChild(pill);
+        }
+      } catch (_e) {
+        // ignore
+      }
+
+      try {
+        const syncInfo = state && state.obsidianSyncById && typeof state.obsidianSyncById.get === "function"
+          ? state.obsidianSyncById.get(conversation.id)
+          : null;
+        if (syncInfo && typeof syncInfo === "object") {
+          const normalized = (obsidianSyncStateApi && typeof obsidianSyncStateApi.normalizeSyncRecord === "function")
+            ? obsidianSyncStateApi.normalizeSyncRecord({ ...syncInfo, conversationId: conversation.id })
+            : syncInfo;
+          const pill = document.createElement("span");
+          const ok = !!normalized.ok;
+          pill.className = ok ? "pill obsOk" : "pill obsFail";
+
+          const mode = normalized.mode ? String(normalized.mode) : (ok ? "ok" : "fail");
+          const appended = Number(normalized.appended);
+          const at = Number(normalized.at) || 0;
+
+          if (!ok) {
+            pill.textContent = "obsidian failed";
+            if (normalized.error) pill.title = String(normalized.error);
+          } else if (mode === "no_changes") {
+            pill.textContent = "obsidian no changes";
+            pill.title = "No changes";
+          } else {
+            pill.textContent = `obsidian ${mode}`;
+            const suffix = (Number.isFinite(appended) && appended > 0) ? ` (+${appended})` : "";
+            const time = at ? ` @ ${new Date(at).toLocaleString()}` : "";
+            pill.title = `${mode}${suffix}${time}`;
+          }
+
+          name.appendChild(pill);
+
+          const forceBtn = document.createElement("button");
+          forceBtn.type = "button";
+          forceBtn.className = "syncForce";
+          forceBtn.textContent = "↻";
+          forceBtn.title = "Force full Obsidian sync for this conversation";
+          forceBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (forceBtn.disabled) return;
+            forceBtn.disabled = true;
+            const prev = forceBtn.textContent;
+            forceBtn.textContent = "…";
+            try {
+              const res = await send("obsidianSyncConversations", { conversationIds: [conversation.id], forceFullConversationIds: [conversation.id] });
+              if (!res || !res.ok) throw new Error((res && res.error && res.error.message) || "sync failed");
+            } catch (_e) {
+              alert("Force full sync failed.");
+            } finally {
+              forceBtn.disabled = false;
+              forceBtn.textContent = prev;
+            }
+          });
+          name.appendChild(forceBtn);
         }
       } catch (_e) {
         // ignore
