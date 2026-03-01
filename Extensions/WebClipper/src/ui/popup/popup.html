@@ -117,6 +117,84 @@
               </div>
             </section>
 
+            <section class="toolbar settingsPanel" id="obsidianSyncCard" aria-label="Obsidian Local REST API">
+              <div class="settingsRow settingsRow--header" aria-label="Obsidian sync header">
+                <div class="notionHeaderText">
+                  <span class="notionHeaderTitle">Obsidian Local REST API</span>
+                </div>
+                <div class="spacer"></div>
+              </div>
+
+              <div class="settingsDivider" role="presentation"></div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Enable Obsidian sync">
+                <div class="settingsControl settingsControl--grow">
+                  <label class="checkbox" for="obsidianSyncEnabled">
+                    <input id="obsidianSyncEnabled" type="checkbox" />
+                    <span>Enable Obsidian Sync</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian API Base URL">
+                <div class="settingsLabel settingsLabel--inline">Base URL</div>
+                <div class="settingsControl settingsControl--grow">
+                  <input
+                    id="obsidianApiBaseUrl"
+                    class="input"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="http://127.0.0.1:27123"
+                    aria-label="Obsidian API base url"
+                  />
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian API key">
+                <div class="settingsLabel settingsLabel--inline">API Key</div>
+                <div class="settingsControl settingsControl--grow">
+                  <input
+                    id="obsidianApiKey"
+                    class="input"
+                    type="password"
+                    placeholder=""
+                    aria-label="Obsidian API key"
+                  />
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian auth header name">
+                <div class="settingsLabel settingsLabel--inline">Auth Header</div>
+                <div class="settingsControl settingsControl--grow">
+                  <input
+                    id="obsidianAuthHeaderName"
+                    class="input"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="Authorization"
+                    aria-label="Obsidian auth header name"
+                  />
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian sync controls">
+                <div class="settingsControl settingsControl--grow">
+                  <button id="btnObsidianSettingsSave" class="btn" type="button">Save</button>
+                  <button id="btnObsidianTestConnection" class="btn" type="button">Test</button>
+                </div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian sync status">
+                <div class="settingsLabel settingsLabel--inline">Status</div>
+                <div id="obsidianSyncStatus" class="sub">Idle</div>
+              </div>
+
+              <div class="settingsRow settingsRow--compact" aria-label="Obsidian sync note">
+                <div class="settingsLabel settingsLabel--inline">Note</div>
+                <div class="sub">Use insecure HTTP mode (localhost) in this version. API Key is stored in the extension background.</div>
+              </div>
+            </section>
+
 	          <section class="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
 	            <div class="settingsRow settingsRow--header" aria-label="Database backup header">
 	              <div class="notionHeaderText">
