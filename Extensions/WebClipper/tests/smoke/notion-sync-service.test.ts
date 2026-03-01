@@ -187,6 +187,85 @@ describe("notion-sync-service", () => {
     const getCalls = calls.filter((c) => c.method === "GET");
     const delCalls = calls.filter((c) => c.method === "DELETE");
     expect(getCalls.length).toBe(2);
-    expect(delCalls.map((c) => c.path)).toEqual(["/v1/blocks/b1", "/v1/blocks/b2"]);
+    expect(delCalls.map((c) => c.path).sort()).toEqual(["/v1/blocks/b1", "/v1/blocks/b2"]);
+  });
+
+  it("retries transient errors when clearing page children", async () => {
+    const calls: any[] = [];
+    let b1DeleteAttempts = 0;
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        calls.push(req);
+        if (req.method === "GET" && req.path.startsWith("/v1/blocks/p2/children")) {
+          return { results: [{ id: "b1" }, { id: "b2" }], has_more: false, next_cursor: null };
+        }
+        if (req.method === "DELETE" && req.path === "/v1/blocks/b1") {
+          b1DeleteAttempts += 1;
+          if (b1DeleteAttempts === 1) {
+            const err: any = new Error("notion api failed: DELETE /v1/blocks/b1 HTTP 429");
+            err.status = 429;
+            err.retryAfterMs = 1;
+            throw err;
+          }
+          return { ok: true };
+        }
+        if (req.method === "DELETE" && req.path === "/v1/blocks/b2") return { ok: true };
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+
+    await notionSyncService.clearPageChildren("t", "p2");
+    const deleteCalls = calls.filter((c) => c.method === "DELETE").map((c) => c.path);
+    const b1Calls = deleteCalls.filter((path) => path === "/v1/blocks/b1");
+    expect(b1Calls.length).toBe(2);
+    expect(deleteCalls.includes("/v1/blocks/b2")).toBe(true);
+  });
+
+  it("archives children concurrently when clearing a page", async () => {
+    const startedDeletes: string[] = [];
+    const deleteResolvers = new Map<string, () => void>();
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    // @ts-expect-error test global
+    globalThis.WebClipper.notionApi = {
+      notionFetch: async (req: any) => {
+        if (req.method === "GET" && req.path.startsWith("/v1/blocks/p3/children")) {
+          return { results: [{ id: "b1" }, { id: "b2" }], has_more: false, next_cursor: null };
+        }
+        if (req.method === "DELETE" && (req.path === "/v1/blocks/b1" || req.path === "/v1/blocks/b2")) {
+          startedDeletes.push(req.path);
+          return new Promise((resolve) => {
+            deleteResolvers.set(req.path, () => resolve({ ok: true }));
+          });
+        }
+        throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete require.cache[modulePath];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+
+    const clearing = notionSyncService.clearPageChildren("t", "p3");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(startedDeletes.slice().sort()).toEqual(["/v1/blocks/b1", "/v1/blocks/b2"]);
+
+    deleteResolvers.get("/v1/blocks/b1")?.();
+    deleteResolvers.get("/v1/blocks/b2")?.();
+    await clearing;
   });
 });
