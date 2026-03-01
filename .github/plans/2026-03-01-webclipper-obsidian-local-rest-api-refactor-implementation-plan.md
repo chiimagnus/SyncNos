@@ -1,0 +1,347 @@
+# WebClipper Obsidian Local REST API 全量重构实施计划
+
+> 执行方式：建议使用`executing-plans`按批次实现与验收。
+
+**Goal（目标）:** 将 WebClipper 的 Obsidian 能力从“URI 导出”重构为“基于 Local REST API 的平台主导同步”，实现 `远端存在=增量`、`远端不存在=全量重建`，并支持可观测的同步状态。
+
+**Non-goals（非目标）:**
+- 不改动 Notion 同步逻辑与数据模型。
+- 不改动采集器（collectors）抓取逻辑。
+- 不做多设备分布式一致性（只保证单机 Obsidian Local REST API 场景）。
+- 不改动国际化字段与多语言文案体系。
+
+**Approach（方案）:**
+- 以 `obsidian-local-rest-api` 为唯一同步通道，后台发起 HTTPS/HTTP 请求；popup 只负责配置、触发和展示结果。
+- 同步状态以 Obsidian 文件 frontmatter 为主，不在扩展本地持久化游标；扩展仅保存连接配置（地址、API Key、开关）。
+- 为避免“标题改名导致找不到旧文件”，使用 `conversationKey` 生成稳定文件路径；标题仅作为 frontmatter 显示字段。
+- 每次同步先 `GET /vault/{file}` 检查远端：`404 -> PUT 全量`，`200 -> 读取 frontmatter 决策增量`。
+- 若检测到历史消息被改写/删除、frontmatter 缺失或不兼容，自动回退 `PUT 全量重建`，保证可恢复性。
+
+**Acceptance（验收）:**
+- 选中会话后执行 Obsidian 同步，首次写入成功创建文件；再次同步仅追加新增消息。
+- 在 Obsidian 手动删除对应文件后，再次同步可自动全量重建文件。
+- 在 Obsidian 保留文件但移除同步 frontmatter 后，再次同步可自动回退全量写入并补齐 frontmatter。
+- API Key 鉴权失败、服务不可达、自签名证书错误都能在 UI 给出明确错误。
+- 自动化验证通过：`npm --prefix Extensions/WebClipper run test` 与 `npm --prefix Extensions/WebClipper run check`。
+
+---
+
+## P1（最高优先级）：重构协议与基础设施
+
+### Task 1: 重构消息协议，新增 Obsidian 同步指令
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/protocols/message-contracts.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background-router.js`
+- Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-open.test.ts`
+- Create: `Extensions/WebClipper/tests/smoke/background-router-obsidian-sync.test.ts`
+
+**Step 1: 实现功能**
+- 新增 Obsidian 消息类型：`SYNC_CONVERSATIONS`、`GET_SYNC_STATUS`、`TEST_CONNECTION`、`SAVE_SETTINGS`、`GET_SETTINGS`。
+- 保留 `OPEN_URL` 仅作为向后兼容（后续可下线）。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- background-router-obsidian`  
+Expected: 新旧 Obsidian 路由测试都通过。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "refactor: task1 - add obsidian sync message contracts"`
+
+### Task 2: 新增 Obsidian 连接配置存储与读取服务
+
+**Files:**
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-settings-store.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background-router.js`
+- Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-sync.test.ts`
+
+**Step 1: 实现功能**
+- 统一存储键：`obsidian_sync_enabled`、`obsidian_api_base_url`、`obsidian_api_key`、`obsidian_allow_insecure_http`。
+- 所有写入由 background 执行，popup 不直接触达密钥。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- background-router-obsidian-sync`  
+Expected: 可读写配置、字段缺失时使用默认值。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task2 - add obsidian settings store for local rest api"`
+
+### Task 3: 实现 Local REST API Client（鉴权、错误归一化、证书策略）
+
+**Files:**
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-local-rest-client.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-local-rest-client.test.ts`
+
+**Step 1: 实现功能**
+- 封装 `GET/PUT/POST/PATCH /vault/{filename}` 与 `GET /` 健康检查。
+- 统一注入 `Authorization: Bearer <apiKey>`。
+- 统一错误结构：`network_error`、`auth_error`、`not_found`、`tls_error`、`bad_request`。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-local-rest-client`  
+Expected: 认证头、路径编码、错误分类符合预期。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task3 - add obsidian local rest api client"`
+
+### Task 4: 建立稳定文件路径与同步元数据编解码
+
+**Files:**
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-note-path.js`
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-metadata.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-note-path.test.ts`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-sync-metadata.test.ts`
+
+**Step 1: 实现功能**
+- 基于 `source + conversationKey` 生成稳定 `filePath`（不依赖标题）。
+- 约定 frontmatter 字段：`syncnos.conversationKey`、`syncnos.lastSyncedSequence`、`syncnos.lastSyncedMessageKey`、`syncnos.schemaVersion`。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-note-path`  
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-sync-metadata`  
+Expected: 相同会话始终命中同一路径；frontmatter 解析/回写稳定。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task4 - add deterministic note path and sync metadata codec"`
+
+### P1 回归验证
+Run: `npm --prefix Extensions/WebClipper run test`  
+Run: `npm --prefix Extensions/WebClipper run check`  
+Expected: 无回归失败，静态检查通过。
+
+---
+
+## P2：实现 Obsidian 同步编排（平台主导）
+
+### Task 5: 新建 Obsidian 同步编排器
+
+**Files:**
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-orchestrator.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background-router.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-sync-orchestrator.test.ts`
+
+**Step 1: 实现功能**
+- 入口：`syncConversations({ conversationIds, instanceId })`。
+- 编排职责：读取会话与消息、探测远端、选择增量/全量、写入、汇总结果。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-sync-orchestrator`  
+Expected: 编排器返回每条会话的 `mode`、`ok`、`error`。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task5 - add obsidian sync orchestrator"`
+
+### Task 6: 实现“远端存在性驱动”的同步决策
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-orchestrator.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-sync-orchestrator.test.ts`
+
+**Step 1: 实现功能**
+- `GET /vault/{file}` 返回 `404` 时执行 `PUT` 全量构建。
+- 返回 `200` 时读取 frontmatter，计算增量区间。
+- frontmatter 缺失或 schema 不兼容时执行 `PUT` 全量重建。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-sync-orchestrator`  
+Expected: `404 -> full_rebuild`，`200 + cursor -> incremental_append`。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task6 - implement remote-existence based sync mode decision"`
+
+### Task 7: 实现增量追加与全量重建写入器
+
+**Files:**
+- Create: `Extensions/WebClipper/src/export/obsidian/obsidian-markdown-writer.js`
+- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-orchestrator.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-markdown-writer.test.ts`
+
+**Step 1: 实现功能**
+- 全量：生成完整 markdown（frontmatter + 全消息）并 `PUT`。
+- 增量：生成仅新增消息片段并 `POST` 追加。
+- 每次成功后更新 frontmatter 游标（同次重写或补丁写入）。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-markdown-writer`  
+Expected: 写入 payload 中包含正确游标和消息内容。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task7 - add markdown writers for full rebuild and incremental append"`
+
+### Task 8: 实现冲突检测与自动回退
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-orchestrator.js`
+- Test: `Extensions/WebClipper/tests/smoke/obsidian-sync-orchestrator.test.ts`
+
+**Step 1: 实现功能**
+- 若检测到 `lastSyncedSequence` 之前消息已变化（messageKey 不匹配或 updatedAt 回退），自动切换 `full_rebuild`。
+- 若 `POST` 失败且属于可恢复错误（409/patch failed），自动重试 `PUT`。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- obsidian-sync-orchestrator`  
+Expected: 冲突场景最终成功并标记 `mode=full_rebuild_fallback`。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task8 - add conflict detection and full-rebuild fallback"`
+
+### P2 回归验证
+Run: `npm --prefix Extensions/WebClipper run test`  
+Run: `npm --prefix Extensions/WebClipper run check`  
+Expected: 新增编排逻辑测试稳定通过。
+
+---
+
+## P3：重构 Popup 交互与状态展示
+
+### Task 9: 将“Add to Obsidian”重构为“Sync Obsidian”动作
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/popup/popup.js`
+- Modify: `Extensions/WebClipper/src/ui/popup/popup-list.js`
+- Modify: `Extensions/WebClipper/src/ui/popup/popup-core.js`
+- Modify: `Extensions/WebClipper/src/ui/popup/popup.html`
+- Modify: `Extensions/WebClipper/src/ui/styles/popup.css`
+
+**Step 1: 实现功能**
+- Obsidian 按钮改为触发后台同步任务而非直接打开 URI。
+- 增加进行中状态与结果提示（成功数、失败数、失败原因摘要）。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- popup`  
+Expected: 按钮状态切换正确；无选中项时禁用。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "refactor: task9 - switch popup obsidian action to sync workflow"`
+
+### Task 10: 新增 Obsidian 连接设置与连通性测试
+
+**Files:**
+- Create: `Extensions/WebClipper/src/ui/popup/popup-obsidian-sync.js`
+- Modify: `Extensions/WebClipper/src/ui/popup/popup.js`
+- Modify: `Extensions/WebClipper/src/ui/popup/popup.html`
+- Modify: `Extensions/WebClipper/src/ui/styles/popup.css`
+- Test: `Extensions/WebClipper/tests/smoke/popup-obsidian-sync.test.ts`
+
+**Step 1: 实现功能**
+- 设置项：API Base URL、API Key、启用开关、连接测试按钮。
+- 密钥输入框仅显示掩码；保存时走 background 消息。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- popup-obsidian-sync`  
+Expected: 设置读写成功，测试连接结果可反馈。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task10 - add popup settings for obsidian local rest api"`
+
+### Task 11: 同步结果可观测性与手动恢复入口
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/popup/popup-list.js`
+- Modify: `Extensions/WebClipper/src/bootstrap/background-router.js`
+- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-sync-orchestrator.js`
+- Test: `Extensions/WebClipper/tests/smoke/popup-obsidian-sync-state.test.ts`
+
+**Step 1: 实现功能**
+- 每条会话展示 `full_rebuild` / `incremental_append` / `no_changes` / `failed`。
+- 提供“强制全量同步本条”入口（仅影响本次任务，不改全局策略）。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- popup-obsidian-sync-state`  
+Expected: 状态 pill 与 tooltip 准确。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "feat: task11 - add sync status visibility and force-full action"`
+
+### P3 回归验证
+Run: `npm --prefix Extensions/WebClipper run test`  
+Run: `npm --prefix Extensions/WebClipper run check`  
+Expected: UI 与交互相关 smoke 测试全部通过。
+
+---
+
+## P4：兼容迁移、文档与最终验收
+
+### Task 12: 向后兼容旧 URI 通道并提供迁移开关
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/popup/popup.js`
+- Modify: `Extensions/WebClipper/src/export/obsidian/obsidian-url-service.js`
+- Modify: `Extensions/WebClipper/src/protocols/message-contracts.js`
+- Test: `Extensions/WebClipper/tests/smoke/background-router-obsidian-open.test.ts`
+
+**Step 1: 实现功能**
+- 默认走 Local REST API；连接不可用时允许手动切换到 URI 模式。
+- URI 模式标记为兼容能力，避免中断老用户。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test -- background-router-obsidian-open`  
+Expected: 兼容链路保持可用。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "chore: task12 - keep uri fallback for backward compatibility"`
+
+### Task 13: 文档与开发说明更新
+
+**Files:**
+- Modify: `Extensions/WebClipper/AGENTS.md`
+- Create: `.github/docs/webclipper-obsidian-local-rest-api-sync.md`
+
+**Step 1: 实现功能**
+- 补充本地 API 配置步骤、证书处理、安全建议、故障排查。
+- 明确“远端存在驱动”策略与 frontmatter 字段约定。
+
+**Step 2: 验证**
+Run: `rg -n "Obsidian|Local REST API|frontmatter|full_rebuild|incremental" Extensions/WebClipper/AGENTS.md .github/docs/webclipper-obsidian-local-rest-api-sync.md`  
+Expected: 文档术语一致，路径准确。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "docs: task13 - document obsidian local rest api sync architecture"`
+
+### Task 14: 端到端冒烟与打包校验
+
+**Files:**
+- Modify: `Extensions/WebClipper/tests/smoke/`（按需要补充 e2e smoke）
+
+**Step 1: 实现功能**
+- 补充端到端 smoke：首次全量、二次增量、远端删除后重建、认证失败。
+
+**Step 2: 验证**
+Run: `npm --prefix Extensions/WebClipper run test`  
+Run: `npm --prefix Extensions/WebClipper run check`  
+Run: `npm --prefix Extensions/WebClipper run build`  
+Expected: 测试、检查、构建全部通过。
+
+**Step 3:（可选）原子提交**
+Run: `git commit -m "test: task14 - add obsidian local rest api end-to-end smoke coverage"`
+
+---
+
+## 边界条件与回归策略
+
+- 空会话（0 条消息）: 同步应拒绝并提示原因，不创建空白垃圾文件。
+- 重复消息 key: 增量计算必须去重，避免重复 append。
+- 历史消息编辑: 自动回退全量重建，防止远端内容分叉。
+- API 不可用/证书异常: 不应卡死任务，单条失败可继续其它条目。
+- 用户手动改标题: 不影响文件定位（路径由 conversationKey 决定）。
+
+每完成一个优先级分组后统一执行：
+- `npm --prefix Extensions/WebClipper run test`
+- `npm --prefix Extensions/WebClipper run check`
+
+---
+
+## 不确定项（执行前确认）
+
+- 是否在第一期直接移除 URI 模式，还是保留兼容开关一个小版本周期。
+- frontmatter 字段命名是否固定为 `syncnos.*`，或需要与现有 SyncNos 主应用字段保持一致。
+- 是否允许 HTTP（27123）作为开发临时模式；生产建议仅 HTTPS（27124）。
+
+---
+
+## 交接
+
+可选下一步：
+1. 直接进入执行：使用 `executing-plans` 按 P1 -> P4 分批实现与验收。
+2. 先 review 计划：你确认 URI 兼容策略与 frontmatter 字段命名后再开工。
