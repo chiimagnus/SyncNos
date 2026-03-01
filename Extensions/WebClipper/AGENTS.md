@@ -73,7 +73,10 @@
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`src/ui/popup/popup-inpage-visibility.js` + `src/bootstrap/content-controller.js`
-  - popup 负责写入 `inpage_supported_only`；content 负责读取并实时过滤 `web` collector 的 inpage 展示资格。
+  - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
+  - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
+    - `src/bootstrap/background-inpage-web-visibility.js`
+  - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.js`）。
 
 ### Obsidian 约束
 

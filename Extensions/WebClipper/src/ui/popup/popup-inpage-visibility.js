@@ -5,8 +5,10 @@
   const core = NS.popupCore;
   if (!core) return;
 
-  const { els, storageGet, storageSet } = core;
+  const { els, storageGet, storageSet, send } = core;
   const STORAGE_KEY = "inpage_supported_only";
+  const contracts = NS.messageContracts || {};
+  const uiMessageTypes = contracts.UI_MESSAGE_TYPES || {};
 
   function normalizeSetting(value) {
     return value === true;
@@ -30,6 +32,16 @@
     await storageSet({ [STORAGE_KEY]: !!value });
   }
 
+  async function requestApply() {
+    const type = uiMessageTypes.APPLY_INPAGE_VISIBILITY;
+    if (!type || typeof send !== "function") return;
+    try {
+      await send(type);
+    } catch (_e) {
+      // ignore
+    }
+  }
+
   function init() {
     const toggle = els.inpageSupportedOnlyToggle;
     if (!toggle) return;
@@ -47,12 +59,14 @@
       const previousValue = currentValue;
       const nextValue = !!toggle.checked;
       currentValue = nextValue;
-      writeSetting(nextValue).catch(() => {
-        currentValue = previousValue;
-        syncing = true;
-        applyToggleValue(currentValue);
-        syncing = false;
-      });
+      writeSetting(nextValue)
+        .then(() => requestApply())
+        .catch(() => {
+          currentValue = previousValue;
+          syncing = true;
+          applyToggleValue(currentValue);
+          syncing = false;
+        });
     });
 
     const onStorageChanged = (changes, areaName) => {

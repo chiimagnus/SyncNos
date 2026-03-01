@@ -32,7 +32,8 @@
   });
 
   const UI_MESSAGE_TYPES = contracts.UI_MESSAGE_TYPES || Object.freeze({
-    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+    OPEN_EXTENSION_POPUP: "openExtensionPopup",
+    APPLY_INPAGE_VISIBILITY: "applyInpageVisibility"
   });
 
   const UI_EVENT_TYPES = contracts.UI_EVENT_TYPES || Object.freeze({
@@ -103,6 +104,18 @@
         } catch (e) {
           const message = e && e.message ? e.message : String(e || "open popup failed");
           return err(message, { code: "OPEN_POPUP_FAILED" });
+        }
+      }
+      case UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY: {
+        const api = NS.backgroundInpageWebVisibility;
+        if (!api || typeof api.applyVisibilitySetting !== "function") {
+          return err("inpage web visibility manager missing", { code: "INPAGE_VISIBILITY_UNAVAILABLE" });
+        }
+        try {
+          const data = await api.applyVisibilitySetting({ reason: "popup" });
+          return ok(data);
+        } catch (e) {
+          return err(e && e.message ? e.message : String(e || "apply inpage visibility failed"));
         }
       }
       case OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS: {

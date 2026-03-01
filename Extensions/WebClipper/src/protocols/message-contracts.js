@@ -31,7 +31,8 @@
   });
 
   const UI_MESSAGE_TYPES = Object.freeze({
-    OPEN_EXTENSION_POPUP: "openExtensionPopup"
+    OPEN_EXTENSION_POPUP: "openExtensionPopup",
+    APPLY_INPAGE_VISIBILITY: "applyInpageVisibility"
   });
 
   const UI_EVENT_TYPES = Object.freeze({
