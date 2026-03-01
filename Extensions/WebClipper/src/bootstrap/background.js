@@ -23,7 +23,7 @@
       "../export/notion/notion-sync-service.js",
       "../export/notion/notion-sync-job-store.js",
       "../export/notion/notion-sync-orchestrator.js",
-      "../export/obsidian/obsidian-url-service.js",
+      "../export/obsidian/obsidian-settings-store.js",
       "./background-events-hub.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
