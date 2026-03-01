@@ -127,9 +127,17 @@ Extensions/WebClipper/
 
 > 这里是“唯一允许写死路径/命令”的地方：先用 Spike 得到真实约定，再固化到本文与实施计划，避免猜测导致反复返工。
 
-- WXT 入口约定（background/content/popup/app）：`TODO`
-- `app.html`（unlisted page）产物路径与打开方式：`TODO`
-- Firefox build 命令与产物目录：`TODO`
+- WXT 入口约定（background/content/popup/app）：
+  - background：`entrypoints/background.ts` → 产物 `background.js`
+  - content：`entrypoints/content.ts` → 产物 `content-scripts/content.js`
+  - popup：`entrypoints/popup/index.html`（+ `main.tsx` 等）→ 产物 `popup.html`
+  - app：`entrypoints/app/index.html`（+ `main.tsx` 等）→ 产物 `app.html`
+- `app.html`（unlisted page）产物路径与打开方式：
+  - 产物位于构建输出根目录（例如 `.output/chrome-mv3/app.html`）
+  - 不会自动写入 manifest（属于“未在 manifest 引用的扩展页面”），用 `browser.runtime.getURL('app.html#/<route>')` 打开
+- Firefox build 命令与产物目录：
+  - `wxt build -b firefox --mv3` → `.output/firefox-mv3/`
+  - 备注：`wxt build -b firefox` 默认产出 `.output/firefox-mv2/`（除非显式 `--mv3`）
 
 ### Phase 1：建立“平台层”与消息协议（1–2 天）
 
