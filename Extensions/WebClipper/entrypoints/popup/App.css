@@ -15,3 +15,18 @@
   opacity: 0.8;
 }
 
+.primaryButton {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, CanvasText 20%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, CanvasText 10%, Canvas);
+  color: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.primaryButton:hover {
+  background: color-mix(in oklab, CanvasText 16%, Canvas);
+}
