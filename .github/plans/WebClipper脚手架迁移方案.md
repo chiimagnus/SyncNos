@@ -22,7 +22,7 @@
 
 ## 1. 当前约束（必须遵守）
 
-- 权限保持最小且明确；新增 permissions/host_permissions 前要有理由与验收（见 `Extensions/WebClipper/AGENTS.md`）
+- 权限保持最小且明确：**迁移期先对齐现状，不新增也不“顺手精简”**；任何变更 permissions/host_permissions 都要有理由与验收（见 `Extensions/WebClipper/AGENTS.md`）
 - 不持久化除 `chrome.storage.local` 外的任何密钥（OAuth token、API key 等不落 IndexedDB）
 - inpage 交互约束不变（单例 tip、400ms combo 结算、双击打开 popup 不可用时提示等）
 - 迁移期间：每个 Phase 结束都必须能构建 + 最小手测冒烟
@@ -122,6 +122,14 @@ Extensions/WebClipper/
 - `dev` 下能从 popup 打开 `app`，HashRouter 路由可切换
 - `build` 产物可在 Chrome 加载
 - Firefox 临时扩展能加载并能打开 popup（不要求全功能，但要跑通核心通信链路）
+
+#### Phase 0 Spike 结论记录（执行 Task 02/03 后填）
+
+> 这里是“唯一允许写死路径/命令”的地方：先用 Spike 得到真实约定，再固化到本文与实施计划，避免猜测导致反复返工。
+
+- WXT 入口约定（background/content/popup/app）：`TODO`
+- `app.html`（unlisted page）产物路径与打开方式：`TODO`
+- Firefox build 命令与产物目录：`TODO`
 
 ### Phase 1：建立“平台层”与消息协议（1–2 天）
 
