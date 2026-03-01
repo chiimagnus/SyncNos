@@ -23,6 +23,8 @@
     error: "Error (see console)"
   });
 
+  const API_KEY_MASK = "********************************";
+
   let suppressEvents = true;
   let busy = false;
 
@@ -31,7 +33,8 @@
   let savePending = false;
   let dirty = false;
 
-  let lastSaved = { enabled: null, apiBaseUrl: null, authHeaderName: null };
+  let apiKeyPresentCached = false;
+  let lastSaved = { apiBaseUrl: null, authHeaderName: null };
 
   function safeString(v) {
     return String(v == null ? "" : v).trim();
@@ -45,36 +48,41 @@
   function setBusy(isBusy) {
     busy = !!isBusy;
     if (els.btnObsidianTestConnection) els.btnObsidianTestConnection.disabled = busy;
-    if (els.obsidianSyncEnabled) els.obsidianSyncEnabled.disabled = busy;
     if (els.obsidianApiBaseUrl) els.obsidianApiBaseUrl.disabled = busy;
     if (els.obsidianApiKey) els.obsidianApiKey.disabled = busy;
     if (els.obsidianAuthHeaderName) els.obsidianAuthHeaderName.disabled = busy;
   }
 
   function readUiPayload({ includeApiKey } = {}) {
-    const enabled = els.obsidianSyncEnabled ? Boolean(els.obsidianSyncEnabled.checked) : false;
     const apiBaseUrl = els.obsidianApiBaseUrl ? safeString(els.obsidianApiBaseUrl.value) : "";
     const authHeaderName = els.obsidianAuthHeaderName ? safeString(els.obsidianAuthHeaderName.value) : "";
 
     const shouldIncludeKey = includeApiKey === true;
     const apiKeyRaw = els.obsidianApiKey ? String(els.obsidianApiKey.value || "") : "";
-    const apiKey = shouldIncludeKey && safeString(apiKeyRaw) ? apiKeyRaw : null;
+    const apiKeyTrimmed = safeString(apiKeyRaw);
+    const apiKey = shouldIncludeKey && apiKeyTrimmed && apiKeyTrimmed !== API_KEY_MASK ? apiKeyRaw : null;
 
-    return { enabled, apiBaseUrl, authHeaderName, apiKey };
+    return { apiBaseUrl, authHeaderName, apiKey };
   }
 
   function applySettingsToUi(settings) {
     const s = settings && typeof settings === "object" ? settings : {};
     suppressEvents = true;
     try {
-      if (els.obsidianSyncEnabled) els.obsidianSyncEnabled.checked = !!s.enabled;
       if (els.obsidianApiBaseUrl) els.obsidianApiBaseUrl.value = s.apiBaseUrl ? String(s.apiBaseUrl) : "";
       if (els.obsidianAuthHeaderName) els.obsidianAuthHeaderName.value = s.authHeaderName ? String(s.authHeaderName) : "";
       if (els.obsidianApiKey) {
         // Never show plaintext key. Provide a placeholder when key exists.
-        els.obsidianApiKey.value = "";
-        const masked = s.apiKeyMasked ? String(s.apiKeyMasked) : "";
-        els.obsidianApiKey.placeholder = masked || "";
+        const hasKey = !!s.apiKeyPresent;
+        apiKeyPresentCached = hasKey;
+        els.obsidianApiKey.value = hasKey ? API_KEY_MASK : "";
+        els.obsidianApiKey.placeholder = "";
+        if (hasKey) {
+          if (!els.obsidianApiKey.dataset) els.obsidianApiKey.dataset = {};
+          els.obsidianApiKey.dataset.masked = "1";
+        } else {
+          if (els.obsidianApiKey.dataset) delete els.obsidianApiKey.dataset.masked;
+        }
       }
     } finally {
       suppressEvents = false;
@@ -84,7 +92,6 @@
   function snapshotFromSettings(settings) {
     const s = settings && typeof settings === "object" ? settings : {};
     return {
-      enabled: !!s.enabled,
       apiBaseUrl: s.apiBaseUrl ? String(s.apiBaseUrl) : "",
       authHeaderName: s.authHeaderName ? String(s.authHeaderName) : ""
     };
@@ -93,7 +100,6 @@
   function snapshotFromUi() {
     const p = readUiPayload({ includeApiKey: false });
     return {
-      enabled: !!p.enabled,
       apiBaseUrl: p.apiBaseUrl ? String(p.apiBaseUrl) : "",
       authHeaderName: p.authHeaderName ? String(p.authHeaderName) : ""
     };
@@ -102,8 +108,7 @@
   function snapshotsEqual(a, b) {
     const x = a && typeof a === "object" ? a : {};
     const y = b && typeof b === "object" ? b : {};
-    return x.enabled === y.enabled
-      && String(x.apiBaseUrl || "") === String(y.apiBaseUrl || "")
+    return String(x.apiBaseUrl || "") === String(y.apiBaseUrl || "")
       && String(x.authHeaderName || "") === String(y.authHeaderName || "");
   }
 
@@ -192,10 +197,6 @@
   }
 
   function bindEvents() {
-    if (els.obsidianSyncEnabled) {
-      els.obsidianSyncEnabled.addEventListener("change", () => scheduleSave({ delayMs: 0 }));
-    }
-
     if (els.obsidianApiBaseUrl) {
       els.obsidianApiBaseUrl.addEventListener("input", () => scheduleSave());
       els.obsidianApiBaseUrl.addEventListener("blur", () => runSave({ applyUi: true }));
@@ -208,7 +209,21 @@
 
     if (els.obsidianApiKey) {
       // Only save API key when the user commits the value (Enter/blur).
-      els.obsidianApiKey.addEventListener("blur", () => runSave({ includeApiKey: true, applyUi: true }));
+      els.obsidianApiKey.addEventListener("focus", () => {
+        if (els.obsidianApiKey && els.obsidianApiKey.dataset && els.obsidianApiKey.dataset.masked === "1") {
+          els.obsidianApiKey.value = "";
+          delete els.obsidianApiKey.dataset.masked;
+        }
+      });
+      els.obsidianApiKey.addEventListener("blur", () => {
+        const typed = els.obsidianApiKey ? safeString(els.obsidianApiKey.value) : "";
+        if (!typed && apiKeyPresentCached) {
+          els.obsidianApiKey.value = API_KEY_MASK;
+          els.obsidianApiKey.dataset.masked = "1";
+          return;
+        }
+        runSave({ includeApiKey: true, applyUi: true });
+      });
       els.obsidianApiKey.addEventListener("keydown", (e) => {
         if (!e || e.key !== "Enter") return;
         try { e.preventDefault(); } catch (_e2) {}

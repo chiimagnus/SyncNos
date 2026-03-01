@@ -85,7 +85,6 @@
       notionPages: document.getElementById("notionPages"),
       btnFetchCurrentArticle: document.getElementById("btnFetchCurrentArticle"),
       articleFetchStatus: document.getElementById("articleFetchStatus"),
-      obsidianSyncEnabled: document.getElementById("obsidianSyncEnabled"),
       obsidianApiBaseUrl: document.getElementById("obsidianApiBaseUrl"),
       obsidianApiKey: document.getElementById("obsidianApiKey"),
       obsidianAuthHeaderName: document.getElementById("obsidianAuthHeaderName"),
