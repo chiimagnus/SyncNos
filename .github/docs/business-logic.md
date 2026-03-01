@@ -128,7 +128,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
    - 或用户在设置页点击 “Fetch Current Page”，将当前网页文章抓取为 `sourceType=article` 的会话并入库
 2. 用户在扩展弹窗中选择会话，执行：
    - 导出（Markdown），或
-   - 添加到 Obsidian（生成 `obsidian://new`，按 kind 分目录落入 `SyncNos-AIChats` / `SyncNos-WebArticles`），或
+   - 同步到 Obsidian（通过 Obsidian Local REST API 写入/更新 vault 文件，按 kind 分目录落入 `SyncNos-AIChats` / `SyncNos-WebArticles`，且目录可配置），或
    - 数据库备份导出/导入（合并导入），或
    - 连接 Notion 并选择 Parent Page，同步到对应 kind 的数据库（`SyncNos-AI Chats` / `SyncNos-Web Articles`）
 3. 重复同步策略：
@@ -153,10 +153,10 @@ flowchart TD
     W1 --> W2["自动增量采集并本地入库"]
     W2 --> W3{用户动作}
     W3 -->|导出| W4["导出 Markdown"]
-    W3 -->|添加到 Obsidian| W8["生成 `obsidian://new` URL（单选可走剪贴板）"]
+    W3 -->|同步到 Obsidian| W8["Obsidian：通过 Local REST API 写入/更新 vault 文件（本期仅 HTTP localhost）"]
     W3 -->|备份| W5["备份导出/导入（合并）"]
     W3 -->|同步 Notion| W6["按 kind 创建/复用数据库（Chats/Web Articles）"]
-    W8 --> W9["Obsidian 创建/打开笔记（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`）"]
+    W8 --> W9["Obsidian 更新笔记（按 kind 分目录：`SyncNos-AIChats` / `SyncNos-WebArticles`；目录可配置）"]
     W6 --> W7["写入/更新会话页（增量追加或覆盖式重建子块）"]
     W4 --> I
     W9 --> I
@@ -173,7 +173,7 @@ flowchart TD
 - WebClipper 重复同步策略（按 kind）：
   - chat：cursor 匹配时增量追加；cursor 缺失时覆盖式重建子块
   - article：当文章被重新 fetch 且内容更新时覆盖式重建子块
-- WebClipper Obsidian 约束：通过 `obsidian://` URL scheme 触发目标应用；若系统未正确处理该协议，扩展应返回可理解的失败提示
+- WebClipper Obsidian 约束：通过 Obsidian Local REST API（localhost HTTP）写入/更新 vault 文件；若 Obsidian 未运行或端口不可用，扩展应返回可理解的失败提示
 - WebClipper 备份约束：备份导出仅 Zip v2；导入为合并模式（Zip v2 + legacy JSON）；备份文件不应包含 Notion token 等敏感凭据
 - WebClipper 采集边界：以“对话消息”为最小单位，避免把侧栏/操作按钮/时间戳/头像等非消息内容写入消息正文
 - WebClipper inpage 显示范围约束：配置项 `inpage_supported_only=false` 时全站显示；为 `true` 时仅支持站点显示；该配置不影响 popup 手动抓取当前页
@@ -202,7 +202,7 @@ flowchart TD
 - 覆盖式重建：为避免重复追加，清空目标页面的子块后重建内容
 - 会话（Conversation）：一次对话的聚合单位；在 WebClipper 中通常对应一个可导出/可同步的记录
 - 消息（Message）：会话中的最小内容单元，通常按 user/assistant 顺序组织
-- Obsidian URL：用于从浏览器触发 Obsidian 创建笔记的协议链接（如 `obsidian://new?...`）
+- Obsidian Local REST API：用于从浏览器扩展通过 HTTP 与 Obsidian Vault 文件交互的本地服务插件
 
 ## 8 入口索引（读码起点，<= 5）
 
