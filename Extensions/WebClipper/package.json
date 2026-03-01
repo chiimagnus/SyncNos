@@ -5,9 +5,13 @@
   "description": "WebClipper browser extension (Chromium/Edge + Firefox)",
   "type": "commonjs",
   "scripts": {
-    "dev:wxt": "wxt dev",
-    "build:wxt": "wxt build",
-    "build:wxt:firefox": "wxt build -b firefox",
+    "dev:wxt": "wxt --mv3",
+    "dev:wxt:firefox": "wxt -b firefox --mv3",
+    "build:wxt": "wxt build --mv3",
+    "build:wxt:firefox": "wxt build -b firefox --mv3",
+    "prepare:wxt": "wxt prepare",
+    "compile:wxt": "tsc --noEmit",
+    "postinstall": "wxt prepare",
     "check": "node scripts/check.mjs",
     "check:dist:edge": "node scripts/check.mjs --root=dist-edge --no-syntax",
     "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox --no-syntax",
@@ -18,13 +22,20 @@
     "package:amo-source": "node scripts/package-amo-source.mjs"
   },
   "devDependencies": {
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
     "@types/node": "^22.10.0",
+    "@wxt-dev/module-react": "^1.1.5",
     "fake-indexeddb": "^6.2.2",
     "jsdom": "^28.1.0",
     "terser": "^5.31.6",
-    "vitest": "^2.1.8"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "wxt": "^0.20.18"
   },
   "dependencies": {
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   }
 }
