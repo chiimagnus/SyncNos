@@ -20,7 +20,11 @@
   });
 
   const OBSIDIAN_MESSAGE_TYPES = contracts.OBSIDIAN_MESSAGE_TYPES || Object.freeze({
-    OPEN_URL: "openObsidianUrl"
+    GET_SETTINGS: "obsidianGetSettings",
+    SAVE_SETTINGS: "obsidianSaveSettings",
+    TEST_CONNECTION: "obsidianTestConnection",
+    SYNC_CONVERSATIONS: "obsidianSyncConversations",
+    GET_SYNC_STATUS: "obsidianGetSyncStatus"
   });
 
   const ARTICLE_MESSAGE_TYPES = contracts.ARTICLE_MESSAGE_TYPES || Object.freeze({
@@ -68,17 +72,6 @@
     return { ok: false, data: null, error: { message, extra: extra || null } };
   }
 
-  function normalizeObsidianUrls(msg) {
-    if (!msg || typeof msg !== "object") return [];
-    if (Array.isArray(msg.urls)) {
-      return msg.urls
-        .map((url) => String(url || "").trim())
-        .filter((url) => !!url);
-    }
-    const single = String(msg.url || "").trim();
-    return single ? [single] : [];
-  }
-
   function storageRemove(keys) {
     return new Promise((resolve) => {
       if (!Array.isArray(keys) || !keys.length) return resolve(false);
@@ -112,22 +105,44 @@
           return err(message, { code: "OPEN_POPUP_FAILED" });
         }
       }
-      case OBSIDIAN_MESSAGE_TYPES.OPEN_URL: {
-        const obsidianService = NS.obsidianUrlService;
-        if (!obsidianService || typeof obsidianService.isObsidianUrl !== "function" || typeof obsidianService.openObsidianUrl !== "function") {
-          return err("obsidian url service missing");
-        }
-        const urls = normalizeObsidianUrls(msg);
-        if (!urls.length) return err("invalid obsidian url");
-        for (const targetUrl of urls) {
-          if (!obsidianService.isObsidianUrl(targetUrl)) return err("invalid obsidian url");
-        }
-        for (const targetUrl of urls) {
-          // open in sequence to preserve creation order
-          // eslint-disable-next-line no-await-in-loop
-          await obsidianService.openObsidianUrl(targetUrl);
-        }
-        return ok({ opened: true, count: urls.length });
+      case OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS: {
+        const store = NS.obsidianSettingsStore;
+        if (!store || typeof store.getSettings !== "function") return err("obsidian settings store missing");
+        const data = await store.getSettings();
+        return ok(data);
+      }
+      case OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS: {
+        const store = NS.obsidianSettingsStore;
+        if (!store || typeof store.saveSettings !== "function") return err("obsidian settings store missing");
+        const data = await store.saveSettings({
+          enabled: msg.enabled,
+          apiBaseUrl: msg.apiBaseUrl,
+          apiKey: msg.apiKey,
+          authHeaderName: msg.authHeaderName
+        });
+        return ok(data);
+      }
+      case OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION: {
+        const orchestrator = NS.obsidianSyncOrchestrator;
+        if (!orchestrator || typeof orchestrator.testConnection !== "function") return err("obsidian sync orchestrator missing");
+        const data = await orchestrator.testConnection({ instanceId: BACKGROUND_INSTANCE_ID });
+        return ok(data);
+      }
+      case OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS: {
+        const orchestrator = NS.obsidianSyncOrchestrator;
+        if (!orchestrator || typeof orchestrator.getSyncStatus !== "function") return err("obsidian sync orchestrator missing");
+        const data = await orchestrator.getSyncStatus({ instanceId: BACKGROUND_INSTANCE_ID });
+        return ok(data);
+      }
+      case OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS: {
+        const orchestrator = NS.obsidianSyncOrchestrator;
+        if (!orchestrator || typeof orchestrator.syncConversations !== "function") return err("obsidian sync orchestrator missing");
+        const data = await orchestrator.syncConversations({
+          conversationIds: msg.conversationIds,
+          forceFullConversationIds: msg.forceFullConversationIds,
+          instanceId: BACKGROUND_INSTANCE_ID
+        });
+        return ok(data);
       }
       case ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB: {
         const articleService = NS.articleFetchService;

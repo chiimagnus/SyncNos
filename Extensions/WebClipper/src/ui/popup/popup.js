@@ -14,20 +14,20 @@
   const articleFetch = NS.popupArticleFetch;
   const inpageVisibility = NS.popupInpageVisibility;
   const about = NS.popupAbout;
-  const docsApi = NS.popupConversationDocs;
-  const obsidianApi = NS.popupObsidian;
+  const obsidianSyncUi = NS.popupObsidianSync;
   const syncStateApi = NS.popupNotionSyncState;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !articleFetch || !inpageVisibility || !about) return;
 
-  const { els, state, send, flashOk, copyTextToClipboard } = core;
+  const { els, state, send, flashOk } = core;
   const contracts = NS.messageContracts || {};
   const notionTypes = contracts.NOTION_MESSAGE_TYPES || {
     SYNC_CONVERSATIONS: "notionSyncConversations",
     GET_SYNC_JOB_STATUS: "getNotionSyncJobStatus"
   };
   const obsidianTypes = contracts.OBSIDIAN_MESSAGE_TYPES || {
-    OPEN_URL: "openObsidianUrl"
+    SYNC_CONVERSATIONS: "obsidianSyncConversations",
+    GET_SYNC_STATUS: "obsidianGetSyncStatus"
   };
   const uiEventTypes = contracts.UI_EVENT_TYPES || {
     CONVERSATIONS_CHANGED: "conversationsChanged"
@@ -37,6 +37,7 @@
   };
 
   let syncPollTimer = 0;
+  let obsidianSyncPollTimer = 0;
   let conversationsEventsPort = null;
   let conversationsRefreshTimer = 0;
   let conversationsRefreshInFlight = false;
@@ -159,17 +160,6 @@
     });
   }
 
-  async function buildObsidianPayloads(selectedIds) {
-    if (!docsApi || typeof docsApi.buildConversationDocs !== "function") {
-      throw new Error("Conversation docs module not available.");
-    }
-    if (!obsidianApi || typeof obsidianApi.createObsidianPayloads !== "function") {
-      throw new Error("Obsidian module not available.");
-    }
-    const docs = await docsApi.buildConversationDocs({ selectedIds });
-    return obsidianApi.createObsidianPayloads(docs);
-  }
-
   async function refreshSyncJobStatus({ pollOnce } = {}) {
     const res = await send(notionTypes.GET_SYNC_JOB_STATUS);
     if (!res || !res.ok) return { ok: false };
@@ -191,6 +181,84 @@
     if (isRunning && !syncPollTimer && !pollOnce) {
       syncPollTimer = setInterval(() => {
         refreshSyncJobStatus({ pollOnce: true }).catch(() => {});
+      }, 1000);
+    }
+    return { ok: true, job };
+  }
+
+  function setObsidianSyncingUi(isSyncing, { done, total } = {}) {
+    if (!els.btnSyncObsidian) return;
+    state.obsidianSyncInProgress = !!isSyncing;
+    if (state.obsidianSyncInProgress) {
+      els.btnSyncObsidian.disabled = true;
+      const d = Number(done);
+      const t = Number(total);
+      if (Number.isFinite(d) && Number.isFinite(t) && t > 0) {
+        els.btnSyncObsidian.textContent = `Obsidian(${d}/${t})`;
+      } else {
+        els.btnSyncObsidian.textContent = "Obsidian...";
+      }
+    } else {
+      els.btnSyncObsidian.textContent = "Obsidian Sync";
+    }
+  }
+
+  function applyObsidianPerConversationResults(perConversation) {
+    const api = NS.popupObsidianSyncState;
+    if (!api || typeof api.applySyncResults !== "function") {
+      if (!Array.isArray(perConversation) || !(state && state.obsidianSyncById instanceof Map)) return;
+      const now = Date.now();
+      for (const r of perConversation) {
+        const conversationId = Number(r && r.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+        const ok = !!(r && r.ok);
+        state.obsidianSyncById.set(conversationId, {
+          ok,
+          mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+          appended: Number(r && r.appended),
+          error: r && r.error ? String(r.error) : "",
+          at: Number(r && r.at) || now
+        });
+      }
+      return;
+    }
+    api.applySyncResults({
+      rows: perConversation,
+      state,
+      onChanged: () => {
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
+  }
+
+  async function refreshObsidianSyncStatus({ pollOnce } = {}) {
+    const res = await send(obsidianTypes.GET_SYNC_STATUS);
+    if (!res || !res.ok) return { ok: false };
+    const job = res.data && res.data.job ? res.data.job : null;
+    if (job && Array.isArray(job.perConversation)) {
+      applyObsidianPerConversationResults(job.perConversation);
+    }
+
+    const isRunning = !!(job && job.status === "running");
+    if (job) {
+      const done = Array.isArray(job.perConversation) ? job.perConversation.length : 0;
+      const total = Array.isArray(job.conversationIds) ? job.conversationIds.length : 0;
+      setObsidianSyncingUi(isRunning, { done, total });
+    } else if (!state.obsidianSyncInProgress) {
+      setObsidianSyncingUi(false);
+    }
+
+    if (!isRunning && obsidianSyncPollTimer) {
+      clearInterval(obsidianSyncPollTimer);
+      obsidianSyncPollTimer = 0;
+    }
+    if (isRunning && !obsidianSyncPollTimer && !pollOnce) {
+      obsidianSyncPollTimer = setInterval(() => {
+        refreshObsidianSyncStatus({ pollOnce: true }).catch(() => {});
       }, 1000);
     }
     return { ok: true, job };
@@ -244,62 +312,51 @@
     });
   }
 
-  function initObsidianAction() {
-    if (!els.btnAddObsidian) return;
-    els.btnAddObsidian.addEventListener("click", async () => {
+  function initObsidianSyncAction() {
+    if (!els.btnSyncObsidian) return;
+    els.btnSyncObsidian.addEventListener("click", async () => {
       const ids = list.getSelectedIds();
       if (!ids.length) return;
-      if (state.obsidianAddInProgress) return;
+      if (state.obsidianSyncInProgress) return;
 
-      const btn = els.btnAddObsidian;
-      const prevText = btn.textContent || "Obsidian";
-      state.obsidianAddInProgress = true;
+      const btn = els.btnSyncObsidian;
+      const prevText = btn.textContent || "Obsidian Sync";
+      state.obsidianSyncInProgress = true;
       btn.disabled = true;
-      btn.textContent = "Adding...";
+      btn.textContent = "Obsidian...";
 
       try {
-        if (!obsidianApi || typeof obsidianApi.buildObsidianNewUrl !== "function") {
-          throw new Error("Obsidian module not available.");
-        }
-        const payloads = await buildObsidianPayloads(ids);
-        if (!payloads.length) throw new Error("No conversations selected.");
+        setObsidianSyncingUi(true, { done: 0, total: ids.length });
+        refreshObsidianSyncStatus().catch(() => {});
+        const res = await send(obsidianTypes.SYNC_CONVERSATIONS, { conversationIds: ids });
+        if (!res || !res.ok) throw new Error((res && res.error && res.error.message) || "Sync failed.");
 
-        let res = null;
-        if (payloads.length === 1) {
-          const payload = payloads[0];
-          let useClipboard = false;
-          try {
-            await copyTextToClipboard(payload.markdown);
-            useClipboard = true;
-          } catch (_e) {
-            // fallback to URI `content` mode
-            useClipboard = false;
-          }
-          const url = obsidianApi.buildObsidianNewUrl({
-            noteName: payload.noteName,
-            markdown: payload.markdown,
-            useClipboard,
-            folder: payload.folder
-          });
-          res = await send(obsidianTypes.OPEN_URL, { url });
-        } else {
-          const urls = payloads.map((payload) => obsidianApi.buildObsidianNewUrl({
-            noteName: payload.noteName,
-            markdown: payload.markdown,
-            useClipboard: false,
-            folder: payload.folder
-          }));
-          res = await send(obsidianTypes.OPEN_URL, { urls });
+        const data = res.data || {};
+        const okCount = data.okCount || 0;
+        const failCount = data.failCount || 0;
+        const failures = Array.isArray(data.failures) ? data.failures : [];
+        const results = Array.isArray(data.results) ? data.results : [];
+        applyObsidianPerConversationResults(results);
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
         }
-        if (!res || !res.ok) {
-          throw new Error((res && res.error && res.error.message) || "Open Obsidian failed.");
+
+        if (failCount) {
+          const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
+          alert(`Obsidian sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}\n\n${lines.join("\n")}`);
+        } else {
+          flashOk(btn);
+          alert(`Obsidian sync finished.\n\nOK: ${okCount}\nFailed: 0`);
         }
         flashOk(btn);
       } catch (e) {
-        alert((e && e.message) || "Add to Obsidian failed.");
+        alert((e && e.message) || "Obsidian sync failed.");
       } finally {
-        state.obsidianAddInProgress = false;
+        state.obsidianSyncInProgress = false;
         btn.textContent = prevText;
+        btn.disabled = false;
         try {
           list && typeof list.render === "function" && list.render();
         } catch (_e) {
@@ -320,16 +377,19 @@
       articleFetch.init();
       inpageVisibility.init();
 	    about.init();
-	    initObsidianAction();
+      obsidianSyncUi && typeof obsidianSyncUi.init === "function" && obsidianSyncUi.init();
+	    initObsidianSyncAction();
 	    initNotionSyncAction();
 
     await tabs.init();
     await refreshSyncJobStatus();
+    await refreshObsidianSyncStatus();
     await list.refresh();
     initConversationsEventsSubscription();
 
     window.addEventListener("unload", () => {
       if (syncPollTimer) clearInterval(syncPollTimer);
+      if (obsidianSyncPollTimer) clearInterval(obsidianSyncPollTimer);
       try {
         conversationsEventsPort && conversationsEventsPort.disconnect && conversationsEventsPort.disconnect();
       } catch (_e) {
@@ -337,6 +397,7 @@
       }
       if (conversationsRefreshTimer) clearTimeout(conversationsRefreshTimer);
       syncPollTimer = 0;
+      obsidianSyncPollTimer = 0;
       conversationsRefreshTimer = 0;
     });
   }

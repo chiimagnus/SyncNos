@@ -76,7 +76,7 @@
       exportMenu: document.getElementById("exportMenu"),
       menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
       menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
-      btnAddObsidian: document.getElementById("btnAddObsidian"),
+      btnSyncObsidian: document.getElementById("btnSyncObsidian"),
       btnSyncNotion: document.getElementById("btnSyncNotion"),
       sourceFilterSelect: document.getElementById("sourceFilterSelect"),
       btnNotionConnect: document.getElementById("btnNotionConnect"),
@@ -85,6 +85,13 @@
       notionPages: document.getElementById("notionPages"),
       btnFetchCurrentArticle: document.getElementById("btnFetchCurrentArticle"),
       articleFetchStatus: document.getElementById("articleFetchStatus"),
+      obsidianSyncEnabled: document.getElementById("obsidianSyncEnabled"),
+      obsidianApiBaseUrl: document.getElementById("obsidianApiBaseUrl"),
+      obsidianApiKey: document.getElementById("obsidianApiKey"),
+      obsidianAuthHeaderName: document.getElementById("obsidianAuthHeaderName"),
+      btnObsidianSettingsSave: document.getElementById("btnObsidianSettingsSave"),
+      btnObsidianTestConnection: document.getElementById("btnObsidianTestConnection"),
+      obsidianSyncStatus: document.getElementById("obsidianSyncStatus"),
       databaseBackupStatus: document.getElementById("databaseBackupStatus"),
 	    btnDatabaseExport: document.getElementById("btnDatabaseExport"),
 	    databaseImportFile: document.getElementById("databaseImportFile"),
@@ -109,7 +116,8 @@
     previewRequestToken: 0,
     notionSyncById: new Map(),
     notionSyncInProgress: false,
-    obsidianAddInProgress: false,
+    obsidianSyncById: new Map(),
+    obsidianSyncInProgress: false,
     sourceFilterKey: "all"
   };
 

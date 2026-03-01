@@ -19,7 +19,11 @@
   });
 
   const OBSIDIAN_MESSAGE_TYPES = Object.freeze({
-    OPEN_URL: "openObsidianUrl"
+    GET_SETTINGS: "obsidianGetSettings",
+    SAVE_SETTINGS: "obsidianSaveSettings",
+    TEST_CONNECTION: "obsidianTestConnection",
+    SYNC_CONVERSATIONS: "obsidianSyncConversations",
+    GET_SYNC_STATUS: "obsidianGetSyncStatus"
   });
 
   const ARTICLE_MESSAGE_TYPES = Object.freeze({
