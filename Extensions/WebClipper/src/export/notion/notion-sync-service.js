@@ -3,7 +3,9 @@
 
   const MAX_TEXT = 1900;
   const APPEND_BATCH = 90;
-  const RATE_DELAY_MS = 250;
+  const APPEND_RATE_DELAY_MS = 250;
+  const CLEAR_DELETE_CONCURRENCY = 3;
+  const CLEAR_DELETE_MAX_ATTEMPTS = 5;
 
   function aiLabelForSource(source) {
     const api = NS.notionAi;
@@ -14,6 +16,25 @@
 
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
+  }
+
+  function parseHttpStatus(error) {
+    const raw = error && error.status != null ? Number(error.status) : NaN;
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    const message = error && error.message ? String(error.message) : String(error || "");
+    const m = message.match(/\bHTTP\s+(\d{3})\b/i);
+    return m ? Number(m[1]) : 0;
+  }
+
+  function retryDelayMs(error, attempt) {
+    const retryAfterMs = error && error.retryAfterMs != null ? Number(error.retryAfterMs) : 0;
+    if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+      return Math.min(5000, Math.max(150, Math.round(retryAfterMs)));
+    }
+    const a = Number.isFinite(Number(attempt)) ? Math.max(1, Number(attempt)) : 1;
+    const base = 180 * (2 ** (a - 1));
+    const jitter = Math.floor(Math.random() * 120);
+    return Math.min(5000, base + jitter);
   }
 
   function splitText(text) {
@@ -134,9 +155,8 @@
     }];
   }
 
-  function messagesToBlocks(messages, options) {
+  function messagesToBlocks(messages, _options) {
     const out = [];
-    const source = options && options.source ? String(options.source) : "";
     for (const m of messages || []) {
       const role = m.role || "assistant";
       const label = role === "user" ? "User" : role === "assistant" ? "Assistant" : role;
@@ -182,13 +202,50 @@
     return NS.notionApi.notionFetch({ accessToken, method: "DELETE", path: `/v1/blocks/${blockId}` });
   }
 
+  async function archiveBlockWithRetry(accessToken, blockId) {
+    let attempt = 0;
+    for (;;) {
+      attempt += 1;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await archiveBlock(accessToken, blockId);
+      } catch (error) {
+        const status = parseHttpStatus(error);
+        const retryable = status === 429 || status === 503;
+        if (!retryable || attempt >= CLEAR_DELETE_MAX_ATTEMPTS) throw error;
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(retryDelayMs(error, attempt));
+      }
+    }
+  }
+
+  async function parallelEach(items, worker, concurrency) {
+    const queue = Array.isArray(items) ? items.slice() : [];
+    if (!queue.length) return true;
+    const size = Number.isFinite(Number(concurrency)) ? Math.max(1, Number(concurrency)) : 1;
+    const workers = [];
+    for (let i = 0; i < size; i += 1) {
+      workers.push((async () => {
+        for (;;) {
+          const item = queue.shift();
+          if (item == null) return;
+          // eslint-disable-next-line no-await-in-loop
+          await worker(item);
+        }
+      })());
+    }
+    await Promise.all(workers);
+    return true;
+  }
+
   async function clearPageChildren(accessToken, pageId) {
     const children = await listChildren(accessToken, pageId);
-    for (const c of children) {
-      if (!c || !c.id) continue;
-      await archiveBlock(accessToken, c.id);
-      await sleep(RATE_DELAY_MS);
-    }
+    const ids = children
+      .map((c) => c && c.id ? String(c.id).trim() : "")
+      .filter(Boolean);
+    await parallelEach(ids, async (blockId) => {
+      await archiveBlockWithRetry(accessToken, blockId);
+    }, CLEAR_DELETE_CONCURRENCY);
   }
 
   async function appendChildren(accessToken, pageId, blocks) {
@@ -202,7 +259,7 @@
         path: `/v1/blocks/${pageId}/children`,
         body: { children: batch }
       });
-      if (remaining.length) await sleep(RATE_DELAY_MS);
+      if (remaining.length) await sleep(APPEND_RATE_DELAY_MS);
     }
   }
 
