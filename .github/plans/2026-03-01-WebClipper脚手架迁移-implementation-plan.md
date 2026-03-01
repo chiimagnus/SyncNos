@@ -92,9 +92,10 @@
 
 **Step 1: 实现**
 - 用 Task 02 的结果补齐：
-  - app 页面文件应放置的真实路径（例如 `entrypoints/app/index.html` 或等价）
-  - background/content 入口真实文件名（例如 `entrypoints/background.ts`）
-  - Firefox build 命令与产物目录
+  - app 页面入口：`entrypoints/app/index.html`（产物 `app.html`，不自动写入 manifest）
+  - popup 入口：`entrypoints/popup/index.html`（产物 `popup.html`）
+  - background/content：`entrypoints/background.ts`、`entrypoints/content.ts`（content 产物位于 `content-scripts/`）
+  - Firefox build：`wxt build -b firefox --mv3`（产物 `.output/firefox-mv3/`）
 
 **Step 2: 验证**
 - Expected: 文档中不再出现 `entrypoints/app.html` 与 `entrypoints/app/main.tsx` 这类自相矛盾表述
@@ -138,7 +139,8 @@
 ### Task 06: 建立 app（扩展内 Web App）最小可用壳（仅路由 + 4 页面空壳）
 
 **Files:**
-- Create: `Extensions/WebClipper/entrypoints/app/<按 Task03 确认的路径>/...`
+- Create: `Extensions/WebClipper/entrypoints/app/index.html`
+- Create: `Extensions/WebClipper/entrypoints/app/main.tsx`
 - Create: `Extensions/WebClipper/src/ui/app/AppShell.tsx`
 - Create: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
 - Create: `Extensions/WebClipper/src/ui/app/routes/SyncJobs.tsx`
@@ -167,7 +169,7 @@
 
 **Step 1: 实现**
 - popup 保持轻量：新增按钮 “Open App”，点击后：
-  - `browser.runtime.getURL('app.html#/')`（路径按 Task 03）
+  - `browser.runtime.getURL('app.html#/')`
   - `browser.tabs.create({ url })`
   - `window.close()`
 
