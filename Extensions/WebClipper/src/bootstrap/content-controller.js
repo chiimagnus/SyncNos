@@ -19,12 +19,10 @@
     5: ["Combo x5! Beast mode on.", "Five-hit streak. Zoomies unlocked."],
     7: ["Combo x7! Legendary paws.", "Seven-hit streak. Animal boss mood."]
   });
-  const INPAGE_SUPPORTED_ONLY_STORAGE_KEY = "inpage_supported_only";
 
   function createController({ runtime }) {
     const inpageButton = NS.inpageButton;
     const inpageTip = NS.inpageTip;
-    let inpageSupportedOnly = false;
 
     function showInpageTip(text, kind) {
       if (!inpageTip || typeof inpageTip.showSaveTip !== "function") return;
@@ -63,30 +61,6 @@
       return lines[idx] || lines[0];
     }
 
-    function normalizeInpageSupportedOnly(value) {
-      return value === true;
-    }
-
-    function shouldAllowInpageCollector(collectorId) {
-      if (collectorId !== "web") return true;
-      return !inpageSupportedOnly;
-    }
-
-    function readInpageSupportedOnlySetting() {
-      return new Promise((resolve) => {
-        try {
-          if (!chrome || !chrome.storage || !chrome.storage.local || typeof chrome.storage.local.get !== "function") {
-            return resolve(false);
-          }
-          chrome.storage.local.get([INPAGE_SUPPORTED_ONLY_STORAGE_KEY], (res) => {
-            resolve(normalizeInpageSupportedOnly(res && res[INPAGE_SUPPORTED_ONLY_STORAGE_KEY]));
-          });
-        } catch (_e) {
-          resolve(false);
-        }
-      });
-    }
-
     function getCollector() {
       const reg = NS.collectorsRegistry;
       if (!reg || typeof reg.pickActive !== "function") return null;
@@ -106,7 +80,7 @@
         const fn = typeof d.inpageMatches === "function" ? d.inpageMatches : d.matches;
         if (typeof fn !== "function") continue;
         try {
-          if (fn(loc) && shouldAllowInpageCollector(d.id)) return { id: d.id, ...(d.collector || {}) };
+          if (fn(loc)) return { id: d.id, ...(d.collector || {}) };
         } catch (_e) {
           // ignore
         }
@@ -135,25 +109,10 @@
       let stopped = false;
       let observer = null;
       let manualSaveInFlight = false;
-      let onStorageChanged = null;
-
-      function toInpageEligibleCollector(collector) {
-        if (!collector) return null;
-        if (!shouldAllowInpageCollector(collector.id)) return null;
-        return collector;
-      }
 
       function stop() {
         if (stopped) return;
         stopped = true;
-        try {
-          if (onStorageChanged && chrome && chrome.storage && chrome.storage.onChanged
-            && typeof chrome.storage.onChanged.removeListener === "function") {
-            chrome.storage.onChanged.removeListener(onStorageChanged);
-          }
-        } catch (_e) {
-          // ignore
-        }
         inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons("");
         observer && observer.stop && observer.stop();
       }
@@ -172,7 +131,7 @@
         manualSaveInFlight = true;
         try {
           const collector = getCollector() || getInpageCollector();
-          const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
+          const inpageCollector = collector || getInpageCollector();
           if (!inpageCollector) return;
           if (inpageCollector.id === "web") {
             await runManualSaveFlow({
@@ -231,7 +190,7 @@
 
       function refreshInpageButton() {
         const collector = getCollector();
-        const inpageCollector = toInpageEligibleCollector(collector) || getInpageCollector();
+        const inpageCollector = collector || getInpageCollector();
         inpageButton && inpageButton.cleanupButtons && inpageButton.cleanupButtons(inpageCollector && inpageCollector.id);
         inpageButton && inpageButton.ensureInpageButton && inpageButton.ensureInpageButton({
           collectorId: inpageCollector ? inpageCollector.id : undefined,
@@ -274,36 +233,10 @@
         }
       });
 
-      try {
-        if (chrome && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function") {
-          onStorageChanged = (changes, areaName) => {
-            if (areaName !== "local") return;
-            if (!changes || !Object.prototype.hasOwnProperty.call(changes, INPAGE_SUPPORTED_ONLY_STORAGE_KEY)) return;
-            inpageSupportedOnly = normalizeInpageSupportedOnly(
-              changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY] && changes[INPAGE_SUPPORTED_ONLY_STORAGE_KEY].newValue
-            );
-            refreshInpageButton();
-          };
-          chrome.storage.onChanged.addListener(onStorageChanged);
-        }
-      } catch (_e) {
-        // ignore
-      }
-
       return {
         start() {
           if (stopped) return;
-          readInpageSupportedOnlySetting()
-            .then((value) => {
-              inpageSupportedOnly = value;
-            })
-            .catch(() => {
-              inpageSupportedOnly = false;
-            })
-            .finally(() => {
-              if (stopped) return;
-              observer && observer.start && observer.start();
-            });
+          observer && observer.start && observer.start();
         },
         stop
       };

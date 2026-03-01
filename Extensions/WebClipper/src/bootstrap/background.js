@@ -29,6 +29,7 @@
       "../export/obsidian/obsidian-sync-metadata.js",
       "../export/obsidian/obsidian-markdown-writer.js",
       "../export/obsidian/obsidian-sync-orchestrator.js",
+      "./background-inpage-web-visibility.js",
       "./background-events-hub.js",
       "./background-storage.js",
       "./background-notion-oauth.js",
@@ -40,5 +41,11 @@
   }
 
   const router = NS.backgroundRouter;
+  try {
+    const inpage = NS.backgroundInpageWebVisibility;
+    inpage && inpage.start && inpage.start();
+  } catch (_e) {
+    // ignore
+  }
   router && router.start && router.start();
 })();
