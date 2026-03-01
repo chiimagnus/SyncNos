@@ -14,6 +14,7 @@
   const articleFetch = NS.popupArticleFetch;
   const inpageVisibility = NS.popupInpageVisibility;
   const about = NS.popupAbout;
+  const obsidianSyncUi = NS.popupObsidianSync;
   const syncStateApi = NS.popupNotionSyncState;
 
 	  if (!core || !tabs || !list || !chatPreview || !popupExport || !popupDelete || !notion || !notionAi || !database || !articleFetch || !inpageVisibility || !about) return;
@@ -356,6 +357,7 @@
       articleFetch.init();
       inpageVisibility.init();
 	    about.init();
+      obsidianSyncUi && typeof obsidianSyncUi.init === "function" && obsidianSyncUi.init();
 	    initObsidianSyncAction();
 	    initNotionSyncAction();
 
