@@ -248,6 +248,27 @@
   }
 
   function start() {
+    // Ensure registration stays consistent across browser restarts / extension updates.
+    // MV3 event listeners are persisted by the browser once registered at least once.
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.onInstalled && typeof chrome.runtime.onInstalled.addListener === "function") {
+        chrome.runtime.onInstalled.addListener(() => {
+          applyVisibilitySetting({ reason: "onInstalled" }).catch(() => {});
+        });
+      }
+    } catch (_e) {
+      // ignore
+    }
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.onStartup && typeof chrome.runtime.onStartup.addListener === "function") {
+        chrome.runtime.onStartup.addListener(() => {
+          applyVisibilitySetting({ reason: "onStartup" }).catch(() => {});
+        });
+      }
+    } catch (_e) {
+      // ignore
+    }
+
     // Best-effort: keep dynamic registration consistent with persisted setting.
     applyVisibilitySetting({ reason: "startup" }).catch(() => {});
 
@@ -270,4 +291,3 @@
     start
   };
 })();
-
