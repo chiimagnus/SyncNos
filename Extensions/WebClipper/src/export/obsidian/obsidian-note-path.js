@@ -7,18 +7,38 @@
     return String(v == null ? "" : v).trim();
   }
 
-  function folderForConversation(conversation) {
+  function normalizeFolderPath(input) {
+    const s = safeString(input);
+    if (!s) return "";
+    return s
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((seg) => String(seg || "").trim())
+      .filter((seg) => !!seg && seg !== "." && seg !== "..")
+      .join("/");
+  }
+
+  function folderForConversation(conversation, { folderByKindId, defaultFolder } = {}) {
     const kinds = (globalThis.WebClipper && globalThis.WebClipper.conversationKinds) || null;
     if (kinds && typeof kinds.pick === "function") {
       try {
         const kind = kinds.pick(conversation);
+        const kindId = kind && kind.id ? safeString(kind.id) : "";
+        const overrideFolderRaw = kindId && folderByKindId && typeof folderByKindId === "object"
+          ? safeString(folderByKindId[kindId])
+          : "";
+        const overrideFolder = normalizeFolderPath(overrideFolderRaw);
+        if (overrideFolder) return overrideFolder;
+
         const folder = kind && kind.obsidian && kind.obsidian.folder ? safeString(kind.obsidian.folder) : "";
-        if (folder) return folder;
+        const normalized = normalizeFolderPath(folder);
+        if (normalized) return normalized;
       } catch (_e) {
         // ignore
       }
     }
-    return DEFAULT_OBSIDIAN_FOLDER;
+    const fallback = normalizeFolderPath(defaultFolder);
+    return fallback || DEFAULT_OBSIDIAN_FOLDER;
   }
 
   // FNV-1a 64-bit hash (BigInt) for a stable, short file id.
@@ -33,22 +53,23 @@
     return hash.toString(16).padStart(16, "0");
   }
 
-  function buildStableNotePath(conversation) {
+  function buildStableNotePath(conversation, opts) {
     const c = conversation || {};
     const source = safeString(c.source) || "unknown";
     const conversationKey = safeString(c.conversationKey) || "unknown";
-    const folder = folderForConversation(c);
+    const folder = folderForConversation(c, opts);
     const id = fnv1a64Hex(`${source}:${conversationKey}`);
-    return `${folder}/${source}-${id}.md`;
+    const filename = `${source}-${id}.md`;
+    return folder ? `${folder}/${filename}` : filename;
   }
 
   NS.obsidianNotePath = {
     DEFAULT_OBSIDIAN_FOLDER,
     folderForConversation,
     fnv1a64Hex,
+    normalizeFolderPath,
     buildStableNotePath
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = NS.obsidianNotePath;
 })();
-
