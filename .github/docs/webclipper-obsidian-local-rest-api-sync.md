@@ -21,13 +21,13 @@
 
 ## WebClipper 配置
 
-Popup -> `Settings` -> `Obsidian Local REST API`
+Popup -> `Settings` -> `Obsidian Local REST API` / `Obsidian Paths`
 
-- `Enable Obsidian Sync`: 打开
 - `Base URL`: 默认 `http://127.0.0.1:27123`
-- `API Key`: 输入插件里生成的 Key（只在保存时传给 background 存储，不会回显明文）
+- `API Key`: 输入插件里生成的 Key（明文显示；存储在扩展本地存储中）
 - `Auth Header`: 默认 `Authorization`
-- 点击 `Test` 验证连通性
+- `Test`: 验证连通性与认证是否正确
+- 保存行为：输入框在 `blur` 时自动保存；也支持按 `Enter` 立即保存
 
 ## 文件定位与 frontmatter
 
@@ -35,6 +35,7 @@ Popup -> `Settings` -> `Obsidian Local REST API`
 - 默认目录按 kind 分流：
   - chat：`SyncNos-AIChats/`
   - article：`SyncNos-WebArticles/`
+- 目录可配置：`Settings -> Obsidian Paths` 可分别设置 Chat 与 Web article 的 vault-relative 文件夹
 - 同步游标存储在 `frontmatter.syncnos`（示例字段）：
   - `schemaVersion`
   - `source`
@@ -52,8 +53,6 @@ Popup -> `Settings` -> `Obsidian Local REST API`
 
 ## 常见问题
 
-- `Obsidian sync is disabled.`：打开 `Enable Obsidian Sync`
 - `Invalid API Base URL`：确保使用 `http://127.0.0.1:27123`
 - `unauthorized` / `auth_error`：检查 API Key 与 header 名称
 - `network_error`：确认 Obsidian 正在运行、插件启用、端口未被占用
-
