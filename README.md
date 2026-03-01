@@ -55,11 +55,13 @@ This repository includes a standalone MV3 browser extension under `Extensions/We
 
 - Captures AI chats from supported sites into local browser storage
 - Exports selected conversations as Markdown (single merged export or multi-file zip export)
-- Adds selected conversations to Obsidian via `obsidian://new` (single selection prefers clipboard mode; multi-selection opens URLs in order)
-- Obsidian export routes by kind:
-  - Chats: `SyncNos-AIChats/<conversation-title>`
-  - Web articles: `SyncNos-WebArticles/<article-title>`
-  - Duplicate note names append numeric suffixes
+- Syncs selected conversations to Obsidian via `Obsidian Local REST API` (writes/updates vault files over `http://127.0.0.1:27123`)
+- Obsidian note paths:
+  - Default folders by kind:
+    - Chats: `SyncNos-AIChats/`
+    - Web articles: `SyncNos-WebArticles/`
+  - Folders are configurable in popup Settings
+  - Filenames are stable by `(source + conversationKey)` (hash-based), so renaming titles does not break incremental updates
 - Database Backup:
   - Export: `*.zip` only (`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`)
   - Import: `*.zip` (recommended) and legacy `*.json`
