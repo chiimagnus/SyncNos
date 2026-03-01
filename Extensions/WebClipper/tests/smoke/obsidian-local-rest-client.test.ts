@@ -1,0 +1,71 @@
+import { describe, expect, it } from "vitest";
+
+function loadClient() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const modulePath = require.resolve("../../src/export/obsidian/obsidian-local-rest-client.js");
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete require.cache[modulePath];
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("../../src/export/obsidian/obsidian-local-rest-client.js");
+}
+
+describe("obsidian-local-rest-client", () => {
+  it("encodes vault path segments without encoding slashes", () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const mod = loadClient();
+    expect(mod.encodeVaultPath("A Folder/My Note.md")).toBe("A%20Folder/My%20Note.md");
+  });
+
+  it("rejects https base url in this version", async () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const mod = loadClient();
+    const client = mod.createClient({ apiBaseUrl: "https://127.0.0.1:27124", apiKey: "k" });
+    expect(client.ok).toBe(false);
+    expect(client.error?.code).toBe("https_unsupported");
+  });
+
+  it("injects bearer auth header and supports custom header name", async () => {
+    const seen: any[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (url: any, init: any) => {
+      seen.push({ url, init });
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const mod = loadClient();
+    const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k", authHeaderName: "X-Api-Key" });
+    expect(client.ok).toBe(true);
+
+    // @ts-expect-error narrowed
+    const res = await client.getVaultFile("Folder/Note.md");
+    expect(res.ok).toBe(true);
+    expect(seen.length).toBe(1);
+    expect(String(seen[0].url)).toContain("/vault/Folder/Note.md");
+
+    const headers = seen[0].init.headers as Headers;
+    expect(headers.get("X-Api-Key")).toBe("Bearer k");
+  });
+
+  it("normalizes 401 as auth_error with message", async () => {
+    // @ts-expect-error test global
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({ errorCode: 40100, message: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+    };
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    const mod = loadClient();
+    const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "bad" });
+    expect(client.ok).toBe(true);
+
+    // @ts-expect-error narrowed
+    const res = await client.getVaultFile("Folder/Note.md");
+    expect(res.ok).toBe(false);
+    expect(res.error?.code).toBe("auth_error");
+    expect(String(res.error?.message || "")).toContain("unauthorized");
+  });
+});
+
