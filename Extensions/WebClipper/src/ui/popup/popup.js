@@ -115,12 +115,12 @@
       const d = Number(done);
       const t = Number(total);
       if (Number.isFinite(d) && Number.isFinite(t) && t > 0) {
-        els.btnSyncNotion.textContent = `Syncing(${d}/${t})`;
+        els.btnSyncNotion.textContent = `Notion(${d}/${t})`;
       } else {
-        els.btnSyncNotion.textContent = "Syncing...";
+        els.btnSyncNotion.textContent = "Notion...";
       }
     } else {
-      els.btnSyncNotion.textContent = "Sync";
+      els.btnSyncNotion.textContent = "Notion";
     }
   }
 
@@ -199,7 +199,7 @@
         els.btnSyncObsidian.textContent = "Obsidian...";
       }
     } else {
-      els.btnSyncObsidian.textContent = "Obsidian Sync";
+      els.btnSyncObsidian.textContent = "Obsidian";
     }
   }
 
@@ -320,7 +320,7 @@
       if (state.obsidianSyncInProgress) return;
 
       const btn = els.btnSyncObsidian;
-      const prevText = btn.textContent || "Obsidian Sync";
+      const prevText = btn.textContent || "Obsidian";
       state.obsidianSyncInProgress = true;
       btn.disabled = true;
       btn.textContent = "Obsidian...";
