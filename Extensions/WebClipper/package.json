@@ -5,6 +5,9 @@
   "description": "WebClipper browser extension (Chromium/Edge + Firefox)",
   "type": "commonjs",
   "scripts": {
+    "dev:wxt": "wxt dev",
+    "build:wxt": "wxt build",
+    "build:wxt:firefox": "wxt build -b firefox",
     "check": "node scripts/check.mjs",
     "check:dist:edge": "node scripts/check.mjs --root=dist-edge --no-syntax",
     "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox --no-syntax",

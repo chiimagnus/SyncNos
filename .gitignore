@@ -18,6 +18,7 @@ Backend/.env
 .github/*.md
 .cursorignore
 .github/hooks/
+Extensions/WebClipper/.tmp-wxt-spike/
 
 # Notion OAuth 配置文件（包含敏感信息）
 notion_auth.env
