@@ -76,7 +76,7 @@
       exportMenu: document.getElementById("exportMenu"),
       menuExportSingleMarkdown: document.getElementById("menuExportSingleMarkdown"),
       menuExportMultiMarkdown: document.getElementById("menuExportMultiMarkdown"),
-      btnAddObsidian: document.getElementById("btnAddObsidian"),
+      btnSyncObsidian: document.getElementById("btnSyncObsidian"),
       btnSyncNotion: document.getElementById("btnSyncNotion"),
       sourceFilterSelect: document.getElementById("sourceFilterSelect"),
       btnNotionConnect: document.getElementById("btnNotionConnect"),
@@ -109,7 +109,8 @@
     previewRequestToken: 0,
     notionSyncById: new Map(),
     notionSyncInProgress: false,
-    obsidianAddInProgress: false,
+    obsidianSyncById: new Map(),
+    obsidianSyncInProgress: false,
     sourceFilterKey: "all"
   };
 
