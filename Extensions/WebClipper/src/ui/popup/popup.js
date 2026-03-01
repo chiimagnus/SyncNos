@@ -204,20 +204,35 @@
   }
 
   function applyObsidianPerConversationResults(perConversation) {
-    if (!Array.isArray(perConversation) || !(state && state.obsidianSyncById instanceof Map)) return;
-    const now = Date.now();
-    for (const r of perConversation) {
-      const conversationId = Number(r && r.conversationId);
-      if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
-      const ok = !!(r && r.ok);
-      state.obsidianSyncById.set(conversationId, {
-        ok,
-        mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
-        appended: Number(r && r.appended),
-        error: r && r.error ? String(r.error) : "",
-        at: Number(r && r.at) || now
-      });
+    const api = NS.popupObsidianSyncState;
+    if (!api || typeof api.applySyncResults !== "function") {
+      if (!Array.isArray(perConversation) || !(state && state.obsidianSyncById instanceof Map)) return;
+      const now = Date.now();
+      for (const r of perConversation) {
+        const conversationId = Number(r && r.conversationId);
+        if (!Number.isFinite(conversationId) || conversationId <= 0) continue;
+        const ok = !!(r && r.ok);
+        state.obsidianSyncById.set(conversationId, {
+          ok,
+          mode: r && r.mode ? String(r.mode) : (ok ? "ok" : "fail"),
+          appended: Number(r && r.appended),
+          error: r && r.error ? String(r.error) : "",
+          at: Number(r && r.at) || now
+        });
+      }
+      return;
     }
+    api.applySyncResults({
+      rows: perConversation,
+      state,
+      onChanged: () => {
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    });
   }
 
   async function refreshObsidianSyncStatus({ pollOnce } = {}) {
@@ -322,6 +337,11 @@
         const failures = Array.isArray(data.failures) ? data.failures : [];
         const results = Array.isArray(data.results) ? data.results : [];
         applyObsidianPerConversationResults(results);
+        try {
+          list && typeof list.render === "function" && list.render();
+        } catch (_e) {
+          // ignore
+        }
 
         if (failCount) {
           const lines = failures.slice(0, 6).map((f) => `- ${f.conversationId}: ${f.error || "unknown error"}`);
