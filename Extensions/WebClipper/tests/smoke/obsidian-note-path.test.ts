@@ -39,5 +39,16 @@ describe("obsidian-note-path", () => {
     expect(path1).toContain("SyncNos-WebArticles/");
     expect(path1).toMatch(/goodlinks-[0-9a-f]{16}\.md$/);
   });
-});
 
+  it("allows per-kind folder override (e.g. user-configured paths)", () => {
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+    loadKinds();
+    const mod = loadNotePath();
+
+    const convo = { sourceType: "article", source: "goodlinks", conversationKey: "abc" };
+    const p = mod.buildStableNotePath(convo, { folderByKindId: { article: "My/Custom Folder" } });
+    expect(p).toContain("My/Custom Folder/");
+    expect(p).toMatch(/goodlinks-[0-9a-f]{16}\.md$/);
+  });
+});

@@ -31,7 +31,7 @@
   let savePending = false;
   let dirty = false;
 
-  let lastSaved = { apiBaseUrl: null, authHeaderName: null };
+  let lastSaved = { apiBaseUrl: null, authHeaderName: null, chatFolder: null, articleFolder: null };
 
   function safeString(v) {
     return String(v == null ? "" : v).trim();
@@ -48,18 +48,22 @@
     if (els.obsidianApiBaseUrl) els.obsidianApiBaseUrl.disabled = busy;
     if (els.obsidianApiKey) els.obsidianApiKey.disabled = busy;
     if (els.obsidianAuthHeaderName) els.obsidianAuthHeaderName.disabled = busy;
+    if (els.obsidianChatFolder) els.obsidianChatFolder.disabled = busy;
+    if (els.obsidianArticleFolder) els.obsidianArticleFolder.disabled = busy;
   }
 
   function readUiPayload({ includeApiKey } = {}) {
     const apiBaseUrl = els.obsidianApiBaseUrl ? safeString(els.obsidianApiBaseUrl.value) : "";
     const authHeaderName = els.obsidianAuthHeaderName ? safeString(els.obsidianAuthHeaderName.value) : "";
+    const chatFolder = els.obsidianChatFolder ? safeString(els.obsidianChatFolder.value) : "";
+    const articleFolder = els.obsidianArticleFolder ? safeString(els.obsidianArticleFolder.value) : "";
 
     const shouldIncludeKey = includeApiKey === true;
     const apiKeyRaw = els.obsidianApiKey ? String(els.obsidianApiKey.value || "") : "";
     const apiKeyTrimmed = safeString(apiKeyRaw);
     const apiKey = shouldIncludeKey && apiKeyTrimmed ? apiKeyRaw : null;
 
-    return { apiBaseUrl, authHeaderName, apiKey };
+    return { apiBaseUrl, authHeaderName, chatFolder, articleFolder, apiKey };
   }
 
   function applySettingsToUi(settings) {
@@ -68,6 +72,8 @@
     try {
       if (els.obsidianApiBaseUrl) els.obsidianApiBaseUrl.value = s.apiBaseUrl ? String(s.apiBaseUrl) : "";
       if (els.obsidianAuthHeaderName) els.obsidianAuthHeaderName.value = s.authHeaderName ? String(s.authHeaderName) : "";
+      if (els.obsidianChatFolder) els.obsidianChatFolder.value = s.chatFolder ? String(s.chatFolder) : "";
+      if (els.obsidianArticleFolder) els.obsidianArticleFolder.value = s.articleFolder ? String(s.articleFolder) : "";
       if (els.obsidianApiKey) {
         els.obsidianApiKey.value = s.apiKey ? String(s.apiKey) : "";
         els.obsidianApiKey.placeholder = "";
@@ -81,7 +87,9 @@
     const s = settings && typeof settings === "object" ? settings : {};
     return {
       apiBaseUrl: s.apiBaseUrl ? String(s.apiBaseUrl) : "",
-      authHeaderName: s.authHeaderName ? String(s.authHeaderName) : ""
+      authHeaderName: s.authHeaderName ? String(s.authHeaderName) : "",
+      chatFolder: s.chatFolder ? String(s.chatFolder) : "",
+      articleFolder: s.articleFolder ? String(s.articleFolder) : ""
     };
   }
 
@@ -89,7 +97,9 @@
     const p = readUiPayload({ includeApiKey: false });
     return {
       apiBaseUrl: p.apiBaseUrl ? String(p.apiBaseUrl) : "",
-      authHeaderName: p.authHeaderName ? String(p.authHeaderName) : ""
+      authHeaderName: p.authHeaderName ? String(p.authHeaderName) : "",
+      chatFolder: p.chatFolder ? String(p.chatFolder) : "",
+      articleFolder: p.articleFolder ? String(p.articleFolder) : ""
     };
   }
 
@@ -97,7 +107,9 @@
     const x = a && typeof a === "object" ? a : {};
     const y = b && typeof b === "object" ? b : {};
     return String(x.apiBaseUrl || "") === String(y.apiBaseUrl || "")
-      && String(x.authHeaderName || "") === String(y.authHeaderName || "");
+      && String(x.authHeaderName || "") === String(y.authHeaderName || "")
+      && String(x.chatFolder || "") === String(y.chatFolder || "")
+      && String(x.articleFolder || "") === String(y.articleFolder || "");
   }
 
   async function refreshSettings() {
@@ -193,6 +205,16 @@
     if (els.obsidianAuthHeaderName) {
       els.obsidianAuthHeaderName.addEventListener("input", () => scheduleSave());
       els.obsidianAuthHeaderName.addEventListener("blur", () => runSave({ applyUi: true }));
+    }
+
+    if (els.obsidianChatFolder) {
+      els.obsidianChatFolder.addEventListener("input", () => scheduleSave());
+      els.obsidianChatFolder.addEventListener("blur", () => runSave({ applyUi: true }));
+    }
+
+    if (els.obsidianArticleFolder) {
+      els.obsidianArticleFolder.addEventListener("input", () => scheduleSave());
+      els.obsidianArticleFolder.addEventListener("blur", () => runSave({ applyUi: true }));
     }
 
     if (els.obsidianApiKey) {
