@@ -63,11 +63,13 @@
 - **消息协议（前后端共享）**：`src/protocols/message-contracts.js`
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **后台路由（统一入口）**：`src/bootstrap/background-router.js`
-  - 路由 `openObsidianUrl`、Notion 同步任务状态、会话 CRUD 等消息。
+  - 路由 Obsidian Local REST API 同步、Notion 同步任务状态、会话 CRUD 等消息。
 - **Notion 同步模块**：`src/export/notion/`
   - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
-- **Obsidian 模块**：`src/ui/popup/popup-obsidian.js` + `src/export/obsidian/obsidian-url-service.js`
-  - popup 负责 payload 和 URL 生成，background 负责 URL 校验与顺序打开。
+- **Obsidian 模块**：Local REST API Sync（平台主导）
+  - 已重构为 Local REST API 平台主导同步：
+  - popup：`src/ui/popup/popup-obsidian-sync.js`（配置与连通性测试）+ `src/ui/popup/popup-obsidian-sync-state.js`（状态）+ `src/ui/popup/popup.js`（触发同步）
+  - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（编排）+ `src/export/obsidian/obsidian-local-rest-client.js`（HTTP client）+ `src/export/obsidian/obsidian-markdown-writer.js`（写入）+ `src/export/obsidian/obsidian-settings-store.js`（配置存储）
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`src/ui/popup/popup-inpage-visibility.js` + `src/bootstrap/content-controller.js`
@@ -78,9 +80,12 @@
 - 默认目录按 kind 分流：
   - chat：`SyncNos-AIChats/`
   - article：`SyncNos-WebArticles/`
-  笔记名优先使用标题并做非法字符清洗与重名后缀。
-- 单选会话：优先复制 Markdown 到剪贴板并走 `clipboard=1`；复制失败时回退到 `content` 参数。
-- 多选会话：生成多个 `obsidian://new` URL，后台按顺序逐个打开，避免创建顺序错乱。
+  文件路径由 `source + conversationKey` 生成稳定 hash（避免标题改名导致找不到旧文件）。
+- 同步策略（平台主导）：
+  - Obsidian 端不存在文件：全量重建（PUT）
+  - Obsidian 端存在文件且 frontmatter 兼容：增量追加（PATCH 追加到 heading `SyncNos::Messages`），并 PATCH frontmatter 更新游标
+  - 若检测到冲突或 PATCH 失败：自动回退全量重建（PUT）
+- 本期仅支持 Obsidian Local REST API 的 HTTP insecure 模式（默认 `http://127.0.0.1:27123`）；不支持 `https://127.0.0.1:27124` 自签名证书模式。
 
 ### 测试与回归
 
