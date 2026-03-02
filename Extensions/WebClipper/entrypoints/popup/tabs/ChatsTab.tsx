@@ -1,9 +1,13 @@
+import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Conversation, ConversationDetail } from '../../../src/domains/conversations/models';
 import { createZipBlob } from '../../../src/domains/backup/zip-utils';
-import { formatConversationMarkdown, sanitizeFilenamePart } from '../../../src/domains/conversations/markdown';
+import { formatConversationMarkdown } from '../../../src/domains/conversations/markdown';
+import type { Conversation, ConversationDetail } from '../../../src/domains/conversations/models';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../src/domains/conversations/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../src/domains/sync/repo';
+import { storageGet, storageSet } from '../../../src/platform/storage/local';
+
+type SourceMeta = { key: string; label: string };
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -14,40 +18,121 @@ function formatTime(ts?: number) {
   }
 }
 
-function trimText(text: unknown, maxLen: number) {
-  const raw = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!raw) return '';
-  if (raw.length <= maxLen) return raw;
-  return `${raw.slice(0, Math.max(0, maxLen - 1))}…`;
+function isSameLocalDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function hasWarningFlags(conversation: Conversation) {
+  return Array.isArray(conversation.warningFlags) && conversation.warningFlags.length > 0;
+}
+
+function getSourceMeta(raw: unknown): SourceMeta {
+  const text = String(raw || '').trim();
+  if (!text) return { key: 'unknown', label: '' };
+  const normalized = text.toLowerCase().replace(/[\s_-]+/g, '');
+  const map: Record<string, SourceMeta> = {
+    chatgpt: { key: 'chatgpt', label: 'ChatGPT' },
+    claude: { key: 'claude', label: 'Claude' },
+    deepseek: { key: 'deepseek', label: 'DeepSeek' },
+    notionai: { key: 'notionai', label: 'Notion AI' },
+    gemini: { key: 'gemini', label: 'Gemini' },
+    kimi: { key: 'kimi', label: 'Kimi' },
+    doubao: { key: 'doubao', label: 'Doubao' },
+    yuanbao: { key: 'yuanbao', label: 'Yuanbao' },
+    poe: { key: 'poe', label: 'Poe' },
+    zai: { key: 'zai', label: 'z.ai' },
+    web: { key: 'web', label: 'Web' },
+  };
+  return map[normalized] || { key: 'unknown', label: text };
+}
+
+function sanitizeHttpUrl(url: unknown) {
+  const text = String(url || '').trim();
+  if (!text) return '';
+  if (/^https?:\/\//i.test(text)) return text;
+  return '';
+}
+
+async function copyTextToClipboard(text: string) {
+  const raw = String(text || '');
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(raw);
+      return;
+    }
+  } catch (_e) {
+    // fallthrough
+  }
+  const el = document.createElement('textarea');
+  el.value = raw;
+  el.style.position = 'fixed';
+  el.style.left = '-9999px';
+  el.style.top = '0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(el);
+  if (!ok) throw new Error('copy failed');
+}
+
+type PreviewState = { conversationId: number; left: number; top: number } | null;
+
+function normalizeRole(role: unknown) {
+  const r = String(role || 'assistant').toLowerCase();
+  if (r === 'user') return 'user';
+  if (r === 'assistant') return 'assistant';
+  return 'other';
 }
 
 export default function ChatsTab() {
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Conversation[]>([]);
+  const [allItems, setAllItems] = useState<Conversation[]>([]);
 
-  const [filterSource, setFilterSource] = useState<string>('__all__');
+  const [filterKey, setFilterKey] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<ConversationDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
 
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
   const [exporting, setExporting] = useState(false);
   const [syncingNotion, setSyncingNotion] = useState(false);
   const [syncingObsidian, setSyncingObsidian] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const copiedTimerRef = useRef<number | null>(null);
+
+  const md = useMemo(() => {
+    const inst = new MarkdownIt({
+      html: false,
+      breaks: true,
+      linkify: true,
+      typographer: false,
+    });
+    try {
+      inst.enable(['table']);
+    } catch (_e) {
+      // ignore
+    }
+    return inst;
+  }, []);
+
+  const [preview, setPreview] = useState<PreviewState>(null);
+  const [previewDetail, setPreviewDetail] = useState<ConversationDetail | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const refresh = async () => {
     setLoadingList(true);
     setError(null);
     try {
       const list = await listConversations();
+      setAllItems(list);
       setItems(list);
       const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
       setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
-      if (list.length && activeId == null) setActiveId(Number(list[0].id));
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -56,49 +141,82 @@ export default function ChatsTab() {
   };
 
   useEffect(() => {
+    storageGet(['popup_source_filter_key'])
+      .then((res) => {
+        const v = String(res?.popup_source_filter_key || 'all').trim().toLowerCase() || 'all';
+        setFilterKey(v);
+      })
+      .catch(() => {});
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filteredItems = useMemo(() => {
+    const key = String(filterKey || 'all').trim().toLowerCase() || 'all';
+    if (key === 'all') return allItems;
+    return allItems.filter((c) => getSourceMeta(c.source).key === key);
+  }, [allItems, filterKey]);
+
+  useEffect(() => {
+    setItems(filteredItems);
+    const allowed = new Set(filteredItems.map((c) => Number(c.id)));
+    setSelectedIds((prev) => prev.filter((id) => allowed.has(Number(id))));
+  }, [filteredItems]);
+
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (!exportOpen) return;
-      const wrap = exportWrapRef.current;
-      const target = e.target as any;
-      if (wrap && target && wrap.contains(target)) return;
-      setExportOpen(false);
+      if (exportOpen) {
+        const wrap = exportWrapRef.current;
+        const target = e.target as any;
+        if (!wrap || !target || !wrap.contains(target)) setExportOpen(false);
+      }
+      if (preview) {
+        const target = e.target as any;
+        if (target && target.closest && target.closest('.chatPreviewPopover, .row')) return;
+        setPreview(null);
+        setPreviewDetail(null);
+      }
     };
     document.addEventListener('click', onDocClick, true);
     return () => document.removeEventListener('click', onDocClick, true);
-  }, [exportOpen]);
+  }, [exportOpen, preview]);
 
-  const sources = useMemo(() => {
-    const unique = new Set<string>();
-    for (const it of items) {
-      const s = String(it?.source || '').trim();
-      if (s) unique.add(s);
-    }
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!preview) return;
+      if (e.key === 'Escape') {
+        setPreview(null);
+        setPreviewDetail(null);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [preview]);
 
-  const filteredItems = useMemo(() => {
-    if (filterSource === '__all__') return items;
-    return items.filter((x) => String(x?.source || '') === filterSource);
-  }, [items, filterSource]);
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = null;
+    };
+  }, []);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds.map((x) => Number(x))), [selectedIds]);
-  const filteredIds = useMemo(
-    () => filteredItems.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0),
-    [filteredItems],
-  );
-  const allSelected = !!filteredIds.length && filteredIds.every((id) => selectedIdSet.has(id));
+
+  const total = items.length;
+  const selectedCount = selectedIds.length;
+
+  const allSelected = total > 0 && selectedCount === total;
+  const indeterminate = selectedCount > 0 && selectedCount < total;
+
+  useEffect(() => {
+    const el = selectAllRef.current;
+    if (!el) return;
+    el.indeterminate = indeterminate;
+  }, [indeterminate]);
 
   const toggleAll = () => {
-    if (allSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(Number(id))));
-      return;
-    }
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(items.map((c) => Number(c.id)).filter((x) => Number.isFinite(x) && x > 0));
   };
 
   const toggleSelected = (id: number) => {
@@ -107,24 +225,27 @@ export default function ChatsTab() {
     setSelectedIds((prev) => (prev.includes(safeId) ? prev.filter((x) => x !== safeId) : [...prev, safeId]));
   };
 
-  const activeConversation = useMemo(
-    () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
-    [items, activeId],
-  );
-
-  useEffect(() => {
-    const id = Number(activeId);
-    if (!id || id <= 0) {
-      setDetail(null);
-      return;
+  const sourceOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string }>();
+    for (const c of allItems) {
+      const meta = getSourceMeta(c.source);
+      if (!meta.key) continue;
+      map.set(meta.key, { key: meta.key, label: meta.label || meta.key });
     }
-    setLoadingDetail(true);
-    setDetail(null);
-    getConversationDetail(id)
-      .then((d) => setDetail(d))
-      .catch(() => setDetail(null))
-      .finally(() => setLoadingDetail(false));
-  }, [activeId]);
+    const opts = Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return [{ key: 'all', label: 'All' }, ...opts];
+  }, [allItems]);
+
+  const setSourceFilterKey = async (key: string) => {
+    const next = String(key || 'all').trim().toLowerCase() || 'all';
+    setFilterKey(next);
+    setSelectedIds([]);
+    try {
+      await storageSet({ popup_source_filter_key: next });
+    } catch (_e) {
+      // ignore
+    }
+  };
 
   const onDeleteSelected = async () => {
     const ids = selectedIds.slice();
@@ -136,7 +257,8 @@ export default function ChatsTab() {
     try {
       await deleteConversations(ids);
       setSelectedIds([]);
-      if (activeId != null && ids.includes(Number(activeId))) setActiveId(null);
+      setPreview(null);
+      setPreviewDetail(null);
       await refresh();
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
@@ -152,7 +274,7 @@ export default function ChatsTab() {
     setExporting(true);
     setError(null);
     try {
-      const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
+      const selectedConversations = allItems.filter((c) => ids.includes(Number(c.id)));
       if (!selectedConversations.length) return;
 
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -172,10 +294,11 @@ export default function ChatsTab() {
           const c = selectedConversations[i];
           // eslint-disable-next-line no-await-in-loop
           const d = await getConversationDetail(Number(c.id));
-          const source = sanitizeFilenamePart(c.source || 'unknown', 'unknown');
-          const title = sanitizeFilenamePart(c.title || 'untitled', 'untitled');
+          const source = getSourceMeta(c.source).key || 'unknown';
+          const title = String(c.title || 'untitled').replace(/\s+/g, ' ').trim() || 'untitled';
+          const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'untitled';
           files.push({
-            name: `webclipper-${source}-${title}-${i + 1}-${stamp}.md`,
+            name: `webclipper-${source}-${safeTitle}-${i + 1}-${stamp}.md`,
             data: formatConversationMarkdown(c, d.messages || []),
           });
         }
@@ -204,8 +327,8 @@ export default function ChatsTab() {
       const res = await syncNotionConversations(ids);
       const okCount = Number(res?.okCount) || 0;
       const failCount = Number(res?.failCount) || 0;
-      if (failCount) alert(`Notion sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}`);
-      else alert(`Notion sync finished.\n\nOK: ${okCount}\nFailed: 0`);
+      if (failCount) alert(`Sync finished.\n\nOK: ${okCount}\nFailed: ${failCount}`);
+      else alert(`Sync finished.\n\nOK: ${okCount}\nFailed: 0`);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'notion sync failed'));
     } finally {
@@ -231,213 +354,297 @@ export default function ChatsTab() {
     }
   };
 
-  const renderPreview = () => {
-    const c = activeConversation;
-    const messages = detail?.messages || [];
-    if (!c) return null;
-    return (
-      <div className="tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.14)] tw-bg-white/50 tw-p-2">
-        <div className="tw-flex tw-items-start tw-justify-between tw-gap-2">
-          <div className="tw-min-w-0">
-            <div className="tw-font-bold tw-text-[13px] tw-truncate">{c.title || 'Untitled'}</div>
-            <div className="tw-text-[12px] tw-text-[var(--muted)] tw-truncate">
-              {c.source} · {formatTime(c.lastCapturedAt)}
-            </div>
-          </div>
-          <button
-            className="tw-h-7 tw-px-2 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-            onClick={() => {
-              try {
-                const url = browser.runtime.getURL(`/app.html#/conversations?focus=${Number(c.id)}`);
-                void browser.tabs.create({ url });
-              } catch (_e) {
-                // ignore
-              }
-            }}
-            type="button"
-          >
-            Open
-          </button>
-        </div>
-        <div className="tw-mt-2 tw-max-h-[160px] tw-overflow-auto tw-rounded-lg tw-bg-[rgba(255,255,255,0.55)] tw-p-2 tw-text-[12px]">
-          {loadingDetail ? (
-            <div className="tw-text-[var(--muted)]">Loading…</div>
-          ) : messages.length ? (
-            <div className="tw-grid tw-gap-2">
-              {messages.slice(-6).map((m) => (
-                <div key={m.id} className="tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.10)] tw-bg-white/65 tw-p-2">
-                  <div className="tw-text-[11px] tw-font-semibold tw-text-[var(--muted)]">{String(m.role || 'message')}</div>
-                  <div className="tw-mt-1 tw-whitespace-pre-wrap tw-break-words">
-                    {trimText(m.contentText || m.contentMarkdown || '', 600)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="tw-text-[var(--muted)]">No messages.</div>
-          )}
-        </div>
-      </div>
-    );
+  const todayCount = useMemo(() => {
+    const now = new Date();
+    return items.filter((c) => {
+      const ts = Number(c.lastCapturedAt) || 0;
+      if (!ts) return false;
+      try {
+        return isSameLocalDay(new Date(ts), now);
+      } catch {
+        return false;
+      }
+    }).length;
+  }, [items]);
+
+  const showPreview = async (conversationId: number, anchorEl: HTMLElement) => {
+    const id = Number(conversationId);
+    if (!id || id <= 0) return;
+    const rect = anchorEl.getBoundingClientRect();
+
+    const margin = 8;
+    const popoverWidth = Math.min(280, Math.max(200, window.innerWidth - 20));
+    const popoverHeight = Math.min(420, Math.max(220, window.innerHeight - 16));
+
+    const preferredLeft = rect.right + margin;
+    const maxLeft = window.innerWidth - margin - popoverWidth;
+    const left = Math.max(margin, Math.min(preferredLeft, maxLeft));
+
+    const preferredTop = rect.top;
+    const maxTop = window.innerHeight - margin - popoverHeight;
+    const top = Math.max(margin, Math.min(preferredTop, maxTop));
+
+    setPreview({ conversationId: id, left, top });
+    setPreviewLoading(true);
+    setPreviewDetail(null);
+    try {
+      const d = await getConversationDetail(id);
+      setPreviewDetail(d);
+    } catch (_e) {
+      setPreviewDetail({ conversationId: id, messages: [] });
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
+  const onRowClick = (e: React.MouseEvent, conversationId: number) => {
+    if (!e || e.button !== 0) return;
+    const target = e.target as any;
+    if (target && target.closest) {
+      if (target.closest("input[type='checkbox'], label.checkbox")) return;
+      if (target.closest('button')) return;
+      if (target.closest('a')) return;
+    }
+    showPreview(conversationId, e.currentTarget as any).catch(() => {});
+  };
+
+  const onCopyConversation = async (conversation: Conversation, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(conversation.id);
+    try {
+      const d = await getConversationDetail(id);
+      const mdText = formatConversationMarkdown(conversation, d.messages || []);
+      await copyTextToClipboard(mdText);
+      setCopiedId(id);
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = window.setTimeout(() => {
+        setCopiedId(null);
+        copiedTimerRef.current = null;
+      }, 1100);
+    } catch (err) {
+      alert((err as any)?.message ?? 'Copy failed.');
+    }
+  };
+
+  const openConversationUrl = async (url: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const safe = sanitizeHttpUrl(url);
+    if (!safe) return;
+    try {
+      await browser.tabs.create({ url: safe });
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  const previewConversation = useMemo(() => {
+    if (!preview) return null;
+    return allItems.find((c) => Number(c.id) === Number(preview.conversationId)) ?? null;
+  }, [preview, allItems]);
+
+  const previewMessages = previewDetail?.messages || [];
+
   return (
-    <section className="tw-h-full tw-min-h-0 tw-flex tw-flex-col tw-gap-2">
-      {error ? (
-        <div className="tw-rounded-xl tw-border tw-border-[rgba(199,55,47,0.25)] tw-bg-[var(--danger-bg)] tw-px-3 tw-py-2 tw-text-[12px] tw-text-[var(--danger)]">
-          {error}
-        </div>
-      ) : null}
+    <>
+      <div className="viewScroll" aria-label="Chats content">
+        {error ? (
+          <div className="toolbar" style={{ borderColor: 'rgba(199, 55, 47, 0.35)', background: 'var(--danger-bg)', color: 'var(--danger)' }}>
+            {error}
+          </div>
+        ) : null}
 
-      <section className="tw-flex-1 tw-min-h-0 tw-rounded-2xl tw-border tw-border-[rgba(217,89,38,0.14)] tw-bg-[var(--panel)] tw-shadow-[var(--shadow)] tw-overflow-hidden tw-flex tw-flex-col">
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-p-3 tw-border-b tw-border-[rgba(217,89,38,0.12)]">
-          <div className="tw-font-extrabold tw-text-[14px]">Conversations</div>
-          <button
-            className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-            onClick={() => refresh().catch(() => {})}
-            disabled={loadingList}
-            type="button"
-          >
-            {loadingList ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
+        <main className="chatsMain">
+          <div id="list" className="list">
+            {items.map((conversation) => {
+              const id = Number(conversation.id);
+              const checked = selectedIdSet.has(id);
+              const { key: sourceKey, label: sourceLabel } = getSourceMeta(conversation.source);
+              const safeUrl = sanitizeHttpUrl(conversation.url || '');
+              const isAnchor = preview && preview.conversationId === id;
+              return (
+                <div
+                  key={conversation.id}
+                  className={['row', isAnchor ? 'is-preview-anchor' : ''].filter(Boolean).join(' ')}
+                  data-conversation-id={String(conversation.id)}
+                  aria-label={conversation.title || '(untitled)'}
+                  onClick={(e) => onRowClick(e, id)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <label className="checkbox">
+                    <input type="checkbox" checked={checked} onChange={() => toggleSelected(id)} aria-label="Select" />
+                  </label>
 
-        <div className="tw-flex-1 tw-min-h-0 tw-overflow-auto">
-          {filteredItems.length ? (
-            <div className="tw-divide-y tw-divide-[rgba(217,89,38,0.10)]">
-              {filteredItems.map((c) => {
-                const id = Number(c.id);
-                const checked = selectedIdSet.has(id);
-                const active = Number(activeId) === id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setActiveId(id)}
-                    className={[
-                      'tw-w-full tw-text-left tw-flex tw-items-start tw-gap-2 tw-px-3 tw-py-2 tw-transition-colors',
-                      active ? 'tw-bg-white/55' : 'hover:tw-bg-white/40',
-                    ].join(' ')}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSelected(id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="tw-mt-1"
-                      aria-label="Select conversation"
-                    />
-                    <div className="tw-min-w-0 tw-flex-1">
-                      <div className="tw-font-semibold tw-text-[13px] tw-truncate">{c.title || 'Untitled'}</div>
-                      <div className="tw-mt-0.5 tw-text-[12px] tw-text-[var(--muted)] tw-truncate">
-                        {c.source} · {formatTime(c.lastCapturedAt)}
-                      </div>
+                  <div className="meta">
+                    <div className="name">
+                      {conversation.title || '(untitled)'}
+                      {hasWarningFlags(conversation) ? <span className="pill warn">warning</span> : null}
                     </div>
-                  </button>
-                );
-              })}
+
+                    <div className="sub">
+                      <button
+                        className={['sourceCopy', copiedId === id ? 'is-copied' : ''].filter(Boolean).join(' ')}
+                        type="button"
+                        aria-label="Copy full markdown"
+                        title={copiedId === id ? 'Copied' : 'Copy full markdown'}
+                        onClick={(e) => void onCopyConversation(conversation, e)}
+                      >
+                        {copiedId === id ? '✓' : '⧉'}
+                      </button>
+                      <button
+                        className="sourceOpen"
+                        type="button"
+                        aria-label="Open original chat"
+                        title={safeUrl ? 'Open chat' : 'No link available'}
+                        disabled={!safeUrl}
+                        onClick={(e) => void openConversationUrl(String(conversation.url || ''), e)}
+                      >
+                        ↗
+                      </button>
+                      <span className={['sourceTag', `sourceTag--${sourceKey}`].join(' ')}>{sourceLabel}</span>
+                      {conversation.lastCapturedAt ? (
+                        <>
+                          <span className="metaDivider"> · </span>
+                          <span className="timeLabel">{formatTime(conversation.lastCapturedAt)}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+      </div>
+
+      <aside
+        id="chatPreviewPopover"
+        className="chatPreviewPopover"
+        aria-label="Conversation preview"
+        hidden={!preview}
+        style={preview ? { left: preview.left, top: preview.top } : undefined}
+      >
+        <div className="chatPreviewBody">
+          {previewConversation ? (
+            <div className="chatPreviewMsg">
+              <div className="chatPreviewMsgRole">{previewConversation.title || '(untitled)'}</div>
+              <div className="chatPreviewMsgMarkdown">
+                {(() => {
+                  const meta = getSourceMeta(previewConversation.source);
+                  return <span className={['sourceTag', `sourceTag--${meta.key}`].join(' ')}>{meta.label || previewConversation.source}</span>;
+                })()}
+              </div>
             </div>
-          ) : (
-            <div className="tw-p-4 tw-text-[12px] tw-text-[var(--muted)]">No conversations yet.</div>
-          )}
+          ) : null}
+
+          {previewLoading ? <div className="chatPreviewPlaceholder">Loading…</div> : null}
+          {!previewLoading && preview && !previewMessages.length ? (
+            <div className="chatPreviewPlaceholder">No messages.</div>
+          ) : null}
+          {previewMessages.slice(-8).map((m) => {
+            const role = normalizeRole(m.role);
+            const text = String(m.contentMarkdown || m.contentText || '');
+            const html = md.render(text);
+            return (
+              <div key={m.id} className={['chatPreviewMsg', role === 'user' ? 'chatPreviewMsg--user' : role === 'assistant' ? 'chatPreviewMsg--assistant' : 'chatPreviewMsg--other'].join(' ')}>
+                <div className="chatPreviewMsgRole">{String(m.role || 'Message')}</div>
+                <div className="chatPreviewMsgMarkdown" dangerouslySetInnerHTML={{ __html: html }} />
+              </div>
+            );
+          })}
         </div>
+      </aside>
 
-        <div className="tw-border-t tw-border-[rgba(217,89,38,0.12)] tw-p-3 tw-grid tw-gap-2">
-          {renderPreview()}
+      <footer className="bottomDock" aria-label="Actions">
+        <section id="chatBottomBar" className={['bottomBar', selectedCount ? 'hasSelection' : ''].filter(Boolean).join(' ')} aria-label="Chat actions">
+          <label className="checkbox compact">
+            <input ref={selectAllRef} id="chkSelectAll" type="checkbox" aria-label="Select all" checked={allSelected} onChange={toggleAll} />
+            <span className="srOnly">Select all</span>
+          </label>
 
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <label className="tw-flex tw-items-center tw-gap-2 tw-text-[12px] tw-text-[var(--muted)]">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-              All
-            </label>
+          <select
+            id="sourceFilterSelect"
+            className="input compact"
+            aria-label="Source filter"
+            value={filterKey}
+            onChange={(e) => void setSourceFilterKey(e.target.value)}
+            disabled={!!selectedCount}
+          >
+            {sourceOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
 
-            <select
-              className="tw-h-8 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.16)] tw-bg-white/55 tw-px-2 tw-text-[12px] tw-text-[var(--muted)]"
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
-              aria-label="Source filter"
-            >
-              <option value="__all__">All sources</option>
-              {sources.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            <div className="tw-flex-1" />
-
-            <button
-              className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(199,55,47,0.26)] tw-bg-[var(--danger-bg)] hover:tw-bg-[rgba(255,229,225,0.85)] tw-text-[12px] tw-font-semibold tw-text-[var(--danger)]"
-              onClick={() => onDeleteSelected().catch(() => {})}
-              disabled={!selectedIds.length || loadingList}
-              type="button"
-              title="Delete selected"
-            >
+          <div id="chatActionButtons" className="chatActionButtons">
+            <button id="btnDelete" className="btn danger" type="button" title="Delete selected" onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedCount}>
               Delete
             </button>
 
-            <div className="tw-relative" ref={exportWrapRef}>
+            <div className="exportWrap" ref={exportWrapRef}>
               <button
-                className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-                onClick={() => setExportOpen((v) => !v)}
-                disabled={!selectedIds.length || exporting}
+                id="btnExport"
+                className="btn export"
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={exportOpen}
+                onClick={() => setExportOpen((v) => !v)}
+                disabled={!selectedCount || exporting}
               >
-                Export ▾
+                <span className="label">Export</span>
+                <span className="caret" aria-hidden="true">
+                  ▾
+                </span>
               </button>
-              {exportOpen ? (
-                <div className="tw-absolute tw-right-0 tw-mt-1 tw-w-44 tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.16)] tw-bg-white/95 tw-shadow-[var(--shadow)] tw-overflow-hidden tw-z-10">
-                  <button
-                    type="button"
-                    className="tw-w-full tw-text-left tw-px-3 tw-py-2 tw-text-[12px] hover:tw-bg-[var(--btn-bg)]"
-                    onClick={() => {
-                      setExportOpen(false);
-                      void exportSelectedMarkdown({ mergeSingle: true });
-                    }}
-                  >
-                    Single Markdown
-                  </button>
-                  <button
-                    type="button"
-                    className="tw-w-full tw-text-left tw-px-3 tw-py-2 tw-text-[12px] hover:tw-bg-[var(--btn-bg)]"
-                    onClick={() => {
-                      setExportOpen(false);
-                      void exportSelectedMarkdown({ mergeSingle: false });
-                    }}
-                  >
-                    Multi Markdown
-                  </button>
-                </div>
-              ) : null}
+              <div id="exportMenu" className="menu" role="menu" aria-label="Export options" hidden={!exportOpen}>
+                <button
+                  id="menuExportSingleMarkdown"
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: true });
+                  }}
+                >
+                  Single Markdown
+                </button>
+                <button
+                  id="menuExportMultiMarkdown"
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setExportOpen(false);
+                    void exportSelectedMarkdown({ mergeSingle: false });
+                  }}
+                >
+                  Multi Markdown
+                </button>
+              </div>
             </div>
 
-            <button
-              className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-              onClick={() => onSyncObsidian().catch(() => {})}
-              disabled={!selectedIds.length || syncingObsidian}
-              type="button"
-            >
-              {syncingObsidian ? 'Obsidian…' : 'Obsidian'}
+            <button id="btnSyncObsidian" className="btn" type="button" onClick={() => onSyncObsidian().catch(() => {})} disabled={!selectedCount || syncingObsidian}>
+              {syncingObsidian ? 'Obsidian...' : 'Obsidian'}
             </button>
-
-            <button
-              className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-              onClick={() => onSyncNotion().catch(() => {})}
-              disabled={!selectedIds.length || syncingNotion}
-              type="button"
-            >
-              {syncingNotion ? 'Notion…' : 'Notion'}
+            <button id="btnSyncNotion" className="btn" type="button" onClick={() => onSyncNotion().catch(() => {})} disabled={!selectedCount || syncingNotion}>
+              {syncingNotion ? 'Notion...' : 'Notion'}
             </button>
-
-            <div className="tw-text-[12px] tw-text-[var(--muted)] tw-ml-1">
-              {filteredItems.length}/{items.length}
-            </div>
           </div>
-        </div>
-      </section>
-    </section>
+
+          <div id="chatBottomSpacer" className="spacer" />
+          <div id="stats" className="stats">
+            <span className="statsLabel">Today:</span>
+            <span className="todayCount">{String(todayCount)}</span>
+            <span className="statsDivider"> · </span>
+            <span className="statsLabel">Total:</span>
+            <span className="totalCount">{String(items.length)}</span>
+          </div>
+        </section>
+      </footer>
+    </>
   );
 }
