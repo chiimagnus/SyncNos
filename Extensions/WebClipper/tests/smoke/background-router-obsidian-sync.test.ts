@@ -1,20 +1,5 @@
 import { describe, expect, it } from "vitest";
-
-function loadBackgroundRouter() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const storeModulePath = require.resolve("../../src/export/obsidian/obsidian-settings-store.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[storeModulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/export/obsidian/obsidian-settings-store.js");
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/background-router.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/background-router.js");
-}
+import { createTestBackgroundRouter } from "./background-router-testkit";
 
 describe("background-router obsidian sync routes", () => {
   it("delegates settings get/save and orchestrator actions", async () => {
@@ -63,7 +48,7 @@ describe("background-router obsidian sync routes", () => {
       }
     };
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
 
     const getRes = await router.__handleMessageForTests({ type: "obsidianGetSettings" });
     expect(getRes.ok).toBe(true);

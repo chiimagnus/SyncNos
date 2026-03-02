@@ -26,7 +26,6 @@ import '../export/obsidian/obsidian-sync-orchestrator.js';
 
 import '../bootstrap/background-inpage-web-visibility.js';
 import '../collectors/web/article-fetch-service.js';
-import '../bootstrap/background-router.js';
 
 export function startLegacyBackground() {
   const NS = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});

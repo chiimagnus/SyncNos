@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createTestBackgroundRouter } from "./background-router-testkit";
 
 function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
@@ -30,7 +31,7 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   };
 }
 
-function loadBackgroundRouter() {
+function prepareNotionRouter() {
   // Ensure global protocol modules are loaded before orchestrator (mirrors MV3 load order).
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const kindContractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
@@ -59,38 +60,35 @@ function loadBackgroundRouter() {
   delete require.cache[orchestratorModulePath];
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require("../../src/export/notion/notion-sync-orchestrator.js");
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/background-router.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/background-router.js");
+  return createTestBackgroundRouter();
 }
 
 describe("background-router notion sync", () => {
   it("disconnect clears notion token and cached notion routing keys", async () => {
-    let tokenCleared = 0;
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
     // @ts-expect-error test global
-    globalThis.WebClipper.notionTokenStore = {
-      clearToken: async () => {
-        tokenCleared += 1;
+    globalThis.WebClipper.notionTokenStore = {};
+    chromeMock.storage.local.set({
+      notion_oauth_token_v1: {
+        accessToken: "t",
+        workspaceId: "w",
+        workspaceName: "ws",
+        createdAt: Date.now()
       }
-    };
+    }, () => {});
     // @ts-expect-error test global
     globalThis.WebClipper.notionSyncJobStore = { NOTION_SYNC_JOB_KEY: "notion_sync_job_v1" };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionDisconnect" });
 
     expect(res.ok).toBe(true);
-    expect(tokenCleared).toBe(1);
     const removedFlatten = chromeMock.__removed.flat();
+    expect(removedFlatten).toContain("notion_oauth_token_v1");
     expect(removedFlatten).toContain("notion_parent_page_id");
     expect(removedFlatten).toContain("notion_db_id_syncnos_ai_chats");
     expect(removedFlatten).toContain("notion_db_id_syncnos_web_articles");
@@ -138,7 +136,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.okCount).toBe(1);
@@ -190,7 +188,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => true
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("appended");
@@ -231,7 +229,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => true
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("rebuilt");
@@ -273,7 +271,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const syncRes = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(syncRes.ok).toBe(true);
 
@@ -335,7 +333,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(calls.some((c) => c.op === "append" && c.pageId === "p_new")).toBe(true);
@@ -394,7 +392,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = loadBackgroundRouter();
+    const router = prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("created");

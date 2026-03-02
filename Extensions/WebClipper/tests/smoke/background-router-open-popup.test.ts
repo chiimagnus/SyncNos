@@ -1,13 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-
-function loadBackgroundRouter() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/background-router.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/background-router.js");
-}
+import { createTestBackgroundRouter } from "./background-router-testkit";
 
 afterEach(() => {
   // @ts-expect-error test cleanup
@@ -30,7 +22,7 @@ describe("background-router open extension popup", () => {
       }
     };
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "openExtensionPopup" });
 
     expect(res.ok).toBe(true);
@@ -51,7 +43,7 @@ describe("background-router open extension popup", () => {
       }
     };
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "openExtensionPopup" });
 
     expect(res.ok).toBe(true);
@@ -64,7 +56,7 @@ describe("background-router open extension popup", () => {
     // @ts-expect-error test global
     globalThis.chrome = {};
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "openExtensionPopup" });
 
     expect(res.ok).toBe(false);
@@ -83,7 +75,7 @@ describe("background-router open extension popup", () => {
       }
     };
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "openExtensionPopup" });
 
     expect(res.ok).toBe(false);
