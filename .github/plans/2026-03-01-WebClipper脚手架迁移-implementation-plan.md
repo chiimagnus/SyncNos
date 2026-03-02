@@ -20,7 +20,8 @@
   - `npm --prefix Extensions/WebClipper run build` 可产出 Chrome/Edge 可加载产物
   - `npm --prefix Extensions/WebClipper run build:firefox`（或等价命令）可产出 Firefox 可加载产物（具体命令由 Task 02/03 Spike 固化）
 - 扩展内 Web App
-  - popup 内按钮可打开 `app.html`，并能切换 `/`、`/sync`、`/settings`、`/debug` 路由（HashRouter）
+  - popup 内按钮可打开 `app.html`，并能切换 `/`、`/settings`、`/debug` 路由（HashRouter）
+  - `sync/backup` 功能面板并入 `settings`（`/sync`、`/backup` 作为兼容重定向到 `/settings`）
 - 核心能力不回归（最小冒烟）
   - 自动采集保存仍可工作（至少 ChatGPT/Claude 任一站点）
   - “Fetch Current Page” 能抓取文章并入库
@@ -88,7 +89,7 @@
 ### Task 03: 固化 WXT 入口约定与产物路径（把 Spike 结果写进计划与代码）
 
 **Files:**
-- Modify: `.github/plans/WebClipper脚手架迁移方案.md`（只补“入口约定/命令”结论，不改设计）
+- Modify: `.github/plans/2026-03-01-WebClipper脚手架迁移-implementation-plan.md`（在本文内固化“入口约定/命令”结论）
 
 **Step 1: 实现**
 - 用 Task 02 的结果补齐：
@@ -99,6 +100,13 @@
 
 **Step 2: 验证**
 - Expected: 文档中不再出现 `entrypoints/app.html` 与 `entrypoints/app/main.tsx` 这类自相矛盾表述
+
+**WXT 入口约定（定稿）**
+- app：`Extensions/WebClipper/entrypoints/app/index.html` → `app.html`
+- popup：`Extensions/WebClipper/entrypoints/popup/index.html` → `popup.html`
+- background：`Extensions/WebClipper/entrypoints/background.ts` → `background.js`
+- content：`Extensions/WebClipper/entrypoints/content.ts` → `content-scripts/content.js`
+- Firefox build：`wxt build -b firefox --mv3` → `.output/firefox-mv3/`
 
 ---
 
@@ -313,6 +321,90 @@
 
 **Step 2: 验证**
 - 手测：Settings 页不显示 token 明文；点击 Clear 后状态更新
+
+---
+
+## P3.5：融合旧 popup → 扩展内 Web App（让 app.html 成为“完整面板”）
+
+> 目标：把旧 popup 面板的核心能力逐步迁入 `app.html`，popup 保持“打开 app”的轻量入口。
+
+### Task 24: App Conversations 支持多选 + Delete（对齐旧 popup）
+
+**Status:** ✅ Done（2026-03-02，含 Notion/Obsidian Sync 入口）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
+
+**Step 1: 实现**
+- 列表支持多选/全选。
+- 增加 “Delete selected” 操作（调用 `deleteConversations` message）。
+
+**Step 2: 验证**
+- 手测：删除后列表刷新；详情区不崩。
+
+---
+
+### Task 25: App 导出 Markdown（Single/Multi）并下载 Zip（对齐旧 popup）
+
+**Status:** ✅ Done（2026-03-02）
+
+**Files:**
+- Create: `Extensions/WebClipper/src/domains/conversations/markdown.ts`
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
+
+**Step 1: 实现**
+- 复刻旧 popup 的 markdown 规则：
+  - chat：按 role 分段
+  - article：输出 article markdown（标题/元信息/正文）
+- 支持 Single/Multi 导出为 Zip 并下载。
+
+**Step 2: 验证**
+- 手测：导出 zip 可下载；内容可读且不为空。
+
+---
+
+### Task 26: App Notion OAuth + Parent Page（不回显 token）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- “Connect/Disconnect” 与旧 popup 行为等价（pending state + 打开授权页 + polling 状态）。
+- Parent Page 下拉列表可加载与保存（写入 `notion_parent_page_id`）。
+
+**Step 2: 验证**
+- 手测：OAuth 回调后 connected；Parent Page 能保存并被后续 sync 使用。
+
+---
+
+### Task 27: App Obsidian Settings/Paths + Test Connection（apiKey 不回显）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- baseUrl/authHeader/chatFolder/articleFolder 可编辑保存。
+- apiKey 输入支持保存，但不回显（显示 configured/not configured）。
+- Test Connection 触发 `obsidianTestConnection` 并展示结果摘要。
+
+**Step 2: 验证**
+- 手测：保存后刷新仍保持；Test 能返回 ok/err。
+
+---
+
+### Task 28: App Article Fetch + Inpage Visibility（即时生效）
+
+**Status:** ✅ Done（2026-03-02）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- Fetch Current Page（调用 `fetchActiveTabArticle`，tabId 取当前活动 tab）。
+- Inpage toggle 写入 `inpage_supported_only` 并调用 `applyInpageVisibility`。
+
+**Step 2: 验证**
+- 手测：Fetch 后 Conversations 出现 article；toggle 切换无需刷新即生效。
 
 ---
 

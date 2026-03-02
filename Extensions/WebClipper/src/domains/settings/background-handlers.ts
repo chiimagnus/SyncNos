@@ -1,0 +1,103 @@
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import { storageRemove } from '../../platform/storage/local';
+
+type AnyRouter = {
+  ok: (data: unknown) => any;
+  err: (message: string, extra?: unknown) => any;
+  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+};
+
+function getInstanceId(): string {
+  try {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const id = NS.__backgroundInstanceId;
+    return id ? String(id) : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  } catch (_e) {
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+function getNotionDisconnectStorageKeys(): string[] {
+  const NS: any = (globalThis as any).WebClipper || {};
+  const base = [
+    'notion_parent_page_id',
+    'notion_oauth_pending_state',
+    'notion_oauth_last_error',
+  ];
+
+  const kinds = NS.conversationKinds;
+  const notionDbKeys = (() => {
+    try {
+      const keys = kinds?.getNotionStorageKeys?.();
+      if (Array.isArray(keys) && keys.length) return keys.map((k: any) => String(k || '').trim()).filter(Boolean);
+    } catch (_e) {
+      // ignore
+    }
+    return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+  })();
+
+  const jobStore = NS.notionSyncJobStore;
+  const syncJobKey = jobStore?.NOTION_SYNC_JOB_KEY ? String(jobStore.NOTION_SYNC_JOB_KEY).trim() : '';
+
+  return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
+}
+
+export function registerSettingsHandlers(router: AnyRouter) {
+  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const token = await (NS.notionTokenStore?.getToken?.() ?? Promise.resolve(null));
+    return router.ok({ connected: !!(token && token.accessToken), token: token || null });
+  });
+
+  router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    await (NS.notionTokenStore?.clearToken?.() ?? Promise.resolve());
+    const clearedKeys = getNotionDisconnectStorageKeys();
+    await storageRemove(clearedKeys);
+    return router.ok({ disconnected: true, clearedKeys });
+  });
+
+  router.register(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, async () => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const store = NS.obsidianSettingsStore;
+    if (!store || typeof store.getSettings !== 'function') return router.err('obsidian settings store missing');
+    const data = await store.getSettings();
+    return router.ok(data);
+  });
+
+  router.register(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, async (msg) => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const store = NS.obsidianSettingsStore;
+    if (!store || typeof store.saveSettings !== 'function') return router.err('obsidian settings store missing');
+    const data = await store.saveSettings({
+      enabled: msg.enabled,
+      apiBaseUrl: msg.apiBaseUrl,
+      apiKey: msg.apiKey,
+      authHeaderName: msg.authHeaderName,
+      chatFolder: msg.chatFolder,
+      articleFolder: msg.articleFolder,
+    });
+    return router.ok(data);
+  });
+
+  router.register(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, async () => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const orchestrator = NS.obsidianSyncOrchestrator;
+    if (!orchestrator || typeof orchestrator.testConnection !== 'function') {
+      return router.err('obsidian sync orchestrator missing');
+    }
+    const data = await orchestrator.testConnection({ instanceId: getInstanceId() });
+    return router.ok(data);
+  });
+
+  router.register(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, async () => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const api = NS.backgroundInpageWebVisibility;
+    if (!api || typeof api.applyVisibilitySetting !== 'function') {
+      return router.err('inpage web visibility manager missing', { code: 'INPAGE_VISIBILITY_UNAVAILABLE' });
+    }
+    const data = await api.applyVisibilitySetting({ reason: 'app' });
+    return router.ok(data);
+  });
+}
+

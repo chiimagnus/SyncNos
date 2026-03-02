@@ -35,6 +35,9 @@ function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
 // Keep only what reviewers need to reproduce the XPI build.
 const items = [
   "manifest.json",
+  "wxt.config.ts",
+  "tsconfig.json",
+  "entrypoints",
   "icons",
   "src",
   "scripts",

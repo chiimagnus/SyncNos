@@ -103,18 +103,21 @@
 ## Quick Start
 
 - 安装依赖：`npm --prefix Extensions/WebClipper install`
-- 本地开发（Chrome）：在 `chrome://extensions` 加载 `Extensions/WebClipper/`
-- 构建 Chrome dist：`npm --prefix Extensions/WebClipper run build`
-- 构建 Edge 包：`npm --prefix Extensions/WebClipper run build:edge`
-- 构建 Firefox `.xpi`：`npm --prefix Extensions/WebClipper run build:firefox`
+- 本地开发（WXT / Chrome）：`npm --prefix Extensions/WebClipper run dev`
+  - 在 `chrome://extensions` 加载 `Extensions/WebClipper/.output/chrome-mv3/`
+- 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
+- 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
 
 ## 命令
 
 - 静态检查（manifest/icons + JS 语法）：`npm --prefix Extensions/WebClipper run check`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
-- 构建打包（Chrome dist）：`npm --prefix Extensions/WebClipper run build`
-- 构建打包（Edge zip）：`npm --prefix Extensions/WebClipper run build:edge`
-- 构建打包（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run build:firefox`
+- TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
+- 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
+- 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
+- （迁移期 legacy 打包链）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
+- （迁移期 legacy 打包链）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
+- （迁移期 legacy 打包链）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
 - 校验 Edge 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:edge`
 - 校验 Firefox 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
@@ -127,7 +130,7 @@
 
 1. 打开 `about:debugging#/runtime/this-firefox`
 2. 点击 “Load Temporary Add-on…”
-3. 选择 `Extensions/WebClipper/dist-firefox/manifest.json`
+3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`（或使用 legacy: `Extensions/WebClipper/dist-firefox/manifest.json`）
 
 ### AMO 发布产物
 
@@ -145,17 +148,16 @@
 - 构建步骤：
   1. `npm --prefix Extensions/WebClipper install`
   2. `npm --prefix Extensions/WebClipper run build:firefox`
-- 依赖说明：
-  - popup 预览使用 `markdown-it`，构建会读取 `node_modules/markdown-it/dist/markdown-it.js`（上游未压缩 bundle）并打包进 `dist-firefox/popup.js`
+  - 如需 `.xpi`：迁移期仍可用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
 
 ## Chrome 开发
 
 - 打开 `chrome://extensions`
 - 启用开发者模式
-- 加载已解压扩展：`Extensions/WebClipper/`
+- 加载已解压扩展：`Extensions/WebClipper/.output/chrome-mv3/`
 
 ## Edge 开发
 
 - 打开 `edge://extensions`
 - 启用开发人员模式
-- 加载已解压扩展：`Extensions/WebClipper/dist-edge/`（或 `Extensions/WebClipper/dist/`）
+- 加载已解压扩展：`Extensions/WebClipper/.output/chrome-mv3/`
