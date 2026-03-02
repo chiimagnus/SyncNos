@@ -529,7 +529,7 @@ export default function SettingsTab() {
   };
 
   const openSetupGuide = () => {
-    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/docs/webclipper-obsidian-local-rest-api-sync.md');
+    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md');
   };
 
   const articleFetchStatusClass = useMemo(() => {
@@ -732,7 +732,7 @@ export default function SettingsTab() {
             <a
               id="obsidianSetupGuideLink"
               className="textLink"
-              href="https://github.com/chiimagnus/SyncNos/blob/main/.github/docs/webclipper-obsidian-local-rest-api-sync.md"
+              href="https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md"
               target="_blank"
               rel="noreferrer"
               onClick={(e) => {
