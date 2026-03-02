@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   function matches(loc) {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;

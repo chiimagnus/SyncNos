@@ -23,24 +23,6 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   };
 }
 
-function loadKinds() {
-  // @ts-expect-error test global
-  globalThis.WebClipper = globalThis.WebClipper || {};
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const contractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[contractPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/protocols/conversation-kind-contract.js");
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const kindsPath = require.resolve("../../src/protocols/conversation-kinds.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[kindsPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/protocols/conversation-kinds.js");
-}
-
 function loadOrchestrator() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/export/notion/notion-sync-orchestrator.js");
@@ -58,7 +40,6 @@ describe("notion-sync-orchestrator kind routing", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    loadKinds();
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
 
@@ -152,7 +133,6 @@ describe("notion-sync-orchestrator kind routing", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    loadKinds();
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
 

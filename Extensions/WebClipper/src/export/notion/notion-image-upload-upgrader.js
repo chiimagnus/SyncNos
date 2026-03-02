@@ -1,6 +1,8 @@
 (function () {
+  const NS = require("../../runtime-context.js");
+
   function getNS() {
-    return (globalThis.WebClipper = globalThis.WebClipper || {});
+    return NS;
   }
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;

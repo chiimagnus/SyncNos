@@ -1,7 +1,7 @@
 /* global clearTimeout, setTimeout */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
   const BUBBLE_ID = "webclipper-inpage-bubble";
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const VISIBLE_MS = 1800;

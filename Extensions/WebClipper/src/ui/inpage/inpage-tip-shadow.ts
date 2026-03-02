@@ -263,9 +263,9 @@ function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
 export const inpageTipApi = { showSaveTip };
 
 try {
-  const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
-  NS.inpageTip = inpageTipApi;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const runtimeContext: any = require('../../runtime-context.js');
+  runtimeContext.inpageTip = inpageTipApi;
 } catch (_e) {
   // ignore
 }
-

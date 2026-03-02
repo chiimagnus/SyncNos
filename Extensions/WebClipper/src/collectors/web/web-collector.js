@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   function isHttpUrl(href) {
     const raw = String(href || "").trim();
@@ -35,4 +35,3 @@
     });
   }
 })();
-

@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const MESSAGES_HEADING = "SyncNos::Messages";
 
@@ -137,4 +137,3 @@
 
   if (typeof module !== "undefined" && module.exports) module.exports = NS.obsidianMarkdownWriter;
 })();
-

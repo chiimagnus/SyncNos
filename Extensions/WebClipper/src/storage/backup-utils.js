@@ -1,5 +1,6 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const { conversationKinds } = require("../protocols/conversation-kinds.js");
+  const NS = require("../runtime-context.js");
 
   const BACKUP_SCHEMA_VERSION = 1;
   const BACKUP_ZIP_SCHEMA_VERSION = 2;
@@ -13,10 +14,9 @@
   ]);
 
   function getNotionDbStorageKeys() {
-    const kinds = NS.conversationKinds;
-    if (kinds && typeof kinds.getNotionStorageKeys === "function") {
+    if (conversationKinds && typeof conversationKinds.getNotionStorageKeys === "function") {
       try {
-        const keys = kinds.getNotionStorageKeys();
+        const keys = conversationKinds.getNotionStorageKeys();
         if (Array.isArray(keys) && keys.length) return keys.map((k) => String(k || "").trim()).filter(Boolean);
       } catch (_e) {
         // ignore

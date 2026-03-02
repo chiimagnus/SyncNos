@@ -1,7 +1,8 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
+  const NS = require("../../runtime-context.js");
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
@@ -128,7 +129,7 @@
       notionDbManager: NS.notionDbManager,
       notionSyncService: NS.notionSyncService,
       storage: NS.backgroundStorage,
-      conversationKinds: NS.conversationKinds
+      conversationKinds
     };
   }
 

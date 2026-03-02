@@ -456,8 +456,9 @@ export const inpageButtonApi = {
 };
 
 try {
-  const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
-  NS.inpageButton = inpageButtonApi;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const runtimeContext: any = require('../../runtime-context.js');
+  runtimeContext.inpageButton = inpageButtonApi;
 } catch (_e) {
   // ignore
 }

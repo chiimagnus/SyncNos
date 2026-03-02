@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
   const INVALIDATED_MESSAGE = "Extension context invalidated";
   const INVALIDATED_RE = /Extension context invalidated/i;
 
