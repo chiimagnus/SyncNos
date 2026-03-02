@@ -12,8 +12,6 @@ import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
 import '../collectors/sites-bootstrap';
 
-import '../collectors/zai/zai-markdown.js';
-import '../collectors/zai/zai-collector.js';
 import '../collectors/web/web-collector.js';
 
 import '../integrations/notionai-model-picker.js';
