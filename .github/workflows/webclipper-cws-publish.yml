@@ -86,7 +86,12 @@ jobs:
           TAG_NAME: ${{ steps.tag.outputs.name }}
 
       - name: Build Chrome zip
-        run: node Extensions/WebClipper/scripts/build.mjs --target=chrome --zip --zip-name="SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip"
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=chrome \
+            --zip \
+            --zip-name="SyncNos-WebClipper-chrome-${{ steps.tag.outputs.name }}.zip"
 
       # Required secrets:
       # - CWS_EXTENSION_ID

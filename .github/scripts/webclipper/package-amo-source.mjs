@@ -1,23 +1,30 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function run(cmd, args, cwd) {
   const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
   if (res.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
 }
 
-const root = new URL("..", import.meta.url).pathname;
-const staging = join(root, ".tmp-amo-source");
-const outZip = join(root, "SyncNos-WebClipper-amo-source.zip");
-const repoLicense = join(root, "..", "..", "LICENSE");
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, "..", "..", "..");
+const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
+if (!existsSync(join(webclipperRoot, "package.json"))) {
+  throw new Error(`webclipper root not found: ${webclipperRoot}`);
+}
+
+const staging = join(webclipperRoot, ".tmp-amo-source");
+const outZip = join(webclipperRoot, "SyncNos-WebClipper-amo-source.zip");
+const repoLicense = join(repoRoot, "LICENSE");
 
 rmSync(staging, { recursive: true, force: true });
 rmSync(outZip, { force: true });
 mkdirSync(staging, { recursive: true });
 
 function copyIntoStaging(relPath) {
-  const src = join(root, relPath);
+  const src = join(webclipperRoot, relPath);
   const dst = join(staging, relPath);
   const dstDir = dst.split("/").slice(0, -1).join("/");
   mkdirSync(dstDir, { recursive: true });
@@ -31,7 +38,10 @@ function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
   const dst = join(staging, dstRelPath);
   const dstDir = dst.split("/").slice(0, -1).join("/");
   mkdirSync(dstDir, { recursive: true });
-  cpSync(srcAbsPath, dst);
+  cpSync(srcAbsPath, dst, {
+    recursive: true,
+    filter: (srcPath) => basename(srcPath) !== ".DS_Store"
+  });
 }
 
 function removeJunkFilesRecursively(rootDir) {
@@ -70,13 +80,18 @@ const items = [
 ];
 
 for (const item of items) {
-  const p = join(root, item);
+  const p = join(webclipperRoot, item);
   if (!existsSync(p)) throw new Error(`missing: ${item}`);
   copyIntoStaging(item);
 }
 
 if (existsSync(repoLicense)) {
   copyExternalIntoStaging(repoLicense, "LICENSE");
+}
+
+const ciScriptsDir = join(repoRoot, ".github", "scripts", "webclipper");
+if (existsSync(ciScriptsDir)) {
+  copyExternalIntoStaging(ciScriptsDir, ".github/scripts/webclipper");
 }
 
 removeJunkFilesRecursively(staging);

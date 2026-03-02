@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function parseArgs(argv) {
   const args = {
@@ -98,19 +99,25 @@ function applyTargetManifestPatches(manifest, { target, geckoId, geckoMinVersion
   return next;
 }
 
-const root = new URL("..", import.meta.url).pathname;
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, "..", "..", "..");
+const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
+if (!existsSync(join(webclipperRoot, "package.json"))) {
+  throw new Error(`webclipper root not found: ${webclipperRoot}`);
+}
+
 const cli = parseArgs(process.argv.slice(2));
 const target = String(cli.target || "chrome");
 const distDirName = cli.outDir
   || (target === "firefox"
     ? "dist-firefox"
     : (target === "edge" ? "dist-edge" : "dist"));
-const dist = join(root, distDirName);
+const dist = join(webclipperRoot, distDirName);
 
 const wxtScript = target === "firefox" ? "build:firefox" : "build";
-run("npm", ["run", wxtScript], root);
+run("npm", ["run", wxtScript], webclipperRoot);
 
-const wxtOut = join(root, ".output", target === "firefox" ? "firefox-mv3" : "chrome-mv3");
+const wxtOut = join(webclipperRoot, ".output", target === "firefox" ? "firefox-mv3" : "chrome-mv3");
 if (!existsSync(wxtOut)) throw new Error(`wxt output missing: ${wxtOut}`);
 
 rmSync(dist, { recursive: true, force: true });
@@ -133,7 +140,7 @@ if (cli.zip) {
     || (target === "firefox"
       ? "SyncNos-WebClipper-firefox.xpi"
       : (target === "edge" ? "SyncNos-WebClipper-edge.zip" : "SyncNos-WebClipper.zip"));
-  const zipOut = join(root, zipName);
+  const zipOut = join(webclipperRoot, zipName);
   rmSync(zipOut, { force: true });
 
   run("zip", ["-r", zipOut, "."], dist);
@@ -143,4 +150,3 @@ if (cli.zip) {
 
 // eslint-disable-next-line no-console
 console.log(`[build] dist: ${dist}`);
-

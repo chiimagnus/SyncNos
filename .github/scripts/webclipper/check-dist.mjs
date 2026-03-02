@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function parseArgs(argv) {
   const args = { root: null, manifest: null };
@@ -34,9 +35,12 @@ function fail(message) {
 }
 
 const cli = parseArgs(process.argv.slice(2));
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, "..", "..", "..");
+const webclipperRoot = join(repoRoot, "Extensions", "WebClipper");
 const root = cli.root
-  ? join(new URL("..", import.meta.url).pathname, cli.root)
-  : join(new URL("..", import.meta.url).pathname, ".output", "chrome-mv3");
+  ? join(repoRoot, cli.root)
+  : join(webclipperRoot, ".output", "chrome-mv3");
 
 const manifestPath = cli.manifest ? join(root, cli.manifest) : join(root, "manifest.json");
 if (!existsSync(manifestPath)) {
@@ -65,4 +69,3 @@ for (const size of [16, 48, 128]) {
 
 // eslint-disable-next-line no-console
 console.log("[check] ok");
-

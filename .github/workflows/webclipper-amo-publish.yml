@@ -59,13 +59,18 @@ jobs:
           TAG_NAME: ${{ steps.tag.outputs.name }}
 
       - name: Build Firefox XPI
-        run: npm --prefix Extensions/WebClipper run build:firefox
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=firefox \
+            --zip \
+            --zip-name="SyncNos-WebClipper-firefox.xpi"
 
       - name: Build AMO source zip
-        run: npm --prefix Extensions/WebClipper run package:amo-source
+        run: node .github/scripts/webclipper/package-amo-source.mjs
 
       - name: Submit to AMO (Listed)
-        run: node Extensions/WebClipper/scripts/amo-publish.mjs
+        run: node .github/scripts/webclipper/publish-amo.mjs
         env:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
