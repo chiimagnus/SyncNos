@@ -1,17 +1,8 @@
 import { describe, expect, it } from "vitest";
-
-function loadBackupUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/storage/backup-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/storage/backup-utils.js");
-}
+import * as backupUtils from "../../src/storage/backup-utils.ts";
 
 describe("backup-utils", () => {
   it("filterStorageForBackup keeps allowlist only", () => {
-    const backupUtils = loadBackupUtils();
     const filtered = backupUtils.filterStorageForBackup({
       notion_oauth_client_id: "abc",
       notion_parent_page_id: "p1",
@@ -34,13 +25,11 @@ describe("backup-utils", () => {
   });
 
   it("validateBackupDocument rejects unsupported version", () => {
-    const backupUtils = loadBackupUtils();
     const res = backupUtils.validateBackupDocument({ schemaVersion: 999, stores: {} });
     expect(res.ok).toBe(false);
   });
 
   it("validateBackupDocument rejects duplicate conversation keys", () => {
-    const backupUtils = loadBackupUtils();
     const doc = {
       schemaVersion: 1,
       stores: {
@@ -57,7 +46,6 @@ describe("backup-utils", () => {
   });
 
   it("validateBackupManifest accepts a minimal zip v2 manifest", () => {
-    const backupUtils = loadBackupUtils();
     const res = backupUtils.validateBackupManifest({
       backupSchemaVersion: 2,
       exportedAt: new Date().toISOString(),
@@ -73,7 +61,6 @@ describe("backup-utils", () => {
   });
 
   it("validateBackupManifest rejects unsafe paths", () => {
-    const backupUtils = loadBackupUtils();
     const res = backupUtils.validateBackupManifest({
       backupSchemaVersion: 2,
       exportedAt: new Date().toISOString(),
@@ -87,7 +74,6 @@ describe("backup-utils", () => {
   });
 
   it("validateConversationBundle requires messageKey and mapping match", () => {
-    const backupUtils = loadBackupUtils();
     const res1 = backupUtils.validateConversationBundle({
       schemaVersion: 1,
       conversation: { source: "chatgpt", conversationKey: "c1" },
@@ -106,7 +92,6 @@ describe("backup-utils", () => {
   });
 
   it("mergeConversationRecord does not overwrite non-empty local title/url", () => {
-    const backupUtils = loadBackupUtils();
     const existing = { id: 10, sourceType: "chat", source: "chatgpt", conversationKey: "c1", title: "Local", url: "https://a", lastCapturedAt: 5 };
     const incoming = { id: 1, sourceType: "chat", source: "chatgpt", conversationKey: "c1", title: "Backup", url: "https://b", lastCapturedAt: 9 };
     const merged = backupUtils.mergeConversationRecord(existing, incoming);
@@ -116,7 +101,6 @@ describe("backup-utils", () => {
   });
 
   it("mergeMessageRecord prefers newer updatedAt and fills missing markdown", () => {
-    const backupUtils = loadBackupUtils();
     const existing = { id: 1, conversationId: 9, messageKey: "m1", contentMarkdown: "", contentText: "hi", updatedAt: 10, sequence: 1, role: "user" };
     const incoming = { conversationId: 9, messageKey: "m1", contentMarkdown: "## md", contentText: "hi", updatedAt: 9, sequence: 1, role: "user" };
     const merged1 = backupUtils.mergeMessageRecord(existing, incoming);
