@@ -4,7 +4,7 @@ import '../src/ui/styles/flash-ok.css';
 import '../src/shared/normalize.ts';
 import '../src/storage/incremental-updater.ts';
 import '../src/collectors/bootstrap.ts';
-import '../src/collectors/runtime-observer.js';
+import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
 import '../src/collectors/web/web-collector.js';
 import '../src/integrations/notionai-model-picker.js';
