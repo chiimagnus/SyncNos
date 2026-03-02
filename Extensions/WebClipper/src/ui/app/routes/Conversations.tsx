@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Conversation, ConversationDetail } from '../../../domains/conversations/models';
-import { getConversationDetail, listConversations } from '../../../domains/conversations/repo';
+import { deleteConversations, getConversationDetail, listConversations } from '../../../domains/conversations/repo';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -16,14 +16,15 @@ export default function Conversations() {
   const [listError, setListError] = useState<string | null>(null);
   const [items, setItems] = useState<Conversation[]>([]);
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
 
   const selected = useMemo(
-    () => items.find((x) => Number(x.id) === Number(selectedId)) ?? null,
-    [items, selectedId],
+    () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
+    [items, activeId],
   );
 
   const refresh = async () => {
@@ -32,7 +33,9 @@ export default function Conversations() {
     try {
       const list = await listConversations();
       setItems(list);
-      if (list.length && selectedId == null) setSelectedId(Number(list[0].id));
+      const ids = new Set(list.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0));
+      setSelectedIds((prev) => prev.filter((id) => ids.has(Number(id))));
+      if (list.length && activeId == null) setActiveId(Number(list[0].id));
     } catch (e) {
       setListError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -46,7 +49,7 @@ export default function Conversations() {
   }, []);
 
   useEffect(() => {
-    const id = selectedId;
+    const id = activeId;
     if (!id || id <= 0) {
       setDetail(null);
       return;
@@ -60,7 +63,42 @@ export default function Conversations() {
       .then((d) => setDetail(d))
       .catch((e) => setDetailError((e as any)?.message ?? String(e ?? 'failed')))
       .finally(() => setLoadingDetail(false));
-  }, [selectedId]);
+  }, [activeId]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds.map((x) => Number(x))), [selectedIds]);
+  const allIds = useMemo(() => items.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0), [items]);
+  const allSelected = !!allIds.length && selectedIds.length === allIds.length;
+
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(allIds);
+  };
+
+  const toggleSelected = (id: number) => {
+    const safeId = Number(id);
+    if (!Number.isFinite(safeId) || safeId <= 0) return;
+    setSelectedIds((prev) => (prev.includes(safeId) ? prev.filter((x) => x !== safeId) : [...prev, safeId]));
+  };
+
+  const onDeleteSelected = async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    const ok = confirm(`Delete ${ids.length} conversation(s)? This cannot be undone.`);
+    if (!ok) return;
+
+    setLoadingList(true);
+    setListError(null);
+    try {
+      await deleteConversations(ids);
+      setSelectedIds([]);
+      if (activeId != null && ids.includes(Number(activeId))) setActiveId(null);
+      await refresh();
+    } catch (e) {
+      setListError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setLoadingList(false);
+    }
+  };
 
   return (
     <section style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
@@ -76,18 +114,37 @@ export default function Conversations() {
           <p style={{ color: 'crimson' }}>{listError}</p>
         ) : null}
 
+        <div
+          style={{
+            marginTop: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.9 }}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+            Select all
+          </label>
+          <button onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedIds.length || loadingList} type="button">
+            Delete selected
+          </button>
+        </div>
+
         <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
           {items.length ? null : (
             <div style={{ opacity: 0.7 }}>No conversations yet.</div>
           )}
 
           {items.map((c) => {
-            const active = Number(c.id) === Number(selectedId);
+            const id = Number(c.id);
+            const active = Number(c.id) === Number(activeId);
             const title = (c.title && String(c.title).trim()) ? String(c.title).trim() : '(Untitled)';
             return (
               <button
                 key={String(c.id)}
-                onClick={() => setSelectedId(Number(c.id))}
+                onClick={() => setActiveId(id)}
                 type="button"
                 style={{
                   textAlign: 'left',
@@ -100,7 +157,15 @@ export default function Conversations() {
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontWeight: 650 }}>{title}</div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIdSet.has(id)}
+                    onChange={() => toggleSelected(id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div style={{ fontWeight: 650, flex: 1 }}>{title}</div>
+                </div>
                 <div style={{ opacity: 0.7, fontSize: 12, marginTop: 4 }}>
                   {c.source} · {formatTime(c.lastCapturedAt)}
                 </div>
@@ -142,7 +207,7 @@ export default function Conversations() {
               </article>
             ))}
           </div>
-        ) : selectedId ? (
+        ) : activeId ? (
           <p style={{ opacity: 0.7, marginTop: 12 }}>No messages.</p>
         ) : (
           <p style={{ opacity: 0.7, marginTop: 12 }}>Select a conversation.</p>
