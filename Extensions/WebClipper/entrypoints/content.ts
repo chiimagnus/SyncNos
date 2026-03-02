@@ -1,8 +1,8 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
-import '../src/shared/normalize.js';
-import '../src/storage/incremental-updater.js';
+import '../src/shared/normalize.ts';
+import '../src/storage/incremental-updater.ts';
 import '../src/collectors/bootstrap.ts';
 import '../src/collectors/runtime-observer.js';
 import '../src/collectors/sites-bootstrap';
