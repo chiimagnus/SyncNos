@@ -2,7 +2,7 @@
 
 // Conversation storage adapters (migration step for P4-16).
 //
-// Primary implementation uses IndexedDB via `globalThis.WebClipper.storageSchema.openDb()`.
+// Primary implementation uses IndexedDB via TS schema `openDb()`.
 // Fallback delegates to legacy `globalThis.WebClipper.backgroundStorage` when schema isn't available.
 
 import type { Conversation, ConversationDetail, ConversationMessage } from './models';
