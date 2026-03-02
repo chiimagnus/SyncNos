@@ -11,16 +11,8 @@
     "build:firefox": "wxt build -b firefox --mv3",
     "prepare": "wxt prepare",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare",
-    "check": "npm run build && node scripts/check.mjs --root=.output/chrome-mv3",
-    "check:no-runtime-js": "node scripts/check-no-runtime-js.mjs",
-    "check:dist:edge": "node scripts/check.mjs --root=dist-edge",
-    "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox",
-    "test": "vitest run",
-    "legacy:build": "node scripts/build.mjs",
-    "legacy:build:edge": "node scripts/build.mjs --target=edge --out=dist-edge --zip --zip-name=SyncNos-WebClipper-edge.zip",
-    "legacy:build:firefox": "node scripts/build.mjs --target=firefox --zip",
-    "package:amo-source": "node scripts/package-amo-source.mjs"
+    "check": "npm run build && node ../../.github/scripts/webclipper/check-dist.mjs --root=Extensions/WebClipper/.output/chrome-mv3",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/react": "^19.2.13",

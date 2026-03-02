@@ -58,6 +58,8 @@ xcodebuild -scheme SyncNos build # 构建
 | 添加新同步目标 | `SyncNos/Services/DataSources-To/添加新同步目标完整指南.md` |
 | WebClipper：Obsidian Local REST API 同步 | `.github/guide/obsidian/LocalRestAPI.zh.md` |
 
+WebClipper 发布产物（Chrome/Edge/Firefox 包）由 GitHub Actions 统一生成与上传，本地仅保留 WXT 开发与验证流程。
+
 ## 测试
 
 当前仓库无强制自动化测试套件，但功能改动需要完成以下验证：

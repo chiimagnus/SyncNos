@@ -82,6 +82,14 @@
 
 ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI / z.ai
 
+### 开发（WXT）
+
+- 安装依赖：`npm --prefix Extensions/WebClipper install`
+- 本地开发（Chrome MV3）：`npm --prefix Extensions/WebClipper run dev`
+- 构建（Chrome / Firefox）：`npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
+- 测试与类型检查：`npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
+- `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `src/vendor/readability.js`（网页正文抽取第三方脚本）。
+
 ### 从 Releases 安装
 
 - 前往 GitHub Releases 下载对应附件：
