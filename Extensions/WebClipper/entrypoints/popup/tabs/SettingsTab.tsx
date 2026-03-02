@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-// Backup import/export needs IndexedDB schema on the popup runtime.
-import '../../../src/storage/schema.js';
-
 import { exportBackupZipV2 } from '../../../src/domains/backup/export';
 import {
   importBackupLegacyJsonMerge,

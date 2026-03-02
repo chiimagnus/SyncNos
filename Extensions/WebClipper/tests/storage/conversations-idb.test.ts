@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { IDBKeyRange, indexedDB } from "fake-indexeddb";
+import { openDb } from "../../src/platform/idb/schema";
 
 import {
   __closeDbForTests,
@@ -23,15 +24,6 @@ async function deleteDb(name: string) {
   await reqToPromise(req as unknown as IDBRequest<unknown>);
 }
 
-function loadSchema() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/storage/schema.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/storage/schema.js");
-}
-
 beforeEach(async () => {
   await __closeDbForTests();
 
@@ -39,11 +31,7 @@ beforeEach(async () => {
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
-
   await deleteDb("webclipper");
-  loadSchema();
 });
 
 afterEach(async () => {
@@ -93,8 +81,7 @@ describe("conversations storage-idb", () => {
     ]);
 
     // Insert a mapping directly.
-    const schema = (globalThis as any).WebClipper.storageSchema;
-    const db = await schema.openDb();
+    const db = await openDb();
     const t = db.transaction(["sync_mappings"], "readwrite");
     const store = t.objectStore("sync_mappings");
     await reqToPromise(store.add({ source: "debug", conversationKey: "k1", notionPageId: "p1", updatedAt: Date.now() }));

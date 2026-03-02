@@ -1,8 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 
-// Ensure IndexedDB schema is available in the app page runtime.
-import '../../../storage/schema.js';
-
 import { exportBackupZipV2 } from '../../../domains/backup/export';
 import {
   importBackupLegacyJsonMerge,
@@ -191,4 +188,3 @@ export default function Backup() {
     </div>
   );
 }
-
