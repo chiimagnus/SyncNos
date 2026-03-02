@@ -1,4 +1,4 @@
-import { conversationKinds } from '../../protocols/conversation-kinds';
+import { conversationKinds } from '../../protocols/conversation-kinds.ts';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;

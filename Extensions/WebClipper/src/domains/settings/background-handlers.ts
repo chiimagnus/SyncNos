@@ -3,7 +3,7 @@ import { storageRemove } from '../../platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '../../integrations/notion/token-store';
 import { getObsidianSettings, saveObsidianSettings } from '../../integrations/obsidian/settings-store';
 import { testObsidianConnection } from '../../integrations/obsidian/sync/orchestrator';
-import { conversationKinds } from '../../protocols/conversation-kinds';
+import { conversationKinds } from '../../protocols/conversation-kinds.ts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

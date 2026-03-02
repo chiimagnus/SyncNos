@@ -1,4 +1,4 @@
-import { assertKindDef, type ConversationKindDefinition } from './conversation-kind-contract';
+import { assertKindDef, type ConversationKindDefinition } from './conversation-kind-contract.ts';
 
 type ConversationKindRegistry = {
   register: (definition: ConversationKindDefinition) => boolean;

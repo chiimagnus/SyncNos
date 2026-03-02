@@ -1,6 +1,6 @@
-import { assertKindDef } from './conversation-kind-contract';
-import { conversationKinds } from './conversation-kinds';
-import { messageContracts } from './message-contracts';
+import { assertKindDef } from './conversation-kind-contract.ts';
+import { conversationKinds } from './conversation-kinds.ts';
+import { messageContracts } from './message-contracts.ts';
 
 const namespace: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
 

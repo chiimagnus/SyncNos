@@ -53,6 +53,9 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
     return;
   }
   if (!msgSeqIdx || !msgKeyIdx || !mappingIdx || !convoKeyIdx) return;
+  const messagesBySequenceIndex = msgSeqIdx;
+  const messagesByKeyIndex = msgKeyIdx;
+  const mappingsBySourceConversationKeyIndex = mappingIdx;
 
   function migrateMappingKey(input: {
     legacyKey: string;
@@ -65,7 +68,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
       return;
     }
 
-    const mapReq = mappingIdx.get(['notionai', legacyKey]);
+    const mapReq = mappingsBySourceConversationKeyIndex.get(['notionai', legacyKey]);
     mapReq.onsuccess = () => {
       const mapping = mapReq.result as Record<string, unknown> | undefined;
       if (!mapping) {
@@ -73,7 +76,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
         return;
       }
 
-      const targetReq = mappingIdx.get(['notionai', stableKey]);
+      const targetReq = mappingsBySourceConversationKeyIndex.get(['notionai', stableKey]);
       targetReq.onsuccess = () => {
         const target = targetReq.result;
         if (!target) {
@@ -125,7 +128,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
             return;
           }
 
-          const existsReq = msgKeyIdx.get([keepId, messageKey]);
+          const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
           existsReq.onsuccess = () => {
             const existing = existsReq.result;
             if (existing) {
@@ -161,7 +164,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
         return;
       }
 
-      const msgCursorReq = msgSeqIdx.openCursor(range);
+      const msgCursorReq = messagesBySequenceIndex.openCursor(range);
       msgCursorReq.onsuccess = () => {
         const cursor = msgCursorReq.result;
         if (!cursor) return done();
@@ -175,7 +178,7 @@ function migrateNotionAiThreadConversations({ db, tx }: MigrationContext): void 
           return;
         }
 
-        const existsReq = msgKeyIdx.get([keepId, messageKey]);
+        const existsReq = messagesByKeyIndex.get([keepId, messageKey]);
         existsReq.onsuccess = () => {
           const existing = existsReq.result;
           if (existing) {
