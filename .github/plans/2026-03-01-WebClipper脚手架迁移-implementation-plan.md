@@ -378,7 +378,7 @@
 
 ### Task 19: backup/export 域替换（Zip v2 + legacy JSON import）
 
-**Status:** 🚧 In progress（2026-03-02：已迁移 backup-utils/zip-utils 到 TS domains 并补齐单测；后台路由 + UI 接入待下一批）
+**Status:** ✅ Done（2026-03-02）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/domains/backup/...`
@@ -388,6 +388,13 @@
     - `Extensions/WebClipper/src/domains/backup/zip-utils.ts`
     - `Extensions/WebClipper/tests/domains/backup-utils.test.ts`
     - `Extensions/WebClipper/tests/domains/backup-zip-utils.test.ts`
+    - `Extensions/WebClipper/src/domains/backup/idb.ts`
+    - `Extensions/WebClipper/src/domains/backup/export.ts`
+    - `Extensions/WebClipper/src/domains/backup/import.ts`
+    - `Extensions/WebClipper/tests/domains/backup-service.test.ts`
+  - App 入口（用于手测）：
+    - `Extensions/WebClipper/src/ui/app/routes/Backup.tsx`
+    - `Extensions/WebClipper/src/ui/app/AppShell.tsx`
 
 **Step 1: 实现**
 - 迁移 `zip-utils`、导出/导入合并规则到 domains。
