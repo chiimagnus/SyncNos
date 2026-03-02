@@ -1,2 +1,2 @@
-import './chatgpt-markdown.js';
-import './chatgpt-collector.js';
+import './chatgpt-markdown.ts';
+import './chatgpt-collector.ts';

@@ -1,44 +1,38 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
-function loadYuanbaoMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/yuanbao/yuanbao-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/yuanbao/yuanbao-markdown.js");
+async function loadYuanbaoMarkdown() {
+  return import("../../src/collectors/yuanbao/yuanbao-markdown.ts");
 }
 
-function loadYuanbaoCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/yuanbao/yuanbao-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/yuanbao/yuanbao-collector.js");
+async function loadYuanbaoCollector() {
+  await import("../../src/collectors/yuanbao/yuanbao-collector.ts");
+  return globalThis.WebClipper?.collectors?.yuanbao;
 }
 
 function setupYuanbaoDom(html: string, url: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { JSDOM } = require("jsdom");
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   // @ts-expect-error test global
   globalThis.window = dom.window;
@@ -114,11 +108,13 @@ describe("yuanbao-collector", () => {
     setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/b");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadYuanbaoMarkdown();
-    loadYuanbaoCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadYuanbaoMarkdown();
+    await loadYuanbaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.yuanbao.capture();
@@ -155,10 +151,12 @@ describe("yuanbao-collector", () => {
     setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/fallback");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadYuanbaoCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadYuanbaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.yuanbao.capture();

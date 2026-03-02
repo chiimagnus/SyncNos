@@ -1,36 +1,34 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadZaiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/zai/zai-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/zai/zai-collector.js");
+async function loadZaiCollector() {
+  await import("../../src/collectors/zai/zai-collector.ts");
+  return globalThis.WebClipper?.collectors?.zai;
 }
 
-function loadZaiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/zai/zai-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/zai/zai-markdown.js");
+async function loadZaiMarkdown() {
+  return import("../../src/collectors/zai/zai-markdown.ts");
 }
 
 describe("zai-collector", () => {
   it("ignores thinking-chain-container content", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-1">
@@ -63,10 +61,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-1");
     const text = collector.__test.extractAssistantText(wrapper);
@@ -76,8 +76,6 @@ describe("zai-collector", () => {
   });
 
   it("extracts assistant markdown from rendered HTML", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-3">
@@ -107,10 +105,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-3");
     const md = collector.__test.extractAssistantMarkdown(wrapper);
@@ -126,8 +126,6 @@ describe("zai-collector", () => {
   });
 
   it("does not leak UI button labels when falling back to wrapper", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-2">
@@ -162,10 +160,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-2");
     const text = collector.__test.extractAssistantText(wrapper);

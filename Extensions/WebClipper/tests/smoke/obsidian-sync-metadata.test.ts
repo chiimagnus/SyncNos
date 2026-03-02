@@ -1,27 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-function loadMetadata() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/obsidian/obsidian-sync-metadata.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/obsidian/obsidian-sync-metadata.js");
+async function loadMetadata() {
+  const mod = await import("../../src/export/obsidian/obsidian-sync-metadata.ts");
+  return mod.default || mod;
 }
 
 describe("obsidian-sync-metadata", () => {
-  it("reads missing or mismatched schema as non-ok", () => {
+  it("reads missing or mismatched schema as non-ok", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadMetadata();
+    const mod = await loadMetadata();
     expect(mod.readSyncnosObject(null).ok).toBe(false);
     expect(mod.readSyncnosObject({ syncnos: { schemaVersion: 2 } }).ok).toBe(false);
   });
 
-  it("builds and reads syncnos object", () => {
+  it("builds and reads syncnos object", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadMetadata();
+    const mod = await loadMetadata();
     const syncnos = mod.buildSyncnosObject({
       conversation: { source: "x", conversationKey: "y" },
       cursor: { lastSyncedSequence: 12, lastSyncedMessageKey: "m1", lastSyncedMessageUpdatedAt: 9, lastSyncedAt: 10 }

@@ -1,21 +1,21 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
-import '../src/shared/normalize.js';
-import '../src/storage/incremental-updater.js';
+import '../src/shared/normalize.ts';
+import '../src/storage/incremental-updater.ts';
 import '../src/collectors/bootstrap.ts';
-import '../src/collectors/runtime-observer.js';
+import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
-import '../src/collectors/web/web-collector.js';
-import '../src/integrations/notionai-model-picker.js';
-import '../src/ui/inpage/inpage-tip.js';
-import '../src/ui/inpage/inpage-button.js';
-import '../src/ui/inpage/inpage-tip-shadow';
-import '../src/ui/inpage/inpage-button-shadow';
+import '../src/collectors/web/web-collector.ts';
+import '../src/integrations/notionai-model-picker.ts';
+import '../src/ui/inpage/inpage-tip.ts';
+import '../src/ui/inpage/inpage-button.ts';
 
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';
 import { createRuntimeClient } from '../src/platform/runtime/client';
+import runtimeContext from '../src/runtime-context.ts';
+import collectorContext from '../src/collectors/collector-context.ts';
 
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
@@ -37,27 +37,23 @@ export default defineContentScript({
     'https://*.notion.so/*',
   ],
   main() {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const runtimeContext: any = require('../src/runtime-context.js');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const collectorContext: any = require('../src/collectors/collector-context.js');
-    const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+    const runtimeNS: any = runtimeContext;
+    const collectorsNS: any = collectorContext;
     runtimeContext.runtimeClient = { createRuntimeClient };
-    NS.runtimeClient = runtimeContext.runtimeClient;
 
     const runtime = createRuntimeClient();
     startContentBootstrap({
       runtime,
-      inpageButton: runtimeContext.inpageButton || NS.inpageButton || null,
+      inpageButton: runtimeNS.inpageButton || null,
       createController: () =>
         createContentController({
           runtime,
-          collectorsRegistry: collectorContext.collectorsRegistry || null,
-          inpageButton: runtimeContext.inpageButton || NS.inpageButton || null,
-          inpageTip: runtimeContext.inpageTip || NS.inpageTip || null,
-          runtimeObserver: runtimeContext.runtimeObserver || NS.runtimeObserver || null,
-          incrementalUpdater: runtimeContext.incrementalUpdater || NS.incrementalUpdater || null,
-          notionAiModelPicker: runtimeContext.notionAiModelPicker || NS.notionAiModelPicker || null,
+          collectorsRegistry: collectorsNS.collectorsRegistry || null,
+          inpageButton: runtimeNS.inpageButton || null,
+          inpageTip: runtimeNS.inpageTip || null,
+          runtimeObserver: runtimeNS.runtimeObserver || null,
+          incrementalUpdater: runtimeNS.incrementalUpdater || null,
+          notionAiModelPicker: runtimeNS.notionAiModelPicker || null,
         }),
     });
   },

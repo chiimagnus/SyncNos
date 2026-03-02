@@ -95,7 +95,7 @@ async function toUint8Array(data: unknown): Promise<Uint8Array> {
   return new TextEncoder().encode(String(data == null ? '' : data));
 }
 
-function isUnsafeZipEntryName(name: unknown) {
+export function isUnsafeZipEntryName(name: unknown) {
   const text = String(name || '');
   if (!text) return true;
   if (text.includes('\0')) return true;

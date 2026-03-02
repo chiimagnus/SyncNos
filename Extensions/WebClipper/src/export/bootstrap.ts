@@ -5,6 +5,7 @@ import {
   NOTION_OAUTH_TOKEN_KEY,
   setNotionOAuthToken,
 } from '../integrations/notion/token-store';
+import { conversationKinds } from '../protocols/conversation-kinds.ts';
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
@@ -13,9 +14,9 @@ import {
   OBSIDIAN_STORAGE_KEYS,
   saveObsidianSettings,
 } from '../integrations/obsidian/settings-store';
+import runtimeContext from '../runtime-context.ts';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const namespace: any = require('../runtime-context.js');
+const namespace: any = runtimeContext;
 
 namespace.backgroundStorage = backgroundStorage;
 
@@ -25,6 +26,7 @@ namespace.notionTokenStore = {
   setToken: setNotionOAuthToken,
   clearToken: clearNotionOAuthToken,
 };
+namespace.conversationKinds = conversationKinds;
 
 namespace.obsidianSettingsStore = {
   STORAGE_KEYS: OBSIDIAN_STORAGE_KEYS,

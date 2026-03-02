@@ -1,12 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-function loadArticleMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/local/article-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/local/article-markdown.js");
+async function loadArticleMarkdown() {
+  const mod = await import("../../src/export/local/article-markdown.ts");
+  return mod.default || mod;
 }
 
 afterEach(() => {
@@ -15,10 +11,10 @@ afterEach(() => {
 });
 
 describe("article-markdown", () => {
-  it("prefers contentMarkdown over plain text for article body", () => {
+  it("prefers contentMarkdown over plain text for article body", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const api = loadArticleMarkdown();
+    const api = await loadArticleMarkdown();
 
     const markdown = api.formatArticleMarkdown({
       conversation: { title: "Article" },

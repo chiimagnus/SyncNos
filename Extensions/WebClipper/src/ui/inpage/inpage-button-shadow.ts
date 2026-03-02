@@ -1,4 +1,5 @@
 import inpageCssRaw from '../styles/inpage.css?raw';
+import runtimeContext from '../../runtime-context.ts';
 
 type InpageRuntime = { getURL?: (path: string) => string } | null;
 
@@ -455,10 +456,4 @@ export const inpageButtonApi = {
   cleanupButtons,
 };
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const runtimeContext: any = require('../../runtime-context.js');
-  runtimeContext.inpageButton = inpageButtonApi;
-} catch (_e) {
-  // ignore
-}
+runtimeContext.inpageButton = inpageButtonApi;

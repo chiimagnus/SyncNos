@@ -1,44 +1,37 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
-function loadChatgptMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/chatgpt/chatgpt-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/chatgpt/chatgpt-markdown.js");
+async function loadChatgptMarkdown() {
+  return import("../../src/collectors/chatgpt/chatgpt-markdown.ts");
 }
 
-function loadChatgptCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/chatgpt/chatgpt-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/chatgpt/chatgpt-collector.js");
+async function loadChatgptCollector() {
+  return import("../../src/collectors/chatgpt/chatgpt-collector.ts");
 }
 
 function setupChatgptDom(html: string, url: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { JSDOM } = require("jsdom");
   const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
   // @ts-expect-error test global
   globalThis.window = dom.window;
@@ -95,11 +88,13 @@ describe("chatgpt-collector", () => {
     setupChatgptDom(html, "https://chatgpt.com/c/conv_md_1");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadChatgptMarkdown();
-    loadChatgptCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadChatgptMarkdown();
+    await loadChatgptCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.chatgpt.capture({ manual: true });
@@ -141,10 +136,12 @@ describe("chatgpt-collector", () => {
     setupChatgptDom(html, "https://chatgpt.com/c/conv_fallback_1");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadChatgptCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadChatgptCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.chatgpt.capture({ manual: true });

@@ -1,2 +1,2 @@
-import './yuanbao-markdown.js';
-import './yuanbao-collector.js';
+import './yuanbao-markdown.ts';
+import './yuanbao-collector.ts';

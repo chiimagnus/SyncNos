@@ -1,26 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-function loadClient() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/obsidian/obsidian-local-rest-client.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/obsidian/obsidian-local-rest-client.js");
+async function loadClient() {
+  const mod = await import("../../src/export/obsidian/obsidian-local-rest-client.ts");
+  return mod.default || mod;
 }
 
 describe("obsidian-local-rest-client", () => {
-  it("encodes vault path segments without encoding slashes", () => {
+  it("encodes vault path segments without encoding slashes", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadClient();
+    const mod = await loadClient();
     expect(mod.encodeVaultPath("A Folder/My Note.md")).toBe("A%20Folder/My%20Note.md");
   });
 
   it("rejects https base url in this version", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadClient();
+    const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "https://127.0.0.1:27124", apiKey: "k" });
     expect(client.ok).toBe(false);
     expect(client.error?.code).toBe("https_unsupported");
@@ -36,7 +32,7 @@ describe("obsidian-local-rest-client", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadClient();
+    const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "k", authHeaderName: "X-Api-Key" });
     expect(client.ok).toBe(true);
 
@@ -57,7 +53,7 @@ describe("obsidian-local-rest-client", () => {
     };
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const mod = loadClient();
+    const mod = await loadClient();
     const client = mod.createClient({ apiBaseUrl: "http://127.0.0.1:27123", apiKey: "bad" });
     expect(client.ok).toBe(true);
 
@@ -68,4 +64,3 @@ describe("obsidian-local-rest-client", () => {
     expect(String(res.error?.message || "")).toContain("unauthorized");
   });
 });
-

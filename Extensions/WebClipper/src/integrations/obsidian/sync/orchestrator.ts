@@ -1,7 +1,5 @@
-import '../../../export/obsidian/obsidian-sync-orchestrator.js';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../../runtime-context.js');
+import obsidianSyncOrchestratorFallback from '../../../export/obsidian/obsidian-sync-orchestrator.ts';
+import runtimeContext from '../../../runtime-context.ts';
 
 type LegacyObsidianSyncOrchestrator = {
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
@@ -14,7 +12,10 @@ type LegacyObsidianSyncOrchestrator = {
 };
 
 function getLegacyObsidianSyncOrchestrator(): LegacyObsidianSyncOrchestrator {
-  const orchestrator = runtimeContext.obsidianSyncOrchestrator;
+  const orchestrator = runtimeContext.obsidianSyncOrchestrator || obsidianSyncOrchestratorFallback;
+  if (!runtimeContext.obsidianSyncOrchestrator && orchestrator) {
+    runtimeContext.obsidianSyncOrchestrator = orchestrator;
+  }
   if (!orchestrator || typeof orchestrator.getSyncStatus !== 'function') {
     throw new Error('obsidian sync orchestrator missing');
   }

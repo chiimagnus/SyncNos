@@ -1,2 +1,2 @@
-import './gemini-markdown.js';
-import './gemini-collector.js';
+import './gemini-markdown.ts';
+import './gemini-collector.ts';

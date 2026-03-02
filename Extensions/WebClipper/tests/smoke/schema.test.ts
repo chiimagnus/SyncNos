@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-// These are UMD-ish modules: they attach to globalThis for the extension, and also export via module.exports for Node tests.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const normalize = require("../../src/shared/normalize.js");
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const incrementalUpdater = require("../../src/storage/incremental-updater.js");
+import * as normalize from "../../src/shared/normalize.ts";
+import * as incrementalUpdater from "../../src/storage/incremental-updater.ts";
 
 describe("smoke", () => {
   it("normalizeText trims and normalizes newlines", () => {

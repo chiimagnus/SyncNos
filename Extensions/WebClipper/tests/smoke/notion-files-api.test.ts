@@ -1,21 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-function loadNotionApi() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/notion/notion-api.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/notion/notion-api.js");
+async function loadFresh(rel: string) {
+  const mod = await import(/* @vite-ignore */ `${rel}?t=${Date.now()}_${Math.random().toString(16).slice(2)}`);
+  return (mod as any).default || mod;
 }
 
-function loadNotionFilesApi() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/notion/notion-files-api.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/notion/notion-files-api.js");
+async function loadNotionApi() {
+  return loadFresh("../../src/export/notion/notion-api.ts");
+}
+
+async function loadNotionFilesApi() {
+  return loadFresh("../../src/export/notion/notion-files-api.ts");
 }
 
 describe("notion-files-api", () => {
@@ -33,7 +28,7 @@ describe("notion-files-api", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const notionApi = loadNotionApi();
+    const notionApi = await loadNotionApi();
 
     await notionApi.notionFetch({ accessToken: "t", method: "GET", path: "/v1/users/me" });
     await notionApi.notionFetch({ accessToken: "t", method: "GET", path: "/v1/users/me", notionVersion: "2099-01-01" });
@@ -74,7 +69,7 @@ describe("notion-files-api", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const notionApi = loadNotionApi();
+    const notionApi = await loadNotionApi();
     const res = await notionApi.searchPages({ accessToken: "t", query: "", pageSize: 50 });
 
     expect(Array.isArray(res.results)).toBe(true);
@@ -99,7 +94,7 @@ describe("notion-files-api", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    const notionApi = loadNotionApi();
+    const notionApi = await loadNotionApi();
     await notionApi.searchPages({ accessToken: "t", query: "syncnos", pageSize: 10 });
 
     expect(bodies[0].query).toBe("syncnos");
@@ -125,7 +120,7 @@ describe("notion-files-api", () => {
       }
     };
 
-    const files = loadNotionFilesApi();
+    const files = await loadNotionFilesApi();
     const created = await files.createExternalURLUpload({ accessToken: "t", url: "https://example.com/a.png" });
     expect(created.id).toBe("u1");
 
@@ -162,7 +157,7 @@ describe("notion-files-api", () => {
       }
     };
 
-    const files = loadNotionFilesApi();
+    const files = await loadNotionFilesApi();
     const created = await files.createFileUpload({
       accessToken: "t",
       filename: "a.png",
@@ -206,7 +201,7 @@ describe("notion-files-api", () => {
       }
     };
 
-    const files = loadNotionFilesApi();
+    const files = await loadNotionFilesApi();
     await expect(files.waitUntilUploaded({ accessToken: "t", id: "u1", pollIntervalMs: 1, maxAttempts: 1 }))
       .rejects
       .toThrow(/file upload failed/i);

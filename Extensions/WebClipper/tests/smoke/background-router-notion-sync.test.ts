@@ -31,20 +31,16 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   };
 }
 
-function prepareNotionRouter() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const jobStoreModulePath = require.resolve("../../src/export/notion/notion-sync-job-store.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[jobStoreModulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/export/notion/notion-sync-job-store.js");
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const orchestratorModulePath = require.resolve("../../src/export/notion/notion-sync-orchestrator.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[orchestratorModulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/export/notion/notion-sync-orchestrator.js");
+async function prepareNotionRouter() {
+  const nonce = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  await import(
+    /* @vite-ignore */
+    `../../src/export/notion/notion-sync-job-store.ts?t=${nonce}`
+  );
+  await import(
+    /* @vite-ignore */
+    `../../src/export/notion/notion-sync-orchestrator.ts?t=${nonce}`
+  );
   return createTestBackgroundRouter();
 }
 
@@ -68,7 +64,7 @@ describe("background-router notion sync", () => {
     // @ts-expect-error test global
     globalThis.WebClipper.notionSyncJobStore = { NOTION_SYNC_JOB_KEY: "notion_sync_job_v1" };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionDisconnect" });
 
     expect(res.ok).toBe(true);
@@ -121,7 +117,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.okCount).toBe(1);
@@ -173,7 +169,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => true
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("appended");
@@ -214,7 +210,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => true
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("rebuilt");
@@ -256,7 +252,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const syncRes = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(syncRes.ok).toBe(true);
 
@@ -318,7 +314,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(calls.some((c) => c.op === "append" && c.pageId === "p_new")).toBe(true);
@@ -377,7 +373,7 @@ describe("background-router notion sync", () => {
       pageBelongsToDatabase: () => false
     };
 
-    const router = prepareNotionRouter();
+    const router = await prepareNotionRouter();
     const res = await router.__handleMessageForTests({ type: "notionSyncConversations", conversationIds: [1] });
     expect(res.ok).toBe(true);
     expect(res.data.results[0].mode).toBe("created");

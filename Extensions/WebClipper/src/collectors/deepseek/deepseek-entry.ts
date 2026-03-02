@@ -1,2 +1,2 @@
-import './deepseek-markdown.js';
-import './deepseek-collector.js';
+import './deepseek-markdown.ts';
+import './deepseek-collector.ts';

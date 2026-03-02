@@ -1,63 +1,57 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import {
+  ensureCollectorContractAndRegistry,
+  ensureCollectorUtils,
+} from "../helpers/collectors-bootstrap";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadRegistry() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/registry.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/registry.js");
+async function loadContractAndRegistry() {
+  return ensureCollectorContractAndRegistry();
 }
 
-function loadContract() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-contract.js");
+async function loadNotionAiCollector() {
+  await import("../../src/collectors/notionai/notionai-collector.ts");
+  const collector = globalThis.WebClipper?.collectors?.notionai;
+  const registry = globalThis.WebClipper?.collectorsRegistry;
+  const matches = collector?.__test?.matches;
+  if (collector && registry && typeof registry.register === "function" && typeof matches === "function") {
+    registry.register({
+      id: "notionai",
+      matches,
+      inpageMatches: collector?.__test?.inpageMatches,
+      collector,
+    });
+  }
+  return collector;
 }
 
-function loadNotionAiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/notionai/notionai-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/notionai/notionai-collector.js");
+async function loadNotionAiMarkdown() {
+  return import("../../src/collectors/notionai/notionai-markdown.ts");
 }
 
-function loadNotionAiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/notionai/notionai-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/notionai/notionai-markdown.js");
-}
-
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
 describe("notionai-collector", () => {
   it("exposes inpageMatches for early UI eligibility", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const dom = new JSDOM("<body></body>", { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
     // @ts-expect-error test global
@@ -70,12 +64,13 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     expect(typeof collector.__test.inpageMatches).toBe("function");
     expect(collector.__test.inpageMatches({ hostname: "www.notion.so", pathname: "/", href: "https://www.notion.so/" })).toBe(true);
@@ -90,8 +85,6 @@ describe("notionai-collector", () => {
   });
 
   it("becomes active only when chat turn signals exist", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `<div data-agent-chat-user-step-id="u1"></div>`;
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
@@ -105,12 +98,13 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    await loadNotionAiCollector();
 
     const active = globalThis.WebClipper.collectorsRegistry.pickActive({
       hostname: "www.notion.so",
@@ -121,8 +115,6 @@ describe("notionai-collector", () => {
   });
 
   it("uses thread id `t` as stable conversationKey and canonical /chat URL", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -149,12 +141,13 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -163,8 +156,6 @@ describe("notionai-collector", () => {
   });
 
   it("keeps notionai conversationKey stable across different page paths when `t` matches", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -194,12 +185,13 @@ describe("notionai-collector", () => {
       globalThis.location = dom.window.location;
 
       // @ts-expect-error test global
+      if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
       globalThis.WebClipper = {};
-      loadNormalize();
-      loadContract();
-      loadRegistry();
-      loadNotionAiMarkdown();
-      const collector = loadNotionAiCollector();
+    }
+      await loadNormalize();
+    await loadContractAndRegistry();
+      await loadNotionAiMarkdown();
+      const collector = await loadNotionAiCollector();
 
       const snap = collector.capture();
       keys.push(snap.conversation.conversationKey);
@@ -210,8 +202,6 @@ describe("notionai-collector", () => {
   });
 
   it("captures user uploaded images (thread attachments) outside text leaf", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -245,13 +235,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -262,8 +253,6 @@ describe("notionai-collector", () => {
   });
 
   it("does not capture left sidebar / page blocks outside chat turns", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -302,13 +291,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -320,8 +310,6 @@ describe("notionai-collector", () => {
   });
 
   it("pairs assistant replies as the next sibling container after each user turn", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -361,13 +349,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -380,8 +369,6 @@ describe("notionai-collector", () => {
   });
 
   it("captures nested list and fenced code markdown from assistant blocks", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -420,13 +407,14 @@ console.log(value);</div>
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
