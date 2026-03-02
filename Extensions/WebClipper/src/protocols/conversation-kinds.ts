@@ -12,11 +12,26 @@ type ConversationKindRegistry = {
 const definitions: ConversationKindDefinition[] = [];
 
 function aiLabelForSource(source: unknown): string {
-  const namespace: any = (globalThis as any).WebClipper || {};
-  const notionAi = namespace.notionAi;
-  if (notionAi && typeof notionAi.optionNameForSource === 'function') {
-    return notionAi.optionNameForSource(source);
-  }
+  const sourceKey = String(source || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+
+  const sourceNameMap: Record<string, string> = {
+    chatgpt: 'ChatGPT',
+    claude: 'Claude',
+    gemini: 'Gemini',
+    deepseek: 'DeepSeek',
+    kimi: 'Kimi',
+    doubao: '豆包',
+    yuanbao: '元宝',
+    poe: 'Poe',
+    notionai: 'NotionAI',
+    goodlinks: 'GoodLinks',
+  };
+
+  const mapped = sourceNameMap[sourceKey];
+  if (mapped) return mapped;
   const fallback = String(source || '').trim();
   return fallback || 'Unknown';
 }

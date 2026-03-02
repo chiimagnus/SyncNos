@@ -1,7 +1,6 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
-import '../src/protocols/bootstrap.ts';
 import '../src/shared/normalize.js';
 import '../src/storage/incremental-updater.js';
 import '../src/collectors/bootstrap.ts';

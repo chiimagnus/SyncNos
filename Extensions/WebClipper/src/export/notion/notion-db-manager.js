@@ -1,4 +1,5 @@
 (function () {
+  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
@@ -28,8 +29,7 @@
   }
 
   function defaultDbSpec() {
-    const kinds = NS.conversationKinds;
-    const list = kinds && typeof kinds.list === "function" ? kinds.list() : [];
+    const list = conversationKinds && typeof conversationKinds.list === "function" ? conversationKinds.list() : [];
     const chat = Array.isArray(list) ? list.find((d) => d && d.id === "chat" && d.notion && d.notion.dbSpec) : null;
     if (chat && chat.notion && chat.notion.dbSpec) return chat.notion.dbSpec;
 
