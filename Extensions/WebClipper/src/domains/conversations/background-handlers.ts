@@ -1,4 +1,4 @@
-import { CORE_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import { CORE_MESSAGE_TYPES, UI_EVENT_TYPES } from '../../platform/messaging/message-contracts';
 import {
   deleteConversationsByIds,
   getConversationDetail,
@@ -13,6 +13,7 @@ type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
   register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  eventsHub?: { broadcast: (type: string, payload: unknown) => void };
 };
 
 export function registerConversationHandlers(router: AnyRouter) {
@@ -40,32 +41,23 @@ export function registerConversationHandlers(router: AnyRouter) {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
     const res = await writeConversationMessagesSnapshot(conversationId, msg.messages);
-    try {
-      const NS: any = (globalThis as any).WebClipper || {};
-      const hub = NS.backgroundEventsHub;
-      const eventType =
-        NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
-      hub?.broadcast?.(eventType, { reason: 'upsert', conversationId });
-    } catch (_e) {
-      // ignore
-    }
+    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+      reason: 'upsert',
+      conversationId,
+    });
     return router.ok(res);
   });
 
   router.register(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, async (msg) => {
     const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
     const res = await deleteConversationsByIds(ids);
-    try {
-      const NS: any = (globalThis as any).WebClipper || {};
-      const hub = NS.backgroundEventsHub;
-      const eventType = NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
-      const normalizedIds = Array.isArray(ids)
-        ? ids.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
-        : [];
-      hub?.broadcast?.(eventType, { reason: 'delete', conversationIds: normalizedIds });
-    } catch (_e) {
-      // ignore
-    }
+    const normalizedIds = Array.isArray(ids)
+      ? ids.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+      : [];
+    router.eventsHub?.broadcast(UI_EVENT_TYPES.CONVERSATIONS_CHANGED, {
+      reason: 'delete',
+      conversationIds: normalizedIds,
+    });
     return router.ok(res);
   });
 }
