@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   function normalizeMarkdown(markdown) {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");

@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("./collector-context.js");
 
   function assertCollectorDef(def) {
     if (!def || typeof def !== "object") throw new Error("collector def must be an object");
@@ -13,4 +13,3 @@
   NS.collectorContract = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

@@ -2,7 +2,8 @@ import { assertCollectorDef } from './collector-contract.ts';
 import * as collectorUtils from './collector-utils.ts';
 import { createCollectorsRegistry } from './registry.ts';
 
-const namespace: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const namespace: any = require('./collector-context.js');
 
 namespace.collectorContract = { assertCollectorDef };
 namespace.collectorUtils = collectorUtils;

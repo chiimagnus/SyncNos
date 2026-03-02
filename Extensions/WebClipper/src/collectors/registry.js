@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("./collector-context.js");
 
   const defs = [];
 
@@ -32,4 +32,3 @@
   NS.collectorsRegistry = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-
