@@ -4,6 +4,7 @@ import {
   ensureDefaultNotionOAuthClientId,
   getNotionOAuthDefaults,
   handleNotionOAuthCallbackNavigation,
+  setupNotionOAuthNavigationListener,
 } from '../../src/integrations/notion/oauth';
 
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
@@ -57,6 +58,25 @@ function mockFetchJsonOk(json: unknown) {
 }
 
 describe('notion oauth (ts)', () => {
+  it('setupNotionOAuthNavigationListener registers webNavigation listener (chrome)', async () => {
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const chromeMock: any = mockChromeStorage();
+    chromeMock.webNavigation = {
+      onCommitted: {
+        addListener(cb: any) {
+          chromeMock.__webNavCb = cb;
+        },
+      },
+    };
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+
+    setupNotionOAuthNavigationListener();
+    expect(typeof chromeMock.__webNavCb).toBe('function');
+  });
+
   it('ensureDefaultNotionOAuthClientId sets default id and removes secret', async () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
@@ -153,4 +173,3 @@ describe('notion oauth (ts)', () => {
     expect(token.createdAt).toBe(456);
   });
 });
-
