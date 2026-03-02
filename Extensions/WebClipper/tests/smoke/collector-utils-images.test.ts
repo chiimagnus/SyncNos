@@ -1,11 +1,9 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { appendImageMarkdown, extractImageUrlsFromElement } from "../../src/collectors/collector-utils";
 
 describe("collector-utils images", () => {
   it("extracts best http(s) image urls from element", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
-
     const dom = new JSDOM(
       `<body>
         <div id="root">

@@ -1,4 +1,6 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
 async function loadNormalize() {
   const normalizeModule = await import("../../src/shared/normalize.ts");
@@ -17,13 +19,8 @@ async function loadNormalize() {
   return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
 async function loadPoeMarkdown() {
@@ -37,8 +34,6 @@ async function loadPoeCollector() {
 
 describe("poe-collector", () => {
   it("prefers chat header title text for conversation title", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="BaseNavbar_chatTitleItem__GtrXf">
@@ -82,7 +77,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -93,8 +88,6 @@ describe("poe-collector", () => {
   });
 
   it("filters thinking process and captures markdown for assistant message", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -143,7 +136,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -171,8 +164,6 @@ describe("poe-collector", () => {
   });
 
   it("captures latest poe markdown structure and keeps normal blockquote content", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -232,7 +223,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -257,8 +248,6 @@ describe("poe-collector", () => {
   });
 
   it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -318,7 +307,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -342,8 +331,6 @@ describe("poe-collector", () => {
   });
 
   it("captures messages across date tupleGroupContainer buckets", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_chatMessagesView__ROOT">
@@ -406,7 +393,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -419,8 +406,6 @@ describe("poe-collector", () => {
   });
 
   it("auto-loads older poe history on manual prepare before capture", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     function tupleHtml(startId: number) {
       const userId = startId;
@@ -494,7 +479,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     const collector = await loadPoeCollector();
 
@@ -514,8 +499,6 @@ describe("poe-collector", () => {
   });
 
   it("appends image markdown but does not capture bot avatar images", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -554,7 +537,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
@@ -569,8 +552,6 @@ describe("poe-collector", () => {
   });
 
   it("captures attachment images outside message text container", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -612,7 +593,7 @@ describe("poe-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadPoeMarkdown();
     await loadPoeCollector();
 
