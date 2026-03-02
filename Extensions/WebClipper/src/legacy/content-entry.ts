@@ -12,7 +12,6 @@ import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
 import '../collectors/sites-bootstrap';
 
-import '../collectors/claude/claude-collector.js';
 import '../collectors/gemini/gemini-markdown.js';
 import '../collectors/gemini/gemini-collector.js';
 import '../collectors/deepseek/deepseek-markdown.js';
