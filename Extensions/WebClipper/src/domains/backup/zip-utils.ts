@@ -111,7 +111,7 @@ async function decompressDeflateRaw(bytes: Uint8Array, expectedSize?: number) {
     for (const format of tryFormats) {
       try {
         const ds = new (globalThis as any).DecompressionStream(format);
-        const stream = new Blob([input]).stream().pipeThrough(ds);
+        const stream = new Blob([input as unknown as BlobPart]).stream().pipeThrough(ds);
         const ab = await new Response(stream).arrayBuffer();
         return new Uint8Array(ab);
       } catch (_e) {
@@ -127,7 +127,7 @@ async function decompressDeflateRaw(bytes: Uint8Array, expectedSize?: number) {
 const TINF_OK = 0;
 const TINF_DATA_ERROR = -3;
 
-function HuffmanTree(table: number[], lengths: number[], symbols: number[]) {
+function HuffmanTree(this: any, table: number[], lengths: number[], symbols: number[]) {
   this.table = table;
   this.lengths = lengths;
   this.symbols = symbols;
@@ -491,4 +491,3 @@ export async function extractZipEntries(blob: Blob): Promise<Map<string, Uint8Ar
 
   return entries;
 }
-

@@ -231,7 +231,7 @@ export async function importBackupLegacyJsonMerge(
       const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
       if (notionPageId) {
         // eslint-disable-next-line no-await-in-loop
-        const convo = await reqToPromise(convoIdx.get([source, conversationKey]) as any);
+        const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
         if (convo && convo.id && (!convo.notionPageId || !String(convo.notionPageId).trim())) {
           convo.notionPageId = notionPageId;
           // eslint-disable-next-line no-await-in-loop
@@ -456,7 +456,7 @@ export async function importBackupZipV2Merge(
       const notionPageId = merged.notionPageId ? String(merged.notionPageId) : '';
       if (notionPageId) {
         // eslint-disable-next-line no-await-in-loop
-        const convo = await reqToPromise(convoIdx.get([source, conversationKey]) as any);
+        const convo: AnyRecord = await reqToPromise<AnyRecord>(convoIdx.get([source, conversationKey]) as any);
         if (convo && convo.id && (!convo.notionPageId || !String(convo.notionPageId).trim())) {
           convo.notionPageId = notionPageId;
           // eslint-disable-next-line no-await-in-loop
@@ -481,4 +481,3 @@ export async function importBackupZipV2Merge(
 
   return stats;
 }
-
