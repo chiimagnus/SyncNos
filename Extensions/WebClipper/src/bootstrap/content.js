@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
   const runtime = NS.runtimeClient && typeof NS.runtimeClient.createRuntimeClient === "function"
     ? NS.runtimeClient.createRuntimeClient()
     : null;

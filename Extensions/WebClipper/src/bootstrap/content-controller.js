@@ -1,7 +1,7 @@
 /* global console, chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
   const contracts = NS.messageContracts || {};
   const CORE_MESSAGE_TYPES = contracts.CORE_MESSAGE_TYPES || Object.freeze({
     UPSERT_CONVERSATION: "upsertConversation",
