@@ -13,7 +13,6 @@
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
     "check": "npm run build && node ../../.github/scripts/webclipper/check-dist.mjs --root=Extensions/WebClipper/.output/chrome-mv3",
-    "check:no-runtime-js": "node scripts/check-no-runtime-js.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
