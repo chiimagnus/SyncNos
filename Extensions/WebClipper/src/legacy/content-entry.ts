@@ -8,10 +8,8 @@ import '../protocols/message-contracts.js';
 import '../shared/normalize.js';
 import '../storage/incremental-updater.js';
 
-import '../collectors/collector-contract.js';
-import '../collectors/registry.js';
+import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
-import '../collectors/collector-utils.js';
 
 import '../collectors/chatgpt/chatgpt-markdown.js';
 import '../collectors/chatgpt/chatgpt-collector.js';
