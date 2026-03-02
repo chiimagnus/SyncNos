@@ -44,11 +44,4 @@ export function startLegacyBackground() {
   } catch (_e) {
     // ignore
   }
-
-  try {
-    NS.backgroundRouter?.start?.();
-  } catch (_e) {
-    // ignore
-  }
 }
-
