@@ -1,6 +1,6 @@
-import { assertCollectorDef } from './collector-contract';
-import * as collectorUtils from './collector-utils';
-import { createCollectorsRegistry } from './registry';
+import { assertCollectorDef } from './collector-contract.ts';
+import * as collectorUtils from './collector-utils.ts';
+import { createCollectorsRegistry } from './registry.ts';
 
 const namespace: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
 

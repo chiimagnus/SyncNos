@@ -1,4 +1,4 @@
-import { assertCollectorDef, type CollectorDefinition } from './collector-contract';
+import { assertCollectorDef, type CollectorDefinition } from './collector-contract.ts';
 
 type CollectorLocation = {
   href?: string;
