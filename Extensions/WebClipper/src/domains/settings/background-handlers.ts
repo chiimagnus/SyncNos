@@ -5,6 +5,9 @@ import { getObsidianSettings, saveObsidianSettings } from '../../integrations/ob
 import { testObsidianConnection } from '../../integrations/obsidian/sync/orchestrator';
 import { conversationKinds } from '../../protocols/conversation-kinds.ts';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../runtime-context.js');
+
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
@@ -13,8 +16,7 @@ type AnyRouter = {
 
 function getInstanceId(): string {
   try {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const id = NS.__backgroundInstanceId;
+    const id = runtimeContext.__backgroundInstanceId;
     return id ? String(id) : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   } catch (_e) {
     return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -22,7 +24,6 @@ function getInstanceId(): string {
 }
 
 function getNotionDisconnectStorageKeys(): string[] {
-  const NS: any = (globalThis as any).WebClipper || {};
   const base = [
     'notion_parent_page_id',
     'notion_oauth_pending_state',
@@ -39,7 +40,7 @@ function getNotionDisconnectStorageKeys(): string[] {
     return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
   })();
 
-  const jobStore = NS.notionSyncJobStore;
+  const jobStore = runtimeContext.notionSyncJobStore;
   const syncJobKey = jobStore?.NOTION_SYNC_JOB_KEY ? String(jobStore.NOTION_SYNC_JOB_KEY).trim() : '';
 
   return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
@@ -95,8 +96,7 @@ export function registerSettingsHandlers(router: AnyRouter) {
   });
 
   router.register(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const api = NS.backgroundInpageWebVisibility;
+    const api = runtimeContext.backgroundInpageWebVisibility;
     if (!api || typeof api.applyVisibilitySetting !== 'function') {
       return router.err('inpage web visibility manager missing', { code: 'INPAGE_VISIBILITY_UNAVAILABLE' });
     }

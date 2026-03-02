@@ -9,12 +9,14 @@ import {
   setupNotionOAuthNavigationListener,
 } from '../src/integrations/notion/oauth';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../src/runtime-context.js');
+
 export default defineBackground(() => {
   startBackgroundBootstrap();
 
-  const NS: any = (globalThis as any).WebClipper || {};
-  if (!NS.__backgroundInstanceId) {
-    NS.__backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  if (!runtimeContext.__backgroundInstanceId) {
+    runtimeContext.__backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 
   const router = createBackgroundRouter({
@@ -27,7 +29,7 @@ export default defineBackground(() => {
 
   // Migration-only utility; routed through platform router (and/or legacy router ping handler).
   router.register('__WXT_PING__', async () => {
-    const instanceId = NS.__backgroundInstanceId ?? null;
+    const instanceId = runtimeContext.__backgroundInstanceId ?? null;
     return router.ok({ pong: true, instanceId });
   });
 
@@ -46,12 +48,12 @@ export default defineBackground(() => {
   }
 
   try {
-    const id = NS.__backgroundInstanceId;
-    NS.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
+    const id = runtimeContext.__backgroundInstanceId;
+    runtimeContext.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
   } catch (_e) {
     // ignore
   }
 
   router.start();
-  NS.__backgroundReady = true;
+  runtimeContext.__backgroundReady = true;
 });
