@@ -13,9 +13,9 @@ import {
   OBSIDIAN_STORAGE_KEYS,
   saveObsidianSettings,
 } from '../integrations/obsidian/settings-store';
+import runtimeContext from '../runtime-context.ts';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const namespace: any = require('../runtime-context.js');
+const namespace: any = runtimeContext;
 
 namespace.backgroundStorage = backgroundStorage;
 

@@ -1,7 +1,5 @@
 import '../../../export/notion/notion-sync-orchestrator.js';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../../runtime-context.js');
+import runtimeContext from '../../../runtime-context.ts';
 
 type LegacyNotionSyncOrchestrator = {
   syncConversations: (input: {
