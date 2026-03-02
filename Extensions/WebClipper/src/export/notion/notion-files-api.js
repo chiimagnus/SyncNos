@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const FILE_UPLOAD_VERSION = "2025-09-03";
   const DEFAULT_POLL_INTERVAL_MS = 800;

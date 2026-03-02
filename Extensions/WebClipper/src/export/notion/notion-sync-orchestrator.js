@@ -2,7 +2,7 @@
 
 (function () {
   const { conversationKinds } = require("../../protocols/conversation-kinds.js");
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";

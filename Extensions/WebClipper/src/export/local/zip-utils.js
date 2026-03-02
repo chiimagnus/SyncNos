@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const SIG_LOCAL_FILE_HEADER = 0x04034b50;
   const SIG_CENTRAL_DIR_FILE_HEADER = 0x02014b50;

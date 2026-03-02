@@ -14,7 +14,8 @@ import {
   saveObsidianSettings,
 } from '../integrations/obsidian/settings-store';
 
-const namespace: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const namespace: any = require('../runtime-context.js');
 
 namespace.backgroundStorage = backgroundStorage;
 

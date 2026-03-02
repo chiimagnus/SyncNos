@@ -1,6 +1,6 @@
 (function () {
   const { conversationKinds } = require("../../protocols/conversation-kinds.js");
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
   const DEFAULT_DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";

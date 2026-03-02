@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
   const DEFAULT_STALE_MS = 20 * 60 * 1000;
