@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 function run(cmd, args, cwd) {
   const res = spawnSync(cmd, args, { cwd, stdio: "inherit" });
@@ -21,7 +21,10 @@ function copyIntoStaging(relPath) {
   const dst = join(staging, relPath);
   const dstDir = dst.split("/").slice(0, -1).join("/");
   mkdirSync(dstDir, { recursive: true });
-  cpSync(src, dst, { recursive: true });
+  cpSync(src, dst, {
+    recursive: true,
+    filter: (srcPath) => basename(srcPath) !== ".DS_Store"
+  });
 }
 
 function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
@@ -31,12 +34,32 @@ function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
   cpSync(srcAbsPath, dst);
 }
 
+function removeJunkFilesRecursively(rootDir) {
+  const stack = [rootDir];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(abs);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (entry.name === ".DS_Store") {
+        rmSync(abs, { force: true });
+      }
+    }
+  }
+}
+
 // Minimal, reviewer-friendly source package contents.
 // Keep only what reviewers need to reproduce the XPI build.
 const items = [
-  "manifest.json",
   "wxt.config.ts",
   "tsconfig.json",
+  "postcss.config.cjs",
+  "tailwind.config.cjs",
   "entrypoints",
   "icons",
   "src",
@@ -55,6 +78,8 @@ for (const item of items) {
 if (existsSync(repoLicense)) {
   copyExternalIntoStaging(repoLicense, "LICENSE");
 }
+
+removeJunkFilesRecursively(staging);
 
 // `.zip` is the required format for AMO "Source code".
 run("zip", ["-r", outZip, "."], staging);
