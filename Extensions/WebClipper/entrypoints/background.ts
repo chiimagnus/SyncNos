@@ -1,5 +1,45 @@
 import { startLegacyBackground } from '../src/legacy/background-entry';
+import { registerConversationHandlers } from '../src/domains/conversations/background-handlers';
+import { createBackgroundRouter } from '../src/platform/messaging/background-router';
 
 export default defineBackground(() => {
   startLegacyBackground();
+
+  const NS: any = (globalThis as any).WebClipper || {};
+  const legacyHandle = NS.backgroundRouter?.__handleMessageForTests;
+  const fallback = typeof legacyHandle === 'function'
+    ? (msg: any) => legacyHandle(msg)
+    : (msg: any) => ({ ok: false, data: null, error: { message: `unknown message type: ${msg?.type}`, extra: null } });
+
+  const router = createBackgroundRouter({
+    fallback: (msg) => fallback(msg),
+  });
+
+  // Migration-only utility; routed through platform router (and/or legacy router ping handler).
+  router.register('__WXT_PING__', async () => {
+    const instanceId = NS.__backgroundInstanceId ?? null;
+    return router.ok({ pong: true, instanceId });
+  });
+
+  registerConversationHandlers(router);
+
+  // Keep legacy "start" side-effects that are not message handlers.
+  try {
+    const oauth = NS.backgroundNotionOAuth;
+    oauth?.ensureDefaultNotionOAuthClientId?.();
+    oauth?.setupNotionOAuthNavigationListener?.();
+    browser.runtime.onInstalled.addListener(() => oauth?.ensureDefaultNotionOAuthClientId?.());
+  } catch (_e) {
+    // ignore
+  }
+
+  try {
+    const id = NS.__backgroundInstanceId;
+    NS.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
+  } catch (_e) {
+    // ignore
+  }
+
+  router.start();
+  NS.__backgroundReady = true;
 });
