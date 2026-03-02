@@ -1,12 +1,16 @@
-# WebClipper 完全迁移到 WXT 新架构（去 Legacy）实施计划
+# WebClipper 完全迁移到 WXT 新架构（Phase 3: JS→TS）实施计划
 
 > 最近更新：2026-03-02
 > 执行方式：`executing-plans` 按批次推进；每个 Task 完成后做原子化 git 提交。
 
-## 1) 当前状态（已执行结果）
+**Goal（目标）:** 完成 WebClipper 运行时代码的 JS→TS 全量迁移，移除 CommonJS `require` 链，确保 MV3 Service Worker 正常启动，并为后续 New Tab / App 扩展提供稳定架构基线。  
+**Non-goals（非目标）:** 本阶段不新增业务功能、不改 UI 文案与交互规则、不调整权限范围。  
+**Approach（方案）:** 先清理“启动阻塞”链路（background/content 的 `require`），再按域迁移（core → collectors → inpage → export → tests），最后做规则化收口（禁止新增 runtime JS）。  
+**Acceptance（验收）:** `compile`/`test`/`build` 全通过；Chrome 加载 `.output/chrome-mv3` 不再出现 `require is not defined` / `Service worker registration failed`；`src+entrypoints` 业务主路径不再依赖 `.js` 主实现。
 
-### Goal（目标）
-WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全局注入桥接，便于后续扩展新标签页/网页应用（`chrome-extension://...`）。
+---
+
+## 1) 当前基线（截至 2026-03-02）
 
 ### 已完成里程碑（Task1 ~ Task24）
 
@@ -27,7 +31,7 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
 - `Task14` 删除 legacy background entry：`fa8307b8`
 - `Task15` 删除 legacy background router：`49f0a518`
 - `Task16` collectors core TS 化：`fc40198f`
-- `Task17` 各站点 collector TS 化：`4b5d4b9d` ~ `a6a20c2e`
+- `Task17` 各站点 collector TS 化（首批）：`4b5d4b9d` ~ `a6a20c2e`
 - `Task18` protocols 去全局（第一阶段）：`f8ccf833`
 - `Task19` export 栈去全局（第一阶段）：`632ccd1d`
 - `Task20` protocol 注入链清理：`06f023d7`
@@ -37,147 +41,356 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
 - `Task24` zero-global 收口：`bc5194de`
 - 执行中补丁（导入路径/构建修复）：`1bb98d73`
 
-### 验收状态快照
+### 当前问题快照（Phase 3 输入）
 
-- 验收 A：`src/legacy/*` 清零 + 入口不再引用 legacy
-  - 状态：**已完成**（`Extensions/WebClipper/src/legacy/` 目录为空）
-- 验收 B：不再依赖 `globalThis.WebClipper.*`
-  - 状态：**已完成**（`rg "globalThis\.WebClipper|WebClipper\." Extensions/WebClipper/src -n | wc -l` = `0`）
-- 验收 C：`compile` / `test` / `build`
-  - 状态：**已完成**（最近一次全量均通过）
+1. Chrome 加载报错：`Service worker registration failed. Status code: 15`
+2. `background.js` 报错：`Uncaught ReferenceError: require is not defined`
+3. 根因定位：运行时链路中仍保留 CJS `require`（`entrypoints/background.ts`、`runtime-context.js`、若干 `*.js` 模块）
 
----
+### 代码规模快照（`src + entrypoints`）
 
-## 2) 下一阶段目标（第三阶段）
-
-> 第二阶段（Task20~Task24）已完成。下一阶段主目标：**统一迁移 `src` 业务模块到 TypeScript（逐步清零 `.js`）**。
-
-### Definition of Done（第三阶段）
-
-1. `Extensions/WebClipper/src` 业务运行路径中的 `.js` 模块完成 TS 对齐（兼容 shim 可短期保留，但不得承载主实现）
-2. 清理 `declare module '*.js'` 与 runtime CJS 兼容桥接（仅在必要测试路径保留）
-3. 通过：
-   - `npm --prefix Extensions/WebClipper run compile`
-   - `npm --prefix Extensions/WebClipper run test --silent`
-   - `npm --prefix Extensions/WebClipper run build`
+- `*.ts`: `60`
+- `*.js`: `57`
+- 高风险 JS 域：`collectors/*`、`export/notion/*`、`export/obsidian/*`、`bootstrap/*`、`runtime-context.js`
 
 ---
 
-## 3) 第二阶段任务清单（Task20+）
+## 2) 第三阶段范围与约束
 
-> 状态：以下 Task20~Task24 已全部完成（见上方里程碑与提交记录），保留为执行留痕。
+### 范围（in-scope）
 
-## P8：Protocols 最终去全局
+- `Extensions/WebClipper/src/**` 与 `Extensions/WebClipper/entrypoints/**` 的业务 JS 主实现迁移到 TS
+- 移除 runtime 链路中的 `require(...)`
+- 移除 `src/types/js-modules.d.ts`
+- 清理 `no-var-requires` 豁免与 `.js` 扩展硬编码导入
 
-### Task 20: 删除协议全局注入链（bootstrap + JS IIFE）
+### 约束（必须满足）
+
+1. MV3 约束：Service Worker 不能使用动态 `import()` 与 Node 风格 `require`
+2. 行为等价：不改变已有功能行为（采集/同步/备份/UI 交互语义）
+3. IDB 兼容：不破坏现有 schema、store、index 与历史数据读取
+4. 渐进式提交：每个 Task 原子提交，便于回滚
+
+### 特殊说明（允许的 JS 例外）
+
+- `src/collectors/web/readability.js` 属于第三方注入脚本资产（executeScript 文件），可暂时保留 JS 形态；
+- 若保留，需迁移到明确的 vendor 位置并在规则中加入 allowlist，不得与业务逻辑 JS 混用。
+
+---
+
+## 3) 第三阶段任务清单（Task25+）
+
+## P12（阻塞优先）：Service Worker require 链清零
+
+### Task 25: `runtime-context` TS 化 + 背景入口去 `require`
 
 **Files（主）**
-- Modify: `Extensions/WebClipper/src/protocols/bootstrap.ts`
-- Delete: `Extensions/WebClipper/src/protocols/message-contracts.js`
-- Delete: `Extensions/WebClipper/src/protocols/conversation-kind-contract.js`
-- Delete: `Extensions/WebClipper/src/protocols/conversation-kinds.js`
-- Modify: 所有依赖这些 JS IIFE 的调用方，改为显式 TS import
+- Create: `Extensions/WebClipper/src/runtime-context.ts`
+- Modify: `Extensions/WebClipper/entrypoints/background.ts`
+- Modify: `Extensions/WebClipper/src/bootstrap/background.ts`
+- Modify: 所有 TS 中 `require('../../runtime-context.js')` 读取点（domains/integrations/ui）
+- Delete: `Extensions/WebClipper/src/runtime-context.js`（或仅保留空壳 re-export，下一 Task 删除）
 
 **Step 1: 实现**
-- 停止在 `bootstrap.ts` 往 `globalThis.WebClipper` 写协议对象
-- 所有协议常量统一来自：`src/platform/messaging/message-contracts.ts` 与 `src/protocols/*.ts`
+- 把 runtime context 改为 ESM TS 导出（可含兼容 getter/setter，但不能依赖 CJS）
+- 背景链路全部改静态 `import`
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run compile`
+- `npm --prefix Extensions/WebClipper run build`
+- `rg "require\\(" Extensions/WebClipper/.output/chrome-mv3/background.js -n`（期望无命中）
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task25 - migrate runtime context to ts and remove background require chain"`
+
+### Task 26: Content 入口去 CJS/全局回退桥接
+
+**Files（主）**
+- Modify: `Extensions/WebClipper/entrypoints/content.ts`
+- Modify: `Extensions/WebClipper/src/collectors/bootstrap.ts`
+- Modify: `Extensions/WebClipper/src/collectors/collector-context.*`
+
+**Step 1: 实现**
+- 移除 `entrypoints/content.ts` 中 `require('../src/runtime-context.js')`
+- 移除 `globalThis.WebClipper` fallback 桥接，改为显式依赖注入
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/content-controller-*.test.ts`
+- `npm --prefix Extensions/WebClipper run build`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task26 - remove cjs bridge and global fallback in content entry"`
+
+---
+
+## P13：Core & Protocols TS 收敛
+
+### Task 27: Protocol JS 双轨清理（只保留 TS）
+
+**Files（主）**
+- Delete: `Extensions/WebClipper/src/protocols/conversation-kind-contract.js`
+- Delete: `Extensions/WebClipper/src/protocols/conversation-kinds.js`
+- Modify: 所有引用方改到 `.ts`（或无扩展 ESM 导入）
+
+**Step 1: 实现**
+- 统一协议导入源为 `src/protocols/*.ts` 与 `src/platform/messaging/message-contracts.ts`
 
 **Step 2: 验证**
 - `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/conversation-kinds.test.ts`
 - `npm --prefix Extensions/WebClipper run compile`
 
 **Step 3: 原子提交**
-- `git commit -m "refactor: task20 - remove protocol global injections"`
+- `git commit -m "refactor: task27 - remove protocol js duplicates and standardize ts imports"`
+
+### Task 28: Shared/Storage JS 模块迁移 TS
+
+**Files（主）**
+- Modify/Create: `Extensions/WebClipper/src/shared/normalize.ts`
+- Modify/Create: `Extensions/WebClipper/src/shared/runtime-client.ts`
+- Modify/Create: `Extensions/WebClipper/src/storage/incremental-updater.ts`
+- Modify/Create: `Extensions/WebClipper/src/storage/backup-utils.ts`
+- Delete: 对应 `.js`
+
+**Step 1: 实现**
+- 将四个核心通用模块切换为 TS 主实现
+- 修正调用方导入路径
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/schema.test.ts tests/smoke/backup-*.test.ts tests/smoke/backup-utils.test.ts`
+- `npm --prefix Extensions/WebClipper run compile`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task28 - migrate shared and storage core modules to ts"`
+
+### Task 29: Bootstrap JS 清理（content/background-inpage）
+
+**Files（主）**
+- Modify/Create: `Extensions/WebClipper/src/bootstrap/background-inpage-web-visibility.ts`
+- Delete: `Extensions/WebClipper/src/bootstrap/background-inpage-web-visibility.js`
+- Delete: `Extensions/WebClipper/src/bootstrap/content.js`（保留 `content.ts`）
+- Delete: `Extensions/WebClipper/src/bootstrap/content-controller.js`（保留 `content-controller.ts`）
+- Modify: 相关导入方
+
+**Step 1: 实现**
+- 统一 bootstrap 仅保留 TS 版本
+- 清理重复实现，避免双维护
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/content-controller-*.test.ts`
+- `npm --prefix Extensions/WebClipper run compile`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task29 - consolidate bootstrap modules to ts only"`
 
 ---
 
-## P9：Collectors/Inpage 去全局
+## P14：Collectors 全域 TS 化
 
-### Task 21: Collectors 运行时去全局（registry/entry 直连）
+### Task 30: Collectors 基础设施迁移 TS
 
 **Files（主）**
-- Modify: `Extensions/WebClipper/src/collectors/*-entry.ts`
-- Modify: `Extensions/WebClipper/src/collectors/*/*.js`（逐步迁 TS 或改显式导出）
-- Modify: `Extensions/WebClipper/entrypoints/content.ts`
-- Modify: `Extensions/WebClipper/src/bootstrap/content-controller.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/collector-context.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/collector-contract.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/collector-utils.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/registry.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/runtime-observer.ts`
+- Delete: 对应 `.js`
 
 **Step 1: 实现**
-- 不再通过 `NS.collectors` / `NS.collectorsRegistry` 共享 collector
-- content 入口显式构建并注入 collectors registry
+- 迁移基础模块并稳定导出类型
+- `collectors/bootstrap.ts` 改 TS 导入
 
 **Step 2: 验证**
 - `npm --prefix Extensions/WebClipper run test --silent -- tests/collectors`
-- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/content-controller-*.test.ts`
+- `npm --prefix Extensions/WebClipper run compile`
 
 **Step 3: 原子提交**
-- `git commit -m "refactor: task21 - deglobalize collectors runtime"`
+- `git commit -m "refactor: task30 - migrate collectors core infrastructure to ts"`
 
-### Task 22: Inpage 依赖去全局（button/tip/observer/updater）
+### Task 31: Collectors 站点实现 TS 化（A 组）
 
 **Files（主）**
-- Modify: `Extensions/WebClipper/src/ui/inpage/inpage-button.js`
-- Modify: `Extensions/WebClipper/src/ui/inpage/inpage-tip.js`
-- Modify: `Extensions/WebClipper/src/collectors/runtime-observer.js`
-- Modify: `Extensions/WebClipper/src/storage/incremental-updater.js`
-- Modify: `Extensions/WebClipper/src/bootstrap/content-controller.ts`
+- `src/collectors/chatgpt/*`
+- `src/collectors/claude/*`
+- `src/collectors/gemini/*`
+- `src/collectors/deepseek/*`
+- `src/collectors/kimi/*`
 
 **Step 1: 实现**
-- 以上模块改为显式导出，不再写 `NS.*`
-- 由 content controller 通过构造参数注入依赖
+- 逐模块迁移为 TS，保持 capture/matches 语义不变
 
 **Step 2: 验证**
-- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/inpage-*.test.ts tests/smoke/content-controller-*.test.ts`
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/collectors/chatgpt-collector.test.ts tests/collectors/claude-collector.test.ts tests/collectors/gemini-collector.test.ts tests/collectors/deepseek-collector.test.ts tests/collectors/kimi-collector.test.ts`
 
 **Step 3: 原子提交**
-- `git commit -m "refactor: task22 - deglobalize inpage runtime modules"`
+- `git commit -m "refactor: task31 - migrate collectors site batch a to ts"`
+
+### Task 32: Collectors 站点实现 TS 化（B 组）
+
+**Files（主）**
+- `src/collectors/doubao/*`
+- `src/collectors/yuanbao/*`
+- `src/collectors/poe/*`
+- `src/collectors/notionai/*`
+- `src/collectors/zai/*`
+
+**Step 1: 实现**
+- 同步迁移 markdown/capture 模块并清理 `.js` 导入
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/collectors/doubao-collector.test.ts tests/collectors/yuanbao-collector.test.ts tests/collectors/poe-collector.test.ts tests/collectors/notionai-collector.test.ts tests/collectors/zai-collector.test.ts`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task32 - migrate collectors site batch b to ts"`
+
+### Task 33: Web Collector 与文章抓取链路 TS 化
+
+**Files（主）**
+- Modify/Create: `Extensions/WebClipper/src/collectors/web/web-collector.ts`
+- Modify/Create: `Extensions/WebClipper/src/collectors/web/article-fetch-service.ts`
+- (可选迁移/归位): `Extensions/WebClipper/src/collectors/web/readability.js` → `src/vendor/readability.js`
+
+**Step 1: 实现**
+- 业务代码迁移到 TS
+- 对 `readability.js` 做 vendor 隔离与 allowlist 说明
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/article-fetch-service.test.ts`
+- `npm --prefix Extensions/WebClipper run compile`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task33 - migrate web collector pipeline to ts and isolate readability vendor asset"`
 
 ---
 
-## P10：Export（Notion/Obsidian）最终去全局
+## P15：Inpage 与 Export 栈 TS 化
 
-### Task 23: Notion/Obsidian orchestrator & service 去全局
+### Task 34: Inpage Button/Tip TS 化
 
 **Files（主）**
-- Modify: `Extensions/WebClipper/src/export/notion/*.js`
-- Modify: `Extensions/WebClipper/src/export/obsidian/*.js`
-- Modify: `Extensions/WebClipper/src/integrations/notion/sync/orchestrator.ts`
-- Modify: `Extensions/WebClipper/src/integrations/obsidian/sync/orchestrator.ts`
-- Delete（完成后）: `Extensions/WebClipper/src/export/bootstrap.ts`
+- Modify/Create: `Extensions/WebClipper/src/ui/inpage/inpage-button.ts`
+- Modify/Create: `Extensions/WebClipper/src/ui/inpage/inpage-tip.ts`
+- Modify: `Extensions/WebClipper/src/ui/inpage/inpage-button-shadow.ts`
+- Modify: `Extensions/WebClipper/src/ui/inpage/inpage-tip-shadow.ts`
+- Delete: 对应 `.js`
 
 **Step 1: 实现**
-- `notion/obsidian` 全部改为显式 `deps` 注入，不再读取 `NS.*`
-- 背景入口停止加载 export 全局桥接
+- 移除 inpage 层的 `require` 与 CJS 依赖
+- shadow 模块改为 ESM TS 导入
 
 **Step 2: 验证**
-- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/background-router-notion-sync.test.ts tests/smoke/background-router-obsidian-sync.test.ts tests/smoke/notion-sync-*.test.ts tests/smoke/obsidian-*.test.ts`
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/inpage-*.test.ts tests/smoke/content-controller-inpage-combo.test.ts`
 - `npm --prefix Extensions/WebClipper run build`
 
 **Step 3: 原子提交**
-- `git commit -m "refactor: task23 - deglobalize export services"`
+- `git commit -m "refactor: task34 - migrate inpage button and tip modules to ts"`
+
+### Task 35: Local + Obsidian Export 模块 TS 化
+
+**Files（主）**
+- `src/export/local/article-markdown.*`
+- `src/export/local/zip-utils.*`
+- `src/export/obsidian/*.js`（6个模块）
+
+**Step 1: 实现**
+- local/obsidian 导出与同步模块迁移 TS
+- 保持现有 orchestrator API 契约不变
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/article-markdown.test.ts tests/smoke/zip-utils.test.ts tests/smoke/obsidian-*.test.ts`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task35 - migrate local and obsidian export modules to ts"`
+
+### Task 36: Notion Export 模块 TS 化
+
+**Files（主）**
+- `src/export/notion/*.js`（9个模块）
+
+**Step 1: 实现**
+- 按 `api -> blocks -> service -> orchestrator/jobStore` 顺序迁移，确保接口不变
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/notion-*.test.ts tests/smoke/background-router-notion-sync.test.ts`
+- `npm --prefix Extensions/WebClipper run compile`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task36 - migrate notion export pipeline modules to ts"`
+
+### Task 37: Integrations/Domain Wrapper 去 `.js` 依赖
+
+**Files（主）**
+- Modify/Create: `Extensions/WebClipper/src/integrations/notionai-model-picker.ts`
+- Modify: `Extensions/WebClipper/src/integrations/notion/sync/orchestrator.ts`
+- Modify: `Extensions/WebClipper/src/integrations/obsidian/sync/orchestrator.ts`
+- Modify: `Extensions/WebClipper/src/domains/**/*`
+
+**Step 1: 实现**
+- 清理最后一批 `require('../../*.js')` 与 `.js` 字面导入
+- 全部改 ESM TS 引用
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run test --silent -- tests/smoke/background-router-*.test.ts tests/smoke/notion-sync-orchestrator-kind-routing.test.ts tests/smoke/obsidian-sync-orchestrator.test.ts`
+
+**Step 3: 原子提交**
+- `git commit -m "refactor: task37 - remove remaining js imports from integrations and domain wrappers"`
 
 ---
 
-## P11：收口
+## P16：测试迁移与规则化收口
 
-### Task 24: 清零 `globalThis.WebClipper` 引用并完成最终验收
+### Task 38: 测试加载方式迁移（从 `require(...*.js)` 到 TS/ESM）
 
 **Files（主）**
-- Modify: `Extensions/WebClipper/entrypoints/background.ts`
-- Modify: `Extensions/WebClipper/entrypoints/content.ts`
-- Modify: 所有残留 `NS` 读取模块
+- Modify: `Extensions/WebClipper/tests/**/*.test.ts`
+- Create（如需要）: `Extensions/WebClipper/tests/helpers/load-module.ts`
 
 **Step 1: 实现**
-- 完全移除 runtime 全局 API 依赖
-- 若必须保留极小兼容层，需仅用于 migration test，不参与运行时逻辑
+- 将测试中的 JS require 路径统一到 TS 模块（可用动态 `import()` in test runtime）
+- 清理 `@ts-ignore` 与兼容桥接依赖
 
 **Step 2: 验证**
-- `rg "globalThis\.WebClipper|WebClipper\." Extensions/WebClipper/src -n | wc -l`（期望 `0`）
+- `npm --prefix Extensions/WebClipper run test --silent`
+
+**Step 3: 原子提交**
+- `git commit -m "test: task38 - migrate tests to ts module loading"`
+
+### Task 39: 删除 JS 过渡声明 + 新增防回退检查
+
+**Files（主）**
+- Delete: `Extensions/WebClipper/src/types/js-modules.d.ts`
+- Create: `Extensions/WebClipper/scripts/check-no-runtime-js.mjs`
+- Modify: `Extensions/WebClipper/package.json`（新增脚本）
+
+**Step 1: 实现**
+- 删除 `declare module '*.js'`
+- 新增检查脚本：`src+entrypoints` 禁止新增 runtime JS（仅允许 allowlist）
+
+**Step 2: 验证**
+- `npm --prefix Extensions/WebClipper run compile`
+- `node Extensions/WebClipper/scripts/check-no-runtime-js.mjs`
+
+**Step 3: 原子提交**
+- `git commit -m "chore: task39 - remove js module declaration and enforce runtime js guardrail"`
+
+### Task 40: Phase 3 总体验收 + 文档回写
+
+**Files（主）**
+- Modify: `.github/plans/2026-03-02-WebClipper-完全迁移到WXT新架构-implementation-plan.md`
+- Modify: `Extensions/WebClipper/AGENTS.md`（仅更新入口索引与命令说明）
+
+**Step 1: 实现**
+- 回写每个 Task commit 与验收状态
+- 标注剩余技术债（如果有）
+
+**Step 2: 验证**
 - `npm --prefix Extensions/WebClipper run compile`
 - `npm --prefix Extensions/WebClipper run test --silent`
 - `npm --prefix Extensions/WebClipper run build`
+- Chrome 手动冒烟：加载 `.output/chrome-mv3`，确认无 SW 注册报错
 
 **Step 3: 原子提交**
-- `git commit -m "chore: task24 - finalize zero-global runtime"`
+- `git commit -m "docs: task40 - finalize phase3 migration status and acceptance evidence"`
 
 ---
 
@@ -193,20 +406,25 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
   4. backup 导入/导出正常
   5. Obsidian Test + Sync 正常
   6. Notion Connect + Sync 正常
+  7. 扩展加载无 `Service worker registration failed` / `require is not defined`
 
 ---
 
 ## 5) 原子提交规范
 
-- 每个 Task 单独一次 commit，不混入下一 Task
-- 提交信息格式：`type: taskNN - ...`
-- 若出现“构建修复型补丁”，必须单独提交并在计划中备注
+1. 每个 Task 单独一次 commit，不混入下一 Task
+2. 提交信息格式：`type: taskNN - ...`
+3. 若出现“构建修复型补丁”，必须单独提交并在计划中备注
 
 ---
 
-## 6) 风险与约束
+## 6) 风险与应对
 
-1. 不改变产品功能行为（本计划只做等价重构）
-2. 保持 MV3 约束（禁止 Service Worker 动态 `import()`）
-3. IDB 兼容性不破坏（DB 名称、版本、store/index 兼容）
-4. 若某 Task 触发跨域回归（Notion/Obsidian/collectors），必须先补针对性测试再继续
+1. **风险：Collector DOM 结构脆弱，迁移后易回归**
+   - 应对：按站点分批迁移（Task31/32），每批跑对应 collector tests
+2. **风险：Notion/Obsidian 同步链路长，改动面大**
+   - 应对：拆 Task35/36，分别验证，避免跨域混改
+3. **风险：测试依赖 CommonJS 装载方式**
+   - 应对：单独 Task38 处理，先迁业务后迁测试装载器
+4. **风险：Service Worker 构建产物隐式回退到 require**
+   - 应对：Task25 与 Task39 双重门禁（产物 grep + no-runtime-js guard）
