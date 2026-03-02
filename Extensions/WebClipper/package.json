@@ -11,7 +11,6 @@
     "build:firefox": "wxt build -b firefox --mv3",
     "prepare": "wxt prepare",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare",
     "check": "npm run build && node ../../.github/scripts/webclipper/check-dist.mjs --root=Extensions/WebClipper/.output/chrome-mv3",
     "test": "vitest run"
   },
