@@ -45,6 +45,8 @@
   });
 
   const BACKGROUND_INSTANCE_ID = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  // Expose for WXT platform router to reuse (avoid multiple instance IDs during migration).
+  NS.__backgroundInstanceId = BACKGROUND_INSTANCE_ID;
   const NOTION_DISCONNECT_BASE_STORAGE_KEYS = Object.freeze([
     "notion_parent_page_id",
     "notion_oauth_pending_state",
@@ -94,6 +96,9 @@
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
       switch (msg.type) {
+      case "__WXT_PING__": {
+        return ok({ pong: true, instanceId: BACKGROUND_INSTANCE_ID });
+      }
       case UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP: {
         if (!chrome || !chrome.action || typeof chrome.action.openPopup !== "function") {
           return err("open popup is not supported in this browser", { code: "OPEN_POPUP_UNSUPPORTED" });

@@ -1,0 +1,334 @@
+type UnknownRecord = Record<string, any>;
+
+export const BACKUP_SCHEMA_VERSION = 1;
+export const BACKUP_ZIP_SCHEMA_VERSION = 2;
+
+const STORAGE_ALLOWLIST_BASE = Object.freeze([
+  'notion_oauth_client_id',
+  'notion_parent_page_id',
+  'popup_active_tab',
+  'popup_source_filter_key',
+  'notion_ai_preferred_model_index',
+]);
+
+function getNotionDbStorageKeys(): string[] {
+  const NS: any = (globalThis as any).WebClipper || {};
+  const kinds = NS.conversationKinds;
+  if (kinds && typeof kinds.getNotionStorageKeys === 'function') {
+    try {
+      const keys = kinds.getNotionStorageKeys();
+      if (Array.isArray(keys) && keys.length) {
+        return keys.map((k) => String(k || '').trim()).filter(Boolean);
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  // Fallback (load-order safety).
+  return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
+}
+
+export const STORAGE_ALLOWLIST = Object.freeze(
+  Array.from(new Set([...STORAGE_ALLOWLIST_BASE, ...getNotionDbStorageKeys()])),
+);
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.trim().length > 0;
+}
+
+function isFinitePositiveInt(v: unknown) {
+  return Number.isFinite(v) && Number(v) > 0 && Math.floor(Number(v)) === Number(v);
+}
+
+export function uniqueConversationKey(conversation: UnknownRecord): string {
+  const source = conversation && conversation.source ? String(conversation.source) : '';
+  const conversationKey =
+    conversation && conversation.conversationKey ? String(conversation.conversationKey) : '';
+  if (!source || !conversationKey) return '';
+  return `${source}||${conversationKey}`;
+}
+
+function pickStringPreferExisting(existing: unknown, incoming: unknown) {
+  const a = existing == null ? '' : String(existing);
+  if (isNonEmptyString(a)) return a.trim();
+  const b = incoming == null ? '' : String(incoming);
+  return isNonEmptyString(b) ? b.trim() : '';
+}
+
+function mergeWarningFlags(existing: unknown, incoming: unknown): string[] {
+  const a = Array.isArray(existing) ? existing : [];
+  const b = Array.isArray(incoming) ? incoming : [];
+  const set = new Set<string>();
+  for (const x of a) {
+    if (isNonEmptyString(x)) set.add(String(x).trim());
+  }
+  for (const x of b) {
+    if (isNonEmptyString(x)) set.add(String(x).trim());
+  }
+  return Array.from(set);
+}
+
+export function mergeConversationRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
+  const a = existing && typeof existing === 'object' ? existing : {};
+  const b = incoming && typeof incoming === 'object' ? incoming : {};
+
+  const next: UnknownRecord = { ...a };
+  next.sourceType = pickStringPreferExisting(a.sourceType, b.sourceType) || 'chat';
+  next.source = pickStringPreferExisting(a.source, b.source);
+  next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
+
+  next.title = pickStringPreferExisting(a.title, b.title);
+  next.url = pickStringPreferExisting(a.url, b.url);
+  next.author = pickStringPreferExisting(a.author, b.author);
+  next.publishedAt = pickStringPreferExisting(a.publishedAt, b.publishedAt);
+  next.description = pickStringPreferExisting(a.description, b.description);
+  next.warningFlags = mergeWarningFlags(a.warningFlags, b.warningFlags);
+
+  // notionPageId: never overwrite a non-empty local mapping.
+  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+
+  const aCaptured = Number(a.lastCapturedAt) || 0;
+  const bCaptured = Number(b.lastCapturedAt) || 0;
+  next.lastCapturedAt = Math.max(aCaptured, bCaptured, 0);
+
+  return next;
+}
+
+function shouldPreferIncomingMessage(existing: UnknownRecord, incoming: UnknownRecord) {
+  const a = existing && typeof existing === 'object' ? existing : {};
+  const b = incoming && typeof incoming === 'object' ? incoming : {};
+  const aUpdated = Number(a.updatedAt) || 0;
+  const bUpdated = Number(b.updatedAt) || 0;
+  if (bUpdated && bUpdated > aUpdated) return true;
+
+  const aMd =
+    a.contentMarkdown && String(a.contentMarkdown).trim() ? String(a.contentMarkdown) : '';
+  const bMd =
+    b.contentMarkdown && String(b.contentMarkdown).trim() ? String(b.contentMarkdown) : '';
+  if (!aMd && bMd) return true;
+  return false;
+}
+
+export function mergeMessageRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
+  const a = existing && typeof existing === 'object' ? existing : {};
+  const b = incoming && typeof incoming === 'object' ? incoming : {};
+
+  const preferIncoming = shouldPreferIncomingMessage(a, b);
+  const base = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+
+  const next: UnknownRecord = { ...base };
+  next.role = pickStringPreferExisting(base.role, 'assistant') || 'assistant';
+  next.contentText = String(next.contentText || '');
+  next.contentMarkdown = String(next.contentMarkdown || '');
+
+  const aUpdated = Number(a.updatedAt) || 0;
+  const bUpdated = Number(b.updatedAt) || 0;
+  const maxUpdated = Math.max(aUpdated, bUpdated, 0);
+  next.updatedAt = maxUpdated || Date.now();
+
+  const aSeq = Number(a.sequence);
+  const bSeq = Number(b.sequence);
+  if (Number.isFinite(bSeq)) next.sequence = bSeq;
+  else if (Number.isFinite(aSeq)) next.sequence = aSeq;
+  else next.sequence = 0;
+
+  return next;
+}
+
+export function mergeSyncMappingRecord(existing: UnknownRecord, incoming: UnknownRecord): UnknownRecord {
+  const a = existing && typeof existing === 'object' ? existing : {};
+  const b = incoming && typeof incoming === 'object' ? incoming : {};
+
+  const next: UnknownRecord = { ...a };
+  next.source = pickStringPreferExisting(a.source, b.source);
+  next.conversationKey = pickStringPreferExisting(a.conversationKey, b.conversationKey);
+
+  // notionPageId: only fill when missing locally.
+  next.notionPageId = pickStringPreferExisting(a.notionPageId, b.notionPageId);
+
+  // cursor: prefer existing local value; only fill when missing locally.
+  next.lastSyncedMessageKey = pickStringPreferExisting(a.lastSyncedMessageKey, b.lastSyncedMessageKey);
+  const aSeq = Number(a.lastSyncedSequence);
+  const bSeq = Number(b.lastSyncedSequence);
+  if (Number.isFinite(aSeq)) next.lastSyncedSequence = aSeq;
+  else if (Number.isFinite(bSeq)) next.lastSyncedSequence = bSeq;
+
+  const aAt = Number(a.lastSyncedAt);
+  const bAt = Number(b.lastSyncedAt);
+  if (Number.isFinite(aAt)) next.lastSyncedAt = aAt;
+  else if (Number.isFinite(bAt)) next.lastSyncedAt = bAt;
+
+  const aUpdated = Number(a.updatedAt) || 0;
+  const bUpdated = Number(b.updatedAt) || 0;
+  next.updatedAt = Math.max(aUpdated, bUpdated, 0);
+
+  return next;
+}
+
+export function filterStorageForBackup(storageLocal: unknown): Record<string, unknown> {
+  const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as any) : {};
+  const out: Record<string, unknown> = {};
+  for (const key of STORAGE_ALLOWLIST) {
+    if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
+  }
+  return out;
+}
+
+export function validateBackupDocument(doc: unknown): { ok: boolean; error: string } {
+  const d: any = doc;
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Backup is not an object' };
+  if (Number(d.schemaVersion) !== BACKUP_SCHEMA_VERSION) {
+    return { ok: false, error: 'Unsupported backup schemaVersion' };
+  }
+  if (!d.stores || typeof d.stores !== 'object') return { ok: false, error: 'Missing stores' };
+  const stores = d.stores;
+  for (const name of ['conversations', 'messages', 'sync_mappings']) {
+    if (!Array.isArray(stores[name])) return { ok: false, error: `Invalid store: ${name}` };
+  }
+  const storageLocal = d.storageLocal;
+  if (storageLocal != null && typeof storageLocal !== 'object') {
+    return { ok: false, error: 'Invalid storageLocal' };
+  }
+
+  const seen = new Set<string>();
+  for (const c of stores.conversations) {
+    const uk = uniqueConversationKey(c);
+    if (!uk) continue;
+    if (seen.has(uk)) return { ok: false, error: 'Duplicate conversation key in backup' };
+    seen.add(uk);
+  }
+
+  for (const m of stores.messages) {
+    if (!m || !isNonEmptyString(m.messageKey)) {
+      return { ok: false, error: 'Backup contains messages without messageKey' };
+    }
+    if (!isFinitePositiveInt(Number(m.conversationId))) {
+      return { ok: false, error: 'Backup contains messages without valid conversationId' };
+    }
+  }
+
+  return { ok: true, error: '' };
+}
+
+function isSafeZipPath(pathValue: unknown) {
+  const raw = String(pathValue || '').trim();
+  if (!raw) return false;
+  if (raw.includes('\0')) return false;
+  if (raw.startsWith('/') || raw.startsWith('\\')) return false;
+  if (raw.includes('\\')) return false;
+  if (/(^|\/)\.\.(\/|$)/.test(raw)) return false;
+  return true;
+}
+
+export function validateBackupManifest(doc: unknown): { ok: boolean; error: string } {
+  const d: any = doc;
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Manifest is not an object' };
+  if (Number(d.backupSchemaVersion) !== BACKUP_ZIP_SCHEMA_VERSION) {
+    return { ok: false, error: 'Unsupported backupSchemaVersion' };
+  }
+  if (!isNonEmptyString(d.exportedAt)) return { ok: false, error: 'Missing exportedAt' };
+  if (!d.db || typeof d.db !== 'object') return { ok: false, error: 'Missing db' };
+  if (!isNonEmptyString(d.db.name)) return { ok: false, error: 'Missing db.name' };
+  if (!Number.isFinite(Number(d.db.version))) return { ok: false, error: 'Missing db.version' };
+
+  if (!d.counts || typeof d.counts !== 'object') return { ok: false, error: 'Missing counts' };
+  for (const k of ['conversations', 'messages', 'sync_mappings']) {
+    if (!Number.isFinite(Number(d.counts[k])) || Number(d.counts[k]) < 0) {
+      return { ok: false, error: `Invalid counts.${k}` };
+    }
+  }
+
+  const config = d.config;
+  if (!config || typeof config !== 'object') return { ok: false, error: 'Missing config' };
+  const storageLocalPath = config.storageLocalPath;
+  if (!isNonEmptyString(storageLocalPath) || !isSafeZipPath(storageLocalPath)) {
+    return { ok: false, error: 'Invalid config.storageLocalPath' };
+  }
+  if (!String(storageLocalPath).endsWith('.json')) {
+    return { ok: false, error: 'Invalid config.storageLocalPath extension' };
+  }
+
+  const index = d.index;
+  if (!index || typeof index !== 'object') return { ok: false, error: 'Missing index' };
+  const conversationsCsvPath = index.conversationsCsvPath;
+  if (!isNonEmptyString(conversationsCsvPath) || !isSafeZipPath(conversationsCsvPath)) {
+    return { ok: false, error: 'Invalid index.conversationsCsvPath' };
+  }
+  if (!String(conversationsCsvPath).endsWith('.csv')) {
+    return { ok: false, error: 'Invalid index.conversationsCsvPath extension' };
+  }
+
+  if (!Array.isArray(d.sources)) return { ok: false, error: 'Missing sources' };
+  const seenFiles = new Set<string>();
+  for (const group of d.sources) {
+    if (!group || typeof group !== 'object') return { ok: false, error: 'Invalid sources item' };
+    if (!isNonEmptyString(group.source)) return { ok: false, error: 'Invalid sources[].source' };
+    const files = Array.isArray(group.files) ? group.files : null;
+    if (!files) return { ok: false, error: 'Invalid sources[].files' };
+    const expectedCount = Number(group.conversationCount);
+    if (!Number.isFinite(expectedCount) || expectedCount < 0) {
+      return { ok: false, error: 'Invalid sources[].conversationCount' };
+    }
+    if (expectedCount !== files.length) return { ok: false, error: 'sources[].conversationCount mismatch' };
+    for (const filePath of files) {
+      const p = String(filePath || '').trim();
+      if (!p || !isSafeZipPath(p)) return { ok: false, error: 'Invalid sources file path' };
+      if (!p.startsWith('sources/')) return { ok: false, error: 'Invalid sources file prefix' };
+      if (!p.endsWith('.json')) return { ok: false, error: 'Invalid sources file extension' };
+      if (seenFiles.has(p)) return { ok: false, error: 'Duplicate sources file path' };
+      seenFiles.add(p);
+    }
+  }
+
+  return { ok: true, error: '' };
+}
+
+export function validateConversationBundle(doc: unknown): { ok: boolean; error: string } {
+  const d: any = doc;
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Bundle is not an object' };
+  if (Number(d.schemaVersion) !== 1) return { ok: false, error: 'Unsupported bundle schemaVersion' };
+  if (!d.conversation || typeof d.conversation !== 'object') {
+    return { ok: false, error: 'Missing conversation' };
+  }
+  const conversation = d.conversation;
+  const source = conversation.source ? String(conversation.source) : '';
+  const conversationKey = conversation.conversationKey ? String(conversation.conversationKey) : '';
+  if (!isNonEmptyString(source) || !isNonEmptyString(conversationKey)) {
+    return { ok: false, error: 'Missing conversation.source or conversation.conversationKey' };
+  }
+
+  const messages = Array.isArray(d.messages) ? d.messages : null;
+  if (!messages) return { ok: false, error: 'Missing messages' };
+  for (const m of messages) {
+    if (!m || typeof m !== 'object') return { ok: false, error: 'Invalid message item' };
+    if (!isNonEmptyString(m.messageKey)) return { ok: false, error: 'Message missing messageKey' };
+  }
+
+  if (d.syncMapping != null) {
+    if (!d.syncMapping || typeof d.syncMapping !== 'object') {
+      return { ok: false, error: 'Invalid syncMapping' };
+    }
+    const mappingSource = d.syncMapping.source ? String(d.syncMapping.source) : '';
+    const mappingKey = d.syncMapping.conversationKey ? String(d.syncMapping.conversationKey) : '';
+    if (!isNonEmptyString(mappingSource) || !isNonEmptyString(mappingKey)) {
+      return { ok: false, error: 'syncMapping missing source or conversationKey' };
+    }
+    if (mappingSource !== source || mappingKey !== conversationKey) {
+      return { ok: false, error: 'syncMapping does not match conversation' };
+    }
+  }
+
+  return { ok: true, error: '' };
+}
+
+export function validateStorageLocalDocument(doc: unknown): { ok: boolean; error: string } {
+  const d: any = doc;
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Storage backup is not an object' };
+  if (Number(d.schemaVersion) !== 1) return { ok: false, error: 'Unsupported storage schemaVersion' };
+  if (d.storageLocal != null && typeof d.storageLocal !== 'object') {
+    return { ok: false, error: 'Invalid storageLocal' };
+  }
+  return { ok: true, error: '' };
+}
+
