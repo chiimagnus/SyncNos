@@ -2,6 +2,7 @@ import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
 import { startLegacyContent } from '../src/legacy/content-entry';
+import { createRuntimeClient } from '../src/platform/runtime/client';
 
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
@@ -23,6 +24,8 @@ export default defineContentScript({
     'https://*.notion.so/*',
   ],
   main() {
+    const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+    NS.runtimeClient = { createRuntimeClient };
     startLegacyContent();
   },
 });

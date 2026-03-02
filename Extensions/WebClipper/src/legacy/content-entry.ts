@@ -6,7 +6,6 @@
 
 import '../protocols/message-contracts.js';
 import '../shared/normalize.js';
-import '../shared/runtime-client.js';
 import '../storage/incremental-updater.js';
 
 import '../collectors/collector-contract.js';
