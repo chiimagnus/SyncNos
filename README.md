@@ -89,7 +89,6 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / Doubao / Yuanbao / Poe / NotionAI 
 - Dev (Chrome MV3): `npm --prefix Extensions/WebClipper run dev`
 - Build (Chrome / Firefox): `npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - Test + typecheck: `npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
-- Runtime JS guardrail: `npm --prefix Extensions/WebClipper run check:no-runtime-js`
 - Runtime code in `src + entrypoints` is TS-only; current JS allowlist is only `src/vendor/readability.js` (third-party asset for article extraction).
 
 ### Install From Releases

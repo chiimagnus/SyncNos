@@ -119,7 +119,6 @@ Phase 3（JS→TS）收口状态：
 ## 命令
 
 - 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix Extensions/WebClipper run check`
-- 运行时 JS 防回退检查（`src + entrypoints` 仅允许 allowlist）：`npm --prefix Extensions/WebClipper run check:no-runtime-js`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
