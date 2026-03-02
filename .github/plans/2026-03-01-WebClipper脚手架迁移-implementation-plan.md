@@ -323,6 +323,84 @@
 
 ---
 
+## P3.5：融合旧 popup → 扩展内 Web App（让 app.html 成为“完整面板”）
+
+> 目标：把旧 popup 面板的核心能力逐步迁入 `app.html`，popup 保持“打开 app”的轻量入口。
+
+### Task 24: App Conversations 支持多选 + Delete（对齐旧 popup）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
+
+**Step 1: 实现**
+- 列表支持多选/全选。
+- 增加 “Delete selected” 操作（调用 `deleteConversations` message）。
+
+**Step 2: 验证**
+- 手测：删除后列表刷新；详情区不崩。
+
+---
+
+### Task 25: App 导出 Markdown（Single/Multi）并下载 Zip（对齐旧 popup）
+
+**Files:**
+- Create: `Extensions/WebClipper/src/domains/conversations/markdown.ts`
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
+
+**Step 1: 实现**
+- 复刻旧 popup 的 markdown 规则：
+  - chat：按 role 分段
+  - article：输出 article markdown（标题/元信息/正文）
+- 支持 Single/Multi 导出为 Zip 并下载。
+
+**Step 2: 验证**
+- 手测：导出 zip 可下载；内容可读且不为空。
+
+---
+
+### Task 26: App Notion OAuth + Parent Page（不回显 token）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- “Connect/Disconnect” 与旧 popup 行为等价（pending state + 打开授权页 + polling 状态）。
+- Parent Page 下拉列表可加载与保存（写入 `notion_parent_page_id`）。
+
+**Step 2: 验证**
+- 手测：OAuth 回调后 connected；Parent Page 能保存并被后续 sync 使用。
+
+---
+
+### Task 27: App Obsidian Settings/Paths + Test Connection（apiKey 不回显）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- baseUrl/authHeader/chatFolder/articleFolder 可编辑保存。
+- apiKey 输入支持保存，但不回显（显示 configured/not configured）。
+- Test Connection 触发 `obsidianTestConnection` 并展示结果摘要。
+
+**Step 2: 验证**
+- 手测：保存后刷新仍保持；Test 能返回 ok/err。
+
+---
+
+### Task 28: App Article Fetch + Inpage Visibility（即时生效）
+
+**Files:**
+- Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
+
+**Step 1: 实现**
+- Fetch Current Page（调用 `fetchActiveTabArticle`，tabId 取当前活动 tab）。
+- Inpage toggle 写入 `inpage_supported_only` 并调用 `applyInpageVisibility`。
+
+**Step 2: 验证**
+- 手测：Fetch 后 Conversations 出现 article；toggle 切换无需刷新即生效。
+
+---
+
 ## P4：逐段替换 legacy（按业务域 strangling，完成一个删一个）
 
 > 每个域替换时：先补单测（数据转换/状态变化/边界条件），再替换调用点，最后删 legacy 子模块。

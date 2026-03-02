@@ -90,73 +90,73 @@
 
 - Task: `Task 04: in-place 引入 WXT`
 - Severity: `High`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/package.json:8`
 - Summary: 计划与验收口径要求 `npm run dev/build` 走 WXT，但当前默认 `build` 仍指向 legacy `scripts/build.mjs`；WXT 命令存在但以 `dev:wxt/build:wxt` 暴露。
 - Risk: 开发/构建工作流分裂，加载的产物与实际改动不一致，容易出现“改了但没生效”的隐性故障。
 - Expected fix: 将 `dev/build/build:firefox` 统一切换到 WXT，并把 legacy 打包链改为显式 `legacy:*`（或在 P6 再删）。
 - Validation: `npm --prefix Extensions/WebClipper run dev` / `npm --prefix Extensions/WebClipper run build`
-- Resolution evidence: （待补）
+- Resolution evidence: `Extensions/WebClipper/package.json` 已将 `dev/build/build:firefox` 切到 WXT；legacy 构建链改为 `legacy:*`。
 
 ## Finding F-03
 
 - Task: `Task 05: WXT manifest 对齐“现状权限/host 权限”`
 - Severity: `High`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/wxt.config.ts:25`
 - Summary: WXT 生成的 manifest 当前缺少 `web_accessible_resources`，但 inpage 代码通过 `runtime.getURL('icons/icon-128.png')` 在页面中加载图片（页面上下文通常要求 WAR）。
 - Risk: inpage icon 在部分浏览器/场景下无法展示，属于明显 UI 回归且会影响交互提示。
 - Expected fix: 在 WXT manifest 中补齐 `web_accessible_resources`（至少 `icons/icon-128.png`），并保持 matches 与现状一致。
 - Validation: `cat Extensions/WebClipper/.output/chrome-mv3/manifest.json | jq '.web_accessible_resources'`
-- Resolution evidence: （待补）
+- Resolution evidence: `Extensions/WebClipper/wxt.config.ts` 已补齐 `web_accessible_resources`（含 `icons/icon-128.png`）并同时补齐 `icons`。
 
 ## Finding F-04
 
 - Task: `全局（用户需求）`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `.github/plans/2026-03-01-WebClipper脚手架迁移-implementation-plan.md:1`
 - Summary: 当前实施计划未明确“把旧 popup 面板功能迁移/融合到新 app”的路线（功能拆分、路由落点、渐进替换顺序、验收点）。
 - Risk: 迁移后的 app 与旧 popup 功能分裂，无法达成“新标签页扩展更方便”的目标；也会阻塞后续重构收尾。
 - Expected fix: 在 plan 中新增一个优先级分组（建议 P3.5 或 P4 前置）覆盖：Chats actions（delete/export/sync）、Settings（Notion/Obsidian/ArticleFetch/Inpage）、About 等功能迁移。
 - Validation: 手测：`app.html` 能覆盖旧 popup 的核心功能闭环。
-- Resolution evidence: （待补）
+- Resolution evidence: `.github/plans/2026-03-01-WebClipper脚手架迁移-implementation-plan.md` 已新增 `P3.5`（Task 24-28）明确旧 popup → app 的迁移路线与验收点。
 
 ## Finding F-05
 
 - Task: `Task 22: AMO source package`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/scripts/package-amo-source.mjs:33`
 - Summary: AMO source package 当前未包含 `wxt.config.ts` / `entrypoints/*` 等 WXT 构建关键文件，偏向 legacy build 复现口径。
 - Risk: Firefox 上架审核可能无法按当前实际构建链复现 `.xpi`；后续切换到 WXT 后会产生合规风险。
 - Expected fix: 在 source package 中纳入 WXT 关键文件，并在文档中写明复现构建命令。
 - Validation: `npm --prefix Extensions/WebClipper run package:amo-source`（产物包含 WXT 文件清单）
-- Resolution evidence: （待补）
+- Resolution evidence: `Extensions/WebClipper/scripts/package-amo-source.mjs` 已纳入 `wxt.config.ts` / `tsconfig.json` / `entrypoints/`。
 
 ## Finding F-06
 
 - Task: `Task 12: background 路由分层`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/entrypoints/background.ts:1`
 - Summary: 目前 platform router 只覆盖 conversations/article；sync/settings 等仍走 legacy fallback，且计划中预期的 `src/domains/sync/background-handlers.ts` 尚未建立。
 - Risk: 迁移期长期依赖 fallback 会导致“哪些消息已迁移”不透明，增加回归定位成本。
 - Expected fix: 增加 sync/settings 的薄 handler（可先委托 legacy orchestrator/store），逐步缩小 fallback 范围，并在 Debug 页可观测。
 - Validation: 手测 app 路由页面不再出现 `unknown message type`。
-- Resolution evidence: （待补）
+- Resolution evidence: 已新增 `Extensions/WebClipper/src/domains/sync/background-handlers.ts` 与 `Extensions/WebClipper/src/domains/settings/background-handlers.ts` 并在 `Extensions/WebClipper/entrypoints/background.ts` 注册。
 
 ## Finding F-07
 
 - Task: `Task 23: 更新 WebClipper AGENTS`
 - Severity: `Medium`
-- Status: `Open`
+- Status: `Resolved`
 - Location: `Extensions/WebClipper/AGENTS.md:1`
 - Summary: WebClipper 开发命令与产物路径说明仍以 legacy `dist*` 为主，未反映 WXT 的 `dev/build` 与 `.output/*` 产物。
 - Risk: 新同学/未来自己按文档操作会加载错误产物，导致调试与发布流程混乱。
 - Expected fix: 按现状更新入口索引与命令，并明确迁移期 legacy 与 WXT 的边界。
 - Validation: 按 AGENTS.md 从 0 到 1 能启动 dev 并加载扩展。
-- Resolution evidence: （待补）
+- Resolution evidence: `Extensions/WebClipper/AGENTS.md` 已更新为 WXT `.output/*` 产物与新 scripts，并保留迁移期 legacy 打包链说明。
 
 ---
 
