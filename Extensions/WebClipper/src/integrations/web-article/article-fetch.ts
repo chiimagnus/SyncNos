@@ -4,7 +4,7 @@ type AnyTab = { id?: number; url?: string; title?: string };
 
 const ARTICLE_SOURCE = 'web';
 const ARTICLE_SOURCE_TYPE = 'article';
-const READABILITY_FILE = 'src/collectors/web/readability.js';
+const READABILITY_FILE = 'src/vendor/readability.js';
 
 function toError(message: unknown) {
   return new Error(String(message || 'unknown error'));
