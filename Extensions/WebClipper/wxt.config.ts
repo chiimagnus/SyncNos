@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
 
-const READABILITY_FILE = 'src/collectors/web/readability.js';
+const READABILITY_FILE = 'src/vendor/readability.js';
 const PUBLIC_FILES = [
   READABILITY_FILE,
   'icons/icon-16.png',
@@ -17,8 +17,8 @@ export default defineConfig({
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],
   hooks: {
-    // Keep legacy article fetch working during migration:
-    // `chrome.scripting.executeScript({ files: ["src/collectors/web/readability.js"] })`
+    // Keep article fetch working:
+    // `chrome.scripting.executeScript({ files: ["src/vendor/readability.js"] })`
     // requires the file to exist in the final extension package, but WXT only
     // auto-copies `public/` by default. So we explicitly copy the legacy file.
     'build:publicAssets': (_wxt, files) => {
@@ -29,7 +29,7 @@ export default defineConfig({
         });
       }
     },
-    // Also allow `browser.runtime.getURL("src/collectors/web/readability.js")` in TS.
+    // Also allow `browser.runtime.getURL("src/vendor/readability.js")` in TS.
     'prepare:publicPaths': (_wxt, paths) => {
       for (const rel of PUBLIC_FILES) paths.push(rel);
     },

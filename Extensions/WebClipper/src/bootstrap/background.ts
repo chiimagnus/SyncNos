@@ -19,7 +19,7 @@ import '../export/obsidian/obsidian-markdown-writer.js';
 import '../export/obsidian/obsidian-sync-orchestrator.js';
 
 import './background-inpage-web-visibility.ts';
-import '../collectors/web/article-fetch-service.js';
+import '../collectors/web/article-fetch-service.ts';
 import runtimeContext from '../runtime-context.ts';
 
 export function startBackgroundBootstrap() {
