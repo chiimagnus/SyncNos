@@ -2,6 +2,10 @@ import { startLegacyBackground } from '../src/legacy/background-entry';
 import { registerConversationHandlers } from '../src/domains/conversations/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
 import { registerWebArticleHandlers } from '../src/integrations/web-article/background-handlers';
+import {
+  ensureDefaultNotionOAuthClientId,
+  setupNotionOAuthNavigationListener,
+} from '../src/integrations/notion/oauth';
 
 export default defineBackground(() => {
   startLegacyBackground();
@@ -27,10 +31,9 @@ export default defineBackground(() => {
 
   // Keep legacy "start" side-effects that are not message handlers.
   try {
-    const oauth = NS.backgroundNotionOAuth;
-    oauth?.ensureDefaultNotionOAuthClientId?.();
-    oauth?.setupNotionOAuthNavigationListener?.();
-    browser.runtime.onInstalled.addListener(() => oauth?.ensureDefaultNotionOAuthClientId?.());
+    ensureDefaultNotionOAuthClientId().catch(() => {});
+    setupNotionOAuthNavigationListener();
+    browser.runtime.onInstalled.addListener(() => ensureDefaultNotionOAuthClientId().catch(() => {}));
   } catch (_e) {
     // ignore
   }
