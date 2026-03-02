@@ -94,6 +94,9 @@
     if (!msg || typeof msg.type !== "string") return err("invalid message");
 
       switch (msg.type) {
+      case "__WXT_PING__": {
+        return ok({ pong: true, instanceId: BACKGROUND_INSTANCE_ID });
+      }
       case UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP: {
         if (!chrome || !chrome.action || typeof chrome.action.openPopup !== "function") {
           return err("open popup is not supported in this browser", { code: "OPEN_POPUP_UNSUPPORTED" });
