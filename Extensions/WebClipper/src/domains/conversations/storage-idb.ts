@@ -1,15 +1,5 @@
 import type { Conversation, ConversationMessage } from './models';
-
-type OpenDb = () => Promise<IDBDatabase>;
-
-function getOpenDb(): OpenDb {
-  const NS: any = (globalThis as any).WebClipper || {};
-  const schema = NS.storageSchema;
-  if (!schema || typeof schema.openDb !== 'function') {
-    throw new Error('schema not loaded');
-  }
-  return schema.openDb.bind(schema);
-}
+import { openDb as openSchemaDb } from '../../platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -17,8 +7,7 @@ let openingDb: Promise<IDBDatabase> | null = null;
 async function openDb(): Promise<IDBDatabase> {
   if (cachedDb) return cachedDb;
   if (openingDb) return openingDb;
-  const open = getOpenDb();
-  openingDb = open()
+  openingDb = openSchemaDb()
     .then((db) => {
       cachedDb = db;
       return db;
