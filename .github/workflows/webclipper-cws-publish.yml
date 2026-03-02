@@ -73,14 +73,17 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const fs = require("fs");
+          const path = "Extensions/WebClipper/wxt.config.ts";
           const tagName = process.env.TAG_NAME;
           const tagVersion = String(tagName || "").replace(/^v/, "");
-          const manifest = JSON.parse(fs.readFileSync("Extensions/WebClipper/manifest.json", "utf8"));
-          if (!manifest.version) throw new Error("manifest.json missing version");
-          if (manifest.version !== tagVersion) {
-            throw new Error(`manifest version mismatch: manifest=${manifest.version} tag=${tagVersion}`);
+          const source = fs.readFileSync(path, "utf8");
+          const m = source.match(/version:\s*['"]([^'"]+)['"]/);
+          if (!m || !m[1]) throw new Error("wxt.config.ts missing manifest.version");
+          const manifestVersion = String(m[1]).trim();
+          if (manifestVersion !== tagVersion) {
+            throw new Error(`manifest version mismatch: wxt=${manifestVersion} tag=${tagVersion}`);
           }
-          console.log(`[ok] manifest version: ${manifest.version}`);
+          console.log(`[ok] manifest version: ${manifestVersion}`);
           NODE
         env:
           TAG_NAME: ${{ steps.tag.outputs.name }}
