@@ -16,8 +16,6 @@ import '../collectors/zai/zai-markdown.js';
 import '../collectors/zai/zai-collector.js';
 import '../collectors/yuanbao/yuanbao-markdown.js';
 import '../collectors/yuanbao/yuanbao-collector.js';
-import '../collectors/poe/poe-markdown.js';
-import '../collectors/poe/poe-collector.js';
 import '../collectors/notionai/notionai-markdown.js';
 import '../collectors/notionai/notionai-collector.js';
 import '../collectors/web/web-collector.js';

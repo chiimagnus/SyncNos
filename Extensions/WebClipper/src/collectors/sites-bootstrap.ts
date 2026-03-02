@@ -4,3 +4,4 @@ import './deepseek/deepseek-entry';
 import './doubao/doubao-entry';
 import './gemini/gemini-entry';
 import './kimi/kimi-entry';
+import './poe/poe-entry';
