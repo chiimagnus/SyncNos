@@ -7,27 +7,23 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
 
-function loadZaiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/zai/zai-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/zai/zai-collector.js");
+async function loadZaiCollector() {
+  await import("../../src/collectors/zai/zai-collector.ts");
+  return globalThis.WebClipper?.collectors?.zai;
 }
 
-function loadZaiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/zai/zai-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/zai/zai-markdown.js");
+async function loadZaiMarkdown() {
+  return import("../../src/collectors/zai/zai-markdown.ts");
 }
 
 describe("zai-collector", () => {
@@ -66,10 +62,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-1");
     const text = collector.__test.extractAssistantText(wrapper);
@@ -110,10 +108,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-3");
     const md = collector.__test.extractAssistantMarkdown(wrapper);
@@ -165,10 +165,12 @@ describe("zai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
-    loadZaiMarkdown();
-    const collector = loadZaiCollector();
+    await loadZaiMarkdown();
+    const collector = await loadZaiCollector();
 
     const wrapper = dom.window.document.querySelector("#message-2");
     const text = collector.__test.extractAssistantText(wrapper);

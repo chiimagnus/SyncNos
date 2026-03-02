@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return /(^|\.)doubao\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       const p = location.pathname || "";
       if (p === "/chat" || p === "/chat/") return false;
@@ -17,28 +18,28 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector("[data-testid='message_list']") || document.querySelector("main") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     return NS.collectorUtils.inEditMode(root);
   }
 
-  function doubaoMarkdown() {
+  function doubaoMarkdown(): any {
     return NS.doubaoMarkdown || {};
   }
 
-  function collectMessages() {
+  function collectMessages(): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const containers = Array.from(document.querySelectorAll("[data-testid='union_message']"));
+    const containers: any[] = Array.from(document.querySelectorAll("[data-testid='union_message']")) as any[];
     if (!containers.length) return [];
 
     const out = [];
@@ -51,7 +52,7 @@
       const sendMessage = c.querySelector("[data-testid='send_message']");
       if (sendMessage) {
         const tEl = sendMessage.querySelector("[data-testid='message_text_content']") || sendMessage;
-        const text = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
+        const text = NS.normalize.normalizeText((tEl as any).innerText || tEl.textContent || "");
         const imageUrls = extractImages ? extractImages(sendMessage) : [];
         if (text || imageUrls.length) {
           const contentText = text || "";
@@ -70,9 +71,9 @@
 
       const recv = c.querySelector("[data-testid='receive_message']");
       if (recv) {
-        const all = Array.from(recv.querySelectorAll("[data-testid='message_text_content']"));
-        const textEl = all.find((el) => !el.closest("[data-testid='think_block_collapse']")) || recv;
-        const fallbackText = NS.normalize.normalizeText(textEl.innerText || textEl.textContent || "");
+        const all: any[] = Array.from(recv.querySelectorAll("[data-testid='message_text_content']")) as any[];
+        const textEl = all.find((el: any) => !el.closest("[data-testid='think_block_collapse']")) || recv;
+        const fallbackText = NS.normalize.normalizeText((textEl as any).innerText || textEl.textContent || "");
         const text = typeof markdown.extractAssistantText === "function"
           ? (markdown.extractAssistantText(textEl) || fallbackText)
           : fallbackText;
@@ -98,7 +99,7 @@
     return out;
   }
 
-  function capture() {
+  function capture(): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
@@ -122,4 +123,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "doubao", matches, collector: api });
   }
-})();

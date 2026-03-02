@@ -1,26 +1,27 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function texFromKatex(el) {
+const NS: any = collectorContext as any;
+
+  function texFromKatex(el: any): any {
     if (!el || !el.querySelector) return "";
     const ann = el.querySelector('annotation[encoding="application/x-tex"]');
     const raw = ann ? (ann.textContent || "") : "";
     return String(raw || "").trim();
   }
 
-  function wrapInlineCode(content) {
+  function wrapInlineCode(content: any): any {
     const raw = String(content || "");
     const delimiter = raw.includes("`") ? "``" : "`";
     const cleaned = raw.replace(/\n+/g, " ").trim();
     return `${delimiter}${cleaned}${delimiter}`;
   }
 
-  function elementStyleString(el) {
+  function elementStyleString(el: any): any {
     if (!el || !el.getAttribute) return "";
     return String(el.getAttribute("style") || "");
   }
 
-  function isBoldEl(el) {
+  function isBoldEl(el: any): any {
     if (!el) return false;
     const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
     if (tag === "strong" || tag === "b") return true;
@@ -28,7 +29,7 @@
     return /font-weight\s*:\s*(600|700|800|900)/i.test(style);
   }
 
-  function isItalicEl(el) {
+  function isItalicEl(el: any): any {
     if (!el) return false;
     const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
     if (tag === "em" || tag === "i") return true;
@@ -36,7 +37,7 @@
     return /font-style\s*:\s*italic/i.test(style);
   }
 
-  function isStrikeEl(el) {
+  function isStrikeEl(el: any): any {
     if (!el) return false;
     const tag = el.tagName ? String(el.tagName).toLowerCase() : "";
     if (tag === "s" || tag === "del") return true;
@@ -44,12 +45,12 @@
     return /text-decoration[^;]*line-through/i.test(style);
   }
 
-  function normalizeMarkdownText(value) {
+  function normalizeMarkdownText(value: any): any {
     // Remove zero-width spaces that Notion sometimes injects.
     return String(value || "").replace(/\u200b/g, "");
   }
 
-  function nodeToMarkdown(node) {
+  function nodeToMarkdown(node: any): any {
     if (!node) return "";
     if (node.nodeType === Node.TEXT_NODE) return normalizeMarkdownText(node.nodeValue || "");
     if (node.nodeType !== Node.ELEMENT_NODE) return "";
@@ -97,7 +98,7 @@
     return out;
   }
 
-  function childrenToMarkdown(el) {
+  function childrenToMarkdown(el: any): any {
     const parts = [];
     const nodes = el && el.childNodes ? Array.from(el.childNodes) : [];
     for (const n of nodes) {
@@ -107,23 +108,23 @@
     return parts.join("");
   }
 
-  function leafToMarkdown(leaf) {
+  function leafToMarkdown(leaf: any): any {
     if (!leaf) return "";
     const raw = childrenToMarkdown(leaf);
     // Keep line breaks, but trim excessive leading/trailing whitespace.
     return normalizeMarkdownText(raw).replace(/[ \t]+\n/g, "\n").trim();
   }
 
-  function getBlockTypeName(block) {
+  function getBlockTypeName(block: any): any {
     if (!block || !block.classList) return "";
-    for (const c of Array.from(block.classList)) {
+    for (const c of (Array.from(block.classList) as any[])) {
       if (!c || !c.startsWith("notion-") || !c.endsWith("-block")) continue;
       return c.slice("notion-".length, -"-block".length);
     }
     return "";
   }
 
-  function isTopLevelBlock(block, scope) {
+  function isTopLevelBlock(block: any, scope: any): any {
     let p = block && block.parentElement ? block.parentElement : null;
     while (p && p !== scope) {
       if (p.getAttribute && p.getAttribute("data-block-id")) return false;
@@ -132,7 +133,7 @@
     return true;
   }
 
-  function blockLeaf(block) {
+  function blockLeaf(block: any): any {
     if (!block || !block.querySelector) return null;
     return (
       block.querySelector("[data-content-editable-leaf='true']") ||
@@ -141,21 +142,21 @@
     );
   }
 
-  function isListType(type) {
+  function isListType(type: any): any {
     return type === "bulleted_list" || type === "numbered_list" || type === "to_do_list";
   }
 
-  function directChildBlocks(block) {
+  function directChildBlocks(block: any): any {
     if (!block || !block.querySelectorAll) return [];
-    const all = Array.from(block.querySelectorAll("div[data-block-id]"));
-    return all.filter((child) => {
+    const all: any[] = Array.from(block.querySelectorAll("div[data-block-id]")) as any[];
+    return all.filter((child: any) => {
       if (!child || child === block) return false;
       const parentBlock = child.parentElement ? child.parentElement.closest("div[data-block-id]") : null;
       return parentBlock === block;
     });
   }
 
-  function numberedListMarker(block) {
+  function numberedListMarker(block: any): any {
     if (!block || !block.querySelector) return "1.";
     const label = block.querySelector(".notion-list-item-box-left .pseudoBefore");
     const fromText = String((label && label.textContent) || "").trim();
@@ -169,7 +170,7 @@
     return "1.";
   }
 
-  function listItemMarker(block, type) {
+  function listItemMarker(block: any, type: any): any {
     if (type === "bulleted_list") return "-";
     if (type === "numbered_list") return numberedListMarker(block);
     if (type === "to_do_list") {
@@ -179,7 +180,7 @@
     return "-";
   }
 
-  function renderListItem(block, depth) {
+  function renderListItem(block: any, depth: any): any {
     const type = getBlockTypeName(block);
     const marker = listItemMarker(block, type);
     const indent = "  ".repeat(Math.max(0, depth));
@@ -208,24 +209,24 @@
     return lines.join("\n");
   }
 
-  function codeLeafText(leaf) {
+  function codeLeafText(leaf: any): any {
     if (!leaf) return "";
     const raw = normalizeMarkdownText(leaf.textContent || "");
     return raw.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
   }
 
-  function codeFenceDelimiter(content) {
+  function codeFenceDelimiter(content: any): any {
     const runs = String(content || "").match(/`+/g) || [];
     const longest = runs.reduce((max, s) => Math.max(max, s.length), 0);
     return "`".repeat(Math.max(3, longest + 1));
   }
 
-  function normalizeCodeLanguage(raw) {
+  function normalizeCodeLanguage(raw: any): any {
     const value = String(raw || "").trim().toLowerCase();
     return value.replace(/[^a-z0-9_+.-]/g, "");
   }
 
-  function detectCodeLanguage(block) {
+  function detectCodeLanguage(block: any): any {
     if (!block || !block.querySelectorAll) return "";
     const attrs = [
       block.getAttribute("data-language"),
@@ -248,32 +249,32 @@
     return "";
   }
 
-  function escapeMarkdownTableCell(value) {
+  function escapeMarkdownTableCell(value: any): any {
     const text = String(value || "").replace(/\n+/g, " ").trim();
     // Escape pipes to avoid breaking table columns.
     return text.replace(/\|/g, "\\|");
   }
 
-  function tableRowsFromHtmlTable(tableEl) {
-    const rows = Array.from(tableEl.querySelectorAll("tr"));
-    return rows.map((tr) => Array.from(tr.querySelectorAll("th, td")));
+  function tableRowsFromHtmlTable(tableEl: any): any {
+    const rows: any[] = Array.from(tableEl.querySelectorAll("tr")) as any[];
+    return rows.map((tr: any) => Array.from(tr.querySelectorAll("th, td")));
   }
 
-  function tableRowsFromRoleGrid(gridEl) {
-    const rows = Array.from(gridEl.querySelectorAll("[role='row']"));
-    return rows.map((row) => Array.from(row.querySelectorAll("[role='gridcell'],[role='cell'],[role='columnheader'],[role='rowheader']")));
+  function tableRowsFromRoleGrid(gridEl: any): any {
+    const rows: any[] = Array.from(gridEl.querySelectorAll("[role='row']")) as any[];
+    return rows.map((row: any) => Array.from(row.querySelectorAll("[role='gridcell'],[role='cell'],[role='columnheader'],[role='rowheader']")));
   }
 
-  function cellToMarkdown(cellEl) {
+  function cellToMarkdown(cellEl: any): any {
     if (!cellEl) return "";
     const leaf = cellEl.querySelector ? cellEl.querySelector("[data-content-editable-leaf='true']") : null;
     const md = leafToMarkdown(leaf);
     if (md) return md;
-    const fallback = cellEl.innerText || cellEl.textContent || "";
+    const fallback = (cellEl as any).innerText || cellEl.textContent || "";
     return normalizeMarkdownText(fallback).trim();
   }
 
-  function extractTableMarkdown(block) {
+  function extractTableMarkdown(block: any): any {
     if (!block || !block.querySelector) return "";
 
     const table = block.querySelector("table");
@@ -283,13 +284,13 @@
     if (table) rows = tableRowsFromHtmlTable(table);
     else if (grid) rows = tableRowsFromRoleGrid(grid);
 
-    function fallbackToTsv() {
-      const raw = String(block.innerText || block.textContent || "");
-      const lines = raw.split("\n").map((l) => l.trim()).filter((l) => l.length);
+    function fallbackToTsv(): any {
+      const raw = String((block as any).innerText || block.textContent || "");
+      const lines = raw.split("\n").map((l: any) => l.trim()).filter((l: any) => l.length);
       const hasTabs = lines.some((l) => l.includes("\t"));
       if (hasTabs) {
-        const matrix = lines.map((l) => l.split("\t").map((c) => escapeMarkdownTableCell(c)));
-        const cols = Math.max(0, ...matrix.map((r) => r.length));
+        const matrix = lines.map((l: any) => l.split("\t").map((c: any) => escapeMarkdownTableCell(c)));
+        const cols = Math.max(0, ...matrix.map((r: any) => r.length));
         if (cols >= 2 && matrix.length >= 1) {
           const header = matrix[0].concat(Array(Math.max(0, cols - matrix[0].length)).fill(""));
           const sep = Array(cols).fill("---");
@@ -309,8 +310,8 @@
     // Fallback: try to interpret `innerText` as TSV (Notion often uses tabs between cells).
     if (!rows.length) return fallbackToTsv();
 
-    const matrix = rows.map((cells) => cells.map((cell) => escapeMarkdownTableCell(cellToMarkdown(cell))));
-    const cols = Math.max(0, ...matrix.map((r) => r.length));
+    const matrix = rows.map((cells: any) => cells.map((cell: any) => escapeMarkdownTableCell(cellToMarkdown(cell))));
+    const cols = Math.max(0, ...matrix.map((r: any) => r.length));
     if (cols < 2 || matrix.length < 1) return fallbackToTsv();
 
     const out = [];
@@ -325,7 +326,7 @@
     return out.join("\n").trim();
   }
 
-  function blockToMarkdown(block) {
+  function blockToMarkdown(block: any): any {
     const type = getBlockTypeName(block);
 
     const tableMd = extractTableMarkdown(block);
@@ -359,26 +360,26 @@
     if (type === "sub_sub_header") return `### ${text}`;
 
     if (type === "quote") {
-      const lines = text.split("\n").map((l) => `> ${l}`.trimEnd());
+      const lines = text.split("\n").map((l: any) => `> ${l}`.trimEnd());
       return lines.join("\n");
     }
 
     if (type === "callout") {
-      const lines = text.split("\n").map((l) => `> ${l}`.trimEnd());
+      const lines = text.split("\n").map((l: any) => `> ${l}`.trimEnd());
       return lines.join("\n");
     }
 
     return text;
   }
 
-  function blockKind(block) {
+  function blockKind(block: any): any {
     const type = getBlockTypeName(block);
     if (type === "bulleted_list" || type === "numbered_list" || type === "to_do_list") return "list";
     if (type === "quote" || type === "callout") return "quote";
     return "para";
   }
 
-  function extractUserMarkdown(wrapper) {
+  function extractUserMarkdown(wrapper: any): any {
     const leaf =
       wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
       wrapper.querySelector("[data-content-editable-leaf='true']");
@@ -386,9 +387,9 @@
     return md || "";
   }
 
-  function extractAssistantMarkdown(wrapper) {
-    const allBlocks = Array.from(wrapper.querySelectorAll("div[data-block-id]"));
-    const blocks = allBlocks.filter((b) => isTopLevelBlock(b, wrapper));
+  function extractAssistantMarkdown(wrapper: any): any {
+    const allBlocks: any[] = Array.from(wrapper.querySelectorAll("div[data-block-id]")) as any[];
+    const blocks = allBlocks.filter((b: any) => isTopLevelBlock(b, wrapper));
     if (!blocks.length) return "";
 
     let out = "";
@@ -414,5 +415,3 @@
   };
 
   NS.notionAiMarkdown = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();

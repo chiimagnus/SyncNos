@@ -7,7 +7,12 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
@@ -30,22 +35,24 @@ function loadContract() {
   return require("../../src/collectors/collector-contract.js");
 }
 
-function loadNotionAiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/notionai/notionai-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/notionai/notionai-collector.js");
+async function loadNotionAiCollector() {
+  await import("../../src/collectors/notionai/notionai-collector.ts");
+  const collector = globalThis.WebClipper?.collectors?.notionai;
+  const registry = globalThis.WebClipper?.collectorsRegistry;
+  const matches = collector?.__test?.matches;
+  if (collector && registry && typeof registry.register === "function" && typeof matches === "function") {
+    registry.register({
+      id: "notionai",
+      matches,
+      inpageMatches: collector?.__test?.inpageMatches,
+      collector,
+    });
+  }
+  return collector;
 }
 
-function loadNotionAiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/notionai/notionai-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/notionai/notionai-markdown.js");
+async function loadNotionAiMarkdown() {
+  return import("../../src/collectors/notionai/notionai-markdown.ts");
 }
 
 function loadCollectorUtils() {
@@ -73,12 +80,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     expect(typeof collector.__test.inpageMatches).toBe("function");
     expect(collector.__test.inpageMatches({ hostname: "www.notion.so", pathname: "/", href: "https://www.notion.so/" })).toBe(true);
@@ -108,12 +117,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    await loadNotionAiCollector();
 
     const active = globalThis.WebClipper.collectorsRegistry.pickActive({
       hostname: "www.notion.so",
@@ -152,12 +163,14 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -197,12 +210,14 @@ describe("notionai-collector", () => {
       globalThis.location = dom.window.location;
 
       // @ts-expect-error test global
+      if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
       globalThis.WebClipper = {};
+    }
       await loadNormalize();
       loadContract();
       loadRegistry();
-      loadNotionAiMarkdown();
-      const collector = loadNotionAiCollector();
+      await loadNotionAiMarkdown();
+      const collector = await loadNotionAiCollector();
 
       const snap = collector.capture();
       keys.push(snap.conversation.conversationKey);
@@ -248,13 +263,15 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -305,13 +322,15 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -364,13 +383,15 @@ describe("notionai-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();
@@ -423,13 +444,15 @@ console.log(value);</div>
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
     loadContract();
     loadRegistry();
-    loadNotionAiMarkdown();
-    const collector = loadNotionAiCollector();
+    await loadNotionAiMarkdown();
+    const collector = await loadNotionAiCollector();
 
     const snap = collector.capture();
     expect(snap).toBeTruthy();

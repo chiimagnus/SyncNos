@@ -7,7 +7,12 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
@@ -21,22 +26,13 @@ function loadCollectorUtils() {
   return require("../../src/collectors/collector-utils.js");
 }
 
-function loadDoubaoMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/doubao/doubao-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/doubao/doubao-markdown.js");
+async function loadDoubaoMarkdown() {
+  return import("../../src/collectors/doubao/doubao-markdown.ts");
 }
 
-function loadDoubaoCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/doubao/doubao-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/doubao/doubao-collector.js");
+async function loadDoubaoCollector() {
+  await import("../../src/collectors/doubao/doubao-collector.ts");
+  return globalThis.WebClipper?.collectors?.doubao;
 }
 
 function setupDoubaoDom(html: string, url: string) {
@@ -101,11 +97,13 @@ describe("doubao-collector", () => {
     setupDoubaoDom(html, "https://www.doubao.com/chat/conv001");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadDoubaoMarkdown();
-    loadDoubaoCollector();
+    await loadDoubaoMarkdown();
+    await loadDoubaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.doubao.capture();
@@ -142,10 +140,12 @@ describe("doubao-collector", () => {
     setupDoubaoDom(html, "https://www.doubao.com/chat/fallback001");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadDoubaoCollector();
+    await loadDoubaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.doubao.capture();

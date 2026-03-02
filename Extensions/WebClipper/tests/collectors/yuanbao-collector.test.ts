@@ -7,7 +7,12 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
@@ -21,22 +26,13 @@ function loadCollectorUtils() {
   return require("../../src/collectors/collector-utils.js");
 }
 
-function loadYuanbaoMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/yuanbao/yuanbao-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/yuanbao/yuanbao-markdown.js");
+async function loadYuanbaoMarkdown() {
+  return import("../../src/collectors/yuanbao/yuanbao-markdown.ts");
 }
 
-function loadYuanbaoCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/yuanbao/yuanbao-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/yuanbao/yuanbao-collector.js");
+async function loadYuanbaoCollector() {
+  await import("../../src/collectors/yuanbao/yuanbao-collector.ts");
+  return globalThis.WebClipper?.collectors?.yuanbao;
 }
 
 function setupYuanbaoDom(html: string, url: string) {
@@ -117,11 +113,13 @@ describe("yuanbao-collector", () => {
     setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/b");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadYuanbaoMarkdown();
-    loadYuanbaoCollector();
+    await loadYuanbaoMarkdown();
+    await loadYuanbaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.yuanbao.capture();
@@ -158,10 +156,12 @@ describe("yuanbao-collector", () => {
     setupYuanbaoDom(html, "https://yuanbao.tencent.com/chat/a/fallback");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadYuanbaoCollector();
+    await loadYuanbaoCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.yuanbao.capture();
