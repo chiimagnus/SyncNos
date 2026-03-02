@@ -16,8 +16,6 @@ import '../collectors/zai/zai-markdown.js';
 import '../collectors/zai/zai-collector.js';
 import '../collectors/kimi/kimi-markdown.js';
 import '../collectors/kimi/kimi-collector.js';
-import '../collectors/doubao/doubao-markdown.js';
-import '../collectors/doubao/doubao-collector.js';
 import '../collectors/yuanbao/yuanbao-markdown.js';
 import '../collectors/yuanbao/yuanbao-collector.js';
 import '../collectors/poe/poe-markdown.js';
