@@ -10,9 +10,8 @@ import '../storage/incremental-updater.js';
 
 import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
+import '../collectors/sites-bootstrap';
 
-import '../collectors/chatgpt/chatgpt-markdown.js';
-import '../collectors/chatgpt/chatgpt-collector.js';
 import '../collectors/claude/claude-collector.js';
 import '../collectors/gemini/gemini-markdown.js';
 import '../collectors/gemini/gemini-collector.js';
