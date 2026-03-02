@@ -8,7 +8,7 @@
 ### Goal（目标）
 WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全局注入桥接，便于后续扩展新标签页/网页应用（`chrome-extension://...`）。
 
-### 已完成里程碑（Task1 ~ Task19）
+### 已完成里程碑（Task1 ~ Task24）
 
 - `Task1` 文档基线：`c1a26d70`
 - `Task2` TS IDB schema：`b6195750`
@@ -30,6 +30,11 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
 - `Task17` 各站点 collector TS 化：`4b5d4b9d` ~ `a6a20c2e`
 - `Task18` protocols 去全局（第一阶段）：`f8ccf833`
 - `Task19` export 栈去全局（第一阶段）：`632ccd1d`
+- `Task20` protocol 注入链清理：`06f023d7`
+- `Task21` collectors runtime 去全局：`ef886034`
+- `Task22` inpage runtime 去全局：`6786c15d`
+- `Task23` export service 去全局：`b6a7962e`
+- `Task24` zero-global 收口：`bc5194de`
 - 执行中补丁（导入路径/构建修复）：`1bb98d73`
 
 ### 验收状态快照
@@ -37,22 +42,21 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
 - 验收 A：`src/legacy/*` 清零 + 入口不再引用 legacy
   - 状态：**已完成**（`Extensions/WebClipper/src/legacy/` 目录为空）
 - 验收 B：不再依赖 `globalThis.WebClipper.*`
-  - 状态：**未完成**（当前扫描仍有 `57` 处引用）
+  - 状态：**已完成**（`rg "globalThis\.WebClipper|WebClipper\." Extensions/WebClipper/src -n | wc -l` = `0`）
 - 验收 C：`compile` / `test` / `build`
   - 状态：**已完成**（最近一次全量均通过）
 
 ---
 
-## 2) 剩余目标（本计划第二阶段）
+## 2) 下一阶段目标（第三阶段）
 
-> 仅保留一个主目标：**清零 `globalThis.WebClipper` 运行时依赖**。
+> 第二阶段（Task20~Task24）已完成。下一阶段主目标：**统一迁移 `src` 业务模块到 TypeScript（逐步清零 `.js`）**。
 
-### Definition of Done（第二阶段）
+### Definition of Done（第三阶段）
 
-1. `rg "globalThis\.WebClipper|WebClipper\." Extensions/WebClipper/src -n | wc -l` 结果为 `0`
-2. `Extensions/WebClipper/src/protocols/*.js`、`src/collectors/*.js`、`src/export/*.js` 中的 IIFE 注入路径全部迁移或删除
-3. `entrypoints/background.ts` 与 `entrypoints/content.ts` 不再依赖“全局桥接模块”
-4. 通过：
+1. `Extensions/WebClipper/src` 业务运行路径中的 `.js` 模块完成 TS 对齐（兼容 shim 可短期保留，但不得承载主实现）
+2. 清理 `declare module '*.js'` 与 runtime CJS 兼容桥接（仅在必要测试路径保留）
+3. 通过：
    - `npm --prefix Extensions/WebClipper run compile`
    - `npm --prefix Extensions/WebClipper run test --silent`
    - `npm --prefix Extensions/WebClipper run build`
@@ -60,6 +64,8 @@ WebClipper 完全运行在 WXT + TS/React 架构下，移除 legacy 入口与全
 ---
 
 ## 3) 第二阶段任务清单（Task20+）
+
+> 状态：以下 Task20~Task24 已全部完成（见上方里程碑与提交记录），保留为执行留痕。
 
 ## P8：Protocols 最终去全局
 
