@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return hostname === "yuanbao.tencent.com";
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       return /^\/chat\/[^/]+\/[^/]+$/.test(location.pathname || "");
     } catch (_e) {
@@ -14,30 +15,30 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector(".agent-chat__list__content") || document.querySelector("main") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     return NS.collectorUtils.inEditMode(root);
   }
 
-  function yuanbaoMarkdown() {
+  function yuanbaoMarkdown(): any {
     return NS.yuanbaoMarkdown || {};
   }
 
-  function collectMessages() {
+  function collectMessages(): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const nodes = [];
-    root.querySelectorAll(".agent-chat__list__item--human").forEach((el) => nodes.push({ el, role: "user" }));
-    root.querySelectorAll(".agent-chat__list__item--ai").forEach((el) => nodes.push({ el, role: "assistant" }));
+    const nodes: any[] = [];
+    root.querySelectorAll(".agent-chat__list__item--human").forEach((el: any) => nodes.push({ el, role: "user" }));
+    root.querySelectorAll(".agent-chat__list__item--ai").forEach((el: any) => nodes.push({ el, role: "assistant" }));
     if (!nodes.length) return [];
 
     nodes.sort((a, b) => {
@@ -47,7 +48,7 @@
       return 0;
     });
 
-    const out = [];
+    const out: any[] = [];
     const utils = NS.collectorUtils || {};
     const markdown = yuanbaoMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
@@ -60,7 +61,7 @@
       } else {
         tEl = el.querySelector(".agent-chat__speech-text") || el.querySelector(".hyc-component-reasoner__text") || el;
       }
-      const fallbackText = NS.normalize.normalizeText(tEl.innerText || tEl.textContent || "");
+      const fallbackText = NS.normalize.normalizeText((tEl as any).innerText || tEl.textContent || "");
       const text = role === "assistant" && typeof markdown.extractAssistantText === "function"
         ? (markdown.extractAssistantText(tEl) || fallbackText)
         : fallbackText;
@@ -83,7 +84,7 @@
     return out;
   }
 
-  function capture() {
+  function capture(): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
@@ -107,4 +108,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "yuanbao", matches, collector: api });
   }
-})();

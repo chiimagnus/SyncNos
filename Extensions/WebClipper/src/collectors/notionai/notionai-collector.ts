@@ -1,7 +1,8 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function findChatThreadIdFromHref(href) {
+const NS: any = collectorContext as any;
+
+  function findChatThreadIdFromHref(href: any): any {
     try {
       const u = new URL(String(href || location.href || ""));
       const t = String(u.searchParams.get("t") || "").trim();
@@ -14,40 +15,40 @@
     }
   }
 
-  function notionAiCanonicalChatUrl(threadId) {
+  function notionAiCanonicalChatUrl(threadId: any): any {
     if (!threadId) return "";
     return `https://www.notion.so/chat?t=${threadId}&wfv=chat`;
   }
 
-  function hasChatSignals(scope) {
+  function hasChatSignals(scope: any): any {
     const s = scope || document;
     // NotionAI chat turns include this marker on user messages (observed across page/side-panel/floating dialog).
     return !!s.querySelector("[data-agent-chat-user-step-id]");
   }
 
-  function matches(loc) {
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     if (!/(^|\.)notion\.so$/.test(hostname)) return false;
     // Important: do not activate on normal Notion pages, otherwise we can capture page blocks as "assistant" turns.
     return hasChatSignals(document);
   }
 
-  function inpageMatches(loc) {
+  function inpageMatches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     // UI eligibility: show the inpage button on Notion pages even before chat turns render.
     // Actual capture is still guarded by `isNotionAiPage()`.
     return /(^|\.)notion\.so$/.test(hostname);
   }
 
-  function isNotionAiPage() {
+  function isNotionAiPage(): any {
     return /(^|\.)notion\.so$/.test(location.hostname) && hasChatSignals(document);
   }
 
-  function getAnyUserStepEl(scope) {
+  function getAnyUserStepEl(scope?: any): any {
     return (scope || document).querySelector("[data-agent-chat-user-step-id]");
   }
 
-  function findScrollContainerFromSeed(seed) {
+  function findScrollContainerFromSeed(seed: any): any {
     if (!seed) return null;
     let el = seed.parentElement;
     for (let i = 0; i < 20 && el; i += 1) {
@@ -65,11 +66,11 @@
     return document.scrollingElement || document.documentElement || document.body;
   }
 
-  function findScrollContainer() {
+  function findScrollContainer(): any {
     return findScrollContainerFromSeed(getAnyUserStepEl());
   }
 
-  function isVisible(el) {
+  function isVisible(el: any): any {
     if (!el || !el.getBoundingClientRect) return false;
     const r = el.getBoundingClientRect();
     if (r.width < 80 || r.height < 80) return false;
@@ -78,7 +79,7 @@
     return true;
   }
 
-  function rectVisibleArea(r) {
+  function rectVisibleArea(r: any): any {
     const left = Math.max(0, r.left);
     const top = Math.max(0, r.top);
     const right = Math.min(window.innerWidth, r.right);
@@ -88,15 +89,15 @@
     return w * h;
   }
 
-  function findCandidateRoots() {
-    const seeds = Array.from(document.querySelectorAll("[data-agent-chat-user-step-id]")).slice(0, 20);
+  function findCandidateRoots(): any {
+    const seeds: any[] = Array.from(document.querySelectorAll("[data-agent-chat-user-step-id]")).slice(0, 20) as any[];
     if (!seeds.length) return [];
     const set = new Set();
     for (const s of seeds) {
       const root = findScrollContainerFromSeed(s);
       if (root) set.add(root);
     }
-    const roots = Array.from(set).filter(isVisible);
+    const roots: any[] = Array.from(set).filter(isVisible) as any[];
     if (!roots.length) {
       const fallback = findScrollContainer();
       if (fallback) roots.push(fallback);
@@ -104,7 +105,7 @@
     return roots;
   }
 
-  function rootScore(root) {
+  function rootScore(root: any): any {
     if (!root) return -Infinity;
     const userCount = root.querySelectorAll("[data-agent-chat-user-step-id]").length;
     const blockCount = root.querySelectorAll("div[data-block-id]").length;
@@ -114,7 +115,7 @@
     return userCount * 100000 - blockCount * 10 + area / 1000;
   }
 
-  function pickBestRoot(roots) {
+  function pickBestRoot(roots: any): any {
     if (!roots || !roots.length) return { root: null, allRoots: [], lowConfidence: true };
     let best = roots[0];
     let bestScore = -Infinity;
@@ -129,33 +130,33 @@
     return { root: best, allRoots: roots, lowConfidence: roots.length !== 1 || userCount < 1 };
   }
 
-  function hasAssistantBlocksOutsideUserStep(el, userStep) {
+  function hasAssistantBlocksOutsideUserStep(el: any, userStep: any): any {
     if (!el || !el.querySelectorAll) return false;
-    const blocks = Array.from(el.querySelectorAll("div[data-block-id]"));
+    const blocks: any[] = Array.from(el.querySelectorAll("div[data-block-id]")) as any[];
     return blocks.some((b) => b && (!userStep || !userStep.contains(b)));
   }
 
-  function isUserTurnContainer(el) {
+  function isUserTurnContainer(el: any): any {
     if (!el || !el.querySelector) return false;
     return !!el.querySelector("[data-agent-chat-user-step-id]");
   }
 
-  function isAssistantTurnContainer(el) {
+  function isAssistantTurnContainer(el: any): any {
     if (!el || !el.querySelector) return false;
     if (el.querySelector("[data-agent-chat-user-step-id]")) return false;
     return !!el.querySelector("div[data-block-id]");
   }
 
-  function directChildContaining(root, target) {
+  function directChildContaining(root: any, target: any): any {
     if (!root || !root.children || !target) return null;
-    const kids = Array.from(root.children || []);
+    const kids: any[] = Array.from(root.children || []) as any[];
     for (const k of kids) {
       if (k && k.contains && k.contains(target)) return k;
     }
     return null;
   }
 
-  function findTurnsListRoot(seedUserStep, boundaryRoot, totalUserStepsInBoundary) {
+  function findTurnsListRoot(seedUserStep: any, boundaryRoot: any, totalUserStepsInBoundary: any): any {
     if (!seedUserStep) return null;
     const total = typeof totalUserStepsInBoundary === "number" ? totalUserStepsInBoundary : 0;
     let el = seedUserStep;
@@ -168,7 +169,7 @@
 
       if (boundaryRoot && el === boundaryRoot.parentElement) break;
 
-      const children = Array.from(el.children || []);
+      const children: any[] = Array.from(el.children || []) as any[];
       if (children.length < 2) continue;
 
       const userChildCount = children.filter(isUserTurnContainer).length;
@@ -195,7 +196,7 @@
     return best;
   }
 
-  function findNextAssistantContainerFromUserItem(userItem, listRoot) {
+  function findNextAssistantContainerFromUserItem(userItem: any, listRoot: any): any {
     if (!userItem) return null;
     let sib = userItem.nextElementSibling;
     while (sib && (!listRoot || listRoot.contains(sib))) {
@@ -206,7 +207,7 @@
     return null;
   }
 
-  function findTupleAndAssistantByChildren(userStep) {
+  function findTupleAndAssistantByChildren(userStep: any): any {
     if (!userStep) return { tuple: null, assistantWrapper: null };
     let el = userStep;
 
@@ -217,13 +218,13 @@
       const userSteps = el.querySelectorAll ? el.querySelectorAll("[data-agent-chat-user-step-id]") : [];
       if (!userSteps || userSteps.length !== 1 || userSteps[0] !== userStep) continue;
 
-      const children = Array.from(el.children || []);
+      const children: any[] = Array.from(el.children || []) as any[];
       if (children.length < 2) continue;
 
-      const userChild = children.find((c) => c && c.contains && c.contains(userStep));
+      const userChild = children.find((c: any) => c && c.contains && c.contains(userStep));
       if (!userChild) continue;
 
-      const assistantChild = children.find((c) => {
+      const assistantChild = children.find((c: any) => {
         if (!c || c === userChild || !c.querySelector) return false;
         if (c.querySelector("[data-agent-chat-user-step-id]")) return false;
         return hasAssistantBlocksOutsideUserStep(c, null);
@@ -235,7 +236,7 @@
     return { tuple: null, assistantWrapper: null };
   }
 
-  function findMessageTupleFromUserStep(userStep, scope) {
+  function findMessageTupleFromUserStep(userStep: any, scope: any): any {
     if (!userStep || !userStep.parentElement) return null;
     const s = scope || document;
     let bestFallback = null;
@@ -253,16 +254,16 @@
         bestFallback = el;
       }
 
-      const assistantBlocks = Array.from(el.querySelectorAll("div[data-block-id]")).filter((b) => b && !userStep.contains(b));
+      const assistantBlocks: any[] = Array.from(el.querySelectorAll("div[data-block-id]")).filter((b: any) => b && !userStep.contains(b)) as any[];
       if (assistantBlocks.length) return el;
     }
 
     return bestFallback;
   }
 
-  function findAssistantWrapperFromTuple(tupleEl, userStep) {
+  function findAssistantWrapperFromTuple(tupleEl: any, userStep: any): any {
     if (!tupleEl || !tupleEl.querySelectorAll) return null;
-    const blocks = Array.from(tupleEl.querySelectorAll("div[data-block-id]")).filter((b) => b && (!userStep || !userStep.contains(b)));
+    const blocks: any[] = Array.from(tupleEl.querySelectorAll("div[data-block-id]")).filter((b: any) => b && (!userStep || !userStep.contains(b))) as any[];
     if (!blocks.length) return null;
 
     const firstBlock = blocks[0];
@@ -281,15 +282,15 @@
     return w;
   }
 
-  function getTurnWrappers(root) {
+  function getTurnWrappers(root: any): any {
     const uniqueNodes = new Set();
     const scope = root || document;
-    const userSteps = Array.from(scope.querySelectorAll("[data-agent-chat-user-step-id]"));
+    const userSteps: any[] = Array.from(scope.querySelectorAll("[data-agent-chat-user-step-id]")) as any[];
     if (!userSteps.length) return [];
 
     const listRoot = findTurnsListRoot(userSteps[0], scope === document ? null : scope, userSteps.length);
     if (listRoot) {
-      const inListSteps = Array.from(listRoot.querySelectorAll("[data-agent-chat-user-step-id]"));
+      const inListSteps: any[] = Array.from(listRoot.querySelectorAll("[data-agent-chat-user-step-id]")) as any[];
       for (const step of inListSteps) {
         const userItem = directChildContaining(listRoot, step);
         const assistantItem = userItem ? findNextAssistantContainerFromUserItem(userItem, listRoot) : null;
@@ -308,8 +309,8 @@
     }
     }
 
-    const finalNodes = [];
-    for (const node of Array.from(uniqueNodes)) {
+    const finalNodes: any[] = [];
+    for (const node of (Array.from(uniqueNodes) as any[])) {
       const isChild = finalNodes.some((parent) => parent.contains(node));
       if (!isChild) finalNodes.push(node);
     }
@@ -321,14 +322,14 @@
     return finalNodes;
   }
 
-  function roleFromWrapper(wrapper) {
+  function roleFromWrapper(wrapper: any): any {
     if (!wrapper) return "";
     if (wrapper.getAttribute && wrapper.getAttribute("data-agent-chat-user-step-id")) return "user";
     if (wrapper.querySelector && wrapper.querySelector("div[data-block-id]")) return "assistant";
     return "";
   }
 
-  function isTopLevelBlock(block, scope) {
+  function isTopLevelBlock(block: any, scope: any): any {
     if (!block) return false;
     if (!scope) return true;
     let p = block && block.parentElement ? block.parentElement : null;
@@ -339,47 +340,47 @@
     return true;
   }
 
-  function extractUserText(wrapper) {
+  function extractUserText(wrapper: any): any {
     const leaf =
       wrapper.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
       wrapper.querySelector("[data-content-editable-leaf='true']");
-    const raw = leaf ? (leaf.innerText || leaf.textContent || "") : (wrapper.innerText || wrapper.textContent || "");
+    const raw = leaf ? ((leaf as any).innerText || leaf.textContent || "") : ((wrapper as any).innerText || wrapper.textContent || "");
     return NS.normalize.normalizeText(raw);
   }
 
-  function extractAssistantText(wrapper) {
-    const blocks = Array.from(wrapper.querySelectorAll("div[data-block-id]"));
+  function extractAssistantText(wrapper: any): any {
+    const blocks: any[] = Array.from(wrapper.querySelectorAll("div[data-block-id]")) as any[];
     if (!blocks.length) {
-      const raw = wrapper.innerText || wrapper.textContent || "";
+      const raw = (wrapper as any).innerText || wrapper.textContent || "";
       return NS.normalize.normalizeText(raw);
     }
-    const topBlocks = blocks.filter((b) => isTopLevelBlock(b, wrapper));
-    const parts = [];
+    const topBlocks = blocks.filter((b: any) => isTopLevelBlock(b, wrapper));
+    const parts: any[] = [];
     for (const b of topBlocks) {
-      const raw = b.innerText || b.textContent || "";
+      const raw = (b as any).innerText || b.textContent || "";
       const t = NS.normalize.normalizeText(raw);
       if (t) parts.push(t);
     }
     return NS.normalize.normalizeText(parts.join("\n"));
   }
 
-  function findPageIdFromUrl() {
+  function findPageIdFromUrl(): any {
     const m = location.pathname.match(/[0-9a-fA-F]{32}/);
     return m ? m[0].toLowerCase() : "";
   }
 
-  function getChatTitleFromHistoryButton() {
+  function getChatTitleFromHistoryButton(): any {
     // Observed DOM (see `Extensions/WebClipper/src/collectors/notionai/notionai.md`):
     // <div role="button" aria-label="history"> <div>Title...</div> ... </div>
     const btn = document.querySelector('div[role="button"][aria-label="history"]');
     if (!btn) return "";
     const titleEl = btn.firstElementChild;
-    const raw = titleEl ? (titleEl.innerText || titleEl.textContent || "") : (btn.innerText || btn.textContent || "");
+    const raw = titleEl ? ((titleEl as any).innerText || titleEl.textContent || "") : ((btn as any).innerText || btn.textContent || "");
     const title = String(raw || "").split("\n").join(" ").trim();
     return title ? title.slice(0, 80) : "";
   }
 
-  function getChatTitleFromRoot(root) {
+  function getChatTitleFromRoot(root: any): any {
     const fromHistory = getChatTitleFromHistoryButton();
     if (fromHistory) return fromHistory;
 
@@ -388,27 +389,27 @@
     const leaf =
       firstUser.querySelector('div[style*="border-radius: 16px"] [data-content-editable-leaf="true"]') ||
       firstUser.querySelector("[data-content-editable-leaf='true']");
-    const raw = leaf ? (leaf.innerText || leaf.textContent || "") : (firstUser.innerText || firstUser.textContent || "");
+    const raw = leaf ? ((leaf as any).innerText || leaf.textContent || "") : ((firstUser as any).innerText || firstUser.textContent || "");
     const title = String(raw || "").split("\n").join(" ").trim().slice(0, 60);
     return title || "NotionAI Chat";
   }
 
-  function capture() {
+  function capture(): any {
     if (!isNotionAiPage()) return null;
     const candidates = findCandidateRoots();
     const picked = pickBestRoot(candidates);
     const root = picked.root;
-    const wrappersInRoot = root ? getTurnWrappers(root) : [];
-    const wrappers = wrappersInRoot.length ? wrappersInRoot : getTurnWrappers(document);
+    const wrappersInRoot: any[] = root ? getTurnWrappers(root) : [];
+    const wrappers: any[] = wrappersInRoot.length ? wrappersInRoot : getTurnWrappers(document);
     if (!wrappers.length) return null;
 
-    const messages = [];
-    const warningFlags = [];
+    const messages: any[] = [];
+    const warningFlags: any[] = [];
     const utils = NS.collectorUtils || {};
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
-    function mergeImageUrls(nodes) {
+    function mergeImageUrls(nodes: any): any {
       if (!extractImages) return [];
       const set = new Set();
       for (const n of nodes || []) {
@@ -418,7 +419,7 @@
       return Array.from(set);
     }
 
-    function isThreadAttachmentImageUrl(url) {
+    function isThreadAttachmentImageUrl(url: any): any {
       const u = String(url || "").trim();
       if (!u) return false;
       // NotionAI user uploaded images often appear as:
@@ -430,14 +431,14 @@
       return true;
     }
 
-    function findUserAttachmentContainer(userWrapper) {
+    function findUserAttachmentContainer(userWrapper: any): any {
       let el = userWrapper;
       for (let depth = 0; depth < 12 && el; depth += 1) {
         try {
           if (el.querySelectorAll) {
             const userSteps = el.querySelectorAll("[data-agent-chat-user-step-id]");
             if (userSteps.length === 1 && userSteps[0] === userWrapper) {
-              const imgs = Array.from(el.querySelectorAll("img"));
+              const imgs: any[] = Array.from(el.querySelectorAll("img")) as any[];
               const hasAttachmentLike = imgs.some((img) => {
                 const src = img && img.src ? String(img.src) : "";
                 return /\/image\/attachment%3a/i.test(src) && /[?&]table=thread/i.test(src);
@@ -453,8 +454,8 @@
       return userWrapper;
     }
 
-    const hasUser = wrappers.some((w) => roleFromWrapper(w) === "user");
-    const hasAssistant = wrappers.some((w) => roleFromWrapper(w) === "assistant");
+    const hasUser = wrappers.some((w: any) => roleFromWrapper(w) === "user");
+    const hasAssistant = wrappers.some((w: any) => roleFromWrapper(w) === "assistant");
     if (picked.lowConfidence || !wrappersInRoot.length || root === document.body || !hasUser || !hasAssistant) {
       warningFlags.push("container_low_confidence");
     }
@@ -466,7 +467,7 @@
       const imageUrls = (() => {
         if (!w || !w.querySelector) return [];
         if (role === "assistant") {
-          const blocks = Array.from(w.querySelectorAll("div[data-block-id]"));
+          const blocks: any[] = Array.from(w.querySelectorAll("div[data-block-id]")) as any[];
           return mergeImageUrls(blocks.length ? blocks : [w]);
         }
 
@@ -505,7 +506,7 @@
 
     const threadId = findChatThreadIdFromHref(location.href);
     const pageId = findPageIdFromUrl();
-    const firstUser = messages.find((m) => m.role === "user");
+    const firstUser = messages.find((m: any) => m.role === "user");
     const firstUserSig = firstUser ? NS.normalize.fnv1a32(firstUser.contentText) : NS.normalize.fnv1a32(String(Date.now()));
     const conversationKey = threadId
       ? `notionai_t_${threadId}`
@@ -530,20 +531,13 @@
   NS.collectors = NS.collectors || {};
   NS.collectors.notionai = {
     capture,
-    getRoot: () => pickBestRoot(findCandidateRoots()).root
+    getRoot: () => pickBestRoot(findCandidateRoots()).root,
+    __test: {
+      matches,
+      inpageMatches,
+    },
   };
 
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "notionai", matches, inpageMatches, collector: NS.collectors.notionai });
   }
-
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = {
-      ...NS.collectors.notionai,
-      __test: {
-        matches,
-        inpageMatches
-      }
-    };
-  }
-})();

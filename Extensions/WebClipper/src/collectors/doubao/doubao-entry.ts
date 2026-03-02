@@ -1,2 +1,2 @@
-import './doubao-markdown.js';
-import './doubao-collector.js';
+import './doubao-markdown.ts';
+import './doubao-collector.ts';

@@ -1,7 +1,8 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function isThinkingLabelText(text) {
+const NS: any = collectorContext as any;
+
+  function isThinkingLabelText(text: any): any {
     const raw = String(text || "").trim();
     if (!raw) return false;
     const lower = raw.toLowerCase();
@@ -9,10 +10,10 @@
     return /^思考(中|过程)?(?:\.{3}|…)?$/.test(raw);
   }
 
-  function removeThinkingNodes(container) {
+  function removeThinkingNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
 
-    const labels = Array.from(container.querySelectorAll("p, div, span"));
+    const labels: any[] = Array.from(container.querySelectorAll("p, div, span")) as any[];
     for (const label of labels) {
       const hasChildren = !!(label && label.children && label.children.length);
       if (hasChildren) continue;
@@ -37,9 +38,9 @@
     return container;
   }
 
-  function removeNonContentNodes(container) {
+  function removeNonContentNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
-    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el) => {
+    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el: any) => {
       try {
         el.remove();
       } catch (_e) {
@@ -49,13 +50,13 @@
     return container;
   }
 
-  function normalizeMarkdown(markdown) {
+  function normalizeMarkdown(markdown: any): any {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const lines = s.split("\n").map((l) => l.replace(/[ \t]+$/g, ""));
+    const lines = s.split("\n").map((l: any) => l.replace(/[ \t]+$/g, ""));
     return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  function pickCodeLanguage(className) {
+  function pickCodeLanguage(className: any): any {
     const raw = String(className || "");
     if (!raw) return "";
     const parts = raw.split(/\s+/).filter(Boolean);
@@ -66,7 +67,7 @@
     return "";
   }
 
-  function wrapInlineCode(text) {
+  function wrapInlineCode(text: any): any {
     const s = String(text || "");
     if (!s) return "``";
     const matches = s.match(/`+/g) || [];
@@ -75,46 +76,46 @@
     return `${fence}${s}${fence}`;
   }
 
-  function htmlToMarkdown(root) {
+  function htmlToMarkdown(root: any): any {
     if (!root) return "";
     const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
     const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-    function renderChildren(el, ctx) {
-      const out = [];
-      const kids = el && el.childNodes ? Array.from(el.childNodes) : [];
+    function renderChildren(el: any, ctx: any): any {
+      const out: any[] = [];
+      const kids: any[] = el && el.childNodes ? (Array.from(el.childNodes) as any[]) : [];
       for (const c of kids) out.push(renderNode(c, ctx));
       return out.join("");
     }
 
-    function renderList(listEl, ordered, ctx) {
+    function renderList(listEl: any, ordered: any, ctx: any): any {
       const depth = (ctx && Number.isFinite(ctx.listDepth)) ? ctx.listDepth : 0;
       const indent = "  ".repeat(Math.max(0, depth));
-      const items = [];
-      const children = listEl && listEl.children ? Array.from(listEl.children) : [];
+      const items: any[] = [];
+      const children: any[] = listEl && listEl.children ? (Array.from(listEl.children) as any[]) : [];
       for (const child of children) {
         if (!child || String(child.tagName || "").toLowerCase() !== "li") continue;
         const childCtx = { ...ctx, listDepth: depth + 1 };
         const body = normalizeMarkdown(renderChildren(child, childCtx)).replace(/\n{2,}/g, "\n");
         const bullet = ordered ? "1." : "-";
-        const lines = String(body || "").split("\n").filter((l) => l.length);
+        const lines = String(body || "").split("\n").filter((l: any) => l.length);
         if (!lines.length) continue;
         const first = `${indent}${bullet} ${lines[0]}`;
-        const rest = lines.slice(1).map((l) => `${indent}  ${l}`);
+        const rest = lines.slice(1).map((l: any) => `${indent}  ${l}`);
         items.push([first, ...rest].join("\n"));
       }
       return items.join("\n") + (items.length ? "\n\n" : "");
     }
 
-    function renderBlockquote(el, ctx) {
+    function renderBlockquote(el: any, ctx: any): any {
       const raw = normalizeMarkdown(renderChildren(el, ctx));
       if (!raw) return "";
       const lines = raw.split("\n");
-      const quoted = lines.map((l) => (l ? `> ${l}` : ">")).join("\n");
+      const quoted = lines.map((l: any) => (l ? `> ${l}` : ">")).join("\n");
       return `${quoted}\n\n`;
     }
 
-    function renderNode(node, ctx) {
+    function renderNode(node: any, ctx: any): any {
       if (!node) return "";
       if (node.nodeType === TEXT_NODE) return node.nodeValue ? String(node.nodeValue) : "";
       if (node.nodeType !== ELEMENT_NODE) return "";
@@ -176,9 +177,9 @@
     return normalizeMarkdown(renderNode(root, { listDepth: 0 }));
   }
 
-  function extractTextFromSanitizedClone(clone) {
+  function extractTextFromSanitizedClone(clone: any): any {
     if (!clone) return "";
-    const inner = typeof clone.innerText === "string" ? clone.innerText : "";
+    const inner = typeof (clone as any).innerText === "string" ? (clone as any).innerText : "";
     if (inner && inner.trim()) return inner;
 
     const blockTags = new Set([
@@ -198,11 +199,11 @@
       "SECTION",
       "ARTICLE"
     ]);
-    const parts = [];
+    const parts: any[] = [];
     const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
     const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-    function walk(node) {
+    function walk(node: any): any {
       if (!node) return;
       const t = node.nodeType;
       if (t === TEXT_NODE) {
@@ -228,7 +229,7 @@
     return parts.join("");
   }
 
-  function getContentRoot(wrapper) {
+  function getContentRoot(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return wrapper;
     return wrapper.querySelector("div[class*='Markdown_markdownContainer__'] div[class*='Prose_prose__']")
       || wrapper.querySelector("div[class*='Markdown_markdownContainer__']")
@@ -237,7 +238,7 @@
       || wrapper;
   }
 
-  function sanitizeContentClone(wrapper, role) {
+  function sanitizeContentClone(wrapper: any, role: any): any {
     const root = getContentRoot(wrapper);
     if (!root || !root.cloneNode) return null;
     let cloned = null;
@@ -252,7 +253,7 @@
     return cloned;
   }
 
-  function normalizeText(text) {
+  function normalizeText(text: any): any {
     const value = String(text || "");
     if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
       return NS.normalize.normalizeText(value);
@@ -260,13 +261,13 @@
     return value.replace(/\s+/g, " ").trim();
   }
 
-  function extractMessageMarkdown(wrapper, role) {
+  function extractMessageMarkdown(wrapper: any, role: any): any {
     const cloned = sanitizeContentClone(wrapper, role);
     if (!cloned) return "";
     return htmlToMarkdown(cloned) || "";
   }
 
-  function extractMessageText(wrapper, role) {
+  function extractMessageText(wrapper: any, role: any): any {
     const cloned = sanitizeContentClone(wrapper, role);
     if (!cloned) return "";
     return normalizeText(extractTextFromSanitizedClone(cloned));
@@ -283,5 +284,3 @@
   };
 
   NS.poeMarkdown = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();

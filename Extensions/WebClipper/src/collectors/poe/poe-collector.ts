@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return /(^|\.)poe\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       const p = String(location.pathname || "");
       if (!p || p === "/") return false;
@@ -18,13 +19,13 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils && typeof NS.collectorUtils.conversationKeyFromLocation === "function"
       ? NS.collectorUtils.conversationKeyFromLocation(location)
       : "";
   }
 
-  function findTitle() {
+  function findTitle(): any {
     const selectors = [
       "div[class*='BaseNavbar_chatTitleItem__'] p[class*='ChatHeader_titleText__']",
       "div[class*='ChatHeader_titleRow__'] p[class*='ChatHeader_titleText__']",
@@ -41,7 +42,7 @@
     return document.title || "Poe";
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     // Poe groups messages by date buckets:
     // tupleGroupContainer -> (MessageDate label) + (one or more messageTuple)
     // If we pick only the first messageTuple's parent, we may only capture one date bucket.
@@ -61,18 +62,18 @@
     return document.querySelector("main") || document.querySelector("[role='main']") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     const utils = NS.collectorUtils;
     if (utils && typeof utils.inEditMode === "function") return utils.inEditMode(root);
     return false;
   }
 
-  function poeMarkdown() {
+  function poeMarkdown(): any {
     return NS.poeMarkdown || {};
   }
 
-  function sortByDomOrder(nodes) {
-    const sorted = Array.from(nodes || []);
+  function sortByDomOrder(nodes: any): any {
+    const sorted: any[] = Array.from(nodes || []) as any[];
     sorted.sort((a, b) => {
       if (a === b) return 0;
       const pos = a.compareDocumentPosition(b);
@@ -83,11 +84,11 @@
     return sorted;
   }
 
-  function sleep(ms) {
+  function sleep(ms: any): any {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
   }
 
-  function isUserWrapper(wrapper) {
+  function isUserWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return false;
     return !!(
       wrapper.querySelector("[class*='ChatMessage_rightSideMessageWrapper__']")
@@ -96,7 +97,7 @@
     );
   }
 
-  function isAssistantWrapper(wrapper) {
+  function isAssistantWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return false;
     return !!(
       wrapper.querySelector("[class*='LeftSideMessageHeader_leftSideMessageHeader__']")
@@ -105,14 +106,14 @@
     );
   }
 
-  function contentNodeFromWrapper(wrapper) {
+  function contentNodeFromWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return wrapper;
     const textContainer = wrapper.querySelector("div[class*='Message_messageTextContainer__']");
     const selectable = textContainer ? textContainer.querySelector("div[class*='Message_selectableText__']") : null;
     return selectable || textContainer || wrapper;
   }
 
-  function imageScopeFromWrapper(wrapper) {
+  function imageScopeFromWrapper(wrapper: any): any {
     if (!wrapper || !wrapper.querySelector) return wrapper;
     const bubble = wrapper.querySelector("div[class*='Message_leftSideMessageBubble__'], div[class*='Message_rightSideMessageBubble__']");
     if (bubble) return bubble;
@@ -121,24 +122,24 @@
     return wrapper.querySelector("div[class*='Message_messageTextContainer__']") || wrapper;
   }
 
-  function getMessageWrappers(root) {
+  function getMessageWrappers(root: any): any {
     const scope = root || document;
-    const out = [];
+    const out: any[] = [];
 
-    const tuples = Array.from(scope.querySelectorAll("div[class*='ChatMessagesView_messageTuple__']"));
+    const tuples: any[] = Array.from(scope.querySelectorAll("div[class*='ChatMessagesView_messageTuple__']")) as any[];
     for (const t of tuples) {
-      const msgs = Array.from(t.querySelectorAll("div[class*='ChatMessage_chatMessage__']"));
+      const msgs: any[] = Array.from(t.querySelectorAll("div[class*='ChatMessage_chatMessage__']")) as any[];
       for (const m of msgs) out.push(m);
     }
 
     if (!out.length) {
-      const msgs = Array.from(scope.querySelectorAll("div[class*='ChatMessage_chatMessage__'][id^='message-']"));
+      const msgs: any[] = Array.from(scope.querySelectorAll("div[class*='ChatMessage_chatMessage__'][id^='message-']")) as any[];
       out.push(...msgs);
     }
 
     const sorted = sortByDomOrder(out);
     // De-dup nested or repeated candidates.
-    const finalNodes = [];
+    const finalNodes: any[] = [];
     for (const node of sorted) {
       if (!node) continue;
       const isChild = finalNodes.some((p) => p && p.contains && p.contains(node));
@@ -147,7 +148,7 @@
     return finalNodes;
   }
 
-  function wrapperSignature(wrapper) {
+  function wrapperSignature(wrapper: any): any {
     if (!wrapper) return "";
     const id = wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
     if (id) return id;
@@ -156,7 +157,7 @@
     return raw.replace(/\s+/g, " ").trim().slice(0, 80);
   }
 
-  function messageLoadSignature(root) {
+  function messageLoadSignature(root: any): any {
     const wrappers = getMessageWrappers(root);
     const total = wrappers.length;
     if (!total) return "0";
@@ -171,7 +172,7 @@
     ].join("|");
   }
 
-  function isScrollableElement(el) {
+  function isScrollableElement(el: any): any {
     if (!el) return false;
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
     const canScroll = Number(el.scrollHeight || 0) > Number(el.clientHeight || 0) + 20;
@@ -190,12 +191,12 @@
     return canScroll && (styleScrollable || !overflowY);
   }
 
-  function isScrollCandidate(el) {
+  function isScrollCandidate(el: any): any {
     if (!el) return false;
     return Number(el.scrollHeight || 0) > Number(el.clientHeight || 0) + 20;
   }
 
-  function findScrollContainer(root) {
+  function findScrollContainer(root: any): any {
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
     const seed = (root && root.querySelector)
       ? (root.querySelector("div[class*='ChatMessagesView_messageTuple__']")
@@ -219,7 +220,7 @@
     return scrollingRoot;
   }
 
-  function getContainerScrollTop(container) {
+  function getContainerScrollTop(container: any): any {
     if (!container) return 0;
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
     if (container === scrollingRoot || container === document.documentElement || container === document.body) {
@@ -231,7 +232,7 @@
     return Number(container.scrollTop || 0);
   }
 
-  function scrollContainerToTop(container) {
+  function scrollContainerToTop(container: any): any {
     if (!container) return;
     const scrollingRoot = document.scrollingElement || document.documentElement || document.body;
     if (container === scrollingRoot || container === document.documentElement || container === document.body) {
@@ -243,7 +244,7 @@
     container.scrollTop = 0;
   }
 
-  async function waitForMessageChange(root, previousSig, { waitForLoadMs, pollMs }) {
+  async function waitForMessageChange(root: any, previousSig: any, { waitForLoadMs, pollMs }: any): Promise<any> {
     const timeoutMs = Math.max(0, Number(waitForLoadMs) || 0);
     const intervalMs = Math.max(10, Number(pollMs) || 80);
     const start = Date.now();
@@ -257,7 +258,7 @@
     return { changed: false, sig: messageLoadSignature(root) };
   }
 
-  async function prepareManualCapture(options) {
+  async function prepareManualCapture(options: any): Promise<any> {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return false;
 
     const root = getConversationRoot();
@@ -296,7 +297,7 @@
     return true;
   }
 
-  function messageKeyFromWrapper(wrapper, role, contentText, sequence) {
+  function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
     const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
     if (id) return id;
     return NS.normalize && typeof NS.normalize.makeFallbackMessageKey === "function"
@@ -304,7 +305,7 @@
       : String(sequence);
   }
 
-  function collectMessages({ allowEditing } = {}) {
+  function collectMessages({ allowEditing }: any = {}): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (!allowEditing && inEditMode(root)) return [];
@@ -317,14 +318,14 @@
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
-    const out = [];
+    const out: any[] = [];
     let seq = 0;
     for (const w of wrappers) {
       const role = isUserWrapper(w) ? "user" : (isAssistantWrapper(w) ? "assistant" : "");
       if (!role) continue;
 
       const node = contentNodeFromWrapper(w);
-      const raw = node && (node.innerText || node.textContent) ? (node.innerText || node.textContent) : "";
+      const raw = node && ((node as any).innerText || node.textContent) ? ((node as any).innerText || node.textContent) : "";
       const fallbackText = NS.normalize && typeof NS.normalize.normalizeText === "function"
         ? NS.normalize.normalizeText(raw)
         : String(raw || "").trim();
@@ -355,7 +356,7 @@
     return out;
   }
 
-  function capture(options) {
+  function capture(options: any): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
@@ -373,26 +374,19 @@
     };
   }
 
-  const api = { capture, getRoot: getConversationRoot, prepareManualCapture };
+  const api: any = { capture, getRoot: getConversationRoot, prepareManualCapture };
+  const markdown = poeMarkdown();
+  api.__test = {
+    removeThinkingNodes: markdown.removeThinkingNodes,
+    removeNonContentNodes: markdown.removeNonContentNodes,
+    normalizeMarkdown: markdown.normalizeMarkdown,
+    htmlToMarkdown: markdown.htmlToMarkdown,
+    extractTextFromSanitizedClone: markdown.extractTextFromSanitizedClone,
+    extractMessageMarkdown: markdown.extractMessageMarkdown,
+    extractMessageText: markdown.extractMessageText,
+  };
   NS.collectors = NS.collectors || {};
   NS.collectors.poe = api;
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "poe", matches, collector: api });
   }
-
-  if (typeof module !== "undefined" && module.exports) {
-    const markdown = poeMarkdown();
-    module.exports = {
-      ...api,
-      __test: {
-        removeThinkingNodes: markdown.removeThinkingNodes,
-        removeNonContentNodes: markdown.removeNonContentNodes,
-        normalizeMarkdown: markdown.normalizeMarkdown,
-        htmlToMarkdown: markdown.htmlToMarkdown,
-        extractTextFromSanitizedClone: markdown.extractTextFromSanitizedClone,
-        extractMessageMarkdown: markdown.extractMessageMarkdown,
-        extractMessageText: markdown.extractMessageText
-      }
-    };
-  }
-})();
