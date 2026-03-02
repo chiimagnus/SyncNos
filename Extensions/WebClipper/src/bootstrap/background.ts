@@ -1,10 +1,5 @@
 /* eslint-disable import/no-unresolved */
 
-// Legacy background bootstrap (migration-only).
-//
-// IMPORTANT: Do not use dynamic `import()` in MV3 service workers. Chrome disallows it on
-// ServiceWorkerGlobalScope. Use static imports so Vite/Rollup bundles legacy code into `background.js`.
-
 import '../protocols/bootstrap.ts';
 import '../export/bootstrap.ts';
 
@@ -24,11 +19,11 @@ import '../export/obsidian/obsidian-sync-metadata.js';
 import '../export/obsidian/obsidian-markdown-writer.js';
 import '../export/obsidian/obsidian-sync-orchestrator.js';
 
-import '../bootstrap/background-inpage-web-visibility.js';
+import './background-inpage-web-visibility.js';
 import '../collectors/web/article-fetch-service.js';
 
-export function startLegacyBackground() {
-  const NS = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+export function startBackgroundBootstrap() {
+  const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
 
   try {
     NS.backgroundInpageWebVisibility?.start?.();

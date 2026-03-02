@@ -1,4 +1,4 @@
-import { startLegacyBackground } from '../src/legacy/background-entry';
+import { startBackgroundBootstrap } from '../src/bootstrap/background.ts';
 import { registerConversationHandlers } from '../src/domains/conversations/background-handlers';
 import { registerSettingsHandlers } from '../src/domains/settings/background-handlers';
 import { registerSyncHandlers } from '../src/domains/sync/background-handlers';
@@ -10,7 +10,7 @@ import {
 } from '../src/integrations/notion/oauth';
 
 export default defineBackground(() => {
-  startLegacyBackground();
+  startBackgroundBootstrap();
 
   const NS: any = (globalThis as any).WebClipper || {};
   if (!NS.__backgroundInstanceId) {
