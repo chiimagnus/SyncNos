@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
+import { inpageButtonApi } from "../../src/ui/inpage/inpage-button-shadow";
 
 function setupDom() {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -20,12 +21,7 @@ function setupDom() {
 }
 
 function loadInpageButton() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/ui/inpage/inpage-button.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/ui/inpage/inpage-button.js");
+  return inpageButtonApi;
 }
 
 describe("inpage-button click combos", () => {

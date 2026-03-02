@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
+import { inpageTipApi } from "../../src/ui/inpage/inpage-tip-shadow";
 
 function setupDom() {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -24,12 +25,7 @@ function setupDom() {
 }
 
 function loadInpageTip() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/ui/inpage/inpage-tip.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/ui/inpage/inpage-tip.js");
+  return inpageTipApi;
 }
 
 function appendIconRect(rect: { left: number; right: number; top: number; bottom: number; width: number; height: number }) {
@@ -69,7 +65,7 @@ describe("inpage-tip speech bubble", () => {
     expect(bubble).toBeTruthy();
     expect(bubble?.dataset.kind).toBe("error");
     expect(bubble?.dataset.placement).toBe("left");
-    expect(bubble?.textContent).toContain("Save failed");
+    expect(bubble?.shadowRoot?.textContent).toContain("Save failed");
   });
 
   it.each([
@@ -102,7 +98,7 @@ describe("inpage-tip speech bubble", () => {
 
     const nodes = document.querySelectorAll("#webclipper-inpage-bubble");
     expect(nodes.length).toBe(1);
-    expect(nodes[0].textContent).toContain("Save failed");
+    expect((nodes[0] as any).shadowRoot?.textContent).toContain("Save failed");
     expect(nodes[0].dataset.kind).toBe("error");
   });
 

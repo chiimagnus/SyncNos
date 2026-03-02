@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
+import { inpageButtonApi } from "../../src/ui/inpage/inpage-button-shadow";
 
 function setViewportSize(width: number, height: number) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
@@ -75,12 +76,7 @@ function setupDom() {
 }
 
 function loadInpageButton() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/ui/inpage/inpage-button.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/ui/inpage/inpage-button.js");
+  return inpageButtonApi;
 }
 
 describe("inpage-button ratio position persistence", () => {
@@ -143,4 +139,3 @@ describe("inpage-button ratio position persistence", () => {
     expect(migrated.ratio).toBeCloseTo(400 / 772, 7);
   });
 });
-

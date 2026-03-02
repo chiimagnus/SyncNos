@@ -1,6 +1,5 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
-import '../src/ui/styles/inpage.css';
 
 import { startLegacyContent } from '../src/legacy/content-entry';
 
