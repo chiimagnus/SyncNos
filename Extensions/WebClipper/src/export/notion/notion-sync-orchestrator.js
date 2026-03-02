@@ -1,8 +1,8 @@
 /* global chrome */
 
 (function () {
-  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
   const NS = require("../../runtime-context.js");
+  const conversationKinds = NS.conversationKinds;
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
