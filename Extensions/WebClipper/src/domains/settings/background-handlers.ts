@@ -1,6 +1,7 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
 import { storageRemove } from '../../platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '../../integrations/notion/token-store';
+import { getObsidianSettings, saveObsidianSettings } from '../../integrations/obsidian/settings-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -57,18 +58,12 @@ export function registerSettingsHandlers(router: AnyRouter) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const store = NS.obsidianSettingsStore;
-    if (!store || typeof store.getSettings !== 'function') return router.err('obsidian settings store missing');
-    const data = await store.getSettings();
+    const data = await getObsidianSettings();
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, async (msg) => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const store = NS.obsidianSettingsStore;
-    if (!store || typeof store.saveSettings !== 'function') return router.err('obsidian settings store missing');
-    const data = await store.saveSettings({
+    const data = await saveObsidianSettings({
       enabled: msg.enabled,
       apiBaseUrl: msg.apiBaseUrl,
       apiKey: msg.apiKey,
