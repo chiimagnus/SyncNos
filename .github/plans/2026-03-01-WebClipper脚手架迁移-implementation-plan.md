@@ -338,15 +338,22 @@
 
 ### Task 17: article fetch 链路替换（scripting 注入 + readability）
 
+**Status:** ✅ Done（2026-03-02）
+
 **Files:**
 - Create: `Extensions/WebClipper/src/integrations/web-article/article-fetch.ts`
-- Modify: `Extensions/WebClipper/src/platform/messaging/background-router.ts`
+- Create: `Extensions/WebClipper/src/integrations/web-article/background-handlers.ts`
+- Modify: `Extensions/WebClipper/entrypoints/background.ts`
+- Modify: `Extensions/WebClipper/wxt.config.ts`
 
 **Step 1: 实现**
 - 迁移 `article-fetch-service.js` 逻辑到 TS，并保持动态注入 `readability.js` 的机制。
+  - 迁移期保留注入路径不变：`src/collectors/web/readability.js`
+  - WXT 构建时显式把该文件复制进最终产物（通过 `build:publicAssets` hook），以满足 `chrome.scripting.executeScript({ files: [...] })`
 
 **Step 2: 验证**
 - 手测：在普通网页点击 Fetch Current Page → 生成 kind=article 的 conversation/messages
+  - 构建校验：`npm --prefix Extensions/WebClipper run build:wxt` 后产物应包含 `.output/chrome-mv3/src/collectors/web/readability.js`
 
 ---
 

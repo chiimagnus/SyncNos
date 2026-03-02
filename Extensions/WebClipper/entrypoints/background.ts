@@ -1,6 +1,7 @@
 import { startLegacyBackground } from '../src/legacy/background-entry';
 import { registerConversationHandlers } from '../src/domains/conversations/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
+import { registerWebArticleHandlers } from '../src/integrations/web-article/background-handlers';
 
 export default defineBackground(() => {
   startLegacyBackground();
@@ -22,6 +23,7 @@ export default defineBackground(() => {
   });
 
   registerConversationHandlers(router);
+  registerWebArticleHandlers(router);
 
   // Keep legacy "start" side-effects that are not message handlers.
   try {
