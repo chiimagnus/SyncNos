@@ -1,9 +1,12 @@
-(function () {
-  const NS = require("../../runtime-context.js");
+// @ts-nocheck
+import notionFilesApi from './notion-files-api.ts';
+import runtimeContext from '../../runtime-context.ts';
 
-  function getNS() {
-    return NS;
-  }
+const NS = runtimeContext as any;
+
+function getNS() {
+  return NS;
+}
 
   const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
@@ -30,8 +33,14 @@
     return "";
   }
 
-  function guessFilenameFromUrl(url) {
-    const files = getNS().notionFilesApi;
+function getNotionFilesApi() {
+  const injected = getNS().notionFilesApi;
+  if (injected) return injected;
+  return notionFilesApi;
+}
+
+function guessFilenameFromUrl(url) {
+  const files = getNotionFilesApi();
     if (files && typeof files.guessFilenameFromUrl === "function") {
       return files.guessFilenameFromUrl(url);
     }
@@ -124,7 +133,7 @@
   async function upgradeImageBlocksToFileUploads(accessToken, blocks) {
     const list = Array.isArray(blocks) ? blocks : [];
     if (!list.length) return [];
-    const files = getNS().notionFilesApi;
+      const files = getNotionFilesApi();
     if (!canUpgrade(files)) return list;
 
     const cache = new Map();
@@ -182,10 +191,16 @@
     return out;
   }
 
-  const api = {
-    upgradeImageBlocksToFileUploads
-  };
+const api = {
+  upgradeImageBlocksToFileUploads,
+};
 
+if (
+  !getNS().notionImageUploadUpgrader ||
+  typeof getNS().notionImageUploadUpgrader.upgradeImageBlocksToFileUploads !== 'function'
+) {
   getNS().notionImageUploadUpgrader = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export { upgradeImageBlocksToFileUploads };
+export default api;

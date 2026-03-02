@@ -1,6 +1,10 @@
-(function () {
-  const NS = require("../../runtime-context.js");
-  const conversationKinds = NS.conversationKinds;
+// @ts-nocheck
+import { buildAiOptions as buildDefaultAiOptions } from './notion-ai.ts';
+import { notionFetch as defaultNotionFetch } from './notion-api.ts';
+import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import runtimeContext from '../../runtime-context.ts';
+
+const NS = runtimeContext as any;
 
   const DEFAULT_DB_TITLE = "SyncNos-AI Chats";
   const DEFAULT_DB_STORAGE_KEY = "notion_db_id_syncnos_ai_chats";
@@ -22,13 +26,25 @@
     return new Promise((resolve) => chrome.storage.local.remove([key], () => resolve(true)));
   }
 
+  function getConversationKinds() {
+    const injected = NS.conversationKinds;
+    if (injected && typeof injected.list === 'function') return injected;
+    return builtInConversationKinds;
+  }
+
+  function getNotionFetch() {
+    if (NS.notionApi && typeof NS.notionApi.notionFetch === 'function') return NS.notionApi.notionFetch;
+    return defaultNotionFetch;
+  }
+
   function buildAiOptions() {
     const api = NS.notionAi;
     if (api && typeof api.buildAiOptions === "function") return api.buildAiOptions();
-    return [];
+    return buildDefaultAiOptions();
   }
 
   function defaultDbSpec() {
+    const conversationKinds = getConversationKinds();
     const list = conversationKinds && typeof conversationKinds.list === "function" ? conversationKinds.list() : [];
     const chat = Array.isArray(list) ? list.find((d) => d && d.id === "chat" && d.notion && d.notion.dbSpec) : null;
     if (chat && chat.notion && chat.notion.dbSpec) return chat.notion.dbSpec;
@@ -50,7 +66,8 @@
   }
 
   async function getDatabase(accessToken, databaseId) {
-    return NS.notionApi.notionFetch({ accessToken, method: "GET", path: `/v1/databases/${databaseId}` });
+    const notionFetch = getNotionFetch();
+    return notionFetch({ accessToken, method: "GET", path: `/v1/databases/${databaseId}` });
   }
 
   async function searchDatabases(accessToken, query) {
@@ -60,12 +77,14 @@
       sort: { direction: "descending", timestamp: "last_edited_time" },
       page_size: 20
     };
-    return NS.notionApi.notionFetch({ accessToken, method: "POST", path: "/v1/search", body });
+    const notionFetch = getNotionFetch();
+    return notionFetch({ accessToken, method: "POST", path: "/v1/search", body });
   }
 
   async function updateDatabase(accessToken, { databaseId, properties }) {
     const body = { properties: properties || {} };
-    return NS.notionApi.notionFetch({ accessToken, method: "PATCH", path: `/v1/databases/${databaseId}`, body });
+    const notionFetch = getNotionFetch();
+    return notionFetch({ accessToken, method: "PATCH", path: `/v1/databases/${databaseId}`, body });
   }
 
   function materializeDbProperties(dbSpec) {
@@ -88,7 +107,8 @@
       title: [{ type: "text", text: { content: spec.title } }],
       properties: materializeDbProperties(spec)
     };
-    return NS.notionApi.notionFetch({ accessToken, method: "POST", path: "/v1/databases", body });
+    const notionFetch = getNotionFetch();
+    return notionFetch({ accessToken, method: "POST", path: "/v1/databases", body });
   }
 
   async function ensureDatabaseSchema({ accessToken, databaseId, dbSpec }) {
@@ -155,16 +175,28 @@
     return { databaseId: created.id, title: spec.title, reused: false, database: created };
   }
 
-  const api = {
-    ensureDatabase,
-    ensureDatabaseSchema,
-    clearCachedDatabaseId,
-    buildAiOptions,
-    getCachedDatabaseId,
-    setCachedDatabaseId,
-    DEFAULT_DB_TITLE,
-    DEFAULT_DB_STORAGE_KEY
-  };
+const api = {
+  ensureDatabase,
+  ensureDatabaseSchema,
+  clearCachedDatabaseId,
+  buildAiOptions,
+  getCachedDatabaseId,
+  setCachedDatabaseId,
+  DEFAULT_DB_TITLE,
+  DEFAULT_DB_STORAGE_KEY,
+};
+if (!NS.notionDbManager || typeof NS.notionDbManager.ensureDatabase !== 'function') {
   NS.notionDbManager = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export {
+  ensureDatabase,
+  ensureDatabaseSchema,
+  clearCachedDatabaseId,
+  buildAiOptions,
+  getCachedDatabaseId,
+  setCachedDatabaseId,
+  DEFAULT_DB_TITLE,
+  DEFAULT_DB_STORAGE_KEY,
+};
+export default api;

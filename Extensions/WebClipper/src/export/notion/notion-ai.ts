@@ -1,5 +1,7 @@
-(function () {
-  const NS = require("../../runtime-context.js");
+// @ts-nocheck
+import runtimeContext from '../../runtime-context.ts';
+
+const NS = runtimeContext as any;
 
   const AI = Object.freeze({
     chatgpt: { name: "ChatGPT", color: "green" },
@@ -29,7 +31,10 @@
     return Object.keys(AI).map((k) => ({ name: AI[k].name, color: AI[k].color }));
   }
 
-  const api = { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
+const api = { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
+if (!NS.notionAi || typeof NS.notionAi.optionNameForSource !== 'function') {
   NS.notionAi = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export { AI, buildAiOptions, optionNameForSource, normalizeSourceKey };
+export default api;

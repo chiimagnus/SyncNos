@@ -2,15 +2,15 @@
 
 import '../export/bootstrap.ts';
 
-import '../export/notion/notion-api.js';
-import '../export/notion/notion-files-api.js';
-import '../export/notion/notion-ai.js';
-import '../export/notion/notion-db-manager.js';
-import '../export/notion/notion-markdown-blocks.js';
-import '../export/notion/notion-image-upload-upgrader.js';
-import '../export/notion/notion-sync-service.js';
-import '../export/notion/notion-sync-job-store.js';
-import '../export/notion/notion-sync-orchestrator.js';
+import '../export/notion/notion-api.ts';
+import '../export/notion/notion-files-api.ts';
+import '../export/notion/notion-ai.ts';
+import '../export/notion/notion-db-manager.ts';
+import '../export/notion/notion-markdown-blocks.ts';
+import '../export/notion/notion-image-upload-upgrader.ts';
+import '../export/notion/notion-sync-service.ts';
+import '../export/notion/notion-sync-job-store.ts';
+import '../export/notion/notion-sync-orchestrator.ts';
 
 import '../export/obsidian/obsidian-local-rest-client.ts';
 import '../export/obsidian/obsidian-note-path.ts';

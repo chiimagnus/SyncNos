@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-function loadNotionSyncService() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/notion/notion-sync-service.js");
+async function loadNotionSyncService() {
+  const mod = await import(
+    /* @vite-ignore */
+    `../../src/export/notion/notion-sync-service.ts?t=${Date.now()}_${Math.random().toString(16).slice(2)}`
+  );
+  return (mod as any).default || mod;
 }
 
 describe("notion-sync-service image uploads", () => {
@@ -34,7 +33,7 @@ describe("notion-sync-service image uploads", () => {
       // `sendFileUpload` not used in this test.
     };
 
-    const service = loadNotionSyncService();
+    const service = await loadNotionSyncService();
     const blocks = [{
       object: "block",
       type: "image",
@@ -82,7 +81,7 @@ describe("notion-sync-service image uploads", () => {
       }
     };
 
-    const service = loadNotionSyncService();
+    const service = await loadNotionSyncService();
     const blocks = [{
       object: "block",
       type: "image",
@@ -130,7 +129,7 @@ describe("notion-sync-service image uploads", () => {
       }
     };
 
-    const service = loadNotionSyncService();
+    const service = await loadNotionSyncService();
     const blocks = [{
       object: "block",
       type: "image",

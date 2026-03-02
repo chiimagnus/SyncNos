@@ -1,5 +1,8 @@
-(function () {
-  const NS = require("../../runtime-context.js");
+// @ts-nocheck
+import { notionFetch as defaultNotionFetch } from './notion-api.ts';
+import runtimeContext from '../../runtime-context.ts';
+
+const NS = runtimeContext as any;
 
   const FILE_UPLOAD_VERSION = "2025-09-03";
   const DEFAULT_POLL_INTERVAL_MS = 800;
@@ -57,8 +60,13 @@
     return String(value);
   }
 
+  function getNotionFetch() {
+    if (NS.notionApi && typeof NS.notionApi.notionFetch === 'function') return NS.notionApi.notionFetch;
+    return defaultNotionFetch;
+  }
+
   async function createExternalURLUpload({ accessToken, url, filename, contentType }) {
-    if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
+    const notionFetch = getNotionFetch();
     const target = String(url || "").trim();
     if (!isHttpUrl(target)) throw new Error("invalid external image url");
     const body = {
@@ -68,7 +76,7 @@
     };
     const ct = String(contentType || "").trim();
     if (ct) body.content_type = ct;
-    return NS.notionApi.notionFetch({
+    return notionFetch({
       accessToken,
       method: "POST",
       path: "/v1/file_uploads",
@@ -78,7 +86,7 @@
   }
 
   async function createFileUpload({ accessToken, filename, contentType, contentLength }) {
-    if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
+    const notionFetch = getNotionFetch();
     const name = sanitizeFilename(filename || "");
     const ct = String(contentType || "").trim() || "application/octet-stream";
     const body = {
@@ -86,7 +94,7 @@
       filename: name,
       content_type: ct
     };
-    return NS.notionApi.notionFetch({
+    return notionFetch({
       accessToken,
       method: "POST",
       path: "/v1/file_uploads",
@@ -122,10 +130,10 @@
   }
 
   async function retrieveUpload({ accessToken, id }) {
-    if (!NS.notionApi || typeof NS.notionApi.notionFetch !== "function") throw new Error("notion api missing");
+    const notionFetch = getNotionFetch();
     const uploadId = String(id || "").trim();
     if (!uploadId) throw new Error("missing upload id");
-    return NS.notionApi.notionFetch({
+    return notionFetch({
       accessToken,
       method: "GET",
       path: `/v1/file_uploads/${encodeURIComponent(uploadId)}`,
@@ -159,17 +167,29 @@
     throw new Error("file upload timed out");
   }
 
-  const api = {
-    FILE_UPLOAD_VERSION,
-    sanitizeFilename,
-    guessFilenameFromUrl,
-    createExternalURLUpload,
-    createFileUpload,
-    sendFileUpload,
-    retrieveUpload,
-    waitUntilUploaded
-  };
+const api = {
+  FILE_UPLOAD_VERSION,
+  sanitizeFilename,
+  guessFilenameFromUrl,
+  createExternalURLUpload,
+  createFileUpload,
+  sendFileUpload,
+  retrieveUpload,
+  waitUntilUploaded,
+};
 
+if (!NS.notionFilesApi || typeof NS.notionFilesApi.createExternalURLUpload !== 'function') {
   NS.notionFilesApi = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export {
+  FILE_UPLOAD_VERSION,
+  sanitizeFilename,
+  guessFilenameFromUrl,
+  createExternalURLUpload,
+  createFileUpload,
+  sendFileUpload,
+  retrieveUpload,
+  waitUntilUploaded,
+};
+export default api;

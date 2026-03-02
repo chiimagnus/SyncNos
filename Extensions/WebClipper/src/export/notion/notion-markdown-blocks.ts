@@ -1,5 +1,7 @@
-(function () {
-  const NS = require("../../runtime-context.js");
+// @ts-nocheck
+import runtimeContext from '../../runtime-context.ts';
+
+const NS = runtimeContext as any;
 
   const MAX_TEXT = 1900;
 
@@ -484,10 +486,13 @@
     return out;
   }
 
-  const api = {
-    inlineMarkdownToRichText,
-    markdownToNotionBlocks
-  };
+const api = {
+  inlineMarkdownToRichText,
+  markdownToNotionBlocks,
+};
+if (!NS.notionMarkdownBlocks || typeof NS.notionMarkdownBlocks.markdownToNotionBlocks !== 'function') {
   NS.notionMarkdownBlocks = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export { inlineMarkdownToRichText, markdownToNotionBlocks };
+export default api;

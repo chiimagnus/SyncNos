@@ -1,7 +1,7 @@
-/* global chrome */
+// @ts-nocheck
+import runtimeContext from '../../runtime-context.ts';
 
-(function () {
-  const NS = require("../../runtime-context.js");
+const NS = runtimeContext as any;
 
   const NOTION_SYNC_JOB_KEY = "notion_sync_job_v1";
   const DEFAULT_STALE_MS = 20 * 60 * 1000;
@@ -62,13 +62,22 @@
     return current;
   }
 
-  const api = {
-    NOTION_SYNC_JOB_KEY,
-    getJob,
-    setJob,
-    isRunningJob,
-    abortRunningJobIfFromOtherInstance
-  };
+const api = {
+  NOTION_SYNC_JOB_KEY,
+  getJob,
+  setJob,
+  isRunningJob,
+  abortRunningJobIfFromOtherInstance,
+};
+if (!NS.notionSyncJobStore || typeof NS.notionSyncJobStore.getJob !== 'function') {
   NS.notionSyncJobStore = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export {
+  NOTION_SYNC_JOB_KEY,
+  getJob,
+  setJob,
+  isRunningJob,
+  abortRunningJobIfFromOtherInstance,
+};
+export default api;

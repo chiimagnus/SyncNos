@@ -1,4 +1,4 @@
-import '../../../export/notion/notion-sync-orchestrator.js';
+import notionSyncOrchestratorFallback from '../../../export/notion/notion-sync-orchestrator.ts';
 import runtimeContext from '../../../runtime-context.ts';
 
 type LegacyNotionSyncOrchestrator = {
@@ -10,7 +10,10 @@ type LegacyNotionSyncOrchestrator = {
 };
 
 function getLegacyNotionSyncOrchestrator(): LegacyNotionSyncOrchestrator {
-  const orchestrator = runtimeContext.notionSyncOrchestrator;
+  const orchestrator = runtimeContext.notionSyncOrchestrator || notionSyncOrchestratorFallback;
+  if (!runtimeContext.notionSyncOrchestrator && orchestrator) {
+    runtimeContext.notionSyncOrchestrator = orchestrator;
+  }
   if (!orchestrator || typeof orchestrator.syncConversations !== 'function') {
     throw new Error('notion sync orchestrator missing');
   }
