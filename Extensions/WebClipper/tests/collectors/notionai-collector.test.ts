@@ -1,4 +1,9 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import {
+  ensureCollectorContractAndRegistry,
+  ensureCollectorUtils,
+} from "../helpers/collectors-bootstrap";
 
 async function loadNormalize() {
   const normalizeModule = await import("../../src/shared/normalize.ts");
@@ -17,22 +22,8 @@ async function loadNormalize() {
   return normalizeApi;
 }
 
-function loadRegistry() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/registry.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/registry.js");
-}
-
-function loadContract() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-contract.js");
+async function loadContractAndRegistry() {
+  return ensureCollectorContractAndRegistry();
 }
 
 async function loadNotionAiCollector() {
@@ -55,19 +46,12 @@ async function loadNotionAiMarkdown() {
   return import("../../src/collectors/notionai/notionai-markdown.ts");
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
 describe("notionai-collector", () => {
   it("exposes inpageMatches for early UI eligibility", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const dom = new JSDOM("<body></body>", { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
     // @ts-expect-error test global
@@ -84,8 +68,7 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadContract();
-    loadRegistry();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 
@@ -102,8 +85,6 @@ describe("notionai-collector", () => {
   });
 
   it("becomes active only when chat turn signals exist", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `<div data-agent-chat-user-step-id="u1"></div>`;
     const dom = new JSDOM(`<body>${html}</body>`, { url: "https://www.notion.so/0123456789abcdef0123456789abcdef" });
@@ -121,8 +102,7 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadContract();
-    loadRegistry();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     await loadNotionAiCollector();
 
@@ -135,8 +115,6 @@ describe("notionai-collector", () => {
   });
 
   it("uses thread id `t` as stable conversationKey and canonical /chat URL", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -167,8 +145,7 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadContract();
-    loadRegistry();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 
@@ -179,8 +156,6 @@ describe("notionai-collector", () => {
   });
 
   it("keeps notionai conversationKey stable across different page paths when `t` matches", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -214,8 +189,7 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
       await loadNormalize();
-      loadContract();
-      loadRegistry();
+    await loadContractAndRegistry();
       await loadNotionAiMarkdown();
       const collector = await loadNotionAiCollector();
 
@@ -228,8 +202,6 @@ describe("notionai-collector", () => {
   });
 
   it("captures user uploaded images (thread attachments) outside text leaf", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -267,9 +239,8 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 
@@ -282,8 +253,6 @@ describe("notionai-collector", () => {
   });
 
   it("does not capture left sidebar / page blocks outside chat turns", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -326,9 +295,8 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 
@@ -342,8 +310,6 @@ describe("notionai-collector", () => {
   });
 
   it("pairs assistant replies as the next sibling container after each user turn", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -387,9 +353,8 @@ describe("notionai-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 
@@ -404,8 +369,6 @@ describe("notionai-collector", () => {
   });
 
   it("captures nested list and fenced code markdown from assistant blocks", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const threadId = "30cbe9d6386a807c83e900a970ea41b2";
     const html = `
@@ -448,9 +411,8 @@ console.log(value);</div>
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
-    loadContract();
-    loadRegistry();
+    await loadCollectorUtils();
+    await loadContractAndRegistry();
     await loadNotionAiMarkdown();
     const collector = await loadNotionAiCollector();
 

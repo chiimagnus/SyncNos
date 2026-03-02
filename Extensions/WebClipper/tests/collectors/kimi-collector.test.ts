@@ -1,4 +1,6 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
 async function loadNormalize() {
   const normalizeModule = await import("../../src/shared/normalize.ts");
@@ -17,13 +19,8 @@ async function loadNormalize() {
   return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
 async function loadKimiMarkdown() {
@@ -35,8 +32,6 @@ async function loadKimiCollector() {
 }
 
 function setupKimiDom(html: string, url: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { JSDOM } = require("jsdom");
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   // @ts-expect-error test global
   globalThis.window = dom.window;
@@ -104,7 +99,7 @@ describe("kimi-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadKimiMarkdown();
     await loadKimiCollector();
 
@@ -143,7 +138,7 @@ describe("kimi-collector", () => {
       globalThis.WebClipper = {};
     }
     await loadNormalize();
-    loadCollectorUtils();
+    await loadCollectorUtils();
     await loadKimiCollector();
 
     // @ts-expect-error test global

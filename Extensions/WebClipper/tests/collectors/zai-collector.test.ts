@@ -1,3 +1,4 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 async function loadNormalize() {
@@ -28,8 +29,6 @@ async function loadZaiMarkdown() {
 
 describe("zai-collector", () => {
   it("ignores thinking-chain-container content", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-1">
@@ -77,8 +76,6 @@ describe("zai-collector", () => {
   });
 
   it("extracts assistant markdown from rendered HTML", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-3">
@@ -129,8 +126,6 @@ describe("zai-collector", () => {
   });
 
   it("does not leak UI button labels when falling back to wrapper", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div id="message-2">
