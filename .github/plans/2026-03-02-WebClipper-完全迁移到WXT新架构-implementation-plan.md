@@ -12,7 +12,7 @@
 
 ## 1) 当前基线（截至 2026-03-02）
 
-### 已完成里程碑（Task1 ~ Task30）
+### 已完成里程碑（Task1 ~ Task39）
 
 - `Task1` 文档基线：`c1a26d70`
 - `Task2` TS IDB schema：`b6195750`
@@ -45,6 +45,15 @@
 - `Task28` shared/storage 核心 TS 化：`c87ebda7`
 - `Task29` bootstrap TS 收敛：`fa74e9d5`
 - `Task30` collectors runtime-observer TS 化 + tests 对齐：`88b9b659`
+- `Task31` collectors A 组 TS 化：`91271e72`
+- `Task32` collectors B 组 TS 化：`9c4aa8a4`
+- `Task33` web collector pipeline TS 化：`20191b28`
+- `Task34` inpage button/tip TS 化：`ea6eee9c`
+- `Task35` local + obsidian export TS 化：`39277017`
+- `Task36` notion export TS 化：`0616edf0`
+- `Task37` integrations/domain wrapper 去 `.js` 依赖：`933ef775`
+- `Task38` 测试装载改为 TS/ESM：`3d60b9bb`
+- `Task39` 删除 JS 过渡声明 + runtime JS guardrail：`62609966`
 
 ### 当前问题快照（Phase 3 输入）
 
@@ -52,11 +61,15 @@
 2. `background.js` 报错：`Uncaught ReferenceError: require is not defined`
 3. 根因定位：运行时链路中仍保留 CJS `require`（`entrypoints/background.ts`、`runtime-context.js`、若干 `*.js` 模块）
 
-### 代码规模快照（`src + entrypoints`）
+**当前状态（截至 2026-03-02）**
+- 上述启动阻塞问题已清零；`require is not defined` / `Service worker registration failed` 复现链路已移除。
+- `src + entrypoints` runtime JS 仅保留 allowlist：`src/vendor/readability.js`（第三方注入资产）。
 
-- `*.ts`: `60`
-- `*.js`: `57`
-- 高风险 JS 域：`collectors/*`、`export/notion/*`、`export/obsidian/*`、`bootstrap/*`、`runtime-context.js`
+### 代码规模快照（`src + entrypoints`，截至 2026-03-02）
+
+- `*.ts`: `108`
+- `*.js`: `1`
+- JS 仅剩 allowlist：`src/vendor/readability.js`
 
 ---
 
@@ -348,7 +361,7 @@
 
 **Files（主）**
 - Modify: `Extensions/WebClipper/tests/**/*.test.ts`
-- Create（如需要）: `Extensions/WebClipper/tests/helpers/load-module.ts`
+- Create（如需要）: `Extensions/WebClipper/tests/helpers/collectors-bootstrap.ts`
 
 **Step 1: 实现**
 - 将测试中的 JS require 路径统一到 TS 模块（可用动态 `import()` in test runtime）
@@ -396,6 +409,17 @@
 
 **Step 3: 原子提交**
 - `git commit -m "docs: task40 - finalize phase3 migration status and acceptance evidence"`
+
+---
+
+## 3.1) 最近验收记录（Task38 ~ Task39）
+
+- `npm --prefix Extensions/WebClipper run test --silent`
+  - 结果：`Test Files 46 passed (46)`，`Tests 177 passed (177)`。
+- `npm --prefix Extensions/WebClipper run compile`
+  - 结果：通过（`tsc --noEmit`）。
+- `node Extensions/WebClipper/scripts/check-no-runtime-js.mjs`
+  - 结果：`OK (1 runtime .js file(s), allowlist size: 1)`。
 
 ---
 
