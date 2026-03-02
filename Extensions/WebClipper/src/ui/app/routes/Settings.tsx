@@ -5,6 +5,19 @@ import {
   getNotionConnectionStatus,
   getObsidianSettingsStatus,
 } from '../../../domains/settings/sensitive';
+import { ARTICLE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../../platform/messaging/message-contracts';
+import { send } from '../../../platform/runtime/runtime';
+import { storageGet, storageSet } from '../../../platform/storage/local';
+
+type ApiError = { message: string; extra: unknown } | null;
+type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
+
+function unwrap<T>(res: ApiResponse<T>): T {
+  if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
+  if (res.ok) return res.data as T;
+  const message = res.error?.message ?? 'unknown error';
+  throw new Error(message);
+}
 
 export default function Settings() {
   const [loading, setLoading] = useState(false);
@@ -18,14 +31,21 @@ export default function Settings() {
     chatFolder: string;
     articleFolder: string;
   } | null>(null);
+  const [articleFetchStatus, setArticleFetchStatus] = useState<string>('Idle');
+  const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
 
   const refresh = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [n, o] = await Promise.all([getNotionConnectionStatus(), getObsidianSettingsStatus()]);
+      const [n, o, s] = await Promise.all([
+        getNotionConnectionStatus(),
+        getObsidianSettingsStatus(),
+        storageGet(['inpage_supported_only']),
+      ]);
       setNotionConnected(n.connected);
       setObsidian(o);
+      setInpageSupportedOnly(!!s?.inpage_supported_only);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -58,6 +78,41 @@ export default function Settings() {
       await refresh();
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
+      setLoading(false);
+    }
+  };
+
+  const onFetchCurrentPage = async () => {
+    setLoading(true);
+    setError(null);
+    setArticleFetchStatus('Fetching…');
+    try {
+      const res = await send<ApiResponse<any>>(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, {});
+      const data = unwrap(res);
+      const conversationId = Number(data?.conversationId) || 0;
+      setArticleFetchStatus(conversationId ? `Saved ✓ (conversationId=${conversationId})` : 'Done ✓');
+      await refresh();
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e ?? 'fetch failed');
+      setArticleFetchStatus(`Error: ${msg}`);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onToggleInpageSupportedOnly = async (next: boolean) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await storageSet({ inpage_supported_only: !!next });
+      setInpageSupportedOnly(!!next);
+      const res = await send<ApiResponse<any>>(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, {});
+      unwrap(res);
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e ?? 'failed');
+      setError(msg);
+    } finally {
       setLoading(false);
     }
   };
@@ -131,8 +186,43 @@ export default function Settings() {
             Clear API key
           </button>
         </section>
+
+        <section
+          style={{
+            border: '1px solid color-mix(in oklab, CanvasText 12%, transparent)',
+            borderRadius: 12,
+            padding: 12,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 16 }}>Article Fetch</h2>
+          <button onClick={() => onFetchCurrentPage().catch(() => {})} disabled={loading} style={{ marginTop: 10 }} type="button">
+            Fetch Current Page
+          </button>
+          <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>status: {articleFetchStatus}</div>
+        </section>
+
+        <section
+          style={{
+            border: '1px solid color-mix(in oklab, CanvasText 12%, transparent)',
+            borderRadius: 12,
+            padding: 12,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 16 }}>Inpage Button</h2>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <input
+              type="checkbox"
+              checked={!!inpageSupportedOnly}
+              disabled={loading || inpageSupportedOnly == null}
+              onChange={(e) => onToggleInpageSupportedOnly(!!e.target.checked).catch(() => {})}
+            />
+            Only show on supported sites
+          </label>
+          <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>
+            Applies immediately to existing tabs.
+          </div>
+        </section>
       </div>
     </section>
   );
 }
-
