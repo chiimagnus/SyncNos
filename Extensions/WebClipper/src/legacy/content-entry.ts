@@ -4,7 +4,7 @@
 //
 // Use static imports so Vite/Rollup bundles legacy content code into `content-scripts/content.js`.
 
-import '../protocols/message-contracts.js';
+import '../protocols/bootstrap.ts';
 import '../shared/normalize.js';
 import '../storage/incremental-updater.js';
 
