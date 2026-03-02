@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   function isThinkingLabelText(text) {
     const raw = String(text || "").trim();

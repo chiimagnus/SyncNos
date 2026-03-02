@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   const ARTICLE_SOURCE = "web";
   const ARTICLE_SOURCE_TYPE = "article";
