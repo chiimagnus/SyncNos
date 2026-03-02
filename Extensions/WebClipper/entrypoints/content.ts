@@ -8,10 +8,8 @@ import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
 import '../src/collectors/web/web-collector.ts';
 import '../src/integrations/notionai-model-picker.js';
-import '../src/ui/inpage/inpage-tip.js';
-import '../src/ui/inpage/inpage-button.js';
-import '../src/ui/inpage/inpage-tip-shadow';
-import '../src/ui/inpage/inpage-button-shadow';
+import '../src/ui/inpage/inpage-tip.ts';
+import '../src/ui/inpage/inpage-button.ts';
 
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';
