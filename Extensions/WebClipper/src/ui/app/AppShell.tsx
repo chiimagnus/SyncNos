@@ -1,4 +1,5 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
+import Backup from './routes/Backup';
 import Conversations from './routes/Conversations';
 import Debug from './routes/Debug';
 import Settings from './routes/Settings';
@@ -21,6 +22,9 @@ function Nav() {
       </NavLink>
       <NavLink to="/settings" style={linkStyle}>
         Settings
+      </NavLink>
+      <NavLink to="/backup" style={linkStyle}>
+        Backup
       </NavLink>
       <NavLink to="/debug" style={linkStyle}>
         Debug
@@ -58,6 +62,7 @@ export default function AppShell() {
             <Route path="/" element={<Conversations />} />
             <Route path="/sync" element={<SyncJobs />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/backup" element={<Backup />} />
             <Route path="/debug" element={<Debug />} />
           </Routes>
         </main>
@@ -65,4 +70,3 @@ export default function AppShell() {
     </HashRouter>
   );
 }
-
