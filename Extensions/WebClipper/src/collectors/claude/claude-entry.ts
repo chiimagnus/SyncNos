@@ -1,1 +1,1 @@
-import './claude-collector.js';
+import './claude-collector.ts';

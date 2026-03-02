@@ -7,7 +7,12 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
@@ -21,22 +26,12 @@ function loadCollectorUtils() {
   return require("../../src/collectors/collector-utils.js");
 }
 
-function loadDeepseekMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/deepseek/deepseek-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/deepseek/deepseek-markdown.js");
+async function loadDeepseekMarkdown() {
+  return import("../../src/collectors/deepseek/deepseek-markdown.ts");
 }
 
-function loadDeepseekCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/deepseek/deepseek-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/deepseek/deepseek-collector.js");
+async function loadDeepseekCollector() {
+  return import("../../src/collectors/deepseek/deepseek-collector.ts");
 }
 
 function setupDeepseekDom(html: string, url: string) {
@@ -98,11 +93,13 @@ describe("deepseek-collector", () => {
     setupDeepseekDom(html, "https://chat.deepseek.com/a/chat/s/abc123");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadDeepseekMarkdown();
-    loadDeepseekCollector();
+    await loadDeepseekMarkdown();
+    await loadDeepseekCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.deepseek.capture();
@@ -145,10 +142,12 @@ describe("deepseek-collector", () => {
     setupDeepseekDom(html, "https://chat.deepseek.com/a/chat/s/fallback1");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadDeepseekCollector();
+    await loadDeepseekCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.deepseek.capture();

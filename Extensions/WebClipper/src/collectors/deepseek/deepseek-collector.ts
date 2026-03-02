@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return hostname === "chat.deepseek.com";
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       return /^\/a\/chat\/s\/[^/]+$/.test(location.pathname || "");
     } catch (_e) {
@@ -14,31 +15,31 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector(".dad65929") || document.querySelector("main") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     return NS.collectorUtils.inEditMode(root);
   }
 
-  function deepseekMarkdown() {
+  function deepseekMarkdown(): any {
     return NS.deepseekMarkdown || {};
   }
 
-  function collectMessages() {
+  function collectMessages(): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const nodes = Array.from(root.querySelectorAll("._9663006, ._4f9bf79._43c05b5"));
+    const nodes: any[] = Array.from(root.querySelectorAll("._9663006, ._4f9bf79._43c05b5")) as any[];
     if (!nodes.length) return [];
 
-    const out = [];
+    const out: any[] = [];
     const utils = NS.collectorUtils || {};
     const markdown = deepseekMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
@@ -56,7 +57,7 @@
       } else {
         const ds = el.querySelector(".ds-message") || el;
         // Prefer direct markdown child for formal response; avoid think blocks.
-        const directMarkdown = Array.from(ds.children || []).find((c) => c && c.classList && c.classList.contains("ds-markdown"));
+        const directMarkdown = Array.from(ds.children || []).find((c: any) => c && c.classList && c.classList.contains("ds-markdown"));
         const contentEl = directMarkdown || ds.querySelector(".ds-markdown") || ds;
         contentNode = contentEl;
         const fallbackText = NS.normalize.normalizeText(contentEl.innerText || contentEl.textContent || "");
@@ -84,7 +85,7 @@
     return out;
   }
 
-  function capture() {
+  function capture(): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
@@ -108,4 +109,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "deepseek", matches, collector: api });
   }
-})();

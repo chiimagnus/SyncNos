@@ -1,2 +1,2 @@
-import './kimi-markdown.js';
-import './kimi-collector.js';
+import './kimi-markdown.ts';
+import './kimi-collector.ts';

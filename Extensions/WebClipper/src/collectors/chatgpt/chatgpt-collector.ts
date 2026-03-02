@@ -1,35 +1,36 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return /(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname);
   }
 
-  function findConversationIdFromUrl() {
+  function findConversationIdFromUrl(): any {
     // Prefer URL path for ChatGPT. Works for both chat.openai.com and chatgpt.com.
     const m = location.pathname.match(/^\/c\/([^/?#]+)/) || location.pathname.match(/^\/g\/[^/]+\/c\/([^/?#]+)/);
     return m && m[1] ? m[1] : "";
   }
 
-  function makeFallbackConversationKey(messages) {
-    const firstUser = Array.isArray(messages) ? messages.find((m) => m && m.role === "user" && m.contentText) : null;
+  function makeFallbackConversationKey(messages: any): any {
+    const firstUser = Array.isArray(messages) ? messages.find((m: any) => m && m.role === "user" && m.contentText) : null;
     const seed = `${location.hostname}|${location.pathname}|${firstUser ? firstUser.contentText : ""}`;
     const hash = NS.normalize && NS.normalize.fnv1a32 ? NS.normalize.fnv1a32(seed) : String(Date.now());
     return `fallback_${hash}`;
   }
 
-  function findTitle() {
+  function findTitle(): any {
     const h = document.querySelector("h1");
     const t = h && h.textContent ? h.textContent.trim() : "";
     return t || document.title || "ChatGPT";
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector("main") || document.querySelector("[role='main']") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     if (!root) return false;
     const ta = root.querySelector("textarea");
     if (!ta) return false;
@@ -37,41 +38,41 @@
     return document.activeElement === ta || ta.contains(document.activeElement);
   }
 
-  function userContentNode(element) {
+  function userContentNode(element: any): any {
     return element.querySelector(".whitespace-pre-wrap") || element;
   }
 
-  function assistantContentNode(element) {
+  function assistantContentNode(element: any): any {
     return element.querySelector(".markdown.prose") || element.querySelector(".markdown") || element;
   }
 
-  function chatgptMarkdown() {
+  function chatgptMarkdown(): any {
     return NS.chatgptMarkdown || {};
   }
 
-  function getTurnWrappers(root) {
+  function getTurnWrappers(root: any): any {
     const scope = root || document;
     const uniqueNodes = new Set();
 
-    scope.querySelectorAll("div[data-testid='conversation-turn']").forEach((el) => uniqueNodes.add(el));
-    scope.querySelectorAll("[data-message-author-role]").forEach((el) => uniqueNodes.add(el));
-    scope.querySelectorAll(".agent-turn").forEach((el) => uniqueNodes.add(el));
+    scope.querySelectorAll("div[data-testid='conversation-turn']").forEach((el: any) => uniqueNodes.add(el));
+    scope.querySelectorAll("[data-message-author-role]").forEach((el: any) => uniqueNodes.add(el));
+    scope.querySelectorAll(".agent-turn").forEach((el: any) => uniqueNodes.add(el));
 
-    const sorted = Array.from(uniqueNodes);
-    sorted.sort((a, b) => {
+    const sorted: any[] = Array.from(uniqueNodes) as any[];
+    sorted.sort((a: any, b: any) => {
       if (a === b) return 0;
       return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
 
-    const finalNodes = [];
+    const finalNodes: any[] = [];
     for (const node of sorted) {
-      const isChild = finalNodes.some((parent) => parent.contains(node));
+      const isChild = finalNodes.some((parent: any) => parent.contains(node));
       if (!isChild) finalNodes.push(node);
     }
     return finalNodes;
   }
 
-  function roleFromWrapper(wrapper) {
+  function roleFromWrapper(wrapper: any): any {
     const direct = wrapper && wrapper.getAttribute ? wrapper.getAttribute("data-message-author-role") : "";
     if (direct === "user" || direct === "assistant") return direct;
 
@@ -84,7 +85,7 @@
     return "assistant";
   }
 
-  function collectMessages({ allowEditing } = {}) {
+  function collectMessages({ allowEditing }: any= {}): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (!allowEditing && inEditMode(root)) return [];
@@ -138,7 +139,7 @@
     return out;
   }
 
-  function capture(options) {
+  function capture(options: any): any {
     if (!matches({ hostname: location.hostname })) return null;
     const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
@@ -163,4 +164,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "chatgpt", matches, collector: NS.collectors.chatgpt });
   }
-})();
