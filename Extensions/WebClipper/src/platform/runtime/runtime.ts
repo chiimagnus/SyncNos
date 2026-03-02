@@ -12,11 +12,38 @@ export function isInvalidContextError(err: unknown): boolean {
 }
 
 export async function sendMessage<TResponse = unknown>(message: unknown): Promise<TResponse> {
+  const anyGlobal = globalThis as any;
+
+  // Prefer promise-based `browser.*` when available (WXT/dev polyfill).
   try {
-    return (await browser.runtime.sendMessage(message as any)) as TResponse;
+    const maybeBrowser = anyGlobal.browser;
+    if (maybeBrowser?.runtime?.sendMessage) {
+      const out = maybeBrowser.runtime.sendMessage(message as any);
+      if (out && typeof out.then === 'function') {
+        return (await out) as TResponse;
+      }
+    }
   } catch (err) {
     throw toError(err, 'runtime.sendMessage failed');
   }
+
+  // Fallback: callback-based `chrome.*` (Chrome stable API surface).
+  const maybeChrome = anyGlobal.chrome;
+  if (maybeChrome?.runtime?.sendMessage) {
+    return (await new Promise((resolve, reject) => {
+      try {
+        maybeChrome.runtime.sendMessage(message as any, (response: any) => {
+          const runtimeError = maybeChrome.runtime?.lastError;
+          if (runtimeError) return reject(new Error(String(runtimeError.message || runtimeError)));
+          resolve(response);
+        });
+      } catch (e) {
+        reject(e);
+      }
+    })) as TResponse;
+  }
+
+  throw new Error(INVALIDATED_MESSAGE);
 }
 
 export async function send<TResponse = unknown>(
@@ -28,8 +55,12 @@ export async function send<TResponse = unknown>(
 }
 
 export function getURL(path: string): string {
+  const anyGlobal = globalThis as any;
+  const rt = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
+  if (!rt?.getURL) return '';
+
   try {
-    return browser.runtime.getURL(path);
+    return rt.getURL(path);
   } catch (err) {
     const normalized = toError(err, 'runtime.getURL failed');
     if (isInvalidContextError(normalized)) return '';
@@ -38,4 +69,3 @@ export function getURL(path: string): string {
 }
 
 export { INVALIDATED_MESSAGE };
-

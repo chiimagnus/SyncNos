@@ -46,7 +46,8 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
       const NS: any = (globalThis as any).WebClipper || {};
       const hub = NS.backgroundEventsHub;
       const portName = NS.messageContracts?.UI_PORT_NAMES?.POPUP_EVENTS ?? 'popup:events';
-      browser.runtime.onConnect.addListener((port) => {
+      const rt = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
+      rt?.onConnect?.addListener?.((port: any) => {
         if (!port || port.name !== portName) return;
         hub?.registerPort?.(port);
       });
@@ -54,11 +55,31 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
       // ignore
     }
 
-    browser.runtime.onMessage.addListener((msg: any, sender) => {
-      return Promise.resolve(handleMessage(msg, sender));
+    const rt = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
+    const onMessage = rt?.onMessage;
+    if (!onMessage?.addListener) return;
+
+    // Prefer callback-style listener for maximum compatibility across browsers/polyfills.
+    onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
+      Promise.resolve()
+        .then(() => handleMessage(msg, sender))
+        .then((res) => {
+          try {
+            sendResponse?.(res);
+          } catch (_e) {
+            // ignore
+          }
+        })
+        .catch((e) => {
+          try {
+            sendResponse?.(err((e as any)?.message ?? String(e ?? 'unknown error')));
+          } catch (_e) {
+            // ignore
+          }
+        });
+      return true;
     });
   }
 
   return { ok, err, register, start };
 }
-
