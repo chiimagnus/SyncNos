@@ -7,3 +7,4 @@ import './kimi/kimi-entry';
 import './notionai/notionai-entry';
 import './poe/poe-entry';
 import './yuanbao/yuanbao-entry';
+import './zai/zai-entry';
