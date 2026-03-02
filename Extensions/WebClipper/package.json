@@ -13,6 +13,7 @@
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
     "check": "npm run build && node scripts/check.mjs --root=.output/chrome-mv3",
+    "check:no-runtime-js": "node scripts/check-no-runtime-js.mjs",
     "check:dist:edge": "node scripts/check.mjs --root=dist-edge",
     "check:dist:firefox": "node scripts/check.mjs --root=dist-firefox",
     "test": "vitest run",

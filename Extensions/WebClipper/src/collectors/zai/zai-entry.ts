@@ -1,2 +1,2 @@
-import './zai-markdown.js';
-import './zai-collector.js';
+import './zai-markdown.ts';
+import './zai-collector.ts';

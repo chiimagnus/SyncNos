@@ -1,2 +1,2 @@
-import './notionai-markdown.js';
-import './notionai-collector.js';
+import './notionai-markdown.ts';
+import './notionai-collector.ts';

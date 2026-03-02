@@ -1,9 +1,9 @@
 import { assertCollectorDef } from './collector-contract.ts';
 import * as collectorUtils from './collector-utils.ts';
 import { createCollectorsRegistry } from './registry.ts';
+import collectorContext from './collector-context.ts';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const namespace: any = require('./collector-context.js');
+const namespace: any = collectorContext;
 
 namespace.collectorContract = { assertCollectorDef };
 namespace.collectorUtils = collectorUtils;

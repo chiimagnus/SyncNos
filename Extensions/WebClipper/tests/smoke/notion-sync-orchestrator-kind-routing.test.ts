@@ -23,13 +23,12 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   };
 }
 
-function loadOrchestrator() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/notion/notion-sync-orchestrator.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/notion/notion-sync-orchestrator.js");
+async function loadOrchestrator() {
+  const mod = await import(
+    /* @vite-ignore */
+    `../../src/export/notion/notion-sync-orchestrator.ts?t=${Date.now()}_${Math.random().toString(16).slice(2)}`
+  );
+  return (mod as any).default || mod;
 }
 
 describe("notion-sync-orchestrator kind routing", () => {
@@ -106,7 +105,7 @@ describe("notion-sync-orchestrator kind routing", () => {
       messagesToBlocks: (messages: any[]) => [{ kind: "blocks", count: messages.length }]
     };
 
-    const orchestrator = loadOrchestrator();
+    const orchestrator = await loadOrchestrator();
     const res = await orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: "i" });
     expect(res.okCount).toBe(2);
 
@@ -183,7 +182,7 @@ describe("notion-sync-orchestrator kind routing", () => {
       messagesToBlocks: () => [{ kind: "blocks", count: 1 }]
     };
 
-    const orchestrator = loadOrchestrator();
+    const orchestrator = await loadOrchestrator();
     const res = await orchestrator.syncConversations({ conversationIds: [1], instanceId: "i" });
     expect(res.okCount).toBe(1);
     expect(res.results[0].mode).toBe("rebuilt");

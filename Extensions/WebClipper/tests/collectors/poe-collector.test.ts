@@ -1,45 +1,39 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
-function loadPoeMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/poe/poe-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/poe/poe-markdown.js");
+async function loadPoeMarkdown() {
+  return import("../../src/collectors/poe/poe-markdown.ts");
 }
 
-function loadPoeCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/poe/poe-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/poe/poe-collector.js");
+async function loadPoeCollector() {
+  await import("../../src/collectors/poe/poe-collector.ts");
+  return globalThis.WebClipper?.collectors?.poe;
 }
 
 describe("poe-collector", () => {
   it("prefers chat header title text for conversation title", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="BaseNavbar_chatTitleItem__GtrXf">
@@ -79,11 +73,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -92,8 +88,6 @@ describe("poe-collector", () => {
   });
 
   it("filters thinking process and captures markdown for assistant message", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -138,11 +132,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -168,8 +164,6 @@ describe("poe-collector", () => {
   });
 
   it("captures latest poe markdown structure and keeps normal blockquote content", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -225,11 +219,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -252,8 +248,6 @@ describe("poe-collector", () => {
   });
 
   it("captures user + assistant messages from message tuples (ignores action bar)", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -309,11 +303,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -335,8 +331,6 @@ describe("poe-collector", () => {
   });
 
   it("captures messages across date tupleGroupContainer buckets", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_chatMessagesView__ROOT">
@@ -395,11 +389,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -410,8 +406,6 @@ describe("poe-collector", () => {
   });
 
   it("auto-loads older poe history on manual prepare before capture", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     function tupleHtml(startId: number) {
       const userId = startId;
@@ -481,11 +475,13 @@ describe("poe-collector", () => {
     });
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    const collector = loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    const collector = await loadPoeCollector();
 
     await collector.prepareManualCapture({ maxRounds: 10, settleMs: 0, waitForLoadMs: 60, pollMs: 5 });
 
@@ -503,8 +499,6 @@ describe("poe-collector", () => {
   });
 
   it("appends image markdown but does not capture bot avatar images", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -539,11 +533,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });
@@ -556,8 +552,6 @@ describe("poe-collector", () => {
   });
 
   it("captures attachment images outside message text container", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { JSDOM } = require("jsdom");
 
     const html = `
       <div class="ChatMessagesView_messageTuple__X">
@@ -595,11 +589,13 @@ describe("poe-collector", () => {
     globalThis.location = dom.window.location;
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadPoeMarkdown();
-    loadPoeCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadPoeMarkdown();
+    await loadPoeCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.poe.capture({ manual: true });

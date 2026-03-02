@@ -1,2 +1,2 @@
-import './poe-markdown.js';
-import './poe-collector.js';
+import './poe-markdown.ts';
+import './poe-collector.ts';

@@ -7,8 +7,7 @@ import {
 } from './backup-utils';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../runtime-context.js');
+import runtimeContext from '../../runtime-context.ts';
 
 type AnyRecord = Record<string, any>;
 

@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-function loadWriter() {
+async function loadWriter() {
   // @ts-expect-error test global
   globalThis.WebClipper = {};
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/obsidian/obsidian-markdown-writer.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/obsidian/obsidian-markdown-writer.js");
+  const mod = await import("../../src/export/obsidian/obsidian-markdown-writer.ts");
+  return mod.default || mod;
 }
 
 describe("obsidian-markdown-writer", () => {
-  it("builds full markdown with frontmatter and stable heading", () => {
-    const w = loadWriter();
+  it("builds full markdown with frontmatter and stable heading", async () => {
+    const w = await loadWriter();
     const md = w.buildFullNoteMarkdown({
       conversation: { title: "T", source: "s", sourceType: "chat", conversationKey: "k" },
       messages: [{ messageKey: "m1", sequence: 1, role: "assistant", contentMarkdown: "hi" }],
@@ -27,7 +23,7 @@ describe("obsidian-markdown-writer", () => {
   });
 
   it("issues patch calls for append and frontmatter replace", async () => {
-    const w = loadWriter();
+    const w = await loadWriter();
     const calls: any[] = [];
     const client = {
       patchVaultFile: async (filePath: string, payload: any) => {
@@ -48,4 +44,3 @@ describe("obsidian-markdown-writer", () => {
     expect(calls[1].payload.contentType).toBe("application/json");
   });
 });
-

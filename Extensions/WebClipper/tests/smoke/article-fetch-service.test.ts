@@ -1,16 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-function loadArticleFetchService() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/web/article-fetch-service.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/web/article-fetch-service.js");
+const storageMocks = {
+  upsertConversation: vi.fn(),
+  syncConversationMessages: vi.fn(),
+};
+
+vi.mock("../../src/domains/conversations/storage", () => ({
+  upsertConversation: storageMocks.upsertConversation,
+  syncConversationMessages: storageMocks.syncConversationMessages,
+}));
+
+async function loadArticleFetchService() {
+  const module = await import("../../src/collectors/web/article-fetch-service.ts");
+  return module.default || module;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
+  storageMocks.upsertConversation.mockReset();
+  storageMocks.syncConversationMessages.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.WebClipper;
   // @ts-expect-error test cleanup
@@ -21,14 +29,8 @@ describe("article-fetch-service", () => {
   it("stores extracted active-tab article into conversations/messages", async () => {
     const upsertConversation = vi.fn(async (payload: any) => ({ id: 11, ...payload }));
     const syncConversationMessages = vi.fn(async () => ({ upserted: 1, deleted: 0 }));
-
-    // @ts-expect-error test global
-    globalThis.WebClipper = {
-      backgroundStorage: {
-        upsertConversation,
-        syncConversationMessages
-      }
-    };
+    storageMocks.upsertConversation.mockImplementation(upsertConversation);
+    storageMocks.syncConversationMessages.mockImplementation(syncConversationMessages);
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
@@ -67,7 +69,7 @@ describe("article-fetch-service", () => {
       }
     };
 
-    const service = loadArticleFetchService();
+    const service = await loadArticleFetchService();
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(11);
@@ -100,13 +102,8 @@ describe("article-fetch-service", () => {
   });
 
   it("rejects non-http active tab url", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {
-      backgroundStorage: {
-        upsertConversation: async () => ({ id: 1 }),
-        syncConversationMessages: async () => ({ upserted: 1, deleted: 0 })
-      }
-    };
+    storageMocks.upsertConversation.mockResolvedValue({ id: 1 });
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
 
     const executeScript = vi.fn((_details: any, cb: (results: any[]) => void) => cb([{}]));
 
@@ -121,14 +118,14 @@ describe("article-fetch-service", () => {
       }
     };
 
-    const service = loadArticleFetchService();
+    const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow("active tab must be an http(s) page");
     expect(executeScript).not.toHaveBeenCalled();
   });
 
   it("fails when storage module is unavailable", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    storageMocks.upsertConversation.mockRejectedValue(new Error("storage module missing"));
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
 
     const executeScript = vi.fn((details: any, cb: (results: any[]) => void) => {
       if (Array.isArray(details?.files)) {
@@ -160,7 +157,7 @@ describe("article-fetch-service", () => {
       }
     };
 
-    const service = loadArticleFetchService();
+    const service = await loadArticleFetchService();
     await expect(service.fetchActiveTabArticle()).rejects.toThrow("storage module missing");
   });
 });

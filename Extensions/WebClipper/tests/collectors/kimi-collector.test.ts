@@ -1,44 +1,37 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
+async function loadCollectorUtils() {
+  return ensureCollectorUtils();
 }
 
-function loadKimiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/kimi/kimi-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/kimi/kimi-markdown.js");
+async function loadKimiMarkdown() {
+  return import("../../src/collectors/kimi/kimi-markdown.ts");
 }
 
-function loadKimiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/kimi/kimi-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/kimi/kimi-collector.js");
+async function loadKimiCollector() {
+  return import("../../src/collectors/kimi/kimi-collector.ts");
 }
 
 function setupKimiDom(html: string, url: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { JSDOM } = require("jsdom");
   const dom = new JSDOM(`<body>${html}</body>`, { url });
   // @ts-expect-error test global
   globalThis.window = dom.window;
@@ -102,11 +95,13 @@ describe("kimi-collector", () => {
     setupKimiDom(html, "https://kimi.com/chat/conv001");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadKimiMarkdown();
-    loadKimiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadKimiMarkdown();
+    await loadKimiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.kimi.capture();
@@ -139,10 +134,12 @@ describe("kimi-collector", () => {
     setupKimiDom(html, "https://kimi.com/chat/fallback001");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    loadNormalize();
-    loadCollectorUtils();
-    loadKimiCollector();
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
+    await loadNormalize();
+    await loadCollectorUtils();
+    await loadKimiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.kimi.capture();

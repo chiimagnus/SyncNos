@@ -58,7 +58,7 @@
 - **节流与速率限制**：对 Notion 写入必须做 pacing/批量；批量同步要能部分失败不影响其它项。
 - **权限变更需要理由**：新增 `permissions/host_permissions` 前先给出“为何需要、替代方案为何不行、风险与范围控制”。
 
-### 模块入口索引（2026-03，WXT 迁移中）
+### 模块入口索引（2026-03，WXT 新架构）
 
 - **WXT Background 入口**：`entrypoints/background.ts`
 - **WXT Content 入口**：`entrypoints/content.ts`
@@ -69,23 +69,22 @@
 - **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
 - **Notion 同步模块**：`src/export/notion/`
-  - 兼容编排入口：`notion-sync-orchestrator.js`（当前由 `src/integrations/notion/sync/orchestrator.ts` 包装调用）。
+  - 编排入口：`src/export/notion/notion-sync-orchestrator.ts`（由 `src/integrations/notion/sync/orchestrator.ts` 调用）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
   - 已重构为 Local REST API 平台主导同步：
   - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
-  - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（兼容实现）+ `src/integrations/obsidian/sync/orchestrator.ts`（TS wrapper）。
+  - background：`src/export/obsidian/obsidian-sync-orchestrator.ts` + `src/integrations/obsidian/sync/orchestrator.ts`。
 - **Web Article Fetch（手动抓取当前页）**：`src/integrations/web-article/article-fetch.ts`
-  - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）；兼容实现仍保留 `src/collectors/web/article-fetch-service.js`。
+  - background 侧通过 `chrome.scripting.executeScript` 注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
-    - `src/bootstrap/background-inpage-web-visibility.js`
+    - `src/bootstrap/background-inpage-web-visibility.ts`
   - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.ts`）。
 
-当前 legacy 残留业务域（按优先级迁移）：
-- Sync（`src/export/notion/*`、`src/export/obsidian/*` 的全局依赖）
-- Collectors（`src/collectors/*` 的全局注册）
-- Inpage（`src/bootstrap/content*.js` + `src/ui/inpage/*` 的全局读写）
+Phase 3（JS→TS）收口状态：
+- `src + entrypoints` 运行时代码已收敛为 TS 主实现。
+- runtime JS allowlist 仅保留第三方脚本资产：`src/vendor/readability.js`。
 
 ### Obsidian 约束
 
@@ -120,6 +119,7 @@
 ## 命令
 
 - 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix Extensions/WebClipper run check`
+- 运行时 JS 防回退检查（`src + entrypoints` 仅允许 allowlist）：`npm --prefix Extensions/WebClipper run check:no-runtime-js`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
