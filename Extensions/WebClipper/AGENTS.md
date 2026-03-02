@@ -64,27 +64,25 @@
 - **WXT Content 入口**：`entrypoints/content.ts`
 - **WXT Popup 入口**：`entrypoints/popup/*`
 - **WXT App 入口**：`entrypoints/app/*`
-- **消息协议（前后端共享，迁移中）**：`src/protocols/message-contracts.js`
+- **消息协议（前后端共享）**：`src/platform/messaging/message-contracts.ts`（兼容导出：`src/protocols/message-contracts.ts`）
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
-- **后台路由（迁移中）**：`src/bootstrap/background-router.js`
-  - 路由 Obsidian Local REST API 同步、Notion 同步任务状态、会话 CRUD 等消息；目标是迁到 TS router 并移除该 legacy 文件。
+- **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/platform/messaging/background-router.ts`
+  - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
 - **Notion 同步模块**：`src/export/notion/`
-  - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
+  - 兼容编排入口：`notion-sync-orchestrator.js`（当前由 `src/integrations/notion/sync/orchestrator.ts` 包装调用）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
   - 已重构为 Local REST API 平台主导同步：
   - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
-  - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（编排）+ `src/export/obsidian/obsidian-local-rest-client.js`（HTTP client）+ `src/export/obsidian/obsidian-markdown-writer.js`（写入）+ `src/export/obsidian/obsidian-settings-store.js`（配置存储）
-- **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
-  - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
-- **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.js`
+  - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（兼容实现）+ `src/integrations/obsidian/sync/orchestrator.ts`（TS wrapper）。
+- **Web Article Fetch（手动抓取当前页）**：`src/integrations/web-article/article-fetch.ts`
+  - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）；兼容实现仍保留 `src/collectors/web/article-fetch-service.js`。
+- **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
     - `src/bootstrap/background-inpage-web-visibility.js`
-  - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.js`）。
+  - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.ts`）。
 
 当前 legacy 残留业务域（按优先级迁移）：
-- Storage（`src/storage/*` 的 schema/IIFE 注入）
-- Events（`src/bootstrap/background-events-hub.js`）
 - Sync（`src/export/notion/*`、`src/export/obsidian/*` 的全局依赖）
 - Collectors（`src/collectors/*` 的全局注册）
 - Inpage（`src/bootstrap/content*.js` + `src/ui/inpage/*` 的全局读写）
