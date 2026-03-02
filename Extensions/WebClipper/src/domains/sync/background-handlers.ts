@@ -8,6 +8,9 @@ import {
   obsidianSyncConversations,
 } from '../../integrations/obsidian/sync/orchestrator';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../runtime-context.js');
+
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
@@ -16,8 +19,7 @@ type AnyRouter = {
 
 function getInstanceId(): string {
   try {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const id = NS.__backgroundInstanceId;
+    const id = runtimeContext.__backgroundInstanceId;
     return id ? String(id) : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   } catch (_e) {
     return `${Date.now()}_${Math.random().toString(16).slice(2)}`;

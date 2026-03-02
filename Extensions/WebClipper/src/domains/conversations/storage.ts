@@ -3,10 +3,12 @@
 // Conversation storage adapters (migration step for P4-16).
 //
 // Primary implementation uses IndexedDB via TS schema `openDb()`.
-// Fallback delegates to legacy `globalThis.WebClipper.backgroundStorage` when schema isn't available.
+// Fallback delegates to runtime context `backgroundStorage` when schema isn't available.
 
 import type { Conversation, ConversationDetail, ConversationMessage } from './models';
 import * as idb from './storage-idb';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../runtime-context.js');
 
 type LegacyStorage = {
   upsertConversation: (payload: any) => Promise<any>;
@@ -17,8 +19,7 @@ type LegacyStorage = {
 };
 
 function legacy(): LegacyStorage {
-  const NS: any = (globalThis as any).WebClipper || {};
-  const storage = NS.backgroundStorage as LegacyStorage | undefined;
+  const storage = runtimeContext.backgroundStorage as LegacyStorage | undefined;
   if (!storage) throw new Error('storage module missing');
   return storage;
 }

@@ -21,11 +21,12 @@ import '../export/obsidian/obsidian-sync-orchestrator.js';
 import './background-inpage-web-visibility.js';
 import '../collectors/web/article-fetch-service.js';
 
-export function startBackgroundBootstrap() {
-  const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../runtime-context.js');
 
+export function startBackgroundBootstrap() {
   try {
-    NS.backgroundInpageWebVisibility?.start?.();
+    runtimeContext.backgroundInpageWebVisibility?.start?.();
   } catch (_e) {
     // ignore
   }

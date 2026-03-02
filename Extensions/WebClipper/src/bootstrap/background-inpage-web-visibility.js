@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
 
   const STORAGE_KEY = "inpage_supported_only";
   const DYNAMIC_SCRIPT_ID = "webclipper_inpage_web_dynamic_v1";
