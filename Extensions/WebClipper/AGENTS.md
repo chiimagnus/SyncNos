@@ -115,11 +115,11 @@
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
 - 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
-- （产物打包到 dist，用于发布/上传）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
-- （产物打包到 dist，用于发布/上传）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
-- （产物打包到 dist，用于发布/上传）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
-- 校验 Edge dist 产物：`npm --prefix Extensions/WebClipper run check:dist:edge`
-- 校验 Firefox dist 产物：`npm --prefix Extensions/WebClipper run check:dist:firefox`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
+- 校验 Edge dist 产物（先 `legacy:build:edge`）：`npm --prefix Extensions/WebClipper run check:dist:edge`
+- 校验 Firefox dist 产物（先 `legacy:build:firefox`）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
 
 ## Firefox / AMO
@@ -130,7 +130,8 @@
 
 1. 打开 `about:debugging#/runtime/this-firefox`
 2. 点击 “Load Temporary Add-on…”
-3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`（或使用 legacy: `Extensions/WebClipper/dist-firefox/manifest.json`）
+3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`
+   - 如果你需要验证“发布/上传产物”的目录结构：先跑 `npm --prefix Extensions/WebClipper run legacy:build:firefox`，再选择 `Extensions/WebClipper/dist-firefox/manifest.json`
 
 ### AMO 发布产物
 
