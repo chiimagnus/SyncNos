@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-function loadNormalize() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/shared/normalize.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/shared/normalize.js");
+async function loadNormalize() {
+  const normalizeModule = await import("../../src/shared/normalize.ts");
+  const normalizeApi = normalizeModule.default || {
+    normalizeText: normalizeModule.normalizeText,
+    fnv1a32: normalizeModule.fnv1a32,
+    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
+  };
+  globalThis.WebClipper = globalThis.WebClipper || {};
+  globalThis.WebClipper.normalize = normalizeApi;
+  return normalizeApi;
 }
 
 function loadCollectorUtils() {
@@ -103,7 +106,7 @@ describe("kimi-collector", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    loadNormalize();
+    await loadNormalize();
     loadCollectorUtils();
     loadKimiMarkdown();
     loadKimiCollector();
@@ -140,7 +143,7 @@ describe("kimi-collector", () => {
 
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    loadNormalize();
+    await loadNormalize();
     loadCollectorUtils();
     loadKimiCollector();
 
