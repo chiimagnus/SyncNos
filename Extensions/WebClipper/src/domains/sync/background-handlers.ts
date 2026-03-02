@@ -3,6 +3,10 @@ import {
   getNotionSyncStatus,
   notionSyncConversations,
 } from '../../integrations/notion/sync/orchestrator';
+import {
+  getObsidianSyncStatus,
+  obsidianSyncConversations,
+} from '../../integrations/obsidian/sync/orchestrator';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -35,22 +39,12 @@ export function registerSyncHandlers(router: AnyRouter) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const orchestrator = NS.obsidianSyncOrchestrator;
-    if (!orchestrator || typeof orchestrator.getSyncStatus !== 'function') {
-      return router.err('obsidian sync orchestrator missing');
-    }
-    const data = await orchestrator.getSyncStatus({ instanceId: getInstanceId() });
+    const data = await getObsidianSyncStatus({ instanceId: getInstanceId() });
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const orchestrator = NS.obsidianSyncOrchestrator;
-    if (!orchestrator || typeof orchestrator.syncConversations !== 'function') {
-      return router.err('obsidian sync orchestrator missing');
-    }
-    const data = await orchestrator.syncConversations({
+    const data = await obsidianSyncConversations({
       conversationIds: msg?.conversationIds,
       forceFullConversationIds: msg?.forceFullConversationIds,
       instanceId: getInstanceId(),

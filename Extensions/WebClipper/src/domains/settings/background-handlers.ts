@@ -2,6 +2,7 @@ import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '
 import { storageRemove } from '../../platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '../../integrations/notion/token-store';
 import { getObsidianSettings, saveObsidianSettings } from '../../integrations/obsidian/settings-store';
+import { testObsidianConnection } from '../../integrations/obsidian/sync/orchestrator';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -75,12 +76,7 @@ export function registerSettingsHandlers(router: AnyRouter) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const orchestrator = NS.obsidianSyncOrchestrator;
-    if (!orchestrator || typeof orchestrator.testConnection !== 'function') {
-      return router.err('obsidian sync orchestrator missing');
-    }
-    const data = await orchestrator.testConnection({ instanceId: getInstanceId() });
+    const data = await testObsidianConnection({ instanceId: getInstanceId() });
     return router.ok(data);
   });
 
