@@ -141,7 +141,7 @@ function openHttpUrl(url: string) {
 function renderStats(stats: ImportStats | null) {
   if (!stats) return null;
   return (
-    <ul className="tw-m-0 tw-pl-5 tw-text-[12px] tw-text-[var(--muted)]">
+    <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--muted)', fontSize: 12 }}>
       <li>
         Conversations: +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
       </li>
@@ -178,9 +178,10 @@ export default function SettingsTab() {
   const [obsidianApiKeyDraft, setObsidianApiKeyDraft] = useState<string>('');
   const [obsidianApiKeyChanged, setObsidianApiKeyChanged] = useState(false);
   const [obsidianApiKeyPresent, setObsidianApiKeyPresent] = useState<boolean>(false);
+  const [obsidianApiKeyMasked, setObsidianApiKeyMasked] = useState<string>('');
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
-  const [obsidianTestResult, setObsidianTestResult] = useState<string>('');
+  const [obsidianStatus, setObsidianStatus] = useState<string>('Idle');
   const [obsidianJob, setObsidianJob] = useState<any>(null);
 
   // Article fetch
@@ -197,14 +198,6 @@ export default function SettingsTab() {
 
   // Inpage
   const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
-
-  const cardCls =
-    'tw-rounded-2xl tw-border tw-border-[rgba(217,89,38,0.14)] tw-bg-[var(--panel)] tw-p-3 tw-shadow-[var(--shadow)]';
-  const labelCls = 'tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]';
-  const inputCls =
-    'tw-h-9 tw-w-full tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.16)] tw-bg-white/55 tw-px-3 tw-text-[13px] tw-text-[var(--text)] placeholder:tw-text-[rgba(184,94,58,0.60)]';
-  const btnCls =
-    'tw-h-9 tw-px-3 tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] disabled:tw-opacity-60';
 
   const refresh = async () => {
     setBusy(true);
@@ -240,6 +233,7 @@ export default function SettingsTab() {
       setObsidianApiBaseUrl(String(obsidian?.apiBaseUrl || ''));
       setObsidianAuthHeaderName(String(obsidian?.authHeaderName || ''));
       setObsidianApiKeyPresent(!!obsidian?.apiKeyPresent);
+      setObsidianApiKeyMasked(String(obsidian?.apiKeyMasked || ''));
       setObsidianChatFolder(String(obsidian?.chatFolder || ''));
       setObsidianArticleFolder(String(obsidian?.articleFolder || ''));
       setNotionJob(nJob?.job ?? null);
@@ -274,9 +268,9 @@ export default function SettingsTab() {
     if (notionConnected == null) return 'unknown';
     if (notionConnected) {
       const w = String(notionWorkspaceName || '').trim();
-      return w ? `Connected ✓ (${w})` : 'Connected ✓';
+      return w ? `Connected ✅ (${w})` : 'Connected ✅';
     }
-    if (notionLastError) return `Error: ${notionLastError}`;
+    if (notionLastError) return 'Error';
     if (notionPendingState) return 'Waiting…';
     return 'Not connected';
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
@@ -372,9 +366,11 @@ export default function SettingsTab() {
     }
   };
 
-  const onSaveObsidianSettings = async () => {
+  const onSaveObsidianSettings = async ({ includeApiKey }: { includeApiKey?: boolean } = {}) => {
+    if (busy) return;
     setBusy(true);
     setError(null);
+    setObsidianStatus('Saving…');
     try {
       const payload: any = {
         apiBaseUrl: obsidianApiBaseUrl,
@@ -382,34 +378,21 @@ export default function SettingsTab() {
         chatFolder: obsidianChatFolder,
         articleFolder: obsidianArticleFolder,
       };
-      if (obsidianApiKeyChanged) payload.apiKey = obsidianApiKeyDraft;
+      if (includeApiKey === true && String(obsidianApiKeyDraft || '').trim()) payload.apiKey = obsidianApiKeyDraft;
       const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, payload);
       const data = unwrap(res);
       setObsidianApiBaseUrl(String(data?.apiBaseUrl || ''));
       setObsidianAuthHeaderName(String(data?.authHeaderName || ''));
       setObsidianApiKeyPresent(!!data?.apiKeyPresent);
+      setObsidianApiKeyMasked(String(data?.apiKeyMasked || ''));
       setObsidianChatFolder(String(data?.chatFolder || ''));
       setObsidianArticleFolder(String(data?.articleFolder || ''));
       setObsidianApiKeyDraft('');
       setObsidianApiKeyChanged(false);
+      setObsidianStatus('Saved');
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onClearObsidianKey = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, { apiKey: '' });
-      const data = unwrap(res);
-      setObsidianApiKeyPresent(!!data?.apiKeyPresent);
-      setObsidianApiKeyDraft('');
-      setObsidianApiKeyChanged(false);
-    } catch (e) {
-      setError((e as any)?.message ?? String(e ?? 'failed'));
+      setObsidianStatus('Error');
     } finally {
       setBusy(false);
     }
@@ -418,16 +401,16 @@ export default function SettingsTab() {
   const onTestObsidianConnection = async () => {
     setBusy(true);
     setError(null);
-    setObsidianTestResult('Testing…');
+    setObsidianStatus('Testing…');
     try {
       const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, {});
       const data = unwrap(res);
       const ok = data && data.ok === true;
       const message = data && data.message ? String(data.message) : '';
-      setObsidianTestResult(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
+      setObsidianStatus(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
     } catch (e) {
       const msg = (e as any)?.message ?? String(e ?? 'failed');
-      setObsidianTestResult(`Error: ${msg}`);
+      setObsidianStatus(`Error: ${msg}`);
       setError(msg);
     } finally {
       setBusy(false);
@@ -549,228 +532,409 @@ export default function SettingsTab() {
     openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/docs/webclipper-obsidian-local-rest-api-sync.md');
   };
 
+  const articleFetchStatusClass = useMemo(() => {
+    const s = String(articleFetchStatus || '').toLowerCase();
+    if (s.includes('fetch')) return 'is-loading';
+    if (s.startsWith('error')) return 'is-error';
+    if (s.includes('saved') || s.includes('done')) return 'is-ok';
+    return '';
+  }, [articleFetchStatus]);
+
   return (
-    <section className="tw-h-full tw-min-h-0 tw-flex tw-flex-col tw-gap-2">
+    <div className="viewScroll" aria-label="Settings content">
       {error ? (
-        <div className="tw-rounded-xl tw-border tw-border-[rgba(199,55,47,0.25)] tw-bg-[var(--danger-bg)] tw-px-3 tw-py-2 tw-text-[12px] tw-text-[var(--danger)]">
+        <section className="toolbar" style={{ borderColor: 'rgba(199, 55, 47, 0.35)', background: 'var(--danger-bg)', color: 'var(--danger)' }}>
           {error}
-        </div>
+        </section>
       ) : null}
 
-      <div className="tw-flex-1 tw-min-h-0 tw-overflow-auto tw-pr-1 tw-grid tw-gap-3">
-        <section className={cardCls} aria-label="Notion OAuth">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Notion OAuth</div>
-            <button className={btnCls} onClick={() => refresh().catch(() => {})} disabled={busy} type="button">
-              {busy ? 'Loading…' : 'Refresh'}
-            </button>
+      <section className="toolbar settingsPanel" id="notionAuthCard" aria-label="Notion settings">
+        <div className="settingsRow settingsRow--header" id="notionBar">
+          <img className="notionLogo" src={browser.runtime.getURL('icons/notion.svg' as any)} alt="" aria-hidden="true" />
+          <div className="notionHeaderText" aria-label="Notion OAuth status">
+            <span className="notionHeaderTitle">Notion OAuth</span>
+            <span className="notionHeaderSep" aria-hidden="true">
+              |
+            </span>
+            <span id="notionStatusTitle" className="notionHeaderStatus">
+              {notionStatusText}
+            </span>
           </div>
-          <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">status: {notionStatusText}</div>
-          <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">
-            clientId: {notionClientId ? notionClientId : '(missing)'}
-          </div>
-          <button
-            className={btnCls}
-            onClick={() => onNotionConnectOrDisconnect().catch(() => {})}
-            disabled={busy}
-            type="button"
-          >
+          <div className="spacer" />
+          <button id="btnNotionConnect" className="btn" disabled={busy} onClick={() => onNotionConnectOrDisconnect().catch(() => {})} type="button">
             {notionConnected ? 'Disconnect' : pollingNotion ? 'Connecting…' : 'Connect'}
           </button>
+        </div>
 
-          <div className="tw-mt-3 tw-grid tw-grid-cols-[1fr_auto] tw-gap-2 tw-items-end">
-            <div>
-              <div className={labelCls}>Parent Page</div>
-              <select
-                className={inputCls}
-                value={notionParentPageId}
-                disabled={busy || !notionConnected}
-                onChange={(e) => onSaveNotionParentPage(e.target.value).catch(() => {})}
-              >
-                {notionPages.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
-                {notionPages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Parent page selector">
+          <div className="settingsLabel settingsLabel--inline">Parent Page</div>
+          <div className="settingsControl settingsControl--grow">
+            <select
+              id="notionPages"
+              className="input"
+              value={notionParentPageId}
+              disabled={busy || !notionConnected}
+              onChange={(e) => onSaveNotionParentPage(e.target.value).catch(() => {})}
+            >
+              {notionPages.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
+              {notionPages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
             <button
-              className={btnCls}
+              id="btnNotionLoadPages"
+              className="btn icon"
+              type="button"
+              title="Refresh"
               onClick={() => onLoadNotionPages().catch(() => {})}
               disabled={busy || !notionConnected || loadingNotionPages}
-              type="button"
             >
-              {loadingNotionPages ? 'Loading…' : 'Refresh'}
+              ↻
             </button>
           </div>
+        </div>
+      </section>
 
-          <div className="tw-mt-3 tw-text-[12px] tw-text-[var(--muted)]">
-            sync: {String(notionJob?.status ?? 'idle')} · {formatTime(notionJob?.updatedAt)}
+      <section className="toolbar settingsPanel" id="articleFetchCard" aria-label="Article fetch">
+        <div className="settingsRow settingsRow--header" aria-label="Article fetch header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Article Fetch</span>
           </div>
-          {notionJob?.error ? (
-            <pre className="tw-mt-2 tw-whitespace-pre-wrap tw-text-[12px] tw-text-[var(--danger)]">{String(notionJob.error)}</pre>
-          ) : null}
-        </section>
+          <div className="spacer" />
+        </div>
 
-        <section className={cardCls} aria-label="Article Fetch">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Article Fetch</div>
-            <button className={btnCls} onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy} type="button">
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Fetch current page article">
+          <div className="settingsControl settingsControl--grow">
+            <button id="btnFetchCurrentArticle" className="btn" type="button" onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy}>
               Fetch Current Page
             </button>
           </div>
-          <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">status: {articleFetchStatus}</div>
-        </section>
+        </div>
 
-        <section className={cardCls} aria-label="Obsidian Local REST API">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Obsidian Local REST API</div>
-            <button className={btnCls} onClick={() => openSetupGuide()} type="button">
-              Setup Guide
+        <div className="settingsRow settingsRow--compact" aria-label="Article fetch status">
+          <div className="settingsLabel settingsLabel--inline">Status</div>
+          <div id="articleFetchStatus" className={['sub', articleFetchStatusClass].filter(Boolean).join(' ')}>
+            {articleFetchStatus}
+          </div>
+        </div>
+      </section>
+
+      <section className="toolbar settingsPanel" id="obsidianSyncCard" aria-label="Obsidian Local REST API">
+        <div className="settingsRow settingsRow--header" aria-label="Obsidian sync header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Obsidian Local REST API</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian API Base URL">
+          <div className="settingsLabel settingsLabel--inline">Base URL</div>
+          <div className="settingsControl settingsControl--grow">
+            <input
+              id="obsidianApiBaseUrl"
+              className="input"
+              type="text"
+              spellCheck={false}
+              placeholder="http://127.0.0.1:27123"
+              aria-label="Obsidian API base url"
+              value={obsidianApiBaseUrl}
+              disabled={busy}
+              onChange={(e) => setObsidianApiBaseUrl(e.target.value)}
+              onBlur={() => onSaveObsidianSettings().catch(() => {})}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                void onSaveObsidianSettings();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian API key">
+          <div className="settingsLabel settingsLabel--inline">API Key</div>
+          <div className="settingsControl settingsControl--grow">
+            <input
+              id="obsidianApiKey"
+              className="input"
+              type="text"
+              placeholder={obsidianApiKeyPresent ? obsidianApiKeyMasked : ''}
+              aria-label="Obsidian API key"
+              value={obsidianApiKeyDraft}
+              disabled={busy}
+              onChange={(e) => {
+                setObsidianApiKeyDraft(e.target.value);
+                setObsidianApiKeyChanged(true);
+              }}
+              onBlur={() => {
+                if (!String(obsidianApiKeyDraft || '').trim()) return;
+                void onSaveObsidianSettings({ includeApiKey: true });
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                if (!String(obsidianApiKeyDraft || '').trim()) return;
+                void onSaveObsidianSettings({ includeApiKey: true });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian auth header name">
+          <div className="settingsLabel settingsLabel--inline">Auth Header</div>
+          <div className="settingsControl settingsControl--grow">
+            <input
+              id="obsidianAuthHeaderName"
+              className="input"
+              type="text"
+              spellCheck={false}
+              placeholder="Authorization"
+              aria-label="Obsidian auth header name"
+              value={obsidianAuthHeaderName}
+              disabled={busy}
+              onChange={(e) => setObsidianAuthHeaderName(e.target.value)}
+              onBlur={() => onSaveObsidianSettings().catch(() => {})}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                void onSaveObsidianSettings();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian sync controls">
+          <div className="settingsControl settingsControl--grow">
+            <button id="btnObsidianTestConnection" className="btn" type="button" onClick={() => onTestObsidianConnection().catch(() => {})} disabled={busy}>
+              Test
             </button>
           </div>
+        </div>
 
-          <div className="tw-mt-3 tw-grid tw-gap-2">
-            <div>
-              <div className={labelCls}>Base URL</div>
-              <input
-                className={inputCls}
-                value={obsidianApiBaseUrl}
-                onChange={(e) => setObsidianApiBaseUrl(e.target.value)}
-                disabled={busy}
-                spellCheck={false}
-                placeholder="http://127.0.0.1:27123"
-              />
-            </div>
-            <div>
-              <div className={labelCls}>API Key {obsidianApiKeyPresent ? '(set)' : '(not set)'}</div>
-              <input
-                className={inputCls}
-                value={obsidianApiKeyDraft}
-                onChange={(e) => {
-                  setObsidianApiKeyDraft(e.target.value);
-                  setObsidianApiKeyChanged(true);
-                }}
-                disabled={busy}
-                placeholder={obsidianApiKeyPresent ? '••••••••' : ''}
-              />
-              <div className="tw-mt-1 tw-flex tw-gap-2">
-                <button className={btnCls} onClick={() => onClearObsidianKey().catch(() => {})} disabled={busy || !obsidianApiKeyPresent} type="button">
-                  Clear Key
-                </button>
-                <button className={btnCls} onClick={() => onTestObsidianConnection().catch(() => {})} disabled={busy} type="button">
-                  Test
-                </button>
-              </div>
-              {obsidianTestResult ? <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">{obsidianTestResult}</div> : null}
-            </div>
-            <div>
-              <div className={labelCls}>Auth Header</div>
-              <input
-                className={inputCls}
-                value={obsidianAuthHeaderName}
-                onChange={(e) => setObsidianAuthHeaderName(e.target.value)}
-                disabled={busy}
-                spellCheck={false}
-                placeholder="Authorization"
-              />
-            </div>
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian sync status">
+          <div className="settingsLabel settingsLabel--inline">Status</div>
+          <div id="obsidianSyncStatus" className="sub">
+            {obsidianStatus}
           </div>
+        </div>
 
-          <div className="tw-mt-3 tw-grid tw-gap-2">
-            <div>
-              <div className={labelCls}>Chat Folder</div>
-              <input className={inputCls} value={obsidianChatFolder} onChange={(e) => setObsidianChatFolder(e.target.value)} disabled={busy} spellCheck={false} />
-            </div>
-            <div>
-              <div className={labelCls}>Article Folder</div>
-              <input className={inputCls} value={obsidianArticleFolder} onChange={(e) => setObsidianArticleFolder(e.target.value)} disabled={busy} spellCheck={false} />
-            </div>
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian sync note">
+          <div className="settingsLabel settingsLabel--inline">Note</div>
+          <div className="sub">
+            Install and configure Obsidian Local REST API first.{' '}
+            <a
+              id="obsidianSetupGuideLink"
+              className="textLink"
+              href="https://github.com/chiimagnus/SyncNos/blob/main/.github/docs/webclipper-obsidian-local-rest-api-sync.md"
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                openSetupGuide();
+              }}
+            >
+              Open Setup Guide
+            </a>
           </div>
+        </div>
+      </section>
 
-          <div className="tw-mt-3 tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-text-[12px] tw-text-[var(--muted)]">
-              sync: {String(obsidianJob?.status ?? 'idle')} · {formatTime(obsidianJob?.updatedAt)}
-            </div>
-            <button className={btnCls} onClick={() => onSaveObsidianSettings().catch(() => {})} disabled={busy} type="button">
-              Save
+      <section className="toolbar settingsPanel" id="obsidianPathsCard" aria-label="Obsidian Paths">
+        <div className="settingsRow settingsRow--header" aria-label="Obsidian paths header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Obsidian Paths</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian AI chats folder">
+          <div className="settingsLabel settingsLabel--inline">AI Chats Folder</div>
+          <div className="settingsControl settingsControl--grow">
+            <input
+              id="obsidianChatFolder"
+              className="input"
+              type="text"
+              spellCheck={false}
+              placeholder="SyncNos-AIChats"
+              aria-label="Obsidian AI chats folder"
+              value={obsidianChatFolder}
+              disabled={busy}
+              onChange={(e) => setObsidianChatFolder(e.target.value)}
+              onBlur={() => onSaveObsidianSettings().catch(() => {})}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                void onSaveObsidianSettings();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian web clipper folder">
+          <div className="settingsLabel settingsLabel--inline">Web Clipper Folder</div>
+          <div className="settingsControl settingsControl--grow">
+            <input
+              id="obsidianArticleFolder"
+              className="input"
+              type="text"
+              spellCheck={false}
+              placeholder="SyncNos-WebArticles"
+              aria-label="Obsidian web clipper folder"
+              value={obsidianArticleFolder}
+              disabled={busy}
+              onChange={(e) => setObsidianArticleFolder(e.target.value)}
+              onBlur={() => onSaveObsidianSettings().catch(() => {})}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                void onSaveObsidianSettings();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="settingsRow settingsRow--compact" aria-label="Obsidian paths note">
+          <div className="settingsLabel settingsLabel--inline">Note</div>
+          <div className="sub">Vault-relative folder paths. Nested folders supported. Empty uses defaults.</div>
+        </div>
+      </section>
+
+      <section className="toolbar settingsPanel" id="databaseBackupCard" aria-label="Database backup">
+        <div className="settingsRow settingsRow--header" aria-label="Database backup header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Database Backup</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Database import controls">
+          <div className="settingsControl settingsControl--grow">
+            <button id="btnDatabaseExport" className="btn" type="button" onClick={() => handleBackupExport().catch(() => {})} disabled={busy}>
+              Export
             </button>
-          </div>
-
-          {obsidianJob?.error ? (
-            <pre className="tw-mt-2 tw-whitespace-pre-wrap tw-text-[12px] tw-text-[var(--danger)]">{String(obsidianJob.error)}</pre>
-          ) : null}
-        </section>
-
-        <section className={cardCls} aria-label="Backup">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Backup</div>
-            <button className={btnCls} onClick={() => handleBackupExport().catch(() => {})} disabled={busy} type="button">
-              Export Zip
+            <button
+              id="btnDatabaseImport"
+              className="btn"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+            >
+              Import
             </button>
-          </div>
-          <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">export: {exportStatus}</div>
-
-          <div className="tw-mt-3">
-            <div className={labelCls}>Import (Zip v2 or legacy JSON)</div>
             <input
               ref={fileInputRef}
+              id="databaseImportFile"
+              className="fileInputHidden"
               type="file"
-              className="tw-mt-1 tw-block tw-w-full tw-text-[12px] tw-text-[var(--muted)]"
-              accept=".zip,application/zip,application/json,.json"
-              disabled={busy}
+              accept=".zip,application/zip,.json,application/json"
               onChange={(e) => {
                 const f = e.target.files && e.target.files[0];
                 if (!f) return;
                 void importFromFile(f);
               }}
             />
-            <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">import: {importStatus}</div>
-            <div className="tw-mt-2">{renderStats(importStats)}</div>
           </div>
-        </section>
+        </div>
 
-        <section className={cardCls} aria-label="Notion AI">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Notion AI</div>
-            <div className="tw-flex tw-gap-2">
-              <button className={btnCls} onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy} type="button">
-                Save
-              </button>
-              <button className={btnCls} onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy} type="button">
-                Reset
-              </button>
-            </div>
+        <div className="settingsRow settingsRow--compact" aria-label="Database backup status">
+          <div className="settingsLabel settingsLabel--inline">Status</div>
+          <div className="sub">
+            export: {exportStatus} · import: {importStatus}
           </div>
-          <div className="tw-mt-2">
-            <div className={labelCls}>Preferred Model Index</div>
+        </div>
+
+        {importStats ? (
+          <div className="settingsRow settingsRow--compact" aria-label="Database backup import stats">
+            <div className="settingsLabel settingsLabel--inline">Stats</div>
+            <div className="sub">{renderStats(importStats)}</div>
+          </div>
+        ) : null}
+
+        <div className="settingsRow settingsRow--compact" aria-label="Database import note">
+          <div className="settingsLabel settingsLabel--inline">Note</div>
+          <div className="sub">
+            Import merges by (source + conversationKey). Notion token is not included. Backup file: .zip (recommended) / .json (legacy).
+          </div>
+        </div>
+      </section>
+
+      <section className="toolbar settingsPanel" id="notionAiCard" aria-label="Notion AI settings">
+        <div className="settingsRow settingsRow--header" aria-label="Notion AI header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Notion AI</span>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Preferred model index">
+          <div className="settingsLabel settingsLabel--inline">Model Index</div>
+          <div className="settingsControl settingsControl--grow">
             <input
-              className={inputCls}
-              value={notionAiModelIndex}
-              onChange={(e) => setNotionAiModelIndex(e.target.value)}
-              disabled={busy}
-              placeholder=""
+              id="notionAiModelIndex"
+              className="input"
+              type="number"
               inputMode="numeric"
+              min={1}
+              step={1}
+              placeholder="3"
+              aria-label="Notion AI preferred model index"
+              value={notionAiModelIndex}
+              disabled={busy}
+              onChange={(e) => setNotionAiModelIndex(e.target.value)}
             />
+            <button id="btnNotionAiModelSave" className="btn" type="button" onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy}>
+              Save
+            </button>
+            <button id="btnNotionAiModelReset" className="btn" type="button" title="Reset to default" onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy}>
+              Reset
+            </button>
           </div>
-        </section>
+        </div>
 
-        <section className={cardCls} aria-label="Inpage visibility">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
-            <div className="tw-font-extrabold tw-text-[14px]">Inpage</div>
+        <div className="settingsRow settingsRow--compact" aria-label="Notion AI model note">
+          <div className="settingsLabel settingsLabel--inline">Note</div>
+          <div className="sub">Applies only when Notion AI model is set to Auto. Menu order may change in Notion.</div>
+        </div>
+      </section>
+
+      <section className="toolbar settingsPanel" id="inpageVisibilityCard" aria-label="Inpage button visibility settings">
+        <div className="settingsRow settingsRow--header" aria-label="Inpage button visibility header">
+          <div className="notionHeaderText">
+            <span className="notionHeaderTitle">Inpage Button</span>
           </div>
-          <label className="tw-mt-2 tw-flex tw-items-center tw-gap-2 tw-text-[12px] tw-text-[var(--muted)]">
-            <input
-              type="checkbox"
-              checked={!!inpageSupportedOnly}
-              disabled={busy || inpageSupportedOnly == null}
-              onChange={(e) => onToggleInpageSupportedOnly(e.target.checked).catch(() => {})}
-            />
-            仅在支持站点显示 Inpage 按钮
-          </label>
-        </section>
-      </div>
-    </section>
+          <div className="spacer" />
+        </div>
+
+        <div className="settingsDivider" role="presentation" />
+
+        <div className="settingsRow settingsRow--compact" aria-label="Inpage button supported sites toggle">
+          <div className="settingsControl settingsControl--grow">
+            <label className="checkbox" htmlFor="inpageSupportedOnlyToggle">
+              <input
+                id="inpageSupportedOnlyToggle"
+                type="checkbox"
+                checked={!!inpageSupportedOnly}
+                disabled={busy || inpageSupportedOnly == null}
+                onChange={(e) => onToggleInpageSupportedOnly(e.target.checked).catch(() => {})}
+              />
+              <span>仅在支持站点显示 Inpage 按钮</span>
+            </label>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
