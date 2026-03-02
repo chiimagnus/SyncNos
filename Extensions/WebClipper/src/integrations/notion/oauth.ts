@@ -189,16 +189,26 @@ export async function handleNotionOAuthCallbackNavigation(
 
 export function setupNotionOAuthNavigationListener(): void {
   const { chrome, browser } = getApis();
-  const addListener =
-    chrome?.webNavigation?.onCommitted?.addListener ??
-    browser?.webNavigation?.onCommitted?.addListener;
-  if (typeof addListener !== 'function') return;
+  try {
+    if (chrome?.webNavigation?.onCommitted?.addListener) {
+      chrome.webNavigation.onCommitted.addListener((details: any) => {
+        handleNotionOAuthCallbackNavigation({
+          url: String(details?.url || ''),
+          tabId: Number(details?.tabId),
+        }).catch(() => {});
+      });
+      return;
+    }
 
-  addListener((details: any) => {
-    handleNotionOAuthCallbackNavigation({
-      url: String(details?.url || ''),
-      tabId: Number(details?.tabId),
-    }).catch(() => {});
-  });
+    if (browser?.webNavigation?.onCommitted?.addListener) {
+      browser.webNavigation.onCommitted.addListener((details: any) => {
+        handleNotionOAuthCallbackNavigation({
+          url: String(details?.url || ''),
+          tabId: Number(details?.tabId),
+        }).catch(() => {});
+      });
+    }
+  } catch (_e) {
+    // ignore: best-effort (some browsers/polyfills may throw on listener registration)
+  }
 }
-
