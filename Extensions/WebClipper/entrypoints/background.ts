@@ -1,6 +1,6 @@
-import { startLegacyBackground } from '../src/legacy/background-entry.js';
+import { startLegacyBackground } from '../src/legacy/background-entry';
 
-export default defineBackground(async () => {
+export default defineBackground(() => {
   // P1: minimal ping for verifying WXT -> background messaging.
   try {
     browser.runtime.onMessage.addListener((msg) => {
@@ -11,5 +11,5 @@ export default defineBackground(async () => {
     // ignore
   }
 
-  await startLegacyBackground();
+  startLegacyBackground();
 });

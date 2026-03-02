@@ -1,4 +1,8 @@
-import { startLegacyContent } from '../src/legacy/content-entry.js';
+import '../src/ui/styles/tokens.css';
+import '../src/ui/styles/flash-ok.css';
+import '../src/ui/styles/inpage.css';
+
+import { startLegacyContent } from '../src/legacy/content-entry';
 
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
@@ -19,7 +23,7 @@ export default defineContentScript({
     'https://poe.com/*',
     'https://*.notion.so/*',
   ],
-  async main() {
-    await startLegacyContent();
+  main() {
+    startLegacyContent();
   },
 });
