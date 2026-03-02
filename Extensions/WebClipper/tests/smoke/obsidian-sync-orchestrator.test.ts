@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-function loadModule(rel: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve(rel);
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require(rel);
+async function loadModule(rel: string) {
+  const mod = await import(/* @vite-ignore */ rel);
+  return (mod as any).default || mod;
 }
 
 function setupChromeStorage() {
@@ -37,9 +33,9 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    loadModule("../../src/export/obsidian/obsidian-settings-store.js");
-    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
-    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     const res = await orch.testConnection({ instanceId: "x" });
     expect(res.ok).toBe(false);
@@ -50,12 +46,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
-    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
-    loadModule("../../src/export/obsidian/obsidian-note-path.js");
-    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
-    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
-    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -91,12 +87,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
-    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
-    loadModule("../../src/export/obsidian/obsidian-note-path.js");
-    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
-    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
-    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -144,12 +140,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
-    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
-    loadModule("../../src/export/obsidian/obsidian-note-path.js");
-    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
-    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
-    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {
@@ -192,12 +188,12 @@ describe("obsidian-sync-orchestrator", () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
     setupChromeStorage();
-    const store = loadModule("../../src/export/obsidian/obsidian-settings-store.js");
-    loadModule("../../src/export/obsidian/obsidian-local-rest-client.js");
-    loadModule("../../src/export/obsidian/obsidian-note-path.js");
-    loadModule("../../src/export/obsidian/obsidian-sync-metadata.js");
-    loadModule("../../src/export/obsidian/obsidian-markdown-writer.js");
-    const orch = loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    const store = await loadModule("../../src/export/obsidian/obsidian-settings-store.ts");
+    await loadModule("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await loadModule("../../src/export/obsidian/obsidian-note-path.ts");
+    await loadModule("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await loadModule("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const orch = await loadModule("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     // @ts-expect-error test global
     globalThis.WebClipper.backgroundStorage = {

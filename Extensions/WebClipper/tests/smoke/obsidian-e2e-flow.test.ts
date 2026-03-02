@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-function load(rel: string) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const p = require.resolve(rel);
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[p];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require(rel);
+async function load(rel: string) {
+  const mod = await import(/* @vite-ignore */ rel);
+  return (mod as any).default || mod;
 }
 
 function setupChromeStorage() {
@@ -38,12 +34,12 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     globalThis.WebClipper = {};
     setupChromeStorage();
 
-    const settingsStore = load("../../src/export/obsidian/obsidian-settings-store.js");
-    load("../../src/export/obsidian/obsidian-local-rest-client.js");
-    load("../../src/export/obsidian/obsidian-note-path.js");
-    load("../../src/export/obsidian/obsidian-sync-metadata.js");
-    load("../../src/export/obsidian/obsidian-markdown-writer.js");
-    const orch = load("../../src/export/obsidian/obsidian-sync-orchestrator.js");
+    const settingsStore = await load("../../src/export/obsidian/obsidian-settings-store.ts");
+    await load("../../src/export/obsidian/obsidian-local-rest-client.ts");
+    await load("../../src/export/obsidian/obsidian-note-path.ts");
+    await load("../../src/export/obsidian/obsidian-sync-metadata.ts");
+    await load("../../src/export/obsidian/obsidian-markdown-writer.ts");
+    const orch = await load("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
 
     // Local data
     let messages: any[] = [
@@ -157,4 +153,3 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     expect(r5.results[0].mode).toBe("failed");
   });
 });
-

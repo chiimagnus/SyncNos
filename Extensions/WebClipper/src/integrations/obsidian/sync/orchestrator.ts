@@ -1,4 +1,4 @@
-import '../../../export/obsidian/obsidian-sync-orchestrator.js';
+import '../../../export/obsidian/obsidian-sync-orchestrator.ts';
 import runtimeContext from '../../../runtime-context.ts';
 
 type LegacyObsidianSyncOrchestrator = {

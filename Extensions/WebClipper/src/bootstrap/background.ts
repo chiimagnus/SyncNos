@@ -12,11 +12,11 @@ import '../export/notion/notion-sync-service.js';
 import '../export/notion/notion-sync-job-store.js';
 import '../export/notion/notion-sync-orchestrator.js';
 
-import '../export/obsidian/obsidian-local-rest-client.js';
-import '../export/obsidian/obsidian-note-path.js';
-import '../export/obsidian/obsidian-sync-metadata.js';
-import '../export/obsidian/obsidian-markdown-writer.js';
-import '../export/obsidian/obsidian-sync-orchestrator.js';
+import '../export/obsidian/obsidian-local-rest-client.ts';
+import '../export/obsidian/obsidian-note-path.ts';
+import '../export/obsidian/obsidian-sync-metadata.ts';
+import '../export/obsidian/obsidian-markdown-writer.ts';
+import '../export/obsidian/obsidian-sync-orchestrator.ts';
 
 import './background-inpage-web-visibility.ts';
 import '../collectors/web/article-fetch-service.ts';
