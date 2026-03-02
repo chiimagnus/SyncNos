@@ -68,11 +68,11 @@
   - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
   - 已重构为 Local REST API 平台主导同步：
-  - popup：`src/ui/popup/popup-obsidian-sync.js`（配置与连通性测试）+ `src/ui/popup/popup-obsidian-sync-state.js`（状态）+ `src/ui/popup/popup.js`（触发同步）
+  - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
   - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（编排）+ `src/export/obsidian/obsidian-local-rest-client.js`（HTTP client）+ `src/export/obsidian/obsidian-markdown-writer.js`（写入）+ `src/export/obsidian/obsidian-settings-store.js`（配置存储）
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
-- **Inpage 显示范围设置**：`src/ui/popup/popup-inpage-visibility.js` + `src/bootstrap/content-controller.js`
+- **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.js`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
     - `src/bootstrap/background-inpage-web-visibility.js`
@@ -110,16 +110,16 @@
 
 ## 命令
 
-- 静态检查（manifest/icons + JS 语法）：`npm --prefix Extensions/WebClipper run check`
+- 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix Extensions/WebClipper run check`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
 - 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
-- （迁移期 legacy 打包链）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
-- （迁移期 legacy 打包链）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
-- （迁移期 legacy 打包链）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
-- 校验 Edge 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:edge`
-- 校验 Firefox 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
+- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
+- 校验 Edge dist 产物（先 `legacy:build:edge`）：`npm --prefix Extensions/WebClipper run check:dist:edge`
+- 校验 Firefox dist 产物（先 `legacy:build:firefox`）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
 
 ## Firefox / AMO
@@ -130,7 +130,8 @@
 
 1. 打开 `about:debugging#/runtime/this-firefox`
 2. 点击 “Load Temporary Add-on…”
-3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`（或使用 legacy: `Extensions/WebClipper/dist-firefox/manifest.json`）
+3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`
+   - 如果你需要验证“发布/上传产物”的目录结构：先跑 `npm --prefix Extensions/WebClipper run legacy:build:firefox`，再选择 `Extensions/WebClipper/dist-firefox/manifest.json`
 
 ### AMO 发布产物
 
@@ -148,7 +149,7 @@
 - 构建步骤：
   1. `npm --prefix Extensions/WebClipper install`
   2. `npm --prefix Extensions/WebClipper run build:firefox`
-  - 如需 `.xpi`：迁移期仍可用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
+  - 如需 `.xpi`：用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
 
 ## Chrome 开发
 

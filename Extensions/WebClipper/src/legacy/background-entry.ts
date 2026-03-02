@@ -10,7 +10,6 @@ import '../protocols/message-contracts.js';
 import '../protocols/conversation-kind-contract.js';
 import '../protocols/conversation-kinds.js';
 
-import '../export/notion/oauth-config.js';
 import '../export/notion/token-store.js';
 import '../export/notion/notion-api.js';
 import '../export/notion/notion-files-api.js';
@@ -32,7 +31,6 @@ import '../export/obsidian/obsidian-sync-orchestrator.js';
 import '../bootstrap/background-inpage-web-visibility.js';
 import '../bootstrap/background-events-hub.js';
 import '../bootstrap/background-storage.js';
-import '../bootstrap/background-notion-oauth.js';
 import '../collectors/web/article-fetch-service.js';
 import '../bootstrap/background-router.js';
 
