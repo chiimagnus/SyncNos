@@ -88,7 +88,7 @@
 ### Task 03: 固化 WXT 入口约定与产物路径（把 Spike 结果写进计划与代码）
 
 **Files:**
-- Modify: `.github/plans/WebClipper脚手架迁移方案.md`（只补“入口约定/命令”结论，不改设计）
+- Modify: `.github/plans/2026-03-01-WebClipper脚手架迁移-implementation-plan.md`（在本文内固化“入口约定/命令”结论）
 
 **Step 1: 实现**
 - 用 Task 02 的结果补齐：
@@ -99,6 +99,13 @@
 
 **Step 2: 验证**
 - Expected: 文档中不再出现 `entrypoints/app.html` 与 `entrypoints/app/main.tsx` 这类自相矛盾表述
+
+**WXT 入口约定（定稿）**
+- app：`Extensions/WebClipper/entrypoints/app/index.html` → `app.html`
+- popup：`Extensions/WebClipper/entrypoints/popup/index.html` → `popup.html`
+- background：`Extensions/WebClipper/entrypoints/background.ts` → `background.js`
+- content：`Extensions/WebClipper/entrypoints/content.ts` → `content-scripts/content.js`
+- Firefox build：`wxt build -b firefox --mv3` → `.output/firefox-mv3/`
 
 ---
 
