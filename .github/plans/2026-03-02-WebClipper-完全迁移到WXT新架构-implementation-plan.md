@@ -12,7 +12,7 @@
 
 ## 1) 当前基线（截至 2026-03-02）
 
-### 已完成里程碑（Task1 ~ Task24）
+### 已完成里程碑（Task1 ~ Task30）
 
 - `Task1` 文档基线：`c1a26d70`
 - `Task2` TS IDB schema：`b6195750`
@@ -39,7 +39,12 @@
 - `Task22` inpage runtime 去全局：`6786c15d`
 - `Task23` export service 去全局：`b6a7962e`
 - `Task24` zero-global 收口：`bc5194de`
-- 执行中补丁（导入路径/构建修复）：`1bb98d73`
+- `Task25` runtime-context TS 化 + background 去 require：`21de81fb`
+- `Task26` content 入口去 CJS/全局回退：`6223e803`
+- `Task27` protocol JS 双轨清理：`6056b72c`
+- `Task28` shared/storage 核心 TS 化：`c87ebda7`
+- `Task29` bootstrap TS 收敛：`fa74e9d5`
+- `Task30` collectors runtime-observer TS 化 + tests 对齐：`88b9b659`
 
 ### 当前问题快照（Phase 3 输入）
 
