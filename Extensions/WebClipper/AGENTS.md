@@ -110,16 +110,16 @@
 
 ## 命令
 
-- 静态检查（manifest/icons + JS 语法）：`npm --prefix Extensions/WebClipper run check`
+- 静态检查（先 build，再校验产物 manifest/icons）：`npm --prefix Extensions/WebClipper run check`
 - 单元测试（Vitest）：`npm --prefix Extensions/WebClipper run test`
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
 - 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
-- （迁移期 legacy 打包链）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
-- （迁移期 legacy 打包链）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
-- （迁移期 legacy 打包链）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
-- 校验 Edge 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:edge`
-- 校验 Firefox 产物（不做源码语法检查）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
+- （产物打包到 dist，用于发布/上传）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
+- （产物打包到 dist，用于发布/上传）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
+- （产物打包到 dist，用于发布/上传）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
+- 校验 Edge dist 产物：`npm --prefix Extensions/WebClipper run check:dist:edge`
+- 校验 Firefox dist 产物：`npm --prefix Extensions/WebClipper run check:dist:firefox`
 - 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
 
 ## Firefox / AMO
@@ -148,7 +148,7 @@
 - 构建步骤：
   1. `npm --prefix Extensions/WebClipper install`
   2. `npm --prefix Extensions/WebClipper run build:firefox`
-  - 如需 `.xpi`：迁移期仍可用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
+  - 如需 `.xpi`：用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
 
 ## Chrome 开发
 
