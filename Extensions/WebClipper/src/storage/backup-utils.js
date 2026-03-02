@@ -1,6 +1,6 @@
 (function () {
-  const { conversationKinds } = require("../protocols/conversation-kinds.js");
   const NS = require("../runtime-context.js");
+  const conversationKinds = NS.conversationKinds;
 
   const BACKUP_SCHEMA_VERSION = 1;
   const BACKUP_ZIP_SCHEMA_VERSION = 2;

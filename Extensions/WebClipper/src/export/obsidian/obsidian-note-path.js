@@ -1,6 +1,6 @@
 (function () {
-  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
   const NS = require("../../runtime-context.js");
+  const conversationKinds = NS.conversationKinds;
 
   const DEFAULT_OBSIDIAN_FOLDER = "SyncNos-AIChats";
 
