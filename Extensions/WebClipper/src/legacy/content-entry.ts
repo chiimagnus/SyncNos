@@ -12,8 +12,6 @@ import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
 import '../collectors/sites-bootstrap';
 
-import '../collectors/deepseek/deepseek-markdown.js';
-import '../collectors/deepseek/deepseek-collector.js';
 import '../collectors/zai/zai-markdown.js';
 import '../collectors/zai/zai-collector.js';
 import '../collectors/kimi/kimi-markdown.js';
