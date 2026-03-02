@@ -81,5 +81,9 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     });
   }
 
-  return { ok, err, register, start, eventsHub };
+  async function __handleMessageForTests(msg: Message, sender?: any) {
+    return handleMessage(msg, sender ?? null);
+  }
+
+  return { ok, err, register, start, eventsHub, __handleMessageForTests };
 }

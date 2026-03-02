@@ -13,13 +13,16 @@ export default defineBackground(() => {
   startLegacyBackground();
 
   const NS: any = (globalThis as any).WebClipper || {};
-  const legacyHandle = NS.backgroundRouter?.__handleMessageForTests;
-  const fallback = typeof legacyHandle === 'function'
-    ? (msg: any) => legacyHandle(msg)
-    : (msg: any) => ({ ok: false, data: null, error: { message: `unknown message type: ${msg?.type}`, extra: null } });
+  if (!NS.__backgroundInstanceId) {
+    NS.__backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
 
   const router = createBackgroundRouter({
-    fallback: (msg) => fallback(msg),
+    fallback: (msg) => ({
+      ok: false,
+      data: null,
+      error: { message: `unknown message type: ${msg?.type}`, extra: null },
+    }),
   });
 
   // Migration-only utility; routed through platform router (and/or legacy router ping handler).
