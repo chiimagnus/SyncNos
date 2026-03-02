@@ -93,7 +93,7 @@ SyncNos 是一套“把分散的阅读高亮/笔记与对话内容沉淀到 Noti
 - 用户价值：即使不连接 Notion，也能把对话以可迁移的形式带走，或快速沉淀到 Obsidian，并可在不同设备/浏览器之间恢复
 - 触发方式：用户在扩展弹窗中选择导出、添加到 Obsidian，或备份导出/导入
 - 输入：选中的会话；备份文件（导入）
-- 输出：导出文件（Markdown）、Obsidian 新建笔记请求（`obsidian://new`）、备份文件（Zip v2，含 manifest/index/sources/config）、合并导入后的本地数据（支持 Zip v2 与 legacy JSON）
+- 输出：导出文件（Markdown）、通过 Obsidian Local REST API 写入/更新后的 vault 笔记、备份文件（Zip v2，含 manifest/index/sources/config）、合并导入后的本地数据（支持 Zip v2 与 legacy JSON）
 - 关键边界与失败方式：备份导入为合并模式（不清空现有数据）；备份不应包含 Notion token；当系统无法调用 Obsidian URL scheme 时应明确提示失败
 
 ### 2.9 隐私与本地存储
