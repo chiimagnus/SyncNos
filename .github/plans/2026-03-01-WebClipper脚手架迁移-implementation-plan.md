@@ -10,7 +10,7 @@
 - 不新增新站点 collector / 新同步目标（除非为了验证架构闭环必须）
 
 **Approach（方案）:**
-- 采用 Strangler Fig 渐进式重构：WXT 先接管构建与入口；background/content 初期可通过“legacy 适配层”保持行为；UI 先引入扩展内 `app`，popup 变快捷入口；随后按业务域逐段替换 legacy（conversations → sync → backup/export → inpage/collectors）。
+- 采用 Strangler Fig 渐进式重构：WXT 先接管构建与入口；background/content 初期可通过“legacy 适配层”保持行为；UI 引入扩展内 `app`（扩展内 SPA）+ React popup（Tailwind），并按业务域逐段替换 legacy（conversations → sync → backup/export → inpage/collectors）。
 - 目录结构按“业务分域”组织（domains/integrations/ui/platform），避免纯技术分层导致未来扩展改动分散。
 - 每个 P1/P2/P3 里每个 Task 都必须能验证；每完成一个优先级分组跑一次最小回归。
 
@@ -22,6 +22,11 @@
 - 扩展内 Web App
   - popup 内按钮可打开 `app.html`，并能切换 `/`、`/settings`、`/debug` 路由（HashRouter）
   - `sync/backup` 功能面板并入 `settings`（`/sync`、`/backup` 作为兼容重定向到 `/settings`）
+- popup（React + Tailwind）
+  - popup 提供 `Chats / Settings / About` 三页签
+  - Chats：可筛选 source、批量选择、删除、导出（Single/Multi Markdown zip）、触发 Obsidian/Notion 同步
+  - Settings：包含 Notion OAuth + Parent Page、Fetch Current Page、Obsidian Local REST API 配置 + Test、Backup Import/Export、Notion AI、Inpage 显示范围开关
+  - About：版本号 + Mac App/Source/Changelog/Mail/GitHub 等链接
 - 核心能力不回归（最小冒烟）
   - 自动采集保存仍可工作（至少 ChatGPT/Claude 任一站点）
   - “Fetch Current Page” 能抓取文章并入库
@@ -169,20 +174,21 @@
 
 ---
 
-### Task 07: popup 加“打开完整界面”按钮（先把入口打通）
+### Task 07: popup（React + Tailwind）实现“原 popup 面板能力对齐”并保留 Open App
 
 **Files:**
 - Modify/Create: `Extensions/WebClipper/entrypoints/popup/...`
-- Modify/Create: `Extensions/WebClipper/src/ui/popup/...`
+- (可选) Modify/Create: `Extensions/WebClipper/src/ui/popup/...`（legacy 仅保留迁移期对照，不作为新 popup 依赖）
 
 **Step 1: 实现**
-- popup 保持轻量：新增按钮 “Open App”，点击后：
+- popup 使用 React + Tailwind，实现三页签（Chats/Settings/About）并对齐原 popup 的核心能力；同时保留 “Open App”：
+  - “Open App” 点击后：
   - `browser.runtime.getURL('app.html#/')`
   - `browser.tabs.create({ url })`
   - `window.close()`
 
 **Step 2: 验证**
-- 手测：打开 popup → 点击按钮 → 新标签页打开 app 并落到 Conversations 页面
+- 手测：打开 popup → 三页签可切换；Chats/Settings/About 行为可用；点击 “Open App” → 新标签页打开 app 并落到 Conversations 页面
 
 ---
 
