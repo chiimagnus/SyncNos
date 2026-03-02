@@ -1,5 +1,6 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
 import { storageRemove } from '../../platform/storage/local';
+import { clearNotionOAuthToken, getNotionOAuthToken } from '../../integrations/notion/token-store';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -44,14 +45,12 @@ function getNotionDisconnectStorageKeys(): string[] {
 
 export function registerSettingsHandlers(router: AnyRouter) {
   router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const token = await (NS.notionTokenStore?.getToken?.() ?? Promise.resolve(null));
+    const token = await getNotionOAuthToken();
     return router.ok({ connected: !!(token && token.accessToken), token: token || null });
   });
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    await (NS.notionTokenStore?.clearToken?.() ?? Promise.resolve());
+    await clearNotionOAuthToken();
     const clearedKeys = getNotionDisconnectStorageKeys();
     await storageRemove(clearedKeys);
     return router.ok({ disconnected: true, clearedKeys });
@@ -100,4 +99,3 @@ export function registerSettingsHandlers(router: AnyRouter) {
     return router.ok(data);
   });
 }
-
