@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const STORAGE_KEYS = Object.freeze({
     apiBaseUrl: "obsidian_api_base_url",

@@ -1,5 +1,8 @@
 import '../../../export/notion/notion-sync-orchestrator.js';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../../runtime-context.js');
+
 type LegacyNotionSyncOrchestrator = {
   syncConversations: (input: {
     conversationIds?: unknown[];
@@ -9,8 +12,7 @@ type LegacyNotionSyncOrchestrator = {
 };
 
 function getLegacyNotionSyncOrchestrator(): LegacyNotionSyncOrchestrator {
-  const namespace: any = (globalThis as any).WebClipper || {};
-  const orchestrator = namespace.notionSyncOrchestrator;
+  const orchestrator = runtimeContext.notionSyncOrchestrator;
   if (!orchestrator || typeof orchestrator.syncConversations !== 'function') {
     throw new Error('notion sync orchestrator missing');
   }

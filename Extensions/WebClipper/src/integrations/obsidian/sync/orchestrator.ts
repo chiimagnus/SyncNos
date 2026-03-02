@@ -1,5 +1,8 @@
 import '../../../export/obsidian/obsidian-sync-orchestrator.js';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../../runtime-context.js');
+
 type LegacyObsidianSyncOrchestrator = {
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
   syncConversations: (input: {
@@ -11,8 +14,7 @@ type LegacyObsidianSyncOrchestrator = {
 };
 
 function getLegacyObsidianSyncOrchestrator(): LegacyObsidianSyncOrchestrator {
-  const namespace: any = (globalThis as any).WebClipper || {};
-  const orchestrator = namespace.obsidianSyncOrchestrator;
+  const orchestrator = runtimeContext.obsidianSyncOrchestrator;
   if (!orchestrator || typeof orchestrator.getSyncStatus !== 'function') {
     throw new Error('obsidian sync orchestrator missing');
   }

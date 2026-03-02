@@ -1,6 +1,6 @@
 (function () {
   const { conversationKinds } = require("../protocols/conversation-kinds.js");
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
 
   const BACKUP_SCHEMA_VERSION = 1;
   const BACKUP_ZIP_SCHEMA_VERSION = 2;
