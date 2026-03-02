@@ -16,6 +16,8 @@ import '../src/ui/inpage/inpage-button-shadow';
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';
 import { createRuntimeClient } from '../src/platform/runtime/client';
+import runtimeContext from '../src/runtime-context.ts';
+import collectorContext from '../src/collectors/collector-context.ts';
 
 export default defineContentScript({
   // P1-05: align with current `manifest.json` content_scripts matches.
@@ -37,27 +39,23 @@ export default defineContentScript({
     'https://*.notion.so/*',
   ],
   main() {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const runtimeContext: any = require('../src/runtime-context.js');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const collectorContext: any = require('../src/collectors/collector-context.js');
-    const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
+    const runtimeNS: any = runtimeContext;
+    const collectorsNS: any = collectorContext;
     runtimeContext.runtimeClient = { createRuntimeClient };
-    NS.runtimeClient = runtimeContext.runtimeClient;
 
     const runtime = createRuntimeClient();
     startContentBootstrap({
       runtime,
-      inpageButton: runtimeContext.inpageButton || NS.inpageButton || null,
+      inpageButton: runtimeNS.inpageButton || null,
       createController: () =>
         createContentController({
           runtime,
-          collectorsRegistry: collectorContext.collectorsRegistry || null,
-          inpageButton: runtimeContext.inpageButton || NS.inpageButton || null,
-          inpageTip: runtimeContext.inpageTip || NS.inpageTip || null,
-          runtimeObserver: runtimeContext.runtimeObserver || NS.runtimeObserver || null,
-          incrementalUpdater: runtimeContext.incrementalUpdater || NS.incrementalUpdater || null,
-          notionAiModelPicker: runtimeContext.notionAiModelPicker || NS.notionAiModelPicker || null,
+          collectorsRegistry: collectorsNS.collectorsRegistry || null,
+          inpageButton: runtimeNS.inpageButton || null,
+          inpageTip: runtimeNS.inpageTip || null,
+          runtimeObserver: runtimeNS.runtimeObserver || null,
+          incrementalUpdater: runtimeNS.incrementalUpdater || null,
+          notionAiModelPicker: runtimeNS.notionAiModelPicker || null,
         }),
     });
   },

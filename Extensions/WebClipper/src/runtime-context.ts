@@ -15,6 +15,35 @@ function resetContext(store: RuntimeContextRecord, nextValue: unknown): RuntimeC
   return store;
 }
 
+function ensureCompatibilityNamespace(
+  root: any,
+  contextStore: RuntimeContextRecord,
+  runtimeContext: RuntimeContextRecord,
+) {
+  const descriptor = Object.getOwnPropertyDescriptor(root, COMPATIBILITY_NAMESPACE_KEY);
+  if (descriptor && descriptor.get && descriptor.set) return;
+
+  const currentNamespace = root[COMPATIBILITY_NAMESPACE_KEY];
+  if (
+    currentNamespace &&
+    currentNamespace !== runtimeContext &&
+    typeof currentNamespace === 'object'
+  ) {
+    resetContext(contextStore, currentNamespace);
+  }
+
+  Object.defineProperty(root, COMPATIBILITY_NAMESPACE_KEY, {
+    configurable: true,
+    enumerable: false,
+    get() {
+      return runtimeContext;
+    },
+    set(value) {
+      resetContext(contextStore, value);
+    },
+  });
+}
+
 function ensureRuntimeContext(): RuntimeContextRecord {
   const root = globalThis as any;
 
@@ -29,34 +58,16 @@ function ensureRuntimeContext(): RuntimeContextRecord {
   let runtimeContext: RuntimeContextRecord = contextStore;
   runtimeContext = new Proxy(contextStore, {
     get(target, property, receiver) {
+      ensureCompatibilityNamespace(root, contextStore, runtimeContext);
       return Reflect.get(target, property, receiver);
     },
     set(target, property, value, receiver) {
+      ensureCompatibilityNamespace(root, contextStore, runtimeContext);
       return Reflect.set(target, property, value, receiver);
     },
   });
 
-  const descriptor = Object.getOwnPropertyDescriptor(root, COMPATIBILITY_NAMESPACE_KEY);
-  if (!descriptor || !descriptor.get || !descriptor.set) {
-    const currentNamespace = root[COMPATIBILITY_NAMESPACE_KEY];
-    if (
-      currentNamespace &&
-      currentNamespace !== runtimeContext &&
-      typeof currentNamespace === 'object'
-    ) {
-      resetContext(contextStore, currentNamespace);
-    }
-    Object.defineProperty(root, COMPATIBILITY_NAMESPACE_KEY, {
-      configurable: true,
-      enumerable: false,
-      get() {
-        return runtimeContext;
-      },
-      set(value) {
-        resetContext(contextStore, value);
-      },
-    });
-  }
+  ensureCompatibilityNamespace(root, contextStore, runtimeContext);
 
   root[RUNTIME_CONTEXT_KEY] = runtimeContext;
   return runtimeContext;
