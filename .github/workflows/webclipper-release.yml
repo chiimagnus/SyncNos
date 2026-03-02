@@ -41,25 +41,38 @@ jobs:
       - name: Install WebClipper deps
         run: npm ci --prefix Extensions/WebClipper
 
-      - name: Build WebClipper package
-        run: npm --prefix Extensions/WebClipper run build
+      - name: Build WebClipper Chrome zip
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=chrome \
+            --zip \
+            --zip-name="syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip"
 
-      - name: Build WebClipper Edge package
-        run: npm --prefix Extensions/WebClipper run build:edge
+      - name: Build WebClipper Edge zip
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=edge \
+            --out=dist-edge \
+            --zip \
+            --zip-name="syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
 
       - name: Build WebClipper Firefox XPI
-        run: npm --prefix Extensions/WebClipper run build:firefox
+        run: |
+          set -euo pipefail
+          node .github/scripts/webclipper/package-release-assets.mjs \
+            --target=firefox \
+            --zip \
+            --zip-name="syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
       - name: Prepare release artifacts
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          (
-            cd Extensions/WebClipper/dist
-            zip -r "${GITHUB_WORKSPACE}/release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" .
-          )
-          cp Extensions/WebClipper/SyncNos-WebClipper-edge.zip "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
-          cp Extensions/WebClipper/SyncNos-WebClipper-firefox.xpi "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
+          cp "Extensions/WebClipper/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-chrome-${{ steps.tag.outputs.name }}.zip"
+          cp "Extensions/WebClipper/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip" "release-artifacts/syncnos-webclipper-edge-${{ steps.tag.outputs.name }}.zip"
+          cp "Extensions/WebClipper/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi" "release-artifacts/syncnos-webclipper-firefox-${{ steps.tag.outputs.name }}.xpi"
 
       - name: Upload assets to GitHub Release
         uses: softprops/action-gh-release@v2
