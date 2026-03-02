@@ -1,6 +1,8 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
+import { createContentController } from '../src/bootstrap/content-controller.ts';
+import { startContentBootstrap } from '../src/bootstrap/content.ts';
 import { startLegacyContent } from '../src/legacy/content-entry';
 import { createRuntimeClient } from '../src/platform/runtime/client';
 
@@ -27,5 +29,21 @@ export default defineContentScript({
     const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
     NS.runtimeClient = { createRuntimeClient };
     startLegacyContent();
+
+    const runtime = createRuntimeClient();
+    startContentBootstrap({
+      runtime,
+      inpageButton: NS.inpageButton || null,
+      createController: () =>
+        createContentController({
+          runtime,
+          collectorsRegistry: NS.collectorsRegistry || null,
+          inpageButton: NS.inpageButton || null,
+          inpageTip: NS.inpageTip || null,
+          runtimeObserver: NS.runtimeObserver || null,
+          incrementalUpdater: NS.incrementalUpdater || null,
+          notionAiModelPicker: NS.notionAiModelPicker || null,
+        }),
+    });
   },
 });
