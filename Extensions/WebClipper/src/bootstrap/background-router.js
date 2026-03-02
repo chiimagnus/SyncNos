@@ -313,13 +313,7 @@
       return true;
     });
 
-    const oauth = NS.backgroundNotionOAuth;
-    oauth && oauth.ensureDefaultNotionOAuthClientId && oauth.ensureDefaultNotionOAuthClientId();
-    oauth && oauth.setupNotionOAuthNavigationListener && oauth.setupNotionOAuthNavigationListener();
-
-    if (chrome && chrome.runtime && chrome.runtime.onInstalled && oauth && oauth.ensureDefaultNotionOAuthClientId) {
-      chrome.runtime.onInstalled.addListener(() => oauth.ensureDefaultNotionOAuthClientId());
-    }
+    // Notion OAuth callback handling is handled by WXT background entrypoint during the migration.
 
     NS.__backgroundReady = true;
   }
