@@ -13,6 +13,27 @@ function resetContext(store, nextValue) {
   return store;
 }
 
+function ensureCompatibilityNamespace(root, contextStore, runtimeContext) {
+  const descriptor = Object.getOwnPropertyDescriptor(root, COMPATIBILITY_NAMESPACE_KEY);
+  if (descriptor && descriptor.get && descriptor.set) return;
+
+  const existing = root[COMPATIBILITY_NAMESPACE_KEY];
+  if (existing && existing !== runtimeContext && typeof existing === "object") {
+    resetContext(contextStore, existing);
+  }
+
+  Object.defineProperty(root, COMPATIBILITY_NAMESPACE_KEY, {
+    configurable: true,
+    enumerable: false,
+    get() {
+      return runtimeContext;
+    },
+    set(value) {
+      resetContext(contextStore, value);
+    },
+  });
+}
+
 function ensureRuntimeContext() {
   const root = globalThis;
   if (root[RUNTIME_CONTEXT_KEY] && typeof root[RUNTIME_CONTEXT_KEY] === "object") {
@@ -26,30 +47,16 @@ function ensureRuntimeContext() {
 
   const runtimeContext = new Proxy(contextStore, {
     get(target, property, receiver) {
+      ensureCompatibilityNamespace(root, contextStore, runtimeContext);
       return Reflect.get(target, property, receiver);
     },
     set(target, property, value, receiver) {
+      ensureCompatibilityNamespace(root, contextStore, runtimeContext);
       return Reflect.set(target, property, value, receiver);
     },
   });
 
-  const descriptor = Object.getOwnPropertyDescriptor(root, COMPATIBILITY_NAMESPACE_KEY);
-  if (!descriptor || !descriptor.get || !descriptor.set) {
-    const existing = root[COMPATIBILITY_NAMESPACE_KEY];
-    if (existing && existing !== runtimeContext && typeof existing === "object") {
-      resetContext(contextStore, existing);
-    }
-    Object.defineProperty(root, COMPATIBILITY_NAMESPACE_KEY, {
-      configurable: true,
-      enumerable: false,
-      get() {
-        return runtimeContext;
-      },
-      set(value) {
-        resetContext(contextStore, value);
-      },
-    });
-  }
+  ensureCompatibilityNamespace(root, contextStore, runtimeContext);
 
   root[RUNTIME_CONTEXT_KEY] = runtimeContext;
   return runtimeContext;
