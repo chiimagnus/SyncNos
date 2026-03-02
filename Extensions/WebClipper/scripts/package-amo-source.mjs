@@ -34,9 +34,10 @@ function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
 // Minimal, reviewer-friendly source package contents.
 // Keep only what reviewers need to reproduce the XPI build.
 const items = [
-  "manifest.json",
   "wxt.config.ts",
   "tsconfig.json",
+  "postcss.config.cjs",
+  "tailwind.config.cjs",
   "entrypoints",
   "icons",
   "src",
