@@ -11,6 +11,36 @@ function getOpenDb(): OpenDb {
   return schema.openDb.bind(schema);
 }
 
+let cachedDb: IDBDatabase | null = null;
+let openingDb: Promise<IDBDatabase> | null = null;
+
+async function openDb(): Promise<IDBDatabase> {
+  if (cachedDb) return cachedDb;
+  if (openingDb) return openingDb;
+  const open = getOpenDb();
+  openingDb = open()
+    .then((db) => {
+      cachedDb = db;
+      return db;
+    })
+    .finally(() => {
+      openingDb = null;
+    });
+  return openingDb;
+}
+
+export async function __closeDbForTests(): Promise<void> {
+  try {
+    const db = cachedDb || (openingDb ? await openingDb : null);
+    db?.close?.();
+  } catch (_e) {
+    // ignore
+  } finally {
+    cachedDb = null;
+    openingDb = null;
+  }
+}
+
 function tx(
   db: IDBDatabase,
   storeNames: string[],
@@ -48,7 +78,6 @@ function withOptionalId<T extends Record<string, any>>(
 }
 
 export async function upsertConversation(payload: any): Promise<Conversation> {
-  const openDb = getOpenDb();
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations'], 'readwrite');
   const idx = stores.conversations.index('by_source_conversationKey');
@@ -92,7 +121,6 @@ export async function syncConversationMessages(
   conversationId: number,
   messages: any[],
 ): Promise<{ upserted: number; deleted: number }> {
-  const openDb = getOpenDb();
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readwrite');
   const idx = stores.messages.index('by_conversationId_messageKey');
@@ -158,7 +186,6 @@ export async function syncConversationMessages(
 }
 
 export async function getConversations(): Promise<Conversation[]> {
-  const openDb = getOpenDb();
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations'], 'readonly');
   const items = (await reqToPromise(stores.conversations.getAll())) as any[];
@@ -170,7 +197,6 @@ export async function getConversations(): Promise<Conversation[]> {
 export async function getMessagesByConversationId(
   conversationId: number,
 ): Promise<ConversationMessage[]> {
-  const openDb = getOpenDb();
   const db = await openDb();
   const { t, stores } = tx(db, ['messages'], 'readonly');
   const idx = stores.messages.index('by_conversationId_sequence');
@@ -199,7 +225,6 @@ export async function deleteConversationsByIds(
     return { deletedConversations: 0, deletedMessages: 0, deletedMappings: 0 };
   }
 
-  const openDb = getOpenDb();
   const db = await openDb();
   const { t, stores } = tx(db, ['conversations', 'messages', 'sync_mappings'], 'readwrite');
 
@@ -254,4 +279,3 @@ export async function deleteConversationsByIds(
   await txDone(t);
   return { deletedConversations, deletedMessages, deletedMappings };
 }
-

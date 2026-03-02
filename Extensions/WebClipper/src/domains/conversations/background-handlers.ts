@@ -3,9 +3,11 @@ import {
   deleteConversationsByIds,
   getConversationDetail,
   listConversations,
-  syncConversationMessages,
-  upsertConversation,
 } from './storage';
+import {
+  writeConversationMessagesSnapshot,
+  writeConversationSnapshot,
+} from './write';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -30,14 +32,14 @@ export function registerConversationHandlers(router: AnyRouter) {
     const payload = msg.payload || {};
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
-    const convo = await upsertConversation(payload);
+    const convo = await writeConversationSnapshot(payload);
     return router.ok(convo);
   });
 
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const res = await syncConversationMessages(conversationId, msg.messages);
+    const res = await writeConversationMessagesSnapshot(conversationId, msg.messages);
     try {
       const NS: any = (globalThis as any).WebClipper || {};
       const hub = NS.backgroundEventsHub;
