@@ -2,7 +2,7 @@ import './App.css';
 
 export default function App() {
   const openApp = async () => {
-    const url = browser.runtime.getURL('app.html#/');
+    const url = browser.runtime.getURL('/app.html#/');
     await browser.tabs.create({ url });
     window.close();
   };

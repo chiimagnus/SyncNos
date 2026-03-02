@@ -56,6 +56,7 @@ export function registerConversationHandlers(router: AnyRouter) {
     const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
     const res = await deleteConversationsByIds(ids);
     try {
+      const NS: any = (globalThis as any).WebClipper || {};
       const hub = NS.backgroundEventsHub;
       const eventType = NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
       const normalizedIds = Array.isArray(ids)

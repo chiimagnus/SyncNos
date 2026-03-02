@@ -2,7 +2,7 @@ type Message = { type: string; [key: string]: any };
 
 type Handler = (
   msg: Message,
-  sender: browser.runtime.MessageSender,
+  sender: any,
 ) => Promise<any> | any;
 
 type RouterOptions = {
@@ -25,7 +25,7 @@ export function createBackgroundRouter({ fallback }: RouterOptions) {
     handlers.set(type, handler);
   }
 
-  async function handleMessage(msg: Message, sender: browser.runtime.MessageSender) {
+  async function handleMessage(msg: Message, sender: any) {
     if (!msg || typeof msg.type !== 'string') return err('invalid message');
 
     const handler = handlers.get(msg.type);
