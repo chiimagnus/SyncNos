@@ -23,3 +23,14 @@ export async function getConversationDetail(conversationId: number): Promise<Con
   });
   return unwrap(res);
 }
+
+export async function deleteConversations(conversationIds: number[]): Promise<unknown> {
+  const ids = Array.isArray(conversationIds)
+    ? conversationIds
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x) && x > 0)
+    : [];
+  if (!ids.length) return null;
+  const res = await send<ApiResponse<unknown>>(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, { conversationIds: ids });
+  return unwrap(res);
+}

@@ -21,3 +21,36 @@ export async function getObsidianSyncStatus(): Promise<ObsidianSyncStatus> {
   const res = await send<ApiResponse<ObsidianSyncStatus>>(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS);
   return unwrap(res);
 }
+
+function normalizeIds(ids: unknown): number[] {
+  return Array.isArray(ids)
+    ? Array.from(
+        new Set(
+          ids
+            .map((x) => Number(x))
+            .filter((x) => Number.isFinite(x) && x > 0),
+        ),
+      )
+    : [];
+}
+
+export async function syncNotionConversations(conversationIds: number[]): Promise<any> {
+  const ids = normalizeIds(conversationIds);
+  if (!ids.length) throw new Error('No conversations selected');
+  const res = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, { conversationIds: ids });
+  return unwrap(res);
+}
+
+export async function syncObsidianConversations(
+  conversationIds: number[],
+  { forceFullConversationIds }: { forceFullConversationIds?: number[] } = {},
+): Promise<any> {
+  const ids = normalizeIds(conversationIds);
+  if (!ids.length) throw new Error('No conversations selected');
+  const forceFull = normalizeIds(forceFullConversationIds);
+  const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, {
+    conversationIds: ids,
+    forceFullConversationIds: forceFull.length ? forceFull : undefined,
+  });
+  return unwrap(res);
+}

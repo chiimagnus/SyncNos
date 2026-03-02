@@ -2,6 +2,16 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
 
 const READABILITY_FILE = 'src/collectors/web/readability.js';
+const PUBLIC_FILES = [
+  READABILITY_FILE,
+  'icons/icon-16.png',
+  'icons/icon-48.png',
+  'icons/icon-128.png',
+  // Legacy popup/about assets (kept for migration compatibility).
+  'icons/notion.svg',
+  'icons/author-avatar.png',
+  'icons/buymeacoffee1.jpg',
+] as const;
 
 export default defineConfig({
   manifestVersion: 3,
@@ -12,14 +22,16 @@ export default defineConfig({
     // requires the file to exist in the final extension package, but WXT only
     // auto-copies `public/` by default. So we explicitly copy the legacy file.
     'build:publicAssets': (_wxt, files) => {
-      files.push({
-        absoluteSrc: resolve(process.cwd(), READABILITY_FILE),
-        relativeDest: READABILITY_FILE,
-      });
+      for (const rel of PUBLIC_FILES) {
+        files.push({
+          absoluteSrc: resolve(process.cwd(), rel),
+          relativeDest: rel,
+        });
+      }
     },
     // Also allow `browser.runtime.getURL("src/collectors/web/readability.js")` in TS.
     'prepare:publicPaths': (_wxt, paths) => {
-      paths.push(READABILITY_FILE);
+      for (const rel of PUBLIC_FILES) paths.push(rel);
     },
   },
   manifest: {
@@ -60,5 +72,33 @@ export default defineConfig({
       'http://*/*',
       'https://*/*',
     ],
+    web_accessible_resources: [
+      {
+        resources: ['icons/icon-128.png'],
+        matches: [
+          'https://chat.openai.com/*',
+          'https://chatgpt.com/*',
+          'https://www.chatgpt.com/*',
+          'https://claude.ai/*',
+          'https://gemini.google.com/*',
+          'https://chat.deepseek.com/*',
+          'https://chat.z.ai/*',
+          'https://kimi.moonshot.cn/*',
+          'https://kimi.com/*',
+          'https://*.kimi.com/*',
+          'https://www.doubao.com/*',
+          'https://yuanbao.tencent.com/*',
+          'https://poe.com/*',
+          'https://*.notion.so/*',
+          'http://*/*',
+          'https://*/*',
+        ],
+      },
+    ],
+    icons: {
+      16: 'icons/icon-16.png',
+      48: 'icons/icon-48.png',
+      128: 'icons/icon-128.png',
+    },
   },
 });
