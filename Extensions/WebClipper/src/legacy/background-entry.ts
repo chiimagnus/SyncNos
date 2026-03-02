@@ -5,7 +5,6 @@
 // IMPORTANT: Do not use dynamic `import()` in MV3 service workers. Chrome disallows it on
 // ServiceWorkerGlobalScope. Use static imports so Vite/Rollup bundles legacy code into `background.js`.
 
-import '../storage/schema.js';
 import '../protocols/message-contracts.js';
 import '../protocols/conversation-kind-contract.js';
 import '../protocols/conversation-kinds.js';

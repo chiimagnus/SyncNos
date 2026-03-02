@@ -6,6 +6,7 @@ import { exportBackupZipV2 } from '../../src/domains/backup/export';
 import { importBackupLegacyJsonMerge } from '../../src/domains/backup/import';
 import { extractZipEntries } from '../../src/domains/backup/zip-utils';
 import { __closeDbForTests } from '../../src/domains/backup/idb';
+import { openDb } from '../../src/platform/idb/schema';
 
 function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -17,15 +18,6 @@ function reqToPromise<T>(request: IDBRequest<T>): Promise<T> {
 async function deleteDb(name: string) {
   const req = indexedDB.deleteDatabase(name);
   await reqToPromise(req as any);
-}
-
-function loadSchema() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve('../../src/storage/schema.js');
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require('../../src/storage/schema.js');
 }
 
 function mockChromeStorage(initial: Record<string, unknown> = {}) {
@@ -62,11 +54,7 @@ beforeEach(async () => {
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
-
   await deleteDb('webclipper');
-  loadSchema();
 });
 
 afterEach(async () => {
@@ -86,8 +74,7 @@ describe('domains/backup service', () => {
     // @ts-expect-error test global
     globalThis.browser = undefined;
 
-    const schema = (globalThis as any).WebClipper.storageSchema;
-    const db = await schema.openDb();
+    const db = await openDb();
     const t = db.transaction(['conversations', 'messages', 'sync_mappings'], 'readwrite');
     const convId = await reqToPromise<number>(
       t.objectStore('conversations').add({
@@ -207,8 +194,7 @@ describe('domains/backup service', () => {
     expect(stats.mappingsAdded).toBe(1);
     expect(stats.settingsApplied).toBeGreaterThanOrEqual(1);
 
-    const schema = (globalThis as any).WebClipper.storageSchema;
-    const db = await schema.openDb();
+    const db = await openDb();
     const t = db.transaction(['conversations', 'messages', 'sync_mappings'], 'readonly');
     const convs = await reqToPromise<any[]>(t.objectStore('conversations').getAll() as any);
     const msgs = await reqToPromise<any[]>(t.objectStore('messages').getAll() as any);
@@ -229,4 +215,3 @@ describe('domains/backup service', () => {
     expect(chromeMock.__setPayloads.some((p) => (p as any).notion_oauth_client_id === 'cid')).toBe(true);
   });
 });
-
