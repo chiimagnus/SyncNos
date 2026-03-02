@@ -58,12 +58,16 @@
 - **节流与速率限制**：对 Notion 写入必须做 pacing/批量；批量同步要能部分失败不影响其它项。
 - **权限变更需要理由**：新增 `permissions/host_permissions` 前先给出“为何需要、替代方案为何不行、风险与范围控制”。
 
-### 模块入口索引（2026-02 重构后）
+### 模块入口索引（2026-03，WXT 迁移中）
 
-- **消息协议（前后端共享）**：`src/protocols/message-contracts.js`
+- **WXT Background 入口**：`entrypoints/background.ts`
+- **WXT Content 入口**：`entrypoints/content.ts`
+- **WXT Popup 入口**：`entrypoints/popup/*`
+- **WXT App 入口**：`entrypoints/app/*`
+- **消息协议（前后端共享，迁移中）**：`src/protocols/message-contracts.js`
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
-- **后台路由（统一入口）**：`src/bootstrap/background-router.js`
-  - 路由 Obsidian Local REST API 同步、Notion 同步任务状态、会话 CRUD 等消息。
+- **后台路由（迁移中）**：`src/bootstrap/background-router.js`
+  - 路由 Obsidian Local REST API 同步、Notion 同步任务状态、会话 CRUD 等消息；目标是迁到 TS router 并移除该 legacy 文件。
 - **Notion 同步模块**：`src/export/notion/`
   - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
@@ -77,6 +81,13 @@
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
     - `src/bootstrap/background-inpage-web-visibility.js`
   - 为了“无需刷新立即生效”，已注入的普通网页 tab 会收到一条消息并 stop/cleanup inpage controller（见 `src/bootstrap/content.js`）。
+
+当前 legacy 残留业务域（按优先级迁移）：
+- Storage（`src/storage/*` 的 schema/IIFE 注入）
+- Events（`src/bootstrap/background-events-hub.js`）
+- Sync（`src/export/notion/*`、`src/export/obsidian/*` 的全局依赖）
+- Collectors（`src/collectors/*` 的全局注册）
+- Inpage（`src/bootstrap/content*.js` + `src/ui/inpage/*` 的全局读写）
 
 ### Obsidian 约束
 
