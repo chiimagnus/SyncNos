@@ -1,17 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-function loadNotePath() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/obsidian/obsidian-note-path.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/obsidian/obsidian-note-path.js");
+async function loadNotePath() {
+  const mod = await import("../../src/export/obsidian/obsidian-note-path.ts");
+  return mod.default || mod;
 }
 
 describe("obsidian-note-path", () => {
-  it("builds stable path from source+conversationKey and routes to kind folder", () => {
-    const mod = loadNotePath();
+  it("builds stable path from source+conversationKey and routes to kind folder", async () => {
+    const mod = await loadNotePath();
 
     const convo = { sourceType: "article", source: "goodlinks", conversationKey: "abc" };
     const path1 = mod.buildStableNotePath(convo);
@@ -21,8 +17,8 @@ describe("obsidian-note-path", () => {
     expect(path1).toMatch(/goodlinks-[0-9a-f]{16}\.md$/);
   });
 
-  it("allows per-kind folder override (e.g. user-configured paths)", () => {
-    const mod = loadNotePath();
+  it("allows per-kind folder override (e.g. user-configured paths)", async () => {
+    const mod = await loadNotePath();
 
     const convo = { sourceType: "article", source: "goodlinks", conversationKey: "abc" };
     const p = mod.buildStableNotePath(convo, { folderByKindId: { article: "My/Custom Folder" } });

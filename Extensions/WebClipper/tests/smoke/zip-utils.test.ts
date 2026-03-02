@@ -1,15 +1,11 @@
 import { deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
-function loadZipUtils() {
+async function loadZipUtils() {
   // @ts-expect-error test global
   globalThis.WebClipper = {};
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/local/zip-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/local/zip-utils.js");
+  const mod = await import("../../src/export/local/zip-utils.ts");
+  return mod.default || mod;
 }
 
 function u16(n: number) {
@@ -115,7 +111,7 @@ function makeDeflatedZipEntry({ name, data }: { name: string; data: Uint8Array }
 
 describe("zip-utils", () => {
   it("extractZipEntries can read stored zips created by createZipBlob", async () => {
-    const zipUtils = loadZipUtils();
+    const zipUtils = await loadZipUtils();
     const blob = await zipUtils.createZipBlob([
       { name: "a.txt", data: "hello" },
       { name: "dir/b.txt", data: "world" }
@@ -127,7 +123,7 @@ describe("zip-utils", () => {
   });
 
   it("extractZipEntries can read deflated (method=8) entries", async () => {
-    const zipUtils = loadZipUtils();
+    const zipUtils = await loadZipUtils();
     const big = "a".repeat(150_000);
     const bytes = makeDeflatedZipEntry({
       name: "sources/chatgpt/c1.json",
