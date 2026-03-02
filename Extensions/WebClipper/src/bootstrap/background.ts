@@ -1,6 +1,5 @@
 /* eslint-disable import/no-unresolved */
 
-import '../protocols/bootstrap.ts';
 import '../export/bootstrap.ts';
 
 import '../export/notion/notion-api.js';

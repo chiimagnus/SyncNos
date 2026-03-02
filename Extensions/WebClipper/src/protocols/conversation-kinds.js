@@ -1,185 +1,195 @@
-(function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+const { assertKindDef } = require("./conversation-kind-contract.js");
 
-  const defs = [];
+const definitions = [];
 
-  function aiLabelForSource(source) {
-    const api = NS.notionAi;
-    if (api && typeof api.optionNameForSource === "function") return api.optionNameForSource(source);
-    const fallback = String(source || "").trim();
-    return fallback || "Unknown";
-  }
+function aiLabelForSource(source) {
+  const sourceKey = String(source || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 
-  function asRichText(value) {
-    const text = String(value || "").trim();
-    if (!text) return { rich_text: [] };
-    return { rich_text: [{ type: "text", text: { content: text } }] };
-  }
+  const sourceNameMap = {
+    chatgpt: "ChatGPT",
+    claude: "Claude",
+    gemini: "Gemini",
+    deepseek: "DeepSeek",
+    kimi: "Kimi",
+    doubao: "豆包",
+    yuanbao: "元宝",
+    poe: "Poe",
+    notionai: "NotionAI",
+    goodlinks: "GoodLinks"
+  };
 
-  function asTitle(value) {
-    const text = String(value || "").trim();
-    return { title: [{ type: "text", text: { content: text || "Untitled" } }] };
-  }
+  const mapped = sourceNameMap[sourceKey];
+  if (mapped) return mapped;
+  const fallback = String(source || "").trim();
+  return fallback || "Unknown";
+}
 
-  function asDate(value) {
-    const t = Number(value);
-    const at = Number.isFinite(t) && t > 0 ? t : Date.now();
-    return { date: { start: new Date(at).toISOString() } };
-  }
+function asRichText(value) {
+  const text = String(value || "").trim();
+  if (!text) return { rich_text: [] };
+  return { rich_text: [{ type: "text", text: { content: text } }] };
+}
 
-  function asUrl(value) {
-    const url = String(value || "").trim();
-    return { url: url || "" };
-  }
+function asTitle(value) {
+  const text = String(value || "").trim();
+  return { title: [{ type: "text", text: { content: text || "Untitled" } }] };
+}
 
-  function register(def) {
-    const contract = NS.conversationKindContract;
-    const checked = contract && contract.assertKindDef ? contract.assertKindDef(def) : def;
-    const exists = defs.some((d) => d.id === checked.id);
-    if (exists) return false;
-    defs.push(checked);
-    return true;
-  }
+function asDate(value) {
+  const timestamp = Number(value);
+  const capturedAt = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now();
+  return { date: { start: new Date(capturedAt).toISOString() } };
+}
 
-  function pick(conversation) {
-    for (const d of defs) {
-      try {
-        if (d.matches(conversation)) return d;
-      } catch (_e) {
-        // ignore and continue
-      }
+function asUrl(value) {
+  const url = String(value || "").trim();
+  return { url: url || "" };
+}
+
+function register(definition) {
+  const checked = assertKindDef(definition);
+  if (definitions.some((item) => item.id === checked.id)) return false;
+  definitions.push(checked);
+  return true;
+}
+
+function pick(conversation) {
+  for (const definition of definitions) {
+    try {
+      if (definition.matches(conversation)) return definition;
+    } catch (_e) {
+      // ignore and continue
     }
-    return null;
   }
+  return null;
+}
 
-  function list() {
-    return defs.slice();
+function list() {
+  return definitions.slice();
+}
+
+function getNotionStorageKeys() {
+  const output = [];
+  for (const definition of definitions) {
+    const key = String((definition && definition.notion && definition.notion.dbSpec && definition.notion.dbSpec.storageKey) || "").trim();
+    if (key) output.push(key);
   }
+  return Array.from(new Set(output));
+}
 
-  function getNotionStorageKeys() {
-    const out = [];
-    for (const d of defs) {
-      try {
-        const key = d && d.notion && d.notion.dbSpec && d.notion.dbSpec.storageKey
-          ? String(d.notion.dbSpec.storageKey).trim()
-          : "";
-        if (key) out.push(key);
-      } catch (_e) {
-        // ignore
-      }
-    }
-    return Array.from(new Set(out));
-  }
+const CHAT_KIND_ID = "chat";
+const ARTICLE_KIND_ID = "article";
 
-  const CHAT_KIND_ID = "chat";
-  const ARTICLE_KIND_ID = "article";
-
-  const chatKind = {
-    id: CHAT_KIND_ID,
-    matches: () => true,
-    notion: {
-      dbSpec: {
-        title: "SyncNos-AI Chats",
-        storageKey: "notion_db_id_syncnos_ai_chats",
-        properties: {
-          Name: { title: {} },
-          Date: { date: {} },
-          URL: { url: {} },
-          AI: { multi_select: { options: [] } }
-        },
-        ensureSchemaPatch: {
-          AI: { multi_select: { options: [] } }
-        }
+const chatKind = {
+  id: CHAT_KIND_ID,
+  matches: () => true,
+  notion: {
+    dbSpec: {
+      title: "SyncNos-AI Chats",
+      storageKey: "notion_db_id_syncnos_ai_chats",
+      properties: {
+        Name: { title: {} },
+        Date: { date: {} },
+        URL: { url: {} },
+        AI: { multi_select: { options: [] } }
       },
-      pageSpec: {
-        buildCreateProperties(conversation) {
-          const c = conversation || {};
-          return {
-            Name: asTitle(c.title),
-            URL: asUrl(c.url),
-            Date: asDate(c.lastCapturedAt),
-            AI: { multi_select: [{ name: aiLabelForSource(c.source) }] }
-          };
-        },
-        buildUpdateProperties(conversation) {
-          const c = conversation || {};
-          return {
-            Name: asTitle(c.title),
-            URL: asUrl(c.url),
-            AI: { multi_select: [{ name: aiLabelForSource(c.source) }] }
-          };
-        }
+      ensureSchemaPatch: {
+        AI: { multi_select: { options: [] } }
       }
     },
-    obsidian: { folder: "SyncNos-AIChats" }
-  };
-
-  const articleKind = {
-    id: ARTICLE_KIND_ID,
-    matches: (conversation) => conversation && String(conversation.sourceType || "") === "article",
-    notion: {
-      dbSpec: {
-        title: "SyncNos-Web Articles",
-        storageKey: "notion_db_id_syncnos_web_articles",
-        properties: {
-          Name: { title: {} },
-          Date: { date: {} },
-          URL: { url: {} },
-          Author: { rich_text: {} },
-          Published: { rich_text: {} },
-          Description: { rich_text: {} }
-        },
-        ensureSchemaPatch: {
-          Author: { rich_text: {} },
-          Published: { rich_text: {} },
-          Description: { rich_text: {} }
-        }
+    pageSpec: {
+      buildCreateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          Date: asDate(data.lastCapturedAt),
+          AI: { multi_select: [{ name: aiLabelForSource(data.source) }] }
+        };
       },
-      pageSpec: {
-        buildCreateProperties(conversation) {
-          const c = conversation || {};
-          return {
-            Name: asTitle(c.title),
-            URL: asUrl(c.url),
-            Date: asDate(c.lastCapturedAt),
-            Author: asRichText(c.author),
-            Published: asRichText(c.publishedAt),
-            Description: asRichText(c.description)
-          };
-        },
-        buildUpdateProperties(conversation) {
-          const c = conversation || {};
-          return {
-            Name: asTitle(c.title),
-            URL: asUrl(c.url),
-            Author: asRichText(c.author),
-            Published: asRichText(c.publishedAt),
-            Description: asRichText(c.description)
-          };
-        },
-        shouldRebuild({ messages, mapping }) {
-          const syncedAt = mapping && Number(mapping.lastSyncedAt);
-          const lastSyncedAt = Number.isFinite(syncedAt) ? syncedAt : 0;
-          const list = Array.isArray(messages) ? messages : [];
-          return list.some((m) => Number(m && m.updatedAt) > lastSyncedAt);
-        }
+      buildUpdateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          AI: { multi_select: [{ name: aiLabelForSource(data.source) }] }
+        };
+      }
+    }
+  },
+  obsidian: { folder: "SyncNos-AIChats" }
+};
+
+const articleKind = {
+  id: ARTICLE_KIND_ID,
+  matches: (conversation) => conversation && String(conversation.sourceType || "") === "article",
+  notion: {
+    dbSpec: {
+      title: "SyncNos-Web Articles",
+      storageKey: "notion_db_id_syncnos_web_articles",
+      properties: {
+        Name: { title: {} },
+        Date: { date: {} },
+        URL: { url: {} },
+        Author: { rich_text: {} },
+        Published: { rich_text: {} },
+        Description: { rich_text: {} }
+      },
+      ensureSchemaPatch: {
+        Author: { rich_text: {} },
+        Published: { rich_text: {} },
+        Description: { rich_text: {} }
       }
     },
-    obsidian: { folder: "SyncNos-WebArticles" }
-  };
+    pageSpec: {
+      buildCreateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          Date: asDate(data.lastCapturedAt),
+          Author: asRichText(data.author),
+          Published: asRichText(data.publishedAt),
+          Description: asRichText(data.description)
+        };
+      },
+      buildUpdateProperties(conversation) {
+        const data = conversation || {};
+        return {
+          Name: asTitle(data.title),
+          URL: asUrl(data.url),
+          Author: asRichText(data.author),
+          Published: asRichText(data.publishedAt),
+          Description: asRichText(data.description)
+        };
+      },
+      shouldRebuild({ messages, mapping }) {
+        const syncedAt = Number(mapping && mapping.lastSyncedAt);
+        const lastSyncedAt = Number.isFinite(syncedAt) ? syncedAt : 0;
+        const messageList = Array.isArray(messages) ? messages : [];
+        return messageList.some((message) => Number(message && message.updatedAt) > lastSyncedAt);
+      }
+    }
+  },
+  obsidian: { folder: "SyncNos-WebArticles" }
+};
 
-  // Register built-ins (order matters: article first, chat fallback).
-  register(articleKind);
-  register(chatKind);
+register(articleKind);
+register(chatKind);
 
-  const api = {
-    register,
-    pick,
-    list,
-    getNotionStorageKeys,
-    CHAT_KIND_ID,
-    ARTICLE_KIND_ID
-  };
-  NS.conversationKinds = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+const conversationKinds = {
+  register,
+  pick,
+  list,
+  getNotionStorageKeys,
+  CHAT_KIND_ID,
+  ARTICLE_KIND_ID
+};
+
+module.exports = conversationKinds;
+module.exports.conversationKinds = conversationKinds;
+module.exports.CHAT_KIND_ID = CHAT_KIND_ID;
+module.exports.ARTICLE_KIND_ID = ARTICLE_KIND_ID;

@@ -1,6 +1,7 @@
 /* global chrome */
 
 (function () {
+  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   function toConvoLabel(convo) {
@@ -128,7 +129,7 @@
       notionDbManager: NS.notionDbManager,
       notionSyncService: NS.notionSyncService,
       storage: NS.backgroundStorage,
-      conversationKinds: NS.conversationKinds
+      conversationKinds
     };
   }
 

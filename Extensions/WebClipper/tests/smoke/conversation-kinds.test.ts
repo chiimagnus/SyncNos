@@ -1,21 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { conversationKinds } from "../../src/protocols/conversation-kinds.ts";
 
 function loadConversationKinds() {
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const contractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[contractPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/protocols/conversation-kind-contract.js");
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const kindsPath = require.resolve("../../src/protocols/conversation-kinds.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[kindsPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/protocols/conversation-kinds.js");
+  return conversationKinds;
 }
 
 describe("conversation-kinds", () => {

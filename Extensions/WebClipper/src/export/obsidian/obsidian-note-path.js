@@ -1,4 +1,5 @@
 (function () {
+  const { conversationKinds } = require("../../protocols/conversation-kinds.js");
   const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
 
   const DEFAULT_OBSIDIAN_FOLDER = "SyncNos-AIChats";
@@ -19,10 +20,9 @@
   }
 
   function folderForConversation(conversation, { folderByKindId, defaultFolder } = {}) {
-    const kinds = (globalThis.WebClipper && globalThis.WebClipper.conversationKinds) || null;
-    if (kinds && typeof kinds.pick === "function") {
+    if (conversationKinds && typeof conversationKinds.pick === "function") {
       try {
-        const kind = kinds.pick(conversation);
+        const kind = conversationKinds.pick(conversation);
         const kindId = kind && kind.id ? safeString(kind.id) : "";
         const overrideFolderRaw = kindId && folderByKindId && typeof folderByKindId === "object"
           ? safeString(folderByKindId[kindId])
