@@ -12,7 +12,7 @@
 
 ## 1) 当前基线（截至 2026-03-02）
 
-### 已完成里程碑（Task1 ~ Task39）
+### 已完成里程碑（Task1 ~ Task40）
 
 - `Task1` 文档基线：`c1a26d70`
 - `Task2` TS IDB schema：`b6195750`
@@ -54,6 +54,7 @@
 - `Task37` integrations/domain wrapper 去 `.js` 依赖：`933ef775`
 - `Task38` 测试装载改为 TS/ESM：`3d60b9bb`
 - `Task39` 删除 JS 过渡声明 + runtime JS guardrail：`62609966`
+- `Task40` 文档回写 + Phase 3 验收收口：`22e848cf`
 
 ### 当前问题快照（Phase 3 输入）
 
@@ -412,12 +413,16 @@
 
 ---
 
-## 3.1) 最近验收记录（Task38 ~ Task39）
+## 3.1) 最近验收记录（Task38 ~ Task40）
 
 - `npm --prefix Extensions/WebClipper run test --silent`
   - 结果：`Test Files 46 passed (46)`，`Tests 177 passed (177)`。
 - `npm --prefix Extensions/WebClipper run compile`
   - 结果：通过（`tsc --noEmit`）。
+- `npm --prefix Extensions/WebClipper run build`
+  - 结果：通过（`wxt build --mv3`，产物输出到 `.output/chrome-mv3`）。
+- `rg "require\\(" Extensions/WebClipper/.output/chrome-mv3/background.js -n`
+  - 结果：无命中（background 产物已无 `require(`）。
 - `node Extensions/WebClipper/scripts/check-no-runtime-js.mjs`
   - 结果：`OK (1 runtime .js file(s), allowlist size: 1)`。
 
