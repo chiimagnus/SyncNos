@@ -1,5 +1,7 @@
-(function () {
-  const NS = require("../../runtime-context.js");
+// @ts-nocheck
+import runtimeContext from '../../runtime-context.ts';
+
+const NS = runtimeContext as any;
 
   const NOTION_VERSION = "2022-06-28";
 
@@ -105,7 +107,10 @@
     return { results: [], has_more: false, next_cursor: null };
   }
 
-  const api = { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
+const api = { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
+if (!NS.notionApi || typeof NS.notionApi.notionFetch !== 'function') {
   NS.notionApi = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export { notionFetch, searchPages, getPageTitle, NOTION_VERSION };
+export default api;

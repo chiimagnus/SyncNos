@@ -1,27 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-function loadNotionAi() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/export/notion/notion-ai.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/export/notion/notion-ai.js");
+async function loadFresh(rel: string) {
+  const mod = await import(/* @vite-ignore */ `${rel}?t=${Date.now()}_${Math.random().toString(16).slice(2)}`);
+  return (mod as any).default || mod;
+}
+
+async function loadNotionAi() {
+  return loadFresh("../../src/export/notion/notion-ai.ts");
+}
+
+async function loadNotionSyncService() {
+  return loadFresh("../../src/export/notion/notion-sync-service.ts");
 }
 
 describe("notion-sync-service markdown", () => {
-  it("parses inline markdown into rich_text", () => {
+  it("parses inline markdown into rich_text", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
-    loadNotionAi();
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
 
     const rich = notionSyncService.inlineMarkdownToRichText("Hello **bold** and `code` plus [link](https://example.com).");
     expect(Array.isArray(rich)).toBe(true);
@@ -33,18 +31,12 @@ describe("notion-sync-service markdown", () => {
     expect(link?.text?.link?.url).toBe("https://example.com");
   });
 
-  it("converts markdown to notion blocks (basic types)", () => {
+  it("converts markdown to notion blocks (basic types)", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
-    loadNotionAi();
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
 
     const md = [
       "### Title",
@@ -80,18 +72,12 @@ describe("notion-sync-service markdown", () => {
     expect(bold?.text?.content).toBe("b");
   });
 
-  it("converts image markdown to notion image blocks", () => {
+  it("converts image markdown to notion image blocks", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
-    loadNotionAi();
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
 
     const md = [
       "Hello",
@@ -106,18 +92,12 @@ describe("notion-sync-service markdown", () => {
     expect(img?.image?.external?.url).toBe("https://example.com/a.png");
   });
 
-  it("messagesToBlocks uses markdown when present (notionai)", () => {
+  it("messagesToBlocks uses markdown when present (notionai)", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
-    loadNotionAi();
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
 
     const messages = [
       { role: "assistant", contentText: "plain", contentMarkdown: "- item **b**" }
@@ -126,18 +106,12 @@ describe("notion-sync-service markdown", () => {
     expect(blocks.some((b: any) => b && b.type === "bulleted_list_item")).toBe(true);
   });
 
-  it("messagesToBlocks uses markdown when present (zai)", () => {
+  it("messagesToBlocks uses markdown when present (zai)", async () => {
     // @ts-expect-error test global
     globalThis.WebClipper = {};
 
-    loadNotionAi();
-
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const modulePath = require.resolve("../../src/export/notion/notion-sync-service.js");
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete require.cache[modulePath];
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const notionSyncService = require("../../src/export/notion/notion-sync-service.js");
+    await loadNotionAi();
+    const notionSyncService = await loadNotionSyncService();
 
     const messages = [
       { role: "assistant", contentText: "plain", contentMarkdown: "```js\nconsole.log(1)\n```" }

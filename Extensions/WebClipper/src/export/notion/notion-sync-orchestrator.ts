@@ -1,8 +1,13 @@
-/* global chrome */
+// @ts-nocheck
+import { backgroundStorage as defaultBackgroundStorage } from '../../domains/conversations/background-storage';
+import { getNotionOAuthToken } from '../../integrations/notion/token-store';
+import { conversationKinds as builtInConversationKinds } from '../../protocols/conversation-kinds.ts';
+import runtimeContext from '../../runtime-context.ts';
+import notionDbManagerDefault from './notion-db-manager.ts';
+import notionSyncJobStoreDefault from './notion-sync-job-store.ts';
+import notionSyncServiceDefault from './notion-sync-service.ts';
 
-(function () {
-  const NS = require("../../runtime-context.js");
-  const conversationKinds = NS.conversationKinds;
+const NS = runtimeContext as any;
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
@@ -122,16 +127,23 @@
     return storageRemove([key]);
   }
 
-  function getDependencies() {
-    return {
-      notionJobStore: NS.notionSyncJobStore,
-      notionTokenStore: NS.notionTokenStore,
-      notionDbManager: NS.notionDbManager,
-      notionSyncService: NS.notionSyncService,
-      storage: NS.backgroundStorage,
-      conversationKinds
-    };
-  }
+function getDependencies() {
+  const injectedKinds = NS.conversationKinds;
+  const conversationKinds = injectedKinds && typeof injectedKinds.pick === 'function'
+    ? injectedKinds
+    : builtInConversationKinds;
+  const notionTokenStore = NS.notionTokenStore && typeof NS.notionTokenStore.getToken === 'function'
+    ? NS.notionTokenStore
+    : { getToken: getNotionOAuthToken };
+  return {
+    notionJobStore: NS.notionSyncJobStore || notionSyncJobStoreDefault,
+    notionTokenStore,
+    notionDbManager: NS.notionDbManager || notionDbManagerDefault,
+    notionSyncService: NS.notionSyncService || notionSyncServiceDefault,
+    storage: NS.backgroundStorage || defaultBackgroundStorage,
+    conversationKinds,
+  };
+}
 
   async function getSyncJobStatus({ instanceId }) {
     const { notionJobStore } = getDependencies();
@@ -406,10 +418,13 @@
     return { results, okCount, failCount, failures, jobId };
   }
 
-  const api = {
-    getSyncJobStatus,
-    syncConversations
-  };
+const api = {
+  getSyncJobStatus,
+  syncConversations,
+};
+if (!NS.notionSyncOrchestrator || typeof NS.notionSyncOrchestrator.syncConversations !== 'function') {
   NS.notionSyncOrchestrator = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();
+}
+
+export { getSyncJobStatus, syncConversations };
+export default api;
