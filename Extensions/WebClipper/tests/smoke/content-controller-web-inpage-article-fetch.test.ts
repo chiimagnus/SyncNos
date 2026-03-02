@@ -1,15 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createContentController } from "../../src/bootstrap/content-controller.ts";
 
 type TickFn = (() => Promise<void>) | null;
-
-function loadContentController() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/content-controller.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/content-controller.js");
-}
 
 function createHarness(options?: { sendImpl?: (type: string, payload?: any) => Promise<any> }) {
   let tickRef: TickFn = null;
@@ -20,19 +12,26 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
   // @ts-expect-error test global (needed by getInpageCollector)
   globalThis.location = { href: "https://example.com/post", hostname: "example.com", pathname: "/post" };
 
-  // @ts-expect-error test global
-  globalThis.WebClipper = {
-    messageContracts: {
-      CORE_MESSAGE_TYPES: {
-        UPSERT_CONVERSATION: "upsertConversation",
-        SYNC_CONVERSATION_MESSAGES: "syncConversationMessages"
-      },
-      ARTICLE_MESSAGE_TYPES: {
-        FETCH_ACTIVE_TAB: "fetchActiveTabArticle"
-      },
-      UI_MESSAGE_TYPES: {
-        OPEN_EXTENSION_POPUP: "openExtensionPopup"
-      }
+  const runtime = {
+    send: async (type: string, payload?: any) => {
+      sendCalls.push({ type, payload });
+      if (typeof options?.sendImpl === "function") return options.sendImpl(type, payload);
+      return { ok: true, data: {} };
+    },
+    onInvalidated: () => () => {},
+    isInvalidContextError: () => false
+  };
+
+  const controller = createContentController({
+    runtime,
+    collectorsRegistry: {
+      pickActive: () => null,
+      list: () => [{
+        id: "web",
+        matches: () => true,
+        inpageMatches: () => true,
+        collector: { capture: () => null }
+      }]
     },
     inpageTip: {
       showSaveTip: (text: string, opts: any) => {
@@ -45,35 +44,15 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
       },
       cleanupButtons: () => {},
     },
-    collectorsRegistry: {
-      pickActive: () => null,
-      list: () => [{
-        id: "web",
-        matches: () => true,
-        inpageMatches: () => true,
-        collector: { capture: () => null }
-      }]
-    },
     runtimeObserver: {
       createObserver: ({ onTick }: { onTick: () => Promise<void> }) => {
         tickRef = onTick;
         return { start: () => {}, stop: () => {} };
       }
-    }
-  };
-
-  const runtime = {
-    send: async (type: string, payload?: any) => {
-      sendCalls.push({ type, payload });
-      if (typeof options?.sendImpl === "function") return options.sendImpl(type, payload);
-      return { ok: true, data: {} };
     },
-    onInvalidated: () => () => {},
-    isInvalidContextError: () => false
-  };
-
-  const api = loadContentController();
-  const controller = api.createController({ runtime });
+    incrementalUpdater: null,
+    notionAiModelPicker: null,
+  });
   controller.start();
 
   return {
@@ -88,8 +67,6 @@ function createHarness(options?: { sendImpl?: (type: string, payload?: any) => P
 
 afterEach(() => {
   vi.restoreAllMocks();
-  // @ts-expect-error cleanup
-  delete globalThis.WebClipper;
   // @ts-expect-error cleanup
   delete globalThis.location;
   // @ts-expect-error cleanup
