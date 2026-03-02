@@ -1,7 +1,5 @@
 import '../../../export/obsidian/obsidian-sync-orchestrator.js';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../../runtime-context.js');
+import runtimeContext from '../../../runtime-context.ts';
 
 type LegacyObsidianSyncOrchestrator = {
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;

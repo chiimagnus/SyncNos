@@ -8,9 +8,7 @@ import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
 } from '../src/integrations/notion/oauth';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../src/runtime-context.js');
+import runtimeContext from '../src/runtime-context.ts';
 
 export default defineBackground(() => {
   startBackgroundBootstrap();

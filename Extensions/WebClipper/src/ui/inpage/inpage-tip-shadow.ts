@@ -1,4 +1,5 @@
 import inpageCssRaw from '../styles/inpage.css?raw';
+import runtimeContext from '../../runtime-context.ts';
 
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
@@ -262,10 +263,4 @@ function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
 
 export const inpageTipApi = { showSaveTip };
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const runtimeContext: any = require('../../runtime-context.js');
-  runtimeContext.inpageTip = inpageTipApi;
-} catch (_e) {
-  // ignore
-}
+runtimeContext.inpageTip = inpageTipApi;

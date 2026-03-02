@@ -20,9 +20,7 @@ import '../export/obsidian/obsidian-sync-orchestrator.js';
 
 import './background-inpage-web-visibility.js';
 import '../collectors/web/article-fetch-service.js';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../runtime-context.js');
+import runtimeContext from '../runtime-context.ts';
 
 export function startBackgroundBootstrap() {
   try {

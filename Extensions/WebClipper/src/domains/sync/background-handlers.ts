@@ -7,9 +7,7 @@ import {
   getObsidianSyncStatus,
   obsidianSyncConversations,
 } from '../../integrations/obsidian/sync/orchestrator';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../runtime-context.js');
+import runtimeContext from '../../runtime-context.ts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

@@ -7,8 +7,7 @@
 
 import type { Conversation, ConversationDetail, ConversationMessage } from './models';
 import * as idb from './storage-idb';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const runtimeContext: any = require('../../runtime-context.js');
+import runtimeContext from '../../runtime-context.ts';
 
 type LegacyStorage = {
   upsertConversation: (payload: any) => Promise<any>;
