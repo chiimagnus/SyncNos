@@ -359,10 +359,14 @@
 
 ### Task 18: Notion OAuth 链路替换（webNavigation 回调 + token store）
 
+**Status:** ✅ Done（2026-03-02）
+
 **Files:**
 - Create: `Extensions/WebClipper/src/integrations/notion/oauth.ts`
 - Create: `Extensions/WebClipper/src/integrations/notion/token-store.ts`
 - Modify: `Extensions/WebClipper/entrypoints/background.ts`
+- Create: `Extensions/WebClipper/src/platform/storage/local.ts`
+- Create: `Extensions/WebClipper/tests/integrations/notion-oauth.test.ts`
 
 **Step 1: 实现**
 - 保持现状约束：token 存 `storage.local`；移除/不使用 client secret；失败写 `notion_oauth_last_error`。
