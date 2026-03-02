@@ -68,11 +68,11 @@
   - 重点入口：`notion-sync-orchestrator.js`（编排）、`notion-sync-job-store.js`（任务状态）、`notion-sync-service.js`（写入主流程）、`notion-markdown-blocks.js`（Markdown -> blocks）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
   - 已重构为 Local REST API 平台主导同步：
-  - popup：`src/ui/popup/popup-obsidian-sync.js`（配置与连通性测试）+ `src/ui/popup/popup-obsidian-sync-state.js`（状态）+ `src/ui/popup/popup.js`（触发同步）
+  - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
   - background：`src/export/obsidian/obsidian-sync-orchestrator.js`（编排）+ `src/export/obsidian/obsidian-local-rest-client.js`（HTTP client）+ `src/export/obsidian/obsidian-markdown-writer.js`（写入）+ `src/export/obsidian/obsidian-settings-store.js`（配置存储）
 - **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch-service.js`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
-- **Inpage 显示范围设置**：`src/ui/popup/popup-inpage-visibility.js` + `src/bootstrap/content-controller.js`
+- **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.js`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
   - background 通过动态注册/反注册普通网页 content script 来实现“仅支持站点显示”（真正不注入普通网页）：
     - `src/bootstrap/background-inpage-web-visibility.js`
