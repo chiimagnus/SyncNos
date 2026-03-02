@@ -6,8 +6,8 @@
 // ServiceWorkerGlobalScope. Use static imports so Vite/Rollup bundles legacy code into `background.js`.
 
 import '../protocols/bootstrap.ts';
+import '../export/bootstrap.ts';
 
-import '../export/notion/token-store.js';
 import '../export/notion/notion-api.js';
 import '../export/notion/notion-files-api.js';
 import '../export/notion/notion-ai.js';
@@ -18,7 +18,6 @@ import '../export/notion/notion-sync-service.js';
 import '../export/notion/notion-sync-job-store.js';
 import '../export/notion/notion-sync-orchestrator.js';
 
-import '../export/obsidian/obsidian-settings-store.js';
 import '../export/obsidian/obsidian-local-rest-client.js';
 import '../export/obsidian/obsidian-note-path.js';
 import '../export/obsidian/obsidian-sync-metadata.js';
@@ -26,7 +25,6 @@ import '../export/obsidian/obsidian-markdown-writer.js';
 import '../export/obsidian/obsidian-sync-orchestrator.js';
 
 import '../bootstrap/background-inpage-web-visibility.js';
-import '../bootstrap/background-storage.js';
 import '../collectors/web/article-fetch-service.js';
 import '../bootstrap/background-router.js';
 
