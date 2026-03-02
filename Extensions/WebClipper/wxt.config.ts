@@ -60,5 +60,33 @@ export default defineConfig({
       'http://*/*',
       'https://*/*',
     ],
+    web_accessible_resources: [
+      {
+        resources: ['icons/icon-128.png'],
+        matches: [
+          'https://chat.openai.com/*',
+          'https://chatgpt.com/*',
+          'https://www.chatgpt.com/*',
+          'https://claude.ai/*',
+          'https://gemini.google.com/*',
+          'https://chat.deepseek.com/*',
+          'https://chat.z.ai/*',
+          'https://kimi.moonshot.cn/*',
+          'https://kimi.com/*',
+          'https://*.kimi.com/*',
+          'https://www.doubao.com/*',
+          'https://yuanbao.tencent.com/*',
+          'https://poe.com/*',
+          'https://*.notion.so/*',
+          'http://*/*',
+          'https://*/*',
+        ],
+      },
+    ],
+    icons: {
+      16: 'icons/icon-16.png',
+      48: 'icons/icon-48.png',
+      128: 'icons/icon-128.png',
+    },
   },
 });
