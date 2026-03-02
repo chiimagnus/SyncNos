@@ -1,0 +1,37 @@
+:root {
+  --theme: #ffc6ad;
+  --text: #d95926;
+  --muted: #b85e3a;
+  --bg: #fff7f3;
+  --panel: #fff1ea;
+  --panel-strong: #ffe7dc;
+  --border: #f4b89e;
+  --border-strong: #e8916f;
+  --btn-bg: #ffe6da;
+  --btn-bg-hover: #ffd8c4;
+  --danger: #c7372f;
+  --danger-bg: #ffe5e1;
+  --warn-bg: #fff0e8;
+  --shadow: 0 8px 18px rgba(217, 89, 38, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 420px;
+  min-height: 600px;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+}
+
+#root {
+  height: 100%;
+}
+

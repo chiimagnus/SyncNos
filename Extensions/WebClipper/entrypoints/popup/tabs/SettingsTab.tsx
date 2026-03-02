@@ -1,0 +1,776 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+// Backup import/export needs IndexedDB schema on the popup runtime.
+import '../../../src/storage/schema.js';
+
+import { exportBackupZipV2 } from '../../../src/domains/backup/export';
+import {
+  importBackupLegacyJsonMerge,
+  importBackupZipV2Merge,
+  type ImportProgress,
+  type ImportStats,
+} from '../../../src/domains/backup/import';
+import { extractZipEntries } from '../../../src/domains/backup/zip-utils';
+import { disconnectNotion } from '../../../src/domains/settings/sensitive';
+import { getNotionOAuthDefaults } from '../../../src/integrations/notion/oauth';
+import {
+  ARTICLE_MESSAGE_TYPES,
+  NOTION_MESSAGE_TYPES,
+  OBSIDIAN_MESSAGE_TYPES,
+  UI_MESSAGE_TYPES,
+} from '../../../src/platform/messaging/message-contracts';
+import { send } from '../../../src/platform/runtime/runtime';
+import { storageGet, storageSet } from '../../../src/platform/storage/local';
+import { getNotionSyncJobStatus, getObsidianSyncStatus } from '../../../src/domains/sync/repo';
+
+type ApiError = { message: string; extra: unknown } | null;
+type ApiResponse<T> = { ok: boolean; data: T | null; error: ApiError };
+
+function unwrap<T>(res: ApiResponse<T>): T {
+  if (!res || typeof res.ok !== 'boolean') throw new Error('no response from background');
+  if (res.ok) return res.data as T;
+  const message = res.error?.message ?? 'unknown error';
+  throw new Error(message);
+}
+
+function formatTime(ts?: number) {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return String(ts);
+  }
+}
+
+function formatProgress(p: ImportProgress) {
+  const safeTotal = Math.max(0, Number(p.total) || 0);
+  const safeDone = Math.min(safeTotal || 0, Math.max(0, Number(p.done) || 0));
+  const pct = safeTotal ? Math.floor((safeDone / safeTotal) * 100) : 0;
+  const labelStage = p.stage ? ` ${p.stage}` : '';
+  return { pct, text: `Importing… ${pct}% (${safeDone}/${safeTotal})${labelStage}`.trim() };
+}
+
+async function isZipFile(file: File) {
+  if (!file) return false;
+  const name = file.name ? String(file.name).toLowerCase() : '';
+  const type = file.type ? String(file.type).toLowerCase() : '';
+  if (name.endsWith('.zip') || type.includes('zip')) return true;
+  try {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    if (head.length < 4) return false;
+    return (
+      head[0] === 0x50 &&
+      head[1] === 0x4b &&
+      ((head[2] === 0x03 && head[3] === 0x04) ||
+        (head[2] === 0x05 && head[3] === 0x06) ||
+        (head[2] === 0x07 && head[3] === 0x08))
+    );
+  } catch (_e) {
+    return false;
+  }
+}
+
+function getPageTitle(page: any) {
+  try {
+    const props = page && page.properties ? page.properties : {};
+    for (const key of Object.keys(props)) {
+      const p = props[key];
+      if (p && p.type === 'title' && Array.isArray(p.title)) {
+        const t = p.title.map((x: any) => x.plain_text || '').join('').trim();
+        if (t) return t;
+      }
+    }
+  } catch (_e) {
+    // ignore
+  }
+  return page && page.url ? String(page.url) : 'Untitled';
+}
+
+type NotionPageOption = { id: string; title: string };
+
+async function searchNotionParentPages(accessToken: string): Promise<NotionPageOption[]> {
+  const res = await fetch('https://api.notion.com/v1/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ filter: { property: 'object', value: 'page' }, page_size: 50 }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`notion api failed: HTTP ${res.status} ${text}`);
+  const json = text ? JSON.parse(text) : {};
+  const results = Array.isArray(json?.results) ? json.results : [];
+  const pages = results.filter((item: any) => {
+    if (!item || item.object !== 'page') return false;
+    if (item.archived === true || item.in_trash === true) return false;
+    const parent = item.parent || null;
+    if (!parent) return true;
+    if (parent.database_id) return false;
+    if (parent.type === 'database_id') return false;
+    return true;
+  });
+  return pages
+    .map((p: any) => ({ id: String(p.id || ''), title: getPageTitle(p) }))
+    .filter((p: NotionPageOption) => !!p.id);
+}
+
+function openHttpUrl(url: string) {
+  const u = String(url || '').trim();
+  if (!/^https?:\/\//i.test(u)) return false;
+  try {
+    const anyGlobal: any = globalThis as any;
+    const tabs = anyGlobal.browser?.tabs ?? anyGlobal.chrome?.tabs;
+    if (tabs?.create) {
+      tabs.create({ url: u });
+      return true;
+    }
+  } catch (_e) {
+    // ignore
+  }
+  try {
+    window.open(u, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function renderStats(stats: ImportStats | null) {
+  if (!stats) return null;
+  return (
+    <ul className="tw-m-0 tw-pl-5 tw-text-[12px] tw-text-[var(--muted)]">
+      <li>
+        Conversations: +{stats.conversationsAdded} / ~{stats.conversationsUpdated}
+      </li>
+      <li>
+        Messages: +{stats.messagesAdded} / ~{stats.messagesUpdated} (skipped {stats.messagesSkipped})
+      </li>
+      <li>
+        Mappings: +{stats.mappingsAdded} / ~{stats.mappingsUpdated}
+      </li>
+      <li>Settings applied: {stats.settingsApplied}</li>
+    </ul>
+  );
+}
+
+export default function SettingsTab() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Notion
+  const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
+  const [notionWorkspaceName, setNotionWorkspaceName] = useState<string>('');
+  const [notionClientId, setNotionClientId] = useState<string>('');
+  const [notionPendingState, setNotionPendingState] = useState<string>('');
+  const [notionLastError, setNotionLastError] = useState<string>('');
+  const [notionParentPageId, setNotionParentPageId] = useState<string>('');
+  const [notionPages, setNotionPages] = useState<Array<{ id: string; title: string }>>([]);
+  const [loadingNotionPages, setLoadingNotionPages] = useState(false);
+  const [pollingNotion, setPollingNotion] = useState(false);
+  const [notionJob, setNotionJob] = useState<any>(null);
+
+  // Obsidian
+  const [obsidianApiBaseUrl, setObsidianApiBaseUrl] = useState<string>('');
+  const [obsidianAuthHeaderName, setObsidianAuthHeaderName] = useState<string>('');
+  const [obsidianApiKeyDraft, setObsidianApiKeyDraft] = useState<string>('');
+  const [obsidianApiKeyChanged, setObsidianApiKeyChanged] = useState(false);
+  const [obsidianApiKeyPresent, setObsidianApiKeyPresent] = useState<boolean>(false);
+  const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
+  const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
+  const [obsidianTestResult, setObsidianTestResult] = useState<string>('');
+  const [obsidianJob, setObsidianJob] = useState<any>(null);
+
+  // Article fetch
+  const [articleFetchStatus, setArticleFetchStatus] = useState<string>('Idle');
+
+  // Backup
+  const [exportStatus, setExportStatus] = useState<string>('Idle');
+  const [importStatus, setImportStatus] = useState<string>('Ready');
+  const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Notion AI
+  const [notionAiModelIndex, setNotionAiModelIndex] = useState<string>('');
+
+  // Inpage
+  const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
+
+  const cardCls =
+    'tw-rounded-2xl tw-border tw-border-[rgba(217,89,38,0.14)] tw-bg-[var(--panel)] tw-p-3 tw-shadow-[var(--shadow)]';
+  const labelCls = 'tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]';
+  const inputCls =
+    'tw-h-9 tw-w-full tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.16)] tw-bg-white/55 tw-px-3 tw-text-[13px] tw-text-[var(--text)] placeholder:tw-text-[rgba(184,94,58,0.60)]';
+  const btnCls =
+    'tw-h-9 tw-px-3 tw-rounded-xl tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)] disabled:tw-opacity-60';
+
+  const refresh = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const [notionRes, local, obsidianRes, nJob, oJob] = await Promise.all([
+        send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}),
+        storageGet([
+          'notion_oauth_client_id',
+          'notion_oauth_pending_state',
+          'notion_oauth_last_error',
+          'notion_parent_page_id',
+          'notion_ai_preferred_model_index',
+          'inpage_supported_only',
+        ]),
+        send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.GET_SETTINGS, {}),
+        getNotionSyncJobStatus().catch(() => ({ job: null } as any)),
+        getObsidianSyncStatus().catch(() => ({ job: null } as any)),
+      ]);
+
+      const notion = unwrap(notionRes);
+      setNotionConnected(!!notion?.connected);
+      setNotionWorkspaceName(String(notion?.token?.workspaceName || ''));
+
+      setNotionClientId(String(local?.notion_oauth_client_id || '').trim());
+      setNotionPendingState(String(local?.notion_oauth_pending_state || '').trim());
+      setNotionLastError(String(local?.notion_oauth_last_error || '').trim());
+      setNotionParentPageId(String(local?.notion_parent_page_id || '').trim());
+      setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || '').trim());
+      setInpageSupportedOnly(local?.inpage_supported_only == null ? null : !!local.inpage_supported_only);
+
+      const obsidian = unwrap(obsidianRes);
+      setObsidianApiBaseUrl(String(obsidian?.apiBaseUrl || ''));
+      setObsidianAuthHeaderName(String(obsidian?.authHeaderName || ''));
+      setObsidianApiKeyPresent(!!obsidian?.apiKeyPresent);
+      setObsidianChatFolder(String(obsidian?.chatFolder || ''));
+      setObsidianArticleFolder(String(obsidian?.articleFolder || ''));
+      setNotionJob(nJob?.job ?? null);
+      setObsidianJob(oJob?.job ?? null);
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!pollingNotion) return;
+    const startedAt = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - startedAt > 60_000) {
+        setPollingNotion(false);
+        return;
+      }
+      refresh().catch(() => {});
+    }, 750);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollingNotion]);
+
+  const notionStatusText = useMemo(() => {
+    if (notionConnected == null) return 'unknown';
+    if (notionConnected) {
+      const w = String(notionWorkspaceName || '').trim();
+      return w ? `Connected ✓ (${w})` : 'Connected ✓';
+    }
+    if (notionLastError) return `Error: ${notionLastError}`;
+    if (notionPendingState) return 'Waiting…';
+    return 'Not connected';
+  }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
+
+  const onNotionConnectOrDisconnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
+      if (status?.connected) {
+        await disconnectNotion();
+        await refresh();
+        return;
+      }
+
+      const clientId = String(notionClientId || '').trim();
+      if (!clientId) throw new Error('Notion OAuth client id not configured');
+
+      const cfg = getNotionOAuthDefaults();
+      const state = `webclipper_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+      await storageSet({ notion_oauth_pending_state: state });
+      const url = new URL(cfg.authorizationUrl);
+      url.searchParams.set('client_id', clientId);
+      url.searchParams.set('response_type', cfg.responseType);
+      url.searchParams.set('owner', cfg.owner);
+      url.searchParams.set('redirect_uri', cfg.redirectUri);
+      url.searchParams.set('state', state);
+
+      const opened = openHttpUrl(url.toString());
+      if (!opened) throw new Error('Failed to open Notion OAuth tab');
+      setPollingNotion(true);
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onLoadNotionPages = async () => {
+    setLoadingNotionPages(true);
+    setError(null);
+    try {
+      const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
+      const accessToken = String(status?.token?.accessToken || '');
+      if (!accessToken) throw new Error('Notion not connected');
+      const pages = await searchNotionParentPages(accessToken);
+      setNotionPages(pages);
+
+      const saved = String(notionParentPageId || '').trim();
+      const hasSaved = saved && pages.some((p) => p.id === saved);
+      const next = hasSaved ? saved : (pages[0]?.id || '');
+      if (next && next !== saved) {
+        setNotionParentPageId(next);
+        await storageSet({ notion_parent_page_id: next });
+      }
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed to load pages'));
+    } finally {
+      setLoadingNotionPages(false);
+    }
+  };
+
+  const onSaveNotionParentPage = async (id: string) => {
+    const next = String(id || '').trim();
+    if (!next) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setNotionParentPageId(next);
+      await storageSet({ notion_parent_page_id: next });
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onFetchCurrentPage = async () => {
+    setBusy(true);
+    setError(null);
+    setArticleFetchStatus('Fetching…');
+    try {
+      const res = await send<ApiResponse<any>>(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, {});
+      const data = unwrap(res);
+      const conversationId = Number(data?.conversationId) || 0;
+      setArticleFetchStatus(conversationId ? `Saved ✓ (conversationId=${conversationId})` : 'Done ✓');
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e ?? 'fetch failed');
+      setArticleFetchStatus(`Error: ${msg}`);
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSaveObsidianSettings = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const payload: any = {
+        apiBaseUrl: obsidianApiBaseUrl,
+        authHeaderName: obsidianAuthHeaderName,
+        chatFolder: obsidianChatFolder,
+        articleFolder: obsidianArticleFolder,
+      };
+      if (obsidianApiKeyChanged) payload.apiKey = obsidianApiKeyDraft;
+      const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, payload);
+      const data = unwrap(res);
+      setObsidianApiBaseUrl(String(data?.apiBaseUrl || ''));
+      setObsidianAuthHeaderName(String(data?.authHeaderName || ''));
+      setObsidianApiKeyPresent(!!data?.apiKeyPresent);
+      setObsidianChatFolder(String(data?.chatFolder || ''));
+      setObsidianArticleFolder(String(data?.articleFolder || ''));
+      setObsidianApiKeyDraft('');
+      setObsidianApiKeyChanged(false);
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onClearObsidianKey = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.SAVE_SETTINGS, { apiKey: '' });
+      const data = unwrap(res);
+      setObsidianApiKeyPresent(!!data?.apiKeyPresent);
+      setObsidianApiKeyDraft('');
+      setObsidianApiKeyChanged(false);
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onTestObsidianConnection = async () => {
+    setBusy(true);
+    setError(null);
+    setObsidianTestResult('Testing…');
+    try {
+      const res = await send<ApiResponse<any>>(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, {});
+      const data = unwrap(res);
+      const ok = data && data.ok === true;
+      const message = data && data.message ? String(data.message) : '';
+      setObsidianTestResult(ok ? `OK ✓ ${message}`.trim() : `Error: ${message || 'failed'}`);
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e ?? 'failed');
+      setObsidianTestResult(`Error: ${msg}`);
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onToggleInpageSupportedOnly = async (next: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await storageSet({ inpage_supported_only: !!next });
+      setInpageSupportedOnly(!!next);
+      const res = await send<ApiResponse<any>>(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, {});
+      unwrap(res);
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSaveNotionAiModelIndex = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const raw = String(notionAiModelIndex || '').trim();
+      const n = raw ? Number(raw) : NaN;
+      if (!raw) {
+        await storageSet({ notion_ai_preferred_model_index: '' });
+      } else if (!Number.isFinite(n) || n <= 0) {
+        throw new Error('Invalid model index');
+      } else {
+        await storageSet({ notion_ai_preferred_model_index: Math.floor(n) });
+      }
+      await refresh();
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onResetNotionAiModelIndex = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await storageSet({ notion_ai_preferred_model_index: '' });
+      await refresh();
+    } catch (e) {
+      setError((e as any)?.message ?? String(e ?? 'failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBackupExport = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setExportStatus('Exporting…');
+    try {
+      const res = await exportBackupZipV2();
+      const url = URL.createObjectURL(res.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.filename;
+      a.click();
+      setExportStatus(`Exported (${res.counts.conversations} convos, ${res.counts.messages} msgs)`);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      const msg = (e as any)?.message ? String((e as any).message) : String(e || 'export failed');
+      setExportStatus(`Error: ${msg}`);
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importFromFile = async (file: File) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setImportStats(null);
+    setImportStatus(`Importing: ${file.name}`);
+    try {
+      const asZip = await isZipFile(file);
+      let stats: ImportStats;
+      if (asZip) {
+        const entries = await extractZipEntries(file);
+        stats = await importBackupZipV2Merge(entries, (p) => {
+          const view = formatProgress(p);
+          setImportStatus(view.text);
+        });
+      } else {
+        const text = await file.text();
+        const doc = JSON.parse(text);
+        stats = await importBackupLegacyJsonMerge(doc, (p) => {
+          const view = formatProgress(p);
+          setImportStatus(view.text);
+        });
+      }
+      setImportStats(stats);
+      setImportStatus('Imported ✓');
+    } catch (e) {
+      const msg = (e as any)?.message ? String((e as any).message) : String(e || 'import failed');
+      setImportStatus(`Error: ${msg}`);
+      setError(msg);
+    } finally {
+      setBusy(false);
+      try {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (_e) {
+        // ignore
+      }
+    }
+  };
+
+  const openSetupGuide = () => {
+    openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/docs/webclipper-obsidian-local-rest-api-sync.md');
+  };
+
+  return (
+    <section className="tw-h-full tw-min-h-0 tw-flex tw-flex-col tw-gap-2">
+      {error ? (
+        <div className="tw-rounded-xl tw-border tw-border-[rgba(199,55,47,0.25)] tw-bg-[var(--danger-bg)] tw-px-3 tw-py-2 tw-text-[12px] tw-text-[var(--danger)]">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="tw-flex-1 tw-min-h-0 tw-overflow-auto tw-pr-1 tw-grid tw-gap-3">
+        <section className={cardCls} aria-label="Notion OAuth">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Notion OAuth</div>
+            <button className={btnCls} onClick={() => refresh().catch(() => {})} disabled={busy} type="button">
+              {busy ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
+          <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">status: {notionStatusText}</div>
+          <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">
+            clientId: {notionClientId ? notionClientId : '(missing)'}
+          </div>
+          <button
+            className={btnCls}
+            onClick={() => onNotionConnectOrDisconnect().catch(() => {})}
+            disabled={busy}
+            type="button"
+          >
+            {notionConnected ? 'Disconnect' : pollingNotion ? 'Connecting…' : 'Connect'}
+          </button>
+
+          <div className="tw-mt-3 tw-grid tw-grid-cols-[1fr_auto] tw-gap-2 tw-items-end">
+            <div>
+              <div className={labelCls}>Parent Page</div>
+              <select
+                className={inputCls}
+                value={notionParentPageId}
+                disabled={busy || !notionConnected}
+                onChange={(e) => onSaveNotionParentPage(e.target.value).catch(() => {})}
+              >
+                {notionPages.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
+                {notionPages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              className={btnCls}
+              onClick={() => onLoadNotionPages().catch(() => {})}
+              disabled={busy || !notionConnected || loadingNotionPages}
+              type="button"
+            >
+              {loadingNotionPages ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
+
+          <div className="tw-mt-3 tw-text-[12px] tw-text-[var(--muted)]">
+            sync: {String(notionJob?.status ?? 'idle')} · {formatTime(notionJob?.updatedAt)}
+          </div>
+          {notionJob?.error ? (
+            <pre className="tw-mt-2 tw-whitespace-pre-wrap tw-text-[12px] tw-text-[var(--danger)]">{String(notionJob.error)}</pre>
+          ) : null}
+        </section>
+
+        <section className={cardCls} aria-label="Article Fetch">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Article Fetch</div>
+            <button className={btnCls} onClick={() => onFetchCurrentPage().catch(() => {})} disabled={busy} type="button">
+              Fetch Current Page
+            </button>
+          </div>
+          <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">status: {articleFetchStatus}</div>
+        </section>
+
+        <section className={cardCls} aria-label="Obsidian Local REST API">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Obsidian Local REST API</div>
+            <button className={btnCls} onClick={() => openSetupGuide()} type="button">
+              Setup Guide
+            </button>
+          </div>
+
+          <div className="tw-mt-3 tw-grid tw-gap-2">
+            <div>
+              <div className={labelCls}>Base URL</div>
+              <input
+                className={inputCls}
+                value={obsidianApiBaseUrl}
+                onChange={(e) => setObsidianApiBaseUrl(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                placeholder="http://127.0.0.1:27123"
+              />
+            </div>
+            <div>
+              <div className={labelCls}>API Key {obsidianApiKeyPresent ? '(set)' : '(not set)'}</div>
+              <input
+                className={inputCls}
+                value={obsidianApiKeyDraft}
+                onChange={(e) => {
+                  setObsidianApiKeyDraft(e.target.value);
+                  setObsidianApiKeyChanged(true);
+                }}
+                disabled={busy}
+                placeholder={obsidianApiKeyPresent ? '••••••••' : ''}
+              />
+              <div className="tw-mt-1 tw-flex tw-gap-2">
+                <button className={btnCls} onClick={() => onClearObsidianKey().catch(() => {})} disabled={busy || !obsidianApiKeyPresent} type="button">
+                  Clear Key
+                </button>
+                <button className={btnCls} onClick={() => onTestObsidianConnection().catch(() => {})} disabled={busy} type="button">
+                  Test
+                </button>
+              </div>
+              {obsidianTestResult ? <div className="tw-mt-1 tw-text-[12px] tw-text-[var(--muted)]">{obsidianTestResult}</div> : null}
+            </div>
+            <div>
+              <div className={labelCls}>Auth Header</div>
+              <input
+                className={inputCls}
+                value={obsidianAuthHeaderName}
+                onChange={(e) => setObsidianAuthHeaderName(e.target.value)}
+                disabled={busy}
+                spellCheck={false}
+                placeholder="Authorization"
+              />
+            </div>
+          </div>
+
+          <div className="tw-mt-3 tw-grid tw-gap-2">
+            <div>
+              <div className={labelCls}>Chat Folder</div>
+              <input className={inputCls} value={obsidianChatFolder} onChange={(e) => setObsidianChatFolder(e.target.value)} disabled={busy} spellCheck={false} />
+            </div>
+            <div>
+              <div className={labelCls}>Article Folder</div>
+              <input className={inputCls} value={obsidianArticleFolder} onChange={(e) => setObsidianArticleFolder(e.target.value)} disabled={busy} spellCheck={false} />
+            </div>
+          </div>
+
+          <div className="tw-mt-3 tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-text-[12px] tw-text-[var(--muted)]">
+              sync: {String(obsidianJob?.status ?? 'idle')} · {formatTime(obsidianJob?.updatedAt)}
+            </div>
+            <button className={btnCls} onClick={() => onSaveObsidianSettings().catch(() => {})} disabled={busy} type="button">
+              Save
+            </button>
+          </div>
+
+          {obsidianJob?.error ? (
+            <pre className="tw-mt-2 tw-whitespace-pre-wrap tw-text-[12px] tw-text-[var(--danger)]">{String(obsidianJob.error)}</pre>
+          ) : null}
+        </section>
+
+        <section className={cardCls} aria-label="Backup">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Backup</div>
+            <button className={btnCls} onClick={() => handleBackupExport().catch(() => {})} disabled={busy} type="button">
+              Export Zip
+            </button>
+          </div>
+          <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">export: {exportStatus}</div>
+
+          <div className="tw-mt-3">
+            <div className={labelCls}>Import (Zip v2 or legacy JSON)</div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="tw-mt-1 tw-block tw-w-full tw-text-[12px] tw-text-[var(--muted)]"
+              accept=".zip,application/zip,application/json,.json"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                void importFromFile(f);
+              }}
+            />
+            <div className="tw-mt-2 tw-text-[12px] tw-text-[var(--muted)]">import: {importStatus}</div>
+            <div className="tw-mt-2">{renderStats(importStats)}</div>
+          </div>
+        </section>
+
+        <section className={cardCls} aria-label="Notion AI">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Notion AI</div>
+            <div className="tw-flex tw-gap-2">
+              <button className={btnCls} onClick={() => onSaveNotionAiModelIndex().catch(() => {})} disabled={busy} type="button">
+                Save
+              </button>
+              <button className={btnCls} onClick={() => onResetNotionAiModelIndex().catch(() => {})} disabled={busy} type="button">
+                Reset
+              </button>
+            </div>
+          </div>
+          <div className="tw-mt-2">
+            <div className={labelCls}>Preferred Model Index</div>
+            <input
+              className={inputCls}
+              value={notionAiModelIndex}
+              onChange={(e) => setNotionAiModelIndex(e.target.value)}
+              disabled={busy}
+              placeholder=""
+              inputMode="numeric"
+            />
+          </div>
+        </section>
+
+        <section className={cardCls} aria-label="Inpage visibility">
+          <div className="tw-flex tw-items-center tw-justify-between tw-gap-2">
+            <div className="tw-font-extrabold tw-text-[14px]">Inpage</div>
+          </div>
+          <label className="tw-mt-2 tw-flex tw-items-center tw-gap-2 tw-text-[12px] tw-text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={!!inpageSupportedOnly}
+              disabled={busy || inpageSupportedOnly == null}
+              onChange={(e) => onToggleInpageSupportedOnly(e.target.checked).catch(() => {})}
+            />
+            仅在支持站点显示 Inpage 按钮
+          </label>
+        </section>
+      </div>
+    </section>
+  );
+}
