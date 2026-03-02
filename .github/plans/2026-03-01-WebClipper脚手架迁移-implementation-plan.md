@@ -329,6 +329,8 @@
 
 ### Task 24: App Conversations 支持多选 + Delete（对齐旧 popup）
 
+**Status:** ✅ Done（2026-03-02）
+
 **Files:**
 - Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
 
@@ -342,6 +344,8 @@
 ---
 
 ### Task 25: App 导出 Markdown（Single/Multi）并下载 Zip（对齐旧 popup）
+
+**Status:** ✅ Done（2026-03-02）
 
 **Files:**
 - Create: `Extensions/WebClipper/src/domains/conversations/markdown.ts`
@@ -388,6 +392,8 @@
 ---
 
 ### Task 28: App Article Fetch + Inpage Visibility（即时生效）
+
+**Status:** ✅ Done（2026-03-02）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/ui/app/routes/Settings.tsx`
