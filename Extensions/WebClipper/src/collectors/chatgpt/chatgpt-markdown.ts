@@ -1,17 +1,18 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function normalizeMarkdown(markdown) {
+const NS: any = collectorContext as any;
+
+  function normalizeMarkdown(markdown: any): any {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const lines = s.split("\n").map((l) => l.replace(/[ \t]+$/g, ""));
+    const lines = s.split("\n").map((l: any) => l.replace(/[ \t]+$/g, ""));
     return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  function normalizeInline(markdown) {
+  function normalizeInline(markdown: any): any {
     return normalizeMarkdown(markdown).replace(/\n+/g, " ").trim();
   }
 
-  function normalizeText(value) {
+  function normalizeText(value: any): any {
     const text = String(value || "");
     if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
       return NS.normalize.normalizeText(text);
@@ -19,22 +20,22 @@
     return text.replace(/\s+/g, " ").trim();
   }
 
-  function wrapInlineCode(text) {
+  function wrapInlineCode(text: any): any {
     const s = String(text || "");
     if (!s) return "``";
     const matches = s.match(/`+/g) || [];
-    const maxTicks = matches.reduce((m, t) => Math.max(m, t.length), 0);
+    const maxTicks = matches.reduce((m: any, t: any) => Math.max(m, t.length), 0);
     const fence = "`".repeat(Math.max(1, maxTicks + 1));
     return `${fence}${s}${fence}`;
   }
 
-  function codeFenceDelimiter(content) {
+  function codeFenceDelimiter(content: any): any {
     const runs = String(content || "").match(/`+/g) || [];
-    const longest = runs.reduce((max, s) => Math.max(max, s.length), 0);
+    const longest = runs.reduce((max: any, s: any) => Math.max(max, s.length), 0);
     return "`".repeat(Math.max(3, longest + 1));
   }
 
-  function normalizeCodeLanguage(raw) {
+  function normalizeCodeLanguage(raw: any): any {
     const value = String(raw || "").trim().toLowerCase();
     if (!value) return "";
     if (!/^[a-z0-9_+.-]{1,40}$/.test(value)) return "";
@@ -42,7 +43,7 @@
     return value;
   }
 
-  function pickCodeLanguageFromClass(className) {
+  function pickCodeLanguageFromClass(className: any): any {
     const raw = String(className || "");
     if (!raw) return "";
     const parts = raw.split(/\s+/).filter(Boolean);
@@ -56,12 +57,12 @@
     return "";
   }
 
-  function extractTextWithBreaks(node) {
+  function extractTextWithBreaks(node: any): any {
     if (!node) return "";
     const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
     const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-    function walk(n) {
+    function walk(n: any): any {
       if (!n) return "";
       if (n.nodeType === TEXT_NODE) return String(n.nodeValue || "");
       if (n.nodeType !== ELEMENT_NODE) return "";
@@ -71,13 +72,13 @@
       if (tag === "script" || tag === "style") return "";
 
       const children = n.childNodes ? Array.from(n.childNodes) : [];
-      return children.map((child) => walk(child)).join("");
+      return children.map((child: any) => walk(child)).join("");
     }
 
     return walk(node).replace(/\r\n?/g, "\n");
   }
 
-  function extractPreCodeText(preEl) {
+  function extractPreCodeText(preEl: any): any {
     if (!preEl) return "";
 
     const codeEl = preEl.querySelector ? preEl.querySelector("code") : null;
@@ -96,14 +97,14 @@
     return String(preEl.textContent || "").replace(/\r\n?/g, "\n").replace(/\n+$/g, "");
   }
 
-  function detectCodeLanguage(preEl) {
+  function detectCodeLanguage(preEl: any): any {
     if (!preEl || !preEl.querySelectorAll) return "";
 
     const codeEl = preEl.querySelector("code");
     const byCodeClass = pickCodeLanguageFromClass(codeEl && codeEl.getAttribute ? codeEl.getAttribute("class") : "");
     if (byCodeClass) return byCodeClass;
 
-    const nodes = Array.from(preEl.querySelectorAll("[data-language],[data-code-language],[class]")).slice(0, 16);
+    const nodes: any[] = (Array.from(preEl.querySelectorAll("[data-language],[data-code-language],[class]")) as any[]).slice(0, 16);
     for (const node of nodes) {
       if (!node || !node.getAttribute) continue;
       const langData = normalizeCodeLanguage(node.getAttribute("data-language") || node.getAttribute("data-code-language"));
@@ -117,7 +118,7 @@
       }
     }
 
-    const labels = Array.from(preEl.querySelectorAll("span,div")).slice(0, 16);
+    const labels: any[] = (Array.from(preEl.querySelectorAll("span,div")) as any[]).slice(0, 16);
     for (const label of labels) {
       const text = normalizeCodeLanguage(label && label.textContent ? label.textContent : "");
       if (text) return text;
@@ -125,14 +126,14 @@
     return "";
   }
 
-  function escapeTableCell(text) {
+  function escapeTableCell(text: any): any {
     return String(text || "").replace(/\|/g, "\\|");
   }
 
-  function removeNonContentNodes(container) {
+  function removeNonContentNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
 
-    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el) => {
+    container.querySelectorAll("button, svg, path, textarea, input, select, option, script, style").forEach((el: any) => {
       try {
         el.remove();
       } catch (_e) {
@@ -140,7 +141,7 @@
       }
     });
 
-    container.querySelectorAll(".sr-only, [aria-hidden='true']").forEach((el) => {
+    container.querySelectorAll(".sr-only, [aria-hidden='true']").forEach((el: any) => {
       try {
         el.remove();
       } catch (_e) {
@@ -151,7 +152,7 @@
     return container;
   }
 
-  function getAssistantContentRoot(wrapper) {
+  function getAssistantContentRoot(wrapper: any): any {
     if (!wrapper) return null;
     const selectors = [
       "[data-message-author-role='assistant'] .markdown.prose",
@@ -171,7 +172,7 @@
     return wrapper;
   }
 
-  function sanitizeAssistantClone(wrapper) {
+  function sanitizeAssistantClone(wrapper: any): any {
     const root = getAssistantContentRoot(wrapper);
     if (!root || !root.cloneNode) return null;
     try {
@@ -183,7 +184,7 @@
     }
   }
 
-  function extractTextFromSanitizedClone(clone) {
+  function extractTextFromSanitizedClone(clone: any): any {
     if (!clone) return "";
     const inner = typeof clone.innerText === "string" ? clone.innerText : "";
     if (inner && inner.trim()) return inner;
@@ -207,11 +208,11 @@
       "TABLE",
       "TR"
     ]);
-    const parts = [];
+    const parts: any[] = [];
     const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
     const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-    function walk(node) {
+    function walk(node: any): any {
       if (!node) return;
       const t = node.nodeType;
       if (t === TEXT_NODE) {
@@ -244,26 +245,26 @@
     return parts.join("");
   }
 
-  function htmlToMarkdown(root) {
+  function htmlToMarkdown(root: any): any {
     if (!root) return "";
     const TEXT_NODE = typeof Node !== "undefined" && Node.TEXT_NODE ? Node.TEXT_NODE : 3;
     const ELEMENT_NODE = typeof Node !== "undefined" && Node.ELEMENT_NODE ? Node.ELEMENT_NODE : 1;
 
-    function renderChildren(el, ctx) {
+    function renderChildren(el: any, ctx: any): any {
       const out = [];
       const kids = el && el.childNodes ? Array.from(el.childNodes) : [];
       for (const c of kids) out.push(renderNode(c, ctx));
       return out.join("");
     }
 
-    function renderListItem(li, marker, depth, ctx) {
+    function renderListItem(li: any, marker: any, depth: any, ctx: any): any {
       const indent = "  ".repeat(Math.max(0, depth));
       const continuationIndent = indent + " ".repeat(marker.length + 1);
 
       const contentClone = li.cloneNode ? li.cloneNode(true) : null;
       if (contentClone && contentClone.childNodes) {
-        const toRemove = [];
-        for (const child of Array.from(contentClone.childNodes)) {
+        const toRemove: any[] = [];
+        for (const child of Array.from(contentClone.childNodes) as any[]) {
           if (!child || !child.tagName) continue;
           const tag = String(child.tagName || "").toLowerCase();
           if (tag === "ul" || tag === "ol") toRemove.push(child);
@@ -278,7 +279,7 @@
       }
 
       const body = normalizeMarkdown(renderChildren(contentClone || li, ctx)).replace(/\n{2,}/g, "\n");
-      const lines = body ? body.split("\n").filter((l) => l.length) : [];
+      const lines = body ? body.split("\n").filter((l: any) => l.length) : [];
       const out = [];
       if (lines.length) {
         out.push(`${indent}${marker} ${lines[0]}`);
@@ -287,9 +288,9 @@
         out.push(`${indent}${marker}`);
       }
 
-      const nestedLists = [];
+      const nestedLists: any[] = [];
       if (li && li.childNodes) {
-        for (const child of Array.from(li.childNodes)) {
+        for (const child of Array.from(li.childNodes) as any[]) {
           if (!child || !child.tagName) continue;
           const tag = String(child.tagName || "").toLowerCase();
           if (tag === "ul" || tag === "ol") nestedLists.push(child);
@@ -306,13 +307,13 @@
       return out.join("\n");
     }
 
-    function renderList(listEl, ordered, ctx) {
+    function renderList(listEl: any, ordered: any, ctx: any): any {
       const depth = (ctx && Number.isFinite(ctx.listDepth)) ? ctx.listDepth : 0;
       const startValue = Number.parseInt(String(listEl.getAttribute ? listEl.getAttribute("start") || "" : ""), 10);
       const hasStart = Number.isFinite(startValue);
 
-      const items = [];
-      const children = listEl && listEl.children ? Array.from(listEl.children) : [];
+      const items: any[] = [];
+      const children: any[] = listEl && listEl.children ? (Array.from(listEl.children) as any[]) : [];
       let orderedIndex = hasStart ? startValue : 1;
       for (const child of children) {
         if (!child || String(child.tagName || "").toLowerCase() !== "li") continue;
@@ -323,28 +324,28 @@
       return items.join("\n") + (items.length ? "\n\n" : "");
     }
 
-    function renderBlockquote(el, ctx) {
+    function renderBlockquote(el: any, ctx: any): any {
       const raw = normalizeMarkdown(renderChildren(el, ctx));
       if (!raw) return "";
       const lines = raw.split("\n");
-      const quoted = lines.map((l) => (l ? `> ${l}` : ">")).join("\n");
+      const quoted = lines.map((l: any) => (l ? `> ${l}` : ">")).join("\n");
       return `${quoted}\n\n`;
     }
 
-    function renderTable(tableEl, ctx) {
+    function renderTable(tableEl: any, ctx: any): any {
       if (!tableEl || !tableEl.querySelectorAll) return "";
       const rows = Array.from(tableEl.querySelectorAll("tr"));
       if (!rows.length) return "";
 
-      const matrix = rows.map((tr) => {
-        const cells = Array.from(tr.children || []).filter((c) => {
+      const matrix = rows.map((tr: any) => {
+        const cells = Array.from(tr.children || []).filter((c: any) => {
           const tag = c && c.tagName ? String(c.tagName).toLowerCase() : "";
           return tag === "th" || tag === "td";
         });
-        return cells.map((cell) => escapeTableCell(normalizeInline(renderChildren(cell, ctx))));
+        return cells.map((cell: any) => escapeTableCell(normalizeInline(renderChildren(cell, ctx))));
       });
 
-      const colCount = Math.max(0, ...matrix.map((r) => r.length));
+      const colCount = Math.max(0, ...matrix.map((r: any) => r.length));
       if (!colCount || !matrix.length) return "";
 
       const out = [];
@@ -358,7 +359,7 @@
       return `${out.join("\n")}\n\n`;
     }
 
-    function renderNode(node, ctx) {
+    function renderNode(node: any, ctx: any): any {
       if (!node) return "";
       if (node.nodeType === TEXT_NODE) return node.nodeValue ? String(node.nodeValue) : "";
       if (node.nodeType !== ELEMENT_NODE) return "";
@@ -426,13 +427,13 @@
     return normalizeMarkdown(renderNode(root, { listDepth: 0 }));
   }
 
-  function extractAssistantMarkdown(wrapper) {
+  function extractAssistantMarkdown(wrapper: any): any {
     const cloned = sanitizeAssistantClone(wrapper);
     if (!cloned) return "";
     return htmlToMarkdown(cloned) || "";
   }
 
-  function extractAssistantText(wrapper) {
+  function extractAssistantText(wrapper: any): any {
     const cloned = sanitizeAssistantClone(wrapper);
     if (!cloned) return "";
     return normalizeText(extractTextFromSanitizedClone(cloned));
@@ -448,5 +449,3 @@
   };
 
   NS.chatgptMarkdown = api;
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-})();

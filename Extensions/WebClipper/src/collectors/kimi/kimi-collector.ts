@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return hostname === "kimi.moonshot.cn" || /(^|\.)kimi\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       return /^\/chat\/[^/]+/.test(location.pathname || "");
     } catch (_e) {
@@ -14,37 +15,37 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector(".chat-content") || document.querySelector("main") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     return NS.collectorUtils.inEditMode(root);
   }
 
-  function kimiMarkdown() {
+  function kimiMarkdown(): any {
     return NS.kimiMarkdown || {};
   }
 
-  function collectMessages() {
+  function collectMessages(): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const items = Array.from(root.querySelectorAll(".chat-content-item"));
+    const items: any[] = Array.from(root.querySelectorAll(".chat-content-item")) as any[];
     if (!items.length) return [];
 
-    const out = [];
+    const out: any[] = [];
     const utils = NS.collectorUtils || {};
     const markdown = kimiMarkdown();
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
-    function mergeImageUrls(nodes) {
+    function mergeImageUrls(nodes: any): any {
       if (!extractImages) return [];
       const set = new Set();
       for (const n of nodes || []) {
@@ -62,38 +63,38 @@
       const role = isUser ? "user" : "assistant";
 
       let text = "";
-      let imageScopes = [item];
+      let imageScopes: any[] = [item];
       if (isUser) {
-        const partsEls = Array.from(item.querySelectorAll(".user-content"));
-        const parts = partsEls.map((el) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
+        const partsEls: any[] = Array.from(item.querySelectorAll(".user-content")) as any[];
+        const parts = partsEls.map((el: any) => NS.normalize.normalizeText(el.innerText || el.textContent || "")).filter(Boolean);
         text = NS.normalize.normalizeText(parts.join("\n\n"));
         imageScopes = partsEls.length ? partsEls : [item];
       } else {
-        const candidates = [];
-        item.querySelectorAll(".markdown-container, .editor-content").forEach((el) => {
+        const candidates: any[] = [];
+        item.querySelectorAll(".markdown-container, .editor-content").forEach((el: any) => {
           if (el.closest(".think-stage")) return;
           candidates.push(el);
         });
-        candidates.sort((a, b) => {
+        candidates.sort((a: any, b: any) => {
           const pos = a.compareDocumentPosition(b);
           if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
           if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
           return 0;
         });
-        const uniq = [];
+        const uniq: any[] = [];
         for (const candidate of candidates) {
-          if (uniq.some((p) => p.contains(candidate))) continue;
+          if (uniq.some((p: any) => p.contains(candidate))) continue;
           uniq.push(candidate);
         }
 
-        const textParts = uniq.map((el) => {
+        const textParts = uniq.map((el: any) => {
           const fallbackText = NS.normalize.normalizeText(el.innerText || el.textContent || "");
           if (typeof markdown.extractAssistantText !== "function") return fallbackText;
           return markdown.extractAssistantText(el) || fallbackText;
         }).filter(Boolean);
         text = NS.normalize.normalizeText(textParts.join("\n\n"));
 
-        const markdownParts = uniq.map((el) => {
+        const markdownParts = uniq.map((el: any) => {
           const fallbackText = NS.normalize.normalizeText(el.innerText || el.textContent || "");
           if (typeof markdown.extractAssistantMarkdown !== "function") return fallbackText;
           return markdown.extractAssistantMarkdown(el) || fallbackText;
@@ -126,7 +127,7 @@
     return out;
   }
 
-  function capture() {
+  function capture(): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
@@ -150,4 +151,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "kimi", matches, collector: api });
   }
-})();

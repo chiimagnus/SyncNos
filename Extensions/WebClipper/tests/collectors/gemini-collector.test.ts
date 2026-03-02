@@ -7,7 +7,12 @@ async function loadNormalize() {
     fnv1a32: normalizeModule.fnv1a32,
     makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
   };
-  globalThis.WebClipper = globalThis.WebClipper || {};
+  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
+  const collectorContext = collectorContextModule.default as any;
+  collectorContext.normalize = normalizeApi;
+  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+    globalThis.WebClipper = {};
+  }
   globalThis.WebClipper.normalize = normalizeApi;
   return normalizeApi;
 }
@@ -21,22 +26,12 @@ function loadCollectorUtils() {
   return require("../../src/collectors/collector-utils.js");
 }
 
-function loadGeminiMarkdown() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/gemini/gemini-markdown.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/gemini/gemini-markdown.js");
+async function loadGeminiMarkdown() {
+  return import("../../src/collectors/gemini/gemini-markdown.ts");
 }
 
-function loadGeminiCollector() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/gemini/gemini-collector.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/gemini/gemini-collector.js");
+async function loadGeminiCollector() {
+  return import("../../src/collectors/gemini/gemini-collector.ts");
 }
 
 function setupGeminiDom(html: string, url: string) {
@@ -75,11 +70,13 @@ describe("gemini-collector", () => {
     dom.window.document.title = "Page Title Should Not Win";
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadGeminiMarkdown();
-    loadGeminiCollector();
+    await loadGeminiMarkdown();
+    await loadGeminiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.gemini.capture();
@@ -100,11 +97,13 @@ describe("gemini-collector", () => {
     dom.window.document.title = "Gemini Page Title";
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadGeminiMarkdown();
-    loadGeminiCollector();
+    await loadGeminiMarkdown();
+    await loadGeminiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.gemini.capture();
@@ -139,11 +138,13 @@ describe("gemini-collector", () => {
     setupGeminiDom(html, "https://gemini.google.com/app/md001");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadGeminiMarkdown();
-    loadGeminiCollector();
+    await loadGeminiMarkdown();
+    await loadGeminiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.gemini.capture();
@@ -174,10 +175,12 @@ describe("gemini-collector", () => {
     setupGeminiDom(html, "https://gemini.google.com/app/fallback1");
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
+    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
+      globalThis.WebClipper = {};
+    }
     await loadNormalize();
     loadCollectorUtils();
-    loadGeminiCollector();
+    await loadGeminiCollector();
 
     // @ts-expect-error test global
     const snap = globalThis.WebClipper.collectors.gemini.capture();

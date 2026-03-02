@@ -1,12 +1,13 @@
-(function () {
-  const NS = require("../collector-context.js");
+import collectorContext from '../collector-context.ts';
 
-  function matches(loc) {
+const NS: any = collectorContext as any;
+
+  function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
     return /(^|\.)gemini\.google\.com$/.test(hostname);
   }
 
-  function isValidConversationUrl() {
+  function isValidConversationUrl(): any {
     try {
       const p = location.pathname || "";
       if (p === "/app") return false;
@@ -17,23 +18,23 @@
     }
   }
 
-  function findConversationKey() {
+  function findConversationKey(): any {
     return NS.collectorUtils.conversationKeyFromLocation(location);
   }
 
-  function geminiMarkdown() {
+  function geminiMarkdown(): any {
     return NS.geminiMarkdown || {};
   }
 
-  function getConversationRoot() {
+  function getConversationRoot(): any {
     return document.querySelector("#chat-history") || document.querySelector("main") || document.body;
   }
 
-  function inEditMode(root) {
+  function inEditMode(root: any): any {
     return NS.collectorUtils.inEditMode(root);
   }
 
-  function normalizeTitle(value) {
+  function normalizeTitle(value: any): any {
     const text = value == null ? "" : String(value);
     if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
       return NS.normalize.normalizeText(text);
@@ -41,7 +42,7 @@
     return text.replace(/\s+/g, " ").trim();
   }
 
-  function extractConversationTitle() {
+  function extractConversationTitle(): any {
     const selectors = [
       "[data-test-id='conversation-title']",
       ".conversation-title-container .conversation-title-column [class*='gds-title']",
@@ -50,14 +51,14 @@
     for (const selector of selectors) {
       const el = document.querySelector(selector);
       if (!el) continue;
-      const title = normalizeTitle(el.textContent || el.innerText || "");
+      const title = normalizeTitle((el as any).textContent || (el as any).innerText || "");
       if (title) return title;
     }
     const pageTitle = normalizeTitle(document.title || "");
     return pageTitle || "Gemini";
   }
 
-  function extractAssistantMarkdown(node, fallbackText) {
+  function extractAssistantMarkdown(node: any, fallbackText: any): any {
     const md = geminiMarkdown();
     if (typeof md.extractAssistantMarkdown === "function") {
       const markdown = md.extractAssistantMarkdown(node);
@@ -66,7 +67,7 @@
     return fallbackText || "";
   }
 
-  function extractAssistantText(node) {
+  function extractAssistantText(node: any): any {
     const md = geminiMarkdown();
     if (typeof md.extractAssistantText === "function") {
       const text = md.extractAssistantText(node);
@@ -76,15 +77,15 @@
     return NS.normalize.normalizeText(raw);
   }
 
-  function collectMessages() {
+  function collectMessages(): any {
     const root = getConversationRoot();
     if (!root) return [];
     if (inEditMode(root)) return [];
 
-    const blocks = Array.from(root.querySelectorAll(".conversation-container"));
+    const blocks: any[] = Array.from(root.querySelectorAll(".conversation-container")) as any[];
     if (!blocks.length) return [];
 
-    const out = [];
+    const out: any[] = [];
     const utils = NS.collectorUtils || {};
     const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
     const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
@@ -132,7 +133,7 @@
     return out;
   }
 
-  function capture() {
+  function capture(): any {
     if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages();
     if (!messages.length) return null;
@@ -164,4 +165,3 @@
   if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
     NS.collectorsRegistry.register({ id: "gemini", matches, collector: api });
   }
-})();
