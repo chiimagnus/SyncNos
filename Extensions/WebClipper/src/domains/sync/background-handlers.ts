@@ -17,6 +17,19 @@ function getInstanceId(): string {
 }
 
 export function registerSyncHandlers(router: AnyRouter) {
+  router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const notionSyncOrchestrator = NS.notionSyncOrchestrator;
+    if (!notionSyncOrchestrator || typeof notionSyncOrchestrator.syncConversations !== 'function') {
+      return router.err('notion sync orchestrator missing');
+    }
+    const data = await notionSyncOrchestrator.syncConversations({
+      conversationIds: msg?.conversationIds,
+      instanceId: getInstanceId(),
+    });
+    return router.ok(data);
+  });
+
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
     const NS: any = (globalThis as any).WebClipper || {};
     const notionSyncOrchestrator = NS.notionSyncOrchestrator;
@@ -36,5 +49,18 @@ export function registerSyncHandlers(router: AnyRouter) {
     const data = await orchestrator.getSyncStatus({ instanceId: getInstanceId() });
     return router.ok(data);
   });
-}
 
+  router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
+    const NS: any = (globalThis as any).WebClipper || {};
+    const orchestrator = NS.obsidianSyncOrchestrator;
+    if (!orchestrator || typeof orchestrator.syncConversations !== 'function') {
+      return router.err('obsidian sync orchestrator missing');
+    }
+    const data = await orchestrator.syncConversations({
+      conversationIds: msg?.conversationIds,
+      forceFullConversationIds: msg?.forceFullConversationIds,
+      instanceId: getInstanceId(),
+    });
+    return router.ok(data);
+  });
+}
