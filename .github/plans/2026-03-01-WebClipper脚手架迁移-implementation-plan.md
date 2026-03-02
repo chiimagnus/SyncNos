@@ -329,7 +329,7 @@
 
 ### Task 24: App Conversations 支持多选 + Delete（对齐旧 popup）
 
-**Status:** ✅ Done（2026-03-02）
+**Status:** ✅ Done（2026-03-02，含 Notion/Obsidian Sync 入口）
 
 **Files:**
 - Modify: `Extensions/WebClipper/src/ui/app/routes/Conversations.tsx`
