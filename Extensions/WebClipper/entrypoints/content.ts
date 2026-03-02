@@ -7,7 +7,7 @@ import '../src/collectors/bootstrap.ts';
 import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
 import '../src/collectors/web/web-collector.ts';
-import '../src/integrations/notionai-model-picker.js';
+import '../src/integrations/notionai-model-picker.ts';
 import '../src/ui/inpage/inpage-tip.ts';
 import '../src/ui/inpage/inpage-button.ts';
 
