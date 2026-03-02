@@ -28,7 +28,6 @@ import '../export/obsidian/obsidian-markdown-writer.js';
 import '../export/obsidian/obsidian-sync-orchestrator.js';
 
 import '../bootstrap/background-inpage-web-visibility.js';
-import '../bootstrap/background-events-hub.js';
 import '../bootstrap/background-storage.js';
 import '../collectors/web/article-fetch-service.js';
 import '../bootstrap/background-router.js';
