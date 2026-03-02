@@ -124,12 +124,9 @@ Phase 3（JS→TS）收口状态：
 - TypeScript 编译检查：`npm --prefix Extensions/WebClipper run compile`
 - 构建（WXT / Chrome）：`npm --prefix Extensions/WebClipper run build`
 - 构建（WXT / Firefox）：`npm --prefix Extensions/WebClipper run build:firefox`
-- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Chrome dist）：`npm --prefix Extensions/WebClipper run legacy:build`
-- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Edge zip）：`npm --prefix Extensions/WebClipper run legacy:build:edge`
-- （产物打包到 `dist*`，用于发布/上传；脚本名保留 legacy 前缀）构建（Firefox `.xpi`）：`npm --prefix Extensions/WebClipper run legacy:build:firefox`
-- 校验 Edge dist 产物（先 `legacy:build:edge`）：`npm --prefix Extensions/WebClipper run check:dist:edge`
-- 校验 Firefox dist 产物（先 `legacy:build:firefox`）：`npm --prefix Extensions/WebClipper run check:dist:firefox`
-- 生成 AMO 源码包（Source code 上传）：`npm --prefix Extensions/WebClipper run package:amo-source`
+- 发布打包（CI 专用，GitHub Actions 直接调用）：`.github/scripts/webclipper/package-release-assets.mjs`
+- AMO Source 包（CI 专用）：`.github/scripts/webclipper/package-amo-source.mjs`
+- AMO 发布（CI 专用）：`.github/scripts/webclipper/publish-amo.mjs`
 
 ## Firefox / AMO
 
@@ -140,7 +137,7 @@ Phase 3（JS→TS）收口状态：
 1. 打开 `about:debugging#/runtime/this-firefox`
 2. 点击 “Load Temporary Add-on…”
 3. 选择 `Extensions/WebClipper/.output/firefox-mv3/manifest.json`
-   - 如果你需要验证“发布/上传产物”的目录结构：先跑 `npm --prefix Extensions/WebClipper run legacy:build:firefox`，再选择 `Extensions/WebClipper/dist-firefox/manifest.json`
+   - 本地开发仅使用 WXT 产物；发布产物由 CI 生成。
 
 ### AMO 发布产物
 
@@ -157,8 +154,8 @@ Phase 3（JS→TS）收口状态：
   - `zip` 命令：macOS 自带；Ubuntu/Debian 可用 `sudo apt-get install zip`
 - 构建步骤：
   1. `npm --prefix Extensions/WebClipper install`
-  2. `npm --prefix Extensions/WebClipper run build:firefox`
-  - 如需 `.xpi`：用 `npm --prefix Extensions/WebClipper run legacy:build:firefox`
+  2. `node .github/scripts/webclipper/package-release-assets.mjs --target=firefox --zip --zip-name=SyncNos-WebClipper-firefox.xpi`
+  3. `node .github/scripts/webclipper/package-amo-source.mjs`
 
 ## Chrome 开发
 
