@@ -20,7 +20,8 @@
   - `npm --prefix Extensions/WebClipper run build` 可产出 Chrome/Edge 可加载产物
   - `npm --prefix Extensions/WebClipper run build:firefox`（或等价命令）可产出 Firefox 可加载产物（具体命令由 Task 02/03 Spike 固化）
 - 扩展内 Web App
-  - popup 内按钮可打开 `app.html`，并能切换 `/`、`/sync`、`/settings`、`/debug` 路由（HashRouter）
+  - popup 内按钮可打开 `app.html`，并能切换 `/`、`/settings`、`/debug` 路由（HashRouter）
+  - `sync/backup` 功能面板并入 `settings`（`/sync`、`/backup` 作为兼容重定向到 `/settings`）
 - 核心能力不回归（最小冒烟）
   - 自动采集保存仍可工作（至少 ChatGPT/Claude 任一站点）
   - “Fetch Current Page” 能抓取文章并入库
