@@ -1,9 +1,21 @@
 import '../src/ui/styles/tokens.css';
 import '../src/ui/styles/flash-ok.css';
 
+import '../src/protocols/bootstrap.ts';
+import '../src/shared/normalize.js';
+import '../src/storage/incremental-updater.js';
+import '../src/collectors/bootstrap.ts';
+import '../src/collectors/runtime-observer.js';
+import '../src/collectors/sites-bootstrap';
+import '../src/collectors/web/web-collector.js';
+import '../src/integrations/notionai-model-picker.js';
+import '../src/ui/inpage/inpage-tip.js';
+import '../src/ui/inpage/inpage-button.js';
+import '../src/ui/inpage/inpage-tip-shadow';
+import '../src/ui/inpage/inpage-button-shadow';
+
 import { createContentController } from '../src/bootstrap/content-controller.ts';
 import { startContentBootstrap } from '../src/bootstrap/content.ts';
-import { startLegacyContent } from '../src/legacy/content-entry';
 import { createRuntimeClient } from '../src/platform/runtime/client';
 
 export default defineContentScript({
@@ -28,7 +40,6 @@ export default defineContentScript({
   main() {
     const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
     NS.runtimeClient = { createRuntimeClient };
-    startLegacyContent();
 
     const runtime = createRuntimeClient();
     startContentBootstrap({
