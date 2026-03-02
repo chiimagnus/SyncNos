@@ -153,6 +153,21 @@ function renderStats(stats: ImportStats | null) {
   );
 }
 
+function isFirefoxFamilyBrowser() {
+  try {
+    const ua = String(globalThis.navigator?.userAgent || '').toLowerCase();
+    if (!ua) return false;
+    return ua.includes('firefox') || ua.includes('librewolf') || ua.includes('zen');
+  } catch (_e) {
+    return false;
+  }
+}
+
+async function openExtensionAppSettings() {
+  const url = browser.runtime.getURL('/app.html#/settings');
+  await browser.tabs.create({ url });
+}
+
 export default function SettingsTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +210,7 @@ export default function SettingsTab() {
 
   // Inpage
   const [inpageSupportedOnly, setInpageSupportedOnly] = useState<boolean | null>(null);
+  const useAppImport = useMemo(() => isFirefoxFamilyBrowser(), []);
 
   const refresh = async () => {
     setBusy(true);
@@ -525,6 +541,17 @@ export default function SettingsTab() {
     }
   };
 
+  const handleBackupImportClick = async () => {
+    if (busy) return;
+    if (!useAppImport) {
+      fileInputRef.current?.click();
+      return;
+    }
+    setImportStatus('Firefox kernel detected: import in App Settings');
+    await openExtensionAppSettings();
+    window.close();
+  };
+
   const openSetupGuide = () => {
     openHttpUrl('https://github.com/chiimagnus/SyncNos/blob/main/.github/guide/obsidian/LocalRestAPI.zh.md');
   };
@@ -824,10 +851,10 @@ export default function SettingsTab() {
               id="btnDatabaseImport"
               className="btn"
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => handleBackupImportClick().catch(() => {})}
               disabled={busy}
             >
-              Import
+              {useAppImport ? 'Import in App' : 'Import'}
             </button>
             <input
               ref={fileInputRef}
@@ -861,7 +888,7 @@ export default function SettingsTab() {
         <div className="settingsRow settingsRow--compact" aria-label="Database import note">
           <div className="settingsLabel settingsLabel--inline">Note</div>
           <div className="sub">
-            Import merges by (source + conversationKey). Notion token is not included. Backup file: .zip (recommended) / .json (legacy).
+            Import merges by (source + conversationKey). Notion token is not included. Backup file: .zip (recommended) / .json (legacy). Firefox kernel imports open App Settings.
           </div>
         </div>
       </section>
