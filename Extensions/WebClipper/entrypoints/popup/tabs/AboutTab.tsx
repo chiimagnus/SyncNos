@@ -29,6 +29,13 @@ export default function AboutTab() {
         <div className="tw-mt-3 tw-flex tw-flex-wrap tw-gap-2">
           <button
             className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
+            onClick={() => openUrl('https://apps.apple.com/app/syncnos/id6755133888').catch(() => {})}
+            type="button"
+          >
+            Mac App
+          </button>
+          <button
+            className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
             onClick={() => openUrl('https://github.com/chiimagnus/SyncNos').catch(() => {})}
             type="button"
           >
@@ -36,9 +43,7 @@ export default function AboutTab() {
           </button>
           <button
             className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-            onClick={() =>
-              openUrl('https://github.com/chiimagnus/SyncNos/blob/main/Extensions/WebClipper/CHANGELOG.md').catch(() => {})
-            }
+            onClick={() => openUrl('https://chiimagnus.notion.site/syncnos-changelog').catch(() => {})}
             type="button"
           >
             Changelog
@@ -60,7 +65,9 @@ export default function AboutTab() {
           <div className="tw-flex-1" />
           <button
             className="tw-h-8 tw-px-3 tw-rounded-lg tw-border tw-border-[rgba(217,89,38,0.18)] tw-bg-white/55 hover:tw-bg-white/75 tw-text-[12px] tw-font-semibold tw-text-[var(--muted)]"
-            onClick={() => openUrl('mailto:chii.magnus@outlook.com').catch(() => {})}
+            onClick={() =>
+              openUrl('mailto:chii_magnus@outlook.com?subject=%5BSyncNos%20WebClipper%5D%20Feedback').catch(() => {})
+            }
             type="button"
           >
             Mail
