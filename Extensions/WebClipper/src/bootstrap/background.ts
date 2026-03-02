@@ -18,7 +18,7 @@ import '../export/obsidian/obsidian-sync-metadata.js';
 import '../export/obsidian/obsidian-markdown-writer.js';
 import '../export/obsidian/obsidian-sync-orchestrator.js';
 
-import './background-inpage-web-visibility.js';
+import './background-inpage-web-visibility.ts';
 import '../collectors/web/article-fetch-service.js';
 import runtimeContext from '../runtime-context.ts';
 
