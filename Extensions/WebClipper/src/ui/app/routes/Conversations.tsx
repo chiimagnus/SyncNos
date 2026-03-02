@@ -3,6 +3,7 @@ import type { Conversation, ConversationDetail } from '../../../domains/conversa
 import { createZipBlob } from '../../../domains/backup/zip-utils';
 import { formatConversationMarkdown, sanitizeFilenamePart } from '../../../domains/conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../domains/conversations/repo';
+import { syncNotionConversations, syncObsidianConversations } from '../../../domains/sync/repo';
 
 function formatTime(ts?: number) {
   if (!ts) return '';
@@ -24,6 +25,8 @@ export default function Conversations() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [syncingNotion, setSyncingNotion] = useState(false);
+  const [syncingObsidian, setSyncingObsidian] = useState(false);
 
   const selected = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
@@ -153,6 +156,34 @@ export default function Conversations() {
     }
   };
 
+  const onSyncNotion = async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    setSyncingNotion(true);
+    setListError(null);
+    try {
+      await syncNotionConversations(ids);
+    } catch (e) {
+      setListError((e as any)?.message ?? String(e ?? 'notion sync failed'));
+    } finally {
+      setSyncingNotion(false);
+    }
+  };
+
+  const onSyncObsidian = async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+    setSyncingObsidian(true);
+    setListError(null);
+    try {
+      await syncObsidianConversations(ids);
+    } catch (e) {
+      setListError((e as any)?.message ?? String(e ?? 'obsidian sync failed'));
+    } finally {
+      setSyncingObsidian(false);
+    }
+  };
+
   return (
     <section style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
       <div>
@@ -181,6 +212,20 @@ export default function Conversations() {
             Select all
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => onSyncObsidian().catch(() => {})}
+              disabled={!selectedIds.length || syncingObsidian}
+              type="button"
+            >
+              {syncingObsidian ? 'Syncing…' : 'Obsidian'}
+            </button>
+            <button
+              onClick={() => onSyncNotion().catch(() => {})}
+              disabled={!selectedIds.length || syncingNotion}
+              type="button"
+            >
+              {syncingNotion ? 'Syncing…' : 'Notion'}
+            </button>
             <button
               onClick={() => exportSelectedMarkdown({ mergeSingle: true }).catch(() => {})}
               disabled={!selectedIds.length || exporting}
