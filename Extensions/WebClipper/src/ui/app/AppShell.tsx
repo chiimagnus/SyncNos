@@ -1,9 +1,7 @@
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
-import Backup from './routes/Backup';
+import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import Conversations from './routes/Conversations';
 import Debug from './routes/Debug';
 import Settings from './routes/Settings';
-import SyncJobs from './routes/SyncJobs';
 
 function Nav() {
   const linkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -17,14 +15,8 @@ function Nav() {
       <NavLink to="/" style={linkStyle}>
         Conversations
       </NavLink>
-      <NavLink to="/sync" style={linkStyle}>
-        Sync
-      </NavLink>
       <NavLink to="/settings" style={linkStyle}>
         Settings
-      </NavLink>
-      <NavLink to="/backup" style={linkStyle}>
-        Backup
       </NavLink>
       <NavLink to="/debug" style={linkStyle}>
         Debug
@@ -60,9 +52,9 @@ export default function AppShell() {
         <main style={{ padding: '16px' }}>
           <Routes>
             <Route path="/" element={<Conversations />} />
-            <Route path="/sync" element={<SyncJobs />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/backup" element={<Backup />} />
+            <Route path="/sync" element={<Navigate to="/settings" replace />} />
+            <Route path="/backup" element={<Navigate to="/settings" replace />} />
             <Route path="/debug" element={<Debug />} />
           </Routes>
         </main>
