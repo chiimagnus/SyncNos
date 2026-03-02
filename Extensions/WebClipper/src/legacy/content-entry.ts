@@ -38,10 +38,11 @@ import '../collectors/web/web-collector.js';
 import '../integrations/notionai-model-picker.js';
 import '../ui/inpage/inpage-tip.js';
 import '../ui/inpage/inpage-button.js';
+import '../ui/inpage/inpage-tip-shadow';
+import '../ui/inpage/inpage-button-shadow';
 import '../bootstrap/content-controller.js';
 import '../bootstrap/content.js';
 
 export function startLegacyContent() {
   (globalThis as any).WebClipper = (globalThis as any).WebClipper || {};
 }
-

@@ -408,6 +408,8 @@
 
 ### Task 20: inpage UI Shadow DOM 化（保持交互约束）
 
+**Status:** ✅ Done（2026-03-02）
+
 **Files:**
 - Create: `Extensions/WebClipper/src/ui/inpage/...`
 - Modify: `Extensions/WebClipper/entrypoints/content.ts`
