@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Conversation, ConversationDetail } from '../../../domains/conversations/models';
+import { createZipBlob } from '../../../domains/backup/zip-utils';
+import { formatConversationMarkdown, sanitizeFilenamePart } from '../../../domains/conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../domains/conversations/repo';
 
 function formatTime(ts?: number) {
@@ -21,6 +23,7 @@ export default function Conversations() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const selected = useMemo(
     () => items.find((x) => Number(x.id) === Number(activeId)) ?? null,
@@ -100,6 +103,56 @@ export default function Conversations() {
     }
   };
 
+  const exportSelectedMarkdown = async ({ mergeSingle }: { mergeSingle: boolean }) => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
+
+    setExporting(true);
+    setListError(null);
+    try {
+      const selectedConversations = items.filter((c) => ids.includes(Number(c.id)));
+      if (!selectedConversations.length) return;
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const files: Array<{ name: string; data: string }> = [];
+
+      if (mergeSingle) {
+        const docs: string[] = [];
+        for (const c of selectedConversations) {
+          // eslint-disable-next-line no-await-in-loop
+          const d = await getConversationDetail(Number(c.id));
+          docs.push(formatConversationMarkdown(c, d.messages || []));
+        }
+        const text = docs.join('\n---\n\n');
+        files.push({ name: `webclipper-export-${stamp}.md`, data: text });
+      } else {
+        for (let i = 0; i < selectedConversations.length; i += 1) {
+          const c = selectedConversations[i];
+          // eslint-disable-next-line no-await-in-loop
+          const d = await getConversationDetail(Number(c.id));
+          const source = sanitizeFilenamePart(c.source || 'unknown', 'unknown');
+          const title = sanitizeFilenamePart(c.title || 'untitled', 'untitled');
+          files.push({
+            name: `webclipper-${source}-${title}-${i + 1}-${stamp}.md`,
+            data: formatConversationMarkdown(c, d.messages || []),
+          });
+        }
+      }
+
+      const zipBlob = await createZipBlob(files);
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `webclipper-export-${stamp}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setListError((e as any)?.message ?? String(e ?? 'export failed'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <section style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
       <div>
@@ -127,9 +180,25 @@ export default function Conversations() {
             <input type="checkbox" checked={allSelected} onChange={toggleAll} />
             Select all
           </label>
-          <button onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedIds.length || loadingList} type="button">
-            Delete selected
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => exportSelectedMarkdown({ mergeSingle: true }).catch(() => {})}
+              disabled={!selectedIds.length || exporting}
+              type="button"
+            >
+              Export (single)
+            </button>
+            <button
+              onClick={() => exportSelectedMarkdown({ mergeSingle: false }).catch(() => {})}
+              disabled={!selectedIds.length || exporting}
+              type="button"
+            >
+              Export (multi)
+            </button>
+            <button onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedIds.length || loadingList} type="button">
+              Delete
+            </button>
+          </div>
         </div>
 
         <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
