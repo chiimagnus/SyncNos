@@ -12,8 +12,6 @@ import '../collectors/bootstrap.ts';
 import '../collectors/runtime-observer.js';
 import '../collectors/sites-bootstrap';
 
-import '../collectors/gemini/gemini-markdown.js';
-import '../collectors/gemini/gemini-collector.js';
 import '../collectors/deepseek/deepseek-markdown.js';
 import '../collectors/deepseek/deepseek-collector.js';
 import '../collectors/zai/zai-markdown.js';
