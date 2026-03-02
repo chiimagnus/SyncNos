@@ -3,6 +3,7 @@ import { storageRemove } from '../../platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '../../integrations/notion/token-store';
 import { getObsidianSettings, saveObsidianSettings } from '../../integrations/obsidian/settings-store';
 import { testObsidianConnection } from '../../integrations/obsidian/sync/orchestrator';
+import { conversationKinds } from '../../protocols/conversation-kinds';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -28,10 +29,9 @@ function getNotionDisconnectStorageKeys(): string[] {
     'notion_oauth_last_error',
   ];
 
-  const kinds = NS.conversationKinds;
   const notionDbKeys = (() => {
     try {
-      const keys = kinds?.getNotionStorageKeys?.();
+      const keys = conversationKinds.getNotionStorageKeys();
       if (Array.isArray(keys) && keys.length) return keys.map((k: any) => String(k || '').trim()).filter(Boolean);
     } catch (_e) {
       // ignore
