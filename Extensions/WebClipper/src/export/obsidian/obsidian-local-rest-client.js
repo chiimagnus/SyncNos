@@ -1,7 +1,7 @@
 /* global fetch */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const NOTE_JSON_ACCEPT = "application/vnd.olrapi.note+json";
 
@@ -178,4 +178,3 @@
 
   if (typeof module !== "undefined" && module.exports) module.exports = NS.obsidianLocalRestClient;
 })();
-

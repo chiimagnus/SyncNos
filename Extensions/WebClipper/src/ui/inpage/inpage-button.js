@@ -1,7 +1,7 @@
 /* global localStorage, clearTimeout, setTimeout */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const INPAGE_BTN_ID = "webclipper-inpage-btn";
   const INPAGE_BTN_STORAGE_KEY_V2 = "webclipper_btn_pos_inpage_v2";

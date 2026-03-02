@@ -1,4 +1,15 @@
 import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import {
+  getNotionSyncStatus,
+  notionSyncConversations,
+} from '../../integrations/notion/sync/orchestrator';
+import {
+  getObsidianSyncStatus,
+  obsidianSyncConversations,
+} from '../../integrations/obsidian/sync/orchestrator';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../runtime-context.js');
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -8,8 +19,7 @@ type AnyRouter = {
 
 function getInstanceId(): string {
   try {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const id = NS.__backgroundInstanceId;
+    const id = runtimeContext.__backgroundInstanceId;
     return id ? String(id) : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   } catch (_e) {
     return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -18,12 +28,7 @@ function getInstanceId(): string {
 
 export function registerSyncHandlers(router: AnyRouter) {
   router.register(NOTION_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const notionSyncOrchestrator = NS.notionSyncOrchestrator;
-    if (!notionSyncOrchestrator || typeof notionSyncOrchestrator.syncConversations !== 'function') {
-      return router.err('notion sync orchestrator missing');
-    }
-    const data = await notionSyncOrchestrator.syncConversations({
+    const data = await notionSyncConversations({
       conversationIds: msg?.conversationIds,
       instanceId: getInstanceId(),
     });
@@ -31,32 +36,17 @@ export function registerSyncHandlers(router: AnyRouter) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.GET_SYNC_JOB_STATUS, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const notionSyncOrchestrator = NS.notionSyncOrchestrator;
-    if (!notionSyncOrchestrator || typeof notionSyncOrchestrator.getSyncJobStatus !== 'function') {
-      return router.err('notion sync orchestrator missing');
-    }
-    const data = await notionSyncOrchestrator.getSyncJobStatus({ instanceId: getInstanceId() });
+    const data = await getNotionSyncStatus({ instanceId: getInstanceId() });
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.GET_SYNC_STATUS, async () => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const orchestrator = NS.obsidianSyncOrchestrator;
-    if (!orchestrator || typeof orchestrator.getSyncStatus !== 'function') {
-      return router.err('obsidian sync orchestrator missing');
-    }
-    const data = await orchestrator.getSyncStatus({ instanceId: getInstanceId() });
+    const data = await getObsidianSyncStatus({ instanceId: getInstanceId() });
     return router.ok(data);
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.SYNC_CONVERSATIONS, async (msg) => {
-    const NS: any = (globalThis as any).WebClipper || {};
-    const orchestrator = NS.obsidianSyncOrchestrator;
-    if (!orchestrator || typeof orchestrator.syncConversations !== 'function') {
-      return router.err('obsidian sync orchestrator missing');
-    }
-    const data = await orchestrator.syncConversations({
+    const data = await obsidianSyncConversations({
       conversationIds: msg?.conversationIds,
       forceFullConversationIds: msg?.forceFullConversationIds,
       instanceId: getInstanceId(),

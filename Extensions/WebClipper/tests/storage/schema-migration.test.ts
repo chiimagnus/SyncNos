@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { IDBKeyRange, indexedDB } from "fake-indexeddb";
+import { openDb } from "../../src/platform/idb/schema";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -42,23 +43,11 @@ async function openV1Db() {
   return reqToPromise(req);
 }
 
-function loadSchema() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/storage/schema.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/storage/schema.js");
-}
-
 beforeEach(async () => {
-  // Ensure globals for the schema module (it runs in an IIFE expecting browser globals).
   // @ts-expect-error test global
   globalThis.indexedDB = indexedDB;
   // @ts-expect-error test global
   globalThis.IDBKeyRange = IDBKeyRange;
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
 
   await deleteDb("webclipper");
 });
@@ -114,8 +103,7 @@ describe("storage schema migration (v2 NotionAI thread id)", () => {
     await txDone(t1);
     db1.close();
 
-    const schema = loadSchema();
-    const db2 = await schema.openDb();
+    const db2 = await openDb();
 
     const t2 = db2.transaction(["conversations", "messages"], "readonly");
     const convs = await reqToPromise<any[]>(t2.objectStore("conversations").getAll());
@@ -167,8 +155,7 @@ describe("storage schema migration (v2 NotionAI thread id)", () => {
     await txDone(t1);
     db1.close();
 
-    const schema = loadSchema();
-    const db2 = await schema.openDb();
+    const db2 = await openDb();
 
     const t2 = db2.transaction(["conversations", "sync_mappings"], "readonly");
     const convs = await reqToPromise<any[]>(t2.objectStore("conversations").getAll());
@@ -186,4 +173,3 @@ describe("storage schema migration (v2 NotionAI thread id)", () => {
     expect(maps.some((m) => m.source === "notionai" && m.conversationKey === stableKey && m.notionPageId === "page_1")).toBe(true);
   });
 });
-

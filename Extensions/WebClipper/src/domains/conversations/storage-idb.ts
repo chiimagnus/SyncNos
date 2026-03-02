@@ -1,15 +1,5 @@
 import type { Conversation, ConversationMessage } from './models';
-
-type OpenDb = () => Promise<IDBDatabase>;
-
-function getOpenDb(): OpenDb {
-  const NS: any = (globalThis as any).WebClipper || {};
-  const schema = NS.storageSchema;
-  if (!schema || typeof schema.openDb !== 'function') {
-    throw new Error('schema not loaded');
-  }
-  return schema.openDb.bind(schema);
-}
+import { openDb as openSchemaDb } from '../../platform/idb/schema';
 
 let cachedDb: IDBDatabase | null = null;
 let openingDb: Promise<IDBDatabase> | null = null;
@@ -17,8 +7,7 @@ let openingDb: Promise<IDBDatabase> | null = null;
 async function openDb(): Promise<IDBDatabase> {
   if (cachedDb) return cachedDb;
   if (openingDb) return openingDb;
-  const open = getOpenDb();
-  openingDb = open()
+  openingDb = openSchemaDb()
     .then((db) => {
       cachedDb = db;
       return db;
@@ -278,4 +267,143 @@ export async function deleteConversationsByIds(
 
   await txDone(t);
   return { deletedConversations, deletedMessages, deletedMappings };
+}
+
+export async function getConversationById(conversationId: number): Promise<Conversation | null> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  const row = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  await txDone(t);
+  return (row || null) as Conversation | null;
+}
+
+export async function getSyncMappingByConversation(
+  conversationId: number,
+): Promise<{ conversation: Conversation; mapping: any | null } | null> {
+  const conversation = await getConversationById(conversationId);
+  if (!conversation) return null;
+
+  const source = String((conversation as any).source || '').trim();
+  const conversationKey = String((conversation as any).conversationKey || '').trim();
+  if (!source || !conversationKey) {
+    return { conversation, mapping: null };
+  }
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['sync_mappings'], 'readonly');
+  const idx = stores.sync_mappings.index('by_source_conversationKey');
+  const mapping = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+  await txDone(t);
+  return { conversation, mapping: mapping || null };
+}
+
+export async function setConversationNotionPageId(
+  conversationId: number,
+  notionPageId: string,
+): Promise<true> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
+  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  if (!conversation) throw new Error('conversation not found');
+
+  conversation.notionPageId = notionPageId || '';
+  await reqToPromise(stores.conversations.put(conversation));
+
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (source && conversationKey) {
+    const idx = stores.sync_mappings.index('by_source_conversationKey');
+    const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+    const payload: any = withOptionalId(existing && existing.id, {
+      source,
+      conversationKey,
+      notionPageId: notionPageId || '',
+      updatedAt: Date.now(),
+    });
+    if (existing) await reqToPromise(stores.sync_mappings.put(payload));
+    else await reqToPromise(stores.sync_mappings.add(payload));
+  }
+
+  await txDone(t);
+  return true;
+}
+
+export async function setSyncCursor(
+  conversationId: number,
+  input: {
+    lastSyncedMessageKey?: string;
+    lastSyncedSequence?: number | null;
+    lastSyncedAt?: number | null;
+    lastSyncedMessageUpdatedAt?: number | null;
+  },
+): Promise<true> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
+  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  if (!conversation) throw new Error('conversation not found');
+
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
+
+  const idx = stores.sync_mappings.index('by_source_conversationKey');
+  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+  const now = Date.now();
+  const payload: any = withOptionalId(existing && existing.id, {
+    source,
+    conversationKey,
+    notionPageId: String(existing?.notionPageId || conversation.notionPageId || ''),
+    lastSyncedMessageKey: String(input?.lastSyncedMessageKey || ''),
+    lastSyncedSequence: Number.isFinite(Number(input?.lastSyncedSequence))
+      ? Number(input?.lastSyncedSequence)
+      : null,
+    lastSyncedAt: Number.isFinite(Number(input?.lastSyncedAt))
+      ? Number(input?.lastSyncedAt)
+      : now,
+    lastSyncedMessageUpdatedAt: Number.isFinite(Number(input?.lastSyncedMessageUpdatedAt))
+      ? Number(input?.lastSyncedMessageUpdatedAt)
+      : null,
+    updatedAt: now,
+  });
+  if (existing) await reqToPromise(stores.sync_mappings.put(payload));
+  else await reqToPromise(stores.sync_mappings.add(payload));
+
+  await txDone(t);
+  return true;
+}
+
+export async function clearSyncCursor(conversationId: number): Promise<true> {
+  const id = Number(conversationId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('invalid conversationId');
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'sync_mappings'], 'readwrite');
+  const conversation = (await reqToPromise(stores.conversations.get(id as any))) as any;
+  if (!conversation) throw new Error('conversation not found');
+
+  const source = String(conversation.source || '').trim();
+  const conversationKey = String(conversation.conversationKey || '').trim();
+  if (!source || !conversationKey) throw new Error('missing source or conversationKey');
+
+  const idx = stores.sync_mappings.index('by_source_conversationKey');
+  const existing = (await reqToPromise(idx.get([source, conversationKey]) as any)) as any;
+  if (existing && existing.id) {
+    existing.lastSyncedMessageKey = '';
+    existing.lastSyncedSequence = null;
+    existing.lastSyncedAt = null;
+    existing.lastSyncedMessageUpdatedAt = null;
+    existing.updatedAt = Date.now();
+    await reqToPromise(stores.sync_mappings.put(existing));
+  }
+
+  await txDone(t);
+  return true;
 }

@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../collector-context.js");
 
   function removeThinkingNodes(container) {
     if (!container || !container.querySelectorAll) return container;
@@ -279,4 +279,3 @@
   NS.zaiMarkdown = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
-

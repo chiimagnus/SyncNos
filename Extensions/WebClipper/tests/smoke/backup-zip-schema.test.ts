@@ -1,22 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 function loadBackupUtils() {
-  // Ensure protocol registry is loaded (mirrors popup runtime load order).
-  // @ts-expect-error test global
-  globalThis.WebClipper = {};
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const contractPath = require.resolve("../../src/protocols/conversation-kind-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[contractPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/protocols/conversation-kind-contract.js");
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const kindsPath = require.resolve("../../src/protocols/conversation-kinds.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[kindsPath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("../../src/protocols/conversation-kinds.js");
-
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const modulePath = require.resolve("../../src/storage/backup-utils.js");
   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -79,4 +63,3 @@ describe("backup zip v2 schema", () => {
     expect(ok.ok).toBe(true);
   });
 });
-

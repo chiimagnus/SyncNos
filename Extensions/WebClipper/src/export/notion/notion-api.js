@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../../runtime-context.js");
 
   const NOTION_VERSION = "2022-06-28";
 

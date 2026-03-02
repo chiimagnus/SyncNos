@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-
-function loadCollectorUtils() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/collectors/collector-utils.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/collectors/collector-utils.js");
-}
+import { appendImageMarkdown, extractImageUrlsFromElement } from "../../src/collectors/collector-utils";
 
 describe("collector-utils images", () => {
   it("extracts best http(s) image urls from element", async () => {
@@ -32,12 +24,8 @@ describe("collector-utils images", () => {
     // @ts-expect-error test global
     globalThis.document = dom.window.document;
 
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    const utils = loadCollectorUtils();
-
     const root = dom.window.document.getElementById("root");
-    const urls = utils.extractImageUrlsFromElement(root);
+    const urls = extractImageUrlsFromElement(root);
     expect(urls).toEqual([
       "https://example.com/a.jpg",
       "https://example.com/large.png",
@@ -46,12 +34,8 @@ describe("collector-utils images", () => {
   });
 
   it("appends image markdown without duplicating existing urls", () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    const utils = loadCollectorUtils();
-
     const base = "Hello\n\n![](https://example.com/a.png)";
-    const md = utils.appendImageMarkdown(base, [
+    const md = appendImageMarkdown(base, [
       "https://example.com/a.png",
       "https://example.com/b.png",
       "data:image/png;base64,abc"

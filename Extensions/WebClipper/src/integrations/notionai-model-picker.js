@@ -1,7 +1,7 @@
 /* global chrome */
 
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
 
   const STORAGE_KEY = "notion_ai_preferred_model_index";
   // 1-based: menu order includes "自动" at #1.

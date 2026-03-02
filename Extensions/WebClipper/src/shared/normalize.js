@@ -1,5 +1,5 @@
 (function () {
-  const NS = (globalThis.WebClipper = globalThis.WebClipper || {});
+  const NS = require("../runtime-context.js");
 
   function normalizeText(text) {
     // Normalization is primarily used for fallback keys/dedupe. Prefer stability over formatting fidelity.

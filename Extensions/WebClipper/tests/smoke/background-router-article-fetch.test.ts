@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTestBackgroundRouter } from "./background-router-testkit";
 
-function loadBackgroundRouter() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const modulePath = require.resolve("../../src/bootstrap/background-router.js");
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete require.cache[modulePath];
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../src/bootstrap/background-router.js");
-}
+const articleFetchMocks = vi.hoisted(() => ({
+  fetchActiveTabArticle: vi.fn(),
+}));
+
+vi.mock("../../src/integrations/web-article/article-fetch", () => ({
+  fetchActiveTabArticle: articleFetchMocks.fetchActiveTabArticle,
+}));
 
 afterEach(() => {
   vi.restoreAllMocks();
+  articleFetchMocks.fetchActiveTabArticle.mockReset();
   // @ts-expect-error test cleanup
   delete globalThis.WebClipper;
   // @ts-expect-error test cleanup
@@ -18,59 +19,52 @@ afterEach(() => {
 });
 
 describe("background-router article fetch", () => {
-  it("routes fetchActiveTabArticle to articleFetchService", async () => {
-    const fetchActiveTabArticle = vi.fn(async ({ tabId }: { tabId?: number }) => ({
+  it("routes fetchActiveTabArticle to integration handler", async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
       conversationId: 7,
-      tabId: Number(tabId || 0)
-    }));
-
+      tabId: 42,
+    });
     // @ts-expect-error test global
-    globalThis.WebClipper = {
-      articleFetchService: {
-        fetchActiveTabArticle
-      }
-    };
-    // @ts-expect-error test global
-    globalThis.chrome = {};
+    globalThis.WebClipper = {};
 
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle", tabId: 42 });
 
     expect(res.ok).toBe(true);
-    expect(res.data?.conversationId).toBe(7);
-    expect(fetchActiveTabArticle).toHaveBeenCalledTimes(1);
-    expect(fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 42 });
+    expect(res.data).toEqual({ conversationId: 7, tabId: 42 });
+    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledTimes(1);
+    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 42 });
   });
 
-  it("returns error when article fetch service is missing", async () => {
+  it("returns integration errors as router errors", async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error("extract failed"));
     // @ts-expect-error test global
     globalThis.WebClipper = {};
-    // @ts-expect-error test global
-    globalThis.chrome = {};
 
-    const router = loadBackgroundRouter();
-    const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
-
-    expect(res.ok).toBe(false);
-    expect(String(res.error?.message || "")).toContain("article fetch service missing");
-  });
-
-  it("returns error payload when article fetch throws", async () => {
-    // @ts-expect-error test global
-    globalThis.WebClipper = {
-      articleFetchService: {
-        fetchActiveTabArticle: async () => {
-          throw new Error("extract failed");
-        }
-      }
-    };
-    // @ts-expect-error test global
-    globalThis.chrome = {};
-
-    const router = loadBackgroundRouter();
+    const router = createTestBackgroundRouter();
     const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
 
     expect(res.ok).toBe(false);
     expect(String(res.error?.message || "")).toContain("extract failed");
+  });
+
+  it("broadcasts conversationsChanged after successful fetch", async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({
+      conversationId: 123,
+    });
+    // @ts-expect-error test global
+    globalThis.WebClipper = {};
+
+    const router = createTestBackgroundRouter();
+    const broadcast = vi.fn();
+    router.eventsHub.broadcast = broadcast;
+
+    const res = await router.__handleMessageForTests({ type: "fetchActiveTabArticle" });
+
+    expect(res.ok).toBe(true);
+    expect(broadcast).toHaveBeenCalledWith("conversationsChanged", {
+      reason: "articleFetch",
+      conversationId: 123,
+    });
   });
 });

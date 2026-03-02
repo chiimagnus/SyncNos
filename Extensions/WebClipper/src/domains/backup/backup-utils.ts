@@ -1,3 +1,4 @@
+import { conversationKinds } from '../../protocols/conversation-kinds.ts';
 type UnknownRecord = Record<string, any>;
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -12,17 +13,13 @@ const STORAGE_ALLOWLIST_BASE = Object.freeze([
 ]);
 
 function getNotionDbStorageKeys(): string[] {
-  const NS: any = (globalThis as any).WebClipper || {};
-  const kinds = NS.conversationKinds;
-  if (kinds && typeof kinds.getNotionStorageKeys === 'function') {
-    try {
-      const keys = kinds.getNotionStorageKeys();
-      if (Array.isArray(keys) && keys.length) {
-        return keys.map((k) => String(k || '').trim()).filter(Boolean);
-      }
-    } catch (_e) {
-      // ignore
+  try {
+    const keys = conversationKinds.getNotionStorageKeys();
+    if (Array.isArray(keys) && keys.length) {
+      return keys.map((k) => String(k || '').trim()).filter(Boolean);
     }
+  } catch (_e) {
+    // ignore
   }
 
   // Fallback (load-order safety).
@@ -331,4 +328,3 @@ export function validateStorageLocalDocument(doc: unknown): { ok: boolean; error
   }
   return { ok: true, error: '' };
 }
-

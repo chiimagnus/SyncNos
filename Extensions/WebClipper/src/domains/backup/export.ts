@@ -7,6 +7,8 @@ import {
 } from './backup-utils';
 import { openDb, reqToPromise, tx, txDone } from './idb';
 import { createZipBlob } from './zip-utils';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../../runtime-context.js');
 
 type AnyRecord = Record<string, any>;
 
@@ -204,8 +206,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     });
   }
 
-  const NS: any = (globalThis as any).WebClipper || {};
-  const schema = NS.storageSchema || {};
+  const schema = runtimeContext.storageSchema || {};
 
   const storageDoc = { schemaVersion: 1, storageLocal };
   files.push({
@@ -249,4 +250,3 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     counts: manifest.counts,
   };
 }
-

@@ -1,4 +1,4 @@
-import { startLegacyBackground } from '../src/legacy/background-entry';
+import { startBackgroundBootstrap } from '../src/bootstrap/background.ts';
 import { registerConversationHandlers } from '../src/domains/conversations/background-handlers';
 import { registerSettingsHandlers } from '../src/domains/settings/background-handlers';
 import { registerSyncHandlers } from '../src/domains/sync/background-handlers';
@@ -9,22 +9,27 @@ import {
   setupNotionOAuthNavigationListener,
 } from '../src/integrations/notion/oauth';
 
-export default defineBackground(() => {
-  startLegacyBackground();
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const runtimeContext: any = require('../src/runtime-context.js');
 
-  const NS: any = (globalThis as any).WebClipper || {};
-  const legacyHandle = NS.backgroundRouter?.__handleMessageForTests;
-  const fallback = typeof legacyHandle === 'function'
-    ? (msg: any) => legacyHandle(msg)
-    : (msg: any) => ({ ok: false, data: null, error: { message: `unknown message type: ${msg?.type}`, extra: null } });
+export default defineBackground(() => {
+  startBackgroundBootstrap();
+
+  if (!runtimeContext.__backgroundInstanceId) {
+    runtimeContext.__backgroundInstanceId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
 
   const router = createBackgroundRouter({
-    fallback: (msg) => fallback(msg),
+    fallback: (msg) => ({
+      ok: false,
+      data: null,
+      error: { message: `unknown message type: ${msg?.type}`, extra: null },
+    }),
   });
 
   // Migration-only utility; routed through platform router (and/or legacy router ping handler).
   router.register('__WXT_PING__', async () => {
-    const instanceId = NS.__backgroundInstanceId ?? null;
+    const instanceId = runtimeContext.__backgroundInstanceId ?? null;
     return router.ok({ pong: true, instanceId });
   });
 
@@ -43,12 +48,12 @@ export default defineBackground(() => {
   }
 
   try {
-    const id = NS.__backgroundInstanceId;
-    NS.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
+    const id = runtimeContext.__backgroundInstanceId;
+    runtimeContext.notionSyncJobStore?.abortRunningJobIfFromOtherInstance?.(id)?.catch?.(() => {});
   } catch (_e) {
     // ignore
   }
 
   router.start();
-  NS.__backgroundReady = true;
+  runtimeContext.__backgroundReady = true;
 });
