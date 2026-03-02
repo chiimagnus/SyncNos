@@ -1,4 +1,11 @@
 import { CORE_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import {
+  deleteConversationsByIds,
+  getConversationDetail,
+  listConversations,
+  syncConversationMessages,
+  upsertConversation,
+} from './storage';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -7,43 +14,35 @@ type AnyRouter = {
 };
 
 export function registerConversationHandlers(router: AnyRouter) {
-  const NS: any = (globalThis as any).WebClipper || {};
-
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATIONS, async () => {
-    const storage = NS.backgroundStorage;
-    if (!storage) return router.err('storage module missing');
-    const items = await storage.getConversations();
+    const items = await listConversations();
     return router.ok(items);
   });
 
   router.register(CORE_MESSAGE_TYPES.GET_CONVERSATION_DETAIL, async (msg) => {
-    const storage = NS.backgroundStorage;
-    if (!storage) return router.err('storage module missing');
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const messages = await storage.getMessagesByConversationId(conversationId);
-    return router.ok({ conversationId, messages });
+    const detail = await getConversationDetail(conversationId);
+    return router.ok(detail);
   });
 
   router.register(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, async (msg) => {
-    const storage = NS.backgroundStorage;
-    if (!storage) return router.err('storage module missing');
     const payload = msg.payload || {};
     if (!payload.source) return router.err('missing conversation source');
     if (!payload.conversationKey) return router.err('missing conversationKey');
-    const convo = await storage.upsertConversation(payload);
+    const convo = await upsertConversation(payload);
     return router.ok(convo);
   });
 
   router.register(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, async (msg) => {
-    const storage = NS.backgroundStorage;
-    if (!storage) return router.err('storage module missing');
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const res = await storage.syncConversationMessages(conversationId, msg.messages);
+    const res = await syncConversationMessages(conversationId, msg.messages);
     try {
+      const NS: any = (globalThis as any).WebClipper || {};
       const hub = NS.backgroundEventsHub;
-      const eventType = NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
+      const eventType =
+        NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
       hub?.broadcast?.(eventType, { reason: 'upsert', conversationId });
     } catch (_e) {
       // ignore
@@ -52,10 +51,8 @@ export function registerConversationHandlers(router: AnyRouter) {
   });
 
   router.register(CORE_MESSAGE_TYPES.DELETE_CONVERSATIONS, async (msg) => {
-    const storage = NS.backgroundStorage;
-    if (!storage) return router.err('storage module missing');
     const ids = Array.isArray(msg.conversationIds) ? msg.conversationIds : [];
-    const res = await storage.deleteConversationsByIds(ids);
+    const res = await deleteConversationsByIds(ids);
     try {
       const hub = NS.backgroundEventsHub;
       const eventType = NS.messageContracts?.UI_EVENT_TYPES?.CONVERSATIONS_CHANGED ?? 'conversationsChanged';
@@ -69,4 +66,3 @@ export function registerConversationHandlers(router: AnyRouter) {
     return router.ok(res);
   });
 }
-
