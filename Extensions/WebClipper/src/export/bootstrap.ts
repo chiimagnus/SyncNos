@@ -4,7 +4,7 @@ import {
   getNotionOAuthToken,
   NOTION_OAUTH_TOKEN_KEY,
   setNotionOAuthToken,
-} from '../integrations/notion/token-store';
+} from '../sync/notion/auth/token-store';
 import { conversationKinds } from '../protocols/conversation-kinds.ts';
 import {
   getObsidianConnectionConfig,

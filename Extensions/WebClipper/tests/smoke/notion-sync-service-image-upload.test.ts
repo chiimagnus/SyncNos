@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 async function loadNotionSyncService() {
   const mod = await import(
     /* @vite-ignore */
-    `../../src/export/notion/notion-sync-service.ts?t=${Date.now()}_${Math.random().toString(16).slice(2)}`
+    `../../src/sync/notion/notion-sync-service.ts?t=${Date.now()}_${Math.random().toString(16).slice(2)}`
   );
   return (mod as any).default || mod;
 }
