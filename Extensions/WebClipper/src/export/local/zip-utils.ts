@@ -3,7 +3,7 @@ import {
   createZipBlob,
   extractZipEntries,
   isUnsafeZipEntryName,
-} from '../../domains/backup/zip-utils';
+} from '../../backup/zip-utils';
 
 const api = { createZipBlob, extractZipEntries, isUnsafeZipEntryName };
 (runtimeContext as any).zipUtils = api;

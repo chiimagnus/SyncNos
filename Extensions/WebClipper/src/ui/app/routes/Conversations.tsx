@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Conversation, ConversationDetail } from '../../../conversations/models';
-import { createZipBlob } from '../../../domains/backup/zip-utils';
+import { createZipBlob } from '../../../backup/zip-utils';
 import { buildConversationBasename } from '../../../conversations/file-naming';
 import { formatConversationMarkdown } from '../../../conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../conversations/repo';
