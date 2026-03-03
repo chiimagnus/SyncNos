@@ -1,33 +1,64 @@
-<img align="right" src="Extensions/WebClipper/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="120" />
+<div align="center"><a name="readme-top"></a>
 
 # SyncNos
 
-[English](README.md) | 中文
+一款聚焦「阅读高亮与 AI 对话沉淀」的同步工具集。  
+支持将多源内容整理后同步到 Notion，同时提供 WebClipper 浏览器扩展。
+
+[English](README.md) · **简体中文**
+
+[![Latest Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
+[![Last Commit](https://img.shields.io/github/last-commit/chiimagnus/SyncNos?logo=git)](https://github.com/chiimagnus/SyncNos/commits/main)
+[![License](https://img.shields.io/github/license/chiimagnus/SyncNos)](LICENSE)
+<br/>
+[![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
+[![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome%20Web%20Store&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+[![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge%20Release&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
+[![Firefox AMO Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox%20AMO&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
 [![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
 
-[![Download macOS](https://img.shields.io/badge/Download-macOS%20App%20Store-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/syncnos/id6755133888) 
+</div>
 
-[![Download Chrome](https://img.shields.io/badge/Download-Chrome%20Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) 
-[![Download Edge](https://img.shields.io/badge/Download-Edge%20Release-0078D7?logo=microsoftedge&logoColor=white)](https://github.com/chiimagnus/SyncNos/releases) 
-[![Download Firefox](https://img.shields.io/badge/Download-Firefox%20AMO-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+<img align="right" src="Extensions/WebClipper/icons/buymeacoffee1.jpg" alt="Chii Magnus 的赞赏码" width="120" />
 
-此项目分为两部分：
+## 项目组成
 
-1. **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion。支持：**macOS 14.0+**。
-2. **WebClipper 浏览器扩展**：从支持的网站抓取 AI 聊天并保存到浏览器本地存储，支持导出（Markdown）、数据库备份/恢复（导出/导入），以及手动同步到 Notion（OAuth）。支持：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**。
+SyncNos 由两部分组成：
+
+- **macOS App**：将 Apple Books、GoodLinks、微信读书、得到，以及聊天记录（含 OCR）的高亮与笔记同步到 Notion（支持 macOS 14.0+）。
+- **WebClipper 浏览器扩展**：抓取支持网站的 AI 聊天并本地保存，支持导出、数据库备份/恢复、同步到 Notion / Obsidian。
 
 ## 工作流程
 
 ![](Resource/flows.svg)
 
+<details>
+<summary><kbd>目录</kbd></summary>
+
+### 目录
+
+- [项目组成](#项目组成)
+- [工作流程](#工作流程)
+- [macOS App](#macos-app)
+  - [同步来源](#同步来源)
+  - [同步目标](#同步目标)
+- [WebClipper（浏览器扩展）](#webclipper浏览器扩展)
+  - [下载与安装](#下载与安装)
+  - [核心能力](#核心能力)
+  - [支持站点](#支持站点)
+  - [开发（WXT）](#开发wxt)
+- [许可证](#许可证)
+
+</details>
+
 ## macOS App
 
-- 支持系统：**macOS 14.0+**
-- 下载（App Store）：https://apps.apple.com/app/syncnos/id6755133888
+| 项目 | 说明 |
+| --- | --- |
+| 支持系统 | **macOS 14.0+** |
+| 下载地址 | [Mac App Store](https://apps.apple.com/app/syncnos/id6755133888) |
 
-### 同步范围
-
-#### 同步来源
+### 同步来源
 
 - Apple Books
 - GoodLinks
@@ -37,46 +68,56 @@
   - 支持 OCR 版本
   - 本地存储加密
 
-#### 同步目标
+### 同步目标
 
 - Notion（推荐 OAuth，也支持手动 token）
 
+<div align="right">[⬆ 回到顶部](#readme-top)</div>
+
 ## WebClipper（浏览器扩展）
 
-仓库内包含一个独立的 MV3 浏览器扩展，位于 `Extensions/WebClipper/`。
+仓库内扩展目录：`Extensions/WebClipper/`（MV3）
 
-- 支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）**与 **Firefox（已上架 AMO）**
-- 下载（Releases）：https://github.com/chiimagnus/SyncNos/releases
-- Chrome Web Store：https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok
-- Firefox（AMO）：https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/
+### 下载与安装
 
-### 作用
+| 渠道 | 链接 |
+| --- | --- |
+| Releases | https://github.com/chiimagnus/SyncNos/releases |
+| Chrome Web Store | https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok |
+| Firefox AMO | https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/ |
 
-- 从支持的网站抓取 AI 聊天并保存到浏览器本地存储
-- 导出所选对话为 Markdown（支持单文件合并导出或多文件 zip 导出）
-- 通过 `Obsidian Local REST API` 将所选对话同步到 Obsidian（通过 `http://127.0.0.1:27123` 写入/更新 vault 文件）
-- Obsidian 笔记路径：
-  - 默认按 kind 分目录：
-    - 聊天：`SyncNos-AIChats/`
-    - 网页文章：`SyncNos-WebArticles/`
-  - 目录可在扩展 Settings 中配置
-  - 文件名由 `(source + conversationKey)` 生成稳定 hash（不依赖标题），便于增量更新
+支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）** 与 **Firefox（已上架 AMO）**。
+
+从 Releases 安装：
+
+- 下载附件：
+  - `syncnos-webclipper-chrome-v*.zip`（Chrome）
+  - `syncnos-webclipper-edge-v*.zip`（Edge）
+  - `syncnos-webclipper-firefox-v*.xpi`（Firefox，本地测试）
+- Chrome/Edge：解压后进入 `chrome://extensions` / `edge://extensions`（开发者模式）加载已解压扩展。
+- Firefox：推荐从 AMO 安装；本地测试可在 `about:debugging#/runtime/this-firefox` 加载 `.xpi`（或解压后选择 `manifest.json`）。
+
+### 核心能力
+
+- 抓取支持网站的 AI 聊天并保存到浏览器本地存储。
+- 导出所选对话为 Markdown（单文件合并或多文件 zip 导出）。
+- 通过 `Obsidian Local REST API` 同步到 Obsidian（`http://127.0.0.1:27123`）。
 - 数据库备份：
-  - 导出：仅支持 `*.zip`（`manifest.json` + `index/conversations.csv` + `sources/<source>/<conversationKey>.json` + `config/storage-local.json`）
-  - 导入：支持 `*.zip`（推荐）与 legacy `*.json`
-  - 合并规则：按 `(source + conversationKey)` 合并导入，避免同 key 重复项
-  - 安全：备份不包含 Notion token / secret
-- 手动同步所选对话到 Notion（OAuth）
-- Inpage 按钮显示范围可在扩展 Settings 中配置：
-  - 默认：所有 `http(s)` 页面显示
-  - 开启“仅在支持站点显示 Inpage 按钮”后：仅在已支持 AI 站点 + Notion 页面显示
-  - 该开关不影响 Settings 中的 `Fetch Current Page`
-- Notion 同步按 kind 分库写入：
-  - 聊天：数据库 `SyncNos-AI Chats`
-  - 网页文章：数据库 `SyncNos-Web Articles`
-  - cursor 匹配时只追加新增消息；cursor 缺失（或文章重复 fetch 有更新）时会清空页面子块并重建内容。
-- 当消息包含 `contentMarkdown` 时，同步会优先将 Markdown 渲染为 Notion blocks（标题/列表/引用/代码块等）；否则回退为纯文本。
-- Notion AI：可选“自动点选偏好的大模型”（仅在 Notion AI 当前为 **自动/Auto** 时生效，可在扩展 Settings 中配置）
+  - 导出 `*.zip`（`manifest.json` + `index/conversations.csv` + `sources/...` + `config/storage-local.json`）
+  - 导入 `*.zip`（推荐）与 legacy `*.json`
+  - 按 `(source + conversationKey)` 合并导入，避免重复
+  - 备份不包含 Notion token / secret
+- 手动同步所选对话到 Notion（OAuth）。
+- Inpage 按钮显示范围可配置：
+  - 默认在所有 `http(s)` 页面显示
+  - 可切换为仅在支持 AI 站点 + Notion 页面显示
+  - 不影响 Settings 中的 `Fetch Current Page`
+- Notion 同步按 kind 分库：
+  - 聊天：`SyncNos-AI Chats`
+  - 网页文章：`SyncNos-Web Articles`
+- cursor 匹配时追加新增消息；cursor 缺失（或文章内容更新）时重建页面子块。
+- 消息存在 `contentMarkdown` 时优先渲染为 Notion blocks（标题/列表/引用/代码块等），否则回退纯文本。
+- Notion AI：可选“自动点选偏好模型”（仅在当前为 **Auto** 时生效）。
 
 ### 支持站点
 
@@ -88,16 +129,9 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI /
 - 本地开发（Chrome MV3）：`npm --prefix Extensions/WebClipper run dev`
 - 构建（Chrome / Firefox）：`npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - 测试与类型检查：`npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
-- `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `src/vendor/readability.js`（网页正文抽取第三方脚本）。
+- `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `src/vendor/readability.js`。
 
-### 从 Releases 安装
-
-- 前往 GitHub Releases 下载对应附件：
-  - `syncnos-webclipper-chrome-v*.zip`（Chrome）
-  - `syncnos-webclipper-edge-v*.zip`（Edge）
-  - `syncnos-webclipper-firefox-v*.xpi`（Firefox，仅用于本地测试）
-- Chrome/Edge：解压后，在 `chrome://extensions` / `edge://extensions`（开发者模式）中“加载已解压的扩展程序”。
-- Firefox：推荐从 AMO 安装；如需本地测试，使用 `about:debugging#/runtime/this-firefox` -> “Load Temporary Add-on...” 选择 `.xpi`（或解压后选择 `manifest.json`）。
+<div align="right">[⬆ 回到顶部](#readme-top)</div>
 
 ## 许可证
 
