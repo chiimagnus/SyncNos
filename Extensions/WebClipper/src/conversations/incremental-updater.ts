@@ -1,4 +1,3 @@
-import runtimeContext from '../runtime-context.ts';
 import normalizeApi from '../shared/normalize.ts';
 
 const state = {
@@ -9,21 +8,9 @@ const state = {
   lastMessageFingerprints: new Map<string, string>(),
 };
 
-function normalizeModule() {
-  return (runtimeContext.normalize || normalizeApi) as {
-    makeFallbackMessageKey?: (input: {
-      role?: unknown;
-      contentText?: unknown;
-      sequence?: unknown;
-    }) => string;
-    normalizeText?: (text: unknown) => string;
-    fnv1a32?: (text: unknown) => string;
-  };
-}
-
 function ensureMessageKey(message: any, sequence: number): string {
   if (message && message.messageKey) return message.messageKey;
-  const normalize = normalizeModule();
+  const normalize = normalizeApi;
   if (normalize && typeof normalize.makeFallbackMessageKey === 'function') {
     return normalize.makeFallbackMessageKey({
       role: message && message.role,
@@ -35,7 +22,7 @@ function ensureMessageKey(message: any, sequence: number): string {
 }
 
 function messageFingerprint(message: any, sequence: number) {
-  const normalize = normalizeModule();
+  const normalize = normalizeApi;
   const role = (message && message.role) || 'assistant';
   const text =
     normalize && typeof normalize.normalizeText === 'function'
@@ -143,7 +130,4 @@ const incrementalUpdaterApi = {
   __resetForTests,
 };
 
-runtimeContext.incrementalUpdater = incrementalUpdaterApi;
-
 export default incrementalUpdaterApi;
-
