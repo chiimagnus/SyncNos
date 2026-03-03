@@ -8,7 +8,7 @@ import {
   type ImportStats,
 } from '../../../src/backup/import';
 import { extractZipEntries } from '../../../src/backup/zip-utils';
-import { disconnectNotion } from '../../../src/domains/settings/sensitive';
+import { disconnectNotion } from '../../../src/settings/sensitive';
 import { getNotionOAuthDefaults } from '../../../src/integrations/notion/oauth';
 import {
   ARTICLE_MESSAGE_TYPES,
