@@ -59,6 +59,9 @@ describe('googleaistudio-collector', () => {
           <div class="chat-turn-container render model">
             <div class="virtual-scroll-container model-prompt-container" data-turn-role="Model">
               <div class="turn-content">
+                <div role="heading" aria-level="3" class="author-label">
+                  MODEL_META_SHOULD_NOT_EXPORT <span class="timestamp">10:11</span>
+                </div>
                 <ms-thought-chunk>
                   <div class="thought-panel">
                     <p>SECRET_THOUGHT_SHOULD_NOT_EXPORT</p>
@@ -92,6 +95,10 @@ describe('googleaistudio-collector', () => {
     expect(assistant).toBeTruthy();
     expect(assistant.contentText).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
     expect(assistant.contentMarkdown).not.toContain('SECRET_THOUGHT_SHOULD_NOT_EXPORT');
+    expect(assistant.contentText).not.toContain('MODEL_META_SHOULD_NOT_EXPORT');
+    expect(assistant.contentMarkdown).not.toContain('MODEL_META_SHOULD_NOT_EXPORT');
+    expect(assistant.contentText).not.toContain('10:11');
+    expect(assistant.contentMarkdown).not.toContain('10:11');
     expect(assistant.contentMarkdown).toContain('**Bold**');
     expect(assistant.contentMarkdown).toContain('[link](https://example.com)');
     expect(assistant.contentMarkdown).toContain('```swift');
