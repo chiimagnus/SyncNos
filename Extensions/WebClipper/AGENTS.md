@@ -71,7 +71,8 @@
 - **WXT App 入口**：`entrypoints/app/*`
 - **消息协议（前后端共享）**：`src/platform/messaging/message-contracts.ts`（兼容导出：`src/protocols/message-contracts.ts`）
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
-- **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/platform/messaging/background-router.ts`
+- **兼容层已移除**：`src/runtime-context.ts` + `src/export/bootstrap.ts` 已删除；禁止依赖 `globalThis.WebClipper` 的隐式注入。
+- **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/bootstrap/background-services.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
 - **Notion 同步模块**：`src/sync/notion/`
   - 编排入口：`src/sync/notion/notion-sync-orchestrator.ts`（由 `src/sync/background-handlers.ts` 路由触发）。
@@ -79,7 +80,7 @@
   - 已重构为 Local REST API 平台主导同步：
   - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
   - background：`src/sync/obsidian/obsidian-sync-orchestrator.ts`。
-- **Web Article Fetch（手动抓取当前页）**：`src/integrations/web-article/article-fetch.ts`
+- **Web Article Fetch（手动抓取当前页）**：`src/collectors/web/article-fetch.ts` + `src/collectors/web/article-fetch-background-handlers.ts`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`
   - popup 负责写入 `inpage_supported_only` 并触发后台 apply。
