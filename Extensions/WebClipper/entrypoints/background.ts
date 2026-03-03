@@ -3,7 +3,7 @@ import { registerConversationHandlers } from '../src/conversations/background-ha
 import { registerSettingsHandlers } from '../src/settings/background-handlers';
 import { registerSyncHandlers } from '../src/sync/background-handlers';
 import { createBackgroundRouter } from '../src/platform/messaging/background-router';
-import { registerWebArticleHandlers } from '../src/integrations/web-article/background-handlers';
+import { registerWebArticleHandlers } from '../src/collectors/web/article-fetch-background-handlers';
 import {
   ensureDefaultNotionOAuthClientId,
   setupNotionOAuthNavigationListener,
