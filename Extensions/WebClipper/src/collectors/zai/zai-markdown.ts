@@ -1,6 +1,4 @@
-import collectorContext from '../collector-context.ts';
-
-const NS: any = collectorContext as any;
+import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
 
   function removeThinkingNodes(container: any): any {
     if (!container || !container.querySelectorAll) return container;
@@ -264,7 +262,7 @@ const NS: any = collectorContext as any;
     }
 
     const raw = node ? extractTextFromSanitizedClone(node) : "";
-    return NS.normalize.normalizeText(raw);
+    return normalizeTextShared(raw);
   }
 
   const api = {
@@ -277,4 +275,4 @@ const NS: any = collectorContext as any;
     extractAssistantText
   };
 
-  NS.zaiMarkdown = api;
+export default api;

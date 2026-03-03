@@ -1,6 +1,4 @@
-import collectorContext from '../collector-context.ts';
-
-const NS: any = collectorContext as any;
+import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
 
   function normalizeMarkdown(markdown: any): any {
     const s = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -14,10 +12,7 @@ const NS: any = collectorContext as any;
 
   function normalizeText(value: any): any {
     const text = String(value || "");
-    if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
-      return NS.normalize.normalizeText(text);
-    }
-    return text.replace(/\s+/g, " ").trim();
+    return normalizeTextShared(text);
   }
 
   function wrapInlineCode(text: any): any {
@@ -441,4 +436,4 @@ const NS: any = collectorContext as any;
     extractAssistantText
   };
 
-  NS.doubaoMarkdown = api;
+export default api;

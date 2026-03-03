@@ -6,7 +6,7 @@ import '../src/conversations/incremental-updater.ts';
 import '../src/collectors/bootstrap.ts';
 import '../src/collectors/runtime-observer.ts';
 import '../src/collectors/sites-bootstrap';
-import '../src/collectors/web/web-collector.ts';
+import '../src/collectors/web/web-entry.ts';
 import '../src/integrations/notionai-model-picker.ts';
 import '../src/ui/inpage/inpage-tip.ts';
 import '../src/ui/inpage/inpage-button.ts';

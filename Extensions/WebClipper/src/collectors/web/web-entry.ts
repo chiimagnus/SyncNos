@@ -1,9 +1,10 @@
 import normalizeApi from '../../shared/normalize.ts';
 import collectorContext from '../collector-context.ts';
 import { createCollectorEnv } from '../collector-env.ts';
-import { createPoeCollectorDef } from './poe-collector.ts';
+import { createWebCollectorDef } from './web-collector.ts';
 
 const NS: any = collectorContext as any;
 const env = createCollectorEnv({ window, document, location, normalize: normalizeApi });
-const def = createPoeCollectorDef(env);
+const def = createWebCollectorDef(env);
 NS.collectorsRegistry?.register?.(def);
+

@@ -1,6 +1,4 @@
-import collectorContext from '../collector-context.ts';
-
-const NS: any = collectorContext as any;
+import { normalizeText as normalizeTextShared } from '../../shared/normalize.ts';
 
   function isThinkingLabelText(text: any): any {
     const raw = String(text || "").trim();
@@ -255,10 +253,7 @@ const NS: any = collectorContext as any;
 
   function normalizeText(text: any): any {
     const value = String(text || "");
-    if (NS.normalize && typeof NS.normalize.normalizeText === "function") {
-      return NS.normalize.normalizeText(value);
-    }
-    return value.replace(/\s+/g, " ").trim();
+    return normalizeTextShared(value);
   }
 
   function extractMessageMarkdown(wrapper: any, role: any): any {
@@ -283,4 +278,4 @@ const NS: any = collectorContext as any;
     extractMessageText
   };
 
-  NS.poeMarkdown = api;
+export default api;

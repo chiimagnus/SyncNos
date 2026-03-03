@@ -19,8 +19,26 @@ async function loadNormalize() {
 }
 
 async function loadZaiCollector() {
-  await import("../../src/collectors/zai/zai-collector.ts");
-  return globalThis.WebClipper?.collectors?.zai;
+  const normalizeApi = await loadNormalize();
+  const envModule = await import("../../src/collectors/collector-env.ts");
+  const zaiModule = await import("../../src/collectors/zai/zai-collector.ts");
+  const env = envModule.createCollectorEnv({
+    // @ts-expect-error test global
+    window: globalThis.window,
+    // @ts-expect-error test global
+    document: globalThis.document,
+    // @ts-expect-error test global
+    location: globalThis.location,
+    normalize: normalizeApi,
+  });
+
+  const collector = zaiModule.createZaiCollectorDef(env).collector as any;
+
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors = globalThis.WebClipper.collectors || {};
+  // @ts-expect-error test global
+  globalThis.WebClipper.collectors.zai = collector;
+  return collector;
 }
 
 async function loadZaiMarkdown() {

@@ -1,6 +1,12 @@
-import collectorContext from '../collector-context.ts';
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import { appendImageMarkdown, conversationKeyFromLocation, extractImageUrlsFromElement, inEditMode as inEditModeUtil } from '../collector-utils.ts';
+import poeMarkdownApi from './poe-markdown.ts';
 
-const NS: any = collectorContext as any;
+export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
+  const window = env.window;
+  const document = env.document;
+  const location = env.location;
 
   function matches(loc: any): any {
     const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
@@ -20,9 +26,7 @@ const NS: any = collectorContext as any;
   }
 
   function findConversationKey(): any {
-    return NS.collectorUtils && typeof NS.collectorUtils.conversationKeyFromLocation === "function"
-      ? NS.collectorUtils.conversationKeyFromLocation(location)
-      : "";
+    return conversationKeyFromLocation(location);
   }
 
   function findTitle(): any {
@@ -63,22 +67,22 @@ const NS: any = collectorContext as any;
   }
 
   function inEditMode(root: any): any {
-    const utils = NS.collectorUtils;
-    if (utils && typeof utils.inEditMode === "function") return utils.inEditMode(root);
-    return false;
+    return inEditModeUtil(root);
   }
 
   function poeMarkdown(): any {
-    return NS.poeMarkdown || {};
+    return poeMarkdownApi || {};
   }
 
   function sortByDomOrder(nodes: any): any {
     const sorted: any[] = Array.from(nodes || []) as any[];
+    const DOCUMENT_POSITION_FOLLOWING = window?.Node?.DOCUMENT_POSITION_FOLLOWING ?? 4;
+    const DOCUMENT_POSITION_PRECEDING = window?.Node?.DOCUMENT_POSITION_PRECEDING ?? 2;
     sorted.sort((a, b) => {
       if (a === b) return 0;
       const pos = a.compareDocumentPosition(b);
-      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-      if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      if (pos & DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (pos & DOCUMENT_POSITION_PRECEDING) return 1;
       return 0;
     });
     return sorted;
@@ -300,9 +304,7 @@ const NS: any = collectorContext as any;
   function messageKeyFromWrapper(wrapper: any, role: any, contentText: any, sequence: any): any {
     const id = wrapper && wrapper.getAttribute ? String(wrapper.getAttribute("id") || "") : "";
     if (id) return id;
-    return NS.normalize && typeof NS.normalize.makeFallbackMessageKey === "function"
-      ? NS.normalize.makeFallbackMessageKey({ role, contentText, sequence })
-      : String(sequence);
+    return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
   }
 
   function collectMessages({ allowEditing }: any = {}): any {
@@ -313,10 +315,7 @@ const NS: any = collectorContext as any;
     const wrappers = getMessageWrappers(root);
     if (!wrappers.length) return [];
 
-    const utils = NS.collectorUtils || {};
     const markdown = poeMarkdown();
-    const extractImages = typeof utils.extractImageUrlsFromElement === "function" ? utils.extractImageUrlsFromElement : null;
-    const appendImageMd = typeof utils.appendImageMarkdown === "function" ? utils.appendImageMarkdown : null;
 
     const out: any[] = [];
     let seq = 0;
@@ -326,22 +325,20 @@ const NS: any = collectorContext as any;
 
       const node = contentNodeFromWrapper(w);
       const raw = node && ((node as any).innerText || node.textContent) ? ((node as any).innerText || node.textContent) : "";
-      const fallbackText = NS.normalize && typeof NS.normalize.normalizeText === "function"
-        ? NS.normalize.normalizeText(raw)
-        : String(raw || "").trim();
+      const fallbackText = env.normalize.normalizeText(raw);
 
       const contentText = typeof markdown.extractMessageText === "function"
         ? String(markdown.extractMessageText(w, role) || "")
         : fallbackText;
 
-      const imageUrls = extractImages ? extractImages(imageScopeFromWrapper(w)) : [];
+      const imageUrls = extractImageUrlsFromElement(imageScopeFromWrapper(w));
       let contentMarkdown = typeof markdown.extractMessageMarkdown === "function"
         ? String(markdown.extractMessageMarkdown(w, role) || "")
         : (contentText || "");
       if (!contentMarkdown) contentMarkdown = contentText || "";
 
       if (!contentText && !imageUrls.length) continue;
-      const nextMarkdown = appendImageMd ? appendImageMd(contentMarkdown, imageUrls) : contentMarkdown;
+      const nextMarkdown = appendImageMarkdown(contentMarkdown, imageUrls);
 
       out.push({
         messageKey: messageKeyFromWrapper(w, role, contentText, seq),
@@ -357,7 +354,7 @@ const NS: any = collectorContext as any;
   }
 
   function capture(options: any): any {
-    if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+    if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
     const messages = collectMessages({ allowEditing: !!(options && options.manual) });
     if (!messages.length) return null;
     return {
@@ -366,7 +363,7 @@ const NS: any = collectorContext as any;
         source: "poe",
         conversationKey: findConversationKey(),
         title: findTitle(),
-        url: location.href,
+        url: env.location.href,
         warningFlags: [],
         lastCapturedAt: Date.now()
       },
@@ -374,9 +371,9 @@ const NS: any = collectorContext as any;
     };
   }
 
-  const api: any = { capture, getRoot: getConversationRoot, prepareManualCapture };
+  const collector: any = { capture, getRoot: getConversationRoot, prepareManualCapture };
   const markdown = poeMarkdown();
-  api.__test = {
+  collector.__test = {
     removeThinkingNodes: markdown.removeThinkingNodes,
     removeNonContentNodes: markdown.removeNonContentNodes,
     normalizeMarkdown: markdown.normalizeMarkdown,
@@ -385,8 +382,6 @@ const NS: any = collectorContext as any;
     extractMessageMarkdown: markdown.extractMessageMarkdown,
     extractMessageText: markdown.extractMessageText,
   };
-  NS.collectors = NS.collectors || {};
-  NS.collectors.poe = api;
-  if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-    NS.collectorsRegistry.register({ id: "poe", matches, collector: api });
-  }
+
+  return { id: "poe", matches, collector };
+}
