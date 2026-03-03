@@ -12,9 +12,9 @@
 [![License](https://img.shields.io/github/license/chiimagnus/SyncNos)](LICENSE)
 <br/>
 [![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
-[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome%20Web%20Store&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
-[![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge%20Release&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
-[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox%20AMO&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+[![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
+[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
 [![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
 
 </div>
@@ -51,32 +51,17 @@ SyncNos 由两部分组成：
 
 ### 同步目标
 
-- Notion（推荐 OAuth，也支持手动 token）
-
-<div align="right">[⬆ 回到顶部](#readme-top)</div>
+- Notion OAuth
 
 ## WebClipper（浏览器扩展）
 
-仓库内扩展目录：`Extensions/WebClipper/`（MV3）
-
 ### 下载与安装
 
-| 渠道 | 链接 |
+| 渠道 | 下载入口 |
 | --- | --- |
-| Releases | https://github.com/chiimagnus/SyncNos/releases |
-| Chrome Web Store | https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok |
-| Firefox AMO | https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/ |
-
-支持浏览器：**Chromium 内核浏览器（Chrome/Edge/Arc 等）** 与 **Firefox（已上架 AMO）**。
-
-从 Releases 安装：
-
-- 下载附件：
-  - `syncnos-webclipper-chrome-v*.zip`（Chrome）
-  - `syncnos-webclipper-edge-v*.zip`（Edge）
-  - `syncnos-webclipper-firefox-v*.xpi`（Firefox，本地测试）
-- Chrome/Edge：解压后进入 `chrome://extensions` / `edge://extensions`（开发者模式）加载已解压扩展。
-- Firefox：推荐从 AMO 安装；本地测试可在 `about:debugging#/runtime/this-firefox` 加载 `.xpi`（或解压后选择 `manifest.json`）。
+| Chrome [![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) | [Chrome Web Store](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok) |
+| Edge [![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases) | [GitHub Releases](https://github.com/chiimagnus/SyncNos/releases) |
+| Firefox [![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/) | [Firefox AMO](https://addons.mozilla.org/zh-CN/firefox/addon/syncnos-webclipper/) |
 
 ### 核心能力
 
@@ -102,7 +87,7 @@ SyncNos 由两部分组成：
 
 ### 支持站点
 
-ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI / z.ai
+ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI / z.ai / Google AI Studio
 
 ### 开发（WXT）
 
@@ -111,9 +96,3 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI /
 - 构建（Chrome / Firefox）：`npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - 测试与类型检查：`npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
 - `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `src/vendor/readability.js`。
-
-<div align="right">[⬆ 回到顶部](#readme-top)</div>
-
-## 许可证
-
-本项目使用 [AGPL-3.0 License](LICENSE)。
