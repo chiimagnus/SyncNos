@@ -1,46 +1,11 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
-
-async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
-  const normalizeApi = normalizeModule.default || {
-    normalizeText: normalizeModule.normalizeText,
-    fnv1a32: normalizeModule.fnv1a32,
-    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
-  };
-  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.normalize = normalizeApi;
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
-  return normalizeApi;
-}
-
-async function loadCollectorUtils() {
-  return ensureCollectorUtils();
-}
-
-async function loadKimiMarkdown() {
-  return import("../../src/collectors/kimi/kimi-markdown.ts");
-}
-
-async function loadKimiCollector() {
-  return import("../../src/collectors/kimi/kimi-collector.ts");
-}
+import { describe, expect, it, vi } from "vitest";
+import normalizeApi from "../../src/shared/normalize.ts";
+import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
+import { createKimiCollectorDef } from "../../src/collectors/kimi/kimi-collector.ts";
 
 function setupKimiDom(html: string, url: string) {
   const dom = new JSDOM(`<body>${html}</body>`, { url });
-  // @ts-expect-error test global
-  globalThis.window = dom.window;
-  // @ts-expect-error test global
-  globalThis.document = dom.window.document;
-  // @ts-expect-error test global
-  globalThis.Node = dom.window.Node;
-  // @ts-expect-error test global
-  globalThis.location = dom.window.location;
   return dom;
 }
 
@@ -92,19 +57,15 @@ describe("kimi-collector", () => {
       </main>
     `;
 
-    setupKimiDom(html, "https://kimi.com/chat/conv001");
+    const dom = setupKimiDom(html, "https://kimi.com/chat/conv001");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadKimiMarkdown();
-    await loadKimiCollector();
-
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.kimi.capture();
+    const snap = createKimiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
@@ -131,18 +92,19 @@ describe("kimi-collector", () => {
       </main>
     `;
 
-    setupKimiDom(html, "https://kimi.com/chat/fallback001");
+    vi.resetModules();
+    vi.doMock("../../src/collectors/kimi/kimi-markdown.ts", () => ({ default: {} }));
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadKimiCollector();
+    const dom = setupKimiDom(html, "https://kimi.com/chat/fallback001");
+    const { createKimiCollectorDef: createDef } = await import("../../src/collectors/kimi/kimi-collector.ts");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.kimi.capture();
+    const snap = createDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe("assistant");

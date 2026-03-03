@@ -1,40 +1,15 @@
-import collectorContext from '../collector-context.ts';
-
-const NS: any = collectorContext as any;
+import type { CollectorDefinition } from '../collector-contract.ts';
+import type { CollectorEnv } from '../collector-env.ts';
+import {
+  appendImageMarkdown,
+  conversationKeyFromLocation,
+  extractImageUrlsFromElement,
+  inEditMode as inEditModeUtil,
+} from '../collector-utils.ts';
+import geminiMarkdown from '../gemini/gemini-markdown.ts';
 
 let manualTurnCache: Map<string, any> | null = null;
 let manualCacheConversationKey: string = '';
-
-function matches(loc: any): any {
-  const hostname = loc && loc.hostname ? loc.hostname : location.hostname;
-  return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
-}
-
-function isValidConversationUrl(): any {
-  try {
-    const p = location.pathname || '';
-    if (!p || p === '/') return false;
-    return true;
-  } catch (_e) {
-    return false;
-  }
-}
-
-function findConversationKey(): any {
-  return NS.collectorUtils.conversationKeyFromLocation(location);
-}
-
-function geminiMarkdown(): any {
-  return NS.geminiMarkdown || {};
-}
-
-function getConversationRoot(): any {
-  return document.querySelector('.chat-session-content') || document.querySelector('main') || document.body;
-}
-
-function inEditMode(root: any): any {
-  return NS.collectorUtils.inEditMode(root);
-}
 
 function sleep(ms: any): any {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -62,56 +37,77 @@ function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | n
   return (anyContent as any) || null;
 }
 
-function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
-  const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
-  if (id) return `${id}:${role}`;
-  return NS.normalize && typeof NS.normalize.makeFallbackMessageKey === 'function'
-    ? NS.normalize.makeFallbackMessageKey({ role, contentText, sequence })
-    : String(sequence);
-}
-
-function normalizeTitle(value: any): any {
-  const text = value == null ? '' : String(value);
-  if (NS.normalize && typeof NS.normalize.normalizeText === 'function') {
-    return NS.normalize.normalizeText(text);
+export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDefinition {
+  function matches(loc: any): any {
+    const hostname = loc && loc.hostname ? loc.hostname : env.location.hostname;
+    return /(^|\.)aistudio\.google\.com$/.test(hostname) || /(^|\.)makersuite\.google\.com$/.test(hostname);
   }
-  return text.replace(/\s+/g, ' ').trim();
-}
 
-function extractConversationTitle(): any {
-  const selectors = [
-    "[data-test-id='conversation-title']",
-    '.conversation-title-container .conversation-title-column [class*="gds-title"]',
-    '.conversation-title-container .conversation-title-column',
-  ];
-  for (const selector of selectors) {
-    const el = document.querySelector(selector);
-    if (!el) continue;
-    const title = normalizeTitle((el as any).textContent || (el as any).innerText || '');
-    if (title) return title;
+  function isValidConversationUrl(): any {
+    try {
+      const p = env.location.pathname || '';
+      if (!p || p === '/') return false;
+      return true;
+    } catch (_e) {
+      return false;
+    }
   }
-  const pageTitle = normalizeTitle(document.title || '');
-  return pageTitle || 'Google AI Studio';
-}
 
-function extractAssistantMarkdown(node: any, fallbackText: any): any {
-  const md = geminiMarkdown();
-  if (typeof md.extractAssistantMarkdown === 'function') {
-    const markdown = md.extractAssistantMarkdown(node);
-    if (markdown) return markdown;
+  function findConversationKey(): any {
+    return conversationKeyFromLocation(env.location);
   }
-  return fallbackText || '';
-}
 
-function extractAssistantText(node: any): any {
-  const md = geminiMarkdown();
-  if (typeof md.extractAssistantText === 'function') {
-    const text = md.extractAssistantText(node);
-    if (text) return text;
+  function getConversationRoot(): any {
+    return env.document.querySelector('.chat-session-content') || env.document.querySelector('main') || env.document.body;
   }
-  const raw = node ? node.innerText || node.textContent || '' : '';
-  return NS.normalize.normalizeText(raw);
-}
+
+  function inEditMode(root: any): any {
+    return inEditModeUtil(root);
+  }
+
+  function messageKeyFromTurn(turn: Element, role: any, contentText: any, sequence: any): any {
+    const id = (turn as any).getAttribute ? String((turn as any).getAttribute('id') || '').trim() : '';
+    if (id) return `${id}:${role}`;
+    return env.normalize.makeFallbackMessageKey({ role, contentText, sequence });
+  }
+
+  function normalizeTitle(value: any): any {
+    const text = value == null ? '' : String(value);
+    return env.normalize.normalizeText(text);
+  }
+
+  function extractConversationTitle(): any {
+    const selectors = [
+      "[data-test-id='conversation-title']",
+      '.conversation-title-container .conversation-title-column [class*="gds-title"]',
+      '.conversation-title-container .conversation-title-column',
+    ];
+    for (const selector of selectors) {
+      const el = env.document.querySelector(selector);
+      if (!el) continue;
+      const title = normalizeTitle((el as any).textContent || (el as any).innerText || '');
+      if (title) return title;
+    }
+    const pageTitle = normalizeTitle(env.document.title || '');
+    return pageTitle || 'Google AI Studio';
+  }
+
+  function extractAssistantMarkdown(node: any, fallbackText: any): any {
+    if (typeof geminiMarkdown.extractAssistantMarkdown === 'function') {
+      const markdown = geminiMarkdown.extractAssistantMarkdown(node);
+      if (markdown) return markdown;
+    }
+    return fallbackText || '';
+  }
+
+  function extractAssistantText(node: any): any {
+    if (typeof geminiMarkdown.extractAssistantText === 'function') {
+      const text = geminiMarkdown.extractAssistantText(node);
+      if (text) return text;
+    }
+    const raw = node ? node.innerText || node.textContent || '' : '';
+    return env.normalize.normalizeText(raw);
+  }
 
 function stripThinkingFromNode(node: Element | null): Element | null {
   if (!node || typeof (node as any).cloneNode !== 'function') return node;
@@ -176,17 +172,13 @@ function extractMessageFromTurn(turn: Element, sequence: number): any | null {
   if (!contentEl) return null;
   const cleanedContent = cleanTurnContentNode(contentEl as any) || contentEl;
 
-  const utils = NS.collectorUtils || {};
-  const extractImages = typeof utils.extractImageUrlsFromElement === 'function' ? utils.extractImageUrlsFromElement : null;
-  const appendImageMd = typeof utils.appendImageMarkdown === 'function' ? utils.appendImageMarkdown : null;
-
   const updatedAt = Date.now();
   if (role === 'user') {
-    const text = NS.normalize.normalizeText((cleanedContent as any).innerText || (cleanedContent as any).textContent || '');
-    const imageUrls = extractImages ? extractImages(cleanedContent) : [];
+    const text = env.normalize.normalizeText((cleanedContent as any).innerText || (cleanedContent as any).textContent || '');
+    const imageUrls = extractImageUrlsFromElement(cleanedContent);
     if (!text && !imageUrls.length) return null;
     const contentText = text || '';
-    const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
+    const contentMarkdown = appendImageMarkdown(contentText, imageUrls);
     return {
       messageKey: messageKeyFromTurn(turn, 'user', contentText, sequence),
       role: 'user',
@@ -198,14 +190,12 @@ function extractMessageFromTurn(turn: Element, sequence: number): any | null {
   }
 
   const text = extractAssistantText(cleanedContent);
-  const imageUrls = extractImages ? extractImages(cleanedContent) : [];
+  const imageUrls = extractImageUrlsFromElement(cleanedContent);
   if (!text && !imageUrls.length) return null;
 
   const contentText = text || '';
   const baseMarkdown = extractAssistantMarkdown(cleanedContent, contentText);
-  const contentMarkdown = appendImageMd
-    ? appendImageMd(baseMarkdown || contentText, imageUrls)
-    : baseMarkdown || contentText;
+  const contentMarkdown = appendImageMarkdown(baseMarkdown || contentText, imageUrls);
   return {
     messageKey: messageKeyFromTurn(turn, 'assistant', contentText, sequence),
     role: 'assistant',
@@ -236,7 +226,7 @@ function collectMessages(): any {
 }
 
 async function prepareManualCapture(options: any = {}): Promise<any> {
-  if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return false;
+  if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return false;
 
   const root = getConversationRoot();
   if (!root) return false;
@@ -297,7 +287,7 @@ async function prepareManualCapture(options: any = {}): Promise<any> {
 }
 
 function capture(options: any = {}): any {
-  if (!matches({ hostname: location.hostname }) || !isValidConversationUrl()) return null;
+  if (!matches({ hostname: env.location.hostname }) || !isValidConversationUrl()) return null;
   const manual = options && options.manual === true;
   let messages: any[] = [];
 
@@ -325,7 +315,7 @@ function capture(options: any = {}): any {
       source: 'googleaistudio',
       conversationKey: findConversationKey(),
       title: extractConversationTitle(),
-      url: location.href,
+      url: env.location.href,
       warningFlags: [],
       lastCapturedAt: Date.now(),
     },
@@ -333,7 +323,7 @@ function capture(options: any = {}): any {
   };
 }
 
-const api = {
+const collector = {
   capture,
   getRoot: getConversationRoot,
   prepareManualCapture,
@@ -343,8 +333,6 @@ const api = {
     extractAssistantText,
   },
 };
-NS.collectors = NS.collectors || {};
-NS.collectors.googleaistudio = api;
-if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
-  NS.collectorsRegistry.register({ id: 'googleaistudio', matches, collector: api });
+
+return { id: 'googleaistudio', matches, collector };
 }
