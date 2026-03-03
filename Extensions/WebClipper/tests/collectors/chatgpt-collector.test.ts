@@ -1,46 +1,11 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
-
-async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
-  const normalizeApi = normalizeModule.default || {
-    normalizeText: normalizeModule.normalizeText,
-    fnv1a32: normalizeModule.fnv1a32,
-    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
-  };
-  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.normalize = normalizeApi;
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
-  return normalizeApi;
-}
-
-async function loadCollectorUtils() {
-  return ensureCollectorUtils();
-}
-
-async function loadChatgptMarkdown() {
-  return import("../../src/collectors/chatgpt/chatgpt-markdown.ts");
-}
-
-async function loadChatgptCollector() {
-  return import("../../src/collectors/chatgpt/chatgpt-collector.ts");
-}
+import { describe, expect, it, vi } from "vitest";
+import normalizeApi from "../../src/shared/normalize.ts";
+import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
+import { createChatgptCollectorDef } from "../../src/collectors/chatgpt/chatgpt-collector.ts";
 
 function setupChatgptDom(html: string, url: string) {
   const dom = new JSDOM(`<body><main>${html}</main></body>`, { url });
-  // @ts-expect-error test global
-  globalThis.window = dom.window;
-  // @ts-expect-error test global
-  globalThis.document = dom.window.document;
-  // @ts-expect-error test global
-  globalThis.Node = dom.window.Node;
-  // @ts-expect-error test global
-  globalThis.location = dom.window.location;
   return dom;
 }
 
@@ -85,19 +50,15 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    setupChatgptDom(html, "https://chatgpt.com/c/conv_md_1");
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_md_1");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadChatgptMarkdown();
-    await loadChatgptCollector();
-
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.chatgpt.capture({ manual: true });
+    const snap = createChatgptCollectorDef(env).collector.capture({ manual: true }) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
 
@@ -133,18 +94,20 @@ describe("chatgpt-collector", () => {
       </article>
     `;
 
-    setupChatgptDom(html, "https://chatgpt.com/c/conv_fallback_1");
+    vi.resetModules();
+    vi.doMock("../../src/collectors/chatgpt/chatgpt-markdown.ts", () => ({ default: {} }));
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadChatgptCollector();
+    const dom = setupChatgptDom(html, "https://chatgpt.com/c/conv_fallback_1");
+    const { createChatgptCollectorDef: createDef } = await import("../../src/collectors/chatgpt/chatgpt-collector.ts");
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.chatgpt.capture({ manual: true });
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
+
+    const snap = createDef(env).collector.capture({ manual: true }) as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(1);
     expect(snap.messages[0].role).toBe("assistant");

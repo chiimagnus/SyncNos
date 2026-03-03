@@ -1,46 +1,11 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
-import { ensureCollectorUtils } from "../helpers/collectors-bootstrap";
-
-async function loadNormalize() {
-  const normalizeModule = await import("../../src/shared/normalize.ts");
-  const normalizeApi = normalizeModule.default || {
-    normalizeText: normalizeModule.normalizeText,
-    fnv1a32: normalizeModule.fnv1a32,
-    makeFallbackMessageKey: normalizeModule.makeFallbackMessageKey,
-  };
-  const collectorContextModule = await import("../../src/collectors/collector-context.ts");
-  const collectorContext = collectorContextModule.default as any;
-  collectorContext.normalize = normalizeApi;
-  if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-    globalThis.WebClipper = {};
-  }
-  globalThis.WebClipper.normalize = normalizeApi;
-  return normalizeApi;
-}
-
-async function loadCollectorUtils() {
-  return ensureCollectorUtils();
-}
-
-async function loadGeminiMarkdown() {
-  return import("../../src/collectors/gemini/gemini-markdown.ts");
-}
-
-async function loadGeminiCollector() {
-  return import("../../src/collectors/gemini/gemini-collector.ts");
-}
+import { describe, expect, it, vi } from "vitest";
+import normalizeApi from "../../src/shared/normalize.ts";
+import { createCollectorEnv } from "../../src/collectors/collector-env.ts";
+import { createGeminiCollectorDef } from "../../src/collectors/gemini/gemini-collector.ts";
 
 function setupGeminiDom(html: string, url: string) {
   const dom = new JSDOM(`<body>${html}</body>`, { url });
-  // @ts-expect-error test global
-  globalThis.window = dom.window;
-  // @ts-expect-error test global
-  globalThis.document = dom.window.document;
-  // @ts-expect-error test global
-  globalThis.Node = dom.window.Node;
-  // @ts-expect-error test global
-  globalThis.location = dom.window.location;
   return dom;
 }
 
@@ -64,17 +29,14 @@ describe("gemini-collector", () => {
     const dom = setupGeminiDom(html, "https://gemini.google.com/app/abc123");
     dom.window.document.title = "Page Title Should Not Win";
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadGeminiMarkdown();
-    await loadGeminiCollector();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.gemini.capture();
+    const snap = createGeminiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("DOM Title");
   });
@@ -91,17 +53,14 @@ describe("gemini-collector", () => {
     const dom = setupGeminiDom(html, "https://gemini.google.com/app/xyz789");
     dom.window.document.title = "Gemini Page Title";
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadGeminiMarkdown();
-    await loadGeminiCollector();
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.gemini.capture();
+    const snap = createGeminiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.conversation.title).toBe("Gemini Page Title");
   });
@@ -130,19 +89,15 @@ describe("gemini-collector", () => {
         </div>
       </div>
     `;
-    setupGeminiDom(html, "https://gemini.google.com/app/md001");
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/md001");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadGeminiMarkdown();
-    await loadGeminiCollector();
-
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.gemini.capture();
+    const snap = createGeminiCollectorDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     expect(snap.messages.length).toBe(2);
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
@@ -167,18 +122,19 @@ describe("gemini-collector", () => {
         </div>
       </div>
     `;
-    setupGeminiDom(html, "https://gemini.google.com/app/fallback1");
+    vi.resetModules();
+    vi.doMock("../../src/collectors/gemini/gemini-markdown.ts", () => ({ default: {} }));
 
-    // @ts-expect-error test global
-    if (!globalThis.WebClipper || typeof globalThis.WebClipper !== "object") {
-      globalThis.WebClipper = {};
-    }
-    await loadNormalize();
-    await loadCollectorUtils();
-    await loadGeminiCollector();
+    const dom = setupGeminiDom(html, "https://gemini.google.com/app/fallback1");
+    const { createGeminiCollectorDef: createDef } = await import("../../src/collectors/gemini/gemini-collector.ts");
+    const env = createCollectorEnv({
+      window: dom.window as any,
+      document: dom.window.document as any,
+      location: dom.window.location as any,
+      normalize: normalizeApi,
+    });
 
-    // @ts-expect-error test global
-    const snap = globalThis.WebClipper.collectors.gemini.capture();
+    const snap = createDef(env).collector.capture() as any;
     expect(snap).toBeTruthy();
     const assistant = snap.messages.find((m: { role: string }) => m.role === "assistant");
     expect(assistant).toBeTruthy();
