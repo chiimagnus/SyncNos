@@ -2,9 +2,6 @@ import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '
 import { storageRemove } from '../platform/storage/local';
 import { clearNotionOAuthToken, getNotionOAuthToken } from '../sync/notion/auth/token-store';
 import { getObsidianSettings, saveObsidianSettings } from '../sync/obsidian/settings-store';
-import { testObsidianConnection } from '../sync/obsidian/orchestrator';
-import { conversationKinds } from '../protocols/conversation-kinds.ts';
-import runtimeContext from '../runtime-context.ts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -14,9 +11,13 @@ type AnyRouter = {
 
 type Deps = {
   getInstanceId: () => string;
+  testObsidianConnection: (input: { instanceId: string }) => Promise<unknown>;
+  notionSyncJobStore: { NOTION_SYNC_JOB_KEY?: unknown } | null;
+  conversationKinds: { getNotionStorageKeys?: () => unknown[] } | null;
+  backgroundInpageWebVisibility: { applyVisibilitySetting?: (input: { reason: string }) => Promise<unknown> } | null;
 };
 
-function getNotionDisconnectStorageKeys(): string[] {
+function getNotionDisconnectStorageKeys(deps: Deps): string[] {
   const base = [
     'notion_parent_page_id',
     'notion_parent_page_title',
@@ -26,7 +27,7 @@ function getNotionDisconnectStorageKeys(): string[] {
 
   const notionDbKeys = (() => {
     try {
-      const keys = conversationKinds.getNotionStorageKeys();
+      const keys = deps.conversationKinds?.getNotionStorageKeys?.();
       if (Array.isArray(keys) && keys.length) return keys.map((k: any) => String(k || '').trim()).filter(Boolean);
     } catch (_e) {
       // ignore
@@ -34,8 +35,7 @@ function getNotionDisconnectStorageKeys(): string[] {
     return ['notion_db_id_syncnos_ai_chats', 'notion_db_id_syncnos_web_articles'];
   })();
 
-  const jobStore = runtimeContext.notionSyncJobStore;
-  const syncJobKey = jobStore?.NOTION_SYNC_JOB_KEY ? String(jobStore.NOTION_SYNC_JOB_KEY).trim() : '';
+  const syncJobKey = deps.notionSyncJobStore?.NOTION_SYNC_JOB_KEY ? String(deps.notionSyncJobStore.NOTION_SYNC_JOB_KEY).trim() : '';
 
   return Array.from(new Set([...base, ...notionDbKeys, ...(syncJobKey ? [syncJobKey] : [])]));
 }
@@ -48,7 +48,7 @@ export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
     await clearNotionOAuthToken();
-    const clearedKeys = getNotionDisconnectStorageKeys();
+    const clearedKeys = getNotionDisconnectStorageKeys(deps);
     await storageRemove(clearedKeys);
     return router.ok({ disconnected: true, clearedKeys });
   });
@@ -71,7 +71,7 @@ export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(OBSIDIAN_MESSAGE_TYPES.TEST_CONNECTION, async () => {
-    const data = await testObsidianConnection({ instanceId: deps.getInstanceId() });
+    const data = await deps.testObsidianConnection({ instanceId: deps.getInstanceId() });
     return router.ok(data);
   });
 
@@ -90,7 +90,7 @@ export function registerSettingsHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(UI_MESSAGE_TYPES.APPLY_INPAGE_VISIBILITY, async () => {
-    const api = runtimeContext.backgroundInpageWebVisibility;
+    const api = deps.backgroundInpageWebVisibility;
     if (!api || typeof api.applyVisibilitySetting !== 'function') {
       return router.err('inpage web visibility manager missing', { code: 'INPAGE_VISIBILITY_UNAVAILABLE' });
     }

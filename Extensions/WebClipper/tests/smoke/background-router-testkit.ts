@@ -3,12 +3,21 @@ import { registerSettingsHandlers } from '../../src/settings/background-handlers
 import { registerSyncHandlers } from '../../src/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
+import { conversationKinds } from '../../src/protocols/conversation-kinds.ts';
+import notionSyncJobStore from '../../src/sync/notion/notion-sync-job-store.ts';
+import {
+  getSyncJobStatus as getNotionSyncJobStatus,
+  syncConversations as syncNotionConversations,
+} from '../../src/sync/notion/notion-sync-orchestrator.ts';
+import {
+  getObsidianSyncStatus,
+  obsidianSyncConversations,
+  testObsidianConnection,
+} from '../../src/sync/obsidian/orchestrator.ts';
+import backgroundInpageWebVisibility from '../../src/bootstrap/background-inpage-web-visibility.ts';
 
 export function createTestBackgroundRouter() {
-  const NS: any = (globalThis as any).WebClipper || ((globalThis as any).WebClipper = {});
-  if (!NS.__backgroundInstanceId) {
-    NS.__backgroundInstanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
+  const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   const router = createBackgroundRouter({
     fallback: (msg: any) => ({
@@ -19,13 +28,29 @@ export function createTestBackgroundRouter() {
   });
 
   router.register('__WXT_PING__', async () => {
-    return router.ok({ pong: true, instanceId: NS.__backgroundInstanceId });
+    return router.ok({ pong: true, instanceId });
   });
 
   registerConversationHandlers(router);
   registerWebArticleHandlers(router);
-  registerSettingsHandlers(router);
-  registerSyncHandlers(router);
+  registerSettingsHandlers(router, {
+    getInstanceId: () => instanceId,
+    testObsidianConnection,
+    notionSyncJobStore,
+    conversationKinds,
+    backgroundInpageWebVisibility,
+  });
+  registerSyncHandlers(router, {
+    getInstanceId: () => instanceId,
+    notionSyncOrchestrator: {
+      syncConversations: syncNotionConversations,
+      getSyncJobStatus: getNotionSyncJobStatus,
+    },
+    obsidianSyncOrchestrator: {
+      syncConversations: obsidianSyncConversations,
+      getSyncStatus: getObsidianSyncStatus,
+    },
+  });
 
   return router;
 }

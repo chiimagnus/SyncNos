@@ -23,7 +23,8 @@ export function createBackgroundServices() {
     conversationKinds,
     notionSyncJobStore,
     notionSyncOrchestrator: {
-      syncConversations: syncNotionConversations,
+      syncConversations: (input: { conversationIds?: unknown[]; instanceId: string }) =>
+        syncNotionConversations({ conversationIds: input.conversationIds, instanceId: input.instanceId } as any),
       getSyncJobStatus: getNotionSyncJobStatus,
     },
     obsidianSyncOrchestrator: {
@@ -35,4 +36,3 @@ export function createBackgroundServices() {
 }
 
 export type BackgroundServices = ReturnType<typeof createBackgroundServices>;
-
