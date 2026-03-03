@@ -98,6 +98,32 @@ function extractAssistantText(node: any): any {
   return NS.normalize.normalizeText(raw);
 }
 
+function stripThinkingFromNode(node: Element | null): Element | null {
+  if (!node || typeof (node as any).cloneNode !== 'function') return node;
+  const cloned = (node as any).cloneNode(true) as Element;
+  const selectors = [
+    'ms-thought-chunk',
+    '.thought-panel',
+    'img[alt="Thinking"]',
+    '.thinking-progress-icon',
+  ];
+  for (const selector of selectors) {
+    try {
+      const list = Array.from((cloned as any).querySelectorAll?.(selector) || []);
+      for (const el of list) {
+        try {
+          (el as any).remove?.();
+        } catch (_e) {
+          // ignore
+        }
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }
+  return cloned;
+}
+
 function collectMessages(): any {
   const root = getConversationRoot();
   if (!root) return [];
@@ -137,11 +163,12 @@ function collectMessages(): any {
     }
 
     if (role === 'assistant') {
-      const text = extractAssistantText(contentEl);
-      const imageUrls = extractImages ? extractImages(contentEl) : [];
+      const cleaned = stripThinkingFromNode(contentEl as any) || contentEl;
+      const text = extractAssistantText(cleaned);
+      const imageUrls = extractImages ? extractImages(cleaned) : [];
       if (text || imageUrls.length) {
         const contentText = text || '';
-        const baseMarkdown = extractAssistantMarkdown(contentEl, contentText);
+        const baseMarkdown = extractAssistantMarkdown(cleaned, contentText);
         const contentMarkdown = appendImageMd
           ? appendImageMd(baseMarkdown || contentText, imageUrls)
           : baseMarkdown || contentText;
