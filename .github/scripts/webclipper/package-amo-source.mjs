@@ -26,8 +26,7 @@ mkdirSync(staging, { recursive: true });
 function copyIntoStaging(relPath) {
   const src = join(webclipperRoot, relPath);
   const dst = join(staging, relPath);
-  const dstDir = dst.split("/").slice(0, -1).join("/");
-  mkdirSync(dstDir, { recursive: true });
+  mkdirSync(dirname(dst), { recursive: true });
   cpSync(src, dst, {
     recursive: true,
     filter: (srcPath) => basename(srcPath) !== ".DS_Store"
@@ -36,8 +35,7 @@ function copyIntoStaging(relPath) {
 
 function copyExternalIntoStaging(srcAbsPath, dstRelPath) {
   const dst = join(staging, dstRelPath);
-  const dstDir = dst.split("/").slice(0, -1).join("/");
-  mkdirSync(dstDir, { recursive: true });
+  mkdirSync(dirname(dst), { recursive: true });
   cpSync(srcAbsPath, dst, {
     recursive: true,
     filter: (srcPath) => basename(srcPath) !== ".DS_Store"
@@ -65,7 +63,7 @@ function removeJunkFilesRecursively(rootDir) {
 
 // Minimal, reviewer-friendly source package contents.
 // Keep only what reviewers need to reproduce the XPI build.
-const items = [
+const requiredItems = [
   "wxt.config.ts",
   "tsconfig.json",
   "postcss.config.cjs",
@@ -73,15 +71,25 @@ const items = [
   "entrypoints",
   "icons",
   "src",
-  "scripts",
   "package.json",
   "package-lock.json",
   "AGENTS.md"
 ];
 
-for (const item of items) {
+const optionalItems = [
+  // Some setups may not have a top-level `scripts/` directory.
+  "scripts"
+];
+
+for (const item of requiredItems) {
   const p = join(webclipperRoot, item);
   if (!existsSync(p)) throw new Error(`missing: ${item}`);
+  copyIntoStaging(item);
+}
+
+for (const item of optionalItems) {
+  const p = join(webclipperRoot, item);
+  if (!existsSync(p)) continue;
   copyIntoStaging(item);
 }
 
