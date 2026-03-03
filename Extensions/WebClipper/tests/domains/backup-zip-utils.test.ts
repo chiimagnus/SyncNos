@@ -109,7 +109,7 @@ function makeDeflatedZipEntry({ name, data }: { name: string; data: Uint8Array }
   return concat([localPart, centralDir, endRecord]);
 }
 
-describe('domains/backup zip-utils', () => {
+describe('backup zip-utils', () => {
   it('extractZipEntries reads stored zips created by createZipBlob', async () => {
     const blob = await createZipBlob([
       { name: 'a.txt', data: 'hello' },

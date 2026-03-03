@@ -67,7 +67,7 @@ afterEach(async () => {
   await deleteDb('webclipper');
 });
 
-describe('domains/backup service', () => {
+describe('backup service', () => {
   it('exportBackupZipV2 emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',
