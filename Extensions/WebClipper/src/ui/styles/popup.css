@@ -782,6 +782,11 @@ input[type="checkbox"] {
   color: #075985;
 }
 
+.sourceTag--googleaistudio {
+  background: rgba(14, 165, 233, 0.16);
+  color: #075985;
+}
+
 .sourceTag--kimi {
   background: rgba(20, 184, 166, 0.16);
   color: #115e59;

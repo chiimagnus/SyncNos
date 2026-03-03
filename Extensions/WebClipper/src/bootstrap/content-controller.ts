@@ -263,6 +263,10 @@ export function createContentController(deps: Deps) {
           const collector = refreshInpageButton();
           if (!collector || typeof collector.capture !== 'function') return;
 
+          // Google AI Studio uses virtualized rendering; auto-capture often sees only the visible turns
+          // and would overwrite history. Keep manual save only for this source.
+          if (collector.id === 'googleaistudio') return;
+
           const snapshot = await Promise.resolve(collector.capture());
           if (!snapshot) return;
 

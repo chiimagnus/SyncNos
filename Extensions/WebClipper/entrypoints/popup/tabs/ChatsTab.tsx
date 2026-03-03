@@ -37,6 +37,7 @@ function getSourceMeta(raw: unknown): SourceMeta {
     deepseek: { key: 'deepseek', label: 'DeepSeek' },
     notionai: { key: 'notionai', label: 'Notion AI' },
     gemini: { key: 'gemini', label: 'Gemini' },
+    googleaistudio: { key: 'googleaistudio', label: 'Google AI Studio' },
     kimi: { key: 'kimi', label: 'Kimi' },
     doubao: { key: 'doubao', label: 'Doubao' },
     yuanbao: { key: 'yuanbao', label: 'Yuanbao' },

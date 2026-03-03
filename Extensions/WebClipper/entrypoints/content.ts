@@ -26,6 +26,8 @@ export default defineContentScript({
     'https://www.chatgpt.com/*',
     'https://claude.ai/*',
     'https://gemini.google.com/*',
+    'https://aistudio.google.com/*',
+    'https://makersuite.google.com/*',
     'https://chat.deepseek.com/*',
     'https://chat.z.ai/*',
     'https://kimi.moonshot.cn/*',
