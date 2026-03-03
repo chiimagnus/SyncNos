@@ -215,7 +215,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
     lastModified: exportedAt,
   });
   files.push({
-    name: 'sources/index/conversations.csv',
+    name: 'sources/conversations.csv',
     data: indexLines.join('\n'),
     lastModified: exportedAt,
   });
@@ -230,7 +230,7 @@ export async function exportBackupZipV2(): Promise<BackupZipV2ExportResult> {
       sync_mappings: allMappings.length,
     },
     config: { storageLocalPath: 'config/storage-local.json' },
-    index: { conversationsCsvPath: 'sources/index/conversations.csv' },
+    index: { conversationsCsvPath: 'sources/conversations.csv' },
     sources: manifestSources,
   };
   files.unshift({

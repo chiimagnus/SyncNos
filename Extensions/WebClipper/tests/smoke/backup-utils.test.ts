@@ -55,7 +55,7 @@ describe("backup-utils", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 2, sync_mappings: 0 },
       config: { storageLocalPath: "config/storage-local.json" },
-      index: { conversationsCsvPath: "sources/index/conversations.csv" },
+      index: { conversationsCsvPath: "sources/conversations.csv" },
       sources: [
         { source: "chatgpt", conversationCount: 1, files: ["sources/chatgpt/c1.json"] }
       ]
@@ -70,7 +70,7 @@ describe("backup-utils", () => {
       db: { name: "webclipper", version: 3 },
       counts: { conversations: 1, messages: 0, sync_mappings: 0 },
       config: { storageLocalPath: "../config/storage-local.json" },
-      index: { conversationsCsvPath: "sources/index/conversations.csv" },
+      index: { conversationsCsvPath: "sources/conversations.csv" },
       sources: []
     });
     expect(res.ok).toBe(false);
