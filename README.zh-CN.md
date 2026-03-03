@@ -34,6 +34,9 @@ SyncNos 由两部分组成：
 
 ## macOS App
 
+<details>
+<summary><kbd>展开查看</kbd></summary>
+
 | 项目 | 说明 |
 | --- | --- |
 | 支持系统 | **macOS 14.0+** |
@@ -53,7 +56,12 @@ SyncNos 由两部分组成：
 
 - Notion OAuth
 
+</details>
+
 ## WebClipper（浏览器扩展）
+
+<details>
+<summary><kbd>展开查看</kbd></summary>
 
 ### 下载与安装
 
@@ -96,3 +104,5 @@ ChatGPT / Claude / Gemini / DeepSeek / Kimi / 豆包 / 元宝 / Poe / NotionAI /
 - 构建（Chrome / Firefox）：`npm --prefix Extensions/WebClipper run build` / `npm --prefix Extensions/WebClipper run build:firefox`
 - 测试与类型检查：`npm --prefix Extensions/WebClipper run test` / `npm --prefix Extensions/WebClipper run compile`
 - `src + entrypoints` 运行时代码已收敛为 TS；当前 JS allowlist 仅保留 `src/vendor/readability.js`。
+
+</details>
