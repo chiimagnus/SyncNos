@@ -114,6 +114,27 @@ async function searchNotionParentPages(accessToken: string): Promise<NotionPageO
     .filter((p: NotionPageOption) => !!p.id);
 }
 
+async function retrieveNotionParentPage(accessToken: string, pageId: string): Promise<NotionPageOption | null> {
+  const safeId = String(pageId || '').trim();
+  if (!safeId) return null;
+  const res = await fetch(`https://api.notion.com/v1/pages/${encodeURIComponent(safeId)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Notion-Version': '2022-06-28',
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) return null;
+  const json = text ? JSON.parse(text) : {};
+  if (!json || json.object !== 'page') return null;
+  if (json.archived === true || json.in_trash === true) return null;
+  const id = String(json.id || safeId).trim();
+  if (!id) return null;
+  return { id, title: getPageTitle(json) };
+}
+
 function openHttpUrl(url: string) {
   const u = String(url || '').trim();
   if (!/^https?:\/\//i.test(u)) return false;
@@ -179,10 +200,12 @@ export default function SettingsTab() {
   const [notionPendingState, setNotionPendingState] = useState<string>('');
   const [notionLastError, setNotionLastError] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
+  const [notionParentPageTitle, setNotionParentPageTitle] = useState<string>('');
   const [notionPages, setNotionPages] = useState<Array<{ id: string; title: string }>>([]);
   const [loadingNotionPages, setLoadingNotionPages] = useState(false);
   const [pollingNotion, setPollingNotion] = useState(false);
   const [notionJob, setNotionJob] = useState<any>(null);
+  const notionPagesAutoLoadRef = useRef(false);
 
   // Obsidian
   const [obsidianApiBaseUrl, setObsidianApiBaseUrl] = useState<string>('');
@@ -223,6 +246,7 @@ export default function SettingsTab() {
           'notion_oauth_pending_state',
           'notion_oauth_last_error',
           'notion_parent_page_id',
+          'notion_parent_page_title',
           'notion_ai_preferred_model_index',
           'inpage_supported_only',
         ]),
@@ -239,6 +263,7 @@ export default function SettingsTab() {
       setNotionPendingState(String(local?.notion_oauth_pending_state || '').trim());
       setNotionLastError(String(local?.notion_oauth_last_error || '').trim());
       setNotionParentPageId(String(local?.notion_parent_page_id || '').trim());
+      setNotionParentPageTitle(String(local?.notion_parent_page_title || '').trim());
       setNotionAiModelIndex(String(local?.notion_ai_preferred_model_index || '').trim());
       setInpageSupportedOnly(local?.inpage_supported_only == null ? null : !!local.inpage_supported_only);
 
@@ -276,6 +301,23 @@ export default function SettingsTab() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollingNotion]);
+
+  const notionPageOptions = useMemo(() => {
+    const list = Array.isArray(notionPages) ? notionPages.slice() : [];
+    const selectedId = String(notionParentPageId || '').trim();
+    if (selectedId && !list.some((p) => String(p?.id || '').trim() === selectedId)) {
+      const title = String(notionParentPageTitle || '').trim();
+      list.unshift({ id: selectedId, title: title || selectedId });
+    }
+    const seen = new Set<string>();
+    return list.filter((p) => {
+      const id = p && p.id ? String(p.id).trim() : '';
+      if (!id) return false;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [notionPages, notionParentPageId, notionParentPageTitle]);
 
   const notionStatusText = useMemo(() => {
     if (notionConnected == null) return 'unknown';
@@ -329,22 +371,51 @@ export default function SettingsTab() {
       const status = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, {}));
       const accessToken = String(status?.token?.accessToken || '');
       if (!accessToken) throw new Error('Notion not connected');
-      const pages = await searchNotionParentPages(accessToken);
+      const savedId = String(notionParentPageId || '').trim();
+      const savedTitle = String(notionParentPageTitle || '').trim();
+
+      let pages = await searchNotionParentPages(accessToken);
+      let resolvedSaved = savedId ? pages.find((p) => p.id === savedId) ?? null : null;
+      if (savedId && !resolvedSaved) {
+        const retrieved = await retrieveNotionParentPage(accessToken, savedId);
+        if (retrieved) {
+          pages = [retrieved, ...pages.filter((p) => p.id !== retrieved.id)];
+          resolvedSaved = retrieved;
+        }
+      }
+
       setNotionPages(pages);
 
-      const saved = String(notionParentPageId || '').trim();
-      const hasSaved = saved && pages.some((p) => p.id === saved);
-      const next = hasSaved ? saved : (pages[0]?.id || '');
-      if (next && next !== saved) {
-        setNotionParentPageId(next);
-        await storageSet({ notion_parent_page_id: next });
-      }
+      const nextId = savedId || (pages[0]?.id || '');
+      const nextTitle = (resolvedSaved?.title || (savedId ? savedTitle : pages[0]?.title) || '').trim();
+      if (nextId) setNotionParentPageId(nextId);
+      if (nextTitle) setNotionParentPageTitle(nextTitle);
+
+      const payload: Record<string, unknown> = {};
+      if (nextId && nextId !== savedId) payload.notion_parent_page_id = nextId;
+      if (nextTitle && nextTitle !== savedTitle) payload.notion_parent_page_title = nextTitle;
+      if (Object.keys(payload).length) await storageSet(payload);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed to load pages'));
     } finally {
       setLoadingNotionPages(false);
     }
   };
+
+  useEffect(() => {
+    if (!notionConnected) {
+      notionPagesAutoLoadRef.current = false;
+      return;
+    }
+    if (notionPagesAutoLoadRef.current) return;
+    if (notionPages.length) {
+      notionPagesAutoLoadRef.current = true;
+      return;
+    }
+    notionPagesAutoLoadRef.current = true;
+    onLoadNotionPages().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notionConnected]);
 
   const onSaveNotionParentPage = async (id: string) => {
     const next = String(id || '').trim();
@@ -353,7 +424,11 @@ export default function SettingsTab() {
     setError(null);
     try {
       setNotionParentPageId(next);
-      await storageSet({ notion_parent_page_id: next });
+      const match = notionPages.find((p) => p && String(p.id || '').trim() === next) ?? null;
+      if (match && match.title) setNotionParentPageTitle(String(match.title || '').trim());
+      const payload: Record<string, unknown> = { notion_parent_page_id: next };
+      if (match && match.title) payload.notion_parent_page_title = String(match.title || '').trim();
+      await storageSet(payload);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -602,8 +677,8 @@ export default function SettingsTab() {
               disabled={busy || !notionConnected}
               onChange={(e) => onSaveNotionParentPage(e.target.value).catch(() => {})}
             >
-              {notionPages.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
-              {notionPages.map((p) => (
+              {notionPageOptions.length ? null : <option value="">{notionConnected ? 'Click refresh →' : 'Connect Notion first'}</option>}
+              {notionPageOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title}
                 </option>

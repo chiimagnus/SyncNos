@@ -24,6 +24,7 @@ function getInstanceId(): string {
 function getNotionDisconnectStorageKeys(): string[] {
   const base = [
     'notion_parent_page_id',
+    'notion_parent_page_title',
     'notion_oauth_pending_state',
     'notion_oauth_last_error',
   ];

@@ -83,7 +83,8 @@ type PreviewState = { conversationId: number; left: number; top: number } | null
 function normalizeRole(role: unknown) {
   const r = String(role || 'assistant').toLowerCase();
   if (r === 'user') return 'user';
-  if (r === 'assistant') return 'assistant';
+  if (r === 'assistant')
+     return 'assistant';
   return 'other';
 }
 
@@ -95,6 +96,8 @@ export default function ChatsTab() {
 
   const [filterKey, setFilterKey] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
 
   const [exportOpen, setExportOpen] = useState(false);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
@@ -249,11 +252,37 @@ export default function ChatsTab() {
     }
   };
 
-  const onDeleteSelected = async () => {
+  const openDeleteConfirm = () => {
     const ids = selectedIds.slice();
-    if (!ids.length) return;
-    const ok = confirm(`Delete ${ids.length} conversation(s)? This cannot be undone.`);
-    if (!ok) return;
+    if (!ids.length || loadingList) return;
+    setConfirmDeleteIds(ids);
+    setConfirmDeleteOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (loadingList) return;
+    setConfirmDeleteOpen(false);
+    setConfirmDeleteIds([]);
+  };
+
+  useEffect(() => {
+    if (!confirmDeleteOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      closeDeleteConfirm();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmDeleteOpen]);
+
+  const onConfirmDelete = async () => {
+    const ids = confirmDeleteIds.slice();
+    if (!ids.length) {
+      closeDeleteConfirm();
+      return;
+    }
     setLoadingList(true);
     setError(null);
     try {
@@ -262,6 +291,8 @@ export default function ChatsTab() {
       setPreview(null);
       setPreviewDetail(null);
       await refresh();
+      setConfirmDeleteOpen(false);
+      setConfirmDeleteIds([]);
     } catch (e) {
       setError((e as any)?.message ?? String(e ?? 'failed'));
     } finally {
@@ -578,7 +609,7 @@ export default function ChatsTab() {
           </select>
 
           <div id="chatActionButtons" className="chatActionButtons">
-            <button id="btnDelete" className="btn danger" type="button" title="Delete selected" onClick={() => onDeleteSelected().catch(() => {})} disabled={!selectedCount}>
+            <button id="btnDelete" className="btn danger" type="button" title="Delete selected" onClick={openDeleteConfirm} disabled={!selectedCount || loadingList}>
               Delete
             </button>
 
@@ -643,6 +674,36 @@ export default function ChatsTab() {
           </div>
         </section>
       </footer>
+
+      {confirmDeleteOpen ? (
+        <div
+          className="modalOverlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            closeDeleteConfirm();
+          }}
+        >
+          <div
+            className="modalCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm delete"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="modalTitle">Delete conversations?</div>
+            <div className="modalBody">Delete {confirmDeleteIds.length} conversation(s)? This cannot be undone.</div>
+            <div className="modalActions">
+              <button className="btn" type="button" onClick={closeDeleteConfirm} disabled={loadingList}>
+                Cancel
+              </button>
+              <button className="btn danger" type="button" onClick={() => onConfirmDelete().catch(() => {})} disabled={loadingList}>
+                {loadingList ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
