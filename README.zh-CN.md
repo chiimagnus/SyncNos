@@ -5,16 +5,16 @@
 一款聚焦「阅读高亮与 AI 对话沉淀」的同步工具集。  
 支持将多源内容整理后同步到 Notion，同时提供 WebClipper 浏览器扩展。
 
-[English](README.md) · **简体中文**
+[English](README.md) · **中文**
 
 [![Latest Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
 [![Last Commit](https://img.shields.io/github/last-commit/chiimagnus/SyncNos?logo=git)](https://github.com/chiimagnus/SyncNos/commits/main)
 [![License](https://img.shields.io/github/license/chiimagnus/SyncNos)](LICENSE)
 <br/>
 [![macOS App Store Version](https://img.shields.io/itunes/v/6755133888?label=macOS%20App%20Store&logo=apple)](https://apps.apple.com/app/syncnos/id6755133888)
-[![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome%20Web%20Store&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
+[![Chrome Version](https://img.shields.io/chrome-web-store/v/hmgjflllphdffeocddjjcfllifhejpok?label=Chrome%20Web%20Store&logo=googlechrome)](https://chromewebstore.google.com/detail/syncnos-webclipper/hmgjflllphdffeocddjjcfllifhejpok)
 [![Edge Version](https://img.shields.io/github/v/release/chiimagnus/SyncNos?label=Edge%20Release&logo=microsoftedge)](https://github.com/chiimagnus/SyncNos/releases)
-[![Firefox AMO Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox%20AMO&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
+[![Firefox Version](https://img.shields.io/amo/v/syncnos-webclipper?label=Firefox%20AMO&logo=firefoxbrowser)](https://addons.mozilla.org/firefox/addon/syncnos-webclipper/)
 [![Release Downloads](https://img.shields.io/github/downloads/chiimagnus/SyncNos/total?label=Release%20Downloads&logo=github)](https://github.com/chiimagnus/SyncNos/releases)
 
 </div>
@@ -31,25 +31,6 @@ SyncNos 由两部分组成：
 ## 工作流程
 
 ![](Resource/flows.svg)
-
-<details>
-<summary><kbd>目录</kbd></summary>
-
-### 目录
-
-- [项目组成](#项目组成)
-- [工作流程](#工作流程)
-- [macOS App](#macos-app)
-  - [同步来源](#同步来源)
-  - [同步目标](#同步目标)
-- [WebClipper（浏览器扩展）](#webclipper浏览器扩展)
-  - [下载与安装](#下载与安装)
-  - [核心能力](#核心能力)
-  - [支持站点](#支持站点)
-  - [开发（WXT）](#开发wxt)
-- [许可证](#许可证)
-
-</details>
 
 ## macOS App
 
