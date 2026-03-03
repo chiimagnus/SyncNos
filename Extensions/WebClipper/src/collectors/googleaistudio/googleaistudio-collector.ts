@@ -26,11 +26,33 @@ function geminiMarkdown(): any {
 }
 
 function getConversationRoot(): any {
-  return document.querySelector('#chat-history') || document.querySelector('main') || document.body;
+  return document.querySelector('.chat-session-content') || document.querySelector('main') || document.body;
 }
 
 function inEditMode(root: any): any {
   return NS.collectorUtils.inEditMode(root);
+}
+
+function normalizeRoleFromTurn(turn: Element): 'user' | 'assistant' | null {
+  const container = turn.querySelector('.chat-turn-container');
+  if (container && (container as any).classList) {
+    const cls = (container as any).classList;
+    if (cls.contains('user')) return 'user';
+    if (cls.contains('model')) return 'assistant';
+  }
+  const marker = turn.querySelector('[data-turn-role]');
+  const roleText = marker && (marker as any).getAttribute ? String((marker as any).getAttribute('data-turn-role') || '') : '';
+  if (/user/i.test(roleText)) return 'user';
+  if (/model|assistant/i.test(roleText)) return 'assistant';
+  return null;
+}
+
+function pickTurnContent(turn: Element, role: 'user' | 'assistant'): Element | null {
+  const roleSelector = role === 'user' ? '[data-turn-role="User"] .turn-content' : '[data-turn-role="Model"] .turn-content';
+  const scoped = turn.querySelector(roleSelector);
+  if (scoped) return scoped as any;
+  const anyContent = turn.querySelector('.turn-content');
+  return (anyContent as any) || null;
 }
 
 function normalizeTitle(value: any): any {
@@ -81,20 +103,24 @@ function collectMessages(): any {
   if (!root) return [];
   if (inEditMode(root)) return [];
 
-  const blocks: any[] = Array.from(root.querySelectorAll('.conversation-container')) as any[];
-  if (!blocks.length) return [];
+  const turns: any[] = Array.from(root.querySelectorAll('ms-chat-turn')) as any[];
+  if (!turns.length) return [];
 
   const out: any[] = [];
   const utils = NS.collectorUtils || {};
   const extractImages = typeof utils.extractImageUrlsFromElement === 'function' ? utils.extractImageUrlsFromElement : null;
   const appendImageMd = typeof utils.appendImageMarkdown === 'function' ? utils.appendImageMarkdown : null;
   let seq = 0;
-  for (const b of blocks) {
-    const user =
-      b.querySelector('user-query .query-text') || b.querySelector("[data-test-id='user-message']") || null;
-    if (user) {
-      const text = NS.normalize.normalizeText(user.innerText || user.textContent || '');
-      const imageUrls = extractImages ? extractImages(user) : [];
+  for (const turn of turns) {
+    const role = normalizeRoleFromTurn(turn);
+    if (!role) continue;
+
+    const contentEl = pickTurnContent(turn, role);
+    if (!contentEl) continue;
+
+    if (role === 'user') {
+      const text = NS.normalize.normalizeText((contentEl as any).innerText || (contentEl as any).textContent || '');
+      const imageUrls = extractImages ? extractImages(contentEl) : [];
       if (text || imageUrls.length) {
         const contentText = text || '';
         const contentMarkdown = appendImageMd ? appendImageMd(contentText, imageUrls) : contentText;
@@ -110,13 +136,12 @@ function collectMessages(): any {
       }
     }
 
-    const model = b.querySelector('model-response') || b.querySelector('model-response .model-response-text') || null;
-    if (model) {
-      const text = extractAssistantText(model);
-      const imageUrls = extractImages ? extractImages(model) : [];
+    if (role === 'assistant') {
+      const text = extractAssistantText(contentEl);
+      const imageUrls = extractImages ? extractImages(contentEl) : [];
       if (text || imageUrls.length) {
         const contentText = text || '';
-        const baseMarkdown = extractAssistantMarkdown(model, contentText);
+        const baseMarkdown = extractAssistantMarkdown(contentEl, contentText);
         const contentMarkdown = appendImageMd
           ? appendImageMd(baseMarkdown || contentText, imageUrls)
           : baseMarkdown || contentText;
@@ -167,4 +192,3 @@ NS.collectors.googleaistudio = api;
 if (NS.collectorsRegistry && NS.collectorsRegistry.register) {
   NS.collectorsRegistry.register({ id: 'googleaistudio', matches, collector: api });
 }
-

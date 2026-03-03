@@ -45,20 +45,26 @@ function setupDom(html: string, url: string) {
 }
 
 describe('googleaistudio-collector', () => {
-  it('captures Gemini-like DOM under aistudio.google.com', async () => {
+  it('captures AI Studio ms-chat-turn DOM and renders assistant markdown', async () => {
     const html = `
-      <div class="center-section">
-        <div class="conversation-title-container">
-          <span class="conversation-title-column">
-            <span data-test-id="conversation-title" class="gds-title-m">DOM Title</span>
-          </span>
-        </div>
-      </div>
-      <div id="chat-history">
-        <div class="conversation-container">
-          <user-query><div class="query-text">hello</div></user-query>
-          <model-response><div class="model-response-text">world</div></model-response>
-        </div>
+      <div class="chat-session-content">
+        <ms-chat-turn id="turn-u1">
+          <div class="chat-turn-container render user">
+            <div class="virtual-scroll-container user-prompt-container" data-turn-role="User">
+              <div class="turn-content">hello</div>
+            </div>
+          </div>
+        </ms-chat-turn>
+        <ms-chat-turn id="turn-a1">
+          <div class="chat-turn-container render model">
+            <div class="virtual-scroll-container model-prompt-container" data-turn-role="Model">
+              <div class="turn-content">
+                <p><strong>Bold</strong> and <a href="https://example.com">link</a>.</p>
+                <pre><code class="language-swift">print("hi")</code></pre>
+              </div>
+            </div>
+          </div>
+        </ms-chat-turn>
       </div>
     `;
     setupDom(html, 'https://aistudio.google.com/app/abc123');
@@ -76,8 +82,12 @@ describe('googleaistudio-collector', () => {
     const snap = globalThis.WebClipper.collectors.googleaistudio.capture();
     expect(snap).toBeTruthy();
     expect(snap.conversation.source).toBe('googleaistudio');
-    expect(snap.conversation.title).toBe('DOM Title');
     expect(snap.messages.length).toBe(2);
+    const assistant = snap.messages.find((m: { role: string }) => m.role === 'assistant');
+    expect(assistant).toBeTruthy();
+    expect(assistant.contentMarkdown).toContain('**Bold**');
+    expect(assistant.contentMarkdown).toContain('[link](https://example.com)');
+    expect(assistant.contentMarkdown).toContain('```swift');
+    expect(assistant.contentMarkdown).toContain('print("hi")');
   });
 });
-
