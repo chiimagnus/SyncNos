@@ -8,19 +8,12 @@ import notionSyncJobStoreDefault from './notion-sync-job-store.ts';
 import notionSyncServiceDefault from './notion-sync-service.ts';
 import notionApiDefault from './notion-api.ts';
 import notionFilesApiDefault from './notion-files-api.ts';
+import { computeNewMessages, extractCursor, lastMessageCursor } from './notion-sync-cursor.ts';
 
   function toConvoLabel(convo) {
     if (!convo) return "(missing conversation)";
     const t = convo.title || "";
     return t ? `"${t}"` : `conversation#${convo.id || "?"}`;
-  }
-
-  function extractCursor(mapping) {
-    const m = mapping && typeof mapping === "object" ? mapping : {};
-    const lastSyncedMessageKey = (m.lastSyncedMessageKey && String(m.lastSyncedMessageKey).trim()) ? String(m.lastSyncedMessageKey).trim() : "";
-    const lastSyncedSequence = Number(m.lastSyncedSequence);
-    const seq = Number.isFinite(lastSyncedSequence) ? lastSyncedSequence : null;
-    return { lastSyncedMessageKey, lastSyncedSequence: seq };
   }
 
   function isObjectNotFoundError(error) {
@@ -34,39 +27,6 @@ import notionFilesApiDefault from './notion-files-api.ts';
     if (!message) return false;
     if (!isObjectNotFoundError(error)) return false;
     return message.toLowerCase().includes("database");
-  }
-
-  function computeNewMessages(messages, cursor) {
-    const list = Array.isArray(messages) ? messages : [];
-    if (!list.length) return { ok: true, mode: "empty", newMessages: [], rebuild: false };
-    const key = cursor && cursor.lastSyncedMessageKey ? String(cursor.lastSyncedMessageKey) : "";
-    const seq = cursor && Number.isFinite(cursor.lastSyncedSequence) ? Number(cursor.lastSyncedSequence) : null;
-
-    if (key) {
-      const idx = list.findIndex((m) => m && String(m.messageKey || "") === key);
-      if (idx < 0) return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
-      return { ok: true, mode: "append", newMessages: list.slice(idx + 1), rebuild: false };
-    }
-
-    if (seq != null) {
-      const next = list.filter((m) => m && Number(m.sequence) > seq);
-      return { ok: true, mode: "append", newMessages: next, rebuild: false };
-    }
-
-    return { ok: false, mode: "cursor_missing", newMessages: [], rebuild: true };
-  }
-
-  function lastMessageCursor(messages) {
-    const list = Array.isArray(messages) ? messages : [];
-    if (!list.length) return { lastSyncedMessageKey: "", lastSyncedSequence: null, lastSyncedAt: Date.now() };
-    const last = list[list.length - 1];
-    const key = last && last.messageKey ? String(last.messageKey) : "";
-    const seq = Number(last && last.sequence);
-    return {
-      lastSyncedMessageKey: key,
-      lastSyncedSequence: Number.isFinite(seq) ? seq : null,
-      lastSyncedAt: Date.now()
-    };
   }
 
   function toPerConversationSnapshot(results) {
