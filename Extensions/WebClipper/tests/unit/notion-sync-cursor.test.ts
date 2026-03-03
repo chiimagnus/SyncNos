@@ -57,6 +57,13 @@ describe('notion-sync-cursor', () => {
     expect(res.rebuild).toBe(true);
   });
 
+  it('computeNewMessages treats null sequence as missing cursor', () => {
+    const messages = [{ messageKey: 'm1', sequence: 1 }];
+    const res = computeNewMessages(messages, { lastSyncedMessageKey: '', lastSyncedSequence: null });
+    expect(res.ok).toBe(false);
+    expect(res.rebuild).toBe(true);
+  });
+
   it('lastMessageCursor picks last message key/sequence', () => {
     const cursor = lastMessageCursor([
       { messageKey: 'm1', sequence: 1 },
@@ -67,4 +74,3 @@ describe('notion-sync-cursor', () => {
     expect(typeof cursor.lastSyncedAt).toBe('number');
   });
 });
-
