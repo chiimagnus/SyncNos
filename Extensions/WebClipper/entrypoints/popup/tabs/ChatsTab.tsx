@@ -1,12 +1,11 @@
 import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createZipBlob } from '../../../src/backup/zip-utils';
-import { buildConversationBasename } from '../../../src/conversations/file-naming';
-import { formatConversationMarkdown } from '../../../src/conversations/markdown';
 import type { Conversation, ConversationDetail } from '../../../src/conversations/models';
+import { formatConversationMarkdown } from '../../../src/conversations/markdown';
 import { deleteConversations, getConversationDetail, listConversations } from '../../../src/conversations/repo';
 import { syncNotionConversations, syncObsidianConversations } from '../../../src/sync/repo';
 import { storageGet, storageSet } from '../../../src/platform/storage/local';
+import { buildConversationsMarkdownZipExport } from '../../../src/sync/local/markdown-export';
 
 type SourceMeta = { key: string; label: string };
 
@@ -314,34 +313,14 @@ export default function ChatsTab() {
       const selectedConversations = allItems.filter((c) => ids.includes(Number(c.id)));
       if (!selectedConversations.length) return;
 
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const files: Array<{ name: string; data: string }> = [];
-
-      if (mergeSingle) {
-        const docs: string[] = [];
-        for (const c of selectedConversations) {
-          // eslint-disable-next-line no-await-in-loop
-          const d = await getConversationDetail(Number(c.id));
-          docs.push(formatConversationMarkdown(c, d.messages || []));
-        }
-        const text = docs.join('\n---\n\n');
-        files.push({ name: `webclipper-export-${stamp}.md`, data: text });
-      } else {
-        for (const c of selectedConversations) {
-          // eslint-disable-next-line no-await-in-loop
-          const d = await getConversationDetail(Number(c.id));
-          files.push({
-            name: `${buildConversationBasename(c)}.md`,
-            data: formatConversationMarkdown(c, d.messages || []),
-          });
-        }
-      }
-
-      const zipBlob = await createZipBlob(files);
+      const { zipBlob, filename } = await buildConversationsMarkdownZipExport({
+        conversations: selectedConversations,
+        mergeSingle,
+      });
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `webclipper-export-${stamp}.zip`;
+      a.download = filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
