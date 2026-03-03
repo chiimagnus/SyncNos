@@ -38,3 +38,5 @@ export function createCollectorsRegistry() {
 
   return { register, pickActive, list };
 }
+
+export type CollectorsRegistry = ReturnType<typeof createCollectorsRegistry>;
