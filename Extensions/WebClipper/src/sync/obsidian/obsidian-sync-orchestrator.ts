@@ -2,7 +2,7 @@ import { backgroundStorage as defaultBackgroundStorage } from '../../conversatio
 import {
   getObsidianConnectionConfig,
   getObsidianPathConfig,
-} from '../../integrations/obsidian/settings-store';
+} from './settings-store';
 import runtimeContext from '../../runtime-context.ts';
 import {
   NOTE_JSON_ACCEPT,

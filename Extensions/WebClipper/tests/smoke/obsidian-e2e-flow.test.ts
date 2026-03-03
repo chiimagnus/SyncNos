@@ -34,12 +34,12 @@ describe("obsidian local rest api sync e2e flow (mock)", () => {
     globalThis.WebClipper = {};
     setupChromeStorage();
 
-    const settingsStore = await load("../../src/export/obsidian/obsidian-settings-store.ts");
-    await load("../../src/export/obsidian/obsidian-local-rest-client.ts");
-    await load("../../src/export/obsidian/obsidian-note-path.ts");
-    await load("../../src/export/obsidian/obsidian-sync-metadata.ts");
-    await load("../../src/export/obsidian/obsidian-markdown-writer.ts");
-    const orch = await load("../../src/export/obsidian/obsidian-sync-orchestrator.ts");
+    const settingsStore = await load("../../src/sync/obsidian/obsidian-settings-store.ts");
+    await load("../../src/sync/obsidian/obsidian-local-rest-client.ts");
+    await load("../../src/sync/obsidian/obsidian-note-path.ts");
+    await load("../../src/sync/obsidian/obsidian-sync-metadata.ts");
+    await load("../../src/sync/obsidian/obsidian-markdown-writer.ts");
+    const orch = await load("../../src/sync/obsidian/obsidian-sync-orchestrator.ts");
 
     // Local data
     let messages: any[] = [

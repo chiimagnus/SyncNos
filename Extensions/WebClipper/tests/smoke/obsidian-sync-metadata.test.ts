@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 async function loadMetadata() {
-  const mod = await import("../../src/export/obsidian/obsidian-sync-metadata.ts");
+  const mod = await import("../../src/sync/obsidian/obsidian-sync-metadata.ts");
   return mod.default || mod;
 }
 

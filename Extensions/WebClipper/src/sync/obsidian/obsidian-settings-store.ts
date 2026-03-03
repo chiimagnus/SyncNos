@@ -6,7 +6,7 @@ import {
   OBSIDIAN_DEFAULTS,
   OBSIDIAN_STORAGE_KEYS,
   saveObsidianSettings,
-} from '../../integrations/obsidian/settings-store';
+} from './settings-store';
 
 const api = {
   STORAGE_KEYS: OBSIDIAN_STORAGE_KEYS,

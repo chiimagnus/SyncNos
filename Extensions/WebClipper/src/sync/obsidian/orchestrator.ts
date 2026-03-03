@@ -1,5 +1,5 @@
-import obsidianSyncOrchestratorFallback from '../../../export/obsidian/obsidian-sync-orchestrator.ts';
-import runtimeContext from '../../../runtime-context.ts';
+import obsidianSyncOrchestratorFallback from './obsidian-sync-orchestrator.ts';
+import runtimeContext from '../../runtime-context.ts';
 
 type LegacyObsidianSyncOrchestrator = {
   getSyncStatus: (input: { instanceId: string }) => Promise<unknown>;
@@ -16,13 +16,13 @@ function getLegacyObsidianSyncOrchestrator(): LegacyObsidianSyncOrchestrator {
   if (!runtimeContext.obsidianSyncOrchestrator && orchestrator) {
     runtimeContext.obsidianSyncOrchestrator = orchestrator;
   }
-  if (!orchestrator || typeof orchestrator.getSyncStatus !== 'function') {
+  if (!orchestrator || typeof (orchestrator as any).getSyncStatus !== 'function') {
     throw new Error('obsidian sync orchestrator missing');
   }
-  if (typeof orchestrator.syncConversations !== 'function') {
+  if (typeof (orchestrator as any).syncConversations !== 'function') {
     throw new Error('obsidian sync orchestrator missing');
   }
-  if (typeof orchestrator.testConnection !== 'function') {
+  if (typeof (orchestrator as any).testConnection !== 'function') {
     throw new Error('obsidian sync orchestrator missing');
   }
   return orchestrator as LegacyObsidianSyncOrchestrator;
@@ -43,3 +43,4 @@ export async function obsidianSyncConversations(input: {
 export async function testObsidianConnection(input: { instanceId: string }) {
   return getLegacyObsidianSyncOrchestrator().testConnection(input);
 }
+
