@@ -1,4 +1,4 @@
-import { storageSet } from '../../platform/storage/local';
+import { storageSet } from '../platform/storage/local';
 import {
   filterStorageForBackup,
   mergeConversationRecord,

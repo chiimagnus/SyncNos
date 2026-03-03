@@ -12,7 +12,7 @@ import {
   validateBackupManifest,
   validateConversationBundle,
   validateStorageLocalDocument,
-} from '../domains/backup/backup-utils';
+} from '../backup/backup-utils';
 
 const backupUtilsApi = {
   BACKUP_SCHEMA_VERSION,

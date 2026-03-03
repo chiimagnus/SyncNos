@@ -1,6 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createZipBlob } from '../../../src/domains/backup/zip-utils';
+import { createZipBlob } from '../../../src/backup/zip-utils';
 import { buildConversationBasename } from '../../../src/conversations/file-naming';
 import { formatConversationMarkdown } from '../../../src/conversations/markdown';
 import type { Conversation, ConversationDetail } from '../../../src/conversations/models';
