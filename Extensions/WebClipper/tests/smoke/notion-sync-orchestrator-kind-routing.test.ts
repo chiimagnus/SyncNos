@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createNotionSyncOrchestrator } from "../../src/sync/notion/notion-sync-orchestrator.ts";
+import { conversationKinds } from "../../src/protocols/conversation-kinds.ts";
 
 function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   const store: Record<string, unknown> = { notion_parent_page_id: parentPageId };
@@ -23,14 +25,6 @@ function mockChromeStorage({ parentPageId = "parent_page" } = {}) {
   };
 }
 
-async function loadOrchestrator() {
-  const mod = await import(
-    /* @vite-ignore */
-    `../../src/sync/notion/notion-sync-orchestrator.ts?t=${Date.now()}_${Math.random().toString(16).slice(2)}`
-  );
-  return (mod as any).default || mod;
-}
-
 describe("notion-sync-orchestrator kind routing", () => {
   it("routes chat/article to different dbSpec and avoids AI for article", async () => {
     const ensureCalls: any[] = [];
@@ -38,20 +32,17 @@ describe("notion-sync-orchestrator kind routing", () => {
     const updateCalls: any[] = [];
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionSyncJobStore = {
+    const jobStore = {
       abortRunningJobIfFromOtherInstance: async () => null,
       isRunningJob: () => false,
       setJob: async () => true
     };
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionDbManager = {
+
+    const tokenStore = { getToken: async () => ({ accessToken: "t" }) };
+
+    const dbManager = {
       ensureDatabase: async ({ dbSpec }: any) => {
         ensureCalls.push(dbSpec);
         if (dbSpec.storageKey === "notion_db_id_syncnos_web_articles") return { databaseId: "db_articles" };
@@ -59,8 +50,7 @@ describe("notion-sync-orchestrator kind routing", () => {
       }
     };
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
+    const storage = {
       getSyncMappingByConversation: async (id: number) => {
         if (id === 1) {
           return {
@@ -87,8 +77,7 @@ describe("notion-sync-orchestrator kind routing", () => {
       setSyncCursor: async () => true
     };
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionSyncService = {
+    const syncService = {
       getPage: async () => {
         throw new Error("not found");
       },
@@ -105,7 +94,16 @@ describe("notion-sync-orchestrator kind routing", () => {
       messagesToBlocks: (messages: any[]) => [{ kind: "blocks", count: messages.length }]
     };
 
-    const orchestrator = await loadOrchestrator();
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore,
+      storage,
+      conversationKinds,
+      notionApi: {},
+      notionFilesApi: {},
+      dbManager,
+      syncService,
+      jobStore,
+    });
     const res = await orchestrator.syncConversations({ conversationIds: [1, 2], instanceId: "i" });
     expect(res.okCount).toBe(2);
 
@@ -131,22 +129,19 @@ describe("notion-sync-orchestrator kind routing", () => {
     const calls: any[] = [];
 
     // @ts-expect-error test global
-    globalThis.WebClipper = {};
-    // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionSyncJobStore = {
+    const jobStore = {
       abortRunningJobIfFromOtherInstance: async () => null,
       isRunningJob: () => false,
       setJob: async () => true
     };
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionTokenStore = { getToken: async () => ({ accessToken: "t" }) };
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionDbManager = { ensureDatabase: async () => ({ databaseId: "db_articles" }) };
-    // @ts-expect-error test global
-    globalThis.WebClipper.backgroundStorage = {
+
+    const tokenStore = { getToken: async () => ({ accessToken: "t" }) };
+
+    const dbManager = { ensureDatabase: async () => ({ databaseId: "db_articles" }) };
+
+    const storage = {
       getSyncMappingByConversation: async () => ({
         conversation: { id: 1, sourceType: "article", title: "A", url: "https://a", lastCapturedAt: 1000, notionPageId: "p1" },
         mapping: { notionPageId: "p1", lastSyncedMessageKey: "article_body", lastSyncedAt: 1000 }
@@ -163,8 +158,7 @@ describe("notion-sync-orchestrator kind routing", () => {
       setSyncCursor: async () => true
     };
 
-    // @ts-expect-error test global
-    globalThis.WebClipper.notionSyncService = {
+    const syncService = {
       getPage: async () => ({ id: "p1", parent: { type: "database_id", database_id: "db_articles" }, archived: false, in_trash: false }),
       isPageUsableForDatabase: () => true,
       updatePageProperties: async (_t: string, req: any) => {
@@ -182,7 +176,16 @@ describe("notion-sync-orchestrator kind routing", () => {
       messagesToBlocks: () => [{ kind: "blocks", count: 1 }]
     };
 
-    const orchestrator = await loadOrchestrator();
+    const orchestrator = createNotionSyncOrchestrator({
+      tokenStore,
+      storage,
+      conversationKinds,
+      notionApi: {},
+      notionFilesApi: {},
+      dbManager,
+      syncService,
+      jobStore,
+    });
     const res = await orchestrator.syncConversations({ conversationIds: [1], instanceId: "i" });
     expect(res.okCount).toBe(1);
     expect(res.results[0].mode).toBe("rebuilt");
