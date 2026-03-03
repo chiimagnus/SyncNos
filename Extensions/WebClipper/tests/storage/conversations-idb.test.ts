@@ -10,7 +10,7 @@ import {
   getMessagesByConversationId,
   syncConversationMessages,
   upsertConversation,
-} from "../../src/domains/conversations/storage-idb";
+} from "../../src/conversations/storage-idb";
 
 function reqToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {

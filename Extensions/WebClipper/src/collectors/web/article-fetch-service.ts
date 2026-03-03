@@ -1,5 +1,5 @@
 import runtimeContext from '../../runtime-context.ts';
-import { fetchActiveTabArticle } from '../../integrations/web-article/article-fetch';
+import { fetchActiveTabArticle } from './article-fetch';
 
 const api = { fetchActiveTabArticle };
 (runtimeContext as any).articleFetchService = api;

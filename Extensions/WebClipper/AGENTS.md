@@ -73,12 +73,12 @@
   - 统一 `CORE_MESSAGE_TYPES` / `NOTION_MESSAGE_TYPES` / `OBSIDIAN_MESSAGE_TYPES` / `UI_MESSAGE_TYPES`，禁止在 popup/background 中散落硬编码 type 字符串。
 - **后台初始化与路由（当前）**：`src/bootstrap/background.ts` + `src/platform/messaging/background-router.ts`
   - 负责 Background 启动 side-effects、消息路由、popup events 广播（TS EventsHub）。
-- **Notion 同步模块**：`src/export/notion/`
-  - 编排入口：`src/export/notion/notion-sync-orchestrator.ts`（由 `src/integrations/notion/sync/orchestrator.ts` 调用）。
+- **Notion 同步模块**：`src/sync/notion/`
+  - 编排入口：`src/sync/notion/notion-sync-orchestrator.ts`（由 `src/sync/background-handlers.ts` 路由触发）。
 - **Obsidian 模块**：Local REST API Sync（平台主导）
   - 已重构为 Local REST API 平台主导同步：
   - popup：`entrypoints/popup/tabs/SettingsTab.tsx`（配置与连通性测试）+ `entrypoints/popup/tabs/ChatsTab.tsx`（触发同步）
-  - background：`src/export/obsidian/obsidian-sync-orchestrator.ts` + `src/integrations/obsidian/sync/orchestrator.ts`。
+  - background：`src/sync/obsidian/obsidian-sync-orchestrator.ts`。
 - **Web Article Fetch（手动抓取当前页）**：`src/integrations/web-article/article-fetch.ts`
   - background 侧通过 `chrome.scripting.executeScript` 注入 `src/vendor/readability.js` 并抽取正文，写入本地 conversations/messages（kind=article）。
 - **Inpage 显示范围设置**：`entrypoints/popup/tabs/SettingsTab.tsx` + `src/bootstrap/content-controller.ts`

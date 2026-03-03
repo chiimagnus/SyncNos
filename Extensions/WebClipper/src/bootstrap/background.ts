@@ -2,21 +2,21 @@
 
 import '../export/bootstrap.ts';
 
-import '../export/notion/notion-api.ts';
-import '../export/notion/notion-files-api.ts';
-import '../export/notion/notion-ai.ts';
-import '../export/notion/notion-db-manager.ts';
-import '../export/notion/notion-markdown-blocks.ts';
-import '../export/notion/notion-image-upload-upgrader.ts';
-import '../export/notion/notion-sync-service.ts';
-import '../export/notion/notion-sync-job-store.ts';
-import '../export/notion/notion-sync-orchestrator.ts';
+import '../sync/notion/notion-api.ts';
+import '../sync/notion/notion-files-api.ts';
+import '../sync/notion/notion-ai.ts';
+import '../sync/notion/notion-db-manager.ts';
+import '../sync/notion/notion-markdown-blocks.ts';
+import '../sync/notion/notion-image-upload-upgrader.ts';
+import '../sync/notion/notion-sync-service.ts';
+import '../sync/notion/notion-sync-job-store.ts';
+import '../sync/notion/notion-sync-orchestrator.ts';
 
-import '../export/obsidian/obsidian-local-rest-client.ts';
-import '../export/obsidian/obsidian-note-path.ts';
-import '../export/obsidian/obsidian-sync-metadata.ts';
-import '../export/obsidian/obsidian-markdown-writer.ts';
-import '../export/obsidian/obsidian-sync-orchestrator.ts';
+import '../sync/obsidian/obsidian-local-rest-client.ts';
+import '../sync/obsidian/obsidian-note-path.ts';
+import '../sync/obsidian/obsidian-sync-metadata.ts';
+import '../sync/obsidian/obsidian-markdown-writer.ts';
+import '../sync/obsidian/obsidian-sync-orchestrator.ts';
 
 import './background-inpage-web-visibility.ts';
 import '../collectors/web/article-fetch-service.ts';

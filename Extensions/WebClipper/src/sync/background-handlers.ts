@@ -1,13 +1,13 @@
-import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../../platform/messaging/message-contracts';
+import { NOTION_MESSAGE_TYPES, OBSIDIAN_MESSAGE_TYPES } from '../platform/messaging/message-contracts';
 import {
-  getNotionSyncStatus,
-  notionSyncConversations,
-} from '../../integrations/notion/sync/orchestrator';
+  getSyncJobStatus as getNotionSyncStatus,
+  syncConversations as notionSyncConversations,
+} from './notion/notion-sync-orchestrator';
 import {
   getObsidianSyncStatus,
   obsidianSyncConversations,
-} from '../../integrations/obsidian/sync/orchestrator';
-import runtimeContext from '../../runtime-context.ts';
+} from './obsidian/orchestrator';
+import runtimeContext from '../runtime-context.ts';
 
 type AnyRouter = {
   ok: (data: unknown) => any;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import * as backupUtils from "../../src/storage/backup-utils.ts";
+import * as backupUtils from "../../src/sync/backup/backup-utils.ts";
 
 describe("backup-utils", () => {
   it("filterStorageForBackup keeps all non-sensitive settings", () => {

@@ -1,10 +1,10 @@
-import { backgroundStorage } from '../domains/conversations/background-storage';
+import { backgroundStorage } from '../conversations/background-storage';
 import {
   clearNotionOAuthToken,
   getNotionOAuthToken,
   NOTION_OAUTH_TOKEN_KEY,
   setNotionOAuthToken,
-} from '../integrations/notion/token-store';
+} from '../sync/notion/auth/token-store';
 import { conversationKinds } from '../protocols/conversation-kinds.ts';
 import {
   getObsidianConnectionConfig,
@@ -13,7 +13,7 @@ import {
   OBSIDIAN_DEFAULTS,
   OBSIDIAN_STORAGE_KEYS,
   saveObsidianSettings,
-} from '../integrations/obsidian/settings-store';
+} from '../sync/obsidian/settings-store';
 import runtimeContext from '../runtime-context.ts';
 
 const namespace: any = runtimeContext;
